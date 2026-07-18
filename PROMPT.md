@@ -169,6 +169,23 @@ at a glance from a bench or the floor):
   propose next week's plan **as JSON conforming to plan.schema.json**").
 - Design the export to be token-efficient: summary metrics by default; raw per-rep
   arrays only behind an "include detail" toggle.
+- **Raw sensor data export (for downstream analysis, distinct from the LLM JSON
+  export).** The raw streams already persisted per set (see 4.1) must be exportable
+  for analysis in Python/R/MATLAB etc.:
+  - Scope: a single set, a whole session, or a date range.
+  - Format: tidy **CSV** (one file per stream, or per set within a zip):
+    `timestamp_ms, ax_g, ay_g, az_g, wx_dps, wy_dps, wz_dps, roll_deg, pitch_deg,
+    yaw_deg` for the IMU; `timestamp_ms, hr_bpm, rr_ms` for the HRM. Timestamps are
+    milliseconds from a stated UTC epoch in the header; include sensor model,
+    measured sample rate, firmware/app version, and set/exercise/load metadata as
+    a JSON sidecar (`meta.json`) in the zip.
+  - Both the **device-frame raw samples** (exactly as decoded from BLE, no
+    processing) and, optionally, the **derived world-frame series** (linear
+    acceleration, vertical velocity, phase labels per sample) so downstream work
+    can either reuse or bypass the app's DSP.
+  - Delivery: share sheet / save-to-file, same as the JSON export.
+  - These CSVs are also the fixture format for the DSP unit tests and replay mode
+    (see 5) — one format, three uses: export, test fixtures, replay.
 
 **Plan JSON (import) — shape sketch** (formalize into JSON Schema):
 ```json
