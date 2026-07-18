@@ -26,6 +26,24 @@ import java.util.Locale
 
 /** Height fraction floor so even a slow rep is visibly a bar, not a sliver. */
 private const val MIN_BAR_FRACTION = 0.15f
+private const val VEL_LOSS_DIM_PCT = 10.0
+private const val VEL_LOSS_DEFAULT_STOP_PCT = 20.0
+
+/**
+ * Standard rep-bar coloring: velocity loss vs the best rep of the set —
+ * volt when fresh, dimmer/amber as loss approaches the stop threshold, red past it.
+ */
+fun velocityLossColor(value: Double, all: List<Double>, stopPct: Double?): Color {
+    val best = all.maxOrNull() ?: return BarColors.Volt
+    if (best <= 0) return BarColors.Volt
+    val lossPct = (1.0 - value / best) * 100.0
+    val stop = stopPct ?: VEL_LOSS_DEFAULT_STOP_PCT
+    return when {
+        lossPct >= stop -> BarColors.Red
+        lossPct >= VEL_LOSS_DIM_PCT -> if (lossPct >= stop * 0.75) BarColors.Amber else BarColors.VoltDim
+        else -> BarColors.Volt
+    }
+}
 
 /**
  * Per-rep bar chart: one bar per completed rep plus dashed placeholder slots

@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.ui
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
@@ -16,9 +17,18 @@ object ShareUtil {
             Intent(Intent.ACTION_SEND).apply {
                 type = mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
+                // ClipData is what actually propagates the URI grant to the chosen app.
+                clipData = ClipData.newRawUri(fileName, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-        context.startActivity(Intent.createChooser(intent, fileName))
+        val chooser =
+            Intent.createChooser(intent, fileName).apply {
+                // Callers pass the Application context (ViewModels); launching an
+                // activity from a non-Activity context requires NEW_TASK.
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        context.startActivity(chooser)
     }
 
     fun shareJson(context: Context, fileName: String, json: String) =

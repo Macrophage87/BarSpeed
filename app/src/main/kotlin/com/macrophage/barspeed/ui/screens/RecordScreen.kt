@@ -51,6 +51,7 @@ import com.macrophage.barspeed.ui.components.SectionCaption
 import com.macrophage.barspeed.ui.components.SensorDot
 import com.macrophage.barspeed.ui.components.TargetLineBars
 import com.macrophage.barspeed.ui.components.VerdictChip
+import com.macrophage.barspeed.ui.components.velocityLossColor
 import java.util.Locale
 
 private const val DEFAULT_VELOCITY_LOSS_STOP_PCT = 20.0
@@ -402,20 +403,8 @@ private fun LiveRepBars(state: RecordState, slot: PlannedSlot?) {
         RepBars(
             values = values,
             plannedSlots = plannedReps,
-            colorFor = { _, v -> repVelocityColor(v, values, stopPct) },
+            colorFor = { _, v -> velocityLossColor(v, values, stopPct) },
         )
-    }
-}
-
-private fun repVelocityColor(value: Double, all: List<Double>, stopPct: Double?): Color {
-    val best = all.maxOrNull() ?: return BarColors.Volt
-    if (best <= 0) return BarColors.Volt
-    val lossPct = (1.0 - value / best) * 100.0
-    val stop = stopPct ?: DEFAULT_VELOCITY_LOSS_STOP_PCT
-    return when {
-        lossPct >= stop -> BarColors.Red
-        lossPct >= VEL_LOSS_OK_PCT -> if (lossPct >= stop * 0.75) BarColors.Amber else BarColors.VoltDim
-        else -> BarColors.Volt
     }
 }
 
@@ -619,7 +608,7 @@ private fun ConVelocityChart(analysis: SetAnalysis) {
     RepBars(
         values = velocities,
         plannedSlots = null,
-        colorFor = { _, v -> repVelocityColor(v, velocities, null) },
+        colorFor = { _, v -> velocityLossColor(v, velocities, null) },
         barHeight = 64,
     )
     Spacer(Modifier.height(6.dp))
