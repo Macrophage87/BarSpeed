@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1.0",
+  "planName": "Hypertrophy Block W3",
+  "notes": "Week 3 of 4. Keep eccentrics honest.",
+  "sessions": [
+    {
+      "name": "Lower A",
+      "exercises": [
+        {
+          "exercise": "back_squat",
+          "sets": [
+            { "reps": 5, "load_kg": 100, "tempo": "4010", "rest_s": 180 },
+            { "reps": 5, "load_kg": 120, "tempo": "4010", "targetMeanConcentricVelocity_mps": 0.5, "velocityLossStop_pct": 20, "rest_s": 180 },
+            { "reps": 5, "load_kg": 120, "tempo": "4010", "targetMeanConcentricVelocity_mps": 0.5, "velocityLossStop_pct": 20, "rest_s": 180 }
+          ]
+        },
+        {
+          "exercise": "romanian_deadlift",
+          "sets": [
+            { "reps": 8, "load_kg": 90, "tempo": "3010", "rest_s": 150 },
+            { "reps": 8, "load_kg": 90, "tempo": "3010", "rest_s": 150 }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Upper A",
+      "exercises": [
+        {
+          "exercise": "bench_press",
+          "sets": [
+            { "reps": 5, "load_kg": 80, "tempo": "30X0", "targetMeanConcentricVelocity_mps": 0.4, "rest_s": 180 },
+            { "reps": 5, "load_kg": 80, "tempo": "30X0", "targetMeanConcentricVelocity_mps": 0.4, "rest_s": 180 }
+          ]
+        }
+      ]
+    }
+  ]
+}

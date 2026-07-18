@@ -1,0 +1,35 @@
+build:
+  maxIssues: 0
+
+style:
+  MagicNumber:
+    active: false
+  LoopWithTooManyJumpStatements:
+    active: false
+  ReturnCount:
+    active: false
+  UnusedPrivateMember:
+    active: true
+    ignoreAnnotated: ["Preview"]
+
+complexity:
+  LongMethod:
+    active: false
+  LongParameterList:
+    active: false
+  CyclomaticComplexMethod:
+    active: false
+  TooManyFunctions:
+    active: false
+  NestedBlockDepth:
+    active: false
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ["Composable"]
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
+  SwallowedException:
+    active: false

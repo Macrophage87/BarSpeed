@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "claude/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, lint, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: ktlint + detekt
+        run: ./gradlew ktlintCheck detekt --stacktrace
+
+      - name: Unit tests (all modules)
+        run: ./gradlew test --stacktrace
+
+      - name: Android lint
+        run: ./gradlew :app:lintDebug --stacktrace
+
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Validate JSON schemas and examples
+        run: |
+          npx --yes -p ajv-cli@5 -p ajv-formats@2 ajv validate -c ajv-formats --spec=draft2020 \
+            -s docs/schemas/plan.schema.json -d docs/schemas/examples/plan.example.json
+          npx --yes -p ajv-cli@5 -p ajv-formats@2 ajv validate -c ajv-formats --spec=draft2020 \
+            -s docs/schemas/session-export.schema.json -d docs/schemas/examples/session-export.example.json
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            **/build/reports/**
+          retention-days: 7

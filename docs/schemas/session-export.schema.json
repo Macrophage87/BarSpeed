@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Macrophage87/AccelerometerLifting/docs/schemas/session-export.schema.json",
+  "title": "Session Export",
+  "description": "A completed training session exported by AccelerometerLifting for LLM analysis.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "startedAt", "exercises"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "endedAt": { "type": "string", "format": "date-time" },
+    "planRef": { "type": "string" },
+    "notes": { "type": "string" },
+    "heartRate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "avgBpm": { "type": "integer" },
+        "maxBpm": { "type": "integer" }
+      }
+    },
+    "exercises": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/exercise" }
+    }
+  },
+  "$defs": {
+    "exercise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exercise", "sets"],
+      "properties": {
+        "exercise": { "type": "string" },
+        "sets": { "type": "array", "items": { "$ref": "#/$defs/set" } }
+      }
+    },
+    "set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["load_kg", "reps", "summary"],
+      "properties": {
+        "load_kg": { "type": "number" },
+        "plannedLoad_kg": { "type": "number", "description": "Present when the set deviated from or followed a plan." },
+        "reps": { "type": "integer" },
+        "plannedReps": { "type": "integer" },
+        "rest_s": { "type": "integer" },
+        "tempoPrescribed": { "type": "string" },
+        "tempoCompliance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["prescribed", "tolerance_s", "withinTolerance", "of"],
+          "properties": {
+            "prescribed": { "type": "string" },
+            "tolerance_s": { "type": "number" },
+            "withinTolerance": { "type": "integer" },
+            "of": { "type": "integer" }
+          }
+        },
+        "velocityLoss_pct": { "type": "number" },
+        "hr": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "endOfSetBpm": { "type": "integer" },
+            "avgBpm": { "type": "integer" },
+            "maxBpm": { "type": "integer" }
+          }
+        },
+        "repMetrics": {
+          "type": "array",
+          "description": "Per-rep detail; present only in detailed exports.",
+          "items": { "$ref": "#/$defs/repMetrics" }
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "meanConVel_mps": { "type": "number" },
+            "peakConVel_mps": { "type": "number" },
+            "meanEcc_s": { "type": "number" },
+            "meanCon_s": { "type": "number" },
+            "meanRom_m": { "type": "number" }
+          }
+        }
+      }
+    },
+    "repMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ecc_s", "bottomPause_s", "con_s", "topPause_s", "meanConVel_mps", "peakConVel_mps", "meanEccVel_mps", "rom_m"],
+      "properties": {
+        "ecc_s": { "type": "number" },
+        "bottomPause_s": { "type": "number" },
+        "con_s": { "type": "number" },
+        "topPause_s": { "type": "number" },
+        "meanConVel_mps": { "type": "number" },
+        "peakConVel_mps": { "type": "number" },
+        "meanEccVel_mps": { "type": "number" },
+        "rom_m": { "type": "number" },
+        "peakPower_w": { "type": "number" }
+      }
+    }
+  }
+}

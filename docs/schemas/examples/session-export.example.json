@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0",
+  "startedAt": "2026-07-18T17:04:00Z",
+  "endedAt": "2026-07-18T18:11:00Z",
+  "planRef": "Hypertrophy Block W3 / Lower A",
+  "heartRate": { "avgBpm": 112, "maxBpm": 156 },
+  "exercises": [
+    {
+      "exercise": "back_squat",
+      "sets": [
+        {
+          "load_kg": 120,
+          "plannedLoad_kg": 120,
+          "reps": 5,
+          "plannedReps": 5,
+          "rest_s": 180,
+          "tempoPrescribed": "4010",
+          "tempoCompliance": { "prescribed": "4010", "tolerance_s": 0.5, "withinTolerance": 4, "of": 5 },
+          "velocityLoss_pct": 14.2,
+          "hr": { "endOfSetBpm": 148, "avgBpm": 131, "maxBpm": 152 },
+          "repMetrics": [
+            { "ecc_s": 3.9, "bottomPause_s": 0.2, "con_s": 0.8, "topPause_s": 1.1, "meanConVel_mps": 0.52, "peakConVel_mps": 0.85, "meanEccVel_mps": -0.16, "rom_m": 0.61, "peakPower_w": 980.2 },
+            { "ecc_s": 3.8, "bottomPause_s": 0.3, "con_s": 0.9, "topPause_s": 1.0, "meanConVel_mps": 0.5, "peakConVel_mps": 0.83, "meanEccVel_mps": -0.16, "rom_m": 0.6, "peakPower_w": 951.7 },
+            { "ecc_s": 4.1, "bottomPause_s": 0.2, "con_s": 1.0, "topPause_s": 1.2, "meanConVel_mps": 0.48, "peakConVel_mps": 0.8, "meanEccVel_mps": -0.15, "rom_m": 0.6, "peakPower_w": 933.4 },
+            { "ecc_s": 3.7, "bottomPause_s": 0.2, "con_s": 1.1, "topPause_s": 1.4, "meanConVel_mps": 0.46, "peakConVel_mps": 0.78, "meanEccVel_mps": -0.15, "rom_m": 0.59, "peakPower_w": 921.0 },
+            { "ecc_s": 3.2, "bottomPause_s": 0.1, "con_s": 1.3, "topPause_s": 0.9, "meanConVel_mps": 0.45, "peakConVel_mps": 0.74, "meanEccVel_mps": -0.17, "rom_m": 0.6, "peakPower_w": 905.6 }
+          ],
+          "summary": { "meanConVel_mps": 0.48, "peakConVel_mps": 0.85, "meanEcc_s": 3.74, "meanCon_s": 1.02, "meanRom_m": 0.6 }
+        }
+      ]
+    }
+  ]
+}
