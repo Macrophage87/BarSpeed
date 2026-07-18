@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "1.0",
+  "planName": "Mon 20 Jul 2026 - Week 4 Lower Body",
+  "sessions": [
+    {
+      "name": "Strength A - Lower Body, Eccentric Emphasis",
+      "exercises": [
+        {
+          "exercise": "back_squat",
+          "sets": [
+            { "reps": 5, "load_lb": 45, "tempo": "4010", "rest_s": 90 },
+            { "reps": 3, "load_lb": 85, "tempo": "4010", "rest_s": 90 },
+            { "reps": 6, "load_lb": 115, "tempo": "4010", "targetMeanConcentricVelocity_mps": 0.55, "velocityLossStop_pct": 20, "rest_s": 180 },
+            { "reps": 6, "load_lb": 115, "tempo": "4010", "targetMeanConcentricVelocity_mps": 0.55, "velocityLossStop_pct": 20, "rest_s": 180 },
+            { "reps": 6, "load_lb": 115, "tempo": "4010", "targetMeanConcentricVelocity_mps": 0.55, "velocityLossStop_pct": 20, "rest_s": 180 }
+          ]
+        },
+        {
+          "exercise": "romanian_deadlift",
+          "sets": [
+            { "reps": 8, "load_lb": 115, "tempo": "4010", "targetMeanConcentricVelocity_mps": 0.45, "velocityLossStop_pct": 20, "rest_s": 150 },
+            { "reps": 8, "load_lb": 115, "tempo": "4010", "targetMeanConcentricVelocity_mps": 0.45, "velocityLossStop_pct": 20, "rest_s": 150 },
+            { "reps": 8, "load_lb": 115, "tempo": "4010", "targetMeanConcentricVelocity_mps": 0.45, "velocityLossStop_pct": 20, "rest_s": 150 }
+          ]
+        },
+        {
+          "exercise": "rear_foot_elevated_split_squat",
+          "sets": [
+            { "reps": 8, "load_lb": 0, "tempo": "3010", "rest_s": 90 },
+            { "reps": 8, "load_lb": 0, "tempo": "3010", "rest_s": 90 },
+            { "reps": 8, "load_lb": 0, "tempo": "3010", "rest_s": 90 }
+          ]
+        },
+        {
+          "exercise": "cossack_squat",
+          "sets": [
+            { "reps": 8, "load_lb": 0, "tempo": "3010", "rest_s": 60 },
+            { "reps": 8, "load_lb": 0, "tempo": "3010", "rest_s": 60 }
+          ]
+        },
+        {
+          "exercise": "seated_leg_curl",
+          "sets": [
+            { "reps": 10, "load_lb": 55, "tempo": "4010", "rest_s": 90 },
+            { "reps": 10, "load_lb": 55, "tempo": "4010", "rest_s": 90 },
+            { "reps": 10, "load_lb": 55, "tempo": "4010", "rest_s": 90 }
+          ]
+        },
+        {
+          "exercise": "calf_raise",
+          "sets": [
+            { "reps": 12, "load_lb": 0, "tempo": "3010", "rest_s": 60 },
+            { "reps": 12, "load_lb": 0, "tempo": "3010", "rest_s": 60 }
+          ]
+        },
+        {
+          "exercise": "leg_extension",
+          "sets": [
+            { "reps": 10, "load_lb": 65, "tempo": "3010", "rest_s": 60 },
+            { "reps": 10, "load_lb": 65, "tempo": "3010", "rest_s": 60 }
+          ]
+        }
+      ]
+    }
+  ]
+}
