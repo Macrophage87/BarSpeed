@@ -1,4 +1,4 @@
-# Build Prompt: AccelerometerLifting — VBT Strength Training Android App
+# Build Prompt: BarSpeed — VBT Strength Training Android App
 
 > This document is an engineered prompt intended to be given to an AI coding agent
 > (e.g., Claude Code) to implement the app. It also serves as the product/technical

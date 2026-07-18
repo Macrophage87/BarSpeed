@@ -5,7 +5,27 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      # Minor + patch bumps arrive as a single weekly PR.
+      gradle-minor-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      # Toolchain majors (Kotlin/KSP/AGP/Gradle) must move in lockstep;
+      # upgrade them deliberately, not via bot PRs.
+      - dependency-name: "org.jetbrains.kotlin*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "com.google.devtools.ksp*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "com.android*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "gradle*"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      # All Actions bumps in one weekly PR.
+      actions:
+        patterns: ["*"]

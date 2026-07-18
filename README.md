@@ -1,4 +1,4 @@
-# AccelerometerLifting ("Bar Speed")
+# BarSpeed
 
 Android app for velocity-based strength training. A WitMotion **WT901BLECL** BLE
 IMU on the barbell measures bar speed and the duration of every rep phase — so a
@@ -78,6 +78,10 @@ The full machine-readable contract is
 CI (GitHub Actions) runs ktlint, detekt, unit tests, Android lint, schema
 validation, and assembles a debug APK on every push; tagging `v*` builds a
 release APK and attaches it to a GitHub Release.
+
+To require green CI before merges to `main` (plus block force-pushes and
+deletions), run `./scripts/protect-branch.sh` (or `scripts\protect-branch.ps1` on Windows) once with an authenticated
+[GitHub CLI](https://cli.github.com).
 
 The DSP pipeline is deterministic and tested against synthetic fixtures with
 known ground truth (a prescribed 4 s eccentric measures 3.66 s ± 0.02 across

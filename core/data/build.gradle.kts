@@ -14,7 +14,7 @@ detekt {
 }
 
 android {
-    namespace = "com.macrophage.accelerometerlifting.data"
+    namespace = "com.macrophage.barspeed.data"
     compileSdk = 35
 
     defaultConfig {
