@@ -75,8 +75,7 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
 
     class Factory(private val app: Application, private val sessionId: Long) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            SessionDetailViewModel(app, sessionId) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T = SessionDetailViewModel(app, sessionId) as T
     }
 }
 
@@ -87,10 +86,10 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
     val viewModel: SessionDetailViewModel =
         viewModel(
             factory =
-                SessionDetailViewModel.Factory(
-                    context.applicationContext as Application,
-                    sessionId,
-                ),
+            SessionDetailViewModel.Factory(
+                context.applicationContext as Application,
+                sessionId,
+            ),
         )
     val session by viewModel.session.collectAsState()
     val weightUnit by viewModel.weightUnit.collectAsState()

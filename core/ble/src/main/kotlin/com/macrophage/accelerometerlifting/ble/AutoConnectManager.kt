@@ -78,6 +78,5 @@ class AutoConnectManager(
         }
     }
 
-    private fun clientFor(role: DeviceRole): GattClient =
-        if (role == DeviceRole.IMU) imuClient else hrmClient
+    private fun clientFor(role: DeviceRole): GattClient = if (role == DeviceRole.IMU) imuClient else hrmClient
 }

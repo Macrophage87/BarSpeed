@@ -19,21 +19,20 @@ object HrCsv {
         return sb.toString()
     }
 
-    fun decode(text: String): List<HrSample> =
-        text.lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() && !it.startsWith("#") && !it.startsWith("timestamp_ms") }
-            .map { line ->
-                val f = line.split(',')
-                HrSample(
-                    timestampMs = f[0].toLong(),
-                    bpm = f[1].toInt(),
-                    rrIntervalsMs =
-                        f.getOrNull(2)?.takeIf { it.isNotEmpty() }
-                            ?.split('|')?.map { it.toDouble() } ?: emptyList(),
-                )
-            }
-            .toList()
+    fun decode(text: String): List<HrSample> = text.lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") && !it.startsWith("timestamp_ms") }
+        .map { line ->
+            val f = line.split(',')
+            HrSample(
+                timestampMs = f[0].toLong(),
+                bpm = f[1].toInt(),
+                rrIntervalsMs =
+                f.getOrNull(2)?.takeIf { it.isNotEmpty() }
+                    ?.split('|')?.map { it.toDouble() } ?: emptyList(),
+            )
+        }
+        .toList()
 }
 
 object Gzip {

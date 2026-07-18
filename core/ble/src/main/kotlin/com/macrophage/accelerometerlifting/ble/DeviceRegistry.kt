@@ -33,18 +33,17 @@ class DeviceRegistry(private val context: Context) {
             } ?: emptyList()
         }
 
-    fun preferred(role: DeviceRole): Flow<KnownDevice?> =
-        context.deviceDataStore.data.map { prefs ->
-            val address = prefs[keyFor(role)] ?: return@map null
-            prefs[knownKey]?.let {
-                try {
-                    json.decodeFromString(ListSerializer(KnownDevice.serializer()), it)
-                        .firstOrNull { d -> d.address == address && d.role == role }
-                } catch (e: Exception) {
-                    null
-                }
+    fun preferred(role: DeviceRole): Flow<KnownDevice?> = context.deviceDataStore.data.map { prefs ->
+        val address = prefs[keyFor(role)] ?: return@map null
+        prefs[knownKey]?.let {
+            try {
+                json.decodeFromString(ListSerializer(KnownDevice.serializer()), it)
+                    .firstOrNull { d -> d.address == address && d.role == role }
+            } catch (e: Exception) {
+                null
             }
         }
+    }
 
     /** Saves the device and makes it the preferred device for its role. */
     suspend fun pair(device: KnownDevice) {

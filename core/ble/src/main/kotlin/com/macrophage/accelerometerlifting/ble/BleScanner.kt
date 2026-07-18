@@ -18,35 +18,34 @@ import java.util.UUID
 /** Wraps the platform LE scanner as a Flow of discovered devices. */
 @SuppressLint("MissingPermission")
 class BleScanner {
-    fun scan(): Flow<DiscoveredDevice> =
-        callbackFlow {
-            val adapter = BluetoothAdapter.getDefaultAdapter()
-            val scanner = adapter?.bluetoothLeScanner
-            if (scanner == null || !adapter.isEnabled) {
-                close(IllegalStateException("Bluetooth unavailable or disabled"))
-                return@callbackFlow
-            }
-            val callback =
-                object : ScanCallback() {
-                    override fun onScanResult(callbackType: Int, result: ScanResult) {
-                        val name = result.device.name ?: result.scanRecord?.deviceName ?: return
-                        trySend(
-                            DiscoveredDevice(
-                                address = result.device.address,
-                                name = name,
-                                rssi = result.rssi,
-                                likelyRole = guessRole(result, name),
-                            ),
-                        )
-                    }
-                }
-            scanner.startScan(
-                null,
-                ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(),
-                callback,
-            )
-            awaitClose { runCatching { scanner.stopScan(callback) } }
+    fun scan(): Flow<DiscoveredDevice> = callbackFlow {
+        val adapter = BluetoothAdapter.getDefaultAdapter()
+        val scanner = adapter?.bluetoothLeScanner
+        if (scanner == null || !adapter.isEnabled) {
+            close(IllegalStateException("Bluetooth unavailable or disabled"))
+            return@callbackFlow
         }
+        val callback =
+            object : ScanCallback() {
+                override fun onScanResult(callbackType: Int, result: ScanResult) {
+                    val name = result.device.name ?: result.scanRecord?.deviceName ?: return
+                    trySend(
+                        DiscoveredDevice(
+                            address = result.device.address,
+                            name = name,
+                            rssi = result.rssi,
+                            likelyRole = guessRole(result, name),
+                        ),
+                    )
+                }
+            }
+        scanner.startScan(
+            null,
+            ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(),
+            callback,
+        )
+        awaitClose { runCatching { scanner.stopScan(callback) } }
+    }
 
     private fun guessRole(result: ScanResult, name: String): DeviceRole? {
         val uuids = result.scanRecord?.serviceUuids.orEmpty()

@@ -111,12 +111,11 @@ class SessionRepository(
 
     suspend fun deleteSession(id: Long) = sessionDao.deleteSession(id)
 
-    fun decodeAnalysis(entity: SetRecordEntity): SetAnalysis? =
-        try {
-            json.decodeFromString(SetAnalysis.serializer(), entity.analysisJson)
-        } catch (e: Exception) {
-            null
-        }
+    fun decodeAnalysis(entity: SetRecordEntity): SetAnalysis? = try {
+        json.decodeFromString(SetAnalysis.serializer(), entity.analysisJson)
+    } catch (e: Exception) {
+        null
+    }
 
     /** Seeded + user-defined exercises, id → definition. */
     suspend fun exerciseById(id: String): ExerciseDef {

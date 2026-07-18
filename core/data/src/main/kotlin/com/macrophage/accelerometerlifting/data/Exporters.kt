@@ -44,15 +44,15 @@ class SessionExporter(
             startedAt = Instant.ofEpochMilli(session.startedAtMs).toString(),
             endedAt = session.endedAtMs?.let { Instant.ofEpochMilli(it).toString() },
             planRef =
-                listOfNotNull(session.planName, session.planSessionName)
-                    .takeIf { it.isNotEmpty() }?.joinToString(" / "),
+            listOfNotNull(session.planName, session.planSessionName)
+                .takeIf { it.isNotEmpty() }?.joinToString(" / "),
             notes = session.notes,
             heartRate =
-                if (session.hrAvgBpm != null || session.hrMaxBpm != null) {
-                    HrSessionSummary(avgBpm = session.hrAvgBpm, maxBpm = session.hrMaxBpm)
-                } else {
-                    null
-                },
+            if (session.hrAvgBpm != null || session.hrMaxBpm != null) {
+                HrSessionSummary(avgBpm = session.hrAvgBpm, maxBpm = session.hrMaxBpm)
+            } else {
+                null
+            },
             exercises = exercises,
         )
     }
@@ -72,47 +72,47 @@ class SessionExporter(
             restS = record.plannedRestS,
             tempoPrescribed = record.tempo,
             tempoCompliance =
-                analysis?.tempoCompliance?.let {
-                    TempoComplianceExport(
-                        prescribed = it.prescribed.notation(),
-                        toleranceS = it.toleranceS,
-                        withinTolerance = it.repsFullyCompliant,
-                        of = it.repsEvaluated,
-                    )
-                },
+            analysis?.tempoCompliance?.let {
+                TempoComplianceExport(
+                    prescribed = it.prescribed.notation(),
+                    toleranceS = it.toleranceS,
+                    withinTolerance = it.repsFullyCompliant,
+                    of = it.repsEvaluated,
+                )
+            },
             velocityLossPct = analysis?.velocityLossPct,
             hr =
-                if (record.hrEndOfSetBpm != null || record.hrAvgBpm != null || record.hrMaxBpm != null) {
-                    HrSetSummary(record.hrEndOfSetBpm, record.hrAvgBpm, record.hrMaxBpm)
-                } else {
-                    null
-                },
+            if (record.hrEndOfSetBpm != null || record.hrAvgBpm != null || record.hrMaxBpm != null) {
+                HrSetSummary(record.hrEndOfSetBpm, record.hrAvgBpm, record.hrMaxBpm)
+            } else {
+                null
+            },
             repMetrics =
-                if (includeRepDetail && reps.isNotEmpty()) {
-                    reps.map {
-                        RepMetricsExport(
-                            eccS = it.eccS,
-                            bottomPauseS = it.bottomPauseS,
-                            conS = it.conS,
-                            topPauseS = it.topPauseS,
-                            meanConVelMps = it.meanConVelMps,
-                            peakConVelMps = it.peakConVelMps,
-                            meanEccVelMps = it.meanEccVelMps,
-                            romM = it.romM,
-                            peakPowerW = it.peakPowerW,
-                        )
-                    }
-                } else {
-                    null
-                },
+            if (includeRepDetail && reps.isNotEmpty()) {
+                reps.map {
+                    RepMetricsExport(
+                        eccS = it.eccS,
+                        bottomPauseS = it.bottomPauseS,
+                        conS = it.conS,
+                        topPauseS = it.topPauseS,
+                        meanConVelMps = it.meanConVelMps,
+                        peakConVelMps = it.peakConVelMps,
+                        meanEccVelMps = it.meanEccVelMps,
+                        romM = it.romM,
+                        peakPowerW = it.peakPowerW,
+                    )
+                }
+            } else {
+                null
+            },
             summary =
-                SetSummaryExport(
-                    meanConVelMps = reps.map { it.meanConVelMps }.averageOrNull()?.round3(),
-                    peakConVelMps = reps.maxOfOrNull { it.peakConVelMps },
-                    meanEccS = reps.map { it.eccS }.averageOrNull()?.round2(),
-                    meanConS = reps.map { it.conS }.averageOrNull()?.round2(),
-                    meanRomM = reps.map { it.romM }.averageOrNull()?.round3(),
-                ),
+            SetSummaryExport(
+                meanConVelMps = reps.map { it.meanConVelMps }.averageOrNull()?.round3(),
+                peakConVelMps = reps.maxOfOrNull { it.peakConVelMps },
+                meanEccS = reps.map { it.eccS }.averageOrNull()?.round2(),
+                meanConS = reps.map { it.conS }.averageOrNull()?.round2(),
+                meanRomM = reps.map { it.romM }.averageOrNull()?.round3(),
+            ),
         )
     }
 

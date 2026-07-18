@@ -264,22 +264,22 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 sessionId = sessionId,
                 orderIdx = stateFlow.value.setsCompleted,
                 set =
-                    CompletedSet(
-                        exerciseId = exercise.id,
-                        exerciseName = exercise.displayName,
-                        loadKg = loadKg,
-                        plannedLoadKg = slot?.plannedLoadKg,
-                        plannedReps = plannedReps,
-                        tempo = tempoText,
-                        targetMeanConVelMps = slot?.targetMeanConVelMps,
-                        velocityLossStopPct = slot?.velocityLossStopPct,
-                        plannedRestS = slot?.restS,
-                        startedAtMs = setStartedAtMs,
-                        endedAtMs = System.currentTimeMillis(),
-                        analysis = analysis,
-                        imuSamples = samples,
-                        hrSamples = hrSamples,
-                    ),
+                CompletedSet(
+                    exerciseId = exercise.id,
+                    exerciseName = exercise.displayName,
+                    loadKg = loadKg,
+                    plannedLoadKg = slot?.plannedLoadKg,
+                    plannedReps = plannedReps,
+                    tempo = tempoText,
+                    targetMeanConVelMps = slot?.targetMeanConVelMps,
+                    velocityLossStopPct = slot?.velocityLossStopPct,
+                    plannedRestS = slot?.restS,
+                    startedAtMs = setStartedAtMs,
+                    endedAtMs = System.currentTimeMillis(),
+                    analysis = analysis,
+                    imuSamples = samples,
+                    hrSamples = hrSamples,
+                ),
             )
 
             val restS = slot?.restS ?: DEFAULT_REST_S
@@ -287,13 +287,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 stateFlow.value.copy(
                     stage = Stage.RESTING,
                     lastFeedback =
-                        SetFeedback(
-                            exerciseName = exercise.displayName,
-                            loadKg = loadKg,
-                            analysis = analysis,
-                            plannedReps = plannedReps,
-                            tempo = tempoText,
-                        ),
+                    SetFeedback(
+                        exerciseName = exercise.displayName,
+                        loadKg = loadKg,
+                        analysis = analysis,
+                        plannedReps = plannedReps,
+                        tempo = tempoText,
+                    ),
                     restRemainingS = restS,
                     setsCompleted = stateFlow.value.setsCompleted + 1,
                     // Pre-fill next-set inputs so in-rest edits start from plan values.
@@ -349,10 +349,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = stateFlow.value.copy(stage = Stage.SETUP, queue = emptyList(), queueIndex = 0)
     }
 
-    private fun currentExercise(s: RecordState): ExerciseDef =
-        s.currentSlot?.exercise
-            ?: ExerciseDef.seedById(s.selectedExerciseId)
-            ?: ExerciseDef(s.selectedExerciseId, s.selectedExerciseId)
+    private fun currentExercise(s: RecordState): ExerciseDef = s.currentSlot?.exercise
+        ?: ExerciseDef.seedById(s.selectedExerciseId)
+        ?: ExerciseDef(s.selectedExerciseId, s.selectedExerciseId)
 
     private suspend fun flattenPlan(planSession: PlanSessionDef): List<PlannedSlot> {
         val slots = mutableListOf<PlannedSlot>()

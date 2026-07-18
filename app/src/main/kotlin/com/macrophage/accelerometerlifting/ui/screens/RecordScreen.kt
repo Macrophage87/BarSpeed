@@ -68,14 +68,13 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
     }
 }
 
-private fun titleFor(state: RecordState): String =
-    when (state.stage) {
-        Stage.SETUP -> "New session"
-        Stage.READY -> state.planSessionName ?: "Ad-hoc session"
-        Stage.IN_SET -> "Set in progress"
-        Stage.RESTING -> "Rest"
-        Stage.FINISHED -> "Session complete"
-    }
+private fun titleFor(state: RecordState): String = when (state.stage) {
+    Stage.SETUP -> "New session"
+    Stage.READY -> state.planSessionName ?: "Ad-hoc session"
+    Stage.IN_SET -> "Set in progress"
+    Stage.RESTING -> "Rest"
+    Stage.FINISHED -> "Session complete"
+}
 
 @Composable
 private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
@@ -231,14 +230,13 @@ private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
     }
 }
 
-private fun phaseLabel(phase: Phase): String =
-    when (phase) {
-        Phase.IDLE -> "Ready"
-        Phase.ECCENTRIC -> "Lowering"
-        Phase.BOTTOM_PAUSE -> "Bottom pause"
-        Phase.CONCENTRIC -> "Driving up"
-        Phase.TOP_PAUSE -> "Lockout"
-    }
+private fun phaseLabel(phase: Phase): String = when (phase) {
+    Phase.IDLE -> "Ready"
+    Phase.ECCENTRIC -> "Lowering"
+    Phase.BOTTOM_PAUSE -> "Bottom pause"
+    Phase.CONCENTRIC -> "Driving up"
+    Phase.TOP_PAUSE -> "Lockout"
+}
 
 @Composable
 private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
@@ -353,14 +351,21 @@ private fun FeedbackCard(feedback: SetFeedback, unit: WeightUnit) {
             }
             if (analysis.reps.isNotEmpty()) {
                 Spacer(Modifier.height(4.dp))
-                Text("rep  ecc   pause  con   vel", fontFamily = FontFamily.Monospace,
-                    style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "rep  ecc   pause  con   vel",
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 analysis.reps.forEach { rep ->
                     Text(
                         String.format(
                             Locale.US,
                             "%2d  %4.1fs  %4.1fs  %4.1fs  %.2f",
-                            rep.index + 1, rep.eccS, rep.bottomPauseS, rep.conS, rep.meanConVelMps,
+                            rep.index + 1,
+                            rep.eccS,
+                            rep.bottomPauseS,
+                            rep.conS,
+                            rep.meanConVelMps,
                         ),
                         fontFamily = FontFamily.Monospace,
                         style = MaterialTheme.typography.bodySmall,
@@ -394,5 +399,4 @@ private fun FinishedStage(state: RecordState, navController: NavController) {
     ) { Text("Done") }
 }
 
-private fun trim(value: Double): String =
-    if (value == Math.floor(value)) value.toInt().toString() else value.toString()
+private fun trim(value: Double): String = if (value == Math.floor(value)) value.toInt().toString() else value.toString()

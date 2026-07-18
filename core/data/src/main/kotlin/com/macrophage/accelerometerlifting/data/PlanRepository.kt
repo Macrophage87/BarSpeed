@@ -60,22 +60,19 @@ class PlanRepository(
 
     suspend fun delete(planId: Long) = planDao.delete(planId)
 
-    suspend fun planFile(planId: Long): PlanFile? =
-        planDao.byId(planId)?.let { decode(it) }
+    suspend fun planFile(planId: Long): PlanFile? = planDao.byId(planId)?.let { decode(it) }
 
-    fun decode(entity: PlanEntity): PlanFile? =
-        try {
-            json.decodeFromString(PlanFile.serializer(), entity.json)
-        } catch (e: Exception) {
-            null
-        }
+    fun decode(entity: PlanEntity): PlanFile? = try {
+        json.decodeFromString(PlanFile.serializer(), entity.json)
+    } catch (e: Exception) {
+        null
+    }
 
-    fun summaryOf(id: Long, plan: PlanFile): PlanImportSummary =
-        PlanImportSummary(
-            planId = id,
-            planName = plan.planName,
-            sessionCount = plan.sessions.size,
-            totalSets = plan.sessions.sumOf { s -> s.exercises.sumOf { it.sets.size } },
-            exerciseNames = plan.sessions.flatMap { s -> s.exercises.map { it.exercise } }.distinct(),
-        )
+    fun summaryOf(id: Long, plan: PlanFile): PlanImportSummary = PlanImportSummary(
+        planId = id,
+        planName = plan.planName,
+        sessionCount = plan.sessions.size,
+        totalSets = plan.sessions.sumOf { s -> s.exercises.sumOf { it.sets.size } },
+        exerciseNames = plan.sessions.flatMap { s -> s.exercises.map { it.exercise } }.distinct(),
+    )
 }

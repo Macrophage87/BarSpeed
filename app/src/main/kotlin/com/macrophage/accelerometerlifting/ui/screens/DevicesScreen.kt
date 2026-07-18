@@ -120,8 +120,10 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
             Text("Paired sensors", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             if (known.isEmpty()) {
-                Text("None yet. Scan below and pair your bar sensor and heart rate strap once — " +
-                    "the app auto-connects from then on.")
+                Text(
+                    "None yet. Scan below and pair your bar sensor and heart rate strap once — " +
+                        "the app auto-connects from then on.",
+                )
             }
             known.forEach { device ->
                 Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
