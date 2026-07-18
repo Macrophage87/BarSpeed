@@ -1,14 +1,18 @@
 package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.PlanImportResult
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PlansViewModel(app: Application) : AndroidViewModel(app) {
     private val container = (app as LiftingApp).container
@@ -19,6 +23,26 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
 
     fun import(text: String) {
         viewModelScope.launch { importResult.value = repository.importPlan(text) }
+    }
+
+    /** File-based import: read the picked document's text, then validate as usual. */
+    fun importFromUri(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            val text =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openInputStream(uri)?.use {
+                            it.bufferedReader().readText()
+                        }
+                    }.getOrNull()
+                }
+            importResult.value =
+                if (text.isNullOrBlank()) {
+                    PlanImportResult.Invalid(listOf("Could not read the selected file."))
+                } else {
+                    repository.importPlan(text)
+                }
+        }
     }
 
     fun dismissImportResult() {

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.RecordingService
+import com.macrophage.barspeed.VoiceCounter
 import com.macrophage.barspeed.ble.ConnectionState
 import com.macrophage.barspeed.data.CompletedSet
 import com.macrophage.barspeed.dsp.LiveSetState
@@ -16,6 +17,7 @@ import com.macrophage.barspeed.dsp.SyntheticSets
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
@@ -71,6 +73,8 @@ data class RecordState(
     val hrBpm: Int? = null,
     val lastFeedback: SetFeedback? = null,
     val restRemainingS: Int = 0,
+    val restTotalS: Int = 0,
+    val audioCues: Boolean = false,
     val imuConnected: Boolean = false,
     val hrmConnected: Boolean = false,
     val demoMode: Boolean = false,
@@ -99,6 +103,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var restJob: Job? = null
     private var demoJob: Job? = null
     private var setStartedAtMs = 0L
+    private var voice: VoiceCounter? = null
+    private var lastCountedPhase: Phase = Phase.IDLE
+    private var lastSpokenSecond = 0
 
     init {
         viewModelScope.launch {
@@ -132,6 +139,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 stateFlow.value = stateFlow.value.copy(weightUnit = unit)
             }
         }
+        viewModelScope.launch {
+            container.settings.audioCues.collect { enabled ->
+                stateFlow.value = stateFlow.value.copy(audioCues = enabled)
+                if (enabled && voice == null) voice = VoiceCounter(getApplication())
+            }
+        }
+    }
+
+    fun toggleAudioCues() {
+        viewModelScope.launch { container.settings.setAudioCues(!stateFlow.value.audioCues) }
     }
 
     fun toggleWeightUnit() {
@@ -187,6 +204,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         this.tracker = tracker
         imuBuffer.clear()
         hrBuffer.clear()
+        lastCountedPhase = Phase.IDLE
+        lastSpokenSecond = 0
         setStartedAtMs = System.currentTimeMillis()
         RecordingService.start(getApplication())
 
@@ -218,6 +237,22 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         imuBuffer += sample
         val live = tracker?.feed(sample) ?: return
         stateFlow.value = stateFlow.value.copy(live = live)
+        countPhaseSeconds(live.phase, live.currentPhaseElapsedS)
+    }
+
+    /** Voice tempo count: speaks 1, 2, 3… through each moving phase (spec: audible 4-s eccentric). */
+    private fun countPhaseSeconds(phase: Phase, elapsedS: Double) {
+        if (!stateFlow.value.audioCues) return
+        if (phase != lastCountedPhase) {
+            lastCountedPhase = phase
+            lastSpokenSecond = 0
+        }
+        if (phase != Phase.ECCENTRIC && phase != Phase.CONCENTRIC) return
+        val second = elapsedS.toInt()
+        if (second >= 1 && second != lastSpokenSecond) {
+            lastSpokenSecond = second
+            voice?.speak(second.toString())
+        }
     }
 
     /** Finish the set: analyze, persist, and enter the rest screen (spec 4.1). */
@@ -286,6 +321,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             stateFlow.value =
                 stateFlow.value.copy(
                     stage = Stage.RESTING,
+                    restTotalS = restS,
                     lastFeedback =
                     SetFeedback(
                         exerciseName = exercise.displayName,
@@ -311,7 +347,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             viewModelScope.launch {
                 while (stateFlow.value.restRemainingS > 0) {
                     delay(1_000)
-                    stateFlow.value = stateFlow.value.copy(restRemainingS = stateFlow.value.restRemainingS - 1)
+                    val remaining = stateFlow.value.restRemainingS - 1
+                    stateFlow.value = stateFlow.value.copy(restRemainingS = remaining)
+                    if (stateFlow.value.audioCues) {
+                        when (remaining) {
+                            in 1..REST_COUNTDOWN_FROM_S -> voice?.speak(remaining.toString())
+                            0 -> voice?.speak("Rest over")
+                        }
+                    }
                 }
             }
     }
@@ -406,7 +449,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             }
     }
 
+    override fun onCleared() {
+        voice?.shutdown()
+        voice = null
+        super.onCleared()
+    }
+
     companion object {
         const val DEFAULT_REST_S = 150
+        const val REST_COUNTDOWN_FROM_S = 3
     }
 }

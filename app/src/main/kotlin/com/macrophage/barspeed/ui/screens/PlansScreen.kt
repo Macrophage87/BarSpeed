@@ -1,5 +1,7 @@
 package com.macrophage.barspeed.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -40,6 +43,11 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
     val importResult by viewModel.importResult.collectAsState()
     var showImportDialog by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val filePicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) viewModel.importFromUri(context, uri)
+        }
 
     Scaffold(
         topBar = {
@@ -55,10 +63,17 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
             Button(onClick = { showImportDialog = true }, modifier = Modifier.fillMaxWidth()) {
                 Text("Import plan (paste JSON)")
             }
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { filePicker.launch(arrayOf("application/json", "text/*", "application/octet-stream")) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Import plan from file")
+            }
             Spacer(Modifier.height(4.dp))
             Text(
-                "Paste a plan from Claude or any LLM. See PROMPTS.md in the repo for " +
-                    "ready-made prompts; plans must match plan.schema.json.",
+                "Paste or pick a .json plan from Claude or any LLM. See PROMPTS.md in the repo " +
+                    "for ready-made prompts; plans must match plan.schema.json.",
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(12.dp))

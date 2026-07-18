@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.ble.DeviceRole
+import com.macrophage.barspeed.ui.components.ConnectionChip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

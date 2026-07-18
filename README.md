@@ -17,9 +17,12 @@ your training and write the next block.
   recorded as such).
 - **Auto-connect**: pair each sensor once; the app reconnects to both in parallel
   from then on. The HRM being absent never blocks the bar sensor.
-- **Plan import with approval gate**: paste plan JSON from Claude; it's validated
-  against `docs/schemas/plan.schema.json`, summarized, and only activated when you
-  approve it.
+- **Plan import with approval gate**: paste plan JSON from Claude — or pick a
+  `.json` file — it's validated against `docs/schemas/plan.schema.json`,
+  summarized, and only activated when you approve it.
+- **Voice counting (optional)**: the phone counts each second of the eccentric
+  and concentric out loud (hit that 4-second lowering without watching the
+  screen) and counts down the last seconds of rest.
 - **Exports**: token-efficient session JSON for LLM analysis (optionally with
   per-rep detail), and raw sensor CSV zips for Python/R.
 - **Demo mode**: try the whole flow with synthesized bar motion, no hardware.
