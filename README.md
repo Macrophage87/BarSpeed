@@ -1,6 +1,6 @@
 # BarSpeed
 
-Android app for velocity-based strength training (repo: AccelerometerLifting). A WitMotion **WT901BLECL** BLE
+Android app for velocity-based strength training. A WitMotion **WT901BLECL** BLE
 IMU on the barbell measures bar speed and the duration of every rep phase — so a
 prescribed 4-second eccentric provably takes 4 seconds — and an optional Garmin
 **HRM 600** (any standard BLE strap works) adds heart rate. Training plans import
