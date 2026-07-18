@@ -3,6 +3,13 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Environments whose git proxy blocks tag pushes can dispatch the release
+  # directly; the tag is then created by the release action itself.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create/release (e.g. v0.1.0)"
+        required: true
 
 permissions:
   contents: write
@@ -38,5 +45,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: app/build/outputs/apk/release/*.apk
           generate_release_notes: true
