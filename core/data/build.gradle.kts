@@ -3,10 +3,18 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.detekt)
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
 }
 
 android {
-    namespace = "com.macrophage.accelerometerlifting.data"
+    namespace = "com.macrophage.barspeed.data"
     compileSdk = 35
 
     defaultConfig {
@@ -24,9 +32,10 @@ kotlin {
     jvmToolchain(17)
 }
 
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
-    arg("room.incremental", "true")
+room {
+    // The Room Gradle plugin serializes per-variant schema output, avoiding the
+    // parallel kspDebug/kspRelease race on schemas/<db>/1.json.
+    schemaDirectory("$projectDir/schemas")
 }
 
 dependencies {
@@ -36,8 +45,9 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
+    // api: AppDatabase extends RoomDatabase, so Room types are part of this module's ABI.
+    api(libs.room.runtime)
+    api(libs.room.ktx)
     ksp(libs.room.compiler)
 
     testImplementation(libs.junit)

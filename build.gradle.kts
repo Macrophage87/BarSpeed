@@ -1,16 +1,6 @@
-plugins {
-    // Kotlin must be on the root classpath so ktlint/detekt can see it in subprojects.
-    alias(libs.plugins.kotlin.jvm) apply false
-    alias(libs.plugins.ktlint) apply false
-    alias(libs.plugins.detekt) apply false
-}
-
-subprojects {
-    apply(plugin = "org.jlleitschuh.gradle.ktlint")
-    apply(plugin = "io.gitlab.arturbosch.detekt")
-
-    extensions.configure<io.gitlab.arturbosch.detekt.extensions.DetektExtension> {
-        buildUponDefaultConfig = true
-        config.setFrom(rootProject.files("config/detekt/detekt.yml"))
-    }
-}
+// Intentionally empty: every module declares its own plugins (including
+// ktlint/detekt) so each build-script classloader has a complete, consistent
+// plugin set. Sharing plugin classpaths at the root breaks one way or the
+// other: ktlint at root can't see Kotlin, and kotlin.android at root can't
+// see AGP (which must stay off the root classpath for -PjvmOnly builds in
+// environments without Google Maven access).

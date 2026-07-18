@@ -41,6 +41,7 @@
       "required": ["load_kg", "reps", "summary"],
       "properties": {
         "load_kg": { "type": "number" },
+        "load_lb": { "type": "number", "description": "Same load in pounds for convenience; load_kg is canonical." },
         "plannedLoad_kg": { "type": "number", "description": "Present when the set deviated from or followed a plan." },
         "reps": { "type": "integer" },
         "plannedReps": { "type": "integer" },

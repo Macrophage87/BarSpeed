@@ -29,8 +29,8 @@
         {
           "exercise": "bench_press",
           "sets": [
-            { "reps": 5, "load_kg": 80, "tempo": "30X0", "targetMeanConcentricVelocity_mps": 0.4, "rest_s": 180 },
-            { "reps": 5, "load_kg": 80, "tempo": "30X0", "targetMeanConcentricVelocity_mps": 0.4, "rest_s": 180 }
+            { "reps": 5, "load_lb": 175, "tempo": "30X0", "targetMeanConcentricVelocity_mps": 0.4, "rest_s": 180 },
+            { "reps": 5, "load_lb": 175, "tempo": "30X0", "targetMeanConcentricVelocity_mps": 0.4, "rest_s": 180 }
           ]
         }
       ]

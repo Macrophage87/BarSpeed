@@ -9,7 +9,7 @@ activityCompose = "1.9.3"
 navigationCompose = "2.8.5"
 lifecycle = "2.8.7"
 coreKtx = "1.15.0"
-room = "2.6.1"
+room = "2.7.1"
 datastore = "1.1.1"
 junit = "4.13.2"
 kotlinTest = "2.1.0"
@@ -53,5 +53,6 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+room = { id = "androidx.room", version.ref = "room" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintPlugin" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }

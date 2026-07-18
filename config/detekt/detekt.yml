@@ -28,6 +28,10 @@ naming:
   FunctionNaming:
     ignoreAnnotated: ["Composable"]
 
+empty-blocks:
+  EmptyFunctionBlock:
+    active: false
+
 exceptions:
   TooGenericExceptionCaught:
     active: false

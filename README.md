@@ -1,4 +1,4 @@
-# AccelerometerLifting ("Bar Speed")
+# BarSpeed
 
 Android app for velocity-based strength training. A WitMotion **WT901BLECL** BLE
 IMU on the barbell measures bar speed and the duration of every rep phase — so a
@@ -38,7 +38,8 @@ Copy this prompt into Claude (fill in the bracketed context), then in the app:
 > Each exercise is `{"exercise": snake_case_id, "sets": [...]}` — use ids like
 > `back_squat`, `bench_press`, `deadlift`, `overhead_press`, `barbell_row`,
 > `romanian_deadlift`, `front_squat`, `hip_thrust`. Each set is
-> `{"reps": int, "load_kg": number}` plus optional `"tempo"` (4-digit notation
+> `{"reps": int}` plus the load as either `"load_kg"` or `"load_lb"` (exactly one,
+> whichever unit I use), plus optional `"tempo"` (4-digit notation
 > like "4010" or "30X0" — eccentric, bottom pause, concentric, top pause seconds,
 > X = explosive), `"targetMeanConcentricVelocity_mps"` (number),
 > `"velocityLossStop_pct"` (number, e.g. 20), and `"rest_s"` (int).
@@ -77,6 +78,10 @@ The full machine-readable contract is
 CI (GitHub Actions) runs ktlint, detekt, unit tests, Android lint, schema
 validation, and assembles a debug APK on every push; tagging `v*` builds a
 release APK and attaches it to a GitHub Release.
+
+To require green CI before merges to `main` (plus block force-pushes and
+deletions), run `./scripts/protect-branch.sh` (or `scripts\protect-branch.ps1` on Windows) once with an authenticated
+[GitHub CLI](https://cli.github.com).
 
 The DSP pipeline is deterministic and tested against synthetic fixtures with
 known ground truth (a prescribed 4 s eccentric measures 3.66 s ± 0.02 across
