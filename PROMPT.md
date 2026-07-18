@@ -190,8 +190,46 @@ at a glance from a bench or the floor):
 }
 ```
 
-### 4.4 Future (design for, don't build yet)
-- MCP server / claude.ai connector for direct pull of sessions; watch app; ANT+.
+### 4.4 LLM connectivity roadmap (Claude-first, phased)
+
+Bidirectional LLM integration is a core product goal, delivered in three phases of
+increasing automation. All three phases consume the SAME versioned schemas from
+`docs/schemas/` — the schemas are the contract; nothing phase-specific may leak into
+them. Build Phase 1 in v1; design interfaces so Phases 2–3 slot in without
+restructuring (e.g., plan import must be a single code path used by file import,
+clipboard paste, API responses, and future sync alike).
+
+- **Phase 1 — Manual round-trip (v1, part of milestone 5).** Export session JSON via
+  share sheet / clipboard; user pastes it into Claude with a prompt from
+  `PROMPTS.md`; Claude replies with a plan JSON conforming to `plan.schema.json`;
+  user imports it back via paste/file. No network code, works with any LLM.
+- **Phase 2 — Direct Claude API integration (post-v1).** An in-app "Analyze &
+  propose next plan" action sends selected session exports to the Claude API and
+  receives a plan JSON back, using structured outputs constrained to
+  `plan.schema.json`. Requirements:
+  - User supplies their own Anthropic API key (stored in Android Keystore-encrypted
+    preferences, never exported, never logged). Model selectable, sensible default.
+  - The analysis prompt templates ship in the app but are user-editable (goals,
+    constraints, coaching philosophy).
+  - Network failures degrade gracefully to Phase 1 (copy the same payload out).
+- **Phase 3 — MCP sync (future; design for, don't build yet).** Sessions sync to a
+  user-owned remote store fronted by a remote MCP server exposing tools such as
+  `get_recent_sessions`, `get_velocity_trends`, `import_plan`; added to claude.ai as
+  a custom connector so any Claude conversation can pull training data and push
+  plans back, which the app picks up on next sync. Keep the repository layer
+  sync-agnostic so this becomes an additional plan/session source, not a rewrite.
+
+**Plan-approval gate (all phases, non-negotiable):** an LLM-proposed plan is never
+activated automatically. Every imported plan — regardless of arrival path — lands in
+a "staged" state and is shown as a human-readable summary (and a diff against the
+current plan, when one exists) that the user must explicitly accept. Schema
+validation failures produce actionable errors that can be copied back to the LLM
+for correction. Keep the LLM out of the real-time loop: in-set and between-set
+feedback remains rules-based and offline (see 4.1); LLM involvement is
+between-session analysis and programming only.
+
+### 4.5 Future (design for, don't build yet)
+- Watch app companion; ANT+ sensor support.
 
 ## 5. Architecture & stack (prescriptive)
 
@@ -229,8 +267,11 @@ at a glance from a bench or the floor):
    metrics — unit-tested on fixtures; live per-rep readout in replay mode.
 4. **Recording UX**: sessions/sets/rest flow with last-set feedback and next-set
    preview on the rest screen, Room persistence, history views.
-5. **Plan import / export + tempo compliance UI + PROMPTS.md.**
+5. **Plan import / export + tempo compliance UI + PROMPTS.md** (LLM Phase 1,
+   including the staged-plan approval gate).
 6. **Polish**: charts, 1RM trends, release pipeline, on-device validation notes.
+7. **Claude API integration** (LLM Phase 2): in-app analyze-and-propose flow with
+   structured outputs, Keystore-encrypted API key, editable prompt templates.
 
 ## 8. Quality bar & constraints
 
