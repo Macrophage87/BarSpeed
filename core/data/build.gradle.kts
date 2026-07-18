@@ -45,8 +45,9 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
+    // api: AppDatabase extends RoomDatabase, so Room types are part of this module's ABI.
+    api(libs.room.runtime)
+    api(libs.room.ktx)
     ksp(libs.room.compiler)
 
     testImplementation(libs.junit)
