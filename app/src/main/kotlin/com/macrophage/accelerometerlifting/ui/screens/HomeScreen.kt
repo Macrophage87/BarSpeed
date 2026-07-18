@@ -1,6 +1,5 @@
 package com.macrophage.accelerometerlifting.ui.screens
 
-import android.app.Application
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,30 +24,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.macrophage.accelerometerlifting.LiftingApp
 import com.macrophage.accelerometerlifting.ble.ConnectionState
 import com.macrophage.accelerometerlifting.data.SessionEntity
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.stateIn
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-
-class HomeViewModel(app: Application) : AndroidViewModel(app) {
-    private val container = (app as LiftingApp).container
-    val sessions =
-        container.sessionRepository.sessions.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
-            emptyList(),
-        )
-    val imuState = container.autoConnect.imuState
-    val hrmState = container.autoConnect.hrmState
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
