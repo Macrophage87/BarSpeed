@@ -3,6 +3,13 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Environments whose git proxy blocks tag pushes can dispatch the release
+  # directly; the tag is then created by the release action itself.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create/release (e.g. v0.1.0)"
+        required: true
 
 permissions:
   contents: write
@@ -12,6 +19,9 @@ jobs:
     name: Build release APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # secrets are not usable in step-level `if`; surface via env instead.
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,9 +33,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Decode signing keystore (if configured)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
 
       - name: Assemble release
@@ -38,5 +46,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: app/build/outputs/apk/release/*.apk
           generate_release_notes: true

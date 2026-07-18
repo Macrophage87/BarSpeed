@@ -13,11 +13,11 @@ detekt {
 }
 
 android {
-    namespace = "com.macrophage.accelerometerlifting"
+    namespace = "com.macrophage.barspeed"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.macrophage.accelerometerlifting"
+        applicationId = "com.macrophage.barspeed"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

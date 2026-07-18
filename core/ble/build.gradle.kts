@@ -12,7 +12,7 @@ detekt {
 }
 
 android {
-    namespace = "com.macrophage.accelerometerlifting.ble"
+    namespace = "com.macrophage.barspeed.ble"
     compileSdk = 35
 
     defaultConfig {
