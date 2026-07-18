@@ -35,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.accelerometerlifting.LiftingApp
 import com.macrophage.accelerometerlifting.data.SetRecordEntity
+import com.macrophage.accelerometerlifting.model.WeightUnit
 import com.macrophage.accelerometerlifting.ui.ShareUtil
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -53,6 +54,10 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun decodeAnalysis(record: SetRecordEntity) = repository.decodeAnalysis(record)
+
+    val weightUnit =
+        container.settings.weightUnit
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WeightUnit.KG)
 
     fun shareJson(includeDetail: Boolean) {
         viewModelScope.launch {
@@ -89,6 +94,7 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
                 ),
         )
     val session by viewModel.session.collectAsState()
+    val weightUnit by viewModel.weightUnit.collectAsState()
     val sets by viewModel.sets.collectAsState()
 
     Scaffold(
@@ -121,23 +127,23 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
             )
             Spacer(Modifier.height(12.dp))
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(sets) { record -> SetCard(record, viewModel) }
+                items(sets) { record -> SetCard(record, viewModel, weightUnit) }
             }
         }
     }
 }
 
 @Composable
-private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel) {
+private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, unit: WeightUnit) {
     val analysis = viewModel.decodeAnalysis(record)
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
-                "${record.exerciseName} — ${record.actualReps}×${formatLoad(record.loadKg)} kg",
+                "${record.exerciseName} — ${record.actualReps}×${unit.format(record.loadKg)}",
                 style = MaterialTheme.typography.titleSmall,
             )
             val deviation =
-                record.plannedLoadKg?.takeIf { it != record.loadKg }?.let { " (planned ${formatLoad(it)} kg)" } ?: ""
+                record.plannedLoadKg?.takeIf { it != record.loadKg }?.let { " (planned ${unit.format(it)})" } ?: ""
             if (deviation.isNotEmpty()) Text("Deviation$deviation", style = MaterialTheme.typography.bodySmall)
             analysis?.let { a ->
                 a.velocityLossPct?.let { Text("Velocity loss $it%") }
@@ -170,6 +176,3 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel) 
         }
     }
 }
-
-private fun formatLoad(value: Double): String =
-    if (value == Math.floor(value)) value.toInt().toString() else value.toString()

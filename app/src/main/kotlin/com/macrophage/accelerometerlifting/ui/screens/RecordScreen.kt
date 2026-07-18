@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.accelerometerlifting.model.Phase
+import com.macrophage.accelerometerlifting.model.WeightUnit
 import com.macrophage.accelerometerlifting.record.PlannedSlot
 import com.macrophage.accelerometerlifting.record.RecordState
 import com.macrophage.accelerometerlifting.record.RecordViewModel
@@ -135,7 +136,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
             }
             Spacer(Modifier.height(8.dp))
         }
-        SlotCard(slot, heading = "Up next")
+        SlotCard(slot, heading = "Up next", unit = state.weightUnit)
     } else {
         AdHocForm(state, viewModel)
     }
@@ -159,7 +160,18 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
 
 @Composable
 private fun AdHocForm(state: RecordState, viewModel: RecordViewModel) {
-    Text("Exercise", style = MaterialTheme.typography.titleSmall)
+    Row(
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Exercise", style = MaterialTheme.typography.titleSmall)
+        FilterChip(
+            selected = false,
+            onClick = viewModel::toggleWeightUnit,
+            label = { Text("Units: ${state.weightUnit.suffix}") },
+        )
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         state.exerciseOptions.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -178,7 +190,7 @@ private fun AdHocForm(state: RecordState, viewModel: RecordViewModel) {
         OutlinedTextField(
             value = state.loadInput,
             onValueChange = viewModel::updateLoadInput,
-            label = { Text("Load (kg)") },
+            label = { Text("Load (${state.weightUnit.suffix})") },
             modifier = Modifier.weight(1f),
         )
         OutlinedTextField(
@@ -235,7 +247,7 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
         state.hrBpm?.let { Text("♥ $it bpm", style = MaterialTheme.typography.titleMedium) }
     }
     Spacer(Modifier.height(12.dp))
-    state.lastFeedback?.let { FeedbackCard(it) }
+    state.lastFeedback?.let { FeedbackCard(it, state.weightUnit) }
     Spacer(Modifier.height(12.dp))
 
     val next = state.nextSlot
@@ -250,14 +262,14 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
             }
             Spacer(Modifier.height(8.dp))
         }
-        SlotCard(next, heading = "Next set")
+        SlotCard(next, heading = "Next set", unit = state.weightUnit)
         Spacer(Modifier.height(8.dp))
         Text("Adjust next set (deviations are recorded)", style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = state.loadInput,
                 onValueChange = viewModel::updateLoadInput,
-                label = { Text("Load (kg)") },
+                label = { Text("Load (${state.weightUnit.suffix})") },
                 modifier = Modifier.weight(1f),
             )
             OutlinedTextField(
@@ -293,7 +305,7 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
 }
 
 @Composable
-private fun SlotCard(slot: PlannedSlot, heading: String) {
+private fun SlotCard(slot: PlannedSlot, heading: String, unit: WeightUnit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(heading, style = MaterialTheme.typography.labelMedium)
@@ -304,7 +316,7 @@ private fun SlotCard(slot: PlannedSlot, heading: String) {
             val parts =
                 listOfNotNull(
                     slot.reps?.let { "$it reps" },
-                    slot.loadKg?.let { "${trim(it)} kg" },
+                    slot.loadKg?.let { unit.format(it) },
                     slot.tempo?.let { "tempo $it" },
                     slot.targetMeanConVelMps?.let { "target ${trim(it)} m/s" },
                     slot.velocityLossStopPct?.let { "stop at ${trim(it)}% vel loss" },
@@ -316,12 +328,12 @@ private fun SlotCard(slot: PlannedSlot, heading: String) {
 }
 
 @Composable
-private fun FeedbackCard(feedback: SetFeedback) {
+private fun FeedbackCard(feedback: SetFeedback, unit: WeightUnit) {
     val analysis = feedback.analysis
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                "Last set: ${feedback.exerciseName} @ ${trim(feedback.loadKg)} kg",
+                "Last set: ${feedback.exerciseName} @ ${unit.format(feedback.loadKg)}",
                 style = MaterialTheme.typography.titleSmall,
             )
             val repsLine =

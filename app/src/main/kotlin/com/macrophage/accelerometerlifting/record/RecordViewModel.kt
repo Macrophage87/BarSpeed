@@ -16,9 +16,9 @@ import com.macrophage.accelerometerlifting.dsp.SyntheticSets
 import com.macrophage.accelerometerlifting.model.ExerciseDef
 import com.macrophage.accelerometerlifting.model.HrSample
 import com.macrophage.accelerometerlifting.model.ImuSample
-import com.macrophage.accelerometerlifting.model.PlanFile
 import com.macrophage.accelerometerlifting.model.PlanSessionDef
 import com.macrophage.accelerometerlifting.model.Tempo
+import com.macrophage.accelerometerlifting.model.WeightUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -75,6 +75,7 @@ data class RecordState(
     val demoMode: Boolean = false,
     val sessionId: Long? = null,
     val setsCompleted: Int = 0,
+    val weightUnit: WeightUnit = WeightUnit.KG,
 ) {
     val currentSlot: PlannedSlot? get() = queue.getOrNull(queueIndex)
     val nextSlot: PlannedSlot? get() = queue.getOrNull(queueIndex + 1)
@@ -124,6 +125,17 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             autoConnect.hrSamples.collect { hr ->
                 stateFlow.value = stateFlow.value.copy(hrBpm = hr.bpm)
             }
+        }
+        viewModelScope.launch {
+            container.settings.weightUnit.collect { unit ->
+                stateFlow.value = stateFlow.value.copy(weightUnit = unit)
+            }
+        }
+    }
+
+    fun toggleWeightUnit() {
+        viewModelScope.launch {
+            container.settings.setWeightUnit(stateFlow.value.weightUnit.other())
         }
     }
 
@@ -216,7 +228,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val s = stateFlow.value
         val exercise = currentExercise(s)
         val slot = s.currentSlot
-        val loadKg = if (s.adHoc || slot?.loadKg == null) s.loadInput.toDoubleOrNull() ?: 0.0 else slot.loadKg
+        val loadKg =
+            if (s.adHoc || slot?.loadKg == null) s.weightUnit.parseToKg(s.loadInput) ?: 0.0 else slot.loadKg
         val plannedReps = if (s.adHoc) s.repsInput.toIntOrNull() else slot?.reps
         val tempoText = if (s.adHoc) s.tempoInput.ifBlank { null } else slot?.tempo
         val samples = imuBuffer.toList()
@@ -283,7 +296,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     restRemainingS = restS,
                     setsCompleted = stateFlow.value.setsCompleted + 1,
                     // Pre-fill next-set inputs so in-rest edits start from plan values.
-                    loadInput = (stateFlow.value.nextSlot?.loadKg ?: loadKg).toString(),
+                    loadInput = stateFlow.value.weightUnit.inputValue(stateFlow.value.nextSlot?.loadKg ?: loadKg),
                     repsInput = (stateFlow.value.nextSlot?.reps ?: plannedReps ?: 5).toString(),
                     tempoInput = stateFlow.value.nextSlot?.tempo ?: tempoText ?: "",
                 )
@@ -309,7 +322,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         if (!s.adHoc && s.nextSlot != null) {
             val edited =
                 s.nextSlot!!.copy(
-                    loadKg = s.loadInput.toDoubleOrNull() ?: s.nextSlot!!.loadKg,
+                    loadKg = s.weightUnit.parseToKg(s.loadInput) ?: s.nextSlot!!.loadKg,
                     reps = s.repsInput.toIntOrNull() ?: s.nextSlot!!.reps,
                     tempo = s.tempoInput.ifBlank { null } ?: s.nextSlot!!.tempo,
                 )

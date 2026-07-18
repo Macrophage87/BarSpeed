@@ -26,6 +26,7 @@ class AppContainer(app: Application) {
     val deviceRegistry = DeviceRegistry(app)
     val bleScanner = BleScanner()
     val autoConnect = AutoConnectManager(app, deviceRegistry, appScope)
+    val settings = SettingsStore(app)
 }
 
 class LiftingApp : Application() {
