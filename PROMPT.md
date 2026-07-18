@@ -314,9 +314,11 @@ between-session analysis and programming only.
   dispatcher. Battery-conscious (no wake-lock outside active recording).
 - DSP determinism: same input stream ⇒ identical metrics (needed for CI fixtures).
 - All timestamps stored UTC (ISO-8601 in exports); durations in seconds (float).
-- Loads are stored and exchanged in kilograms (`load_kg`) everywhere; the UI
-  offers a kg/lb display preference and converts at the input/display boundary
-  only — schemas and the database never contain pounds.
+- Loads are stored in kilograms internally; the UI offers a kg/lb display
+  preference. The exchange formats are unit-flexible: plan imports accept
+  exactly one of `load_kg` / `load_lb` per set (lb converted to kg on import),
+  and session exports emit `load_kg` (canonical) alongside a convenience
+  `load_lb`.
 - Accessibility: TalkBack labels on recording controls; large-text friendly live
   readouts (readable from the floor mid-set).
 - No analytics/tracking; data stays on-device unless the user explicitly exports.

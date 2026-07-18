@@ -46,6 +46,25 @@ class PlanValidationTest {
     }
 
     @Test
+    fun `accepts load in pounds and resolves to kg`() {
+        val lbPlan = validPlan.replace("\"load_kg\": 120", "\"load_lb\": 225")
+        val plan = json.decodeFromString(PlanFile.serializer(), lbPlan)
+        assertTrue(plan.validate().isEmpty())
+        val resolved = plan.sessions[0].exercises[0].sets[0].resolvedLoadKg
+        assertTrue(resolved != null && kotlin.math.abs(resolved - 102.06) < 0.01)
+    }
+
+    @Test
+    fun `rejects sets with both or neither load unit`() {
+        val both = validPlan.replace("\"load_kg\": 120", "\"load_kg\": 120, \"load_lb\": 265")
+        val neither = validPlan.replace("\"load_kg\": 120, ", "")
+        val bothErrors = json.decodeFromString(PlanFile.serializer(), both).validate()
+        val neitherErrors = json.decodeFromString(PlanFile.serializer(), neither).validate()
+        assertTrue(bothErrors.any { it.contains("both load_kg and load_lb") })
+        assertTrue(neitherErrors.any { it.contains("must have load_kg or load_lb") })
+    }
+
+    @Test
     fun `wrong schema version is rejected`() {
         val plan = json.decodeFromString(PlanFile.serializer(), validPlan.replace("1.0", "9.9"))
         assertTrue(plan.validate().any { it.contains("schemaVersion") })

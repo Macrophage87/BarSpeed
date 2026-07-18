@@ -27,7 +27,15 @@ data class PlanFile(
                 exercise.sets.forEachIndexed { xi, set ->
                     val path = "sessions[$si].exercises[$ei].sets[$xi]"
                     if (set.reps <= 0) errors += "$path.reps must be positive"
-                    if (set.loadKg < 0) errors += "$path.load_kg must be >= 0"
+                    if (set.loadKg == null && set.loadLb == null) {
+                        errors += "$path must have load_kg or load_lb"
+                    }
+                    if (set.loadKg != null && set.loadLb != null) {
+                        errors += "$path must not have both load_kg and load_lb"
+                    }
+                    if ((set.loadKg ?: 0.0) < 0 || (set.loadLb ?: 0.0) < 0) {
+                        errors += "$path load must be >= 0"
+                    }
                     set.tempo?.let {
                         if (Tempo.parseOrNull(it) == null) errors += "$path.tempo '$it' is not valid tempo notation"
                     }
@@ -62,9 +70,16 @@ data class PlanExerciseDef(
 @Serializable
 data class PlanSetDef(
     val reps: Int,
-    @SerialName("load_kg") val loadKg: Double,
+    /** Load in kilograms; exactly one of load_kg / load_lb must be present. */
+    @SerialName("load_kg") val loadKg: Double? = null,
+    /** Load in pounds; converted to kilograms on import. */
+    @SerialName("load_lb") val loadLb: Double? = null,
     val tempo: String? = null,
     @SerialName("targetMeanConcentricVelocity_mps") val targetMeanConcentricVelocityMps: Double? = null,
     @SerialName("velocityLossStop_pct") val velocityLossStopPct: Double? = null,
     @SerialName("rest_s") val restS: Int? = null,
-)
+) {
+    /** Canonical load in kilograms regardless of which unit the plan used. */
+    val resolvedLoadKg: Double?
+        get() = loadKg ?: loadLb?.let { it / WeightUnit.LB_PER_KG }
+}

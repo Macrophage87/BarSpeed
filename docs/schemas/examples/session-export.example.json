@@ -10,6 +10,7 @@
       "sets": [
         {
           "load_kg": 120,
+          "load_lb": 264.6,
           "plannedLoad_kg": 120,
           "reps": 5,
           "plannedReps": 5,

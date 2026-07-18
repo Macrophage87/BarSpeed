@@ -9,6 +9,7 @@ import com.macrophage.accelerometerlifting.model.SessionExport
 import com.macrophage.accelerometerlifting.model.SetExport
 import com.macrophage.accelerometerlifting.model.SetSummaryExport
 import com.macrophage.accelerometerlifting.model.TempoComplianceExport
+import com.macrophage.accelerometerlifting.model.WeightUnit
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
@@ -64,6 +65,7 @@ class SessionExporter(
         val reps = analysis?.reps.orEmpty()
         return SetExport(
             loadKg = record.loadKg,
+            loadLb = Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0,
             plannedLoadKg = record.plannedLoadKg,
             reps = record.actualReps,
             plannedReps = record.plannedReps,

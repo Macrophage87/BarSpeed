@@ -34,6 +34,8 @@ data class ExerciseExport(
 @Serializable
 data class SetExport(
     @SerialName("load_kg") val loadKg: Double,
+    /** Same load in pounds, for readers who think in lb; kg remains canonical. */
+    @SerialName("load_lb") val loadLb: Double? = null,
     @SerialName("plannedLoad_kg") val plannedLoadKg: Double? = null,
     val reps: Int,
     val plannedReps: Int? = null,

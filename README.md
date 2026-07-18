@@ -38,8 +38,8 @@ Copy this prompt into Claude (fill in the bracketed context), then in the app:
 > Each exercise is `{"exercise": snake_case_id, "sets": [...]}` — use ids like
 > `back_squat`, `bench_press`, `deadlift`, `overhead_press`, `barbell_row`,
 > `romanian_deadlift`, `front_squat`, `hip_thrust`. Each set is
-> `{"reps": int, "load_kg": number}` — always kilograms; if I give you weights in
-> pounds, convert them (lb ÷ 2.2046) — plus optional `"tempo"` (4-digit notation
+> `{"reps": int}` plus the load as either `"load_kg"` or `"load_lb"` (exactly one,
+> whichever unit I use), plus optional `"tempo"` (4-digit notation
 > like "4010" or "30X0" — eccentric, bottom pause, concentric, top pause seconds,
 > X = explosive), `"targetMeanConcentricVelocity_mps"` (number),
 > `"velocityLossStop_pct"` (number, e.g. 20), and `"rest_s"` (int).
