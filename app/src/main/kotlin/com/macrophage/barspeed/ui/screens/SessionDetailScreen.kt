@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +25,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -65,6 +69,31 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
     val session by viewModel.session.collectAsState()
     val weightUnit by viewModel.weightUnit.collectAsState()
     val sets by viewModel.sets.collectAsState()
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete this session?") },
+            text = {
+                Text(
+                    "This permanently removes the session, all ${sets.size} recorded sets, " +
+                        "and their raw sensor data. This cannot be undone.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        viewModel.deleteSession { navController.popBackStack() }
+                    },
+                ) { Text("Delete", color = BarColors.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -72,6 +101,11 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
                 title = { Text(session?.planSessionName ?: "Session") },
                 navigationIcon = {
                     TextButton(onClick = { navController.popBackStack() }) { Text("Back") }
+                },
+                actions = {
+                    TextButton(onClick = { showDeleteConfirm = true }) {
+                        Text("Delete", color = BarColors.Red)
+                    }
                 },
             )
         },

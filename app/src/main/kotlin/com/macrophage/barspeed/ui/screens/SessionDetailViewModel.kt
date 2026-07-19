@@ -34,6 +34,14 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
 
     fun decodeAnalysis(record: SetRecordEntity) = repository.decodeAnalysis(record)
 
+    /** Permanently deletes the session (sets and raw streams cascade). */
+    fun deleteSession(onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            repository.deleteSession(sessionId)
+            onDeleted()
+        }
+    }
+
     fun shareJson(includeDetail: Boolean) {
         viewModelScope.launch {
             val json = container.sessionExporter.exportJson(sessionId, includeDetail) ?: return@launch
