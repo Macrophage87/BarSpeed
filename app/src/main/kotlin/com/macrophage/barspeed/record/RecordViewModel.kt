@@ -164,6 +164,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var voice: VoiceCounter? = null
     private var lastCountedPhase: Phase = Phase.IDLE
     private var lastSpokenSecond = 0
+    private var lastAnnouncedRep = 0
+    private var plannedRepsForSet: Int? = null
 
     init {
         viewModelScope.launch {
@@ -316,6 +318,15 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         hrBuffer.clear()
         lastCountedPhase = Phase.IDLE
         lastSpokenSecond = 0
+        lastAnnouncedRep = 0
+        plannedRepsForSet =
+            if (s.currentIsTimed) {
+                null
+            } else if (s.adHoc) {
+                s.repsInput.toIntOrNull()
+            } else {
+                s.currentSlot?.reps
+            }
         setStartedAtMs = System.currentTimeMillis()
         RecordingService.start(getApplication())
 
@@ -355,6 +366,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val live = tracker?.feed(sample) ?: return
         stateFlow.value = stateFlow.value.copy(live = live)
         countPhaseSeconds(live.phase, live.currentPhaseElapsedS)
+        announceRepMilestones(live.repCount)
+    }
+
+    /** Voice: "last rep" going into the final planned rep, "done" when the count is hit. */
+    private fun announceRepMilestones(repCount: Int) {
+        val planned = plannedRepsForSet ?: return
+        if (!stateFlow.value.audioCues || repCount == lastAnnouncedRep) return
+        lastAnnouncedRep = repCount
+        when (repCount) {
+            planned - 1 -> if (planned > 1) voice?.speak("Last rep")
+            planned -> voice?.speak("Done")
+        }
     }
 
     /** Voice tempo count: speaks 1, 2, 3… through each moving phase (spec: audible 4-s eccentric). */
