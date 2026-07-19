@@ -166,6 +166,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var lastSpokenSecond = 0
     private var lastAnnouncedRep = 0
     private var plannedRepsForSet: Int? = null
+    private var announceReps = false
 
     init {
         viewModelScope.launch {
@@ -327,6 +328,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 s.currentSlot?.reps
             }
+        // Never announce reps on timed sets: a carry's gait can trip the rep detector.
+        announceReps = !s.currentIsTimed
         setStartedAtMs = System.currentTimeMillis()
         RecordingService.start(getApplication())
 
@@ -369,14 +372,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         announceRepMilestones(live.repCount)
     }
 
-    /** Voice: "last rep" going into the final planned rep, "done" when the count is hit. */
+    /**
+     * Voice at each lockout: "Rep N" as reps complete, "Last rep" going into the
+     * final planned rep, and "Done" when the count is hit.
+     */
     private fun announceRepMilestones(repCount: Int) {
-        val planned = plannedRepsForSet ?: return
-        if (!stateFlow.value.audioCues || repCount == lastAnnouncedRep) return
+        if (!announceReps || !stateFlow.value.audioCues) return
+        if (repCount == lastAnnouncedRep || repCount == 0) return
         lastAnnouncedRep = repCount
-        when (repCount) {
-            planned - 1 -> if (planned > 1) voice?.speak("Last rep")
-            planned -> voice?.speak("Done")
+        val planned = plannedRepsForSet
+        when {
+            planned != null && repCount == planned -> voice?.speak("Done")
+            planned != null && repCount == planned - 1 && planned > 1 -> voice?.speak("Last rep")
+            else -> voice?.speak("Rep $repCount")
         }
     }
 

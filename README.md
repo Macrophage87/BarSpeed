@@ -25,8 +25,9 @@ your training and write the next block.
   summarized, and only activated when you approve it.
 - **Voice counting (optional)**: the phone counts each second of the eccentric
   and concentric out loud (hit that 4-second lowering without watching the
-  screen), calls "last rep" going into the final planned rep and "done" when
-  you hit the count, and counts down the last seconds of rest.
+  screen), calls each rep at lockout ("rep 3"), "last rep" going into the
+  final planned rep, "done" when you hit the count, and counts down the last
+  seconds of rest.
 - **Exports**: token-efficient session JSON for LLM analysis (optionally with
   per-rep detail), and raw sensor CSV zips for Python/R.
 - **Demo mode**: try the whole flow with synthesized bar motion, no hardware.
