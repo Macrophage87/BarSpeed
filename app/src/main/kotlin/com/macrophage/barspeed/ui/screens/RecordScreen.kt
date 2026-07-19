@@ -727,17 +727,17 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     }
 }
 
-/** One tile of the RPE grid: value (null = failed set), short description, tint. */
-private data class RpeOption(val rpe: Int?, val label: String, val description: String, val color: Color)
+/** One tile of the effort grid: stored RPE value (null = failed set), wording, tint. */
+private data class RpeOption(val rpe: Int?, val description: String, val color: Color)
 
 private val RPE_OPTIONS =
     listOf(
-        RpeOption(6, "6", "4+ reps in the tank", BarColors.Volt),
-        RpeOption(7, "7", "3 reps left", BarColors.Volt),
-        RpeOption(8, "8", "2 reps left", BarColors.VoltDim),
-        RpeOption(9, "9", "1 rep left", BarColors.Amber),
-        RpeOption(10, "10", "nothing left", BarColors.Amber),
-        RpeOption(null, "✗", "failed the set", BarColors.Red),
+        RpeOption(6, "4+ reps in the tank", BarColors.Volt),
+        RpeOption(7, "3 reps left", BarColors.Volt),
+        RpeOption(8, "2 reps left", BarColors.VoltDim),
+        RpeOption(9, "1 rep left", BarColors.Amber),
+        RpeOption(10, "Nothing left", BarColors.Amber),
+        RpeOption(null, "Failed the set", BarColors.Red),
     )
 
 /**
@@ -747,15 +747,19 @@ private val RPE_OPTIONS =
 @Composable
 private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, startsNext: Boolean) {
     val rated = state.lastSetRpe != null || state.lastSetFailed
+    val ratedText =
+        RPE_OPTIONS.firstOrNull {
+            if (state.lastSetFailed) it.rpe == null else it.rpe == state.lastSetRpe
+        }?.description
     SectionCaption(
         when {
-            rated -> "Rated" + (state.lastSetRpe?.let { " · RPE $it" } ?: " · failed set")
+            rated -> "Rated · ${ratedText ?: ""}"
             startsNext -> "How hard was that? Tap to rate & start next set"
             else -> "How hard was that? Tap to rate"
         },
     )
     Spacer(Modifier.height(6.dp))
-    RPE_OPTIONS.chunked(3).forEach { row ->
+    RPE_OPTIONS.chunked(2).forEach { row ->
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -787,17 +791,12 @@ private fun RpeTile(option: RpeOption, selected: Boolean, modifier: Modifier = M
             .background(if (selected) option.color.copy(alpha = 0.2f) else BarColors.Surface, shape)
             .border(1.dp, if (selected) option.color else BarColors.Track, shape)
             .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+            .padding(vertical = 14.dp, horizontal = 6.dp),
     ) {
         Text(
-            option.label,
-            style = MaterialTheme.typography.headlineSmall,
-            color = option.color,
-        )
-        Text(
             option.description,
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Sub,
+            style = MaterialTheme.typography.titleSmall,
+            color = option.color,
         )
     }
 }
