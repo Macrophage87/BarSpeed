@@ -110,6 +110,7 @@ class SessionExporter(
                         meanEccVelMps = it.meanEccVelMps,
                         romM = it.romM,
                         peakPowerW = it.peakPowerW,
+                        meanConPowerW = it.meanConPowerW,
                     )
                 }
             } else {
@@ -122,11 +123,15 @@ class SessionExporter(
                 meanEccS = reps.map { it.eccS }.averageOrNull()?.round2(),
                 meanConS = reps.map { it.conS }.averageOrNull()?.round2(),
                 meanRomM = reps.map { it.romM }.averageOrNull()?.round3(),
+                peakPowerW = reps.mapNotNull { it.peakPowerW }.maxOrNull(),
+                meanConPowerW = reps.mapNotNull { it.meanConPowerW }.averageOrNull()?.round1(),
             ),
         )
     }
 
     private fun List<Double>.averageOrNull(): Double? = if (isEmpty()) null else average()
+
+    private fun Double.round1(): Double = Math.round(this * 10.0) / 10.0
 
     private fun Double.round2(): Double = Math.round(this * 100.0) / 100.0
 
@@ -134,20 +139,25 @@ class SessionExporter(
 }
 
 /**
- * Builds the raw-data zip: per-set CSVs (device-frame IMU + HRM) with a
- * meta.json sidecar describing every file (spec 4.3).
+ * Builds the raw-data zip: per-set CSVs (device-frame IMU + HRM), the FULL
+ * detailed session analysis (session.json — everything the JSON export has,
+ * including per-rep velocity/power, tempo compliance, RPE, sides, durations,
+ * and HRV), and a meta.json manifest describing every file (spec 4.3).
  */
 class RawExporter(
     private val sessionRepository: SessionRepository,
+    private val sessionExporter: SessionExporter,
     private val appVersion: String,
 ) {
     suspend fun buildZip(sessionId: Long): ByteArray? {
         val session = sessionRepository.session(sessionId) ?: return null
         val sets = sessionRepository.sets(sessionId)
+        val sessionJson = sessionExporter.exportJson(sessionId, includeRepDetail = true)
         val out = ByteArrayOutputStream()
         val meta = StringBuilder()
         meta.append("{\n  \"epoch\": \"${Instant.ofEpochMilli(session.startedAtMs)}\",\n")
         meta.append("  \"appVersion\": \"$appVersion\",\n  \"sensorModel\": \"WitMotion WT901BLECL\",\n")
+        meta.append("  \"analysisFile\": \"session.json\",\n")
         meta.append("  \"csvHeaderImu\": \"${ImuCsv.HEADER}\",\n  \"csvHeaderHrm\": \"${HrCsv.HEADER}\",\n")
         meta.append("  \"sets\": [\n")
 
@@ -173,6 +183,11 @@ class RawExporter(
             zip.putNextEntry(ZipEntry("meta.json"))
             zip.write(meta.toString().toByteArray(Charsets.UTF_8))
             zip.closeEntry()
+            sessionJson?.let {
+                zip.putNextEntry(ZipEntry("session.json"))
+                zip.write(it.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
         }
         return out.toByteArray()
     }

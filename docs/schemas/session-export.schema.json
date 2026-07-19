@@ -171,6 +171,16 @@
             },
             "meanRom_m": {
               "type": "number"
+            },
+            "peakPower_w": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Best instantaneous concentric (drive) power across the set, watts."
+            },
+            "meanConPower_w": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Mean of per-rep average concentric power, watts."
             }
           }
         },
@@ -245,7 +255,14 @@
           "type": "number"
         },
         "peakPower_w": {
-          "type": "number"
+          "type": "number",
+          "minimum": 0,
+          "description": "Peak instantaneous power during this rep's concentric, watts."
+        },
+        "meanConPower_w": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Average power over the concentric phase of this rep, watts."
         }
       }
     }

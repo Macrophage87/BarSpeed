@@ -968,6 +968,7 @@ private fun PeakVelocityChart(analysis: SetAnalysis) {
         barHeight = 64,
     )
     Spacer(Modifier.height(6.dp))
+    PowerLine(analysis)
     val best = peaks.maxOrNull()
     if (best != null && best > 0) {
         val lastLossPct = (1.0 - peaks.last() / best) * 100.0
@@ -1006,6 +1007,7 @@ private fun EccTempoChart(analysis: SetAnalysis, targetEccS: Double) {
         },
     )
     Spacer(Modifier.height(6.dp))
+    PowerLine(analysis)
     val worst = eccTimes.withIndex().maxByOrNull { kotlin.math.abs(it.value - targetEccS) }
     val insight =
         if (worst == null || kotlin.math.abs(worst.value - targetEccS) <= TEMPO_TOLERANCE_S) {
@@ -1040,6 +1042,7 @@ private fun ConVelocityChart(analysis: SetAnalysis) {
         barHeight = 64,
     )
     Spacer(Modifier.height(6.dp))
+    PowerLine(analysis)
     analysis.velocityLossPct?.let {
         Text(
             "Velocity loss ${trim(it)}% across the set.",
@@ -1050,6 +1053,20 @@ private fun ConVelocityChart(analysis: SetAnalysis) {
     analysis.verdicts.take(2).forEach {
         Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     }
+}
+
+/** Drive power summary — shown wherever a loaded set's analysis appears. */
+@Composable
+private fun PowerLine(analysis: SetAnalysis) {
+    powerSummary(analysis)?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+    }
+}
+
+private fun powerSummary(analysis: SetAnalysis): String? {
+    val peak = analysis.reps.mapNotNull { it.peakPowerW }.maxOrNull() ?: return null
+    val avg = analysis.reps.mapNotNull { it.meanConPowerW }.takeIf { it.isNotEmpty() }?.average()
+    return "Drive power: peak ${peak.toInt()} W" + (avg?.let { " · avg ${it.toInt()} W" } ?: "")
 }
 
 @Composable

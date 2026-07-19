@@ -194,6 +194,9 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
                     record.tempo?.let { Tempo.parseOrNull(it) }?.let { tempo ->
                         SetTempoChart(a, tempo.eccentricS)
                     }
+                    powerSummary(a)?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+                    }
                 }
                 a.verdicts.forEach {
                     Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
@@ -292,3 +295,9 @@ private fun SetTempoChart(analysis: SetAnalysis, targetEccS: Double) {
 
 private fun trimNum(value: Double): String =
     if (value == Math.floor(value)) value.toInt().toString() else String.format(Locale.US, "%.1f", value)
+
+private fun powerSummary(analysis: SetAnalysis): String? {
+    val peak = analysis.reps.mapNotNull { it.peakPowerW }.maxOrNull() ?: return null
+    val avg = analysis.reps.mapNotNull { it.meanConPowerW }.takeIf { it.isNotEmpty() }?.average()
+    return "Drive power: peak ${peak.toInt()} W" + (avg?.let { " · avg ${it.toInt()} W" } ?: "")
+}

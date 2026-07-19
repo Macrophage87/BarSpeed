@@ -21,7 +21,7 @@ class AppContainer(app: Application) {
     val planRepository = PlanRepository(database.planDao())
     val sessionRepository = SessionRepository(database.sessionDao(), database.exerciseDao())
     val sessionExporter = SessionExporter(sessionRepository)
-    val rawExporter = RawExporter(sessionRepository, appVersion = BuildConfig.VERSION_NAME)
+    val rawExporter = RawExporter(sessionRepository, sessionExporter, appVersion = BuildConfig.VERSION_NAME)
 
     val deviceRegistry = DeviceRegistry(app)
     val bleScanner = BleScanner()

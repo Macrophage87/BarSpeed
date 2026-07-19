@@ -70,6 +70,10 @@ data class SetSummaryExport(
     @SerialName("meanEcc_s") val meanEccS: Double? = null,
     @SerialName("meanCon_s") val meanConS: Double? = null,
     @SerialName("meanRom_m") val meanRomM: Double? = null,
+    /** Best instantaneous concentric power across the set, watts. */
+    @SerialName("peakPower_w") val peakPowerW: Double? = null,
+    /** Mean of per-rep average concentric power, watts. */
+    @SerialName("meanConPower_w") val meanConPowerW: Double? = null,
 )
 
 @Serializable
@@ -83,6 +87,7 @@ data class RepMetricsExport(
     @SerialName("meanEccVel_mps") val meanEccVelMps: Double,
     @SerialName("rom_m") val romM: Double,
     @SerialName("peakPower_w") val peakPowerW: Double? = null,
+    @SerialName("meanConPower_w") val meanConPowerW: Double? = null,
 )
 
 @Serializable

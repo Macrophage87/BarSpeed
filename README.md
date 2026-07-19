@@ -29,7 +29,8 @@ your training and write the next block.
   final planned rep, "done" when you hit the count, and counts down the last
   seconds of rest.
 - **Exports**: token-efficient session JSON for LLM analysis (optionally with
-  per-rep detail), and raw sensor CSV zips for Python/R.
+  per-rep detail incl. drive power), and a self-contained raw zip for Python/R
+  — per-set sensor CSVs plus the full session.json analysis in one archive.
 - **Demo mode**: try the whole flow with synthesized bar motion, no hardware.
 
 ## Get a training plan out of Claude and into the app

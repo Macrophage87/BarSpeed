@@ -20,6 +20,8 @@ data class RepAnalysis(
     val peakEccVelMps: Double,
     val romM: Double,
     val peakPowerW: Double?,
+    /** Average power over the concentric (drive) phase, watts. Null for bodyweight. */
+    val meanConPowerW: Double? = null,
 )
 
 @Serializable
@@ -99,10 +101,13 @@ object SetAnalyzer {
         val meanEcc = eccRange.map { v[it] }.average()
         val peakEcc = eccRange.minOf { v[it] }
         val rom = RepSegmenter.displacement(series, span.conStartIdx, span.conEndIdx)
-        val peakPower =
-            loadKg?.let { load ->
-                conRange.maxOf { i -> load * (config.gravityMps2 + series.accelMps2[i]) * v[i] }
-            }
+        // Bar power P = m(g + a)v over the drive; meaningless without load on the bar.
+        val effectiveLoad = loadKg?.takeIf { it > 0 }
+        val conPower = effectiveLoad?.let { load ->
+            conRange.map { i -> load * (config.gravityMps2 + series.accelMps2[i]) * v[i] }
+        }
+        val peakPower = conPower?.max()
+        val meanConPower = conPower?.average()
         val bottomPause = if (startsWith == StartPhase.ECCENTRIC) span.midPauseS else span.endPauseS
         val topPause = if (startsWith == StartPhase.ECCENTRIC) span.endPauseS else span.midPauseS
         return RepAnalysis(
@@ -117,6 +122,7 @@ object SetAnalyzer {
             peakEccVelMps = round3(peakEcc),
             romM = round3(rom),
             peakPowerW = peakPower?.let { round1(it) },
+            meanConPowerW = meanConPower?.let { round1(it) },
         )
     }
 
