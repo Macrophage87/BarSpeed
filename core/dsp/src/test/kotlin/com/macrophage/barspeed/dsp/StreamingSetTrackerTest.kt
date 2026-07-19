@@ -49,5 +49,11 @@ class StreamingSetTrackerTest {
         last.repMeanVelocities.forEach { mean ->
             assertTrue(mean in 0.45..0.75, "live rep mean $mean should be ~0.6")
         }
+        // Peaks (half-sine peak ≈ 0.94 m/s) must exceed the means.
+        assertEquals(3, last.repPeakVelocities.size)
+        last.repPeakVelocities.forEachIndexed { i, peak ->
+            assertTrue(peak in 0.7..1.2, "live rep peak $peak should be ~0.94")
+            assertTrue(peak > last.repMeanVelocities[i], "peak should exceed mean")
+        }
     }
 }

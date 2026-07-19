@@ -13,6 +13,9 @@ enum class ExerciseKind {
 
     /** Loaded carry (farmer's walk) — measured by duration; load still matters. */
     CARRY,
+
+    /** Single explosive concentric (snatch, clean) — peak velocity is the metric; no tempo. */
+    EXPLOSIVE,
 }
 
 /** Exercise definition with per-exercise segmentation configuration. */
@@ -24,7 +27,7 @@ data class ExerciseDef(
     val kind: ExerciseKind = ExerciseKind.DYNAMIC,
     val isCustom: Boolean = false,
 ) {
-    val isTimed: Boolean get() = kind != ExerciseKind.DYNAMIC
+    val isTimed: Boolean get() = kind == ExerciseKind.HOLD || kind == ExerciseKind.CARRY
 
     companion object {
         val SEED: List<ExerciseDef> =
@@ -42,6 +45,11 @@ data class ExerciseDef(
                 ExerciseDef("dead_hang", "Dead Hang", kind = ExerciseKind.HOLD),
                 ExerciseDef("farmers_walk", "Farmer's Walk", kind = ExerciseKind.CARRY),
                 ExerciseDef("suitcase_carry", "Suitcase Carry", kind = ExerciseKind.CARRY),
+                ExerciseDef("snatch", "Snatch", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
+                ExerciseDef("power_snatch", "Power Snatch", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
+                ExerciseDef("clean", "Clean", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
+                ExerciseDef("power_clean", "Power Clean", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
+                ExerciseDef("push_press", "Push Press", StartPhase.ECCENTRIC, ExerciseKind.EXPLOSIVE),
             )
 
         fun seedById(id: String): ExerciseDef? = SEED.firstOrNull { it.id == id }

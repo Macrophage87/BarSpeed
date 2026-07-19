@@ -13,6 +13,8 @@ data class LiveSetState(
     val currentPhaseElapsedS: Double = 0.0,
     /** Mean concentric velocity of each completed rep, for live per-rep bars. */
     val repMeanVelocities: List<Double> = emptyList(),
+    /** Peak concentric velocity of each completed rep — the metric for explosive lifts. */
+    val repPeakVelocities: List<Double> = emptyList(),
 )
 
 /**
@@ -42,8 +44,10 @@ class StreamingSetTracker(
 
     private var repCount = 0
     private val repVelocities = mutableListOf<Double>()
+    private val repPeaks = mutableListOf<Double>()
     private var runVelocitySum = 0.0
     private var runSampleCount = 0
+    private var runVelocityMax = 0.0
 
     var state: LiveSetState = LiveSetState()
         private set
@@ -69,6 +73,7 @@ class StreamingSetTracker(
                 repCount = repCount,
                 currentPhaseElapsedS = if (runType == 0 && repCount == 0) 0.0 else timeS - runStartS,
                 repMeanVelocities = repVelocities.toList(),
+                repPeakVelocities = repPeaks.toList(),
             )
         return state
     }
@@ -113,6 +118,7 @@ class StreamingSetTracker(
                 runPeak = maxOf(runPeak, abs(v))
                 runVelocitySum += v
                 runSampleCount++
+                runVelocityMax = maxOf(runVelocityMax, v)
             }
             return
         }
@@ -124,6 +130,7 @@ class StreamingSetTracker(
             if (qualified && runType == concentricDirection) {
                 repCount++
                 if (runSampleCount > 0) repVelocities += runVelocitySum / runSampleCount
+                repPeaks += runVelocityMax
             }
         }
         runType = type
@@ -131,6 +138,7 @@ class StreamingSetTracker(
         runPeak = abs(v)
         runVelocitySum = v
         runSampleCount = 1
+        runVelocityMax = v
     }
 
     private fun currentPhase(): Phase = when (runType) {

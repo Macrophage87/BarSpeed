@@ -35,6 +35,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.ExerciseDef
+import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
@@ -260,8 +262,10 @@ private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis) {
 
 @Composable
 private fun SetVelocityBars(record: SetRecordEntity, analysis: SetAnalysis) {
-    SectionCaption("Mean concentric velocity (m/s)")
-    val velocities = analysis.reps.map { it.meanConVelMps }
+    // Olympic-lift style movements are judged on peak velocity, not mean.
+    val explosive = ExerciseDef.seedById(record.exerciseId)?.kind == ExerciseKind.EXPLOSIVE
+    SectionCaption(if (explosive) "Peak velocity (m/s)" else "Mean concentric velocity (m/s)")
+    val velocities = analysis.reps.map { if (explosive) it.peakConVelMps else it.meanConVelMps }
     RepBars(
         values = velocities,
         plannedSlots = record.plannedReps,

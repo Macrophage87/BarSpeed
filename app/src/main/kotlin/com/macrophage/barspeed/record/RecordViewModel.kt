@@ -15,6 +15,7 @@ import com.macrophage.barspeed.dsp.SetTargets
 import com.macrophage.barspeed.dsp.StreamingSetTracker
 import com.macrophage.barspeed.dsp.SyntheticSets
 import com.macrophage.barspeed.model.ExerciseDef
+import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.Phase
@@ -64,6 +65,8 @@ data class SetFeedback(
     val actualDurationS: Int? = null,
     val plannedDurationS: Int? = null,
     val side: String? = null,
+    /** Olympic-lift style set: peak velocity is the headline metric. */
+    val explosive: Boolean = false,
 )
 
 /** One pick in the "equipment busy — switch exercise" chooser. */
@@ -439,6 +442,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         actualDurationS = actualDurationS,
                         plannedDurationS = plannedDurationS,
                         side = side,
+                        explosive = exercise.kind == ExerciseKind.EXPLOSIVE,
                     ),
                     restRemainingS = restS,
                     setsCompleted = stateFlow.value.setsCompleted + 1,

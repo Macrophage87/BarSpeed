@@ -337,11 +337,19 @@ private fun AdHocForm(state: RecordState, viewModel: RecordViewModel) {
     }
 }
 
+private fun currentKind(state: RecordState): ExerciseKind = state.currentSlot?.exercise?.kind
+    ?: state.exerciseOptions.firstOrNull { it.id == state.selectedExerciseId }?.kind
+    ?: ExerciseKind.DYNAMIC
+
 @Composable
 private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
     val slot = state.currentSlot
     if (state.currentIsTimed) {
         TimedSetStage(state, viewModel, slot)
+        return
+    }
+    if (currentKind(state) == ExerciseKind.EXPLOSIVE) {
+        ExplosiveSetStage(state, viewModel, slot)
         return
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
@@ -364,6 +372,73 @@ private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
         }
         Spacer(Modifier.height(14.dp))
         LiveRepBars(state, slot)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = viewModel::endSet, modifier = Modifier.fillMaxWidth().height(64.dp)) {
+            Text("END SET", style = MaterialTheme.typography.titleLarge)
+        }
+    }
+}
+
+/**
+ * In-set display for explosive lifts (snatch, clean): no tempo — the ring fills
+ * with completed reps and the headline number is the last rep's PEAK velocity.
+ */
+@Composable
+private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot?) {
+    val peaks = state.live.repPeakVelocities
+    val plannedReps = if (state.adHoc) state.repsInput.toIntOrNull() else slot?.reps
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        InSetHeader(state, slot)
+        Spacer(Modifier.height(10.dp))
+        val repProgress =
+            plannedReps?.takeIf { it > 0 }?.let { state.live.repCount / it.toFloat() } ?: 0f
+        ProgressRing(progress = repProgress) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "PEAK",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = BarColors.Sub,
+                    letterSpacing = 2.sp,
+                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        peaks.lastOrNull()?.let { String.format(Locale.US, "%.2f", it) } ?: "—",
+                        style = MaterialTheme.typography.displayLarge,
+                        color = BarColors.Volt,
+                    )
+                    Text(
+                        " m/s",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = BarColors.Sub,
+                        modifier = Modifier.padding(bottom = 10.dp),
+                    )
+                }
+                Text(
+                    "rep ${state.live.repCount}" + (plannedReps?.let { " of $it" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BarColors.Sub,
+                )
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Column(Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("Peak velocity per rep", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+                slot?.velocityLossStopPct?.let {
+                    Text(
+                        "stop at −${trim(it)}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BarColors.Amber,
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            RepBars(
+                values = peaks,
+                plannedSlots = plannedReps,
+                colorFor = { _, v -> velocityLossColor(v, peaks, slot?.velocityLossStopPct) },
+            )
+        }
         Spacer(Modifier.height(24.dp))
         Button(onClick = viewModel::endSet, modifier = Modifier.fillMaxWidth().height(64.dp)) {
             Text("END SET", style = MaterialTheme.typography.titleLarge)
@@ -722,12 +797,38 @@ private fun RepQualityCard(feedback: SetFeedback) {
     val tempo = feedback.tempo?.let { Tempo.parseOrNull(it) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
-            if (tempo != null) {
-                EccTempoChart(analysis, tempo.eccentricS)
-            } else {
-                ConVelocityChart(analysis)
+            when {
+                feedback.explosive -> PeakVelocityChart(analysis)
+                tempo != null -> EccTempoChart(analysis, tempo.eccentricS)
+                else -> ConVelocityChart(analysis)
             }
         }
+    }
+}
+
+@Composable
+private fun PeakVelocityChart(analysis: SetAnalysis) {
+    Text("Peak velocity per rep (m/s)", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+    Spacer(Modifier.height(8.dp))
+    val peaks = analysis.reps.map { it.peakConVelMps }
+    RepBars(
+        values = peaks,
+        plannedSlots = null,
+        colorFor = { _, v -> velocityLossColor(v, peaks, null) },
+        barHeight = 64,
+    )
+    Spacer(Modifier.height(6.dp))
+    val best = peaks.maxOrNull()
+    if (best != null && best > 0) {
+        val lastLossPct = (1.0 - peaks.last() / best) * 100.0
+        Text(
+            String.format(Locale.US, "Best %.2f m/s · last rep −%.0f%% off best.", best, lastLossPct),
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+    }
+    analysis.verdicts.take(2).forEach {
+        Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     }
 }
 
