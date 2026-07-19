@@ -40,6 +40,8 @@ data class SetExport(
     @SerialName("load_lb") val loadLb: Double? = null,
     @SerialName("plannedLoad_kg") val plannedLoadKg: Double? = null,
     val reps: Int,
+    /** True when reps were entered or corrected manually rather than sensor-counted. */
+    val repsManual: Boolean = false,
     val plannedReps: Int? = null,
     /** Actual hold/carry time for timed sets (planks, farmer's walks). */
     @SerialName("duration_s") val durationS: Int? = null,

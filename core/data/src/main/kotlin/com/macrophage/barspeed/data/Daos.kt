@@ -75,6 +75,9 @@ interface SessionDao {
     @Query("UPDATE set_records SET rpe = :rpe, failed = :failed, warmup = :warmup WHERE id = :setId")
     suspend fun updateRpe(setId: Long, rpe: Int?, failed: Boolean, warmup: Boolean)
 
+    @Query("UPDATE set_records SET actualReps = :reps, repsManual = 1 WHERE id = :setId")
+    suspend fun overrideReps(setId: Long, reps: Int)
+
     @Query("SELECT * FROM sessions WHERE startedAtMs >= :fromMs AND startedAtMs <= :toMs ORDER BY startedAtMs")
     suspend fun sessionsInRange(fromMs: Long, toMs: Long): List<SessionEntity>
 

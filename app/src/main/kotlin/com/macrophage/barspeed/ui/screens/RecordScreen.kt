@@ -186,10 +186,10 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         AdHocForm(state, viewModel)
     }
     Spacer(Modifier.height(16.dp))
-    // Timed sets (planks, carries) don't need the bar sensor at all.
-    val canStart = state.currentIsTimed || state.imuConnected || state.demoMode
-    Button(onClick = viewModel::beginSet, enabled = canStart, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-        Text(if (canStart) "START SET" else "Bar sensor not connected", fontWeight = FontWeight.Bold)
+    // Sets always start: without a sensor (and not in demo), reps are tap-counted.
+    val manual = !state.currentIsTimed && !state.imuConnected && !state.demoMode
+    Button(onClick = viewModel::beginSet, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+        Text(if (manual) "START SET — count reps manually" else "START SET", fontWeight = FontWeight.Bold)
     }
     Spacer(Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -351,6 +351,10 @@ private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
         TimedSetStage(state, viewModel, slot)
         return
     }
+    if (state.manualSet) {
+        ManualSetStage(state, viewModel, slot)
+        return
+    }
     if (currentKind(state) == ExerciseKind.EXPLOSIVE) {
         ExplosiveSetStage(state, viewModel, slot)
         return
@@ -378,6 +382,49 @@ private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
         Spacer(Modifier.height(24.dp))
         Button(onClick = viewModel::endSet, modifier = Modifier.fillMaxWidth().height(64.dp)) {
             Text("END SET", style = MaterialTheme.typography.titleLarge)
+        }
+    }
+}
+
+/** Sensorless set: the lifter taps to count reps; the ring tracks planned progress. */
+@Composable
+private fun ManualSetStage(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot?) {
+    val plannedReps = if (state.adHoc) state.repsInput.toIntOrNull() else slot?.reps
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        InSetHeader(state, slot)
+        Spacer(Modifier.height(10.dp))
+        val progress = plannedReps?.takeIf { it > 0 }?.let { state.manualReps / it.toFloat() } ?: 0f
+        ProgressRing(progress = progress) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "MANUAL COUNT",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = BarColors.Sub,
+                    letterSpacing = 2.sp,
+                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text("${state.manualReps}", style = MaterialTheme.typography.displayLarge)
+                    Text(
+                        " reps",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = BarColors.Sub,
+                        modifier = Modifier.padding(bottom = 10.dp),
+                    )
+                }
+                Text(
+                    plannedReps?.let { "of $it planned" } ?: "Elapsed ${formatMmSs(state.setElapsedS)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BarColors.Sub,
+                )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = viewModel::addManualRep, modifier = Modifier.fillMaxWidth().height(72.dp)) {
+            Text("+1 REP", style = MaterialTheme.typography.titleLarge)
+        }
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(onClick = viewModel::endSet, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            Text("END SET", fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -659,7 +706,9 @@ private fun phaseLabel(phase: Phase): String = when (phase) {
 @Composable
 private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     RestHeader(state)
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(6.dp))
+    state.lastFeedback?.let { RepCorrectionRow(it, viewModel) }
+    Spacer(Modifier.height(6.dp))
     state.lastFeedback?.let { RepQualityCard(it) }
     Spacer(Modifier.height(4.dp))
 
@@ -859,6 +908,33 @@ private fun RpeTile(option: RpeOption, selected: Boolean, modifier: Modifier = M
     }
 }
 
+/** Sensor miscount (or manual set)? Adjust the recorded rep count with − / +. */
+@Composable
+private fun RepCorrectionRow(feedback: SetFeedback, viewModel: RecordViewModel) {
+    if (feedback.actualDurationS != null) return
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            if (feedback.repsOverride != null) "Reps (corrected)" else "Reps counted",
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+        TextButton(onClick = { viewModel.overrideLastSetReps(feedback.effectiveReps - 1) }) {
+            Text("−", style = MaterialTheme.typography.titleMedium)
+        }
+        Text(
+            "${feedback.effectiveReps}",
+            style = MaterialTheme.typography.titleMedium,
+            color = if (feedback.repsOverride != null) BarColors.Amber else BarColors.Text,
+        )
+        TextButton(onClick = { viewModel.overrideLastSetReps(feedback.effectiveReps + 1) }) {
+            Text("+", style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
 @Composable
 private fun RestHeader(state: RecordState) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -881,7 +957,7 @@ private fun RestHeader(state: RecordState) {
                         (feedback.side?.let { " (${it.replaceFirstChar { c -> c.uppercase() }})" } ?: "")
                 Text(
                     feedback.actualDurationS?.let { "$name ${it}s @ $loadText" }
-                        ?: "$name ${feedback.analysis.reps.size} × $loadText",
+                        ?: "$name ${feedback.effectiveReps} × $loadText",
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(Modifier.height(6.dp))

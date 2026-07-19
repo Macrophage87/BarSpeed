@@ -213,6 +213,10 @@
         "warmup": {
           "type": "boolean",
           "description": "True for warm-up sets; these carry no RPE and should be excluded from effort/fatigue analysis."
+        },
+        "repsManual": {
+          "type": "boolean",
+          "description": "True when reps were entered or corrected manually rather than sensor-counted."
         }
       }
     },

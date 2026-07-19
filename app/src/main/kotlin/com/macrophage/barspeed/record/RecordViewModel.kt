@@ -68,7 +68,11 @@ data class SetFeedback(
     val side: String? = null,
     /** Olympic-lift style set: peak velocity is the headline metric. */
     val explosive: Boolean = false,
-)
+    /** Manually entered/corrected rep count; overrides the sensor count when set. */
+    val repsOverride: Int? = null,
+) {
+    val effectiveReps: Int get() = repsOverride ?: analysis.reps.size
+}
 
 /** One pick in the "equipment busy — switch exercise" chooser. */
 data class ExerciseChoice(val exerciseId: String, val displayName: String, val setsLeft: Int)
@@ -90,6 +94,9 @@ data class RecordState(
     val sideInput: String? = null,
     val tempoInput: String = "",
     val live: LiveSetState = LiveSetState(),
+    /** Sensorless rep set: the lifter taps to count reps. */
+    val manualSet: Boolean = false,
+    val manualReps: Int = 0,
     val setElapsedS: Int = 0,
     val hrBpm: Int? = null,
     /** Rolling HRV (RMSSD, ms) over the last ~2 minutes of beats. */
@@ -330,6 +337,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             }
         // Never announce reps on timed sets: a carry's gait can trip the rep detector.
         announceReps = !s.currentIsTimed
+        // No sensor, no demo, not timed → the lifter counts reps by tapping.
+        val manualSet = !s.currentIsTimed && !s.imuConnected && !s.demoMode
         setStartedAtMs = System.currentTimeMillis()
         RecordingService.start(getApplication())
 
@@ -361,7 +370,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
             }
-        stateFlow.value = s.copy(stage = Stage.IN_SET, setElapsedS = 0, live = LiveSetState())
+        stateFlow.value =
+            s.copy(
+                stage = Stage.IN_SET,
+                setElapsedS = 0,
+                live = LiveSetState(),
+                manualSet = manualSet,
+                manualReps = 0,
+            )
     }
 
     private fun onSample(sample: ImuSample) {
@@ -370,6 +386,28 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = stateFlow.value.copy(live = live)
         countPhaseSeconds(live.phase, live.currentPhaseElapsedS)
         announceRepMilestones(live.repCount)
+    }
+
+    /** Tap-to-count for sensorless sets; announces milestones like sensor reps. */
+    fun addManualRep() {
+        val s = stateFlow.value
+        if (!s.manualSet) return
+        val count = s.manualReps + 1
+        stateFlow.value = s.copy(manualReps = count)
+        announceRepMilestones(count)
+    }
+
+    /** Rest-screen correction when the sensor miscounted (or the set was manual). */
+    fun overrideLastSetReps(reps: Int) {
+        if (reps < 0) return
+        val setId = lastRecordedSetId ?: return
+        viewModelScope.launch {
+            sessionRepository.overrideReps(setId, reps)
+            stateFlow.value =
+                stateFlow.value.copy(
+                    lastFeedback = stateFlow.value.lastFeedback?.copy(repsOverride = reps),
+                )
+        }
     }
 
     /**
@@ -437,6 +475,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     targetMeanConcentricVelocityMps = slot?.targetMeanConVelMps,
                     velocityLossStopPct = slot?.velocityLossStopPct,
                 )
+            val manualReps = if (s.manualSet) s.manualReps else null
             val analysis =
                 withContext(Dispatchers.Default) {
                     when {
@@ -447,6 +486,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                             null,
                             timedVerdicts(actualDurationS, plannedDurationS),
                         )
+                        manualReps != null ->
+                            SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))
                         samples.size >= 8 -> SetAnalyzer.analyze(samples, exercise.startsWith, loadKg, targets)
                         else -> SetAnalysis(emptyList(), 0.0, null, null, listOf("No sensor data recorded."))
                     }
@@ -469,6 +510,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     loadKg = loadKg,
                     plannedLoadKg = slot?.plannedLoadKg,
                     plannedReps = plannedReps,
+                    manualReps = manualReps,
                     actualDurationS = actualDurationS,
                     plannedDurationS = plannedDurationS,
                     side = side,
@@ -500,6 +542,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         plannedDurationS = plannedDurationS,
                         side = side,
                         explosive = exercise.kind == ExerciseKind.EXPLOSIVE,
+                        repsOverride = manualReps,
                     ),
                     lastSetRpe = null,
                     lastSetFailed = false,

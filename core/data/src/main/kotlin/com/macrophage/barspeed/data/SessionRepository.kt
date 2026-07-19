@@ -16,6 +16,8 @@ data class CompletedSet(
     val loadKg: Double,
     val plannedLoadKg: Double?,
     val plannedReps: Int?,
+    /** Lifter-counted reps for sensorless sets; overrides the analysis count. */
+    val manualReps: Int? = null,
     /** Timed sets (planks, carries): actual and planned hold/carry seconds. */
     val actualDurationS: Int? = null,
     val plannedDurationS: Int? = null,
@@ -55,7 +57,8 @@ class SessionRepository(
                     exerciseName = set.exerciseName,
                     loadKg = set.loadKg,
                     plannedLoadKg = set.plannedLoadKg,
-                    actualReps = set.analysis.reps.size,
+                    actualReps = set.manualReps ?: set.analysis.reps.size,
+                    repsManual = set.manualReps != null,
                     plannedReps = set.plannedReps,
                     actualDurationS = set.actualDurationS,
                     plannedDurationS = set.plannedDurationS,
@@ -121,6 +124,9 @@ class SessionRepository(
     /** Rest-screen effort rating (RPE, failed, or warm-up) applied to the just-recorded set. */
     suspend fun rateSet(setId: Long, rpe: Int?, failed: Boolean, warmup: Boolean) =
         sessionDao.updateRpe(setId, rpe, failed, warmup)
+
+    /** Lifter correction of a miscounted (or uncounted) set's reps. */
+    suspend fun overrideReps(setId: Long, reps: Int) = sessionDao.overrideReps(setId, reps)
 
     suspend fun deleteSession(id: Long) = sessionDao.deleteSession(id)
 

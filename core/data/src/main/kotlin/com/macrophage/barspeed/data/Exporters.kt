@@ -72,6 +72,7 @@ class SessionExporter(
             loadLb = Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0,
             plannedLoadKg = record.plannedLoadKg,
             reps = record.actualReps,
+            repsManual = record.repsManual,
             plannedReps = record.plannedReps,
             durationS = record.actualDurationS,
             plannedDurationS = record.plannedDurationS,

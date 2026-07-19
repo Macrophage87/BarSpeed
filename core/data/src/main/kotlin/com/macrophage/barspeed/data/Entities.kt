@@ -58,6 +58,8 @@ data class SetRecordEntity(
     val loadKg: Double,
     val plannedLoadKg: Double? = null,
     val actualReps: Int,
+    /** True when actualReps was entered or corrected by the lifter, not the sensor. */
+    val repsManual: Boolean = false,
     val plannedReps: Int? = null,
     /** Timed sets (planks, carries): actual and planned hold/carry seconds. */
     val actualDurationS: Int? = null,
