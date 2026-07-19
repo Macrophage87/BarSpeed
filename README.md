@@ -38,7 +38,9 @@ Copy this prompt into Claude (fill in the bracketed context), then in the app:
 > Reply with ONLY a JSON document (no prose, no code fences) conforming exactly to
 > this schema: top level `{"schemaVersion": "1.1", "planName": string,
 > "sessions": [...]}`. Each session is `{"name": string, "exercises": [...]}`.
-> Each exercise is `{"exercise": snake_case_id, "sets": [...]}` — use ids like
+> Each exercise is `{"exercise": snake_case_id, "sets": [...]}` plus an optional
+> `"notes"` string (form cues or intent — it's shown to me in the app with each
+> set of that exercise) — use ids like
 > `back_squat`, `bench_press`, `deadlift`, `overhead_press`, `barbell_row`,
 > `romanian_deadlift`, `front_squat`, `hip_thrust`, and for timed work `plank`,
 > `side_plank`, `dead_hang`, `farmers_walk`, `suitcase_carry`. Each set has

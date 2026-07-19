@@ -43,6 +43,8 @@ data class PlannedSlot(
     val loadKg: Double?,
     val plannedLoadKg: Double?,
     val tempo: String?,
+    /** Coach/LLM comment on this exercise from the plan, shown with the set. */
+    val exerciseNotes: String? = null,
     val targetMeanConVelMps: Double? = null,
     val velocityLossStopPct: Double? = null,
     val restS: Int? = null,
@@ -60,6 +62,9 @@ data class SetFeedback(
     val actualDurationS: Int? = null,
     val plannedDurationS: Int? = null,
 )
+
+/** One pick in the "equipment busy — switch exercise" chooser. */
+data class ExerciseChoice(val exerciseId: String, val displayName: String, val setsLeft: Int)
 
 data class RecordState(
     val stage: Stage = Stage.SETUP,
@@ -91,6 +96,21 @@ data class RecordState(
 ) {
     val currentSlot: PlannedSlot? get() = queue.getOrNull(queueIndex)
     val nextSlot: PlannedSlot? get() = queue.getOrNull(queueIndex + 1)
+
+    /** Index of the first not-yet-done slot: during rest the current one is already complete. */
+    val upcomingIndex: Int get() = if (stage == Stage.RESTING) queueIndex + 1 else queueIndex
+
+    /** Other exercises with sets still to do — offered when equipment is busy. */
+    val exerciseChoices: List<ExerciseChoice>
+        get() {
+            if (adHoc) return emptyList()
+            val remaining = queue.drop(upcomingIndex)
+            val upcomingId = remaining.firstOrNull()?.exercise?.id ?: return emptyList()
+            return remaining
+                .groupBy { it.exercise.id }
+                .filterKeys { it != upcomingId }
+                .map { (id, slots) -> ExerciseChoice(id, slots.first().exercise.displayName, slots.size) }
+        }
 
     /** True when the set being set up / recorded is duration-based (hold or carry). */
     val currentIsTimed: Boolean
@@ -190,6 +210,38 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     adHoc = false,
                 )
         }
+    }
+
+    /**
+     * Equipment busy: pull the chosen exercise's remaining sets forward so they
+     * are done next, keeping everything else in order (deviating set order is fine
+     * — recorded sets keep their actual timestamps).
+     */
+    fun jumpToExercise(exerciseId: String) {
+        val s = stateFlow.value
+        if (s.adHoc) return
+        val done = s.queue.take(s.upcomingIndex)
+        val remaining = s.queue.drop(s.upcomingIndex)
+        if (remaining.firstOrNull()?.exercise?.id == exerciseId) return
+        val (target, others) = remaining.partition { it.exercise.id == exerciseId }
+        if (target.isEmpty()) return
+        val reordered = target + others
+        // Recompute "move the sensor" boundaries for the new order.
+        val fixed =
+            reordered.mapIndexed { i, slot ->
+                val prevId = if (i == 0) done.lastOrNull()?.exercise?.id else reordered[i - 1].exercise.id
+                slot.copy(isExerciseChange = prevId != null && prevId != slot.exercise.id)
+            }
+        val upcoming = fixed.first()
+        stateFlow.value =
+            s.copy(
+                queue = done + fixed,
+                // Refresh the editable inputs so they describe the new upcoming set.
+                loadInput = upcoming.loadKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
+                repsInput = upcoming.reps?.toString() ?: s.repsInput,
+                durationInput = upcoming.durationS?.toString() ?: s.durationInput,
+                tempoInput = upcoming.tempo ?: "",
+            )
     }
 
     fun startAdHocSession() {
@@ -462,6 +514,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         loadKg = set.resolvedLoadKg,
                         plannedLoadKg = set.resolvedLoadKg,
                         tempo = set.tempo,
+                        exerciseNotes = exerciseDef.notes,
                         targetMeanConVelMps = set.targetMeanConcentricVelocityMps,
                         velocityLossStopPct = set.velocityLossStopPct,
                         restS = set.restS,

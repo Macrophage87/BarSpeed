@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +27,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -174,6 +178,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
             MoveSensorCard(slot.exercise.displayName)
         }
         SlotCard(slot, heading = "Up next", unit = state.weightUnit, highlight = true)
+        SwitchExerciseSection(state, viewModel)
     } else {
         AdHocForm(state, viewModel)
     }
@@ -196,6 +201,49 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     }
     TextButton(onClick = viewModel::finishSession, modifier = Modifier.fillMaxWidth()) {
         Text("Finish session", color = BarColors.Sub)
+    }
+}
+
+/** Equipment busy? Offer the session's other remaining exercises out of order. */
+@Composable
+private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel) {
+    val choices = state.exerciseChoices
+    if (choices.isEmpty()) return
+    var showChooser by remember { mutableStateOf(false) }
+    TextButton(onClick = { showChooser = true }) {
+        Text("Equipment busy? Switch exercise", color = BarColors.Blue)
+    }
+    if (showChooser) {
+        AlertDialog(
+            onDismissRequest = { showChooser = false },
+            title = { Text("Do another exercise next") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "Its remaining sets move to the front; everything else keeps its order.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BarColors.Sub,
+                    )
+                    choices.forEach { choice ->
+                        TextButton(
+                            onClick = {
+                                showChooser = false
+                                viewModel.jumpToExercise(choice.exerciseId)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                "${choice.displayName} — ${choice.setsLeft} " +
+                                    if (choice.setsLeft == 1) "set left" else "sets left",
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showChooser = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 
@@ -516,6 +564,7 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
             unit = state.weightUnit,
             highlight = true,
         )
+        SwitchExerciseSection(state, viewModel)
         Spacer(Modifier.height(8.dp))
         Text(
             "Adjust next set (deviations are recorded)",
@@ -764,6 +813,10 @@ private fun SlotCard(slot: PlannedSlot, heading: String, unit: WeightUnit, highl
                 )
             if (secondary.isNotEmpty()) {
                 Text(secondary.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+            }
+            slot.exerciseNotes?.let { notes ->
+                Spacer(Modifier.height(4.dp))
+                Text("“$notes”", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
             }
         }
     }
