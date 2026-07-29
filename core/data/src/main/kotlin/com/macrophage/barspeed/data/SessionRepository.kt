@@ -153,6 +153,7 @@ class SessionRepository(
             ExerciseDef(
                 id,
                 id.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                ExerciseDef.inferStartPhase(id),
                 kind = ExerciseDef.inferKind(id),
                 isCustom = true,
                 usesBarbell = ExerciseDef.inferBarbell(id),
@@ -166,7 +167,7 @@ class SessionRepository(
                 CustomExerciseEntity(
                     id = id,
                     displayName = id.replace('_', ' ').replaceFirstChar { it.uppercase() },
-                    startsWith = StartPhase.ECCENTRIC.name,
+                    startsWith = ExerciseDef.inferStartPhase(id).name,
                 ),
             )
         }

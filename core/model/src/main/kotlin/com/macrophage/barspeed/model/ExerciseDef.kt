@@ -37,7 +37,7 @@ data class ExerciseDef(
                 ExerciseDef("back_squat", "Back Squat"),
                 ExerciseDef("front_squat", "Front Squat"),
                 ExerciseDef("bench_press", "Bench Press"),
-                ExerciseDef("overhead_press", "Overhead Press"),
+                ExerciseDef("overhead_press", "Overhead Press", startsWith = StartPhase.CONCENTRIC),
                 ExerciseDef("deadlift", "Deadlift", startsWith = StartPhase.CONCENTRIC),
                 ExerciseDef("romanian_deadlift", "Romanian Deadlift"),
                 ExerciseDef("barbell_row", "Barbell Row", startsWith = StartPhase.CONCENTRIC),
@@ -93,6 +93,27 @@ data class ExerciseDef(
                 HOLD_HINTS.any { lower.contains(it) } -> ExerciseKind.HOLD
                 CARRY_HINTS.any { lower.contains(it) } -> ExerciseKind.CARRY
                 else -> ExerciseKind.DYNAMIC
+            }
+        }
+
+        private val CONCENTRIC_START_HINTS =
+            listOf(
+                "deadlift", "row", "curl", "pull", "chin", "shrug", "thrust",
+                "overhead", "shoulder_press", "military", "raise", "snatch", "clean",
+            )
+
+        /**
+         * Lifts that begin with the drive (deadlifts, rows, presses from the
+         * rack position) must count concentric-first — pairing ecc→con would
+         * miss almost every rep. Bench-style lifts start at lockout and lower
+         * first, so bare "press" stays eccentric-first.
+         */
+        fun inferStartPhase(id: String): StartPhase {
+            val lower = id.lowercase()
+            return if (CONCENTRIC_START_HINTS.any { lower.contains(it) }) {
+                StartPhase.CONCENTRIC
+            } else {
+                StartPhase.ECCENTRIC
             }
         }
 

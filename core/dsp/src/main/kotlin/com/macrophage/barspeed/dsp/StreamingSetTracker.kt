@@ -29,18 +29,31 @@ class StreamingSetTracker(
 ) {
     private var filter = Biquad.lowPass(config.lowPassCutoffHz, expectedSampleRateHz)
 
-    // The sensor may stream at its 10 Hz factory default instead of the rate we
-    // requested; a filter designed for the wrong rate lags badly and the
-    // integrator drifts. Measure the delivered rate and rebuild the filter.
+    // The sensor samples uniformly, but two things make arrival timestamps
+    // unusable as an integration time base: BLE delivers frames in bursts that
+    // share one arrival time (most samples would integrate over zero seconds),
+    // and the sensor may stream at a rate other than the one we requested.
+    // Measure the average per-frame interval from the arrival SPAN and run the
+    // whole pipeline on a reconstructed uniform clock.
     private var rateCalibrated = false
-    private var firstTimeS = Double.NaN
+    private var firstArrivalMs = Long.MIN_VALUE
+    private var lastArrivalMs = Long.MIN_VALUE
     private var sampleCount = 0
+    private var frameIntervalS = 1.0 / expectedSampleRateHz
+    private var correctedTimeS = 0.0
 
-    private var lastTimeS = Double.NaN
     private var lastAccel = 0.0
     private var rawV = 0.0
     private var anchorOffset = 0.0
-    private var stableRejectedWindows = 0
+    private var anchorTimeS = 0.0
+
+    /**
+     * Learned accelerometer bias (gravity-projection error while the sensor is
+     * tilted/rotated). When the IMU is quiet the true acceleration is zero, so
+     * the filtered reading IS the bias; without correction, continuous press
+     * cycling drifts the integrator far past the ZUPT rejection band.
+     */
+    private var accelBias = 0.0
 
     private var quietWindowStartS = Double.NaN
     private var quietWindowLo = 0.0
@@ -57,7 +70,6 @@ class StreamingSetTracker(
     private var runSampleCount = 0
     private var runVelocityMax = 0.0
     private var runDisplacement = 0.0
-    private var lastDtS = 0.0
 
     /** Ecc-first lifts: a concentric only counts after a qualified eccentric (kills walkout/re-rack bumps). */
     private var eccentricPending = false
@@ -66,18 +78,22 @@ class StreamingSetTracker(
         private set
 
     fun feed(sample: ImuSample): LiveSetState {
-        val timeS = sample.timestampMs / 1000.0
-        calibrateSampleRate(timeS)
-        val accel = filter.process(FrameTransform.verticalLinearAccelMps2(sample, config.gravityMps2))
-        if (!lastTimeS.isNaN()) {
-            val dt = (timeS - lastTimeS).coerceIn(0.0, MAX_INTEGRATION_DT_S)
-            rawV += 0.5 * (accel + lastAccel) * dt
-            lastDtS = dt
+        val firstSample = sampleCount == 0
+        updateClock(sample.timestampMs)
+        val timeS = correctedTimeS
+        val filtered = filter.process(FrameTransform.verticalLinearAccelMps2(sample, config.gravityMps2))
+        val quietSample = VelocityEstimator.isQuietSample(sample, config)
+        if (quietSample) {
+            val alpha = (frameIntervalS / BIAS_TAU_S).coerceAtMost(MAX_BIAS_ALPHA)
+            accelBias += alpha * (filtered - accelBias)
         }
-        lastTimeS = timeS
+        val accel = filtered - accelBias
+        if (!firstSample) {
+            rawV += 0.5 * (accel + lastAccel) * frameIntervalS
+        }
         lastAccel = accel
 
-        updateZupt(sample, timeS)
+        updateZupt(quietSample, timeS)
         val v = rawV - anchorOffset
         updateRuns(v, timeS)
 
@@ -93,27 +109,29 @@ class StreamingSetTracker(
         return state
     }
 
-    private fun calibrateSampleRate(timeS: Double) {
-        if (rateCalibrated) return
-        if (firstTimeS.isNaN()) {
-            firstTimeS = timeS
-            sampleCount = 1
-            return
+    /** Advance the reconstructed uniform clock and (re)estimate the frame interval. */
+    private fun updateClock(arrivalMs: Long) {
+        if (sampleCount == 0) {
+            firstArrivalMs = arrivalMs
+        } else {
+            correctedTimeS += frameIntervalS
         }
+        lastArrivalMs = arrivalMs
         sampleCount++
-        if (sampleCount < RATE_WARMUP_SAMPLES) return
-        val span = timeS - firstTimeS
-        val measuredHz = (sampleCount - 1) / span
-        if (span > 0 && measuredHz in MIN_PLAUSIBLE_HZ..MAX_PLAUSIBLE_HZ) {
-            filter = Biquad.lowPass(config.lowPassCutoffHz, measuredHz)
+        val spanS = (lastArrivalMs - firstArrivalMs) / 1000.0
+        if (sampleCount >= RATE_WARMUP_SAMPLES && spanS >= RATE_WARMUP_SPAN_S) {
+            val measured = spanS / (sampleCount - 1)
+            if (measured in MIN_FRAME_INTERVAL_S..MAX_FRAME_INTERVAL_S) {
+                frameIntervalS = measured
+                if (!rateCalibrated) {
+                    filter = Biquad.lowPass(config.lowPassCutoffHz, 1.0 / measured)
+                    rateCalibrated = true
+                }
+            }
         }
-        rateCalibrated = true
     }
 
-    private fun updateZupt(sample: ImuSample, timeS: Double) {
-        val quiet =
-            abs(FrameTransform.accMagnitudeG(sample) - 1.0) < config.stationaryAccBandG &&
-                FrameTransform.gyroMagnitudeDps(sample) < config.stationaryGyroBandDps
+    private fun updateZupt(quiet: Boolean, timeS: Double) {
         if (quiet) {
             if (quietWindowStartS.isNaN()) {
                 quietWindowStartS = timeS
@@ -123,21 +141,18 @@ class StreamingSetTracker(
             quietWindowLo = minOf(quietWindowLo, rawV)
             quietWindowHi = maxOf(quietWindowHi, rawV)
             if (timeS - quietWindowStartS >= config.minStationaryS) {
-                // Anchor only on flat, near-zero windows: a slow eccentric is IMU-quiet
-                // but its raw velocity ramps and sits far from the last anchor.
+                // Anchor only on flat, near-anchor windows: a slow eccentric is
+                // IMU-quiet and flat near its velocity peak, but sits a real
+                // bar-speed away from the last anchor. Exception: after ANCHOR
+                // STARVATION (no anchor for many seconds — residual drift may
+                // have outrun the rejection band) the next flat window
+                // re-anchors, or the tracker locks into a phantom phase.
                 val stable = quietWindowHi - quietWindowLo <= config.anchorStabilityBandMps
-                if (stable && abs(rawV - anchorOffset) <= config.anchorRejectThresholdMps) {
+                val nearPrev = abs(rawV - anchorOffset) <= config.anchorRejectThresholdMps
+                val starved = timeS - anchorTimeS > ANCHOR_STARVATION_S
+                if (stable && (nearPrev || starved)) {
                     anchorOffset = rawV
-                    stableRejectedWindows = 0
-                } else if (stable) {
-                    // Escape hatch: repeated flat windows far from the anchor mean the
-                    // integrator drifted past the rejection band. Without this the
-                    // tracker locks into a phantom phase for the rest of the set.
-                    stableRejectedWindows++
-                    if (stableRejectedWindows >= FORCE_ANCHOR_AFTER_STABLE_WINDOWS) {
-                        anchorOffset = rawV
-                        stableRejectedWindows = 0
-                    }
+                    anchorTimeS = timeS
                 }
                 quietWindowStartS = timeS
                 quietWindowLo = rawV
@@ -161,7 +176,7 @@ class StreamingSetTracker(
                 runVelocitySum += v
                 runSampleCount++
                 runVelocityMax = maxOf(runVelocityMax, v)
-                runDisplacement += abs(v) * lastDtS
+                runDisplacement += abs(v) * frameIntervalS
             }
             return
         }
@@ -181,7 +196,7 @@ class StreamingSetTracker(
         runVelocitySum = v
         runSampleCount = 1
         runVelocityMax = v
-        runDisplacement = abs(v) * lastDtS
+        runDisplacement = abs(v) * frameIntervalS
     }
 
     private fun onQualifiedRun(direction: Int) {
@@ -206,11 +221,17 @@ class StreamingSetTracker(
     }
 
     private companion object {
-        const val RATE_WARMUP_SAMPLES = 12
-        const val MIN_PLAUSIBLE_HZ = 4.0
-        const val MAX_PLAUSIBLE_HZ = 250.0
-        const val FORCE_ANCHOR_AFTER_STABLE_WINDOWS = 2
-        const val MAX_INTEGRATION_DT_S = 0.15
+        const val RATE_WARMUP_SAMPLES = 24
+        const val RATE_WARMUP_SPAN_S = 1.0
+        const val MIN_FRAME_INTERVAL_S = 1.0 / 250.0
+        const val MAX_FRAME_INTERVAL_S = 1.0 / 4.0
+
+        /** Time constant for the quiet-sample accel-bias learner (s). */
+        const val BIAS_TAU_S = 2.0
+        const val MAX_BIAS_ALPHA = 0.2
+
+        /** No accepted anchor for this long → next flat window re-anchors (s). */
+        const val ANCHOR_STARVATION_S = 6.0
     }
 
     private fun currentPhase(): Phase = when (runType) {

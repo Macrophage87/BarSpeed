@@ -31,10 +31,15 @@ object VelocityEstimator {
     fun estimate(samples: List<ImuSample>, config: DspConfig = DspConfig()): VelocitySeries {
         require(samples.size >= 8) { "Not enough samples (${samples.size})" }
 
+        // BLE delivers frames in bursts: several frames share one arrival
+        // timestamp, then a ~100 ms jump. The sensor itself samples uniformly,
+        // so rebuild a uniform time base from the overall span — integrating
+        // against arrival times would give most samples zero duration.
         val n = samples.size
-        val t0 = samples.first().timestampMs
-        val timeS = DoubleArray(n) { (samples[it].timestampMs - t0) / 1000.0 }
-        val sampleRateHz = measureSampleRate(timeS)
+        val spanS = (samples.last().timestampMs - samples.first().timestampMs) / 1000.0
+        val sampleRateHz = measureSampleRate(n, spanS)
+        val dt = 1.0 / sampleRateHz
+        val timeS = DoubleArray(n) { it * dt }
 
         val filter = Biquad.lowPass(config.lowPassCutoffHz, sampleRateHz)
         val accel = DoubleArray(n)
@@ -42,10 +47,13 @@ object VelocityEstimator {
             accel[i] = filter.process(FrameTransform.verticalLinearAccelMps2(samples[i], config.gravityMps2))
         }
 
-        // Trapezoidal integration to raw velocity.
+        // Trapezoidal integration to raw velocity. Accel bias (gravity-projection
+        // error while the sensor is tilted) is NOT corrected here — the ZUPT
+        // stage detects biased pauses and its piecewise-linear offset removes
+        // the resulting drift. A per-sample bias learner is unusable: a clean
+        // slow eccentric is IMU-quiet too, and the learner eats the movement.
         val rawV = DoubleArray(n)
         for (i in 1 until n) {
-            val dt = (timeS[i] - timeS[i - 1]).coerceIn(0.0, 0.1)
             rawV[i] = rawV[i - 1] + 0.5 * (accel[i] + accel[i - 1]) * dt
         }
 
@@ -54,22 +62,27 @@ object VelocityEstimator {
         return VelocitySeries(timeS, accel, velocity, sampleRateHz)
     }
 
-    /** Median inter-sample interval → rate; robust against batched BLE arrivals. */
-    fun measureSampleRate(timeS: DoubleArray): Double {
-        val dts = (1 until timeS.size).map { timeS[it] - timeS[it - 1] }.filter { it > 0 }.sorted()
-        if (dts.isEmpty()) return 100.0
-        val median = dts[dts.size / 2]
-        return if (median > 0) 1.0 / median else 100.0
+    private const val MIN_PLAUSIBLE_HZ = 4.0
+    private const val MAX_PLAUSIBLE_HZ = 250.0
+    private const val DEFAULT_HZ = 100.0
+
+    /** No acceptable anchor for this long → next flat window re-anchors (s). */
+    private const val ANCHOR_STARVATION_S = 6.0
+
+    /** Span-based rate: (n-1)/span. Robust against burst arrivals, unlike median dt. */
+    fun measureSampleRate(sampleCount: Int, spanS: Double): Double {
+        if (sampleCount < 2 || spanS <= 0.0) return DEFAULT_HZ
+        return ((sampleCount - 1) / spanS).coerceIn(MIN_PLAUSIBLE_HZ, MAX_PLAUSIBLE_HZ)
     }
+
+    internal fun isQuietSample(sample: ImuSample, config: DspConfig): Boolean =
+        abs(FrameTransform.accMagnitudeG(sample) - 1.0) < config.stationaryAccBandG &&
+            FrameTransform.gyroMagnitudeDps(sample) < config.stationaryGyroBandDps
 
     /** True where the IMU itself is quiet for at least minStationaryS. */
     internal fun quietMask(samples: List<ImuSample>, timeS: DoubleArray, config: DspConfig): BooleanArray {
         val n = samples.size
-        val candidate =
-            BooleanArray(n) { i ->
-                abs(FrameTransform.accMagnitudeG(samples[i]) - 1.0) < config.stationaryAccBandG &&
-                    FrameTransform.gyroMagnitudeDps(samples[i]) < config.stationaryGyroBandDps
-            }
+        val candidate = BooleanArray(n) { isQuietSample(samples[it], config) }
         val quiet = BooleanArray(n)
         var runStart = -1
         for (i in 0..n) {
@@ -93,6 +106,11 @@ object VelocityEstimator {
         // Walk quiet regions in windows of minStationaryS. A window anchors only if
         // (a) raw velocity is noise-flat across it (true pause, not slow motion) and
         // (b) its raw value is near the previous anchor (drift, not displacement).
+        // Exception: after ANCHOR STARVATION (a long stretch with no acceptable
+        // anchor — e.g. continuous press cycling where accel bias drifts rawV far
+        // past the rejection band) the next flat window re-anchors regardless of
+        // (b). Tempo work pauses every few seconds, so starvation never triggers
+        // there and slow eccentrics keep being rejected as anchors.
         var i = 1
         while (i < n) {
             if (!quiet[i]) {
@@ -109,8 +127,12 @@ object VelocityEstimator {
                 if (timeS[j] - timeS[windowStart] >= config.minStationaryS) {
                     val mid = (windowStart + j) / 2
                     val stable = hi - lo <= config.anchorStabilityBandMps
-                    val nearPrev = abs(rawV[mid] - anchors.last().rawValue) <= config.anchorRejectThresholdMps
-                    if (stable && nearPrev) anchors += Anchor(mid, rawV[mid])
+                    val last = anchors.last()
+                    val nearPrev = abs(rawV[mid] - last.rawValue) <= config.anchorRejectThresholdMps
+                    val starved = timeS[mid] - timeS[last.index] > ANCHOR_STARVATION_S
+                    if (stable && (nearPrev || starved)) {
+                        anchors += Anchor(mid, rawV[mid])
+                    }
                     windowStart = j + 1
                     if (windowStart < n) {
                         lo = rawV[minOf(windowStart, n - 1)]
