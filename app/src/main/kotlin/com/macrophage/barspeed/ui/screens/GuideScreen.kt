@@ -46,6 +46,14 @@ The JSON must conform exactly to this schema:
 - Set: exactly one of {"reps": int} (dynamic) or {"duration_s": int} (holds/carries). Load: at most one of "load_kg" / "load_lb" (omit both for bodyweight). Optional: "tempo" (4-digit like "4010", dynamic sets only), "side" ("left"/"right" for unilateral work — emit one set per side), "targetMeanConcentricVelocity_mps", "velocityLossStop_pct", "rest_s".
 
 Use tempo and velocity targets deliberately on primary barbell lifts to enable auto-regulation, and put form cues in exercise notes.
+
+When I share BarSpeed session exports, read the effort fields with this key. "rpe" is RIR-based, 6-10; the app shows me narrative tiles and stores these numbers:
+- Dynamic sets: 6 = easy (4+ reps in reserve), 7 = solid (~3 left), 8 = hard (~2 left), 9 = very hard (1 left), 10 = max (nothing left).
+- Timed sets (holds/carries): same 6-10 scale but for time in reserve (6 = plenty of time left ... 10 = held to my limit).
+- Explosive sets: rated on bar speed, not reps in reserve (6 = bar was flying, 8 = speed dropping, 10 = barely made the lift).
+- "warmup": true (rpe null) = warm-up set, barely any effort — exclude it from fatigue and progression analysis.
+- "failed": true = failed set (missed reps, broke a hold early, or missed the lift) — treat as beyond RPE 10.
+- rpe null with neither flag = I skipped rating that set. There are no values below 6; easier-than-6 work is what the warm-up flag means.
     """.trimIndent()
 
 private data class GuideSection(val title: String, val body: String)
