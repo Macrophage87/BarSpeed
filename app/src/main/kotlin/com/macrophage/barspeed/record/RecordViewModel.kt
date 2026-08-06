@@ -400,9 +400,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     seconds++
                     stateFlow.value = stateFlow.value.copy(setElapsedS = seconds)
                     if (timedTargetS != null && stateFlow.value.audioCues) {
-                        when (timedTargetS - seconds) {
-                            in 1..REST_COUNTDOWN_FROM_S -> voice?.speak((timedTargetS - seconds).toString())
-                            0 -> voice?.speak("Time")
+                        // Long holds/carries: milestone every 15 s remaining
+                        // ("45 seconds"), then each second from 10 down.
+                        val remaining = timedTargetS - seconds
+                        when {
+                            remaining == 0 -> voice?.speak("Time")
+                            remaining in 1..TIMED_FINAL_COUNTDOWN_FROM_S -> voice?.speak(remaining.toString())
+                            remaining > 0 && remaining % TIMED_MILESTONE_EVERY_S == 0 ->
+                                voice?.speak("$remaining seconds")
                         }
                     }
                 }
@@ -419,7 +424,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 guidedCountdown = 0,
             )
         if (guidedSet && guidedTempo != null) {
-            startGuidedCadence(guidedTempo, plannedRepsForSet)
+            startGuidedCadence(guidedTempo, plannedRepsForSet, exercise.startsWith == StartPhase.CONCENTRIC)
         }
     }
 
@@ -433,10 +438,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Voice-guided cadence (e.g. tempo 4010): "Down, one, two, three, Up",
-     * ~2 s breather, "Rep one", and around again — with a 3 s lead-in. The app
-     * counts the reps; the lifter just follows the voice.
+     * ~2 s breather, "Rep one", and around again — with a 5 s lead-in so
+     * there's time to get positioned on the bar. Concentric-first lifts
+     * (press, deadlift, row) run the cycle the way they're performed: "Up",
+     * hold, counted "Down", breather at the rack/floor. The app counts the
+     * reps; the lifter just follows the voice.
      */
-    private fun startGuidedCadence(tempo: Tempo, plannedReps: Int?) {
+    private fun startGuidedCadence(tempo: Tempo, plannedReps: Int?, concentricFirst: Boolean) {
         if (voice == null) voice = VoiceCounter(getApplication())
         guidedJob =
             viewModelScope.launch {
@@ -444,24 +452,25 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 countdownPhase("GET READY", GUIDED_LEAD_IN_S)
                 var rep = 1
                 while (true) {
-                    val eccS = tempo.eccentricS.toInt().coerceAtLeast(1)
-                    speakGuided("Down")
-                    updateGuided("DOWN", eccS, eccS)
-                    for (second in 1..eccS) {
-                        delay(1_000)
-                        if (second < eccS) {
-                            speakGuided("$second")
-                            updateGuided("DOWN", eccS - second, eccS)
+                    if (concentricFirst) {
+                        guidedConcentric(tempo)
+                        val topS = tempo.topPauseS.toInt()
+                        if (topS > 0) {
+                            speakGuided("Hold")
+                            countdownPhase("HOLD", topS)
                         }
+                        guidedCountedEccentric(tempo)
+                        countdownPhase("BREATHE", maxOf(tempo.bottomPauseS.toInt(), GUIDED_BREATHER_MIN_S))
+                    } else {
+                        guidedCountedEccentric(tempo)
+                        val bottomS = tempo.bottomPauseS.toInt()
+                        if (bottomS > 0) {
+                            speakGuided("Hold")
+                            countdownPhase("HOLD", bottomS)
+                        }
+                        guidedConcentric(tempo)
+                        countdownPhase("BREATHE", maxOf(tempo.topPauseS.toInt(), GUIDED_BREATHER_MIN_S))
                     }
-                    val bottomS = tempo.bottomPauseS.toInt()
-                    if (bottomS > 0) {
-                        speakGuided("Hold")
-                        countdownPhase("HOLD", bottomS)
-                    }
-                    speakGuided("Up")
-                    countdownPhase("UP", (tempo.concentricS ?: 1.0).toInt().coerceAtLeast(1))
-                    countdownPhase("BREATHE", maxOf(tempo.topPauseS.toInt(), GUIDED_TOP_PAUSE_MIN_S))
                     stateFlow.value = stateFlow.value.copy(manualReps = rep)
                     when {
                         plannedReps != null && rep >= plannedReps -> {
@@ -476,6 +485,24 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     rep++
                 }
             }
+    }
+
+    private suspend fun guidedCountedEccentric(tempo: Tempo) {
+        val eccS = tempo.eccentricS.toInt().coerceAtLeast(1)
+        speakGuided("Down")
+        updateGuided("DOWN", eccS, eccS)
+        for (second in 1..eccS) {
+            delay(1_000)
+            if (second < eccS) {
+                speakGuided("$second")
+                updateGuided("DOWN", eccS - second, eccS)
+            }
+        }
+    }
+
+    private suspend fun guidedConcentric(tempo: Tempo) {
+        speakGuided("Up")
+        countdownPhase("UP", (tempo.concentricS ?: 1.0).toInt().coerceAtLeast(1))
     }
 
     private suspend fun countdownPhase(label: String, seconds: Int) {
@@ -819,11 +846,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         const val DEFAULT_REST_S = 150
         const val REST_COUNTDOWN_FROM_S = 3
+        const val TIMED_FINAL_COUNTDOWN_FROM_S = 10
+        const val TIMED_MILESTONE_EVERY_S = 15
         const val TIMED_CLOSE_ENOUGH_FRACTION = 0.9
 
         /** ~2 minutes of beats at typical training heart rates. */
         const val ROLLING_HRV_BEATS = 150
-        const val GUIDED_LEAD_IN_S = 3
-        const val GUIDED_TOP_PAUSE_MIN_S = 2
+        const val GUIDED_LEAD_IN_S = 5
+        const val GUIDED_BREATHER_MIN_S = 2
     }
 }

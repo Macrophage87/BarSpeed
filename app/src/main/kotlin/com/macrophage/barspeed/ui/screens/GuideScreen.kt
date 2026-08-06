@@ -89,8 +89,11 @@ private val SECTIONS =
             "Turn on 'Voice count' to hear the eccentric counted out loud, each rep called at " +
                 "lockout, 'last rep', 'done', and the rest countdown. 'Guided tempo' goes further: " +
                 "the app calls the whole cadence — 'Down, one, two, three, Up… Rep one' — with a " +
-                "3-second lead-in, and counts the reps for you. Guided mode is automatic for tempo " +
-                "work when no sensor is connected.",
+                "5-second lead-in so you can get set on the bar, and counts the reps for you. " +
+                "Lifts that start from the bottom (press, deadlift, row) are called the way " +
+                "they're performed: 'Up… Down, one, two, three'. Guided mode is automatic for " +
+                "tempo work when no sensor is connected. Holds and carries get spoken time checks " +
+                "every 15 seconds remaining, then a second-by-second count from 10.",
         ),
         GuideSection(
             "Exports",
