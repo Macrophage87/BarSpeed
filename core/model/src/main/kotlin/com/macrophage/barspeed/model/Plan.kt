@@ -27,6 +27,9 @@ data class PlanFile(
                 if (exercise.start != null && exercise.start !in VALID_STARTS) {
                     errors += "sessions[$si].exercises[$ei].start must be \"up\" or \"down\""
                 }
+                exercise.contradictoryTempoStartError()?.let {
+                    errors += "sessions[$si].exercises[$ei]: $it"
+                }
                 if (exercise.sets.isEmpty()) errors += "sessions[$si].exercises[$ei] must contain at least one set"
                 exercise.sets.forEachIndexed { xi, set ->
                     errors += set.validate("sessions[$si].exercises[$ei].sets[$xi]")
@@ -69,6 +72,24 @@ data class PlanExerciseDef(
             "down" -> StartPhase.ECCENTRIC
             else -> null
         }
+
+    /**
+     * A start override that contradicts how a known lift is performed is only
+     * meaningful for drive-keyed counting on sets WITHOUT tempo. With tempo,
+     * the voice guide would call the first phase from the wrong end of the
+     * movement (e.g. "Up" while sitting at bench lockout) — reject the combo.
+     * Custom ids are not second-guessed: inference is heuristic there.
+     */
+    fun contradictoryTempoStartError(): String? {
+        val seed = ExerciseDef.seedById(exercise) ?: return null
+        val override = startPhaseOverride ?: return null
+        if (override == seed.startsWith) return null
+        if (sets.none { it.tempo != null }) return null
+        val natural =
+            if (seed.startsWith == StartPhase.ECCENTRIC) "the top (down-first)" else "the bottom (up-first)"
+        return "tempo sets on $exercise start from $natural — omit \"start\" for tempo work; " +
+            "use the override only on sets without tempo (drive-keyed counting)"
+    }
 }
 
 @Serializable

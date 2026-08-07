@@ -136,4 +136,29 @@ class PlanValidationTest {
 
         assertTrue(planWith(""", "start": "sideways"""").validate().any { it.contains("start") })
     }
+
+    @Test
+    fun `contradictory start override is rejected on tempo sets but allowed without tempo`() {
+        fun errorsFor(exercise: String, start: String?, tempo: Boolean): List<String> {
+            val startJson = start?.let { """, "start": "$it"""" } ?: ""
+            val tempoJson = if (tempo) """, "tempo": "3010"""" else ""
+            val plan =
+                """
+                {"schemaVersion": "1.2", "planName": "t", "sessions": [{"name": "s",
+                  "exercises": [{"exercise": "$exercise"$startJson,
+                    "sets": [{"reps": 5, "load_kg": 60$tempoJson}]}]}]}
+                """.trimIndent()
+            return json.decodeFromString(PlanFile.serializer(), plan).validate()
+        }
+        // Tempo bench still starts from the top: "up" override + tempo is contradictory.
+        assertTrue(errorsFor("bench_press", "up", tempo = true).any { it.contains("start from the top") })
+        // Same guard in the other direction: a tempo press starts from the bottom.
+        assertTrue(errorsFor("overhead_press", "down", tempo = true).any { it.contains("start from the bottom") })
+        // Drive-keyed counting without tempo is the intended use — allowed.
+        assertTrue(errorsFor("bench_press", "up", tempo = false).isEmpty())
+        // Override matching the lift's natural direction is fine with tempo.
+        assertTrue(errorsFor("overhead_press", "up", tempo = true).isEmpty())
+        // Custom ids are not second-guessed: inference is heuristic, the override wins.
+        assertTrue(errorsFor("landmine_press", "up", tempo = true).isEmpty())
+    }
 }
