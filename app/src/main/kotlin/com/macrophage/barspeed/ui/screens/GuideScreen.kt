@@ -91,7 +91,7 @@ private val SECTIONS =
         ),
         GuideSection(
             "Voice",
-            "Turn on 'Voice count' to hear the eccentric counted out loud, each rep called at " +
+            "Voice count is ON by default: the eccentric counted out loud, each rep called at " +
                 "lockout, 'last rep', 'done', and the rest countdown. 'Guided tempo' goes further: " +
                 "the app calls the whole cadence — 'Down, one, two, three, Up… Rep one' — with a " +
                 "5-second lead-in so you can get set on the bar, and counts the reps for you. " +
@@ -104,8 +104,10 @@ private val SECTIONS =
             "Exports",
             "On any session: Share or Save the compact JSON (for LLM analysis), the detailed JSON " +
                 "(per-rep velocity and power), or the Raw zip — sensor CSVs plus the full analysis in " +
-                "one archive. Paste a session export into your LLM chat and ask it to revise next " +
-                "week's plan; RPE, HRV, power, and velocity-loss data are all in there.",
+                "one archive. Every spoken cue ('Down', 'Up', 'Rep 4'…) is timestamped on the same " +
+                "clock as the sensor streams, so cues can be cross-referenced with the " +
+                "accelerometer data. Paste a session export into your LLM chat and ask it to " +
+                "revise next week's plan; RPE, HRV, power, and velocity-loss data are all in there.",
         ),
     )
 

@@ -22,7 +22,7 @@ class SettingsStore(private val context: Context) {
 
     /** Voice counting during sets (tempo count-up) and rest countdown. Off by default. */
     val audioCues: Flow<Boolean> =
-        context.settingsDataStore.data.map { prefs -> prefs[audioCuesKey] ?: false }
+        context.settingsDataStore.data.map { prefs -> prefs[audioCuesKey] ?: true }
 
     suspend fun setWeightUnit(unit: WeightUnit) {
         context.settingsDataStore.edit { it[weightUnitKey] = unit.name }

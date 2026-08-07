@@ -61,6 +61,8 @@ data class SetExport(
     val hr: HrSetSummary? = null,
     /** Per-rep detail; included only when the user enables detailed export. */
     val repMetrics: List<RepMetricsExport>? = null,
+    /** Spoken cues with epoch-ms stamps, cross-referenceable with the raw IMU stream (detailed export only). */
+    val voiceCues: List<VoiceCue>? = null,
     /** Always-included summary across reps. */
     val summary: SetSummaryExport,
 )

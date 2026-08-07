@@ -100,9 +100,9 @@ data class SetRecordEntity(
 data class RawStreamEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val setId: Long,
-    /** One of: imu, hrm. */
+    /** One of: imu, hrm, cues. */
     val kind: String,
-    /** Gzipped CSV in the canonical format (see ImuCsv / HrCsv). */
+    /** Gzipped CSV in the canonical format (see ImuCsv / HrCsv / CueCsv). */
     val csvGzip: ByteArray,
     val sampleRateHz: Double? = null,
 ) {
@@ -113,6 +113,7 @@ data class RawStreamEntity(
     companion object {
         const val KIND_IMU = "imu"
         const val KIND_HRM = "hrm"
+        const val KIND_CUES = "cues"
     }
 }
 

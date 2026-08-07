@@ -6,6 +6,7 @@ import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
+import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
 
@@ -32,6 +33,8 @@ data class CompletedSet(
     val analysis: SetAnalysis,
     val imuSamples: List<ImuSample>,
     val hrSamples: List<HrSample>,
+    /** Spoken cues during the set, epoch-ms stamped for IMU cross-reference. */
+    val voiceCues: List<VoiceCue> = emptyList(),
 )
 
 class SessionRepository(
@@ -91,6 +94,15 @@ class SessionRepository(
                     setId = setId,
                     kind = RawStreamEntity.KIND_HRM,
                     csvGzip = Gzip.compress(HrCsv.encode(set.hrSamples)),
+                ),
+            )
+        }
+        if (set.voiceCues.isNotEmpty()) {
+            sessionDao.insertRawStream(
+                RawStreamEntity(
+                    setId = setId,
+                    kind = RawStreamEntity.KIND_CUES,
+                    csvGzip = Gzip.compress(CueCsv.encode(set.voiceCues)),
                 ),
             )
         }

@@ -23,6 +23,7 @@ import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
+import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -117,7 +118,7 @@ data class RecordState(
     val lastSetRpe: Int? = null,
     val lastSetFailed: Boolean = false,
     val lastSetWarmup: Boolean = false,
-    val audioCues: Boolean = false,
+    val audioCues: Boolean = true,
     val imuConnected: Boolean = false,
     val imuConnecting: Boolean = false,
     val hrmConnected: Boolean = false,
@@ -166,6 +167,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     private val imuBuffer = mutableListOf<ImuSample>()
     private val hrBuffer = mutableListOf<HrSample>()
+
+    /** Spoken cues this set, epoch-ms stamped for IMU cross-reference in exports. */
+    private val cueBuffer = mutableListOf<VoiceCue>()
     private var tracker: StreamingSetTracker? = null
     private var collectJob: Job? = null
     private var hrJob: Job? = null
@@ -355,6 +359,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         this.tracker = tracker
         imuBuffer.clear()
         hrBuffer.clear()
+        cueBuffer.clear()
         lastCountedPhase = Phase.IDLE
         lastSpokenSecond = 0
         lastAnnouncedRep = 0
@@ -407,10 +412,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         // ("45 seconds"), then each second from 10 down.
                         val remaining = timedTargetS - seconds
                         when {
-                            remaining == 0 -> voice?.speak("Time")
-                            remaining in 1..TIMED_FINAL_COUNTDOWN_FROM_S -> voice?.speak(remaining.toString())
+                            remaining == 0 -> speakCue("Time")
+                            remaining in 1..TIMED_FINAL_COUNTDOWN_FROM_S -> speakCue(remaining.toString())
                             remaining > 0 && remaining % TIMED_MILESTONE_EVERY_S == 0 ->
-                                voice?.speak("$remaining seconds")
+                                speakCue("$remaining seconds")
                         }
                     }
                 }
@@ -445,7 +450,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         guidedCadence =
             GuidedCadenceRunner(
                 scope = viewModelScope,
-                speak = { voice?.speak(it) },
+                speak = ::speakCue,
                 update = { label, remaining, total ->
                     stateFlow.value =
                         stateFlow.value.copy(
@@ -456,6 +461,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 },
                 onRepCounted = { rep -> stateFlow.value = stateFlow.value.copy(manualReps = rep) },
             ).also { it.start(tempo, plannedReps, concentricFirst) }
+    }
+
+    /** Speak an in-set cue and log it on the sample clock (see VoiceCue). */
+    private fun speakCue(text: String) {
+        cueBuffer += VoiceCue(System.currentTimeMillis(), text)
+        voice?.speak(text)
     }
 
     /** Tap-to-count for sensorless sets; announces milestones like sensor reps. */
@@ -490,9 +501,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         lastAnnouncedRep = repCount
         val planned = plannedRepsForSet
         when {
-            planned != null && repCount == planned -> voice?.speak("Done")
-            planned != null && repCount == planned - 1 && planned > 1 -> voice?.speak("Last rep")
-            else -> voice?.speak("Rep $repCount")
+            planned != null && repCount == planned -> speakCue("Done")
+            planned != null && repCount == planned - 1 && planned > 1 -> speakCue("Last rep")
+            else -> speakCue("Rep $repCount")
         }
     }
 
@@ -507,7 +518,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val second = elapsedS.toInt()
         if (second >= 1 && second != lastSpokenSecond) {
             lastSpokenSecond = second
-            voice?.speak(second.toString())
+            speakCue(second.toString())
         }
     }
 
@@ -537,6 +548,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             }
         val samples = imuBuffer.toList()
         val hrSamples = hrBuffer.toList()
+        val cues = cueBuffer.toList()
 
         viewModelScope.launch {
             val targets =
@@ -597,6 +609,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     analysis = analysis,
                     imuSamples = samples,
                     hrSamples = hrSamples,
+                    voiceCues = cues,
                 ),
             )
 

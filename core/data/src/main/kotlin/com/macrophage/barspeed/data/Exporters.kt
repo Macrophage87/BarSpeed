@@ -64,9 +64,18 @@ class SessionExporter(
     suspend fun exportJson(sessionId: Long, includeRepDetail: Boolean): String? =
         buildExport(sessionId, includeRepDetail)?.let { json.encodeToString(SessionExport.serializer(), it) }
 
-    private fun setExport(record: SetRecordEntity, includeRepDetail: Boolean): SetExport {
+    private suspend fun setExport(record: SetRecordEntity, includeRepDetail: Boolean): SetExport {
         val analysis = sessionRepository.decodeAnalysis(record)
         val reps = analysis?.reps.orEmpty()
+        val voiceCues =
+            if (includeRepDetail) {
+                sessionRepository.rawStreams(record.id)
+                    .firstOrNull { it.kind == RawStreamEntity.KIND_CUES }
+                    ?.let { CueCsv.decode(Gzip.decompress(it.csvGzip)) }
+                    ?.takeIf { it.isNotEmpty() }
+            } else {
+                null
+            }
         return SetExport(
             loadKg = record.loadKg,
             loadLb = Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0,
@@ -98,6 +107,7 @@ class SessionExporter(
             } else {
                 null
             },
+            voiceCues = voiceCues,
             repMetrics =
             if (includeRepDetail && reps.isNotEmpty()) {
                 reps.map {
@@ -160,6 +170,7 @@ class RawExporter(
         meta.append("  \"appVersion\": \"$appVersion\",\n  \"sensorModel\": \"WitMotion WT901BLECL\",\n")
         meta.append("  \"analysisFile\": \"session.json\",\n")
         meta.append("  \"csvHeaderImu\": \"${ImuCsv.HEADER}\",\n  \"csvHeaderHrm\": \"${HrCsv.HEADER}\",\n")
+        meta.append("  \"csvHeaderCues\": \"${CueCsv.HEADER}\",\n")
         meta.append("  \"sets\": [\n")
 
         ZipOutputStream(out).use { zip ->

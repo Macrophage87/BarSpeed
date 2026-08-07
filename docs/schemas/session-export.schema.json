@@ -153,6 +153,27 @@
             "$ref": "#/$defs/repMetrics"
           }
         },
+        "voiceCues": {
+          "type": "array",
+          "description": "Spoken voice cues during the set ('Down', '3', 'Up', 'Rep 4', 'Time'...), stamped in epoch ms on the same clock as the raw IMU/HR streams so they can be cross-referenced with accelerometer data. Detailed export only.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "t_ms",
+              "cue"
+            ],
+            "properties": {
+              "t_ms": {
+                "type": "integer",
+                "description": "Epoch milliseconds when the cue was spoken."
+              },
+              "cue": {
+                "type": "string"
+              }
+            }
+          }
+        },
         "summary": {
           "type": "object",
           "additionalProperties": false,
