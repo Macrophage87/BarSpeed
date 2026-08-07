@@ -112,4 +112,28 @@ class PlanValidationTest {
         assertTrue(errorsFor("""{"duration_s": 30, "side": "left"}""").isEmpty())
         assertTrue(errorsFor("""{"reps": 8, "load_kg": 20, "side": "right"}""").isEmpty())
     }
+
+    @Test
+    fun `exercise start override validates and maps to a phase`() {
+        fun planWith(startJson: String): PlanFile {
+            val plan =
+                """
+                {"schemaVersion": "1.2", "planName": "t", "sessions": [{"name": "s",
+                  "exercises": [{"exercise": "bench_press"$startJson, "sets": [{"reps": 5, "load_kg": 60}]}]}]}
+                """.trimIndent()
+            return json.decodeFromString(PlanFile.serializer(), plan)
+        }
+        val up = planWith(""", "start": "up"""")
+        assertTrue(up.validate().isEmpty(), up.validate().joinToString())
+        assertEquals(StartPhase.CONCENTRIC, up.sessions[0].exercises[0].startPhaseOverride)
+
+        val down = planWith(""", "start": "down"""")
+        assertEquals(StartPhase.ECCENTRIC, down.sessions[0].exercises[0].startPhaseOverride)
+
+        val omitted = planWith("")
+        assertTrue(omitted.validate().isEmpty())
+        assertEquals(null, omitted.sessions[0].exercises[0].startPhaseOverride)
+
+        assertTrue(planWith(""", "start": "sideways"""").validate().any { it.contains("start") })
+    }
 }

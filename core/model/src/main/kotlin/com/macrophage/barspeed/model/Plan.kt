@@ -24,6 +24,9 @@ data class PlanFile(
             if (session.exercises.isEmpty()) errors += "sessions[$si] must contain at least one exercise"
             session.exercises.forEachIndexed { ei, exercise ->
                 if (exercise.exercise.isBlank()) errors += "sessions[$si].exercises[$ei].exercise must not be blank"
+                if (exercise.start != null && exercise.start !in VALID_STARTS) {
+                    errors += "sessions[$si].exercises[$ei].start must be \"up\" or \"down\""
+                }
                 if (exercise.sets.isEmpty()) errors += "sessions[$si].exercises[$ei] must contain at least one set"
                 exercise.sets.forEachIndexed { xi, set ->
                     errors += set.validate("sessions[$si].exercises[$ei].sets[$xi]")
@@ -34,9 +37,10 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.1"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1")
+        const val SCHEMA_VERSION = "1.2"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2")
         val VALID_SIDES = setOf("left", "right")
+        val VALID_STARTS = setOf("up", "down")
     }
 }
 
@@ -51,8 +55,21 @@ data class PlanSessionDef(
 data class PlanExerciseDef(
     val exercise: String,
     val notes: String? = null,
+    /**
+     * Which direction the lift starts: "up" (press, deadlift — count keys on
+     * the concentric) or "down" (squat, bench). Omitted → inferred from the id.
+     */
+    val start: String? = null,
     val sets: List<PlanSetDef>,
-)
+) {
+    /** Start-phase override, when the plan pins one. */
+    val startPhaseOverride: StartPhase?
+        get() = when (start) {
+            "up" -> StartPhase.CONCENTRIC
+            "down" -> StartPhase.ECCENTRIC
+            else -> null
+        }
+}
 
 @Serializable
 data class PlanSetDef(

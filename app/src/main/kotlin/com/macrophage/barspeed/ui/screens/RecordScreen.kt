@@ -101,6 +101,7 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
                 Stage.SETUP -> SetupStage(state, viewModel)
                 Stage.READY -> ReadyStage(state, viewModel)
                 Stage.IN_SET -> InSetStage(state, viewModel)
+                Stage.RATING -> RatingStage(state, viewModel)
                 Stage.RESTING -> RestingStage(state, viewModel)
                 Stage.FINISHED -> FinishedStage(state, navController)
             }
@@ -112,6 +113,7 @@ private fun titleFor(state: RecordState): String = when (state.stage) {
     Stage.SETUP -> "New session"
     Stage.READY -> state.planSessionName ?: "Ad-hoc session"
     Stage.IN_SET -> ""
+    Stage.RATING -> "Set done"
     Stage.RESTING -> "Rest"
     Stage.FINISHED -> "Session complete"
 }
@@ -793,10 +795,32 @@ private fun phaseLabel(phase: Phase): String = when (phase) {
     Phase.TOP_PAUSE -> "Lockout"
 }
 
+/**
+ * Set-end stage: the effort question comes FIRST, while the set is fresh —
+ * rest (whose countdown is already running) follows the answer. Sets that
+ * were stopped early skip this stage entirely; they're logged as failed.
+ */
+@Composable
+private fun RatingStage(state: RecordState, viewModel: RecordViewModel) {
+    state.lastFeedback?.let { feedback ->
+        Text(feedback.exerciseName, style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(6.dp))
+        RepCorrectionRow(feedback, viewModel)
+        Spacer(Modifier.height(6.dp))
+        RepQualityCard(feedback)
+        Spacer(Modifier.height(12.dp))
+    }
+    RpeSelector(state, viewModel)
+    TextButton(onClick = viewModel::skipRating, modifier = Modifier.fillMaxWidth()) {
+        Text("Skip rating", color = BarColors.Sub)
+    }
+}
+
 @Composable
 private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     RestHeader(state)
     Spacer(Modifier.height(6.dp))
+    LoggedEffortLine(state)
     state.lastFeedback?.let { RepCorrectionRow(it, viewModel) }
     Spacer(Modifier.height(6.dp))
     state.lastFeedback?.let { RepQualityCard(it) }
@@ -848,7 +872,10 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
             TrackingModeRow(state, viewModel)
         }
         Spacer(Modifier.height(12.dp))
-        RpeSelector(state, viewModel, startsNext = true)
+        Button(
+            onClick = viewModel::startNextSet,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+        ) { Text("START NEXT SET") }
     } else if (state.adHoc) {
         AdHocForm(state, viewModel)
         if (!state.currentIsTimed) {
@@ -856,7 +883,10 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
             TrackingModeRow(state, viewModel)
         }
         Spacer(Modifier.height(12.dp))
-        RpeSelector(state, viewModel, startsNext = true)
+        Button(
+            onClick = viewModel::startNextSet,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+        ) { Text("START NEXT SET") }
     } else {
         Card(Modifier.fillMaxWidth()) {
             Text(
@@ -866,8 +896,6 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
                 color = BarColors.Volt,
             )
         }
-        Spacer(Modifier.height(8.dp))
-        RpeSelector(state, viewModel, startsNext = false)
     }
     TextButton(onClick = viewModel::finishSession, modifier = Modifier.fillMaxWidth()) {
         Text("Finish session", color = BarColors.Sub)
@@ -930,34 +958,19 @@ private fun rpeColor(rpe: Int): Color = when {
 }
 
 /**
- * Rest-screen effort grid: tapping a narrative saves it on the finished set
- * (warm-ups get a flag instead of an RPE, keeping effort data clean) and,
- * when another set is queued, starts the next set in the same tap.
+ * End-of-set effort grid: tapping a narrative saves it on the finished set
+ * (warm-ups get a flag instead of an RPE, keeping effort data clean) and
+ * moves on to the rest screen.
  */
 @Composable
-private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, startsNext: Boolean) {
+private fun RpeSelector(state: RecordState, viewModel: RecordViewModel) {
     val feedback = state.lastFeedback
     val options =
         rpeOptions(
             timed = feedback?.actualDurationS != null,
             explosive = feedback?.explosive == true,
         )
-    val rated = state.lastSetRpe != null || state.lastSetFailed || state.lastSetWarmup
-    val ratedText =
-        options.firstOrNull {
-            when {
-                state.lastSetWarmup -> it.warmup
-                state.lastSetFailed -> it.failed
-                else -> !it.warmup && !it.failed && it.rpe == state.lastSetRpe
-            }
-        }?.description
-    SectionCaption(
-        when {
-            rated -> "Logged · ${ratedText ?: ""}"
-            startsNext -> "How was that set? Tap to log & start next set"
-            else -> "How was that set? Tap to log"
-        },
-    )
+    SectionCaption("How was that set? Tap to log")
     Spacer(Modifier.height(6.dp))
     options.chunked(2).forEach { row ->
         Row(
@@ -965,24 +978,32 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, startsNe
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         ) {
             row.forEach { option ->
-                val selected =
-                    when {
-                        option.warmup -> state.lastSetWarmup
-                        option.failed -> state.lastSetFailed
-                        else -> !state.lastSetWarmup && !state.lastSetFailed && state.lastSetRpe == option.rpe
-                    }
-                RpeTile(option, selected, modifier = Modifier.weight(1f)) {
-                    viewModel.rateLastSetAndContinue(option.rpe, failed = option.failed, warmup = option.warmup)
+                RpeTile(option, selected = false, modifier = Modifier.weight(1f)) {
+                    viewModel.rateLastSet(option.rpe, failed = option.failed, warmup = option.warmup)
                 }
             }
             if (row.size == 1) Spacer(Modifier.weight(1f))
         }
     }
-    if (startsNext) {
-        TextButton(onClick = viewModel::startNextSet, modifier = Modifier.fillMaxWidth()) {
-            Text("Start next set without logging", color = BarColors.Sub)
-        }
-    }
+}
+
+/** Rest-screen reminder of what was logged for the finished set (incl. auto-fail on early stop). */
+@Composable
+private fun LoggedEffortLine(state: RecordState) {
+    val feedback = state.lastFeedback ?: return
+    if (state.lastSetRpe == null && !state.lastSetFailed && !state.lastSetWarmup) return
+    val options =
+        rpeOptions(timed = feedback.actualDurationS != null, explosive = feedback.explosive)
+    val text =
+        options.firstOrNull {
+            when {
+                state.lastSetWarmup -> it.warmup
+                state.lastSetFailed -> it.failed
+                else -> !it.warmup && !it.failed && it.rpe == state.lastSetRpe
+            }
+        }?.description
+    SectionCaption("Effort · ${text ?: ""}", color = if (state.lastSetFailed) BarColors.Red else BarColors.Volt)
+    Spacer(Modifier.height(4.dp))
 }
 
 @Composable

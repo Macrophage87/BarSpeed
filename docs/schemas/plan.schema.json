@@ -5,47 +5,89 @@
   "description": "A training plan importable by AccelerometerLifting. LLMs generating plans MUST conform to this schema exactly.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "planName", "sessions"],
+  "required": [
+    "schemaVersion",
+    "planName",
+    "sessions"
+  ],
   "properties": {
-    "schemaVersion": { "enum": ["1.0", "1.1"] },
-    "planName": { "type": "string", "minLength": 1 },
-    "notes": { "type": "string" },
+    "schemaVersion": {
+      "enum": [
+        "1.0",
+        "1.1",
+        "1.2"
+      ]
+    },
+    "planName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "notes": {
+      "type": "string"
+    },
     "sessions": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/session" }
+      "items": {
+        "$ref": "#/$defs/session"
+      }
     }
   },
   "$defs": {
     "session": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "exercises"],
+      "required": [
+        "name",
+        "exercises"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "notes": { "type": "string" },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string"
+        },
         "exercises": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/exercise" }
+          "items": {
+            "$ref": "#/$defs/exercise"
+          }
         }
       }
     },
     "exercise": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["exercise", "sets"],
+      "required": [
+        "exercise",
+        "sets"
+      ],
       "properties": {
         "exercise": {
           "type": "string",
           "minLength": 1,
           "description": "Exercise id, snake_case (e.g. back_squat). Unknown ids create a custom exercise on import."
         },
-        "notes": { "type": "string", "description": "Coach comment (form cues, intent). Shown to the lifter in the app with each set of this exercise." },
+        "notes": {
+          "type": "string",
+          "description": "Coach comment (form cues, intent). Shown to the lifter in the app with each set of this exercise."
+        },
+        "start": {
+          "enum": [
+            "up",
+            "down"
+          ],
+          "description": "Which direction the lift starts: 'up' (press, deadlift, row - reps are counted on the concentric) or 'down' (squat, bench). Omitted: inferred from the exercise id."
+        },
         "sets": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/set" }
+          "items": {
+            "$ref": "#/$defs/set"
+          }
         }
       }
     },
@@ -53,24 +95,88 @@
       "type": "object",
       "additionalProperties": false,
       "oneOf": [
-        { "required": ["reps"], "not": { "required": ["duration_s"] } },
-        { "required": ["duration_s"], "not": { "anyOf": [{ "required": ["reps"] }, { "required": ["tempo"] }] } }
+        {
+          "required": [
+            "reps"
+          ],
+          "not": {
+            "required": [
+              "duration_s"
+            ]
+          }
+        },
+        {
+          "required": [
+            "duration_s"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "reps"
+                ]
+              },
+              {
+                "required": [
+                  "tempo"
+                ]
+              }
+            ]
+          }
+        }
       ],
-      "not": { "required": ["load_kg", "load_lb"] },
+      "not": {
+        "required": [
+          "load_kg",
+          "load_lb"
+        ]
+      },
       "properties": {
-        "reps": { "type": "integer", "minimum": 1, "description": "Rep count for dynamic sets. Provide exactly one of reps / duration_s." },
-        "duration_s": { "type": "integer", "minimum": 1, "description": "Hold/carry duration in seconds for timed sets (plank, farmer's walk). Provide exactly one of reps / duration_s." },
-        "load_kg": { "type": "number", "minimum": 0, "description": "Load in kilograms. Provide at most one of load_kg / load_lb; omit both for bodyweight." },
-        "load_lb": { "type": "number", "minimum": 0, "description": "Load in pounds; converted to kg on import. Provide at most one of load_kg / load_lb; omit both for bodyweight." },
-        "side": { "enum": ["left", "right"], "description": "For unilateral exercises (side plank, suitcase carry, single-leg RDL): which side this set trains. Emit one set per side." },
+        "reps": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Rep count for dynamic sets. Provide exactly one of reps / duration_s."
+        },
+        "duration_s": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Hold/carry duration in seconds for timed sets (plank, farmer's walk). Provide exactly one of reps / duration_s."
+        },
+        "load_kg": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Load in kilograms. Provide at most one of load_kg / load_lb; omit both for bodyweight."
+        },
+        "load_lb": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Load in pounds; converted to kg on import. Provide at most one of load_kg / load_lb; omit both for bodyweight."
+        },
+        "side": {
+          "enum": [
+            "left",
+            "right"
+          ],
+          "description": "For unilateral exercises (side plank, suitcase carry, single-leg RDL): which side this set trains. Emit one set per side."
+        },
         "tempo": {
           "type": "string",
           "pattern": "^([0-9]{4}|[0-9]{2}[Xx][0-9]|[0-9]+(\\.[0-9]+)?-[0-9]+(\\.[0-9]+)?-([0-9]+(\\.[0-9]+)?|[Xx])-[0-9]+(\\.[0-9]+)?)$",
           "description": "4-digit tempo: eccentric/bottom-pause/concentric/top-pause seconds; X = explosive concentric. E.g. 4010, 30X0, 4-0-1-0."
         },
-        "targetMeanConcentricVelocity_mps": { "type": "number", "exclusiveMinimum": 0 },
-        "velocityLossStop_pct": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
-        "rest_s": { "type": "integer", "minimum": 0 }
+        "targetMeanConcentricVelocity_mps": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "velocityLossStop_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        },
+        "rest_s": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     }
   }

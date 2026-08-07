@@ -32,7 +32,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Stage { SETUP, READY, IN_SET, RESTING, FINISHED }
+enum class Stage { SETUP, READY, IN_SET, RATING, RESTING, FINISHED }
 
 /** One planned set, flattened from the plan into an ordered queue. */
 data class PlannedSlot(
@@ -130,8 +130,9 @@ data class RecordState(
     val currentSlot: PlannedSlot? get() = queue.getOrNull(queueIndex)
     val nextSlot: PlannedSlot? get() = queue.getOrNull(queueIndex + 1)
 
-    /** Index of the first not-yet-done slot: during rest the current one is already complete. */
-    val upcomingIndex: Int get() = if (stage == Stage.RESTING) queueIndex + 1 else queueIndex
+    /** Index of the first not-yet-done slot: during rating/rest the current one is already complete. */
+    val upcomingIndex: Int
+        get() = if (stage == Stage.RATING || stage == Stage.RESTING) queueIndex + 1 else queueIndex
 
     /** Other exercises with sets still to do — offered when equipment is busy. */
     val exerciseChoices: List<ExerciseChoice>
@@ -171,7 +172,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var tickJob: Job? = null
     private var restJob: Job? = null
     private var demoJob: Job? = null
-    private var guidedJob: Job? = null
+    private var guidedCadence: GuidedCadenceRunner? = null
     private var setStartedAtMs = 0L
     private var lastRecordedSetId: Long? = null
 
@@ -222,7 +223,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 if (hr.rrIntervalsMs.isNotEmpty()) {
                     recentRrMs.addAll(hr.rrIntervalsMs)
                     while (recentRrMs.size > ROLLING_HRV_BEATS) recentRrMs.removeFirst()
-                    val inSession = stateFlow.value.stage in setOf(Stage.READY, Stage.IN_SET, Stage.RESTING)
+                    val inSession =
+                        stateFlow.value.stage in setOf(Stage.READY, Stage.IN_SET, Stage.RATING, Stage.RESTING)
                     if (inSession) sessionRrMs += hr.rrIntervalsMs
                 }
                 stateFlow.value =
@@ -369,12 +371,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Manual when chosen explicitly, or when there's no sensor and no demo.
         var manualSet = !s.currentIsTimed && (s.manualRequested || (!s.imuConnected && !s.demoMode))
         // Guided cadence: the app calls the tempo out loud and counts the reps
-        // itself. Chosen explicitly, or the default for sensorless tempo work.
+        // itself — the DEFAULT for all tempo work. A missed phase switch in
+        // sensor counting corrupts the whole set, so the app's own count wins;
+        // the sensor still records for velocity/power metrics. Explosive lifts
+        // (concentric is the metric) stay sensor-counted.
         val guidedTempo =
             (if (s.adHoc) s.tempoInput.ifBlank { null } else s.currentSlot?.tempo)?.let { Tempo.parseOrNull(it) }
-        val guidedSet =
-            !s.currentIsTimed && exercise.kind != ExerciseKind.EXPLOSIVE && guidedTempo != null &&
-                (s.guidedRequested || manualSet)
+        val guidedSet = !s.currentIsTimed && exercise.kind != ExerciseKind.EXPLOSIVE && guidedTempo != null
         if (guidedSet) manualSet = true
         setStartedAtMs = System.currentTimeMillis()
         RecordingService.start(getApplication())
@@ -436,91 +439,23 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         announceRepMilestones(live.repCount)
     }
 
-    /**
-     * Voice-guided cadence (e.g. tempo 4010): "Down, one, two, three, Up",
-     * ~2 s breather, "Rep one", and around again — with a 5 s lead-in so
-     * there's time to get positioned on the bar. Concentric-first lifts
-     * (press, deadlift, row) run the cycle the way they're performed: "Up",
-     * hold, counted "Down", breather at the rack/floor. The app counts the
-     * reps; the lifter just follows the voice.
-     */
+    /** See [GuidedCadenceRunner]; the runner speaks and counts, the VM just mirrors state. */
     private fun startGuidedCadence(tempo: Tempo, plannedReps: Int?, concentricFirst: Boolean) {
         if (voice == null) voice = VoiceCounter(getApplication())
-        guidedJob =
-            viewModelScope.launch {
-                speakGuided("Ready")
-                countdownPhase("GET READY", GUIDED_LEAD_IN_S)
-                var rep = 1
-                while (true) {
-                    if (concentricFirst) {
-                        guidedConcentric(tempo)
-                        val topS = tempo.topPauseS.toInt()
-                        if (topS > 0) {
-                            speakGuided("Hold")
-                            countdownPhase("HOLD", topS)
-                        }
-                        guidedCountedEccentric(tempo)
-                        countdownPhase("BREATHE", maxOf(tempo.bottomPauseS.toInt(), GUIDED_BREATHER_MIN_S))
-                    } else {
-                        guidedCountedEccentric(tempo)
-                        val bottomS = tempo.bottomPauseS.toInt()
-                        if (bottomS > 0) {
-                            speakGuided("Hold")
-                            countdownPhase("HOLD", bottomS)
-                        }
-                        guidedConcentric(tempo)
-                        countdownPhase("BREATHE", maxOf(tempo.topPauseS.toInt(), GUIDED_BREATHER_MIN_S))
-                    }
-                    stateFlow.value = stateFlow.value.copy(manualReps = rep)
-                    when {
-                        plannedReps != null && rep >= plannedReps -> {
-                            speakGuided("Done")
-                            updateGuided("DONE", 0, 1)
-                            return@launch
-                        }
-                        plannedReps != null && rep == plannedReps - 1 -> speakGuided("Last rep")
-                        else -> speakGuided("Rep $rep")
-                    }
-                    delay(1_000)
-                    rep++
-                }
-            }
-    }
-
-    private suspend fun guidedCountedEccentric(tempo: Tempo) {
-        val eccS = tempo.eccentricS.toInt().coerceAtLeast(1)
-        speakGuided("Down")
-        updateGuided("DOWN", eccS, eccS)
-        for (second in 1..eccS) {
-            delay(1_000)
-            if (second < eccS) {
-                speakGuided("$second")
-                updateGuided("DOWN", eccS - second, eccS)
-            }
-        }
-    }
-
-    private suspend fun guidedConcentric(tempo: Tempo) {
-        speakGuided("Up")
-        countdownPhase("UP", (tempo.concentricS ?: 1.0).toInt().coerceAtLeast(1))
-    }
-
-    private suspend fun countdownPhase(label: String, seconds: Int) {
-        updateGuided(label, seconds, seconds.coerceAtLeast(1))
-        repeat(seconds) { done ->
-            delay(1_000)
-            updateGuided(label, seconds - done - 1, seconds.coerceAtLeast(1))
-        }
-    }
-
-    private fun updateGuided(label: String, remaining: Int, total: Int) {
-        stateFlow.value =
-            stateFlow.value.copy(guidedLabel = label, guidedCountdown = remaining, guidedPhaseTotal = total)
-    }
-
-    /** Guided cadence is an audio feature: it speaks even with the count toggle off. */
-    private fun speakGuided(text: String) {
-        voice?.speak(text)
+        guidedCadence =
+            GuidedCadenceRunner(
+                scope = viewModelScope,
+                speak = { voice?.speak(it) },
+                update = { label, remaining, total ->
+                    stateFlow.value =
+                        stateFlow.value.copy(
+                            guidedLabel = label,
+                            guidedCountdown = remaining,
+                            guidedPhaseTotal = total,
+                        )
+                },
+                onRepCounted = { rep -> stateFlow.value = stateFlow.value.copy(manualReps = rep) },
+            ).also { it.start(tempo, plannedReps, concentricFirst) }
     }
 
     /** Tap-to-count for sensorless sets; announces milestones like sensor reps. */
@@ -582,7 +517,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         hrJob?.cancel()
         tickJob?.cancel()
         demoJob?.cancel()
-        guidedJob?.cancel()
+        guidedCadence?.cancel()
         val s = stateFlow.value
         val exercise = currentExercise(s)
         val slot = s.currentSlot
@@ -612,6 +547,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     velocityLossStopPct = slot?.velocityLossStopPct,
                 )
             val manualReps = if (s.manualSet) s.manualReps else null
+            // Sensor data is analyzed even on manually-counted sets — the manual
+            // count overrides the rep COUNT, but velocity/power metrics still come
+            // from the bar sensor when it was recording.
             val analysis =
                 withContext(Dispatchers.Default) {
                     when {
@@ -622,9 +560,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                             null,
                             timedVerdicts(actualDurationS, plannedDurationS),
                         )
+                        samples.size >= 8 -> SetAnalyzer.analyze(samples, exercise.startsWith, loadKg, targets)
                         manualReps != null ->
                             SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))
-                        samples.size >= 8 -> SetAnalyzer.analyze(samples, exercise.startsWith, loadKg, targets)
                         else -> SetAnalysis(emptyList(), 0.0, null, null, listOf("No sensor data recorded."))
                     }
                 }
@@ -662,10 +600,24 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 ),
             )
 
+            // Stopped early = failed. Judged only where the count is trustworthy:
+            // timed sets against the clock, manual/guided sets against the app's
+            // own rep count — never against a possibly-miscounted sensor total.
+            val stoppedEarly =
+                when {
+                    isTimed && plannedDurationS != null ->
+                        (actualDurationS ?: 0) < (plannedDurationS * TIMED_CLOSE_ENOUGH_FRACTION).toInt()
+                    manualReps != null && plannedReps != null -> manualReps < plannedReps
+                    else -> false
+                }
+            if (stoppedEarly) {
+                lastRecordedSetId?.let { sessionRepository.rateSet(it, rpe = null, failed = true, warmup = false) }
+            }
+
             val restS = slot?.restS ?: DEFAULT_REST_S
             stateFlow.value =
                 stateFlow.value.copy(
-                    stage = Stage.RESTING,
+                    stage = if (stoppedEarly) Stage.RESTING else Stage.RATING,
                     restTotalS = restS,
                     lastFeedback =
                     SetFeedback(
@@ -681,7 +633,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         repsOverride = manualReps,
                     ),
                     lastSetRpe = null,
-                    lastSetFailed = false,
+                    lastSetFailed = stoppedEarly,
                     lastSetWarmup = false,
                     restRemainingS = restS,
                     setsCompleted = stateFlow.value.setsCompleted + 1,
@@ -715,18 +667,24 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             }
     }
 
-    /**
-     * Rest-screen RPE tap: saves the rating on the just-finished set, then —
-     * when another set is queued (or ad-hoc) — immediately starts the next set.
-     */
-    fun rateLastSetAndContinue(rpe: Int?, failed: Boolean, warmup: Boolean) {
+    /** End-of-set RPE tap: saves the rating on the just-finished set, then rest begins. */
+    fun rateLastSet(rpe: Int?, failed: Boolean, warmup: Boolean) {
         val setId = lastRecordedSetId ?: return
         viewModelScope.launch {
             sessionRepository.rateSet(setId, rpe, failed, warmup)
             stateFlow.value =
-                stateFlow.value.copy(lastSetRpe = rpe, lastSetFailed = failed, lastSetWarmup = warmup)
-            if (stateFlow.value.adHoc || stateFlow.value.nextSlot != null) startNextSet()
+                stateFlow.value.copy(
+                    stage = Stage.RESTING,
+                    lastSetRpe = rpe,
+                    lastSetFailed = failed,
+                    lastSetWarmup = warmup,
+                )
         }
+    }
+
+    /** Leave the effort question unanswered and head into rest. */
+    fun skipRating() {
+        stateFlow.value = stateFlow.value.copy(stage = Stage.RESTING)
     }
 
     /** Advance to the next planned set, applying any in-rest load/rep edits. */
@@ -773,7 +731,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun flattenPlan(planSession: PlanSessionDef): List<PlannedSlot> {
         val slots = mutableListOf<PlannedSlot>()
         for ((exerciseIdx, exerciseDef) in planSession.exercises.withIndex()) {
-            val exercise = sessionRepository.exerciseById(exerciseDef.exercise)
+            val base = sessionRepository.exerciseById(exerciseDef.exercise)
+            // A plan-pinned "start": "up"/"down" beats seed defaults and name inference.
+            val exercise =
+                exerciseDef.startPhaseOverride?.let { base.copy(startsWith = it) } ?: base
             exerciseDef.sets.forEachIndexed { setIdx, set ->
                 slots +=
                     PlannedSlot(
@@ -852,7 +813,5 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
         /** ~2 minutes of beats at typical training heart rates. */
         const val ROLLING_HRV_BEATS = 150
-        const val GUIDED_LEAD_IN_S = 5
-        const val GUIDED_BREATHER_MIN_S = 2
     }
 }

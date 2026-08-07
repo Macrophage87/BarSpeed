@@ -39,9 +39,10 @@ First decide, from this conversation so far, whether you already have what you n
 Output rules: produce ONLY a JSON document — as a downloadable .json file if you can create files, otherwise as a single raw JSON code block with no prose around it.
 
 The JSON must conform exactly to this schema:
-- Top level: {"schemaVersion": "1.1", "planName": string, "notes": optional string, "sessions": [...]}
+- Top level: {"schemaVersion": "1.2", "planName": string, "notes": optional string, "sessions": [...]}
 - Session: {"name": string, "notes": optional string, "exercises": [...]}
-- Exercise: {"exercise": snake_case_id, "notes": optional coaching cue shown to me in-app, "sets": [...]}
+- Exercise: {"exercise": snake_case_id, "notes": optional coaching cue shown to me in-app, "start": optional "up"|"down", "sets": [...]}
+  "start" pins which direction the lift begins: "up" for lifts that drive first (press from the rack, deadlift, row — reps are keyed on the concentric), "down" for lifts that lower first (squat, bench). Omit it and the app infers from the id.
   Built-in ids: back_squat, front_squat, bench_press, overhead_press, deadlift, romanian_deadlift, barbell_row, hip_thrust; timed: plank, side_plank, dead_hang, farmers_walk, suitcase_carry; explosive (peak-velocity tracked, no tempo): snatch, power_snatch, clean, power_clean, push_press, kettlebell_swing, kettlebell_snatch, kettlebell_clean. Other snake_case ids are allowed; include words like dumbbell/cable/plank/carry/swing in the id so the app infers the right tracking mode.
 - Set: exactly one of {"reps": int} (dynamic) or {"duration_s": int} (holds/carries). Load: at most one of "load_kg" / "load_lb" (omit both for bodyweight). Optional: "tempo" (4-digit like "4010", dynamic sets only), "side" ("left"/"right" for unilateral work — emit one set per side), "targetMeanConcentricVelocity_mps", "velocityLossStop_pct", "rest_s".
 
@@ -80,9 +81,12 @@ private val SECTIONS =
             "Start a session from the home screen. Each set shows live bar velocity, the tempo ring, " +
                 "and per-rep bars; explosive lifts show peak velocity and cadence; holds and carries " +
                 "get a countdown. Equipment busy? 'Switch exercise' reorders the queue. Barbell sets " +
-                "show which plates to load per side. After each set, correct the rep count if needed, " +
-                "then tap how hard it felt — that logs the effort (or warm-up/failed) and starts the " +
-                "next set in one tap.",
+                "show which plates to load per side. Tempo sets are counted by the app's voice guide " +
+                "by default — a miscounted phase switch would corrupt the whole set — while the " +
+                "sensor still records velocity and power; explosive lifts stay sensor-counted. " +
+                "Right when a set ends, tap how hard it felt (warm-up and failed included); a set " +
+                "stopped short of its target is logged as failed automatically. Rest follows, then " +
+                "'Start next set'.",
         ),
         GuideSection(
             "Voice",
