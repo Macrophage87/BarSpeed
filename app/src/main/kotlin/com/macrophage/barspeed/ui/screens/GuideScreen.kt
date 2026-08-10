@@ -82,9 +82,10 @@ private val SECTIONS =
             "Start a session from the home screen. Each set shows live bar velocity, the tempo ring, " +
                 "and per-rep bars; explosive lifts show peak velocity and cadence; holds and carries " +
                 "get a countdown. Equipment busy? 'Switch exercise' reorders the queue. Barbell sets " +
-                "show which plates to load per side. Tempo sets are counted by the app's voice guide " +
-                "by default — a miscounted phase switch would corrupt the whole set — while the " +
-                "sensor still records velocity and power; explosive lifts stay sensor-counted. " +
+                "show which plates to load per side. The bar sensor is RECORD-ONLY on standard " +
+                "lifts: it measures velocity and power while the reps are counted by you (tap) or " +
+                "by the voice guide on tempo sets — a miscounted phase switch can't corrupt the " +
+                "count. Explosive lifts stay sensor-counted. " +
                 "Right when a set ends, tap how hard it felt (warm-up and failed included); a set " +
                 "stopped short of its target is logged as failed automatically. Rest follows, then " +
                 "'Start next set'.",

@@ -188,14 +188,15 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     } else {
         AdHocForm(state, viewModel)
     }
-    if (!state.currentIsTimed) {
-        Spacer(Modifier.height(8.dp))
-        TrackingModeRow(state, viewModel)
-    }
     Spacer(Modifier.height(12.dp))
-    val manual = !state.currentIsTimed && (state.manualRequested || (!state.imuConnected && !state.demoMode))
+    // The bar sensor is record-only for standard lifts: the lifter (or the
+    // voice guide) counts; explosive lifts stay sensor-counted.
+    val kind = state.currentSlot?.exercise?.kind
+        ?: state.exerciseOptions.firstOrNull { it.id == state.selectedExerciseId }?.kind
+    val manual = !state.currentIsTimed && !state.demoMode &&
+        (kind != ExerciseKind.EXPLOSIVE || !state.imuConnected)
     Button(onClick = viewModel::beginSet, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-        Text(if (manual) "START SET — manual count" else "START SET", fontWeight = FontWeight.Bold)
+        Text(if (manual) "START SET — you count" else "START SET", fontWeight = FontWeight.Bold)
     }
     Spacer(Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -207,13 +208,6 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
             )
         }
         AudioCueChip(state, viewModel)
-        if (!state.currentIsTimed) {
-            FilterChip(
-                selected = state.guidedRequested,
-                onClick = viewModel::toggleGuided,
-                label = { Text(if (state.guidedRequested) "Guided tempo ON" else "Guided tempo") },
-            )
-        }
     }
     TextButton(onClick = viewModel::finishSession, modifier = Modifier.fillMaxWidth()) {
         Text("Finish session", color = BarColors.Sub)
@@ -259,27 +253,6 @@ private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel
             confirmButton = {
                 TextButton(onClick = { showChooser = false }) { Text("Cancel") }
             },
-        )
-    }
-}
-
-/** Sensor (auto) vs manual tracking for the upcoming set; sticky across sets. */
-@Composable
-private fun TrackingModeRow(state: RecordState, viewModel: RecordViewModel) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Tracking", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
-        FilterChip(
-            selected = !state.manualRequested,
-            onClick = { viewModel.setManualMode(false) },
-            label = { Text(if (state.imuConnected || state.demoMode) "Auto (sensor)" else "Auto (no sensor)") },
-        )
-        FilterChip(
-            selected = state.manualRequested,
-            onClick = { viewModel.setManualMode(true) },
-            label = { Text("Manual") },
         )
     }
 }
@@ -867,10 +840,6 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
                 )
             }
         }
-        if (next.isTimed.not()) {
-            Spacer(Modifier.height(8.dp))
-            TrackingModeRow(state, viewModel)
-        }
         Spacer(Modifier.height(12.dp))
         Button(
             onClick = viewModel::startNextSet,
@@ -878,10 +847,6 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
         ) { Text("START NEXT SET") }
     } else if (state.adHoc) {
         AdHocForm(state, viewModel)
-        if (!state.currentIsTimed) {
-            Spacer(Modifier.height(8.dp))
-            TrackingModeRow(state, viewModel)
-        }
         Spacer(Modifier.height(12.dp))
         Button(
             onClick = viewModel::startNextSet,

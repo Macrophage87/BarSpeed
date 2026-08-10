@@ -95,13 +95,9 @@ data class RecordState(
     val sideInput: String? = null,
     val tempoInput: String = "",
     val live: LiveSetState = LiveSetState(),
-    /** Lifter forced manual tracking for upcoming sets (e.g. cable work with the sensor still on the bar). */
-    val manualRequested: Boolean = false,
     /** Sensorless rep set: the lifter taps to count reps. */
     val manualSet: Boolean = false,
     val manualReps: Int = 0,
-    /** Lifter opted into voice-guided cadence for tempo work. */
-    val guidedRequested: Boolean = false,
     /** Active guided-cadence set: the app calls the tempo and counts the reps. */
     val guidedSet: Boolean = false,
     val guidedLabel: String = "",
@@ -338,15 +334,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = stateFlow.value.copy(sideInput = side)
     }
 
-    fun toggleGuided() {
-        stateFlow.value = stateFlow.value.copy(guidedRequested = !stateFlow.value.guidedRequested)
-    }
-
-    /** Choose sensor (auto) vs manual tracking for the next sets; sticky until changed. */
-    fun setManualMode(manual: Boolean) {
-        stateFlow.value = stateFlow.value.copy(manualRequested = manual)
-    }
-
     fun updateTempoInput(text: String) {
         stateFlow.value = stateFlow.value.copy(tempoInput = text)
     }
@@ -373,8 +360,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             }
         // Never announce reps on timed sets: a carry's gait can trip the rep detector.
         announceReps = !s.currentIsTimed
-        // Manual when chosen explicitly, or when there's no sensor and no demo.
-        var manualSet = !s.currentIsTimed && (s.manualRequested || (!s.imuConnected && !s.demoMode))
+        // The bar sensor is RECORD-ONLY for standard lifts: the lifter (or the
+        // voice guide) counts the reps, while sensor data feeds velocity/power
+        // analysis. Explosive lifts stay sensor-counted (single drives, peak
+        // velocity is the point) unless no sensor is present. Demo mode keeps
+        // sensor counting to showcase the live tracking.
+        var manualSet = !s.currentIsTimed && !s.demoMode &&
+            (exercise.kind != ExerciseKind.EXPLOSIVE || !s.imuConnected)
         // Guided cadence: the app calls the tempo out loud and counts the reps
         // itself — the DEFAULT for all tempo work. A missed phase switch in
         // sensor counting corrupts the whole set, so the app's own count wins;
