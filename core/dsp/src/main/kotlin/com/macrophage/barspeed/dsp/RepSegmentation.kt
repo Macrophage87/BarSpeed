@@ -60,7 +60,8 @@ object RepSegmenter {
                 start = i
             }
         }
-        // Demote movement runs that never exceed the start threshold or are too brief.
+        // Demote movement runs that never exceed the start threshold, are too
+        // brief, or displace implausibly far (unanchored drift, not a lift).
         val demoted =
             runs.map { run ->
                 if (run.type == RunType.STILL) {
@@ -68,7 +69,10 @@ object RepSegmenter {
                 } else {
                     val duration = series.timeS[run.endIdx] - series.timeS[run.startIdx]
                     val peak = (run.startIdx..run.endIdx).maxOf { abs(v[it]) }
-                    if (peak < config.startThresholdMps || duration < config.minPhaseS) {
+                    val disp = displacement(series, run.startIdx, run.endIdx)
+                    if (peak < config.startThresholdMps || duration < config.minPhaseS ||
+                        disp > config.maxRunDisplacementM
+                    ) {
                         run.copy(type = RunType.STILL)
                     } else {
                         run
@@ -93,44 +97,80 @@ object RepSegmenter {
         series: VelocitySeries,
         startsWith: StartPhase,
         config: DspConfig,
-    ): List<RepSpan> {
-        val firstType = if (startsWith == StartPhase.ECCENTRIC) RunType.DOWN else RunType.UP
-        val secondType = if (startsWith == StartPhase.ECCENTRIC) RunType.UP else RunType.DOWN
+    ): List<RepSpan> = if (startsWith == StartPhase.ECCENTRIC) {
+        pairEccentricFirst(runs, series, config)
+    } else {
+        pairConcentricFirst(runs, series, config)
+    }
+
+    /** Ecc-first lifts: a rep is a qualifying down+up pair (kills walkout/re-rack bumps). */
+    private fun pairEccentricFirst(runs: List<Run>, series: VelocitySeries, config: DspConfig): List<RepSpan> {
         val reps = mutableListOf<RepSpan>()
         var i = 0
         while (i < runs.size) {
             val first = runs[i]
-            if (first.type != firstType) {
+            if (first.type != RunType.DOWN) {
                 i++
                 continue
             }
-            // Find the matching second movement, allowing one STILL run between.
+            // Find the matching up movement, allowing one STILL run between.
             var j = i + 1
             while (j < runs.size && runs[j].type == RunType.STILL) j++
-            if (j >= runs.size || runs[j].type != secondType) {
+            if (j >= runs.size || runs[j].type != RunType.UP) {
                 i++
                 continue
             }
             val second = runs[j]
             val midPauseS = series.timeS[second.startIdx] - series.timeS[first.endIdx]
-            // End pause: stillness after the second movement until the next movement run.
-            var k = j + 1
-            while (k < runs.size && runs[k].type == RunType.STILL) k++
-            val endBoundaryIdx = if (k < runs.size) runs[k].startIdx else series.size - 1
+            val endBoundaryIdx = nextMovementStart(runs, j + 1, series)
             val endPauseS = series.timeS[endBoundaryIdx] - series.timeS[second.endIdx]
-
-            val rom = displacement(series, second.startIdx, second.endIdx)
-            if (rom >= config.minRomM) {
-                reps +=
-                    if (startsWith == StartPhase.ECCENTRIC) {
-                        RepSpan(first.startIdx, first.endIdx, second.startIdx, second.endIdx, midPauseS, endPauseS)
-                    } else {
-                        RepSpan(second.startIdx, second.endIdx, first.startIdx, first.endIdx, midPauseS, endPauseS)
-                    }
+            if (displacement(series, second.startIdx, second.endIdx) >= config.minRomM) {
+                reps += RepSpan(first.startIdx, first.endIdx, second.startIdx, second.endIdx, midPauseS, endPauseS)
             }
             i = j + 1
         }
         return reps
+    }
+
+    /**
+     * Con-first lifts (press, deadlift): the DRIVE alone makes the rep — a slow
+     * controlled lowering often never exceeds the run threshold, and requiring a
+     * down pair would then drop the whole rep. A following down run, when seen,
+     * supplies the eccentric metrics; otherwise the eccentric span is empty.
+     */
+    private fun pairConcentricFirst(runs: List<Run>, series: VelocitySeries, config: DspConfig): List<RepSpan> {
+        val reps = mutableListOf<RepSpan>()
+        var i = 0
+        while (i < runs.size) {
+            val con = runs[i]
+            if (con.type != RunType.UP || displacement(series, con.startIdx, con.endIdx) < config.minRomM) {
+                i++
+                continue
+            }
+            var j = i + 1
+            while (j < runs.size && runs[j].type == RunType.STILL) j++
+            if (j < runs.size && runs[j].type == RunType.DOWN) {
+                val ecc = runs[j]
+                val midPauseS = series.timeS[ecc.startIdx] - series.timeS[con.endIdx]
+                val endBoundaryIdx = nextMovementStart(runs, j + 1, series)
+                val endPauseS = series.timeS[endBoundaryIdx] - series.timeS[ecc.endIdx]
+                reps += RepSpan(ecc.startIdx, ecc.endIdx, con.startIdx, con.endIdx, midPauseS, endPauseS)
+                i = j + 1
+            } else {
+                // No detectable lowering — count the drive, leave the eccentric empty.
+                val endBoundaryIdx = if (j < runs.size) runs[j].startIdx else series.size - 1
+                val endPauseS = series.timeS[endBoundaryIdx] - series.timeS[con.endIdx]
+                reps += RepSpan(con.endIdx, con.endIdx, con.startIdx, con.endIdx, 0.0, endPauseS)
+                i = j
+            }
+        }
+        return reps
+    }
+
+    private fun nextMovementStart(runs: List<Run>, from: Int, series: VelocitySeries): Int {
+        var k = from
+        while (k < runs.size && runs[k].type == RunType.STILL) k++
+        return if (k < runs.size) runs[k].startIdx else series.size - 1
     }
 
     internal fun displacement(series: VelocitySeries, startIdx: Int, endIdx: Int): Double {

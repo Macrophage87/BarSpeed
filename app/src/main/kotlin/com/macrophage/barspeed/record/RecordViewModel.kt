@@ -440,8 +440,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         imuBuffer += sample
         val live = tracker?.feed(sample) ?: return
         stateFlow.value = stateFlow.value.copy(live = live)
-        countPhaseSeconds(live.phase, live.currentPhaseElapsedS)
-        announceRepMilestones(live.repCount)
+        // Manual/guided sets: the app (or the lifter) is the counter — the
+        // sensor keeps recording for velocity metrics, but its phase counts and
+        // rep calls must stay silent or two voices count over each other.
+        if (!stateFlow.value.manualSet) {
+            countPhaseSeconds(live.phase, live.currentPhaseElapsedS)
+            announceRepMilestones(live.repCount)
+        }
     }
 
     /** See [GuidedCadenceRunner]; the runner speaks and counts, the VM just mirrors state. */

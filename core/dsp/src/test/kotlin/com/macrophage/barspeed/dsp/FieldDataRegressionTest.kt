@@ -89,6 +89,28 @@ class FieldDataRegressionTest {
     }
 
     @Test
+    fun `slow-eccentric seated press counts on the drive alone`() {
+        // 2 real reps of seated OHP at tempo 3010: the ~5 s lowering averages
+        // ~0.08 m/s — under the run threshold — so batch pairing that REQUIRED
+        // a down run used to find 0 reps here. Con-first counting keys on the
+        // drive; the eccentric is optional metric data. The second press sits
+        // inside end-of-set re-rack drift (a 9 m phantom run, discarded by the
+        // displacement cap), so batch recovers 1-2 reps — all must be sane.
+        val samples = load("field-seated-ohp-2rep.csv")
+        val analysis = SetAnalyzer.analyze(samples, StartPhase.CONCENTRIC, loadKg = 20.4)
+        assertTrue(analysis.reps.size in 1..2, "reps ${analysis.reps.size} (2 real presses)")
+        analysis.reps.forEach { rep ->
+            assertTrue(rep.conS in 0.2..2.5, "concentric ${rep.conS}s is implausible")
+            assertTrue(rep.romM in 0.1..1.2, "ROM ${rep.romM}m is implausible")
+        }
+
+        val tracker = StreamingSetTracker(StartPhase.CONCENTRIC)
+        var last = LiveSetState()
+        samples.forEach { last = tracker.feed(it) }
+        assertEquals(2, last.repCount, "live count should match the 2 real presses")
+    }
+
+    @Test
     fun `streaming tracker counts presses live despite bursty arrivals`() {
         val samples = load("field-ohp-100hz-bursty.csv")
         // Presses from the rack position drive up first — concentric-first

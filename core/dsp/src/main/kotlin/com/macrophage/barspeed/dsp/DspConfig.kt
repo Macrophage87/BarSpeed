@@ -40,4 +40,10 @@ data class DspConfig(
      * ~0.5 m squats measured only ~0.15-0.2 m in 10 Hz field data.
      */
     val minRomM: Double = 0.10,
+    /**
+     * No real barbell phase displaces more than this (m); movement runs beyond
+     * it are unanchored integration drift (typically end-of-set re-rack and
+     * bar handling with no quiet window to re-anchor on) and are discarded.
+     */
+    val maxRunDisplacementM: Double = 2.0,
 )
