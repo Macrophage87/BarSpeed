@@ -192,7 +192,7 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
                 if (a.reps.isNotEmpty()) {
                     SetVelocityBars(record, a)
                     record.tempo?.let { Tempo.parseOrNull(it) }?.let { tempo ->
-                        SetTempoChart(a, tempo.eccentricS)
+                        SetTempoChart(a, tempo.downS)
                     }
                     powerSummary(a)?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
@@ -287,7 +287,8 @@ private fun SetTempoChart(analysis: SetAnalysis, targetEccS: Double) {
     SectionCaption("Eccentric time vs ${trimNum(targetEccS)} s target")
     Spacer(Modifier.height(2.dp))
     TargetLineBars(
-        values = analysis.reps.map { it.eccS },
+        // Unmeasured eccentrics are omitted, not charted as zero.
+        values = analysis.reps.mapNotNull { it.eccS },
         target = targetEccS,
         colorFor = { _, v -> if (abs(v - targetEccS) <= TEMPO_TOLERANCE_S) BarColors.Volt else BarColors.Amber },
         chartHeight = 48,

@@ -14,6 +14,8 @@ import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.SetTargets
 import com.macrophage.barspeed.dsp.StreamingSetTracker
 import com.macrophage.barspeed.dsp.SyntheticSets
+import com.macrophage.barspeed.dsp.TempoSchedule
+import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.hrm.Hrv
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
@@ -802,9 +804,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 delay(1_500)
                 val spec =
                     SyntheticSets.RepSpec(
-                        eccS = tempo?.eccentricS?.coerceAtLeast(0.5) ?: 2.0,
+                        eccS = tempo?.downS?.coerceAtLeast(0.5) ?: 2.0,
                         bottomPauseS = (tempo?.bottomPauseS ?: 0.3).coerceAtLeast(0.3),
-                        conS = tempo?.concentricS ?: 1.0,
+                        conS = tempo?.upS ?: 1.0,
                         topPauseS = (tempo?.topPauseS ?: 1.0).coerceAtLeast(0.8),
                         romM = 0.55,
                     )

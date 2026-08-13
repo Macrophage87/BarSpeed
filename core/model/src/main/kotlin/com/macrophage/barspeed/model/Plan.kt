@@ -123,6 +123,12 @@ data class PlanExerciseDef(
      */
     val sensorInverted: Boolean = false,
     /**
+     * True when the sensor rides the cable weight stack rather than the handle.
+     * The stack travels VERTICALLY however the lifter moves, so this — not
+     * [plane] — is what decides which axis is measured.
+     */
+    val sensorOnStack: Boolean = false,
+    /**
      * Lifter-side travel per unit of sensor travel, for pulleys that do not move
      * 1:1 — a 2:1 cable moves the handle twice as far as the stack, so `2`.
      * Defaults to 1.

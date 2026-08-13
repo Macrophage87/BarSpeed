@@ -35,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.data.PlanEntity
 import com.macrophage.barspeed.data.PlanImportResult
+import com.macrophage.barspeed.ui.BarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

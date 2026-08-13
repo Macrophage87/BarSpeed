@@ -722,8 +722,8 @@ private fun TempoRing(state: RecordState, slot: PlannedSlot?) {
 }
 
 private fun phaseTargetS(tempo: Tempo, phase: Phase): Double? = when (phase) {
-    Phase.ECCENTRIC -> tempo.eccentricS
-    Phase.CONCENTRIC -> tempo.concentricS
+    Phase.ECCENTRIC -> tempo.downS
+    Phase.CONCENTRIC -> tempo.upS
     Phase.BOTTOM_PAUSE -> tempo.bottomPauseS
     Phase.TOP_PAUSE -> tempo.topPauseS
     Phase.IDLE -> null
@@ -1109,7 +1109,7 @@ private fun RepQualityCard(feedback: SetFeedback) {
         Column(Modifier.padding(14.dp)) {
             when {
                 feedback.explosive -> PeakVelocityChart(analysis)
-                tempo != null -> EccTempoChart(analysis, tempo.eccentricS)
+                tempo != null -> EccTempoChart(analysis, tempo.downS)
                 else -> ConVelocityChart(analysis)
             }
         }
@@ -1151,7 +1151,8 @@ private fun EccTempoChart(analysis: SetAnalysis, targetEccS: Double) {
         color = BarColors.Sub,
     )
     Spacer(Modifier.height(8.dp))
-    val eccTimes = analysis.reps.map { it.eccS }
+    // Reps whose eccentric was never measured are left out rather than charted as 0.
+    val eccTimes = analysis.reps.mapNotNull { it.eccS }
     TargetLineBars(
         values = eccTimes,
         target = targetEccS,
