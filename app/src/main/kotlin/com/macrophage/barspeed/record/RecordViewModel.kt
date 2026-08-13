@@ -111,6 +111,8 @@ data class RecordState(
     val guidedLabel: String = "",
     val guidedCountdown: Int = 0,
     val guidedPhaseTotal: Int = 1,
+    /** True once the voice guide has called the prescription all the way through. */
+    val guidedFinished: Boolean = false,
     val setElapsedS: Int = 0,
     val hrBpm: Int? = null,
     /** Rolling HRV (RMSSD, ms) over the last ~2 minutes of beats. */
@@ -172,16 +174,21 @@ data class RecordState(
      * way out is to stop early, which is a failed set.
      *
      * Judged exactly where the count can be trusted, matching the auto-fail rule
-     * in [RecordViewModel.endSet]: timed sets against the clock, manual and
-     * guided sets against the app's own rep count. A sensor total is never
-     * trusted here — a low miscount would otherwise leave a lifter who finished
-     * every rep with no way to end the set except by logging it as a failure —
-     * and a set with no target has nothing to fall short of.
+     * in [RecordViewModel.endSet]: timed sets against the clock, voice-guided
+     * sets against the guide, and hand-counted sets against the app's own rep
+     * count. A sensor total is never trusted here — a low miscount would
+     * otherwise leave a lifter who finished every rep with no way to end the set
+     * except by logging it as a failure — and a set with no target has nothing
+     * to fall short of.
      */
     val setTargetMet: Boolean
         get() = when {
             currentIsTimed ->
                 currentTimedTargetS?.let { setElapsedS >= (it * TIMED_CLOSE_ENOUGH_FRACTION).toInt() } ?: true
+            // The guide finishing IS the set being done. Its rep count lands one
+            // stroke early, before the closing cue is even spoken, and a guided
+            // set given no rep target never finishes on its own at all.
+            guidedSet -> guidedFinished || currentTargetReps == null
             manualSet -> currentTargetReps?.let { manualReps >= it } ?: true
             else -> true
         }
@@ -470,6 +477,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 guidedSet = guidedSet,
                 guidedLabel = "",
                 guidedCountdown = 0,
+                guidedFinished = false,
             )
         if (guidedSet && guidedTempo != null) {
             startGuidedCadence(TempoSchedule.of(guidedTempo, exercise.liftDirection()), plannedRepsForSet)
@@ -505,6 +513,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         )
                 },
                 onRepCounted = { rep -> stateFlow.value = stateFlow.value.copy(manualReps = rep) },
+                onFinished = { stateFlow.value = stateFlow.value.copy(guidedFinished = true) },
             ).also { it.start(schedule, plannedReps) }
     }
 

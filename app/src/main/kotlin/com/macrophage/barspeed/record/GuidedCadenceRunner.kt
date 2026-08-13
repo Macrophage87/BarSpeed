@@ -33,6 +33,12 @@ class GuidedCadenceRunner(
     private val update: (String, Int, Int) -> Unit,
     /** Called each time a full rep cycle completes, with the running count. */
     private val onRepCounted: (Int) -> Unit,
+    /**
+     * Called once the prescription has been called all the way through. Not
+     * called when the runner is cancelled — a set the lifter cut short did not
+     * finish, and nothing downstream should think it did.
+     */
+    private val onFinished: () -> Unit = {},
 ) {
     private var job: Job? = null
 
@@ -61,6 +67,7 @@ class GuidedCadenceRunner(
                     }
                     if (done) {
                         update("DONE", 0, 1)
+                        onFinished()
                         return@launch
                     }
                     countdownPhase("BREATHE", closing)
