@@ -13,7 +13,6 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.SetTargets
 import com.macrophage.barspeed.dsp.StreamingSetTracker
-import com.macrophage.barspeed.dsp.SyntheticSets
 import com.macrophage.barspeed.dsp.TempoSchedule
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.hrm.Hrv
@@ -35,7 +34,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Stage { SETUP, READY, IN_SET, RATING, RESTING, FINISHED }
+enum class Stage { SETUP, READY, IN_SET, RESTING, FINISHED }
+
+/**
+ * How the set felt, tapped at the moment the set ends. The effort grid IS the
+ * end-set control — one tap finishes the set and logs the rating, rather than
+ * ending the set and then asking on a separate screen.
+ */
+data class SetRating(val rpe: Int?, val failed: Boolean, val warmup: Boolean)
 
 /** One planned set, flattened from the plan into an ordered queue. */
 data class PlannedSlot(
@@ -133,7 +139,7 @@ data class RecordState(
 
     /** Index of the first not-yet-done slot: during rating/rest the current one is already complete. */
     val upcomingIndex: Int
-        get() = if (stage == Stage.RATING || stage == Stage.RESTING) queueIndex + 1 else queueIndex
+        get() = if (stage == Stage.RESTING) queueIndex + 1 else queueIndex
 
     /** Other exercises with sets still to do — offered when equipment is busy. */
     val exerciseChoices: List<ExerciseChoice>
@@ -178,7 +184,15 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var demoJob: Job? = null
     private var guidedCadence: GuidedCadenceRunner? = null
     private var setStartedAtMs = 0L
-    private var lastRecordedSetId: Long? = null
+    private val ratings = SetRatingTracker(sessionRepository)
+
+    /**
+     * The effort grid is seven separately clickable tiles, and finishing a set
+     * takes a few hundred ms (analysis, then gzipping the whole sample stream).
+     * Two fingers landing on two tiles would otherwise run endSet twice, which
+     * starts two sessions and writes the same set twice.
+     */
+    private var endingSet = false
 
     /** All R-R intervals seen during the active session (sets + rests) for session HRV. */
     private val sessionRrMs = mutableListOf<Double>()
@@ -228,7 +242,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     recentRrMs.addAll(hr.rrIntervalsMs)
                     while (recentRrMs.size > ROLLING_HRV_BEATS) recentRrMs.removeFirst()
                     val inSession =
-                        stateFlow.value.stage in setOf(Stage.READY, Stage.IN_SET, Stage.RATING, Stage.RESTING)
+                        stateFlow.value.stage in setOf(Stage.READY, Stage.IN_SET, Stage.RESTING)
                     if (inSession) sessionRrMs += hr.rrIntervalsMs
                 }
                 stateFlow.value =
@@ -274,7 +288,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun startPlanSession(planSession: PlanSessionDef) {
         viewModelScope.launch {
             sessionRrMs.clear()
-            val queue = flattenPlan(planSession)
+            val queue = sessionRepository.flattenPlan(planSession)
             stateFlow.value =
                 stateFlow.value.copy(
                     stage = Stage.READY,
@@ -356,6 +370,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         imuBuffer.clear()
         hrBuffer.clear()
         cueBuffer.clear()
+        endingSet = false
         lastCountedPhase = Phase.IDLE
         lastSpokenSecond = 0
         lastAnnouncedRep = 0
@@ -487,12 +502,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     /** Rest-screen correction when the sensor miscounted (or the set was manual). */
     fun overrideLastSetReps(reps: Int) {
         if (reps < 0) return
-        val setId = lastRecordedSetId ?: return
         viewModelScope.launch {
-            sessionRepository.overrideReps(setId, reps)
+            val s = stateFlow.value
+            val failed = ratings.correctReps(reps, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
             stateFlow.value =
                 stateFlow.value.copy(
                     lastFeedback = stateFlow.value.lastFeedback?.copy(repsOverride = reps),
+                    lastSetFailed = failed,
                 )
         }
     }
@@ -529,7 +545,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Finish the set: analyze, persist, and enter the rest screen (spec 4.1). */
-    fun endSet() {
+    /**
+     * Finish the set, logging [rating] as part of the same tap. Analyze, persist,
+     * and go straight to rest.
+     */
+    fun endSet(rating: SetRating? = null) {
+        if (endingSet) return
+        endingSet = true
         collectJob?.cancel()
         hrJob?.cancel()
         tickJob?.cancel()
@@ -598,7 +620,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 ).also { stateFlow.value = stateFlow.value.copy(sessionId = it) }
 
             sessionRepository.ensureExerciseExists(exercise.id)
-            lastRecordedSetId = sessionRepository.recordSet(
+            val setId = sessionRepository.recordSet(
                 sessionId = sessionId,
                 orderIdx = stateFlow.value.setsCompleted,
                 set =
@@ -635,14 +657,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     manualReps != null && plannedReps != null -> manualReps < plannedReps
                     else -> false
                 }
-            if (stoppedEarly) {
-                lastRecordedSetId?.let { sessionRepository.rateSet(it, rpe = null, failed = true, warmup = false) }
-            }
+            // The lifter's tap is authoritative for effort, but a set that ended
+            // short of its target is still a failed set — both facts are recorded.
+            val failed = ratings.onSetRecorded(setId, plannedReps, stoppedEarly, rating)
 
             val restS = slot?.restS ?: DEFAULT_REST_S
             stateFlow.value =
                 stateFlow.value.copy(
-                    stage = if (stoppedEarly) Stage.RESTING else Stage.RATING,
+                    stage = Stage.RESTING,
                     restTotalS = restS,
                     lastFeedback =
                     SetFeedback(
@@ -657,9 +679,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         explosive = exercise.kind == ExerciseKind.EXPLOSIVE,
                         repsOverride = manualReps,
                     ),
-                    lastSetRpe = null,
-                    lastSetFailed = stoppedEarly,
-                    lastSetWarmup = false,
+                    lastSetRpe = rating?.rpe,
+                    lastSetFailed = failed,
+                    lastSetWarmup = rating?.warmup ?: false,
                     restRemainingS = restS,
                     setsCompleted = stateFlow.value.setsCompleted + 1,
                     // Pre-fill next-set inputs so in-rest edits start from plan values.
@@ -692,24 +714,17 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             }
     }
 
-    /** End-of-set RPE tap: saves the rating on the just-finished set, then rest begins. */
+    /**
+     * Correct a mistapped effort rating from the rest screen. The tap can change
+     * how the set FELT, but it cannot erase the fact that the set ended short of
+     * its target — that verdict comes from the rep count, not from an opinion.
+     */
     fun rateLastSet(rpe: Int?, failed: Boolean, warmup: Boolean) {
-        val setId = lastRecordedSetId ?: return
         viewModelScope.launch {
-            sessionRepository.rateSet(setId, rpe, failed, warmup)
+            val effectiveFailed = ratings.rate(rpe, failed, warmup) ?: return@launch
             stateFlow.value =
-                stateFlow.value.copy(
-                    stage = Stage.RESTING,
-                    lastSetRpe = rpe,
-                    lastSetFailed = failed,
-                    lastSetWarmup = warmup,
-                )
+                stateFlow.value.copy(lastSetRpe = rpe, lastSetFailed = effectiveFailed, lastSetWarmup = warmup)
         }
-    }
-
-    /** Leave the effort question unanswered and head into rest. */
-    fun skipRating() {
-        stateFlow.value = stateFlow.value.copy(stage = Stage.RESTING)
     }
 
     /** Advance to the next planned set, applying any in-rest load/rep edits. */
@@ -753,85 +768,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         ?: ExerciseDef.seedById(s.selectedExerciseId)
         ?: ExerciseDef(s.selectedExerciseId, s.selectedExerciseId)
 
-    private suspend fun flattenPlan(planSession: PlanSessionDef): List<PlannedSlot> {
-        val slots = mutableListOf<PlannedSlot>()
-        for ((exerciseIdx, exerciseDef) in planSession.exercises.withIndex()) {
-            val base = sessionRepository.exerciseById(exerciseDef.exercise)
-            // Plan-declared direction beats seed defaults and name inference: the
-            // same movement pattern starts at the top on one machine and the
-            // bottom on another, and no signal processing can tell which.
-            val exercise =
-                base.copy(
-                    startsWith = exerciseDef.startPhaseOverride ?: base.startsWith,
-                    concentricUp = exerciseDef.concentric?.let { it == "up" } ?: base.concentricUp,
-                    sensorInverted = exerciseDef.sensorInverted,
-                    travelRatio = exerciseDef.travelRatio ?: 1.0,
-                    horizontal = exerciseDef.plane == "horizontal",
-                    sensorOnStack = exerciseDef.sensorOnStack,
-                    bodyweight = exerciseDef.bodyweight,
-                )
-            exerciseDef.sets.forEachIndexed { setIdx, set ->
-                slots +=
-                    PlannedSlot(
-                        exercise = exercise,
-                        setIndexInExercise = setIdx,
-                        setsInExercise = exerciseDef.sets.size,
-                        reps = set.reps,
-                        durationS = set.durationS,
-                        loadKg = set.resolvedLoadKg,
-                        plannedLoadKg = set.resolvedLoadKg,
-                        tempo = set.tempo,
-                        side = set.side,
-                        exerciseNotes = listOfNotNull(exerciseDef.notes, set.note)
-                            .takeIf { it.isNotEmpty() }?.joinToString(" · "),
-                        targetMeanConVelMps = set.targetMeanConcentricVelocityMps,
-                        velocityLossStopPct = set.velocityLossStopPct,
-                        restS = set.restS,
-                        isExerciseChange = setIdx == 0 && exerciseIdx > 0,
-                    )
-            }
-        }
-        return slots
-    }
-
     /** Demo/replay mode (spec 5): synthesizes a realistic set through the full pipeline. */
     private fun startDemoStream(s: RecordState, exercise: ExerciseDef) {
         val slot = s.currentSlot
-        val reps = (if (s.adHoc) s.repsInput.toIntOrNull() else slot?.reps) ?: 5
-        val tempo = (if (s.adHoc) s.tempoInput else slot?.tempo)?.let { Tempo.parseOrNull(it) }
         demoJob =
-            viewModelScope.launch(Dispatchers.Default) {
-                delay(1_500)
-                val spec =
-                    SyntheticSets.RepSpec(
-                        eccS = tempo?.downS?.coerceAtLeast(0.5) ?: 2.0,
-                        bottomPauseS = (tempo?.bottomPauseS ?: 0.3).coerceAtLeast(0.3),
-                        conS = tempo?.upS ?: 1.0,
-                        topPauseS = (tempo?.topPauseS ?: 1.0).coerceAtLeast(0.8),
-                        romM = 0.55,
-                    )
-                val samples =
-                    SyntheticSets.generate(
-                        List(reps) { spec },
-                        eccentricFirst = exercise.startsWith == StartPhase.ECCENTRIC,
-                    )
-                val epoch = System.currentTimeMillis()
-                for (sample in samples) {
-                    onSample(sample.copy(timestampMs = epoch + sample.timestampMs))
-                    delay(5)
-                }
-            }
-    }
-
-    private fun timedVerdicts(actualS: Int?, plannedS: Int?): List<String> {
-        if (actualS == null) return emptyList()
-        return when {
-            plannedS == null -> listOf("Held ${actualS}s.")
-            actualS >= plannedS -> listOf("Held ${actualS}s — full ${plannedS}s target. Nice.")
-            actualS >= (plannedS * TIMED_CLOSE_ENOUGH_FRACTION).toInt() ->
-                listOf("Held ${actualS}s of ${plannedS}s — just short.")
-            else -> listOf("Held ${actualS}s of ${plannedS}s. Consider a shorter target or lighter load.")
-        }
+            viewModelScope.launchDemoStream(
+                reps = (if (s.adHoc) s.repsInput.toIntOrNull() else slot?.reps) ?: DEMO_REPS,
+                tempo = (if (s.adHoc) s.tempoInput else slot?.tempo)?.let { Tempo.parseOrNull(it) },
+                eccentricFirst = exercise.startsWith == StartPhase.ECCENTRIC,
+                onSample = ::onSample,
+            )
     }
 
     override fun onCleared() {
@@ -845,7 +791,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         const val REST_COUNTDOWN_FROM_S = 3
         const val TIMED_FINAL_COUNTDOWN_FROM_S = 10
         const val TIMED_MILESTONE_EVERY_S = 15
-        const val TIMED_CLOSE_ENOUGH_FRACTION = 0.9
+
+        /** Reps synthesized for a demo set when nothing planned one. */
+        const val DEMO_REPS = 5
 
         /** ~2 minutes of beats at typical training heart rates. */
         const val ROLLING_HRV_BEATS = 150

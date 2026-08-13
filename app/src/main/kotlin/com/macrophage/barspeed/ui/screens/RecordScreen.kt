@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +52,7 @@ import com.macrophage.barspeed.record.PlannedSlot
 import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
+import com.macrophage.barspeed.record.SetRating
 import com.macrophage.barspeed.record.Stage
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
@@ -94,14 +96,18 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
             )
         },
     ) { padding ->
+        // One scroll position is shared by every stage, and the in-set screen is
+        // now tall enough to scroll — without this reset, a set would open at the
+        // rest screen's offset, with the tempo ring and velocity readout off-screen.
+        val scroll = rememberScrollState()
+        LaunchedEffect(state.stage) { scroll.scrollTo(0) }
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
+            Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(scroll),
         ) {
             when (state.stage) {
                 Stage.SETUP -> SetupStage(state, viewModel)
                 Stage.READY -> ReadyStage(state, viewModel)
                 Stage.IN_SET -> InSetStage(state, viewModel)
-                Stage.RATING -> RatingStage(state, viewModel)
                 Stage.RESTING -> RestingStage(state, viewModel)
                 Stage.FINISHED -> FinishedStage(state, navController)
             }
@@ -113,7 +119,6 @@ private fun titleFor(state: RecordState): String = when (state.stage) {
     Stage.SETUP -> "New session"
     Stage.READY -> state.planSessionName ?: "Ad-hoc session"
     Stage.IN_SET -> ""
-    Stage.RATING -> "Set done"
     Stage.RESTING -> "Rest"
     Stage.FINISHED -> "Session complete"
 }
@@ -391,9 +396,7 @@ private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
         Spacer(Modifier.height(14.dp))
         LiveRepBars(state, slot)
         Spacer(Modifier.height(24.dp))
-        Button(onClick = viewModel::endSet, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-            Text("END SET", style = MaterialTheme.typography.titleLarge)
-        }
+        EndSetRpeGrid(state, viewModel)
     }
 }
 
@@ -445,9 +448,7 @@ private fun GuidedSetStage(state: RecordState, viewModel: RecordViewModel, slot:
             color = BarColors.Sub,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = viewModel::endSet, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-            Text("END SET", style = MaterialTheme.typography.titleLarge)
-        }
+        EndSetRpeGrid(state, viewModel)
     }
 }
 
@@ -488,9 +489,7 @@ private fun ManualSetStage(state: RecordState, viewModel: RecordViewModel, slot:
             Text("+1 REP", style = MaterialTheme.typography.titleLarge)
         }
         Spacer(Modifier.height(10.dp))
-        OutlinedButton(onClick = viewModel::endSet, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            Text("END SET", fontWeight = FontWeight.Bold)
-        }
+        EndSetRpeGrid(state, viewModel)
     }
 }
 
@@ -571,9 +570,7 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
             )
         }
         Spacer(Modifier.height(24.dp))
-        Button(onClick = viewModel::endSet, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-            Text("END SET", style = MaterialTheme.typography.titleLarge)
-        }
+        EndSetRpeGrid(state, viewModel)
     }
 }
 
@@ -628,9 +625,7 @@ private fun TimedSetStage(state: RecordState, viewModel: RecordViewModel, slot: 
             color = BarColors.Sub,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = viewModel::endSet, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-            Text("END SET", style = MaterialTheme.typography.titleLarge)
-        }
+        EndSetRpeGrid(state, viewModel)
     }
 }
 
@@ -769,23 +764,27 @@ private fun phaseLabel(phase: Phase): String = when (phase) {
 }
 
 /**
- * Set-end stage: the effort question comes FIRST, while the set is fresh —
- * rest (whose countdown is already running) follows the answer. Sets that
- * were stopped early skip this stage entirely; they're logged as failed.
+ * The effort grid IS the end-set control. Tapping how the set felt ends the
+ * set and logs the rating in one action, while the set is still fresh — there
+ * is no separate page between lifting and resting.
  */
 @Composable
-private fun RatingStage(state: RecordState, viewModel: RecordViewModel) {
-    state.lastFeedback?.let { feedback ->
-        Text(feedback.exerciseName, style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(6.dp))
-        RepCorrectionRow(feedback, viewModel)
-        Spacer(Modifier.height(6.dp))
-        RepQualityCard(feedback)
-        Spacer(Modifier.height(12.dp))
-    }
-    RpeSelector(state, viewModel)
-    TextButton(onClick = viewModel::skipRating, modifier = Modifier.fillMaxWidth()) {
-        Text("Skip rating", color = BarColors.Sub)
+private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel) {
+    val options = rpeOptions(timed = state.currentIsTimed, explosive = currentKind(state) == ExerciseKind.EXPLOSIVE)
+    SectionCaption("Tap how that set felt to end it")
+    Spacer(Modifier.height(6.dp))
+    options.chunked(2).forEach { row ->
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        ) {
+            row.forEach { option ->
+                RpeTile(option, selected = false, modifier = Modifier.weight(1f)) {
+                    viewModel.endSet(SetRating(option.rpe, failed = option.failed, warmup = option.warmup))
+                }
+            }
+            if (row.size == 1) Spacer(Modifier.weight(1f))
+        }
     }
 }
 
@@ -793,7 +792,13 @@ private fun RatingStage(state: RecordState, viewModel: RecordViewModel) {
 private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     RestHeader(state)
     Spacer(Modifier.height(6.dp))
-    LoggedEffortLine(state)
+    // The effort tile is tapped mid-workout to end the set, so give a mistap
+    // somewhere to go rather than baking it into the record.
+    var changingEffort by remember(state.setsCompleted) { mutableStateOf(false) }
+    LoggedEffortLine(state) { changingEffort = !changingEffort }
+    if (changingEffort) {
+        RpeSelector(state, viewModel) { changingEffort = false }
+    }
     state.lastFeedback?.let { RepCorrectionRow(it, viewModel) }
     Spacer(Modifier.height(6.dp))
     state.lastFeedback?.let { RepQualityCard(it) }
@@ -922,20 +927,16 @@ private fun rpeColor(rpe: Int): Color = when {
     else -> BarColors.Amber
 }
 
-/**
- * End-of-set effort grid: tapping a narrative saves it on the finished set
- * (warm-ups get a flag instead of an RPE, keeping effort data clean) and
- * moves on to the rest screen.
- */
+/** Correction grid on the rest screen, for a mistapped effort rating. */
 @Composable
-private fun RpeSelector(state: RecordState, viewModel: RecordViewModel) {
+private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked: () -> Unit) {
     val feedback = state.lastFeedback
     val options =
         rpeOptions(
             timed = feedback?.actualDurationS != null,
             explosive = feedback?.explosive == true,
         )
-    SectionCaption("How was that set? Tap to log")
+    SectionCaption("Change the effort logged for that set")
     Spacer(Modifier.height(6.dp))
     options.chunked(2).forEach { row ->
         Row(
@@ -943,8 +944,18 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel) {
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         ) {
             row.forEach { option ->
-                RpeTile(option, selected = false, modifier = Modifier.weight(1f)) {
+                // A set can now carry BOTH an effort rating and the auto-fail
+                // flag, so these have to be a precedence chain rather than three
+                // independent predicates — otherwise two tiles light up at once.
+                val selected =
+                    when {
+                        state.lastSetWarmup -> option.warmup
+                        state.lastSetFailed -> option.failed
+                        else -> !option.warmup && !option.failed && option.rpe == state.lastSetRpe
+                    }
+                RpeTile(option, selected, modifier = Modifier.weight(1f)) {
                     viewModel.rateLastSet(option.rpe, failed = option.failed, warmup = option.warmup)
+                    onPicked()
                 }
             }
             if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -954,20 +965,36 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel) {
 
 /** Rest-screen reminder of what was logged for the finished set (incl. auto-fail on early stop). */
 @Composable
-private fun LoggedEffortLine(state: RecordState) {
+private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
     val feedback = state.lastFeedback ?: return
     if (state.lastSetRpe == null && !state.lastSetFailed && !state.lastSetWarmup) return
     val options =
         rpeOptions(timed = feedback.actualDurationS != null, explosive = feedback.explosive)
-    val text =
+    // Show what the lifter tapped, and mark the failure alongside it rather than
+    // replacing it — a set can be both "very hard" and short of its target.
+    val tapped =
         options.firstOrNull {
             when {
                 state.lastSetWarmup -> it.warmup
-                state.lastSetFailed -> it.failed
-                else -> !it.warmup && !it.failed && it.rpe == state.lastSetRpe
+                state.lastSetRpe != null -> !it.warmup && !it.failed && it.rpe == state.lastSetRpe
+                else -> it.failed
             }
         }?.description
-    SectionCaption("Effort · ${text ?: ""}", color = if (state.lastSetFailed) BarColors.Red else BarColors.Volt)
+    val text =
+        when {
+            tapped == null -> null
+            state.lastSetFailed && state.lastSetRpe == null && !state.lastSetWarmup -> tapped
+            state.lastSetFailed -> "$tapped · short of target"
+            else -> tapped
+        }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        SectionCaption(
+            "Effort · ${text ?: ""}",
+            color = if (state.lastSetFailed) BarColors.Red else BarColors.Volt,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onChange) { Text("Change", color = BarColors.Sub) }
+    }
     Spacer(Modifier.height(4.dp))
 }
 
