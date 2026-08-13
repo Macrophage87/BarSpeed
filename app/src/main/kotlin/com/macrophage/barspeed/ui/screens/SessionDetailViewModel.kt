@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.macrophage.barspeed.BuildConfig
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.model.WeightUnit
@@ -42,18 +43,26 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
         }
     }
 
+    /**
+     * Exports carry the app name and the version that produced them: several of
+     * these end up in one Downloads folder or one chat, and how a number should
+     * be read depends on which build wrote it.
+     */
+    private fun exportName(suffix: String) = "BarSpeed-v${BuildConfig.VERSION_NAME}-session$sessionId-$suffix"
+
+    private fun jsonName(includeDetail: Boolean) = exportName(if (includeDetail) "detailed.json" else "summary.json")
+
     fun shareJson(includeDetail: Boolean) {
         viewModelScope.launch {
             val json = container.sessionExporter.exportJson(sessionId, includeDetail) ?: return@launch
-            val name = if (includeDetail) "session-$sessionId-detailed.json" else "session-$sessionId.json"
-            ShareUtil.shareJson(getApplication(), name, json)
+            ShareUtil.shareJson(getApplication(), jsonName(includeDetail), json)
         }
     }
 
     fun shareRawZip() {
         viewModelScope.launch {
             val zip = container.rawExporter.buildZip(sessionId) ?: return@launch
-            ShareUtil.shareFile(getApplication(), "session-$sessionId-raw.zip", zip, "application/zip")
+            ShareUtil.shareFile(getApplication(), exportName("raw.zip"), zip, "application/zip")
         }
     }
 
@@ -65,7 +74,7 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
         viewModelScope.launch {
             val json = container.sessionExporter.exportJson(sessionId, includeDetail) ?: return@launch
             pendingSave = json.toByteArray(Charsets.UTF_8)
-            onReady(if (includeDetail) "session-$sessionId-detailed.json" else "session-$sessionId.json")
+            onReady(jsonName(includeDetail))
         }
     }
 
@@ -73,7 +82,7 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
         viewModelScope.launch {
             val zip = container.rawExporter.buildZip(sessionId) ?: return@launch
             pendingSave = zip
-            onReady("session-$sessionId-raw.zip")
+            onReady(exportName("raw.zip"))
         }
     }
 

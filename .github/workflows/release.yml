@@ -43,9 +43,19 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew :app:assembleRelease --stacktrace
 
+      # Gradle always writes app-release.apk, so every download collides in the
+      # Downloads folder and none of them says which app or which version it is.
+      - name: Name the APK for humans
+        run: |
+          set -euo pipefail
+          version="${{ github.event.inputs.tag || github.ref_name }}"
+          mkdir -p release-artifacts
+          cp app/build/outputs/apk/release/app-release.apk "release-artifacts/BarSpeed-${version}.apk"
+          ls -l release-artifacts
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: app/build/outputs/apk/release/*.apk
+          files: release-artifacts/BarSpeed-*.apk
           generate_release_notes: true
