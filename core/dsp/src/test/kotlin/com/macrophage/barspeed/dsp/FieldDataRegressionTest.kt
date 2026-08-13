@@ -29,7 +29,7 @@ class FieldDataRegressionTest {
         // which can smear the final rep, so require the CORE reps to carry the
         // ~4-5s eccentric character and plausible squat ROM.
         assertTrue(analysis.reps.size in 4..6, "reps ${analysis.reps.size} (5 real)")
-        val sane = analysis.reps.count { it.eccS in 2.5..8.0 && it.romM < 1.5 }
+        val sane = analysis.reps.count { (it.eccS ?: 0.0) in 2.5..8.0 && it.romM < 1.5 }
         assertTrue(sane >= 4, "only $sane/${analysis.reps.size} reps show the slow-tempo character")
     }
 

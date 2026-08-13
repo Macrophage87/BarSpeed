@@ -20,7 +20,7 @@ class SetAnalyzerTest {
 
         assertEquals(5, analysis.reps.size, "expected 5 reps, verdicts=${analysis.verdicts}")
         for (rep in analysis.reps) {
-            assertTrue(abs(rep.eccS - 4.0) < 0.5, "eccentric ${rep.eccS}s should be ~4s")
+            assertTrue(abs((rep.eccS ?: 0.0) - 4.0) < 0.5, "eccentric ${rep.eccS}s should be ~4s")
             assertTrue(abs(rep.conS - 1.0) < 0.35, "concentric ${rep.conS}s should be ~1s")
             assertTrue(rep.bottomPauseS in 0.5..1.6, "bottom pause ${rep.bottomPauseS}s should be ~1s")
             assertTrue(rep.romM in 0.45..0.75, "ROM ${rep.romM}m should be ~0.6m")
@@ -100,7 +100,7 @@ class SetAnalyzerTest {
         assertEquals(3, analysis.reps.size)
         for (rep in analysis.reps) {
             assertTrue(abs(rep.conS - 1.2) < 0.35, "concentric ${rep.conS}s should be ~1.2s")
-            assertTrue(abs(rep.eccS - 2.0) < 0.45, "eccentric ${rep.eccS}s should be ~2s")
+            assertTrue(abs((rep.eccS ?: 0.0) - 2.0) < 0.45, "eccentric ${rep.eccS}s should be ~2s")
         }
     }
 

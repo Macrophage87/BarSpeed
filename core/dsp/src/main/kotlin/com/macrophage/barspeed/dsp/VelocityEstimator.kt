@@ -15,6 +15,23 @@ data class VelocitySeries(
     val sampleRateHz: Double,
 ) {
     val size: Int get() = timeS.size
+
+    /**
+     * The same series mapped into the lifter's frame. A cable machine puts the
+     * sensor on the weight stack, so the lifter's downward drive reads as upward
+     * motion; a non-1:1 pulley scales the distance as well. Applying it once
+     * here keeps every downstream stage — run classification, phase labels,
+     * ROM, velocity — working in the frame the lifter actually moves in.
+     */
+    fun mappedToLifter(factor: Double): VelocitySeries {
+        if (factor == 1.0) return this
+        return VelocitySeries(
+            timeS = timeS,
+            accelMps2 = DoubleArray(size) { accelMps2[it] * factor },
+            velocityMps = DoubleArray(size) { velocityMps[it] * factor },
+            sampleRateHz = sampleRateHz,
+        )
+    }
 }
 
 /**
@@ -28,7 +45,11 @@ data class VelocitySeries(
  * discriminator is velocity, not acceleration alone.
  */
 object VelocityEstimator {
-    fun estimate(samples: List<ImuSample>, config: DspConfig = DspConfig()): VelocitySeries {
+    fun estimate(
+        samples: List<ImuSample>,
+        config: DspConfig = DspConfig(),
+        plane: MovementPlane = MovementPlane.VERTICAL,
+    ): VelocitySeries {
         require(samples.size >= 8) { "Not enough samples (${samples.size})" }
 
         // BLE delivers frames in bursts: several frames share one arrival
@@ -43,8 +64,23 @@ object VelocityEstimator {
 
         val filter = Biquad.lowPass(config.lowPassCutoffHz, sampleRateHz)
         val accel = DoubleArray(n)
-        for (i in 0 until n) {
-            accel[i] = filter.process(FrameTransform.verticalLinearAccelMps2(samples[i], config.gravityMps2))
+        when (plane) {
+            MovementPlane.VERTICAL ->
+                for (i in 0 until n) {
+                    accel[i] =
+                        filter.process(FrameTransform.verticalLinearAccelMps2(samples[i], config.gravityMps2))
+                }
+            // A seated row or a chest-press machine barely moves vertically:
+            // measuring world-Z there returns noise. Travel along one horizontal
+            // line instead, with the line recovered from the set's own motion.
+            MovementPlane.HORIZONTAL -> {
+                val horizontal = samples.map { FrameTransform.horizontalLinearAccelMps2(it, config.gravityMps2) }
+                val (ux, uy) = principalHorizontalAxis(horizontal)
+                for (i in 0 until n) {
+                    val (ax, ay) = horizontal[i]
+                    accel[i] = filter.process(ax * ux + ay * uy)
+                }
+            }
         }
 
         // Trapezoidal integration to raw velocity. Accel bias (gravity-projection
@@ -68,6 +104,29 @@ object VelocityEstimator {
 
     /** No acceptable anchor for this long → next flat window re-anchors (s). */
     private const val ANCHOR_STARVATION_S = 6.0
+
+    /**
+     * Dominant direction of horizontal motion across the set, as a unit vector.
+     *
+     * Closed-form principal axis of the 2x2 covariance: a machine travels along
+     * one line, so almost all horizontal variance lies on that line, and its
+     * heading in the (yaw-free) world frame is whatever it is. The sign is
+     * arbitrary here; [SetAnalyzer] orients it so the drive reads positive.
+     */
+    internal fun principalHorizontalAxis(accel: List<Pair<Double, Double>>): Pair<Double, Double> {
+        var sxx = 0.0
+        var sxy = 0.0
+        var syy = 0.0
+        for ((x, y) in accel) {
+            sxx += x * x
+            sxy += x * y
+            syy += y * y
+        }
+        if (sxx + syy <= 0.0) return 1.0 to 0.0
+        // Largest-eigenvalue eigenvector of [[sxx, sxy], [sxy, syy]].
+        val theta = 0.5 * kotlin.math.atan2(2.0 * sxy, sxx - syy)
+        return kotlin.math.cos(theta) to kotlin.math.sin(theta)
+    }
 
     /** Span-based rate: (n-1)/span. Robust against burst arrivals, unlike median dt. */
     fun measureSampleRate(sampleCount: Int, spanS: Double): Double {

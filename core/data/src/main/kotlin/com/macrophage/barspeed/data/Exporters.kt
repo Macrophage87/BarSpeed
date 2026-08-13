@@ -98,6 +98,9 @@ class SessionExporter(
                     toleranceS = it.toleranceS,
                     withinTolerance = it.repsFullyCompliant,
                     of = it.repsEvaluated,
+                    scoredPhases = it.phases.filter { p -> p.scored }.map { p -> p.phase },
+                    prescribedEccConRatio = it.prescribedEccConRatio,
+                    actualEccConRatio = it.actualEccConRatio,
                 )
             },
             velocityLossPct = analysis?.velocityLossPct,
@@ -108,6 +111,11 @@ class SessionExporter(
                 null
             },
             voiceCues = voiceCues,
+            // The stored rep count comes from the lifter or the voice guide; the
+            // sensor segmenter is a separate opinion. Say so when they disagree
+            // rather than letting a short per-rep array look like the whole set.
+            repMetricsComplete =
+            if (includeRepDetail && reps.isNotEmpty()) reps.size == record.actualReps else null,
             repMetrics =
             if (includeRepDetail && reps.isNotEmpty()) {
                 reps.map {
@@ -131,7 +139,7 @@ class SessionExporter(
             SetSummaryExport(
                 meanConVelMps = reps.map { it.meanConVelMps }.averageOrNull()?.round3(),
                 peakConVelMps = reps.maxOfOrNull { it.peakConVelMps },
-                meanEccS = reps.map { it.eccS }.averageOrNull()?.round2(),
+                meanEccS = reps.mapNotNull { it.eccS }.averageOrNull()?.round2(),
                 meanConS = reps.map { it.conS }.averageOrNull()?.round2(),
                 meanRomM = reps.map { it.romM }.averageOrNull()?.round3(),
                 peakPowerW = reps.mapNotNull { it.peakPowerW }.maxOrNull(),
@@ -185,11 +193,11 @@ class RawExporter(
                     zip.closeEntry()
                     files += name
                 }
-                setLines +=
-                    "    {\"set\": ${idx + 1}, \"exercise\": \"${record.exerciseId}\", " +
-                    "\"load_kg\": ${record.loadKg}, \"reps\": ${record.actualReps}, " +
-                    "\"sampleRate_hz\": ${streams.firstOrNull { it.kind == "imu" }?.sampleRateHz}, " +
-                    "\"files\": [${files.joinToString(", ") { "\"$it\"" }}]}"
+                // The raw zip has to stand on its own: an analysis that opens
+                // only the CSVs must still be able to tell left from right, a
+                // warm-up from a working set, and which sets were rotating
+                // enough for attitude error to matter.
+                setLines += buildSetDescriptor(idx, record, streams, files)
             }
             meta.append(setLines.joinToString(",\n")).append("\n  ]\n}\n")
             zip.putNextEntry(ZipEntry("meta.json"))
@@ -202,5 +210,48 @@ class RawExporter(
             }
         }
         return out.toByteArray()
+    }
+
+    private fun buildSetDescriptor(
+        idx: Int,
+        record: SetRecordEntity,
+        streams: List<RawStreamEntity>,
+        files: List<String>,
+    ): String {
+        val fields = mutableListOf<String>()
+        fun num(key: String, value: Any?) = value?.let { fields += "\"$key\": $it" }
+        fun str(key: String, value: String?) = value?.let { fields += "\"$key\": \"${it.replace("\"", "'")}\"" }
+        fun flag(key: String, value: Boolean) = if (value) fields += "\"$key\": true" else Unit
+
+        num("set", idx + 1)
+        str("exercise", record.exerciseId)
+        num("load_kg", record.loadKg)
+        num("load_lb", Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0)
+        num("reps", record.actualReps)
+        num("plannedReps", record.plannedReps)
+        num("duration_s", record.actualDurationS)
+        str("side", record.side)
+        num("rpe", record.rpe)
+        flag("failed", record.failed)
+        flag("warmup", record.warmup)
+        flag("repsManual", record.repsManual)
+        str("tempoPrescribed", record.tempo)
+        num("startedAt_ms", record.startedAtMs)
+        num("endedAt_ms", record.endedAtMs)
+        num("sampleRate_hz", streams.firstOrNull { it.kind == RawStreamEntity.KIND_IMU }?.sampleRateHz)
+        // Attitude excursion decides which analysis is even valid on this set:
+        // a rail-guided machine barely rotates and integrates cleanly, while a
+        // barbell tumbling through 300 degrees leaks gravity into every sample.
+        rollExcursionDeg(streams)?.let { num("rollExcursion_deg", Math.round(it * 10.0) / 10.0) }
+        fields += "\"files\": [${files.joinToString(", ") { "\"$it\"" }}]"
+        return "    {${fields.joinToString(", ")}}"
+    }
+
+    private fun rollExcursionDeg(streams: List<RawStreamEntity>): Double? {
+        val imu = streams.firstOrNull { it.kind == RawStreamEntity.KIND_IMU } ?: return null
+        val samples = runCatching { ImuCsv.decode(Gzip.decompress(imu.csvGzip)) }.getOrNull() ?: return null
+        if (samples.isEmpty()) return null
+        val rolls = samples.map { it.rollDeg }
+        return rolls.max() - rolls.min()
     }
 }

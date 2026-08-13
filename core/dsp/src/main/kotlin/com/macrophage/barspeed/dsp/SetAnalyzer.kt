@@ -10,14 +10,20 @@ import kotlin.math.abs
 @Serializable
 data class RepAnalysis(
     val index: Int,
-    val eccS: Double,
+    /**
+     * Eccentric seconds, or null when no eccentric was measurable (the rep was
+     * counted on the drive alone). Never report an unmeasured phase as 0.
+     */
+    val eccS: Double?,
     val bottomPauseS: Double,
     val conS: Double,
     val topPauseS: Double,
+    /** Mean drive velocity, positive in the direction the drive moves. */
     val meanConVelMps: Double,
     val peakConVelMps: Double,
-    val meanEccVelMps: Double,
-    val peakEccVelMps: Double,
+    /** Mean eccentric velocity, negative (opposite the drive); null when unmeasured. */
+    val meanEccVelMps: Double?,
+    val peakEccVelMps: Double?,
     val romM: Double,
     val peakPowerW: Double?,
     /** Average power over the concentric (drive) phase, watts. Null for bodyweight. */
@@ -32,6 +38,8 @@ data class PhaseComplianceResult(
     val worstDeviationS: Double,
     val repsWithinTolerance: Int,
     val repsEvaluated: Int,
+    /** False for pauses: measured and reported, but deliberately not scored. */
+    val scored: Boolean = true,
 )
 
 @Serializable
@@ -39,15 +47,26 @@ data class TempoComplianceResult(
     val prescribed: Tempo,
     val toleranceS: Double,
     val phases: List<PhaseComplianceResult>,
-    /** Reps where every prescribed phase was within tolerance. */
+    /** Reps where every SCORED (movement) phase was within tolerance. */
     val repsFullyCompliant: Int,
     val repsEvaluated: Int,
+    /** Prescribed eccentric:concentric contrast — the ratio the block trains. */
+    val prescribedEccConRatio: Double? = null,
+    /** Measured eccentric:concentric contrast, comparable to the prescribed one. */
+    val actualEccConRatio: Double? = null,
 )
 
 /** Targets carried over from the active plan for this set, if any. */
 @Serializable
 data class SetTargets(
     val plannedReps: Int? = null,
+    /**
+     * Reps the lifter or the voice guide actually counted. The segmenter is a
+     * separate opinion and a worse one — telling someone they did 2 of 10 leg
+     * curls because the sensor only resolved 2 is the app calling its own
+     * measurement error the athlete's shortfall.
+     */
+    val countedReps: Int? = null,
     val tempo: Tempo? = null,
     val toleranceS: Double = 0.5,
     val targetMeanConcentricVelocityMps: Double? = null,
@@ -69,107 +88,190 @@ data class SetAnalysis(
 object SetAnalyzer {
     fun analyze(
         samples: List<ImuSample>,
-        startsWith: StartPhase = StartPhase.ECCENTRIC,
+        direction: LiftDirection = LiftDirection(),
         loadKg: Double? = null,
         targets: SetTargets = SetTargets(),
         config: DspConfig = DspConfig(),
     ): SetAnalysis {
-        val series = VelocityEstimator.estimate(samples, config)
-        val spans = RepSegmenter.segment(series, startsWith, config)
-        val reps = spans.mapIndexed { idx, span -> repMetrics(idx, span, series, startsWith, loadKg, config) }
+        val raw = VelocityEstimator.estimate(samples, config, direction.measuredPlane)
+        val series = orient(raw, direction, config).mappedToLifter(direction.sensorToLifter)
+        val spans = RepSegmenter.segment(series, direction, config)
+        val reps = spans.mapIndexed { idx, span -> repMetrics(idx, span, series, direction, loadKg, config) }
         val velocityLoss = velocityLossPct(reps)
-        val tempoCompliance = targets.tempo?.let { complianceFor(it, targets.toleranceS, reps) }
+        val tempoCompliance =
+            targets.tempo?.let { complianceFor(it, targets.toleranceS, reps, direction) }
         val verdicts = CoachingRules.verdicts(reps, velocityLoss, tempoCompliance, targets)
         return SetAnalysis(reps, series.sampleRateHz, velocityLoss, tempoCompliance, verdicts)
+    }
+
+    fun analyze(
+        samples: List<ImuSample>,
+        startsWith: StartPhase,
+        loadKg: Double? = null,
+        targets: SetTargets = SetTargets(),
+        config: DspConfig = DspConfig(),
+    ): SetAnalysis = analyze(samples, LiftDirection(startsWith), loadKg, targets, config)
+
+    /**
+     * The horizontal principal axis comes out of the covariance with an
+     * arbitrary sign — nothing in a yaw-free frame says which end of a seated
+     * row is "forward". Orient it from what the lift declares instead: the
+     * first real movement of the set is the first phase, so if it points the
+     * wrong way, flip the axis. Vertical work needs none of this: up is up.
+     */
+    private fun orient(series: VelocitySeries, direction: LiftDirection, config: DspConfig): VelocitySeries {
+        if (direction.measuredPlane != MovementPlane.HORIZONTAL) return series
+        val firstMove =
+            RepSegmenter.classifyRuns(series, config).firstOrNull { it.type != RunType.STILL } ?: return series
+        val expected =
+            if (direction.startsWith == StartPhase.CONCENTRIC) direction.concentricRun else direction.eccentricRun
+        return if (firstMove.type == expected) series else series.mappedToLifter(-1.0)
     }
 
     private fun repMetrics(
         index: Int,
         span: RepSpan,
         series: VelocitySeries,
-        startsWith: StartPhase,
+        direction: LiftDirection,
         loadKg: Double?,
         config: DspConfig,
     ): RepAnalysis {
+        // Sign so that the drive always reads positive, whichever way it moves:
+        // a leg curl's concentric goes down, and reporting it as -0.4 m/s would
+        // make every downstream comparison and every power figure backwards.
+        val sign = direction.concentricSign
         val v = series.velocityMps
-        val eccDur = series.timeS[span.eccEndIdx] - series.timeS[span.eccStartIdx]
         val conDur = series.timeS[span.conEndIdx] - series.timeS[span.conStartIdx]
         val conRange = span.conStartIdx..span.conEndIdx
+        val meanCon = conRange.map { v[it] * sign }.average()
+        val peakCon = conRange.maxOf { v[it] * sign }
         val eccRange = span.eccStartIdx..span.eccEndIdx
-        val meanCon = conRange.map { v[it] }.average()
-        val peakCon = conRange.maxOf { v[it] }
-        val meanEcc = eccRange.map { v[it] }.average()
-        val peakEcc = eccRange.minOf { v[it] }
+        val eccDur = if (span.hasEccentric) series.timeS[span.eccEndIdx] - series.timeS[span.eccStartIdx] else null
+        val meanEcc = if (span.hasEccentric) eccRange.map { v[it] * sign }.average() else null
+        val peakEcc = if (span.hasEccentric) eccRange.minOf { v[it] * sign } else null
         val rom = RepSegmenter.displacement(series, span.conStartIdx, span.conEndIdx)
-        // Bar power P = m(g + a)v over the drive; meaningless without load on the bar.
-        val effectiveLoad = loadKg?.takeIf { it > 0 }
+        // Bar power P = m(g + a)v over the drive. Only defensible when the drive
+        // lifts the load against gravity — a cammed machine whose drive goes
+        // down carries no such relationship, so leave power unreported there.
+        // ...and not through a cable: the sensor is on the stack, not on the
+        // load the lifter feels, so m(g+a)v is not that lifter's power.
+        val effectiveLoad = loadKg?.takeIf { it > 0 && direction.concentricUp && !direction.sensorInverted }
         val conPower = effectiveLoad?.let { load ->
             conRange.map { i -> load * (config.gravityMps2 + series.accelMps2[i]) * v[i] }
         }
         val peakPower = conPower?.max()
         val meanConPower = conPower?.average()
-        val bottomPause = if (startsWith == StartPhase.ECCENTRIC) span.midPauseS else span.endPauseS
-        val topPause = if (startsWith == StartPhase.ECCENTRIC) span.endPauseS else span.midPauseS
+        // The pause after the DOWN stroke is the bottom pause, whichever phase
+        // that stroke happens to be.
+        val bottomPause = if (direction.startsAtTop) span.midPauseS else span.endPauseS
+        val topPause = if (direction.startsAtTop) span.endPauseS else span.midPauseS
         return RepAnalysis(
             index = index,
-            eccS = round2(eccDur),
+            eccS = eccDur?.let { round2(it) },
             bottomPauseS = round2(bottomPause),
             conS = round2(conDur),
             topPauseS = round2(topPause),
             meanConVelMps = round3(meanCon),
             peakConVelMps = round3(peakCon),
-            meanEccVelMps = round3(meanEcc),
-            peakEccVelMps = round3(peakEcc),
+            meanEccVelMps = meanEcc?.let { round3(it) },
+            peakEccVelMps = peakEcc?.let { round3(it) },
             romM = round3(rom),
             peakPowerW = peakPower?.let { round1(it) },
             meanConPowerW = meanConPower?.let { round1(it) },
         )
     }
 
+    /**
+     * Velocity loss at the point of set termination: best rep → LAST rep, the
+     * definition velocity-based training uses. A best-to-worst drawdown would
+     * report any single fumbled rep mid-set as the set's fatigue, which inverts
+     * the metric against perceived effort.
+     */
     fun velocityLossPct(reps: List<RepAnalysis>): Double? {
         if (reps.size < 2) return null
         val best = reps.maxOf { it.meanConVelMps }
-        val worst = reps.minOf { it.meanConVelMps }
+        val last = reps.last().meanConVelMps
         if (best <= 0) return null
-        return round1((best - worst) / best * 100.0)
+        return round1(((best - last) / best * 100.0).coerceAtLeast(0.0))
     }
 
-    fun complianceFor(tempo: Tempo, toleranceS: Double, reps: List<RepAnalysis>): TempoComplianceResult {
-        data class PhaseDef(val name: String, val prescribed: Double?, val actual: (RepAnalysis) -> Double)
+    /**
+     * Tempo compliance over the two MOVEMENT phases only.
+     *
+     * Pauses are reported but never scored: telling a genuine pause apart from a
+     * very slow movement needs displacement, and displacement is the least
+     * trustworthy thing this pipeline produces. Scoring them turned every set
+     * into a failure regardless of how the lifter actually moved.
+     */
+    fun complianceFor(
+        tempo: Tempo,
+        toleranceS: Double,
+        reps: List<RepAnalysis>,
+        direction: LiftDirection = LiftDirection(),
+    ): TempoComplianceResult {
+        val schedule = TempoSchedule.of(tempo, direction)
+        data class PhaseDef(
+            val name: String,
+            val prescribed: Double?,
+            val scored: Boolean,
+            val actual: (RepAnalysis) -> Double?,
+        )
 
         val defs =
             listOf(
-                PhaseDef("eccentric", tempo.eccentricS) { it.eccS },
-                PhaseDef("bottomPause", tempo.bottomPauseS) { it.bottomPauseS },
-                PhaseDef("concentric", tempo.concentricS) { it.conS },
-                PhaseDef("topPause", tempo.topPauseS) { it.topPauseS },
+                PhaseDef("eccentric", schedule.eccentricS, scored = true) { it.eccS },
+                PhaseDef("bottomPause", tempo.bottomPauseS, scored = false) { it.bottomPauseS },
+                PhaseDef("concentric", schedule.concentricS, scored = true) { it.conS },
+                PhaseDef("topPause", tempo.topPauseS, scored = false) { it.topPauseS },
             )
         val phaseResults =
             defs.map { def ->
-                val deviations = reps.map { rep -> def.actual(rep) - (def.prescribed ?: 0.0) }
-                val evaluated = if (def.prescribed != null) reps.size else 0
-                val within =
-                    if (def.prescribed != null) {
-                        reps.count { rep -> abs(def.actual(rep) - def.prescribed) <= toleranceS }
-                    } else {
-                        0
-                    }
+                val actuals = reps.mapNotNull(def.actual)
+                val scorable = def.scored && def.prescribed != null
+                val deviations = actuals.map { it - (def.prescribed ?: 0.0) }
                 PhaseComplianceResult(
                     phase = def.name,
                     prescribedS = def.prescribed,
-                    actualMeanS = round2(reps.map(def.actual).average()),
+                    actualMeanS = if (actuals.isEmpty()) 0.0 else round2(actuals.average()),
                     worstDeviationS = round2(deviations.maxByOrNull { abs(it) } ?: 0.0),
-                    repsWithinTolerance = within,
-                    repsEvaluated = evaluated,
+                    repsWithinTolerance =
+                    if (scorable) actuals.count { abs(it - def.prescribed!!) <= toleranceS } else 0,
+                    repsEvaluated = if (scorable) actuals.size else 0,
+                    scored = scorable,
                 )
             }
+        val scoredDefs = defs.filter { it.scored && it.prescribed != null }
         val fullyCompliant =
             reps.count { rep ->
-                defs.all { def ->
-                    def.prescribed == null || abs(def.actual(rep) - def.prescribed) <= toleranceS
+                scoredDefs.all { def ->
+                    val actual = def.actual(rep)
+                    actual != null && abs(actual - def.prescribed!!) <= toleranceS
                 }
             }
-        return TempoComplianceResult(tempo, toleranceS, phaseResults, fullyCompliant, reps.size)
+        return TempoComplianceResult(
+            prescribed = tempo,
+            toleranceS = toleranceS,
+            phases = phaseResults,
+            repsFullyCompliant = fullyCompliant,
+            repsEvaluated = reps.size,
+            prescribedEccConRatio = ratioOf(schedule.eccentricS, schedule.concentricS),
+            actualEccConRatio =
+            ratioOf(
+                reps.mapNotNull { it.eccS }.takeIf { it.isNotEmpty() }?.average(),
+                reps.map { it.conS }.takeIf { it.isNotEmpty() }?.average(),
+            ),
+        )
+    }
+
+    /**
+     * Ecc:con contrast — the thing a tempo block actually trains. Report it,
+     * but do not treat it as a corrected score: the measured bias is
+     * multiplicative, not a constant offset, so a 2x spread in prescribed
+     * ratios came back as a 1.26x spread in measured ones on field data.
+     */
+    private fun ratioOf(ecc: Double?, con: Double?): Double? {
+        if (ecc == null || con == null || con <= 0.0) return null
+        return round2(ecc / con)
     }
 
     private fun round1(x: Double) = Math.round(x * 10.0) / 10.0
@@ -192,9 +294,14 @@ object CoachingRules {
             out += "No reps detected — check sensor placement and that the set was recorded."
             return out
         }
+        if (targets.countedReps != null && targets.countedReps != reps.size) {
+            out += "Sensor resolved ${reps.size} of ${targets.countedReps} reps — " +
+                "per-rep velocity and tempo below cover only those."
+        }
+        val counted = targets.countedReps ?: reps.size
         targets.plannedReps?.let { planned ->
-            if (reps.size < planned) out += "Completed ${reps.size} of $planned planned reps."
-            if (reps.size > planned) out += "Completed ${reps.size} reps, ${reps.size - planned} over plan."
+            if (counted < planned) out += "Completed $counted of $planned planned reps."
+            if (counted > planned) out += "Completed $counted reps, ${counted - planned} over plan."
         }
         targets.targetMeanConcentricVelocityMps?.let { target ->
             val mean = reps.map { it.meanConVelMps }.average()
@@ -218,7 +325,7 @@ object CoachingRules {
             }
         }
         tempoCompliance?.phases?.forEach { phase ->
-            if (phase.repsEvaluated > 0 && phase.repsWithinTolerance < phase.repsEvaluated) {
+            if (phase.scored && phase.repsEvaluated > 0 && phase.repsWithinTolerance < phase.repsEvaluated) {
                 val direction = if (phase.worstDeviationS < 0) "fast" else "slow"
                 out += "Tempo (${phase.phase}): ${phase.repsWithinTolerance}/${phase.repsEvaluated} reps on " +
                     "tempo; worst was ${fmt(abs(phase.worstDeviationS))} s too $direction " +

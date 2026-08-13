@@ -1,18 +1,29 @@
 package com.macrophage.barspeed.record
 
-import com.macrophage.barspeed.model.Tempo
+import com.macrophage.barspeed.dsp.TempoSchedule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Voice-guided cadence (e.g. tempo 4010): "Down, one, two, three, Up",
- * ~2 s breather, "Rep one", and around again — with a 5 s lead-in so
- * there's time to get positioned on the bar. Concentric-first lifts
- * (press, deadlift, row) run the cycle the way they're performed: "Up",
- * hold, counted "Down", breather at the rack/floor. The runner counts the
+ * Voice-guided cadence. The runner plays the tempo prescription and counts the
  * reps; the lifter just follows the voice.
+ *
+ * **The metronome plays exactly what the tempo string asks for.** The digits are
+ * positional — down, bottom pause, up, top pause — and each gets its prescribed
+ * seconds and nothing more. The rep call is spoken at the START of the closing
+ * phase rather than added after it, so it costs no time. Only when a
+ * prescription leaves no gap at all between the last stroke and the next rep is
+ * a one-second breath inserted, enough to say "Rep four" without the next call
+ * cutting it off. An earlier version allotted a flat 3 s to everything after the
+ * first stroke, which made every tempo unachievable and scored the surplus as
+ * the athlete's error.
+ *
+ * The order of the strokes, their prescribed seconds and the words used for
+ * them all come from [TempoSchedule], which resolves the tempo digits against
+ * the declared direction and plane — so a leg curl is called "Down" on its
+ * drive and a seated row is called "Drive" and "Return", having no up or down.
  */
 class GuidedCadenceRunner(
     private val scope: CoroutineScope,
@@ -25,35 +36,34 @@ class GuidedCadenceRunner(
 ) {
     private var job: Job? = null
 
-    fun start(tempo: Tempo, plannedReps: Int?, concentricFirst: Boolean) {
+    fun start(schedule: TempoSchedule, plannedReps: Int?) {
         job =
             scope.launch {
                 speak("Ready")
                 countdownPhase("GET READY", GUIDED_LEAD_IN_S)
+                val firstS = (schedule.first.seconds ?: 1.0).toInt().coerceAtLeast(1)
+                val secondS = (schedule.second.seconds ?: 1.0).toInt().coerceAtLeast(1)
+                val firstPause = schedule.pauseAfterFirstS.toInt()
+                // Something has to carry the rep call; borrow the closing pause
+                // when the prescription provides one, otherwise add a single second.
+                val closing = maxOf(schedule.pauseAfterSecondS.toInt(), GUIDED_REP_CALL_S)
                 var rep = 1
                 while (true) {
-                    if (concentricFirst) {
-                        concentric(tempo)
-                        hold(tempo.topPauseS.toInt())
-                        countedEccentric(tempo)
-                        countdownPhase("BREATHE", maxOf(tempo.bottomPauseS.toInt(), GUIDED_BREATHER_MIN_S))
-                    } else {
-                        countedEccentric(tempo)
-                        hold(tempo.bottomPauseS.toInt())
-                        concentric(tempo)
-                        countdownPhase("BREATHE", maxOf(tempo.topPauseS.toInt(), GUIDED_BREATHER_MIN_S))
-                    }
+                    stroke(schedule.first.label, firstS)
+                    pause(firstPause)
+                    stroke(schedule.second.label, secondS)
                     onRepCounted(rep)
+                    val done = plannedReps != null && rep >= plannedReps
                     when {
-                        plannedReps != null && rep >= plannedReps -> {
-                            speak("Done")
-                            update("DONE", 0, 1)
-                            return@launch
-                        }
+                        done -> speak("Done")
                         plannedReps != null && rep == plannedReps - 1 -> speak("Last rep")
                         else -> speak("Rep $rep")
                     }
-                    delay(1_000)
+                    if (done) {
+                        update("DONE", 0, 1)
+                        return@launch
+                    }
+                    countdownPhase("BREATHE", closing)
                     rep++
                 }
             }
@@ -64,28 +74,27 @@ class GuidedCadenceRunner(
         job = null
     }
 
-    private suspend fun hold(seconds: Int) {
+    private suspend fun pause(seconds: Int) {
         if (seconds <= 0) return
         speak("Hold")
         countdownPhase("HOLD", seconds)
     }
 
-    private suspend fun countedEccentric(tempo: Tempo) {
-        val eccS = tempo.eccentricS.toInt().coerceAtLeast(1)
-        speak("Down")
-        update("DOWN", eccS, eccS)
-        for (second in 1..eccS) {
+    /**
+     * One movement stroke. Strokes long enough to lose your place in are counted
+     * out loud ("Down, one, two, three"); a one-second drive just gets its call.
+     */
+    private suspend fun stroke(label: String, seconds: Int) {
+        speak(label.lowercase().replaceFirstChar { it.uppercase() })
+        update(label, seconds, seconds)
+        val countAloud = seconds >= COUNT_ALOUD_FROM_S
+        for (second in 1..seconds) {
             delay(1_000)
-            if (second < eccS) {
-                speak("$second")
-                update("DOWN", eccS - second, eccS)
+            if (second < seconds) {
+                if (countAloud) speak("$second")
+                update(label, seconds - second, seconds)
             }
         }
-    }
-
-    private suspend fun concentric(tempo: Tempo) {
-        speak("Up")
-        countdownPhase("UP", (tempo.concentricS ?: 1.0).toInt().coerceAtLeast(1))
     }
 
     private suspend fun countdownPhase(label: String, seconds: Int) {
@@ -98,6 +107,11 @@ class GuidedCadenceRunner(
 
     companion object {
         const val GUIDED_LEAD_IN_S = 5
-        const val GUIDED_BREATHER_MIN_S = 2
+
+        /** Seconds borrowed from (not added to) the closing pause for the rep call. */
+        const val GUIDED_REP_CALL_S = 1
+
+        /** Strokes at least this long get counted out loud second by second. */
+        const val COUNT_ALOUD_FROM_S = 2
     }
 }

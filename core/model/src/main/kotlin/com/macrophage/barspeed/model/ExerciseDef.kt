@@ -28,8 +28,54 @@ data class ExerciseDef(
     val isCustom: Boolean = false,
     /** True for straight-bar lifts — enables the plate-loading readout. */
     val usesBarbell: Boolean = true,
+    /**
+     * Which way the concentric (the driving, muscle-shortening phase) moves.
+     * True for almost everything; false for lifts whose drive goes DOWN — leg
+     * curl, lat pulldown, triceps pushdown. Independent of [startsWith]: one
+     * says which phase comes first, this says which direction that phase moves.
+     *
+     * **Never inferred from the exercise id.** The tempting heuristic (ids
+     * containing "leg_curl" or "pulldown" drive downward) reasons about the
+     * LIFTER, while the sensor usually rides the machine's weight stack and
+     * moves the other way: applied to a seated leg curl in field data it
+     * collapsed rep detection from 12 to 2. Direction and mount have to be
+     * declared together, so this stays true until a plan says otherwise.
+     */
+    val concentricUp: Boolean = true,
+    /**
+     * True when the sensor moves opposite to the load the lifter drives — a
+     * cable machine with the sensor on the weight stack, where pulling the
+     * handle down drives the stack up. Every measured direction is flipped back
+     * into lifter space before analysis.
+     */
+    val sensorInverted: Boolean = false,
+    /** Lifter-side travel per unit of sensor travel (2 for a 2:1 pulley). */
+    val travelRatio: Double = 1.0,
+    /** True for movements that travel horizontally — seated rows, chest-press machines. */
+    val horizontal: Boolean = false,
+    /**
+     * True when the sensor rides a cable weight stack rather than the load the
+     * lifter holds. The stack moves vertically whatever plane the lifter works
+     * in, so this decides which axis is measured.
+     */
+    val sensorOnStack: Boolean = false,
+    /**
+     * True when the lifter's own body is the load (pull-ups, dips). The set's
+     * load is then what was ADDED, negative for band or machine assistance.
+     */
+    val bodyweight: Boolean = false,
 ) {
     val isTimed: Boolean get() = kind == ExerciseKind.HOLD || kind == ExerciseKind.CARRY
+
+    /**
+     * True when the lift begins at the top of its range, so the first movement
+     * of every rep is downward. This is what the voice guide announces and what
+     * the tempo digits are positioned against.
+     */
+    val startsAtTop: Boolean get() = (startsWith == StartPhase.ECCENTRIC) == concentricUp
+
+    /** Maps measured sensor motion into the lifter's frame; see [sensorInverted]. */
+    val sensorToLifter: Double get() = (if (sensorInverted) -1.0 else 1.0) * travelRatio
 
     companion object {
         val SEED: List<ExerciseDef> =

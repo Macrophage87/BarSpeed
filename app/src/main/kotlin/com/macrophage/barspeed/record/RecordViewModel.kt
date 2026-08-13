@@ -123,6 +123,8 @@ data class RecordState(
     val sessionId: Long? = null,
     val setsCompleted: Int = 0,
     val weightUnit: WeightUnit = WeightUnit.KG,
+    /** Lifter body weight, the base load for pull-ups and dips; null until set. */
+    val bodyWeightKg: Double? = null,
 ) {
     val currentSlot: PlannedSlot? get() = queue.getOrNull(queueIndex)
     val nextSlot: PlannedSlot? get() = queue.getOrNull(queueIndex + 1)
@@ -240,6 +242,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
+            container.settings.bodyWeightKg.collect { kg ->
+                stateFlow.value = stateFlow.value.copy(bodyWeightKg = kg)
+            }
+        }
+        viewModelScope.launch {
             container.settings.audioCues.collect { enabled ->
                 stateFlow.value = stateFlow.value.copy(audioCues = enabled)
                 if (enabled && voice == null) voice = VoiceCounter(getApplication())
@@ -342,7 +349,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun beginSet() {
         val s = stateFlow.value
         val exercise = currentExercise(s)
-        val tracker = StreamingSetTracker(exercise.startsWith)
+        val tracker = StreamingSetTracker(exercise.startsWith, velocityScale = exercise.sensorToLifter)
         this.tracker = tracker
         imuBuffer.clear()
         hrBuffer.clear()
@@ -424,7 +431,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 guidedCountdown = 0,
             )
         if (guidedSet && guidedTempo != null) {
-            startGuidedCadence(guidedTempo, plannedRepsForSet, exercise.startsWith == StartPhase.CONCENTRIC)
+            startGuidedCadence(TempoSchedule.of(guidedTempo, exercise.liftDirection()), plannedRepsForSet)
         }
     }
 
@@ -442,7 +449,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** See [GuidedCadenceRunner]; the runner speaks and counts, the VM just mirrors state. */
-    private fun startGuidedCadence(tempo: Tempo, plannedReps: Int?, concentricFirst: Boolean) {
+    private fun startGuidedCadence(schedule: TempoSchedule, plannedReps: Int?) {
         if (voice == null) voice = VoiceCounter(getApplication())
         guidedCadence =
             GuidedCadenceRunner(
@@ -457,7 +464,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         )
                 },
                 onRepCounted = { rep -> stateFlow.value = stateFlow.value.copy(manualReps = rep) },
-            ).also { it.start(tempo, plannedReps, concentricFirst) }
+            ).also { it.start(schedule, plannedReps) }
     }
 
     /** Speak an in-set cue and log it on the sample clock (see VoiceCue). */
@@ -530,8 +537,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val exercise = currentExercise(s)
         val slot = s.currentSlot
         val isTimed = s.currentIsTimed
-        val loadKg =
+        val addedKg =
             if (s.adHoc || slot?.loadKg == null) s.weightUnit.parseToKg(s.loadInput) ?: 0.0 else slot.loadKg
+        // Pull-ups and dips move the lifter: the plan's number is what was ADDED
+        // (negative when a band or machine assists), so the load that actually
+        // travelled is body weight plus that.
+        val loadKg = if (exercise.bodyweight) (s.bodyWeightKg ?: 0.0) + addedKg else addedKg
         val plannedReps = if (s.adHoc) s.repsInput.toIntOrNull() else slot?.reps
         val side = if (s.adHoc) s.sideInput else slot?.side
         val plannedDurationS = if (isTimed) s.currentTimedTargetS else null
@@ -551,6 +562,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             val targets =
                 SetTargets(
                     plannedReps = plannedReps,
+                    countedReps = if (s.manualSet) s.manualReps else null,
                     tempo = tempoText?.let { Tempo.parseOrNull(it) },
                     targetMeanConcentricVelocityMps = slot?.targetMeanConVelMps,
                     velocityLossStopPct = slot?.velocityLossStopPct,
@@ -569,7 +581,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                             null,
                             timedVerdicts(actualDurationS, plannedDurationS),
                         )
-                        samples.size >= 8 -> SetAnalyzer.analyze(samples, exercise.startsWith, loadKg, targets)
+                        samples.size >= 8 ->
+                            SetAnalyzer.analyze(samples, exercise.liftDirection(), loadKg, targets)
                         manualReps != null ->
                             SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))
                         else -> SetAnalysis(emptyList(), 0.0, null, null, listOf("No sensor data recorded."))
@@ -742,9 +755,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val slots = mutableListOf<PlannedSlot>()
         for ((exerciseIdx, exerciseDef) in planSession.exercises.withIndex()) {
             val base = sessionRepository.exerciseById(exerciseDef.exercise)
-            // A plan-pinned "start": "up"/"down" beats seed defaults and name inference.
+            // Plan-declared direction beats seed defaults and name inference: the
+            // same movement pattern starts at the top on one machine and the
+            // bottom on another, and no signal processing can tell which.
             val exercise =
-                exerciseDef.startPhaseOverride?.let { base.copy(startsWith = it) } ?: base
+                base.copy(
+                    startsWith = exerciseDef.startPhaseOverride ?: base.startsWith,
+                    concentricUp = exerciseDef.concentric?.let { it == "up" } ?: base.concentricUp,
+                    sensorInverted = exerciseDef.sensorInverted,
+                    travelRatio = exerciseDef.travelRatio ?: 1.0,
+                    horizontal = exerciseDef.plane == "horizontal",
+                    sensorOnStack = exerciseDef.sensorOnStack,
+                    bodyweight = exerciseDef.bodyweight,
+                )
             exerciseDef.sets.forEachIndexed { setIdx, set ->
                 slots +=
                     PlannedSlot(
@@ -757,7 +780,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         plannedLoadKg = set.resolvedLoadKg,
                         tempo = set.tempo,
                         side = set.side,
-                        exerciseNotes = exerciseDef.notes,
+                        exerciseNotes = listOfNotNull(exerciseDef.notes, set.note)
+                            .takeIf { it.isNotEmpty() }?.joinToString(" · "),
                         targetMeanConVelMps = set.targetMeanConcentricVelocityMps,
                         velocityLossStopPct = set.velocityLossStopPct,
                         restS = set.restS,

@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,6 +26,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -44,12 +49,57 @@ import java.util.Locale
 
 private const val KG_PER_TONNE = 1000.0
 
+/**
+ * Body weight is the base load for pull-ups, dips and other bodyweight work,
+ * where the plan prescribes only what was ADDED (or assisted away).
+ */
+@Composable
+private fun BodyWeightDialog(current: Double?, unit: WeightUnit, onDismiss: () -> Unit, onSet: (Double) -> Unit) {
+    var text by remember { mutableStateOf(current?.let { unit.inputValue(it) } ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Body weight") },
+        text = {
+            Column {
+                Text(
+                    "Used as the base load for pull-ups, dips and other bodyweight work — " +
+                        "those plans prescribe only the weight you add or take off.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BarColors.Sub,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Weight (${unit.suffix})") },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { unit.parseToKg(text)?.takeIf { it > 0 }?.let(onSet) }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
     val imuState by viewModel.imuState.collectAsState()
     val hrmState by viewModel.hrmState.collectAsState()
+    var showBodyWeight by remember { mutableStateOf(false) }
+    if (showBodyWeight) {
+        BodyWeightDialog(
+            current = state.bodyWeightKg,
+            unit = state.weightUnit,
+            onDismiss = { showBodyWeight = false },
+            onSet = {
+                viewModel.setBodyWeight(it)
+                showBodyWeight = false
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -71,6 +121,12 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                             hrmState is ConnectionState.Connected,
                             connecting = hrmState is ConnectionState.Connecting,
                         )
+                        TextButton(onClick = { showBodyWeight = true }) {
+                            Text(
+                                state.bodyWeightKg?.let { "BW ${state.weightUnit.inputValue(it)}" } ?: "Set BW",
+                                color = if (state.bodyWeightKg == null) BarColors.Amber else BarColors.Sub,
+                            )
+                        }
                         TextButton(onClick = viewModel::toggleWeightUnit) {
                             Text("${state.weightUnit.suffix} ⇄", color = BarColors.Sub)
                         }

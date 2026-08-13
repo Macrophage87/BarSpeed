@@ -26,6 +26,12 @@ class StreamingSetTracker(
     private val startsWith: StartPhase = StartPhase.ECCENTRIC,
     private val config: DspConfig = DspConfig(),
     expectedSampleRateHz: Double = 100.0,
+    /**
+     * Maps measured sensor motion into the lifter's frame — negative when the
+     * sensor rides a cable's weight stack and moves opposite the handle. Applied
+     * to the live velocity so the on-screen phase is the lifter's, not the stack's.
+     */
+    private val velocityScale: Double = 1.0,
 ) {
     private var filter = Biquad.lowPass(config.lowPassCutoffHz, expectedSampleRateHz)
 
@@ -94,7 +100,7 @@ class StreamingSetTracker(
         lastAccel = accel
 
         updateZupt(quietSample, timeS)
-        val v = rawV - anchorOffset
+        val v = (rawV - anchorOffset) * velocityScale
         updateRuns(v, timeS)
 
         state =

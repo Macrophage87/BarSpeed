@@ -12,7 +12,11 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "1.0"
+      "enum": [
+        "1.0",
+        "1.1"
+      ],
+      "description": "1.1: velocityLoss_pct is best-to-LAST rep; unmeasured phases are null rather than 0; tempo compliance scores movement digits only; repMetricsComplete reports per-rep coverage."
     },
     "startedAt": {
       "type": "string",
@@ -125,6 +129,21 @@
             },
             "of": {
               "type": "integer"
+            },
+            "scoredPhases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Which phases were scored. Pauses are measured and reported but never scored."
+            },
+            "prescribedEccConRatio": {
+              "type": "number",
+              "description": "Prescribed eccentric:concentric contrast."
+            },
+            "actualEccConRatio": {
+              "type": "number",
+              "description": "Measured eccentric:concentric contrast. Diagnostic, not a corrected score: the measurement bias is multiplicative."
             }
           }
         },
@@ -238,6 +257,10 @@
         "repsManual": {
           "type": "boolean",
           "description": "True when reps were entered or corrected manually rather than sensor-counted."
+        },
+        "repMetricsComplete": {
+          "type": "boolean",
+          "description": "False when the per-rep array does not cover every performed rep \u2014 the sensor segmenter resolved fewer (or more) than the lifter/voice counted. Per-rep detail is then a sample of the set, not the set, and the summary and tempo compliance are drawn from that sample too."
         }
       }
     },
@@ -245,13 +268,11 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "ecc_s",
         "bottomPause_s",
         "con_s",
         "topPause_s",
         "meanConVel_mps",
         "peakConVel_mps",
-        "meanEccVel_mps",
         "rom_m"
       ],
       "properties": {

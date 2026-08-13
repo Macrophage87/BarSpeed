@@ -11,6 +11,10 @@ data class PlanImportSummary(
     val sessionCount: Int,
     val totalSets: Int,
     val exerciseNames: List<String>,
+    /** Non-blocking notes from validation, shown at the approval gate. */
+    val warnings: List<String> = emptyList(),
+    /** Exercises the plan marks droppable when the session runs long. */
+    val optionalExercises: List<String> = emptyList(),
 )
 
 sealed interface PlanImportResult {
@@ -76,5 +80,8 @@ class PlanRepository(
         sessionCount = plan.sessions.size,
         totalSets = plan.sessions.sumOf { s -> s.exercises.sumOf { it.sets.size } },
         exerciseNames = plan.sessions.flatMap { s -> s.exercises.map { it.exercise } }.distinct(),
+        warnings = plan.warnings(),
+        optionalExercises =
+        plan.sessions.flatMap { s -> s.exercises.filter { it.optional }.map { it.exercise } }.distinct(),
     )
 }

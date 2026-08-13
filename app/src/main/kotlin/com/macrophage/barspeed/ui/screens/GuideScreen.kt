@@ -38,16 +38,26 @@ First decide, from this conversation so far, whether you already have what you n
 
 Output rules: produce ONLY a JSON document — as a downloadable .json file if you can create files, otherwise as a single raw JSON code block with no prose around it.
 
-The JSON must conform exactly to this schema:
-- Top level: {"schemaVersion": "1.2", "planName": string, "notes": optional string, "sessions": [...]}
+The authoritative machine-readable schema is docs/schemas/plan.schema.json in the BarSpeed repo, keyed by schemaVersion. Unknown keys are REJECTED, never silently dropped, and the rejection names the JSON path — paste it back to me and fix it. This is the full 1.3 contract:
+
+- Top level: {"schemaVersion": "1.3", "planName": string, "notes": optional string, "sessions": [...]}
 - Session: {"name": string, "notes": optional string, "exercises": [...]}
-- Exercise: {"exercise": snake_case_id, "notes": optional coaching cue shown to me in-app, "start": optional "up"|"down", "sets": [...]}
-  "start" pins which direction the lift begins: "up" for lifts that drive first (press from the rack, deadlift, row — reps are keyed on the concentric), "down" for lifts that lower first (squat, bench). Omit it and the app infers from the id.
-  IMPORTANT: never combine a "start" that contradicts the lift's natural direction with tempo sets — a tempo bench press still starts from the top, so it must NOT get "start": "up" (the importer rejects that combination on built-in lifts). Overriding "start" is for drive-keyed counting on sets WITHOUT tempo, e.g. explosive-style bench where only the press-out matters.
+- Exercise: {"exercise": snake_case_id, "notes": optional coaching cue shown to me in-app, "sets": [...]} plus these optional keys:
+  "start": "top" | "bottom" — where the lift BEGINS, which fixes the direction of the first movement of every rep. "top" = first movement is down (squat, bench, leg curl, lat pulldown); "bottom" = first movement is up (press from the rack, deadlift, leg press, row). ("down"/"up" name that first movement directly and mean the same thing.) DECLARE THIS ON EVERY MACHINE: the same movement pattern starts at opposite ends on different machines, and nothing in the signal can tell which. Omitted → inferred from the id, which is a guess.
+  "concentric": "up" | "down" — which way the DRIVING phase moves. Default "up". Use "down" for leg curls, lat pulldowns, triceps pushdowns. This is INDEPENDENT of "start": start says which phase comes first, concentric says which direction the drive goes. Both are needed to know which tempo digit is the eccentric.
+  "sensorInverted": true — set this on cable machines whose routing reverses the sensor. The sensor rides the weight stack, so when I pull the handle DOWN the stack (and the sensor) goes UP; without this flag every phase label and velocity on that exercise is backwards.
+  "sensorOnStack": true — the sensor is on the cable weight stack rather than on what I hold. The stack travels VERTICALLY no matter which way I move, so this is what decides which axis gets measured.
+  "travelRatio": number — lifter-side travel per unit of sensor travel, for pulleys that aren't 1:1 (a 2:1 cable moves the handle twice as far as the stack → 2). Default 1.
+  "plane": "vertical" | "horizontal" — the plane I move in. Use "horizontal" for seated rows, chest-press machines and horizontal cable work. This is MY plane, not the sensor's: a seated cable row is "plane": "horizontal" WITH "sensorOnStack": true, because the stack still goes up and down.
+  "bodyweight": true — my own body is the load (pull-ups, dips, push-ups). The set's load is then only what I ADD, and it may be NEGATIVE for band or machine assistance; the app adds my body weight to get the real load.
+  "optional": true — accessory work I can drop if the session runs long; the app shows it as droppable so the decision is planned rather than improvised.
   Built-in ids: back_squat, front_squat, bench_press, overhead_press, deadlift, romanian_deadlift, barbell_row, hip_thrust; timed: plank, side_plank, dead_hang, farmers_walk, suitcase_carry; explosive (peak-velocity tracked, no tempo): snatch, power_snatch, clean, power_clean, push_press, kettlebell_swing, kettlebell_snatch, kettlebell_clean. Other snake_case ids are allowed; include words like dumbbell/cable/plank/carry/swing in the id so the app infers the right tracking mode.
-- Set: exactly one of {"reps": int} (dynamic) or {"duration_s": int} (holds/carries). Load: at most one of "load_kg" / "load_lb" (omit both for bodyweight). Optional: "tempo" (4-digit like "4010", dynamic sets only), "side" ("left"/"right" for unilateral work — emit one set per side), "targetMeanConcentricVelocity_mps", "velocityLossStop_pct", "rest_s".
+- Set: exactly one of {"reps": int} (dynamic) or {"duration_s": int} (holds/carries). Load: at most one of "load_kg" / "load_lb" (omit both for bodyweight). Optional: "tempo", "side" ("left"/"right" for unilateral work — emit one set per side, which also makes the true set count visible), "note" (commentary for this set alone), "targetMeanConcentricVelocity_mps", "velocityLossStop_pct", "rest_s".
+  "tempo" digits: on VERTICAL exercises they are POSITIONAL — digit 1 = the DOWN stroke, digit 2 = pause at the bottom, digit 3 = the UP stroke, digit 4 = pause at the top — so which stroke is the eccentric follows from "concentric", not from the digit order (on a leg curl with "concentric": "down", "1030" is a 1 s driving pull down and a 3 s eccentric return up). On HORIZONTAL exercises there is no up or down, so the digits revert to the classic phase reading: digit 1 = eccentric, digit 3 = concentric. Either way digit 2 follows the digit-1 stroke and digit 4 follows the digit-3 stroke, and the voice guide plays exactly these seconds — it calls "Down"/"Up" on vertical work and "Return"/"Drive" on horizontal work.
 
 Use tempo and velocity targets deliberately on primary barbell lifts to enable auto-regulation, and put form cues in exercise notes.
+
+Two things the app does NOT accept, so don't invent them: there is no per-side shorthand (write one set object per side, with "side" — which also makes the real set count visible up front), and there is no way to mark prescribed work as skipped. A session that ends early simply has fewer sets in its export.
 
 When I share BarSpeed session exports, read the effort fields with this key. "rpe" is RIR-based, 6-10; the app shows me narrative tiles and stores these numbers:
 - Dynamic sets: 6 = easy (4+ reps in reserve), 7 = solid (~3 left), 8 = hard (~2 left), 9 = very hard (1 left), 10 = max (nothing left).
@@ -56,6 +66,14 @@ When I share BarSpeed session exports, read the effort fields with this key. "rp
 - "warmup": true (rpe null) = warm-up set, barely any effort — exclude it from fatigue and progression analysis.
 - "failed": true = failed set (missed reps, broke a hold early, or missed the lift) — treat as beyond RPE 10.
 - rpe null with neither flag = I skipped rating that set. There are no values below 6; easier-than-6 work is what the warm-up flag means.
+
+How to read the rest of a session export, so you don't over-trust it:
+- "reps" is authoritative — I counted it, or the voice guide did. The accelerometer is RECORD-ONLY on standard lifts.
+- "repMetrics" is the sensor's separate per-rep opinion. When "repMetricsComplete": false it did NOT resolve every rep, so treat the array as a sample of the set, not the set — and treat any summary built from it the same way.
+- "tempoCompliance" scores the two MOVEMENT digits only ("scoredPhases" says which). Pauses are measured and reported but never scored, because separating a real pause from a very slow movement needs displacement, which is the least trustworthy thing here. Prefer "actualEccConRatio" vs "prescribedEccConRatio" — the contrast is what a tempo block trains and it survives a constant timing offset.
+- "rom_m" and everything derived from it (velocities, power) come from double integration and drift, badly on free weights where the sensor rotates. Compare them WITHIN a set and within a session; do not read them as calibrated distances or watts. "rollExcursion_deg" in the raw zip's meta.json tells you which sets rotated: a few degrees means the kinematics are clean, hundreds means gravity leaked into every sample.
+- "velocityLoss_pct" is best rep → LAST rep, at the point I stopped the set.
+- "voiceCues" are epoch-ms stamped on the same clock as the raw IMU CSVs, so you can align exactly what I was told to do against what the bar did.
     """.trimIndent()
 
 private data class GuideSection(val title: String, val body: String)

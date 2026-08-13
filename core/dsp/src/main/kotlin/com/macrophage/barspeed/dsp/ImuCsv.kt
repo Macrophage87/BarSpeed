@@ -9,18 +9,27 @@ import java.util.Locale
  * '#' are comments; the header row is required.
  */
 object ImuCsv {
-    const val HEADER = "timestamp_ms,ax_g,ay_g,az_g,wx_dps,wy_dps,wz_dps,roll_deg,pitch_deg,yaw_deg"
+    /**
+     * `timestamp_ms` is the BLE notification ARRIVAL time: a packet carries
+     * several samples and they all share it, so consecutive deltas are 0 ms and
+     * then jump ~30 ms. It is exact enough to align against the cue track, and
+     * useless as an integration step. `sample_idx` is the monotonic sample
+     * counter — divide by the set's `sampleRate_hz` from meta.json for a true
+     * sample clock.
+     */
+    const val HEADER =
+        "timestamp_ms,ax_g,ay_g,az_g,wx_dps,wy_dps,wz_dps,roll_deg,pitch_deg,yaw_deg,sample_idx"
 
     fun encode(samples: List<ImuSample>): String {
         val sb = StringBuilder(HEADER).append('\n')
-        for (s in samples) {
+        for ((idx, s) in samples.withIndex()) {
             sb.append(
                 String.format(
                     Locale.US,
-                    "%d,%.6f,%.6f,%.6f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f%n",
+                    "%d,%.6f,%.6f,%.6f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%d%n",
                     s.timestampMs, s.axG, s.ayG, s.azG,
                     s.wxDps, s.wyDps, s.wzDps,
-                    s.rollDeg, s.pitchDeg, s.yawDeg,
+                    s.rollDeg, s.pitchDeg, s.yawDeg, idx,
                 ),
             )
         }

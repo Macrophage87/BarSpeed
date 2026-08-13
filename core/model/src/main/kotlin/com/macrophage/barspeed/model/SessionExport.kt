@@ -1,12 +1,18 @@
 package com.macrophage.barspeed.model
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** Root of a session export; contract is docs/schemas/session-export.schema.json. */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class SessionExport(
-    val schemaVersion: String = SCHEMA_VERSION,
+    // Always written, even though it equals its default: the exporter drops
+    // defaults, and an export without its version is unreadable by anything
+    // that has to tell 1.0's field meanings from 1.1's.
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val schemaVersion: String = SCHEMA_VERSION,
     val startedAt: String,
     val endedAt: String? = null,
     val planRef: String? = null,
@@ -15,7 +21,14 @@ data class SessionExport(
     val exercises: List<ExerciseExport>,
 ) {
     companion object {
-        const val SCHEMA_VERSION = "1.0"
+        /**
+         * 1.1 — velocityLoss_pct became best→LAST rep (was best→worst), unknown
+         * phases report null instead of 0, tempo compliance scores movement
+         * digits only, and repMetricsComplete says whether the per-rep array
+         * covers the whole set.
+         */
+        const val SCHEMA_VERSION = "1.1"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1")
     }
 }
 
@@ -63,6 +76,13 @@ data class SetExport(
     val repMetrics: List<RepMetricsExport>? = null,
     /** Spoken cues with epoch-ms stamps, cross-referenceable with the raw IMU stream (detailed export only). */
     val voiceCues: List<VoiceCue>? = null,
+    /**
+     * False when the per-rep array does not cover every performed rep — the
+     * sensor segmenter found a different number than the lifter/voice counted.
+     * Per-rep detail is then a sample, not the set, and summaries built from it
+     * (velocity loss, tempo compliance) are drawn from that sample too.
+     */
+    val repMetricsComplete: Boolean? = null,
     /** Always-included summary across reps. */
     val summary: SetSummaryExport,
 )
@@ -82,13 +102,15 @@ data class SetSummaryExport(
 
 @Serializable
 data class RepMetricsExport(
-    @SerialName("ecc_s") val eccS: Double,
+    /** Null when no eccentric was measurable — never 0, which would read as an instant phase. */
+    @SerialName("ecc_s") val eccS: Double? = null,
     @SerialName("bottomPause_s") val bottomPauseS: Double,
     @SerialName("con_s") val conS: Double,
     @SerialName("topPause_s") val topPauseS: Double,
+    /** Mean drive velocity, positive in the direction the drive moves. */
     @SerialName("meanConVel_mps") val meanConVelMps: Double,
     @SerialName("peakConVel_mps") val peakConVelMps: Double,
-    @SerialName("meanEccVel_mps") val meanEccVelMps: Double,
+    @SerialName("meanEccVel_mps") val meanEccVelMps: Double? = null,
     @SerialName("rom_m") val romM: Double,
     @SerialName("peakPower_w") val peakPowerW: Double? = null,
     @SerialName("meanConPower_w") val meanConPowerW: Double? = null,
@@ -98,8 +120,14 @@ data class RepMetricsExport(
 data class TempoComplianceExport(
     val prescribed: String,
     @SerialName("tolerance_s") val toleranceS: Double,
+    /** Reps within tolerance on the SCORED phases; pauses are reported, not scored. */
     val withinTolerance: Int,
     val of: Int,
+    /** Which phases were scored — the movement digits only. */
+    val scoredPhases: List<String> = emptyList(),
+    /** Prescribed eccentric:concentric contrast — what a tempo block actually trains. */
+    val prescribedEccConRatio: Double? = null,
+    val actualEccConRatio: Double? = null,
 )
 
 @Serializable

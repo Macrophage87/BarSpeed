@@ -137,28 +137,77 @@ class PlanValidationTest {
         assertTrue(planWith(""", "start": "sideways"""").validate().any { it.contains("start") })
     }
 
+    private fun planWith(exercise: String, direction: String): PlanFile {
+        val plan =
+            """
+            {"schemaVersion": "1.3", "planName": "t", "sessions": [{"name": "s",
+              "exercises": [{"exercise": "$exercise"$direction,
+                "sets": [{"reps": 5, "load_kg": 60, "tempo": "3010"}]}]}]}
+            """.trimIndent()
+        return json.decodeFromString(PlanFile.serializer(), plan)
+    }
+
     @Test
-    fun `contradictory start override is rejected on tempo sets but allowed without tempo`() {
-        fun errorsFor(exercise: String, start: String?, tempo: Boolean): List<String> {
-            val startJson = start?.let { """, "start": "$it"""" } ?: ""
-            val tempoJson = if (tempo) """, "tempo": "3010"""" else ""
-            val plan =
-                """
-                {"schemaVersion": "1.2", "planName": "t", "sessions": [{"name": "s",
-                  "exercises": [{"exercise": "$exercise"$startJson,
-                    "sets": [{"reps": 5, "load_kg": 60$tempoJson}]}]}]}
-                """.trimIndent()
-            return json.decodeFromString(PlanFile.serializer(), plan).validate()
-        }
-        // Tempo bench still starts from the top: "up" override + tempo is contradictory.
-        assertTrue(errorsFor("bench_press", "up", tempo = true).any { it.contains("start from the top") })
-        // Same guard in the other direction: a tempo press starts from the bottom.
-        assertTrue(errorsFor("overhead_press", "down", tempo = true).any { it.contains("start from the bottom") })
-        // Drive-keyed counting without tempo is the intended use — allowed.
-        assertTrue(errorsFor("bench_press", "up", tempo = false).isEmpty())
-        // Override matching the lift's natural direction is fine with tempo.
-        assertTrue(errorsFor("overhead_press", "up", tempo = true).isEmpty())
-        // Custom ids are not second-guessed: inference is heuristic, the override wins.
-        assertTrue(errorsFor("landmine_press", "up", tempo = true).isEmpty())
+    fun `start declares where the lift begins, in either vocabulary`() {
+        // A machine chest press started from the bottom pins: the same movement
+        // pattern as a bench, opposite start. The declaration must win.
+        val bottom = planWith("bench_press", """, "start": "bottom"""")
+        assertTrue(bottom.validate().isEmpty(), bottom.validate().joinToString())
+        assertEquals(StartPhase.CONCENTRIC, bottom.sessions[0].exercises[0].startPhaseOverride)
+        // ...but it is worth a non-blocking note, since a bench normally starts at the top.
+        assertTrue(bottom.warnings().any { it.contains("normally starts at the top") })
+
+        // "down"/"up" name the first movement and mean the same thing.
+        assertEquals(
+            planWith("bench_press", """, "start": "top"""").sessions[0].exercises[0].startPhaseOverride,
+            planWith("bench_press", """, "start": "down"""").sessions[0].exercises[0].startPhaseOverride,
+        )
+        // Declaring the natural direction raises no warning.
+        assertTrue(planWith("bench_press", """, "start": "top"""").warnings().isEmpty())
+        // Omitted → inferred, no override.
+        assertEquals(null, planWith("bench_press", "").sessions[0].exercises[0].startPhaseOverride)
+        assertTrue(planWith("bench_press", """, "start": "sideways"""").validate().any { it.contains("start") })
+    }
+
+    @Test
+    fun `concentric direction is independent of where the lift starts`() {
+        // A seated leg curl starts at the top (legs extended) and its DRIVE goes
+        // down — so the first phase is the concentric, which no start value alone
+        // could express.
+        val curl = planWith("seated_leg_curl", """, "start": "top", "concentric": "down"""")
+        assertTrue(curl.validate().isEmpty(), curl.validate().joinToString())
+        val def = curl.sessions[0].exercises[0]
+        assertEquals(StartPhase.CONCENTRIC, def.startPhaseOverride)
+        assertEquals(false, def.concentricUp)
+        assertTrue(def.startsAtTop)
+
+        // Same start, ordinary upward drive → eccentric first (a squat).
+        val squat = planWith("back_squat", """, "start": "top"""")
+        assertEquals(StartPhase.ECCENTRIC, squat.sessions[0].exercises[0].startPhaseOverride)
+        assertTrue(squat.sessions[0].exercises[0].concentricUp)
+
+        // A leg press: starts at the bottom, drives up.
+        val press = planWith("single_leg_press", """, "start": "bottom"""")
+        assertEquals(StartPhase.CONCENTRIC, press.sessions[0].exercises[0].startPhaseOverride)
+
+        val bad = planWith("back_squat", """, "concentric": "sideways"""")
+        assertTrue(bad.validate().any { it.contains("concentric") })
+    }
+
+    @Test
+    fun `set-level note and exercise-level optional are accepted`() {
+        val plan =
+            """
+            {"schemaVersion": "1.3", "planName": "t", "sessions": [{"name": "s", "exercises": [
+              {"exercise": "back_squat", "sets": [{"reps": 5, "load_kg": 60}]},
+              {"exercise": "cable_face_pull", "optional": true, "notes": "accessory",
+               "sets": [{"reps": 12, "load_kg": 20, "note": "closer to the plate, higher ROM"}]}
+            ]}]}
+            """.trimIndent()
+        val file = json.decodeFromString(PlanFile.serializer(), plan)
+        assertTrue(file.validate().isEmpty(), file.validate().joinToString())
+        assertEquals(false, file.sessions[0].exercises[0].optional)
+        assertEquals(true, file.sessions[0].exercises[1].optional)
+        assertEquals("closer to the plate, higher ROM", file.sessions[0].exercises[1].sets[0].note)
     }
 }

@@ -25,25 +25,63 @@ data class PlanFile(
             session.exercises.forEachIndexed { ei, exercise ->
                 if (exercise.exercise.isBlank()) errors += "sessions[$si].exercises[$ei].exercise must not be blank"
                 if (exercise.start != null && exercise.start !in VALID_STARTS) {
-                    errors += "sessions[$si].exercises[$ei].start must be \"up\" or \"down\""
+                    errors += "sessions[$si].exercises[$ei].start must be one of ${VALID_STARTS.joinToString()}"
                 }
-                exercise.contradictoryTempoStartError()?.let {
-                    errors += "sessions[$si].exercises[$ei]: $it"
+                if (exercise.concentric != null && exercise.concentric !in VALID_CONCENTRIC) {
+                    errors += "sessions[$si].exercises[$ei].concentric must be \"up\" or \"down\""
+                }
+                exercise.travelRatio?.let {
+                    if (it <= 0.0) errors += "sessions[$si].exercises[$ei].travelRatio must be positive"
+                }
+                if (exercise.plane != null && exercise.plane !in VALID_PLANES) {
+                    errors += "sessions[$si].exercises[$ei].plane must be \"vertical\" or \"horizontal\""
                 }
                 if (exercise.sets.isEmpty()) errors += "sessions[$si].exercises[$ei] must contain at least one set"
                 exercise.sets.forEachIndexed { xi, set ->
-                    errors += set.validate("sessions[$si].exercises[$ei].sets[$xi]")
+                    // On bodyweight work the load is what was ADDED, and a band or
+                    // assist machine subtracts — so negatives are meaningful there.
+                    errors += set.validate(
+                        "sessions[$si].exercises[$ei].sets[$xi]",
+                        allowNegativeLoad = exercise.bodyweight,
+                    )
                 }
             }
         }
         return errors
     }
 
+    /**
+     * Non-blocking notes shown at the import gate. A declaration always wins —
+     * machines of the same movement pattern really do start at opposite ends —
+     * but it is worth saying out loud when a plan pins a direction that
+     * contradicts how the built-in lift is normally performed, because a
+     * mis-declared direction inverts the voice guide's whole cadence.
+     */
+    fun warnings(): List<String> {
+        val out = mutableListOf<String>()
+        sessions.forEachIndexed { si, session ->
+            session.exercises.forEachIndexed { ei, exercise ->
+                val seed = ExerciseDef.seedById(exercise.exercise) ?: return@forEachIndexed
+                val declared = exercise.startPhaseOverride ?: return@forEachIndexed
+                if (declared == seed.startsWith) return@forEachIndexed
+                val natural = if (seed.startsAtTop) "the top" else "the bottom"
+                val asked = if (exercise.startsAtTop) "the top" else "the bottom"
+                out += "sessions[$si].exercises[$ei]: ${exercise.exercise} normally starts at $natural, " +
+                    "but this plan starts it at $asked — the voice guide will follow the plan."
+            }
+        }
+        return out
+    }
+
     companion object {
-        const val SCHEMA_VERSION = "1.2"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2")
+        const val SCHEMA_VERSION = "1.3"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3")
         val VALID_SIDES = setOf("left", "right")
-        val VALID_STARTS = setOf("up", "down")
+
+        /** "top"/"bottom" name the start position; "down"/"up" the first movement. */
+        val VALID_STARTS = setOf("top", "bottom", "up", "down")
+        val VALID_CONCENTRIC = setOf("up", "down")
+        val VALID_PLANES = setOf("vertical", "horizontal")
     }
 }
 
@@ -59,37 +97,86 @@ data class PlanExerciseDef(
     val exercise: String,
     val notes: String? = null,
     /**
-     * Which direction the lift starts: "up" (press, deadlift — count keys on
-     * the concentric) or "down" (squat, bench). Omitted → inferred from the id.
+     * Where the lift begins in space, so the app knows which way the first
+     * movement of every rep goes: `"top"` (squat, bench, leg curl — first
+     * movement is down) or `"bottom"` (press from the rack, deadlift, leg
+     * press — first movement is up). Legacy `"down"`/`"up"` name the first
+     * movement directly and mean the same thing. Omitted → inferred from the id.
+     *
+     * Machines of the same movement pattern genuinely differ here, which is why
+     * it is declared rather than inferred.
      */
     val start: String? = null,
+    /**
+     * Which way the concentric (driving) phase moves: `"up"` (default) or
+     * `"down"` for leg curls, pulldowns and pushdowns. **Independent of
+     * [start]** — that says which phase comes first, this says which direction
+     * the drive goes — and it is what decides which tempo digit is the
+     * eccentric.
+     */
+    val concentric: String? = null,
+    /**
+     * True when the sensor moves OPPOSITE to the load the lifter drives — the
+     * usual case on a cable machine, where the sensor rides the weight stack, so
+     * pulling the handle down sends the stack (and the sensor) up. Without this
+     * every phase label and every velocity on that exercise is backwards.
+     */
+    val sensorInverted: Boolean = false,
+    /**
+     * Lifter-side travel per unit of sensor travel, for pulleys that do not move
+     * 1:1 — a 2:1 cable moves the handle twice as far as the stack, so `2`.
+     * Defaults to 1.
+     */
+    val travelRatio: Double? = null,
+    /**
+     * Which plane the movement travels in: `"vertical"` (default — squats,
+     * presses, curls) or `"horizontal"` (seated rows, chest-press machines,
+     * horizontal cable work). Vertical analysis measures the wrong axis
+     * entirely on a horizontal machine, so declare it.
+     */
+    val plane: String? = null,
+    /**
+     * True when the lifter's own body is the load — pull-ups, dips, push-ups.
+     * The set's load is then what was ADDED, and may be negative for assistance
+     * (band or machine). Total load is body weight plus that.
+     */
+    val bodyweight: Boolean = false,
+    /** Accessory work that may be dropped when a session runs long. */
+    val optional: Boolean = false,
     val sets: List<PlanSetDef>,
 ) {
-    /** Start-phase override, when the plan pins one. */
-    val startPhaseOverride: StartPhase?
+    /** True when the drive goes up; plans may pin it, otherwise inferred from the id. */
+    val concentricUp: Boolean
+        get() = when (concentric) {
+            "down" -> false
+            "up" -> true
+            // Never guessed from the id: see ExerciseDef.concentricUp.
+            else -> true
+        }
+
+    /** Declared first-movement direction, when the plan pins one. */
+    private val startsAtTopOverride: Boolean?
         get() = when (start) {
-            "up" -> StartPhase.CONCENTRIC
-            "down" -> StartPhase.ECCENTRIC
+            "top", "down" -> true
+            "bottom", "up" -> false
             else -> null
         }
 
+    /** Where this exercise begins, declared or inferred from the id. */
+    val startsAtTop: Boolean
+        get() = startsAtTopOverride
+            ?: ((ExerciseDef.inferStartPhase(exercise) == StartPhase.ECCENTRIC) == concentricUp)
+
     /**
-     * A start override that contradicts how a known lift is performed is only
-     * meaningful for drive-keyed counting on sets WITHOUT tempo. With tempo,
-     * the voice guide would call the first phase from the wrong end of the
-     * movement (e.g. "Up" while sitting at bench lockout) — reject the combo.
-     * Custom ids are not second-guessed: inference is heuristic there.
+     * Start-phase override, when the plan pins one. Combines the two declared
+     * properties: the first phase is the concentric when the direction the lift
+     * starts moving is the direction the drive goes.
      */
-    fun contradictoryTempoStartError(): String? {
-        val seed = ExerciseDef.seedById(exercise) ?: return null
-        val override = startPhaseOverride ?: return null
-        if (override == seed.startsWith) return null
-        if (sets.none { it.tempo != null }) return null
-        val natural =
-            if (seed.startsWith == StartPhase.ECCENTRIC) "the top (down-first)" else "the bottom (up-first)"
-        return "tempo sets on $exercise start from $natural — omit \"start\" for tempo work; " +
-            "use the override only on sets without tempo (drive-keyed counting)"
-    }
+    val startPhaseOverride: StartPhase?
+        get() {
+            val top = startsAtTopOverride ?: return null
+            return if (top == concentricUp) StartPhase.ECCENTRIC else StartPhase.CONCENTRIC
+        }
 }
 
 @Serializable
@@ -105,6 +192,8 @@ data class PlanSetDef(
     val tempo: String? = null,
     /** For unilateral work: "left" or "right". Emit one set per side. */
     val side: String? = null,
+    /** Commentary for this set alone (the exercise-level `notes` covers all its sets). */
+    val note: String? = null,
     @SerialName("targetMeanConcentricVelocity_mps") val targetMeanConcentricVelocityMps: Double? = null,
     @SerialName("velocityLossStop_pct") val velocityLossStopPct: Double? = null,
     @SerialName("rest_s") val restS: Int? = null,
@@ -115,7 +204,7 @@ data class PlanSetDef(
 
     val isTimed: Boolean get() = durationS != null
 
-    fun validate(path: String): List<String> {
+    fun validate(path: String, allowNegativeLoad: Boolean = false): List<String> {
         val errors = mutableListOf<String>()
         if (reps == null && durationS == null) {
             errors += "$path must have reps (dynamic set) or duration_s (hold/carry)"
@@ -128,8 +217,9 @@ data class PlanSetDef(
         if (loadKg != null && loadLb != null) {
             errors += "$path must not have both load_kg and load_lb"
         }
-        if ((loadKg ?: 0.0) < 0 || (loadLb ?: 0.0) < 0) {
-            errors += "$path load must be >= 0"
+        if (!allowNegativeLoad && ((loadKg ?: 0.0) < 0 || (loadLb ?: 0.0) < 0)) {
+            errors += "$path load must be >= 0 (negative load means assistance, " +
+                "which requires \"bodyweight\": true on the exercise)"
         }
         if (tempo != null && durationS != null) {
             errors += "$path.tempo does not apply to timed sets"

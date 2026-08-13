@@ -15,7 +15,8 @@
       "enum": [
         "1.0",
         "1.1",
-        "1.2"
+        "1.2",
+        "1.3"
       ]
     },
     "planName": {
@@ -77,10 +78,32 @@
         },
         "start": {
           "enum": [
+            "top",
+            "bottom",
             "up",
             "down"
           ],
-          "description": "Which direction the lift starts: 'up' (press, deadlift, row - reps are counted on the concentric) or 'down' (squat, bench). Omitted: inferred from the exercise id."
+          "description": "Where the lift BEGINS, so the app knows which way the first movement of every rep goes. 'top' = starts at the top, first movement is down (squat, bench, leg curl). 'bottom' = starts at the bottom, first movement is up (press from the rack, deadlift, leg press). 'down'/'up' name that first movement directly and are equivalent. Machines of the same movement pattern genuinely differ, so declare it. Omitted: inferred from the exercise id, which is a guess."
+        },
+        "concentric": {
+          "enum": [
+            "up",
+            "down"
+          ],
+          "description": "Which way the CONCENTRIC (driving) phase moves. Default 'up'. Use 'down' for leg curls, lat pulldowns and pushdowns. Independent of 'start': that says which phase comes first, this says which direction the drive goes, and together they decide which tempo digit is the eccentric."
+        },
+        "sensorInverted": {
+          "type": "boolean",
+          "description": "True when the sensor moves OPPOSITE to the load the lifter drives \u2014 common on a cable machine, where the sensor rides the weight stack, so pulling the handle down sends the stack (and the sensor) up. Without this, every phase label and velocity on that exercise is backwards."
+        },
+        "travelRatio": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Lifter-side travel per unit of sensor travel, for pulleys that are not 1:1. A 2:1 cable moves the handle twice as far as the stack, so 2. Default 1."
+        },
+        "optional": {
+          "type": "boolean",
+          "description": "Accessory work that may be dropped when the session runs long. Surfaced in the app so the decision is planned rather than improvised."
         },
         "sets": {
           "type": "array",
@@ -88,6 +111,21 @@
           "items": {
             "$ref": "#/$defs/set"
           }
+        },
+        "plane": {
+          "enum": [
+            "vertical",
+            "horizontal"
+          ],
+          "description": "The plane the LIFTER moves in. 'horizontal' for seated rows, chest-press machines and horizontal cable work. This also changes how the tempo digits are read: vertical work reads them positionally (digit 1 = down stroke), while horizontal work has no up or down and reads them by phase (digit 1 = eccentric, digit 3 = concentric). Note this is the lifter's plane, not the sensor's \u2014 see sensorOnStack."
+        },
+        "sensorOnStack": {
+          "type": "boolean",
+          "description": "True when the sensor rides a cable weight stack. The stack travels VERTICALLY however the lifter moves, so a seated row measured off the stack is a vertical measurement of a horizontal exercise \u2014 set this together with plane: 'horizontal' and sensorInverted as the routing requires."
+        },
+        "bodyweight": {
+          "type": "boolean",
+          "description": "True when the lifter's own body is the load \u2014 pull-ups, dips, push-ups. The set's load_kg/load_lb is then what was ADDED, and may be NEGATIVE for band or machine assistance. Total load is the lifter's body weight (set in the app) plus that."
         }
       }
     },
@@ -159,10 +197,14 @@
           ],
           "description": "For unilateral exercises (side plank, suitcase carry, single-leg RDL): which side this set trains. Emit one set per side."
         },
+        "note": {
+          "type": "string",
+          "description": "Commentary for THIS SET alone (the exercise-level 'notes' applies to all of its sets). E.g. 'closer to the plate, higher ROM'."
+        },
         "tempo": {
           "type": "string",
           "pattern": "^([0-9]{4}|[0-9]{2}[Xx][0-9]|[0-9]+(\\.[0-9]+)?-[0-9]+(\\.[0-9]+)?-([0-9]+(\\.[0-9]+)?|[Xx])-[0-9]+(\\.[0-9]+)?)$",
-          "description": "4-digit tempo: eccentric/bottom-pause/concentric/top-pause seconds; X = explosive concentric. E.g. 4010, 30X0, 4-0-1-0."
+          "description": "Four-digit tempo. The digits are POSITIONAL: digit 1 is the DOWN stroke, digit 2 the pause at the bottom, digit 3 the UP stroke, digit 4 the pause at the top. Which of the strokes is the eccentric follows from the exercise's 'concentric' direction, not from the digit order. 'X' in digit 3 means explosive. Dash form ('4-0-1-0') is accepted."
         },
         "targetMeanConcentricVelocity_mps": {
           "type": "number",

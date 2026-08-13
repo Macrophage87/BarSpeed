@@ -23,6 +23,8 @@ data class HistoryRow(
     val sparkline: List<Double>,
 )
 
+private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
 data class HomeState(
     val planName: String? = null,
     val planSessionCount: Int = 0,
@@ -32,6 +34,8 @@ data class HomeState(
     val weekSessions: Int = 0,
     val history: List<HistoryRow> = emptyList(),
     val weightUnit: WeightUnit = WeightUnit.KG,
+    /** Base load for bodyweight work (pull-ups, dips); null until set. */
+    val bodyWeightKg: Double? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -48,11 +52,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             sessionRepository.sessions,
             planRepository.activePlan,
             container.settings.weightUnit,
-        ) { sessions, planEntity, unit -> Triple(sessions, planEntity, unit) }
-            .mapLatest { (sessions, planEntity, unit) ->
-                withContext(Dispatchers.Default) { buildState(sessions, planEntity, unit) }
+            container.settings.bodyWeightKg,
+        ) { sessions, planEntity, unit, bodyWeight -> Quad(sessions, planEntity, unit, bodyWeight) }
+            .mapLatest { inputs ->
+                withContext(Dispatchers.Default) {
+                    buildState(inputs.first, inputs.second, inputs.third, inputs.fourth)
+                }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
+
+    fun setBodyWeight(kg: Double) {
+        viewModelScope.launch { container.settings.setBodyWeightKg(kg) }
+    }
 
     fun toggleWeightUnit() {
         viewModelScope.launch {
@@ -64,6 +75,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         sessions: List<SessionEntity>,
         planEntity: com.macrophage.barspeed.data.PlanEntity?,
         unit: WeightUnit,
+        bodyWeightKg: Double?,
     ): HomeState {
         val plan = planEntity?.let { planRepository.decode(it) }
         val weekStartMs = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(DAYS_PER_WEEK)
@@ -98,6 +110,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             weekSessions = weekSessions,
             history = history,
             weightUnit = unit,
+            bodyWeightKg = bodyWeightKg,
         )
     }
 

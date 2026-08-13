@@ -124,6 +124,17 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                         Spacer(Modifier.height(6.dp))
                         Text("${summary.sessionCount} sessions, ${summary.totalSets} sets")
                         Text("Exercises: ${summary.exerciseNames.joinToString(", ")}")
+                        if (summary.optionalExercises.isNotEmpty()) {
+                            Text(
+                                "Droppable if short on time: ${summary.optionalExercises.joinToString(", ")}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = BarColors.Blue,
+                            )
+                        }
+                        summary.warnings.take(4).forEach {
+                            Spacer(Modifier.height(4.dp))
+                            Text("⚠ $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
+                        }
                         Spacer(Modifier.height(6.dp))
                         Text(
                             "Approving makes this the active plan for new sessions.",

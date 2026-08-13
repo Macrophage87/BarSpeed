@@ -10,24 +10,24 @@ class TempoTest {
     @Test
     fun `parses compact notation`() {
         val tempo = Tempo.parse("4010")
-        assertEquals(4.0, tempo.eccentricS)
+        assertEquals(4.0, tempo.downS)
         assertEquals(0.0, tempo.bottomPauseS)
-        assertEquals(1.0, tempo.concentricS)
+        assertEquals(1.0, tempo.upS)
         assertEquals(0.0, tempo.topPauseS)
     }
 
     @Test
     fun `parses explosive X concentric`() {
         val tempo = Tempo.parse("30X1")
-        assertNull(tempo.concentricS)
-        assertTrue(tempo.isExplosiveConcentric)
+        assertNull(tempo.upS)
+        assertTrue(tempo.isExplosiveUpStroke)
         assertEquals("30X1", tempo.notation())
     }
 
     @Test
     fun `parses dash separated notation`() {
         val tempo = Tempo.parse("4-0-1-0")
-        assertEquals(4.0, tempo.eccentricS)
+        assertEquals(4.0, tempo.downS)
         assertEquals("4010", tempo.notation())
     }
 
