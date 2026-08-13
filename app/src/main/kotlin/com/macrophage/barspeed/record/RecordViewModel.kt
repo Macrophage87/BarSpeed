@@ -161,6 +161,30 @@ data class RecordState(
     /** Target seconds for the current timed set. */
     val currentTimedTargetS: Int?
         get() = if (!currentIsTimed) null else currentSlot?.durationS ?: durationInput.toIntOrNull()
+
+    /** Reps asked of the set in progress; ad-hoc sets use the typed target. */
+    val currentTargetReps: Int?
+        get() = if (adHoc) repsInput.toIntOrNull() else currentSlot?.reps
+
+    /**
+     * True once the set in progress has delivered what it was asked for — the
+     * point at which rating the effort makes sense. Before it, the only honest
+     * way out is to stop early, which is a failed set.
+     *
+     * Judged exactly where the count can be trusted, matching the auto-fail rule
+     * in [RecordViewModel.endSet]: timed sets against the clock, manual and
+     * guided sets against the app's own rep count. A sensor total is never
+     * trusted here — a low miscount would otherwise leave a lifter who finished
+     * every rep with no way to end the set except by logging it as a failure —
+     * and a set with no target has nothing to fall short of.
+     */
+    val setTargetMet: Boolean
+        get() = when {
+            currentIsTimed ->
+                currentTimedTargetS?.let { setElapsedS >= (it * TIMED_CLOSE_ENOUGH_FRACTION).toInt() } ?: true
+            manualSet -> currentTargetReps?.let { manualReps >= it } ?: true
+            else -> true
+        }
 }
 
 class RecordViewModel(app: Application) : AndroidViewModel(app) {

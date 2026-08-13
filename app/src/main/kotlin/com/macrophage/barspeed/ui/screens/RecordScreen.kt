@@ -396,7 +396,7 @@ private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
         Spacer(Modifier.height(14.dp))
         LiveRepBars(state, slot)
         Spacer(Modifier.height(24.dp))
-        EndSetRpeGrid(state, viewModel)
+        EndSetControl(state, viewModel)
     }
 }
 
@@ -448,7 +448,7 @@ private fun GuidedSetStage(state: RecordState, viewModel: RecordViewModel, slot:
             color = BarColors.Sub,
         )
         Spacer(Modifier.height(24.dp))
-        EndSetRpeGrid(state, viewModel)
+        EndSetControl(state, viewModel)
     }
 }
 
@@ -489,7 +489,7 @@ private fun ManualSetStage(state: RecordState, viewModel: RecordViewModel, slot:
             Text("+1 REP", style = MaterialTheme.typography.titleLarge)
         }
         Spacer(Modifier.height(10.dp))
-        EndSetRpeGrid(state, viewModel)
+        EndSetControl(state, viewModel)
     }
 }
 
@@ -570,7 +570,7 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
             )
         }
         Spacer(Modifier.height(24.dp))
-        EndSetRpeGrid(state, viewModel)
+        EndSetControl(state, viewModel)
     }
 }
 
@@ -625,7 +625,7 @@ private fun TimedSetStage(state: RecordState, viewModel: RecordViewModel, slot: 
             color = BarColors.Sub,
         )
         Spacer(Modifier.height(24.dp))
-        EndSetRpeGrid(state, viewModel)
+        EndSetControl(state, viewModel)
     }
 }
 
@@ -764,9 +764,34 @@ private fun phaseLabel(phase: Phase): String = when (phase) {
 }
 
 /**
- * The effort grid IS the end-set control. Tapping how the set felt ends the
- * set and logs the rating in one action, while the set is still fresh — there
- * is no separate page between lifting and resting.
+ * The set-end control, which changes with what the set has actually delivered.
+ *
+ * Until the set has met its target the only way out is to stop early, and that
+ * is a failed set — offering "solid, had more in me" three reps into a five-rep
+ * set would let an abandoned set be logged as a good one. Once the target is
+ * met the effort grid takes over and rating IS ending.
+ */
+@Composable
+private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
+    if (state.setTargetMet) EndSetRpeGrid(state, viewModel) else EndSetEarlyButton(viewModel)
+}
+
+@Composable
+private fun EndSetEarlyButton(viewModel: RecordViewModel) {
+    OutlinedButton(
+        onClick = { viewModel.endSet(SetRating(rpe = null, failed = true, warmup = false)) },
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+    ) {
+        Text("END SET EARLY", style = MaterialTheme.typography.titleLarge, color = BarColors.Red)
+    }
+    Spacer(Modifier.height(6.dp))
+    SectionCaption("Stopping short logs a failed set · finish it to rate the effort")
+}
+
+/**
+ * The effort grid IS the end-set control once the set is complete. Tapping how
+ * the set felt ends the set and logs the rating in one action, while the set is
+ * still fresh — there is no separate page between lifting and resting.
  */
 @Composable
 private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel) {
