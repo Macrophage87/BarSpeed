@@ -78,7 +78,14 @@ data class LiftDirection(
 }
 
 /** The two declared direction properties of an exercise, as the DSP consumes them. */
-fun ExerciseDef.liftDirection(): LiftDirection = LiftDirection(startsWith, concentricUp, sensorInverted, travelRatio)
+fun ExerciseDef.liftDirection(): LiftDirection = LiftDirection(
+    startsWith = startsWith,
+    concentricUp = concentricUp,
+    sensorInverted = sensorInverted,
+    travelRatio = travelRatio,
+    plane = if (horizontal) MovementPlane.HORIZONTAL else MovementPlane.VERTICAL,
+    sensorOnStack = sensorOnStack,
+)
 
 /** One segmented rep, expressed as index spans into the [VelocitySeries]. */
 data class RepSpan(
