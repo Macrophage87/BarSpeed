@@ -527,6 +527,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun addManualRep() {
         val s = stateFlow.value
         if (!s.manualSet) return
+        // Ending a set takes a few hundred ms of analysis and gzipping, and the
+        // in-set screen stays up for all of it. A tap landing in that window
+        // would count a rep onto a set already written at the old count, and
+        // could swap the effort grid back in for a set that is over.
+        if (endingSet) return
         val count = s.manualReps + 1
         stateFlow.value = s.copy(manualReps = count)
         announceRepMilestones(count)
