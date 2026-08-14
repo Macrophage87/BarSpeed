@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.macrophage.barspeed.ble.ConnectionState
 import com.macrophage.barspeed.ble.DeviceRole
 import com.macrophage.barspeed.ui.components.ConnectionChip
 
@@ -59,6 +60,10 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                 )
             }
             known.forEach { device ->
+                // Keyed on role, not on device: with two saved devices of one
+                // role every row shows the same link. Pre-existing, and not
+                // touched here.
+                val state = if (device.role == DeviceRole.IMU) imuState else hrmState
                 Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Row(
                         Modifier.padding(12.dp),
@@ -67,11 +72,21 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                         Column(Modifier.weight(1f)) {
                             Text(device.name, style = MaterialTheme.typography.titleSmall)
                             Text("${device.role} · ${device.address}", style = MaterialTheme.typography.bodySmall)
+                            if (state is ConnectionState.Failed) {
+                                // This screen is the only surface that *does*
+                                // show why, which is a choice rather than a
+                                // constraint: Home and Record draw
+                                // SensorDot(label, connected, connecting), and
+                                // widening it to carry ConnectionState is four
+                                // call sites plus the view model, not done here.
+                                Text(
+                                    state.reason,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
                         }
-                        ConnectionChip(
-                            device.role.name,
-                            if (device.role == DeviceRole.IMU) imuState else hrmState,
-                        )
+                        ConnectionChip(device.role.name, state)
                         TextButton(onClick = { viewModel.forget(device) }) { Text("Forget") }
                     }
                 }

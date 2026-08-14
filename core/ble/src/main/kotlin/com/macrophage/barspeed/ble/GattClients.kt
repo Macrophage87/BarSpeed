@@ -10,9 +10,12 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
+import androidx.core.content.ContextCompat
 import com.macrophage.barspeed.hrm.HeartRateMeasurementParser
 import com.macrophage.barspeed.hrm.HeartRateProfile
+import com.macrophage.barspeed.model.BlePermissionPolicy
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.witmotion.WitmotionCommands
@@ -49,22 +52,88 @@ abstract class GattClient(protected val context: Context) {
 
     private var deviceName: String = "sensor"
 
+    /**
+     * Open a GATT link to [address], reporting refusal as state rather than as
+     * a throw.
+     *
+     * The gate runs before `device.name` and `connectGatt`, both of which are
+     * `@RequiresPermission(BLUETOOTH_CONNECT)` from API 31 — checked in
+     * `platforms/android-35/data/annotations.zip`, where `getName` and four
+     * `connectGatt` overloads are annotated and `getRemoteDevice` is not. It
+     * sets [ConnectionState.Failed] first and never reaches
+     * [ConnectionState.Connecting], so [AutoConnectManager]'s backoff branch
+     * takes over instead of its two-second Connecting poll, which has no exit.
+     *
+     * Every path out of this function that is not a live link leaves a
+     * terminal state behind. That includes `connectGatt` returning null, which
+     * previously latched Connecting forever with the adapter simply switched
+     * off: pre-existing, in these same ten lines, and the same lying-chip
+     * failure the gate exists to fix. It also includes the two early returns
+     * below, which review found still returning bare `false`: with the state
+     * flow left untouched at whatever it held, the sentence above was false
+     * for them, and a chip could still sit on a stale `Connecting`.
+     */
     fun connect(address: String, autoConnect: Boolean = true): Boolean {
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
-        if (!BluetoothAdapter.checkBluetoothAddress(address)) return false
-        val device = adapter.getRemoteDevice(address)
-        deviceName = device.name ?: address
-        stateFlow.value = ConnectionState.Connecting
-        gatt?.close()
-        gatt = device.connectGatt(context, autoConnect, callback, android.bluetooth.BluetoothDevice.TRANSPORT_LE)
-        return gatt != null
+        if (!BlePermissionPolicy.mayConnect(Build.VERSION.SDK_INT, hasBluetoothConnect())) {
+            stateFlow.value = ConnectionState.Failed(PERMISSION_DENIED_REASON)
+            return false
+        }
+        val adapter = BluetoothAdapter.getDefaultAdapter()
+        if (adapter == null) {
+            stateFlow.value = ConnectionState.Failed("Bluetooth unavailable")
+            return false
+        }
+        if (!BluetoothAdapter.checkBluetoothAddress(address)) {
+            stateFlow.value = ConnectionState.Failed("Bad device address")
+            return false
+        }
+        return try {
+            val device = adapter.getRemoteDevice(address)
+            deviceName = device.name ?: address
+            stateFlow.value = ConnectionState.Connecting
+            gatt?.close()
+            val opened =
+                device.connectGatt(context, autoConnect, callback, android.bluetooth.BluetoothDevice.TRANSPORT_LE)
+            gatt = opened
+            if (opened == null) {
+                stateFlow.value = ConnectionState.Failed("Bluetooth is off or the link was refused")
+            }
+            opened != null
+        } catch (e: SecurityException) {
+            // The permission can be revoked between the gate above and the
+            // call below; the framework then throws rather than returning
+            // null, and this coroutine has no handler above it.
+            stateFlow.value = ConnectionState.Failed(PERMISSION_DENIED_REASON)
+            false
+        }
     }
 
     fun disconnect() {
-        gatt?.disconnect()
-        gatt?.close()
+        try {
+            gatt?.disconnect()
+            gatt?.close()
+        } catch (e: SecurityException) {
+            // Both calls are BLUETOOTH_CONNECT-gated too, and tearing a link
+            // down must not be able to kill the process. They share one try,
+            // so a throwing disconnect() skips close() and the assignment
+            // below then drops the only BluetoothGatt reference: the local
+            // handle goes either way, but the native GATT client registration
+            // is not released on this path. Splitting the try would trade that
+            // leak for a second catch; neither is reachable today, since
+            // disconnect()'s only caller is AutoConnectManager.stop(), which
+            // has no callers.
+        }
         gatt = null
         stateFlow.value = ConnectionState.Disconnected
+    }
+
+    private fun hasBluetoothConnect(): Boolean =
+        ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private companion object {
+        /** Issue #20's own wording; it is what the Devices screen renders. */
+        const val PERMISSION_DENIED_REASON = "Bluetooth permission not granted"
     }
 
     protected fun updateBattery(pct: Int) {

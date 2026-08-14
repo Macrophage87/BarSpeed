@@ -53,7 +53,20 @@ fun SensorDot(label: String, connected: Boolean, modifier: Modifier = Modifier, 
     )
 }
 
-/** Chip summarizing a device's link state, tinted by connection status. */
+/**
+ * Chip summarizing a device's link state, tinted by connection status.
+ *
+ * Failed and Disconnected used to collapse into one grey "✗": a sensor that
+ * refused to connect looked exactly like one that was simply off, so the chip
+ * could not say a permission had been denied. They are now separate tones, and
+ * the branches are exhaustive over [ConnectionState] so a new state has to be
+ * decided rather than falling into the grey. The reason string itself is
+ * rendered by the caller — the pill is too narrow for a framework diagnostic.
+ * [ConnectionState.Failed] has seven producers in `GattClients.kt` carrying
+ * six distinct reasons, and exactly one of them interpolates a raw GATT status
+ * integer (the service-discovery failure); an earlier version of this comment
+ * said two of three, which was wrong on both numbers.
+ */
 @Composable
 fun ConnectionChip(label: String, state: ConnectionState, modifier: Modifier = Modifier) {
     val (text, tone) =
@@ -61,7 +74,8 @@ fun ConnectionChip(label: String, state: ConnectionState, modifier: Modifier = M
             is ConnectionState.Connected ->
                 ("$label ✓" + (state.batteryPct?.let { " $it%" } ?: "")) to ChipTone.OK
             is ConnectionState.Connecting -> "$label …" to ChipTone.WARN
-            else -> "$label ✗" to ChipTone.NEUTRAL
+            is ConnectionState.Failed -> "$label ✗" to ChipTone.BAD
+            is ConnectionState.Disconnected -> "$label ✗" to ChipTone.NEUTRAL
         }
     VerdictChip(text, tone, modifier)
 }
