@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
@@ -34,10 +35,29 @@
             </intent-filter>
         </activity>
 
+        <!--
+            specialUse is the fallback type for the case where the lifter has
+            denied Nearby devices: from API 34 the platform refuses
+            connectedDevice unless the app actually holds BLUETOOTH_CONNECT,
+            and the refusal lands the instant a set starts. Both tokens must
+            stay declared here or the platform rejects the type the policy
+            picks; ForegroundServiceContractTest pins that pair.
+        -->
         <service
             android:name=".RecordingService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="connectedDevice|specialUse">
+            <!--
+                Play-review metadata for the specialUse fallback: a Play
+                console requirement, not a runtime one. No lint check in AGP
+                8.7.3 knows this property name, so nothing in CI reads it. The
+                <property> element itself was added in API 31; how a 26-30
+                package parser treats it has not been measured on a device.
+            -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="@string/fgs_special_use_subtype" />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

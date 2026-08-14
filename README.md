@@ -79,7 +79,7 @@ The full machine-readable contract is
 | Module | Contents |
 |---|---|
 | `:app` | Compose UI, record flow, foreground recording service |
-| `:core:model` | Domain models, tempo notation, plan/export schemas (pure JVM) |
+| `:core:model` | Domain models, tempo notation, plan/export schemas, Android permission policy (pure JVM) |
 | `:core:dsp` | Velocity estimation, ZUPT drift correction, rep segmentation, metrics, coaching rules (pure JVM) |
 | `:core:witmotion` | WitMotion BLE frame decoder + commands (pure JVM) |
 | `:core:hrm` | BLE Heart Rate Profile parser (pure JVM) |
