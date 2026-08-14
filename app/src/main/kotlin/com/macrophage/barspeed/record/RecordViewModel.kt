@@ -22,6 +22,7 @@ import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
+import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.VoiceCue
@@ -351,12 +352,24 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 val prevId = if (i == 0) done.lastOrNull()?.exercise?.id else reordered[i - 1].exercise.id
                 slot.copy(isExerciseChange = prevId != null && prevId != slot.exercise.id)
             }
+        // Non-empty because the empty-target case returned above, so there is
+        // always a planned next set here. upcomingIndex is queueIndex + 1 from
+        // the rest screen and queueIndex from READY: either way this slot has
+        // not been through the bake at startNextSet's `loadKg = parseToKg(
+        // loadInput) ?: next.loadKg`, so its loadKg is still the plan's
+        // declaration rather than a value the app wrote back.
         val upcoming = fixed.first()
+        val seedKg =
+            SetLoadPolicy.seedAddedKg(
+                hasPlannedNext = true,
+                nextDeclaredAddedKg = upcoming.loadKg,
+                lastAddedKg = null,
+            )
         stateFlow.value =
             s.copy(
                 queue = done + fixed,
                 // Refresh the editable inputs so they describe the new upcoming set.
-                loadInput = upcoming.loadKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
+                loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
                 repsInput = upcoming.reps?.toString() ?: s.repsInput,
                 durationInput = upcoming.durationS?.toString() ?: s.durationInput,
                 tempoInput = upcoming.tempo ?: "",
@@ -600,7 +613,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val slot = s.currentSlot
         val isTimed = s.currentIsTimed
         val addedKg =
-            if (s.adHoc || slot?.loadKg == null) s.weightUnit.parseToKg(s.loadInput) ?: 0.0 else slot.loadKg
+            SetLoadPolicy.resolve(s.adHoc, slot?.loadKg, s.weightUnit.parseToKg(s.loadInput))
         // Pull-ups and dips move the lifter: the plan's number is what was ADDED
         // (negative when a band or machine assists), so the load that actually
         // travelled is body weight plus that.
@@ -700,6 +713,26 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             val failed = ratings.onSetRecorded(setId, plannedReps, stoppedEarly, rating)
 
             val restS = slot?.restS ?: DEFAULT_REST_S
+            // queue[queueIndex + 1] has not been through startNextSet's bake
+            // yet, so its loadKg is still the plan's declaration. That is the
+            // field to seed from, not plannedLoadKg: plannedLoadKg is frozen at
+            // the plan's number and would discard an in-rest edit made to a set
+            // that then got postponed. Nothing else pins that ordering, and the
+            // seam's unit tests cannot see it break.
+            //
+            // The write half stays outside the seam: startNextSet does
+            // `loadKg = parseToKg(loadInput) ?: next.loadKg` on this same slot
+            // when the lifter taps through, so the string seeded below is read
+            // straight back as a declaration one set later. Nothing is lost
+            // there today, because 0 round-trips exactly through inputValue and
+            // parseToKg in both display units — but nothing pins that either.
+            val nextSlot = stateFlow.value.nextSlot
+            val seedKg =
+                SetLoadPolicy.seedAddedKg(
+                    hasPlannedNext = nextSlot != null,
+                    nextDeclaredAddedKg = nextSlot?.loadKg,
+                    lastAddedKg = loadKg,
+                )
             stateFlow.value =
                 stateFlow.value.copy(
                     stage = Stage.RESTING,
@@ -723,7 +756,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     restRemainingS = restS,
                     setsCompleted = stateFlow.value.setsCompleted + 1,
                     // Pre-fill next-set inputs so in-rest edits start from plan values.
-                    loadInput = stateFlow.value.weightUnit.inputValue(stateFlow.value.nextSlot?.loadKg ?: loadKg),
+                    loadInput =
+                    seedKg?.let { stateFlow.value.weightUnit.inputValue(it) } ?: stateFlow.value.loadInput,
                     repsInput = (stateFlow.value.nextSlot?.reps ?: plannedReps ?: 5).toString(),
                     durationInput =
                     (stateFlow.value.nextSlot?.durationS ?: plannedDurationS)?.toString()
