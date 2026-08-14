@@ -776,10 +776,19 @@ private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
     if (state.setTargetMet) EndSetRpeGrid(state, viewModel) else EndSetEarlyButton(viewModel)
 }
 
+/**
+ * Deliberately ends the set with NO rating attached. The set still lands as a
+ * failure — this button only appears when the set is short of its target, which
+ * is exactly what [RecordViewModel.endSet] auto-fails on — but it lands as a
+ * DERIVED failure rather than a tapped one. Tapping the verdict would make it
+ * stick: a lifter who did all five reps but only tapped "+1 REP" three times
+ * gets this button as their only exit, and a tapped failure is one that
+ * correcting the rep count afterwards can never clear.
+ */
 @Composable
 private fun EndSetEarlyButton(viewModel: RecordViewModel) {
     OutlinedButton(
-        onClick = { viewModel.endSet(SetRating(rpe = null, failed = true, warmup = false)) },
+        onClick = { viewModel.endSet() },
         modifier = Modifier.fillMaxWidth().height(64.dp),
     ) {
         Text("END SET EARLY", style = MaterialTheme.typography.titleLarge, color = BarColors.Red)
