@@ -46,6 +46,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlateMath
+import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.record.PlannedSlot
@@ -635,14 +636,18 @@ private fun InSetHeader(state: RecordState, slot: PlannedSlot?) {
         slot?.exercise?.displayName
             ?: state.exerciseOptions.firstOrNull { it.id == state.selectedExerciseId }?.displayName
             ?: "Set"
-    val loadKg = slot?.loadKg ?: state.weightUnit.parseToKg(state.loadInput)
+    // The same rule endSet records by, called rather than restated: this header
+    // is on screen while the set that will carry that number is being done, so
+    // a second reading of the load here would be a number the row does not
+    // contain. `slot` is state.currentSlot at all five call sites.
+    val loadKg = SetLoadPolicy.resolve(state.adHoc, slot?.loadKg, state.weightUnit.parseToKg(state.loadInput))
     val side = if (state.adHoc) state.sideInput else slot?.side
     val parts =
         listOfNotNull(
             exerciseName,
             side?.replaceFirstChar { it.uppercase() },
             slot?.let { "Set ${it.setIndexInExercise + 1}/${it.setsInExercise}" },
-            loadKg?.takeIf { it > 0 }?.let { state.weightUnit.format(it) }
+            loadKg.takeIf { it > 0 }?.let { state.weightUnit.format(it) }
                 ?: "bodyweight".takeIf { state.currentIsTimed },
         )
     Row(

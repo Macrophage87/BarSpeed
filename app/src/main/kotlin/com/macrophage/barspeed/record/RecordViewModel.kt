@@ -731,7 +731,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 SetLoadPolicy.seedAddedKg(
                     hasPlannedNext = nextSlot != null,
                     nextDeclaredAddedKg = nextSlot?.loadKg,
-                    lastAddedKg = loadKg,
+                    // addedKg, never loadKg: the field holds what is ADDED, and
+                    // seeding it with the body-weight-inclusive total is what
+                    // made a loadless block climb set over set.
+                    lastAddedKg = addedKg,
                 )
             stateFlow.value =
                 stateFlow.value.copy(
