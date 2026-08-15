@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -29,7 +31,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -45,6 +49,7 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
     var showImportDialog by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     val filePicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) viewModel.importFromUri(context, uri)
@@ -120,7 +125,7 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                 onDismissRequest = viewModel::dismissImportResult,
                 title = { Text("Approve plan?") },
                 text = {
-                    Column {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
                         Text("\"${summary.planName}\"", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(6.dp))
                         Text("${summary.sessionCount} sessions, ${summary.totalSets} sets")
@@ -132,9 +137,20 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                                 color = BarColors.Blue,
                             )
                         }
-                        summary.warnings.take(4).forEach {
+                        summary.warnings.take(WARNINGS_SHOWN).forEach {
                             Spacer(Modifier.height(4.dp))
                             Text("⚠ $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
+                        }
+                        MoreLine(summary.warnings.size, WARNINGS_SHOWN)
+                        if (summary.warnings.isNotEmpty()) {
+                            CopyForTheAuthor(
+                                label = "Copy warnings",
+                                text = relayText(
+                                    "BarSpeed flagged these while importing \"${summary.planName}\"",
+                                    summary.warnings,
+                                ),
+                                clipboard = clipboard,
+                            )
                         }
                         Spacer(Modifier.height(6.dp))
                         Text(
@@ -156,10 +172,18 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                 onDismissRequest = viewModel::dismissImportResult,
                 title = { Text("Plan rejected") },
                 text = {
-                    Column {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
                         Text("Fix these and re-import (or paste the errors back to the LLM):")
                         Spacer(Modifier.height(6.dp))
-                        result.errors.take(8).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+                        result.errors.take(ERRORS_SHOWN).forEach {
+                            Text("• $it", style = MaterialTheme.typography.bodySmall)
+                        }
+                        MoreLine(result.errors.size, ERRORS_SHOWN)
+                        CopyForTheAuthor(
+                            label = "Copy errors",
+                            text = relayText("BarSpeed rejected this plan", result.errors),
+                            clipboard = clipboard,
+                        )
                     }
                 },
                 confirmButton = {
@@ -170,6 +194,42 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
         null -> {}
     }
 }
+
+/**
+ * How many lines either dialog shows before deferring to the clipboard. The
+ * list itself is never truncated on the way out — [relayText] always carries
+ * all of it — so this only decides how much is readable without scrolling.
+ */
+private const val WARNINGS_SHOWN = 12
+private const val ERRORS_SHOWN = 12
+
+/** Says how many lines were not drawn, so a cut list never looks like a whole one. */
+@Composable
+private fun MoreLine(total: Int, shown: Int) {
+    if (total <= shown) return
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "…and ${total - shown} more — use the copy button to get all $total.",
+        style = MaterialTheme.typography.bodySmall,
+        color = BarColors.Sub,
+    )
+}
+
+/**
+ * The point of showing any of this is that the lifter can go back to whoever
+ * wrote the plan and ask. That means the text has to leave the phone, and a
+ * dialog that is read-only, clipped and discarded on dismiss cannot do it —
+ * these lines exist nowhere else, since only the plan JSON is stored.
+ */
+@Composable
+private fun CopyForTheAuthor(label: String, text: String, clipboard: androidx.compose.ui.platform.ClipboardManager) {
+    Spacer(Modifier.height(6.dp))
+    TextButton(onClick = { clipboard.setText(AnnotatedString(text)) }) { Text(label) }
+}
+
+/** Every line, never the truncated view, with a heading that survives a paste. */
+private fun relayText(heading: String, lines: List<String>): String =
+    (listOf("$heading:") + lines.map { "- $it" }).joinToString("\n")
 
 @Composable
 private fun PlanCard(plan: PlanEntity, viewModel: PlansViewModel, onOpen: () -> Unit) {
