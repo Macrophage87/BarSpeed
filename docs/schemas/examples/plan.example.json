@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.4",
   "planName": "Hypertrophy Block W3",
   "notes": "Week 3 of 4. Keep eccentrics honest.",
   "sessions": [
@@ -93,6 +93,21 @@
               "duration_s": 30,
               "load_kg": 24,
               "side": "right",
+              "rest_s": 90
+            }
+          ]
+        },
+        {
+          "exercise": "hanging_leg_raise",
+          "kind": "dynamic",
+          "notes": "Declared: the id contains \"hang\", so without this the app would track it as an isometric hold and never count a rep.",
+          "sets": [
+            {
+              "reps": 12,
+              "rest_s": 60
+            },
+            {
+              "reps": 12,
               "rest_s": 90
             }
           ]

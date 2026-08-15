@@ -168,7 +168,10 @@ private fun SessionHeader(session: PlanSessionDef) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
-    val def = ExerciseDef.seedById(exercise.exercise)
+    // What the app will actually track this as, which is what the plan should
+    // show: a declaration, else the built-in, else the guess. Reading the seed
+    // alone made a custom carry render as a hold.
+    val kind = exercise.effectiveKind
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
             Row(
@@ -202,7 +205,7 @@ private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
             Spacer(Modifier.height(10.dp))
             val groups = groupSets(exercise.sets)
             groups.forEach { group ->
-                SetGroupRow(group, unit, def?.kind, common)
+                SetGroupRow(group, unit, kind, common)
             }
         }
     }
@@ -237,7 +240,7 @@ private fun commonPrescriptions(sets: List<PlanSetDef>): List<String> {
 }
 
 @Composable
-private fun SetGroupRow(group: SetGroup, unit: WeightUnit, kind: ExerciseKind?, common: List<String>) {
+private fun SetGroupRow(group: SetGroup, unit: WeightUnit, kind: ExerciseKind, common: List<String>) {
     val set = group.set
     val setLabel = if (group.firstSet == group.lastSet) "${group.firstSet}" else "${group.firstSet}–${group.lastSet}"
     val sidePrefix = set.side?.let { "${it.replaceFirstChar { c -> c.uppercase() }} · " } ?: ""

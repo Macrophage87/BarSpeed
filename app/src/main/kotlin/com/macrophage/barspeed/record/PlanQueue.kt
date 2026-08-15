@@ -14,13 +14,23 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
         // Plan-declared direction beats seed defaults and name inference: the
         // same movement pattern starts at the top on one machine and the
         // bottom on another, and no signal processing can tell which.
+        // An omitted key must fall back to what `base` already says, not to the
+        // Kotlin default: overwriting with the default discards the built-in
+        // definition. travelRatio and plane are nullable on the wire, so they
+        // can express "omitted" and are written that way here. sensorInverted,
+        // sensorOnStack and bodyweight cannot -- they are non-nullable Boolean
+        // (Plan.kt:124, :130, :149), so an omitted key and a declared false are
+        // the same value, and there is nothing for `?:` to test. That is
+        // latent today because no SEED entry sets any of the three; the first
+        // one that does (pull_up, dip, seated_row) makes it live.
         val exercise =
             base.copy(
                 startsWith = exerciseDef.startPhaseOverride ?: base.startsWith,
                 concentricUp = exerciseDef.concentric?.let { it == "up" } ?: base.concentricUp,
+                kind = exerciseDef.effectiveKind,
                 sensorInverted = exerciseDef.sensorInverted,
-                travelRatio = exerciseDef.travelRatio ?: 1.0,
-                horizontal = exerciseDef.plane == "horizontal",
+                travelRatio = exerciseDef.travelRatio ?: base.travelRatio,
+                horizontal = exerciseDef.plane?.let { it == "horizontal" } ?: base.horizontal,
                 sensorOnStack = exerciseDef.sensorOnStack,
                 bodyweight = exerciseDef.bodyweight,
             )

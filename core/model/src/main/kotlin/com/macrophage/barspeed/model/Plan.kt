@@ -36,6 +36,9 @@ data class PlanFile(
                 if (exercise.plane != null && exercise.plane !in VALID_PLANES) {
                     errors += "sessions[$si].exercises[$ei].plane must be \"vertical\" or \"horizontal\""
                 }
+                if (exercise.kind != null && exercise.kind !in VALID_KINDS) {
+                    errors += "sessions[$si].exercises[$ei].kind must be one of ${VALID_KINDS.joinToString()}"
+                }
                 if (exercise.sets.isEmpty()) errors += "sessions[$si].exercises[$ei] must contain at least one set"
                 exercise.sets.forEachIndexed { xi, set ->
                     // On bodyweight work the load is what was ADDED, and a band or
@@ -74,14 +77,22 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.3"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3")
+        const val SCHEMA_VERSION = "1.4"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4")
         val VALID_SIDES = setOf("left", "right")
 
         /** "top"/"bottom" name the start position; "down"/"up" the first movement. */
         val VALID_STARTS = setOf("top", "bottom", "up", "down")
         val VALID_CONCENTRIC = setOf("up", "down")
         val VALID_PLANES = setOf("vertical", "horizontal")
+
+        /**
+         * The declarable exercise kinds, lowercased [ExerciseKind] names. This
+         * is the first plan vocabulary that is 1:1 with a Kotlin enum, so it is
+         * the first that can be pinned in both directions rather than only
+         * against the published schema.
+         */
+        val VALID_KINDS = setOf("dynamic", "hold", "carry", "explosive")
     }
 }
 
@@ -149,6 +160,18 @@ data class PlanExerciseDef(
     val bodyweight: Boolean = false,
     /** Accessory work that may be dropped when a session runs long. */
     val optional: Boolean = false,
+    /**
+     * How the movement is performed: `"dynamic"`, `"hold"`, `"carry"` or
+     * `"explosive"`. Omitted → the built-in definition if there is one, then a
+     * guess from the id, which matches word fragments and gets ordinary names
+     * wrong.
+     *
+     * This says what the movement IS, not how a set of it is measured. Whether
+     * a set runs on reps or on the clock comes from the set's own shape — see
+     * [PlanSetDef.isTimed]. Kind decides the peak-velocity readout, whether the
+     * voice guide runs a tempo, and whether plate math applies.
+     */
+    val kind: String? = null,
     val sets: List<PlanSetDef>,
 ) {
     /** True when the drive goes up; plans may pin it, otherwise inferred from the id. */
@@ -172,6 +195,24 @@ data class PlanExerciseDef(
     val startsAtTop: Boolean
         get() = startsAtTopOverride
             ?: ((ExerciseDef.inferStartPhase(exercise) == StartPhase.ECCENTRIC) == concentricUp)
+
+    /** Declared kind, when the plan pins one and names a kind that exists. */
+    val kindOverride: ExerciseKind?
+        get() = kind?.let { declared ->
+            ExerciseKind.entries.firstOrNull { it.name.equals(declared, ignoreCase = true) }
+        }
+
+    /**
+     * The kind to track this exercise as. A declaration always wins — over the
+     * built-in definition as well as over the guess — because the plan's author
+     * knows which movement they meant and the app is guessing from a string.
+     * Every disagreement is warned about at the import gate rather than
+     * silently resolved.
+     */
+    val effectiveKind: ExerciseKind
+        get() = kindOverride
+            ?: ExerciseDef.seedById(exercise)?.kind
+            ?: ExerciseDef.inferKind(exercise)
 
     /**
      * Start-phase override, when the plan pins one. Combines the two declared

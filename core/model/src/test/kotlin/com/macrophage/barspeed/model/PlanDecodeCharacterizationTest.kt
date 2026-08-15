@@ -34,11 +34,37 @@ class PlanDecodeCharacterizationTest {
         """
         {"schemaVersion":"1.3","planName":"P","sessions":[
           {"name":"S","exercises":[
-            {"exercise":"back_squat","kind":"explosive","rpeTarget":8,
+            {"exercise":"back_squat","tempoBias":1,"rpeTarget":8,
              "sets":[{"reps":5,"loadKg":100}]}
           ]}
         ]}
         """.trimIndent()
+
+    @Test
+    fun `a declared kind is a known key now, where it used to be a hard rejection`() {
+        // The behaviour change this commit introduces, stated as a test rather
+        // than left to be noticed: every plan carrying "kind" was rejected
+        // outright until the key existed on the model.
+        val doc =
+            """
+            {"schemaVersion":"1.4","planName":"P","sessions":[
+              {"name":"S","exercises":[
+                {"exercise":"back_squat","kind":"explosive","sets":[{"reps":5,"load_kg":100}]}
+              ]}
+            ]}
+            """.trimIndent()
+        val plan = strict.decodeFromString(PlanFile.serializer(), doc)
+        val exercise = plan.sessions[0].exercises[0]
+
+        assertEquals(emptyList(), plan.validate())
+        assertEquals(ExerciseKind.EXPLOSIVE, exercise.kindOverride)
+        // back_squat is a seed exercise declared DYNAMIC (ExerciseDef.kt:83).
+        // The declaration beats it, which is what makes the mismatch worth
+        // warning about - and nothing warns yet.
+        assertEquals(ExerciseKind.DYNAMIC, checkNotNull(ExerciseDef.seedById("back_squat")).kind)
+        assertEquals(ExerciseKind.EXPLOSIVE, exercise.effectiveKind)
+        assertEquals(emptyList(), plan.warnings())
+    }
 
     @Test
     fun `an unknown key is a hard rejection, and only the first one is named`() {
@@ -48,7 +74,7 @@ class PlanDecodeCharacterizationTest {
         val firstLine = failure.message?.lineSequence()?.first().orEmpty()
 
         // PlanRepository.kt:44 keeps exactly this line and shows it to the lifter.
-        assertContains(firstLine, "Encountered an unknown key 'kind'")
+        assertContains(firstLine, "Encountered an unknown key 'tempoBias'")
         // The path IS named — but it names the PRECEDING SIBLING key, not the
         // offending one, so pasting it back sends the plan's author to `exercise`.
         assertContains(firstLine, "at path: $.sessions[0].exercises[0].exercise")
@@ -76,18 +102,24 @@ class PlanDecodeCharacterizationTest {
 
     @Test
     fun `an unsupported schemaVersion is unreachable behind the unknown-key failure`() {
-        val v14 = documentWithUnknownKeys.replace("\"1.3\"", "\"1.4\"")
-        val failure = assertFailsWith<Exception> { strict.decodeFromString(PlanFile.serializer(), v14) }
+        val v15 = documentWithUnknownKeys.replace("\"1.3\"", "\"1.5\"")
+        val failure = assertFailsWith<Exception> { strict.decodeFromString(PlanFile.serializer(), v15) }
 
         // Same message as the 1.3 document: the version is never looked at.
-        assertContains(failure.message.orEmpty(), "Encountered an unknown key 'kind'")
+        assertContains(failure.message.orEmpty(), "Encountered an unknown key 'tempoBias'")
 
-        // Decoded leniently, the version check does run - and rejects 1.4.
-        val errors = lenient.decodeFromString(PlanFile.serializer(), v14).validate()
+        // Decoded leniently, the version check does run - and rejects 1.5.
+        val errors = lenient.decodeFromString(PlanFile.serializer(), v15).validate()
         assertEquals(
-            listOf("Unsupported schemaVersion '1.4' (expected one of 1.0, 1.1, 1.2, 1.3)"),
+            listOf("Unsupported schemaVersion '1.5' (expected one of 1.0, 1.1, 1.2, 1.3, 1.4)"),
             errors,
         )
+
+        // 1.4 is the version this change introduces, and it validates clean.
+        // This assertion was written against 1.4 as the REJECTED version one
+        // commit ago; the flip is the behaviour change, not an oversight.
+        val v14 = documentWithUnknownKeys.replace("\"1.3\"", "\"1.4\"")
+        assertEquals(emptyList(), lenient.decodeFromString(PlanFile.serializer(), v14).validate())
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -106,7 +138,7 @@ class PlanDecodeCharacterizationTest {
         assertEquals(
             setOf(
                 "exercise", "notes", "start", "concentric", "sensorInverted", "sensorOnStack",
-                "travelRatio", "plane", "bodyweight", "optional", "sets",
+                "travelRatio", "plane", "bodyweight", "optional", "kind", "sets",
             ),
             PlanExerciseDef.serializer().descriptor.elementNames.toSet(),
         )
