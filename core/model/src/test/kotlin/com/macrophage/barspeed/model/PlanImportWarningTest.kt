@@ -181,12 +181,17 @@ class PlanImportWarningTest {
 
     @Test
     fun `a declared kind that only contradicts the guess is informational`() {
-        val result = parse("""{"exercise":"hanging_leg_raise","kind":"dynamic","sets":[{"reps":12}]}""")
+        // pallof_hold, not hanging_leg_raise. The first version of this test
+        // used hanging_leg_raise, whose whole point is that the guess is WRONG
+        // -- and the matcher fix makes the guess dynamic, which is what the
+        // plan declares, so there is nothing left to disagree about. An id the
+        // fix does not touch is needed to exercise this band at all.
+        val result = parse("""{"exercise":"pallof_hold","kind":"dynamic","sets":[{"reps":10}]}""")
 
         assertEquals(
             listOf(
                 "sessions[0].exercises[0]: this plan declares \"kind\": \"dynamic\" for " +
-                    "hanging_leg_raise; the app would have guessed hold from the id. The plan wins.",
+                    "pallof_hold; the app would have guessed hold from the id. The plan wins.",
             ),
             result.warnings,
         )
@@ -197,7 +202,7 @@ class PlanImportWarningTest {
         val result = parse(
             """{"exercise":"back_squat","rpeTarget":8,"sets":[{"reps":5}]}""",
             """{"exercise":"pallof_hold","kind":"hold","sets":[{"reps":10}]}""",
-            """{"exercise":"hanging_leg_raise","kind":"dynamic","sets":[{"reps":12}]}""",
+            """{"exercise":"wall_sit","kind":"dynamic","sets":[{"reps":12}]}""",
             """{"exercise":"plank","kind":"dynamic","sets":[{"reps":12}]}""",
             """{"exercise":"bench_press","sets":[{"reps":5,"loadKg":100}]}""",
         )

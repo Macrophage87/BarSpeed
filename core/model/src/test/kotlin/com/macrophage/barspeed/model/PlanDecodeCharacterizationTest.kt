@@ -59,11 +59,18 @@ class PlanDecodeCharacterizationTest {
         assertEquals(emptyList(), plan.validate())
         assertEquals(ExerciseKind.EXPLOSIVE, exercise.kindOverride)
         // back_squat is a seed exercise declared DYNAMIC (ExerciseDef.kt:83).
-        // The declaration beats it, which is what makes the mismatch worth
-        // warning about - and nothing warns yet.
+        // The declaration beats it, and overriding something the app ships
+        // with is the case that most needs saying out loud - the plan is
+        // telling the app to track a squat on peak velocity with no tempo.
         assertEquals(ExerciseKind.DYNAMIC, checkNotNull(ExerciseDef.seedById("back_squat")).kind)
         assertEquals(ExerciseKind.EXPLOSIVE, exercise.effectiveKind)
-        assertEquals(emptyList(), plan.warnings())
+        assertEquals(
+            listOf(
+                "sessions[0].exercises[0]: back_squat is built in as a dynamic lift, but this plan " +
+                    "declares \"kind\": \"explosive\" - the app will follow the plan.",
+            ),
+            plan.warnings(),
+        )
     }
 
     @Test
