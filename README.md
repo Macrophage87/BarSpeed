@@ -38,11 +38,15 @@ your training and write the next block.
 Copy this prompt into Claude (fill in the bracketed context), then in the app:
 **Plans → Import plan → paste → Approve**.
 
+The short version below is enough to get started. The app's own **Guide →
+COPY PLAN PROMPT** carries the full contract and is the copy kept in step with
+the code; when the two disagree, that one is right.
+
 > Create a strength training plan for me. My context: [goals, experience,
 > days/week, equipment, current working weights or estimated 1RMs].
 >
 > Reply with ONLY a JSON document (no prose, no code fences) conforming exactly to
-> this schema: top level `{"schemaVersion": "1.1", "planName": string,
+> this schema: top level `{"schemaVersion": "1.4", "planName": string,
 > "sessions": [...]}`. Each session is `{"name": string, "exercises": [...]}`.
 > Each exercise is `{"exercise": snake_case_id, "sets": [...]}` plus an optional
 > `"notes"` string (form cues or intent — it's shown to me in the app with each

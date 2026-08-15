@@ -16,6 +16,16 @@ enum class ExerciseKind {
 
     /** Single explosive concentric (snatch, clean) — peak velocity is the metric; no tempo. */
     EXPLOSIVE,
+    ;
+
+    /** How this kind reads in a sentence written for the lifter. */
+    val description: String
+        get() = when (this) {
+            DYNAMIC -> "a dynamic lift"
+            HOLD -> "a hold"
+            CARRY -> "a carry"
+            EXPLOSIVE -> "an explosive lift"
+        }
 }
 
 /** Exercise definition with per-exercise segmentation configuration. */
@@ -128,16 +138,56 @@ data class ExerciseDef(
         private val CARRY_HINTS = listOf("carry", "walk", "farmer", "yoke", "sled")
 
         /**
+         * Slow strength work built on an Olympic grip: a snatch-grip deadlift is
+         * a deadlift, and a clean-grip deadlift is a deadlift. The Olympic word
+         * names the grip, not the movement, so it must not win.
+         *
+         * "squat" is deliberately NOT here, though the obvious reading of this
+         * rule puts it there. A squat clean and a squat snatch are the full
+         * Olympic lifts — vetoing on "squat" sends squat_clean and squat_snatch
+         * to DYNAMIC and hang_squat_clean to HOLD, via "hang". All three are
+         * classified correctly today, and there is no id where a "squat" token
+         * ought to veto an explosive one.
+         */
+        private val SLOW_LIFT_VETO = listOf("deadlift", "rdl", "romanian", "row")
+
+        private fun tokens(id: String): List<String> = id.lowercase().split('_')
+
+        /**
+         * Whether one snake_case token names one word of a hint. Plurals count,
+         * because plans write "farmers_walks" and "push_presses" as readily as
+         * the singular; nothing else does, because the alternative — matching a
+         * hint anywhere inside a token — is what put "row" inside "narrow" and
+         * "chin" inside "machine".
+         */
+        private fun namesWord(token: String, word: String): Boolean =
+            token == word || token == word + "s" || token == word + "es"
+
+        /** Whether these tokens contain the hint's words, in order and adjacent. */
+        private fun List<String>.name(hint: String): Boolean {
+            val words = hint.split('_')
+            if (words.size > size) return false
+            return (0..size - words.size).any { start ->
+                words.indices.all { namesWord(this[start + it], words[it]) }
+            }
+        }
+
+        /**
          * Best-effort kind for exercise ids not in the seed list (LLM plans invent
          * ids freely), so e.g. "kettlebell_swing_heavy" still gets the explosive
          * UI and "pallof_hold" the timed one.
+         *
+         * A guess only: a plan that declares `"kind"` overrides this, and should,
+         * because whole-token matching still cannot read an id like "deadhang"
+         * that runs two words together.
          */
         fun inferKind(id: String): ExerciseKind {
-            val lower = id.lowercase()
+            val tokens = tokens(id)
+            val explosive = EXPLOSIVE_HINTS.any { tokens.name(it) } && SLOW_LIFT_VETO.none { tokens.name(it) }
             return when {
-                EXPLOSIVE_HINTS.any { lower.contains(it) } -> ExerciseKind.EXPLOSIVE
-                HOLD_HINTS.any { lower.contains(it) } -> ExerciseKind.HOLD
-                CARRY_HINTS.any { lower.contains(it) } -> ExerciseKind.CARRY
+                explosive -> ExerciseKind.EXPLOSIVE
+                HOLD_HINTS.any { tokens.name(it) } -> ExerciseKind.HOLD
+                CARRY_HINTS.any { tokens.name(it) } -> ExerciseKind.CARRY
                 else -> ExerciseKind.DYNAMIC
             }
         }
@@ -146,6 +196,10 @@ data class ExerciseDef(
             listOf(
                 "deadlift", "row", "curl", "pull", "chin", "shrug", "thrust",
                 "overhead", "shoulder_press", "military", "raise", "snatch", "clean",
+                // Movements whose own name is one word containing another hint.
+                // Substring matching reached inside them for free and whole-token
+                // matching cannot, so they are listed rather than lost.
+                "pulldown", "pullup", "chinup",
             )
 
         /**
@@ -153,23 +207,33 @@ data class ExerciseDef(
          * rack position) must count concentric-first — pairing ecc→con would
          * miss almost every rep. Bench-style lifts start at lockout and lower
          * first, so bare "press" stays eccentric-first.
+         *
+         * This is the one inference whose result is written down. The others are
+         * recomputed from the id on every read, but SessionRepository.kt:182
+         * stores this in a CustomExerciseEntity the first time an id is used and
+         * ExerciseDao has no statement that would update it, so an id already
+         * seen keeps whatever this returned then. A plan-declared `"start"`
+         * overrides it per exercise; nothing overrides it for an ad-hoc set.
          */
         fun inferStartPhase(id: String): StartPhase {
-            val lower = id.lowercase()
-            return if (CONCENTRIC_START_HINTS.any { lower.contains(it) }) {
+            val tokens = tokens(id)
+            return if (CONCENTRIC_START_HINTS.any { tokens.name(it) }) {
                 StartPhase.CONCENTRIC
             } else {
                 StartPhase.ECCENTRIC
             }
         }
 
+        // "db" and "kb" replace the old "db_" and "kb_". Those were written as
+        // prefixes because the match was a substring search; as whole tokens
+        // they are unambiguous under either reading, which is the only reason
+        // to prefer one spelling of a hint over another.
         private val NON_BARBELL_HINTS =
-            listOf("dumbbell", "db_", "kettlebell", "kb_", "cable", "machine", "band", "bodyweight", "smith")
+            listOf("dumbbell", "db", "kettlebell", "kb", "cable", "machine", "band", "bodyweight", "smith")
 
         /** Plate math only applies to straight-bar lifts. */
         fun inferBarbell(id: String): Boolean {
-            val lower = id.lowercase()
-            if (NON_BARBELL_HINTS.any { lower.contains(it) }) return false
+            if (NON_BARBELL_HINTS.any { tokens(id).name(it) }) return false
             return inferKind(id) == ExerciseKind.DYNAMIC || inferKind(id) == ExerciseKind.EXPLOSIVE
         }
     }

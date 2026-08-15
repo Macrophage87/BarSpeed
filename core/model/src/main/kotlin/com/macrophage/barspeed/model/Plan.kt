@@ -56,24 +56,70 @@ data class PlanFile(
     /**
      * Non-blocking notes shown at the import gate. A declaration always wins —
      * machines of the same movement pattern really do start at opposite ends —
-     * but it is worth saying out loud when a plan pins a direction that
+     * but it is worth saying out loud when a plan pins something that
      * contradicts how the built-in lift is normally performed, because a
-     * mis-declared direction inverts the voice guide's whole cadence.
+     * mis-declared direction inverts the voice guide's whole cadence and a
+     * mis-declared kind changes which numbers the set is judged on.
+     *
+     * Grouped by what the declaration disagrees WITH, not by where it appears,
+     * because the three prompt different questions back to whoever wrote the
+     * plan. Overriding a built-in comes first: that is the app being told to
+     * ignore something it ships with, and this is the only sign it happened.
      */
-    fun warnings(): List<String> {
-        val out = mutableListOf<String>()
-        sessions.forEachIndexed { si, session ->
-            session.exercises.forEachIndexed { ei, exercise ->
-                val seed = ExerciseDef.seedById(exercise.exercise) ?: return@forEachIndexed
-                val declared = exercise.startPhaseOverride ?: return@forEachIndexed
-                if (declared == seed.startsWith) return@forEachIndexed
-                val natural = if (seed.startsAtTop) "the top" else "the bottom"
-                val asked = if (exercise.startsAtTop) "the top" else "the bottom"
-                out += "sessions[$si].exercises[$ei]: ${exercise.exercise} normally starts at $natural, " +
-                    "but this plan starts it at $asked — the voice guide will follow the plan."
-            }
+    fun warnings(): List<String> = eachExercise(::startVsSeed) +
+        eachExercise(::kindVsSeed) +
+        eachExercise(::kindVsShape) +
+        eachExercise(::kindVsInference)
+
+    private fun eachExercise(warn: (Int, Int, PlanExerciseDef) -> String?): List<String> = sessions
+        .flatMapIndexed { si, session ->
+            session.exercises.mapIndexedNotNull { ei, exercise -> warn(si, ei, exercise) }
         }
-        return out
+
+    private fun startVsSeed(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        val seed = ExerciseDef.seedById(exercise.exercise) ?: return null
+        val declared = exercise.startPhaseOverride ?: return null
+        if (declared == seed.startsWith) return null
+        val natural = if (seed.startsAtTop) "the top" else "the bottom"
+        val asked = if (exercise.startsAtTop) "the top" else "the bottom"
+        return "sessions[$si].exercises[$ei]: ${exercise.exercise} normally starts at $natural, " +
+            "but this plan starts it at $asked — the voice guide will follow the plan."
+    }
+
+    private fun kindVsSeed(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        val declared = exercise.kindOverride ?: return null
+        val seed = ExerciseDef.seedById(exercise.exercise) ?: return null
+        if (declared == seed.kind) return null
+        return "sessions[$si].exercises[$ei]: ${exercise.exercise} is built in as ${seed.kind.description}, " +
+            "but this plan declares \"kind\": \"${exercise.kind}\" - the app will follow the plan."
+    }
+
+    /**
+     * A declared kind and the set's own shape are allowed to disagree and both
+     * still hold: the declaration decides what the movement is, the shape
+     * decides how the set is measured. Saying so is the point — a plan that
+     * declares a hold and prescribes reps is going to be counted in reps, and
+     * whoever wrote it should know that before the lifter is under the bar.
+     */
+    private fun kindVsShape(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        val declared = exercise.kindOverride ?: return null
+        val timedKind = declared == ExerciseKind.HOLD || declared == ExerciseKind.CARRY
+        val mismatched = exercise.sets.firstOrNull { it.isTimed != timedKind } ?: return null
+        val prescribed = if (mismatched.isTimed) "duration_s" else "reps"
+        val measured = if (mismatched.isTimed) "on the clock" else "on reps"
+        return "sessions[$si].exercises[$ei]: this plan declares \"kind\": \"${exercise.kind}\" " +
+            "but prescribes $prescribed - the set is measured $measured either way. " +
+            "Kind sets the movement type, not the timing."
+    }
+
+    private fun kindVsInference(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        val declared = exercise.kindOverride ?: return null
+        if (ExerciseDef.seedById(exercise.exercise) != null) return null
+        val guess = ExerciseDef.inferKind(exercise.exercise)
+        if (declared == guess) return null
+        return "sessions[$si].exercises[$ei]: this plan declares \"kind\": \"${exercise.kind}\" for " +
+            "${exercise.exercise}; the app would have guessed ${guess.name.lowercase()} from the id. " +
+            "The plan wins."
     }
 
     companion object {

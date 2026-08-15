@@ -2,6 +2,8 @@
 
 > The quickest start — a self-contained "write me a plan" prompt that needs no
 > schema file attached — is in the [README](README.md#get-a-training-plan-out-of-claude-and-into-the-app).
+> The full plan contract lives in the app, under **Guide → COPY PLAN PROMPT**;
+> the prompts here name the schema version but do not restate it.
 
 Copy one of these into a Claude conversation together with your exported session
 JSON (Settings → Export, or the share button on a session). Claude's plan replies
@@ -40,7 +42,7 @@ can be pasted straight back into the app via Plans → Import → Paste.
 >
 > IMPORTANT: Reply with a single JSON document conforming EXACTLY to the schema at
 > the end. No prose before or after the JSON. Use the same exercise ids that appear
-> in my data. schemaVersion must be "1.1". Timed sets (planks, carries) use
+> in my data. schemaVersion must be "1.4". Timed sets (planks, carries) use
 > `duration_s` instead of `reps`; bodyweight sets omit the load entirely.
 >
 > Current plan:

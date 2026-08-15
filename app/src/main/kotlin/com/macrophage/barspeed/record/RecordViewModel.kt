@@ -64,7 +64,17 @@ data class PlannedSlot(
     val restS: Int? = null,
     val isExerciseChange: Boolean = false,
 ) {
-    val isTimed: Boolean get() = durationS != null || exercise.isTimed
+    /**
+     * Whether this slot is measured on the clock, which is a question about the
+     * SET, not about the exercise. Agrees with [PlanSetDef.isTimed]
+     * (`Plan.kt:211`), which is the same rule stated where the plan is parsed;
+     * this used to add `|| exercise.isTimed` and so answered a different
+     * question — what the movement usually is — with the result that a plan
+     * prescribing reps of a hold got a stopwatch, a fabricated 60 s target from
+     * the untouched duration field, no rep counter, and a rep count the lifter
+     * could not correct afterwards.
+     */
+    val isTimed: Boolean get() = durationS != null
 }
 
 data class SetFeedback(
