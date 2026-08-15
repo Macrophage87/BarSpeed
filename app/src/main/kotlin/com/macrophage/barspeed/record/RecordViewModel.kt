@@ -67,7 +67,7 @@ data class PlannedSlot(
     /**
      * Whether this slot is measured on the clock, which is a question about the
      * SET, not about the exercise. Agrees with [PlanSetDef.isTimed]
-     * (`Plan.kt:211`), which is the same rule stated where the plan is parsed;
+     * on PlanExerciseDef's sets, the same rule stated where the plan is parsed;
      * this used to add `|| exercise.isTimed` and so answered a different
      * question — what the movement usually is — with the result that a plan
      * prescribing reps of a hold got a stopwatch, a fabricated 60 s target from

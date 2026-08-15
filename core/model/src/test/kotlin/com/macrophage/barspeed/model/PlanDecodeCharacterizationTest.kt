@@ -11,19 +11,25 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Characterization of how a plan document is turned into a [PlanFile] today.
+ * Characterization of how a plan document was turned into a [PlanFile] BEFORE
+ * this branch. Written to record the behaviour being replaced, and kept
+ * afterwards because a record of what changed is worth more than a record of
+ * what is.
  *
- * `PlanRepository` decodes with `Json { ignoreUnknownKeys = false }`
- * (`PlanRepository.kt:28`) at two call sites — `importPlan:41`, which reports
- * the failure, and `decode:72`, which swallows it to null. This file
- * REPRODUCES that configuration rather than importing it, because
- * `:core:data` has no test source directory. Nothing mechanically ties this
- * reproduction to `PlanRepository.kt:28`: it would keep passing if that line
- * changed underneath it.
+ * As it stood, `PlanRepository` took a `Json { ignoreUnknownKeys = false }`
+ * constructor parameter and decoded with it at two call sites: `importPlan`,
+ * which reported the failure, and `decode`, which swallowed it to null. That
+ * parameter no longer exists — both call sites now go through
+ * [PlanImport.parse] — so the strict decoder here is this file's own, built
+ * locally because `:core:data` has no test source directory.
  *
- * The guarantee that the two call sites cannot diverge is therefore not this
- * file. It is that they share one decoder with no seam between them, which is
- * a compile-time property of `PlanRepository`, not a test.
+ * It was always its own: nothing mechanically tied it to `PlanRepository`, and
+ * it would have kept passing if that configuration had changed underneath it.
+ * The guarantee that the two call sites cannot diverge was never this file
+ * either. It is that they share one decoder with no seam between them, which
+ * is a compile-time property of `PlanRepository`, not a test — and it is
+ * stronger now than when this was written, because there is no longer a
+ * parameter to pass a different decoder through.
  */
 class PlanDecodeCharacterizationTest {
     private val strict = Json { ignoreUnknownKeys = false }
@@ -58,7 +64,7 @@ class PlanDecodeCharacterizationTest {
 
         assertEquals(emptyList(), plan.validate())
         assertEquals(ExerciseKind.EXPLOSIVE, exercise.kindOverride)
-        // back_squat is a seed exercise declared DYNAMIC (ExerciseDef.kt:83).
+        // back_squat is in [ExerciseDef.SEED], declared DYNAMIC there.
         // The declaration beats it, and overriding something the app ships
         // with is the case that most needs saying out loud - the plan is
         // telling the app to track a squat on peak velocity with no tempo.
@@ -80,7 +86,8 @@ class PlanDecodeCharacterizationTest {
         }
         val firstLine = failure.message?.lineSequence()?.first().orEmpty()
 
-        // PlanRepository.kt:44 keeps exactly this line and shows it to the lifter.
+        // Only the first line of the exception was ever shown to the lifter, so
+        // only the first line is pinned.
         assertContains(firstLine, "Encountered an unknown key 'tempoBias'")
         // The path IS named — but it names the PRECEDING SIBLING key, not the
         // offending one, so pasting it back sends the plan's author to `exercise`.
@@ -93,11 +100,14 @@ class PlanDecodeCharacterizationTest {
 
     @Test
     fun `a near miss on a renamed key silently empties the load when decoded leniently`() {
-        // Not what the app does today - the app rejects this document outright.
-        // Pinned because it is the hazard that accepting unknown keys creates:
-        // "loadKg" is not the wire name, `load_kg` is (Plan.kt:195), so a
-        // lenient decode drops it and the set becomes indistinguishable from an
-        // intended bodyweight set. Validation has nothing to say about it.
+        // Written before the app accepted unknown keys at all, to pin the
+        // hazard that accepting them would create. The app now takes this
+        // document, so the hazard is live and a warning is what stands against
+        // it: "loadKg" is not the wire name -- [PlanSetDef] renames it to
+        // `load_kg` -- so a lenient decode drops it and the set becomes
+        // indistinguishable from an intended bodyweight set. Neither
+        // validate() nor warnings() has anything to say about it; only the
+        // near-miss warning in [PlanImport] does.
         val plan = lenient.decodeFromString(PlanFile.serializer(), documentWithUnknownKeys)
         val set = plan.sessions[0].exercises[0].sets[0]
 
@@ -160,15 +170,15 @@ class PlanDecodeCharacterizationTest {
 
     @Test
     fun `a set's shape and an exercise's kind are two different questions`() {
-        // Premise pin only. `PlanSetDef.isTimed` (Plan.kt:211) asks what the set
-        // prescribes; `ExerciseDef.isTimed` (:68) asks what the movement is.
-        // A plan may prescribe reps of a built-in hold, and then the two
-        // disagree. This asserts NOTHING about `PlannedSlot.isTimed`
-        // (RecordViewModel.kt:67), which is the place that conflates them and
-        // which lives in `:app`, where no test in this repo can reach it.
+        // Premise pin only. [PlanSetDef.isTimed] asks what the set prescribes;
+        // [ExerciseDef.isTimed] asks what the movement is. A plan may
+        // prescribe reps of a built-in hold, and then the two disagree. This
+        // asserts NOTHING about PlannedSlot.isTimed, which is the place that
+        // conflated them and which lives in :app, where no test in this repo
+        // can reach it.
         val repSet = PlanSetDef(reps = 12)
         val heldSet = PlanSetDef(durationS = 60)
-        // validate() rejects this one (Plan.kt:215), but it is constructible and
+        // [PlanSetDef.validate] rejects this one, but it is constructible and
         // it is the case that separates "duration_s is present" from "reps is
         // absent" - two readings that agree on every valid set.
         val shapelessSet = PlanSetDef()

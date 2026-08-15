@@ -164,7 +164,7 @@ class RecordingService : Service() {
         /**
          * `ForegroundServiceStartNotAllowedException` is where issue #21's
          * clause is honoured. `startForegroundService()` is where the refusal
-         * lands *for this caller*: `RecordViewModel.kt:435` starts the service
+         * lands *for this caller*: `RecordViewModel.beginSet` starts the service
          * this way, on the lifter's tap, so a throw here would kill the app
          * between "START SET" and the first sample.
          *

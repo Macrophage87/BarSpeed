@@ -6,15 +6,17 @@ import kotlin.test.assertEquals
 /**
  * Characterization sweep over the three id-based inferences in [ExerciseDef].
  *
- * Twenty rows moved in this commit and NONE of them passes yet: the sweep now
- * records what whole-token matching must produce, against a matcher that still
- * matches substrings. Every one of the twenty is named in the section comments
- * below as a fix, an accepted loss, or a question nobody has answered.
+ * Twenty rows moved when whole-token matching replaced substring matching.
+ * They were written here first, against the substring matcher, so every one
+ * of them failed before it passed — which is the only way to know a row is
+ * pinned to the behaviour and not to the implementation. Each of the twenty
+ * is named in the section comments below as a fix, an accepted loss, or a
+ * question nobody has answered.
  *
  * All three inferences are swept together because they share one mechanism —
  * a hint list matched against the id — and because they feed each other:
- * [ExerciseDef.inferBarbell] is defined in terms of [ExerciseDef.inferKind]
- * (`ExerciseDef.kt:173`), so a kind row moving drags a barbell row with it.
+ * [ExerciseDef.inferBarbell] is defined in terms of [ExerciseDef.inferKind],
+ * so a kind row moving drags a barbell row with it.
  *
  * The three differ in one way that matters more than the arithmetic. `kind` and
  * `usesBarbell` are re-derived from the id on every read
@@ -56,7 +58,9 @@ class ExerciseIdInferenceCharacterizationTest {
             // The last two rows are why the veto is a plain token test rather
             // than a positional one. Scoping it to "slow token AFTER explosive
             // token" would keep the squat variants and lose these two, which
-            // are ordinary slow deadlift work. ---
+            // are ordinary slow deadlift work. Both are FIXES and both move,
+            // EXPLOSIVE to DYNAMIC, alongside the seven from issue #24 -- they
+            // are counted there, not treated as a separate argument. ---
             Row("squat_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
             Row("hang_squat_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
             Row("squat_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
@@ -109,9 +113,11 @@ class ExerciseIdInferenceCharacterizationTest {
             Row("plank_reach", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
 
             // --- plurals: `contains` tolerates them by accident, and a whole-
-            // token rule has to do it on purpose. "press" is the one hint that
-            // pluralises with -es, so the rule covers both. None of these rows
-            // moves. ---
+            // token rule has to do it on purpose. Two hints pluralise with -es
+            // rather than -s, and each is load-bearing in a different column:
+            // push_presses is EXPLOSIVE only through EXPLOSIVE_HINTS' own
+            // "push_press" plus the -es arm, and snatches is CONCENTRIC only
+            // through "snatch" plus the -es arm. None of these rows moves. ---
             Row("farmers_walks", ExerciseKind.CARRY, StartPhase.ECCENTRIC, false),
             Row("wall_sits", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
             Row("planks", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
@@ -152,9 +158,10 @@ class ExerciseIdInferenceCharacterizationTest {
             // own "throw" contains CONCENTRIC_START_HINTS' "row". All seven
             // rows move to ECCENTRIC.
             //
-            // Five of the seven are unambiguous: a close-grip bench, a
+            // Four of the seven are unambiguous: a close-grip bench, a
             // pullover, a prowler push and a med-ball throw all begin by
-            // lowering or loading, not by driving.
+            // lowering or loading, not by driving. The other three are the
+            // machine_* rows below.
             //
             // The three machine_* rows are NOT claimed as fixes. Nothing here
             // knows which end a machine chest press starts at, and Plan.kt's

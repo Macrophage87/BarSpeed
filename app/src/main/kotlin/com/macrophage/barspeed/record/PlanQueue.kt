@@ -19,7 +19,7 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
         // definition. travelRatio and plane are nullable on the wire, so they
         // can express "omitted" and are written that way here. sensorInverted,
         // sensorOnStack and bodyweight cannot -- they are non-nullable Boolean
-        // (Plan.kt:124, :130, :149), so an omitted key and a declared false are
+        // on PlanExerciseDef, so an omitted key and a declared false are
         // the same value, and there is nothing for `?:` to test. That is
         // latent today because no SEED entry sets any of the three; the first
         // one that does (pull_up, dip, seated_row) makes it live.

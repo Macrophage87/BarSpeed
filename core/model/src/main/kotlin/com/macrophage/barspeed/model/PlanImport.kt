@@ -89,7 +89,7 @@ object PlanImport {
     /**
      * Lowercased with underscores removed. Two keys collide here exactly when
      * they are the same word spelled camelCase and snake_case, which is the one
-     * mistake worth naming: `PlanSetDef` renames five of its ten keys, so a
+     * mistake worth naming: [PlanSetDef] renames six of its ten keys, so a
      * plan writing `loadKg` for `load_kg` is writing the Kotlin spelling of a
      * real key. No edit distance and no threshold — a key that is merely
      * similar, like `rest` for `rest_s`, is not this mistake and gets the
