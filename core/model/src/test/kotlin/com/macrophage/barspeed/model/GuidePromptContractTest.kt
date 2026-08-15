@@ -60,4 +60,25 @@ class GuidePromptContractTest {
     fun `the plan prompt documents every top-level key`() {
         listOf("schemaVersion", "planName", "sessions", "name", "exercises").forEach(::assertDocuments)
     }
+
+    @Test
+    fun `the plan prompt documents kind`() {
+        // Red until the prompt is rewritten. kind is declarable from the commit
+        // before this one, and a key the prompt never mentions is a key no
+        // generated plan will carry, so declaring it would stay theoretical.
+        assertDocuments("kind")
+    }
+
+    @Test
+    fun `the plan prompt states the schema version the code writes`() {
+        // The prompt names the contract version in prose. There are four other
+        // statements of this contract in the repo and they already disagree
+        // (README and PROMPTS say 1.1, PROMPT.md says 1.0); this is the one an
+        // LLM is actually given, so it is the one pinned.
+        assertTrue(
+            prompt.contains(PlanFile.SCHEMA_VERSION),
+            "the plan prompt does not mention version ${PlanFile.SCHEMA_VERSION}, " +
+                "so it is describing a contract the app no longer publishes",
+        )
+    }
 }
