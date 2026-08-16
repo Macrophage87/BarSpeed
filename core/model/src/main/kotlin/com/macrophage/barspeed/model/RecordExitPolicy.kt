@@ -161,21 +161,24 @@ object RecordExitPolicy {
      * than assumed, because "cannot happen" and "is not looked at" are
      * different guarantees and only the second one is this function's to make.
      *
-     * As of this commit [write] is inert: all three states map to the prompt
-     * the stage alone gave. It is branched on rather than ignored because
-     * detekt's `UnusedParameter` rejects a parameter that is accepted and never
-     * read, and because an exhaustive `when` here means the commit that adds a
-     * state cannot leave it silently answered by a fallback. The mapping
-     * arrives two commits later, after the differentials that fail against
-     * this version.
+     * IN_SET therefore has three answers, not one, and the difference between
+     * them is what the prompt is allowed to claim. Before the write starts,
+     * nothing of the set is in the database and leaving destroys it.
+     * [SetWriteState.IN_FLIGHT] cannot say that: the insert is already running,
+     * so the set is not the lifter's to discard any more, and the prompt drops
+     * the offer to finish the session instead -- closing it here would
+     * summarise a set list the in-flight set is missing from.
+     * [SetWriteState.FAILED] is back to "nothing was saved", but the set is
+     * over, so the controls the in-progress wording names are no longer drawn
+     * and its own prompt points at the retry instead.
      */
     fun promptFor(stage: Stage, write: SetWriteState): ExitPrompt = when (stage) {
         Stage.SETUP, Stage.READY, Stage.FINISHED -> ExitPrompt.NONE
         Stage.IN_SET ->
             when (write) {
                 SetWriteState.NONE -> ExitPrompt.SET_IN_PROGRESS
-                SetWriteState.IN_FLIGHT -> ExitPrompt.SET_IN_PROGRESS
-                SetWriteState.FAILED -> ExitPrompt.SET_IN_PROGRESS
+                SetWriteState.IN_FLIGHT -> ExitPrompt.SET_SAVING
+                SetWriteState.FAILED -> ExitPrompt.SET_UNSAVED
             }
         Stage.RESTING -> ExitPrompt.SESSION_OPEN
     }
