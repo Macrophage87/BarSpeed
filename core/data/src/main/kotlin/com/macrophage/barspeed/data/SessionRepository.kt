@@ -35,6 +35,16 @@ data class CompletedSet(
     val hrSamples: List<HrSample>,
     /** Spoken cues during the set, epoch-ms stamped for IMU cross-reference. */
     val voiceCues: List<VoiceCue> = emptyList(),
+    /**
+     * How the set was rated at the moment it ended.
+     *
+     * Accepted here but not yet stored: the next commit is what puts these on
+     * the row. The defaults match [SetRecordEntity]'s own, so an unrated set is
+     * stored exactly as it was before these existed.
+     */
+    val rpe: Int? = null,
+    val failed: Boolean = false,
+    val warmup: Boolean = false,
 )
 
 class SessionRepository(

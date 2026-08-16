@@ -273,14 +273,59 @@ class SessionRepositoryRecordSetTest {
     }
 
     /**
-     * The effort rating is NOT part of the row this function writes. It arrives
-     * afterwards through [SessionRepository.rateSet], a second statement against
-     * the row that was just inserted, so between the two the set exists rated as
-     * nothing at all. Pinned as it stands so that moving the rating is visible
-     * as a change rather than as a coincidence.
+     * The rating the lifter tapped must travel with the row, not follow it.
+     *
+     * The effort tile IS the end-set control, so the rating is part of the same
+     * gesture that ended the set, and it is captured once: no screen can edit a
+     * stored set's rating once the rest screen is gone. Writing it as a second
+     * statement against the row just inserted leaves a window in which the set
+     * exists rated as nothing, and a set the lifter tapped as failed reads
+     * afterwards as an unremarkable set.
      */
     @Test
-    fun `recordSet writes no effort rating, leaving the entity defaults`() = runTest {
+    fun `the rating the set ended with is stored on the row`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).recordSet(
+            sessionId = 1L,
+            orderIdx = 0,
+            set = completedSet().copy(rpe = 9, failed = true, warmup = false),
+        )
+        val row = dao.sets.single()
+        assertEquals(9, row.rpe)
+        assertEquals(true, row.failed)
+        assertEquals(false, row.warmup)
+    }
+
+    @Test
+    fun `a warm-up set is stored as a warm-up`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).recordSet(
+            sessionId = 1L,
+            orderIdx = 0,
+            set = completedSet().copy(rpe = null, failed = false, warmup = true),
+        )
+        assertEquals(true, dao.sets.single().warmup)
+    }
+
+    /**
+     * No second statement. `updateRpe` is what the rest screen uses to correct a
+     * rating later; the set-end path must not need it, because a failure between
+     * the insert and the update is exactly the window this closes.
+     */
+    @Test
+    fun `storing a set issues no separate rating update`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).recordSet(
+            sessionId = 1L,
+            orderIdx = 0,
+            set = completedSet().copy(rpe = 7, failed = false, warmup = false),
+        )
+        assertTrue("updateRpe" !in dao.calls)
+    }
+
+    /** An unrated set is stored exactly as it was before the rating moved. */
+    @Test
+    fun `a set with no rating keeps the entity defaults`() = runTest {
         val dao = FakeSessionDao()
         repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet())
         val row = dao.sets.single()
