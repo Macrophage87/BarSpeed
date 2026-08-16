@@ -107,9 +107,56 @@ class TempoComplianceTest {
         // Exporters.kt evaluates exactly this expression to fill the export's
         // scoredPhases; :core:data has no test source set, so this is where it
         // can be pinned. Fixture A measured three eccentrics and must keep both
-        // phases. Case B measured none, and today still advertises both.
+        // phases. Case B measured none, so it may advertise only the drive.
         assertEquals(listOf("eccentric", "concentric"), scoredPhases(assertNotNull(fixtureA().tempoCompliance)))
-        assertEquals(listOf("eccentric", "concentric"), scoredPhases(assertNotNull(caseB().tempoCompliance)))
+        assertEquals(listOf("concentric"), scoredPhases(assertNotNull(caseB().tempoCompliance)))
+    }
+
+    @Test
+    fun `a drive-only set is graded on the drives it did measure`() {
+        val c = assertNotNull(caseB().tempoCompliance)
+        // The filed defect in its pure form. Every rep was driven on tempo and
+        // the lifter is told 0 of 4, because a phase the sensor never resolved
+        // is scored identically to one the lifter got wrong.
+        assertEquals(4, c.repsEvaluated, "reps with something to grade")
+        assertEquals(4, c.repsFullyCompliant, "reps on tempo on every phase that resolved")
+    }
+
+    @Test
+    fun `a phase with no measurements is not advertised as scored`() {
+        val c = assertNotNull(caseB().tempoCompliance)
+        // scoredPhases is the export's only statement of what the ratio covers,
+        // and the shipped coaching prompt tells the model to read it. Listing a
+        // phase that was never measured makes 4 of 4 look like a graded
+        // eccentric.
+        assertEquals(false, phase(c, "eccentric").scored, "eccentric measured nothing")
+        assertEquals(true, phase(c, "concentric").scored, "concentric measured four reps")
+    }
+
+    @Test
+    fun `a mixed set counts every rep that resolved a scored phase`() {
+        val c = assertNotNull(fixtureA().tempoCompliance)
+        // Reps 0, 1, 5 and 6 have no eccentric but were driven within tolerance,
+        // so they are graded on the concentric alone. Of the three that resolved
+        // both, rep 2 misses the concentric only, rep 3 the eccentric only, and
+        // rep 4 misses both -- which is what reconciles 1 of 3 eccentrics with
+        // 5 of 7 concentrics and 4 of 7 reps overall. Dropping the four
+        // unmeasured reps instead would report 0 of 3 and discard real
+        // evidence.
+        assertEquals(7, c.repsEvaluated, "every rep resolved at least one scored phase")
+        assertEquals(4, c.repsFullyCompliant, "four reps were in tolerance on all they resolved")
+    }
+
+    @Test
+    fun `a set with no gradeable phase at all reports no denominator`() {
+        // An explosive up stroke leaves the eccentric as the only scored phase.
+        // Case B never resolves one, so nothing is gradeable and the honest
+        // denominator is zero -- not four. Rendering that zero is the app's
+        // problem, and RecordScreen currently draws 0/0 as a green tick.
+        val c = assertNotNull(caseB("30X0").tempoCompliance)
+        assertEquals(0, c.repsEvaluated, "nothing was gradeable")
+        assertEquals(0, c.repsFullyCompliant, "nothing was graded")
+        assertEquals(emptyList(), scoredPhases(c), "no phase was both prescribed and measured")
     }
 
     @Test
