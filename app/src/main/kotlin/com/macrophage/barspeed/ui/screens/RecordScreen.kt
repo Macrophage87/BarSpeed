@@ -105,8 +105,10 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
         exitOpen = false
         when (action) {
             ExitAction.STAY -> Unit
-            // Closes the session row and stays put; the write runs on
-            // viewModelScope, so popping here would race it.
+            // Closes the session row and stays put. Not because popping would
+            // race the write — it no longer can, the close runs on appScope —
+            // but because FINISHED is where the lifter asked to go, and it is
+            // the screen that offers the session and its export.
             ExitAction.FINISH_SESSION -> viewModel.finishSession()
             ExitAction.DISCARD_SET_AND_LEAVE,
             ExitAction.LEAVE_SESSION_OPEN,
@@ -1194,10 +1196,34 @@ private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel)
             Text("Finish session", color = BarColors.Sub)
         }
     }
-    // RestControl.RETRY_FINISH is not drawn yet. Nothing can produce a failed
-    // close until the close moves off viewModelScope, and a retry control with
-    // no failure able to reach it would be dead wording of exactly the kind
-    // SET_SAVING was for two commits. It arrives with its writer.
+    if (RestControl.RETRY_FINISH in controls) {
+        UnclosedSessionNotice(viewModel)
+    }
+}
+
+/**
+ * The session did not close: it has no end time, no heart-rate summary and no
+ * HRV. Every set is already stored, so what is at risk here is smaller than an
+ * unsaved set and is not nothing — the R-R intervals the session HRV is computed
+ * from are held in memory here and in no durable place at all.
+ *
+ * It replaces Finish session rather than sitting beside it, as
+ * [UnsavedSetNotice] replaces the effort grid: two controls that both close the
+ * session would launch the same work from different inputs, and one of them
+ * would be the wrong one.
+ */
+@Composable
+private fun UnclosedSessionNotice(viewModel: RecordViewModel) {
+    Text("THIS SESSION DID NOT FINISH", style = MaterialTheme.typography.titleMedium, color = BarColors.Red)
+    Spacer(Modifier.height(6.dp))
+    SectionCaption("Your sets are saved. The end time, heart rate and HRV are not")
+    Spacer(Modifier.height(10.dp))
+    Button(
+        onClick = viewModel::retrySessionClose,
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+    ) {
+        Text("FINISH SESSION AGAIN", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    }
 }
 
 /** One tile of the effort grid: what gets stored plus the gym-facing wording. */

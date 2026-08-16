@@ -308,6 +308,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      */
     private var writtenSetId: Long? = null
 
+    /** Closing the session, on the scope this screen going away cannot cancel. */
+    private val closer = SessionCloser(sessionRepository, container.appScope)
+
     /** All R-R intervals seen during the active session (sets + rests) for session HRV. */
     private val sessionRrMs = mutableListOf<Double>()
 
@@ -1031,15 +1034,71 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         beginSet()
     }
 
+    /**
+     * Close the session the lifter just asked to finish.
+     *
+     * This was the last durable writer on this screen still running on
+     * `viewModelScope`, and the pop cancels that scope wherever the write has
+     * got to: inside `sessionById`, inside the read of every set row, or inside
+     * the update itself. What that costs is not the timestamp. `endedAtMs`,
+     * `hrAvgBpm` and `hrMaxBpm` are all rebuildable later from rows that are
+     * already durable — the set rows carry their own end times and their own
+     * heart-rate columns. `hrvRmssdMs` is not. Its input is [sessionRrMs],
+     * accumulated across READY, IN_SET and RESTING, and the only R-R that
+     * reaches storage is the per-set `hrm` stream covering IN_SET; the rest
+     * windows are held here and nowhere else. A cancelled close is the
+     * difference between the lifter having that number and never having it.
+     *
+     * So the work moves to `appScope`, joining the set write and the two rest
+     * screen corrections, and on `Dispatchers.Main.immediate` for the reason
+     * [launchSetWrite] documents: `appScope` is `SupervisorJob() +
+     * Dispatchers.Default`, and every `stateFlow.value = stateFlow.value.copy()`
+     * in this file is a non-atomic read-modify-write.
+     *
+     * Everything the close needs is frozen here, above the launch, rather than
+     * read inside it. That is the freeze [PendingSetWrite] performs and it is
+     * what makes the retry a retry.
+     *
+     * The consequence to weigh, named rather than buried: a lifter who taps
+     * Finish and then leaves before it lands now gets the finish, where
+     * cancellation used to win. Cancellation winning was never a decision — it
+     * was an artefact of the scope. Honouring the finish writes an end time that
+     * was measured when they asked, a summary over the sets that exist, and an
+     * HRV that is otherwise lost; nothing false is written. The screen no longer
+     * offers "Leave without finishing" during that window at all, which is what
+     * makes this a completed instruction rather than a contradicted one.
+     */
     fun finishSession() {
         restJob?.cancel()
-        viewModelScope.launch {
-            stateFlow.value.sessionId?.let {
-                sessionRepository.endSession(it, System.currentTimeMillis(), Hrv.rmssdMs(sessionRrMs))
-            }
-            RecordingService.stop(getApplication())
-            stateFlow.value = stateFlow.value.copy(stage = Stage.FINISHED)
-        }
+        closer.close(
+            sessionId = stateFlow.value.sessionId,
+            endedAtMs = System.currentTimeMillis(),
+            // Snapshotted, not handed the live list: the passive HR collector
+            // keeps appending to it for as long as this ViewModel lives.
+            rrMs = sessionRrMs.toList(),
+            onState = ::onSessionCloseState,
+            onClosed = ::onSessionClosed,
+        )
+    }
+
+    /**
+     * Close the session again after a close that failed, from the copy frozen
+     * when the lifter first asked. Nothing is recomputed and nothing is re-read
+     * from the clock.
+     */
+    fun retrySessionClose() {
+        if (stateFlow.value.sessionClose != SessionCloseState.FAILED) return
+        closer.retry(::onSessionCloseState, ::onSessionClosed)
+    }
+
+    private fun onSessionCloseState(close: SessionCloseState) {
+        stateFlow.value = stateFlow.value.copy(sessionClose = close)
+    }
+
+    private fun onSessionClosed() {
+        RecordingService.stop(getApplication())
+        stateFlow.value =
+            stateFlow.value.copy(stage = Stage.FINISHED, sessionClose = SessionCloseState.NONE)
     }
 
     fun abandonSetup() {
@@ -1099,15 +1158,36 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * not. It is a field item on this commit rather than a change to this
      * function.
      *
-     * This writes nothing to the database, deliberately. The session row is
-     * left open with `endedAtMs` null, which is the honest state and the only
-     * signal anywhere that the session was abandoned rather than finished.
-     * Closing it here would make the two shape-identical and permanently so:
-     * `SessionDao.updateSession` has one caller, so those columns are written
-     * once, and `SessionEntity.endedAtMs` has exactly one reader — `Exporters`,
-     * which builds the export under `explicitNulls = false` and so omits the
-     * key entirely while it is null. Closing an abandoned session is its own
-     * piece of work; see the commit body.
+     * This writes nothing to the database, and that is now a settled ruling
+     * rather than deferred work. The session row is left open with `endedAtMs`
+     * null, which is the honest state and the only signal anywhere that the
+     * session was abandoned rather than finished. `SessionEntity.endedAtMs` has
+     * exactly one reader — `Exporters`, which builds the export under
+     * `explicitNulls = false` and so omits the key entirely while it is null —
+     * and the published schema does not require it, so nothing downstream
+     * breaks on the absence.
+     *
+     * Four reasons, against closing it here:
+     *
+     *  - It would override a choice the lifter just made. The RESTING exit
+     *    prompt offers "Leave without finishing" and says in as many words that
+     *    the session stays open and nothing can finish it later. A close on this
+     *    path makes both branches of that prompt do the same thing.
+     *  - The stages that reach here with a session row are IN_SET and RESTING,
+     *    and RESTING is exactly the deliberate-abandonment case. There is no
+     *    third bucket to close.
+     *  - There is no timestamp to write. `System.currentTimeMillis()` here
+     *    measures when the screen was destroyed, which can be long after the
+     *    last rep; the honest measured alternative, the last set's own
+     *    `endedAtMs`, means something different from what a deliberate finish
+     *    writes into the same column.
+     *  - It could not be complete. This function is not called on a task swipe
+     *    or a process kill, so `endedAtMs == null` would stop meaning
+     *    "abandoned" and start meaning "abandoned in one of the ways that
+     *    happen to run this". Today it means one thing.
+     *
+     * What piece 4 does instead is make the close the lifter DOES ask for
+     * survive this screen going away; see [finishSession].
      */
     override fun onCleared() {
         voice?.shutdown()

@@ -33,14 +33,18 @@ enum class ExitAction {
     /**
      * Close the session row, and STAY on the screen.
      *
-     * Deliberately not a leave. `finishSession` writes on `viewModelScope`, so
-     * popping in the same frame would race the write that closes the session.
-     * The FINISHED stage draws its own exits once that write lands.
+     * The reason given here used to be that `finishSession` wrote on
+     * `viewModelScope`, so popping in the same frame would race the write. That
+     * is no longer true and the note is corrected rather than deleted: the close
+     * has joined the set write and the two rest-screen corrections on the
+     * process-wide scope, so it is now the case that no durable writer on this
+     * screen can be cancelled by leaving it.
      *
-     * That is still true, and it is now the only writer on the record screen of
-     * which it is true: the set-end write and the two rest-screen corrections
-     * have moved to a scope the pop cannot cancel, and this one has not. It is
-     * the remaining half of the same problem rather than a settled case.
+     * Still not a leave, for a smaller and better reason. The FINISHED stage is
+     * a destination rather than a formality — it offers the session and its
+     * export — and arriving there is what the lifter asked for. While the close
+     * runs, [SessionCloseState.IN_FLIGHT] answers Back with its own prompt, so
+     * staying here is no longer the thing that protects the write.
      */
     FINISH_SESSION,
 
