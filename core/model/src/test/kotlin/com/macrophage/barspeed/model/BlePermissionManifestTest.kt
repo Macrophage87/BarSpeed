@@ -93,6 +93,45 @@ class BlePermissionManifestTest {
         assertEquals(null, maxSdkVersion("android.permission.POST_NOTIFICATIONS"))
     }
 
+    @Test
+    fun `the manifest declares every permission the policy asks for and decides on`() {
+        val declared = usesPermissions().map { it.getAttribute("android:name") }.toSet()
+        for (sdk in SDK_BAND) {
+            for (permission in BlePermissionPolicy.runtimePermissions(sdk)) {
+                assertTrue(
+                    permission in declared,
+                    "runtimePermissions($sdk) asks for $permission, which the manifest does not declare, " +
+                        "so the platform denies it with no dialog",
+                )
+            }
+            for (permission in BlePermissionPolicy.blePermissions(sdk)) {
+                assertTrue(
+                    permission in declared,
+                    "blePermissions($sdk) reads the grant state of $permission, which the manifest " +
+                        "does not declare, so it reads denied forever",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `the policy asks on no SDK level above a permission's maxSdkVersion cap`() {
+        // The direction that matters. A request above the cap is silently
+        // ignored -- no dialog, no error, no grant -- and the grant check
+        // beside it then reads denied forever. The opposite direction, a
+        // declaration wider than the band asked on, costs nothing and is not
+        // asserted.
+        for (sdk in SDK_BAND) {
+            for (permission in BlePermissionPolicy.runtimePermissions(sdk)) {
+                val cap = maxSdkVersion(permission) ?: continue
+                assertTrue(
+                    sdk <= cap,
+                    "the policy asks for $permission at API $sdk, above its android:maxSdkVersion=$cap",
+                )
+            }
+        }
+    }
+
     private companion object {
         /**
          * What `MainActivity.requestBlePermissions` passes to the launcher today,
@@ -106,5 +145,13 @@ class BlePermissionManifestTest {
                 "android.permission.POST_NOTIFICATIONS",
                 "android.permission.ACCESS_FINE_LOCATION",
             )
+
+        /**
+         * `minSdk = 26` and `compileSdk = 35` (`app/build.gradle.kts:17,21` at
+         * 5606250eb22039a6625b747a6d0c1d5b7364ea9a). Written out so that raising
+         * either is a visible decision here rather than a silent widening of
+         * what these two assertions cover.
+         */
+        val SDK_BAND = 26..35
     }
 }

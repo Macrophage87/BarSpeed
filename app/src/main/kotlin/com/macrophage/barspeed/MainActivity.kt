@@ -1,6 +1,5 @@
 package com.macrophage.barspeed
 
-import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.macrophage.barspeed.model.BlePermissionPolicy
 import com.macrophage.barspeed.ui.LiftingTheme
 import com.macrophage.barspeed.ui.screens.DevicesScreen
 import com.macrophage.barspeed.ui.screens.GuideScreen
@@ -35,17 +35,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * The set asked for is [BlePermissionPolicy.runtimePermissions], which is
+     * pinned against the manifest that has to declare it. The two bare SDK
+     * literals this used to carry could not be tested from anywhere: `:app` has
+     * no test source set.
+     */
     private fun requestBlePermissions() {
-        val permissions =
-            if (Build.VERSION.SDK_INT >= 31) {
-                arrayOf(
-                    Manifest.permission.BLUETOOTH_SCAN,
-                    Manifest.permission.BLUETOOTH_CONNECT,
-                ) + if (Build.VERSION.SDK_INT >= 33) arrayOf(Manifest.permission.POST_NOTIFICATIONS) else emptyArray()
-            } else {
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
-        permissionLauncher.launch(permissions)
+        permissionLauncher.launch(
+            BlePermissionPolicy.runtimePermissions(Build.VERSION.SDK_INT).toTypedArray(),
+        )
     }
 }
 

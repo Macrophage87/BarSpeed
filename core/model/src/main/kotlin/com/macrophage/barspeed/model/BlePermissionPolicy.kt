@@ -14,6 +14,98 @@ enum class FgsTypeChoice(val manifestToken: String) {
 }
 
 /**
+ * Where a permission request has got to, in THIS process.
+ *
+ * Deliberately four states and deliberately not persisted. The obvious shape is
+ * a boolean "have we asked before" in `SettingsStore`, and it is wrong in a way
+ * that costs the lifter the sensor: a stored flag survives Android's unused-app
+ * auto-reset, which revokes the permission and clears the platform's
+ * don't-ask-again state at the same moment. The app would then read "asked
+ * before, no rationale, denied" as permanently denied and send the lifter to
+ * Settings for a permission the system would have granted on one tap. Scoped to
+ * the process, the flag dies with the reset and the next launch simply asks
+ * again.
+ *
+ * [ANSWERED] and [ABANDONED] are separated because the map the platform hands
+ * back does not mean one thing. `RequestMultiplePermissions.parseResult` in
+ * activity 1.9.3 returns an empty map on three early exits -- `resultCode` not
+ * `RESULT_OK`, a null `Intent`, either extra array null -- and a fourth way
+ * exists past them: a dismissed dialog delivers `RESULT_OK` with EMPTY
+ * permission and grant-result arrays, which reach `CollectionsKt.zip` at offset
+ * 155 and produce an empty map from a request nobody answered. A real answer
+ * carries one entry per requested permission. So the discriminator is
+ * `result.isEmpty()`, and getting it wrong is not cosmetic: an empty map read
+ * as [ANSWERED] leaves `shouldShowRequestPermissionRationale` false and lands
+ * on [BlePermissionStep.SETTINGS_ONLY] for a lifter who never denied anything.
+ */
+enum class PermissionAsk {
+    /** No request has been issued in this process. */
+    NEVER_ASKED,
+
+    /**
+     * A request was issued and its result has not arrived.
+     *
+     * Set only after `launch` returns normally. `ActivityResultLauncher.launch`
+     * throws `IllegalStateException` on an unregistered or destroyed launcher,
+     * and this state renders the one screen with no button on it, so marking it
+     * before the call would latch the buttonless state for the life of the
+     * process -- rebuilding the dead end this whole change exists to close.
+     */
+    IN_FLIGHT,
+
+    /** A result arrived carrying a verdict: one entry per requested permission. */
+    ANSWERED,
+
+    /** A result arrived carrying no verdict: an empty map. The request was closed unanswered. */
+    ABANDONED,
+}
+
+/**
+ * What the app must do next about the runtime permissions BLE capture needs.
+ *
+ * The screen renders this; the wording of each button stays with the screen, as
+ * it does for [ExitPrompt].
+ */
+enum class BlePermissionStep {
+    /** Held. Nothing is drawn. */
+    GRANTED,
+
+    /**
+     * Not held, and the system dialog is either up or about to be.
+     *
+     * Drawn with no action, because there is nothing to offer that the dialog in
+     * front of it does not already offer. It exists as a state rather than as
+     * silence so that a request which never happens leaves something on screen:
+     * silence is how the defect in issue #41 hid for the whole life of the app.
+     */
+    AWAITING_ANSWER,
+
+    /** Denied, and the platform will still show the dialog. One tap fixes it. */
+    ASK_AGAIN,
+
+    /**
+     * The request came back unanswered, and which route works cannot be known
+     * from here.
+     *
+     * `shouldShowRequestPermissionRationale` is false both for a permission
+     * never denied and for one denied permanently, and a process-scoped
+     * [PermissionAsk] cannot separate them after an [PermissionAsk.ABANDONED]
+     * result. Under the first reading asking again works in one tap and Settings
+     * is a five-tap detour; under the second, asking again is a button that does
+     * nothing visible -- the dead end itself -- and Settings is the only way
+     * back. Offering both is the only output that is never a no-op and never a
+     * lie. This is an ambiguity in the input, not indecision about the output,
+     * and it is resolvable if it ever needs to be: one persisted `hasEverAsked`
+     * boolean collapses it exactly, at the cost of the auto-reset behaviour
+     * [PermissionAsk] documents.
+     */
+    ASK_AGAIN_OR_SETTINGS,
+
+    /** Denied with a verdict and no rationale: the platform will not ask again. */
+    SETTINGS_ONLY,
+}
+
+/**
  * Pure decisions about Android's runtime Bluetooth permissions.
  *
  * These live here rather than in `:core:ble` or `:app` for one reason: neither
@@ -25,6 +117,9 @@ enum class FgsTypeChoice(val manifestToken: String) {
 object BlePermissionPolicy {
     /** First SDK level on which `BLUETOOTH_CONNECT` exists as a runtime permission. */
     const val BLUETOOTH_RUNTIME_PERMISSIONS_SDK = 31
+
+    /** First SDK level on which `POST_NOTIFICATIONS` exists as a runtime permission. */
+    const val POST_NOTIFICATIONS_SDK = 33
 
     /** First SDK level that checks a foreground-service type against the permissions held. */
     const val FGS_TYPE_ENFORCED_SDK = 34
@@ -82,4 +177,85 @@ object BlePermissionPolicy {
         hasBluetoothConnect -> FgsTypeChoice.CONNECTED_DEVICE
         else -> FgsTypeChoice.SPECIAL_USE
     }
+
+    /**
+     * The runtime permissions BLE capture needs at [sdkInt], and the set whose
+     * grant state the app reads back.
+     *
+     * Names rather than an Android type, for the reason [FgsTypeChoice] carries
+     * `"connectedDevice"` as a string: this module cannot see `android.Manifest`,
+     * and `BlePermissionManifestTest` checks each name against the manifest that
+     * has to declare it. A `List`, never an `Array` -- `assertEquals` on two
+     * arrays compares identity, so an array-typed pin fails against a correct
+     * implementation and the natural repair is to weaken it to a size check,
+     * which is a pin that cannot fail. The caller converts at `launch`.
+     *
+     * This is NOT the set the app asks for; see [runtimePermissions]. The two
+     * differ by `POST_NOTIFICATIONS`, and keeping them apart is the whole point:
+     * folding notifications in here would raise "the bar sensor is blocked" at a
+     * lifter who merely declined notifications.
+     *
+     * Below 31 this is location, not Bluetooth, and that is not a quirk of the
+     * request: scan results are withheld without it. Connecting to an
+     * already-paired sensor is unaffected, which is what [mayConnect] encodes and
+     * what [denialBlocksRecording] reports.
+     */
+    fun blePermissions(sdkInt: Int): List<String> = if (sdkInt >= BLUETOOTH_RUNTIME_PERMISSIONS_SDK) {
+        listOf(BLUETOOTH_SCAN, BLUETOOTH_CONNECT)
+    } else {
+        listOf(ACCESS_FINE_LOCATION)
+    }
+
+    /**
+     * Every runtime permission the app asks for in one request at [sdkInt].
+     *
+     * A superset of [blePermissions] by `POST_NOTIFICATIONS` from 33. One
+     * request rather than two because two launchers cannot be in flight at once
+     * and two dialogs back to back is worse than one; the decision that follows
+     * reads only [blePermissions], never this.
+     */
+    fun runtimePermissions(sdkInt: Int): List<String> = blePermissions(sdkInt) +
+        if (sdkInt >= POST_NOTIFICATIONS_SDK) listOf(POST_NOTIFICATIONS) else emptyList()
+
+    /**
+     * What the app must do next, given what it holds and what it has asked.
+     *
+     * [granted] is every name in [blePermissions] being held, read from
+     * `checkSelfPermission` at the moment of the call and never from the result
+     * map -- the map is empty on an abandoned request, and permissions change
+     * while the app is backgrounded.
+     *
+     * Order matters twice. [granted] wins outright, so a grant arriving through
+     * Settings clears the banner without anything else being consulted. Then
+     * [ask] is read before [shouldShowRationale], which decides the one tuple
+     * where both have a claim: `(denied, rationale = true, NEVER_ASKED)` happens
+     * routinely, because this state dies with the process while the platform's
+     * rationale flag does not, and [BlePermissionStep.AWAITING_ANSWER] is the
+     * right answer there -- the launch that clears [PermissionAsk.NEVER_ASKED]
+     * is going out in the same frame, and an "Ask again" button under a dialog
+     * already rising is a double prompt.
+     */
+    fun permissionStep(granted: Boolean, shouldShowRationale: Boolean, ask: PermissionAsk): BlePermissionStep = when {
+        granted -> BlePermissionStep.GRANTED
+        ask == PermissionAsk.NEVER_ASKED || ask == PermissionAsk.IN_FLIGHT -> BlePermissionStep.AWAITING_ANSWER
+        shouldShowRationale -> BlePermissionStep.ASK_AGAIN
+        ask == PermissionAsk.ABANDONED -> BlePermissionStep.ASK_AGAIN_OR_SETTINGS
+        else -> BlePermissionStep.SETTINGS_ONLY
+    }
+
+    /**
+     * Whether a denial at [sdkInt] costs the recording or only the discovery.
+     *
+     * From 31 `BLUETOOTH_CONNECT` gates the link itself, so a denial means no
+     * samples at all. Below it [mayConnect] still allows a remembered sensor to
+     * connect and only the scan for a new one is lost. The banner says one or
+     * the other; saying "cannot record" to a lifter on API 30 whose sensor is
+     * already paired would be false.
+     */
+    fun denialBlocksRecording(sdkInt: Int): Boolean = sdkInt >= BLUETOOTH_RUNTIME_PERMISSIONS_SDK
+
+    private const val BLUETOOTH_SCAN = "android.permission.BLUETOOTH_SCAN"
+    private const val BLUETOOTH_CONNECT = "android.permission.BLUETOOTH_CONNECT"
+    private const val ACCESS_FINE_LOCATION = "android.permission.ACCESS_FINE_LOCATION"
+    private const val POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
 }
