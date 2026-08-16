@@ -279,39 +279,36 @@ class SessionRepositoryEndSessionTest {
         assertEquals(150, dao.updates.single().hrMaxBpm)
     }
 
-    // ---- what a second close does today ------------------------------------
+    // ---- what a second close must not do -----------------------------------
 
     @Test
-    fun `a second close restamps a session that was already closed`() = runTest {
+    fun `a session that is already closed is not closed again`() = runTest {
         val dao = FakeSessionDao(seedSessions = listOf(session(endedAtMs = 9_000L)))
         repo(dao).endSession(1L, endedAtMs = 12_000L, hrvRmssdMs = 41.5)
 
-        // Characterization of what ships, not an endorsement. A row that already
-        // carries an end time is written over.
-        assertEquals(1, dao.updates.size)
-        assertEquals(12_000L, dao.updates.single().endedAtMs)
+        // A close is a fact about a workout, not a stamp to be refreshed. The
+        // first one is the one the lifter asked for.
+        assertTrue(dao.updates.isEmpty())
+        assertEquals(9_000L, dao.sessions.getValue(1L).endedAtMs)
     }
 
     @Test
-    fun `a second close with no HRV erases the HRV the first one stored`() = runTest {
+    fun `a second close cannot erase the HRV the first one stored`() = runTest {
         val dao =
             FakeSessionDao(seedSessions = listOf(session(endedAtMs = 9_000L, hrvRmssdMs = 41.5)))
-        // hrvRmssdMs defaults to null and is copied onto the row unconditionally,
-        // so a caller that omits it wipes the one figure in this row that cannot
-        // be recomputed from anything durable: its input is the session's R-R
-        // intervals, which live only in memory in `:app` and cover the rest
-        // windows the per-set HR streams never see.
+        // hrvRmssdMs is an argument with a null default, copied onto the row
+        // unconditionally, so a caller that omits it wipes the one figure here
+        // that cannot be recomputed from anything durable: its input is the
+        // session's R-R intervals, held in memory in `:app` and covering the
+        // rest windows the per-set HR streams never see. Nothing in the app
+        // omits it today; this is the API the next caller inherits.
         repo(dao).endSession(1L, endedAtMs = 12_000L)
 
-        // Characterization of what ships. No caller in the app omits the
-        // argument today, so this is a property of the API rather than a
-        // reachable path; it is pinned because the API is what the next caller
-        // will use.
-        assertNull(dao.updates.single().hrvRmssdMs)
+        assertEquals(41.5, dao.sessions.getValue(1L).hrvRmssdMs)
     }
 
     @Test
-    fun `a second close recomputes the heart-rate summary from scratch`() = runTest {
+    fun `a second close does not rewrite the heart-rate summary`() = runTest {
         val dao =
             FakeSessionDao(
                 seedSessions = listOf(session(endedAtMs = 9_000L, hrAvgBpm = 130, hrMaxBpm = 165)),
@@ -319,9 +316,23 @@ class SessionRepositoryEndSessionTest {
             )
         repo(dao).endSession(1L, endedAtMs = 12_000L)
 
-        // The stored summary is not read back and merged; it is replaced by
-        // whatever the set rows say now.
-        assertEquals(100, dao.updates.single().hrAvgBpm)
-        assertEquals(110, dao.updates.single().hrMaxBpm)
+        // The stored summary stands. Recomputing it from whatever set rows exist
+        // at the time of a later call is how a correct summary is replaced by one
+        // drawn from a list that has since changed.
+        assertEquals(130, dao.sessions.getValue(1L).hrAvgBpm)
+        assertEquals(165, dao.sessions.getValue(1L).hrMaxBpm)
+    }
+
+    @Test
+    fun `a session with no end time yet is still closeable`() = runTest {
+        // The guard keys on the end time already being present, so the ordinary
+        // first close has to be untouched by it. Without this, a guard that
+        // returned unconditionally would satisfy the three tests above.
+        val dao = FakeSessionDao(seedSessions = listOf(session(endedAtMs = null)))
+        repo(dao).endSession(1L, endedAtMs = 12_000L, hrvRmssdMs = 41.5)
+
+        assertEquals(1, dao.updates.size)
+        assertEquals(12_000L, dao.updates.single().endedAtMs)
+        assertEquals(41.5, dao.updates.single().hrvRmssdMs)
     }
 }

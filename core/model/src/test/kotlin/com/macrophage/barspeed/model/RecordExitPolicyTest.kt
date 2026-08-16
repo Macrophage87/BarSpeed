@@ -263,20 +263,60 @@ class RecordExitPolicyTest {
 
     // ---- the session close -------------------------------------------------
 
+    /**
+     * A session whose close is in flight must not be offered the open-session
+     * prompt.
+     *
+     * That prompt's body tells the lifter that leaving without finishing leaves
+     * the session open and that nothing can finish it later. Once the close
+     * outlives the screen both halves are false, in the direction that reads as
+     * a bug: the lifter is told the session will stay open, taps the button that
+     * says so, and finds it closed.
+     */
     @Test
-    fun `the close state is not read yet, in flight (pre-fix)`() {
+    fun `back names the session as closing rather than as open`() {
         assertEquals(
-            ExitPrompt.SESSION_OPEN,
+            ExitPrompt.SESSION_CLOSING,
             RecordExitPolicy.promptFor(Stage.RESTING, SetWriteState.NONE, SessionCloseState.IN_FLIGHT),
         )
     }
 
     @Test
-    fun `the close state is not read yet, failed (pre-fix)`() {
-        assertEquals(
+    fun `a session being closed is never offered the open-session prompt`() {
+        assertNotEquals(
             ExitPrompt.SESSION_OPEN,
+            RecordExitPolicy.promptFor(Stage.RESTING, SetWriteState.NONE, SessionCloseState.IN_FLIGHT),
+        )
+    }
+
+    /**
+     * A failed close is its own answer, not the open-session one.
+     *
+     * The session really is open by then, so the actions coincide -- but the
+     * open-session body says every completed set is saved and offers to finish,
+     * and says nothing about the close that just failed or the retry sitting on
+     * the screen. Naming no control at all where one exists loses the session's
+     * HRV, which is held nowhere else.
+     */
+    @Test
+    fun `back names the session as unclosed after the close failed`() {
+        assertEquals(
+            ExitPrompt.SESSION_NOT_CLOSED,
             RecordExitPolicy.promptFor(Stage.RESTING, SetWriteState.NONE, SessionCloseState.FAILED),
         )
+    }
+
+    /**
+     * The three resting answers must be three different prompts, for the reason
+     * the three in-set answers must be.
+     */
+    @Test
+    fun `each close state gets its own answer while resting`() {
+        val answers =
+            SessionCloseState.entries.map {
+                RecordExitPolicy.promptFor(Stage.RESTING, SetWriteState.NONE, it)
+            }
+        assertEquals(answers.size, answers.toSet().size, "resting prompts collapsed: $answers")
     }
 
     @Test
