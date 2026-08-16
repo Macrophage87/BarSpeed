@@ -11,7 +11,7 @@
 # sent explicitly below, not just the ones this script cares about
 # changing. The one field left out on purpose is required_signatures:
 # GitHub manages it through its own endpoint
-# (.../protection/required_signatures, PUT to enable / DELETE to
+# (.../protection/required_signatures, POST to enable / DELETE to
 # disable), it is not part of this object at all, and this script does
 # not assert it -- check it separately if it ever matters.
 #

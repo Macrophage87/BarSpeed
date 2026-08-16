@@ -109,10 +109,10 @@ asserts a complete desired state — green CI required, force-pushes and
 deletions blocked, admins bound by the same required check, and linear
 history enforced (no merge commits) — rather than patching individual
 fields, because the underlying GitHub API replaces the whole protection
-object on every call. Two settings have documented, opt-in weakenings for
-cases that need them (`ENFORCE_ADMINS=0` / `-NoEnforceAdmins` to exempt
-admins, `REQUIRE_LINEAR_HISTORY=0` / `-NoRequireLinearHistory` to allow
-merge commits); everything else the script sends is fixed.
+object on every call. Three settings are flags rather than fixed values:
+`ENFORCE_ADMINS=0` / `-NoEnforceAdmins` exempts admins, `REQUIRE_LINEAR_HISTORY=0`
+/ `-NoRequireLinearHistory` allows merge commits, and `REQUIRE_REVIEWS=1` /
+`-RequireReviews` turns on a required PR approval (off by default).
 
 The DSP pipeline is deterministic and tested against synthetic fixtures with
 known ground truth (a prescribed 4 s eccentric measures 3.66 s ± 0.02 across
