@@ -23,11 +23,13 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.SetLoadPolicy
+import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.WeightUnit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -96,6 +98,42 @@ data class SetFeedback(
 /** One pick in the "equipment busy — switch exercise" chooser. */
 data class ExerciseChoice(val exerciseId: String, val displayName: String, val setsLeft: Int)
 
+/**
+ * Everything the set-end write needs, frozen at the moment the set ended.
+ *
+ * The point of freezing it is the retry. Half of these are read from live UI
+ * state and two are read from the clock, so recomputing them on a second
+ * attempt would store a different set from the one the lifter finished:
+ * [actualDurationS] and [endedAtMs] would both have moved, and [orderIdx] reads
+ * a counter the successful write increments.
+ *
+ * The sample lists are the buffers copied out, not the buffers themselves, so
+ * they survive this ViewModel being destroyed while the write is still running.
+ */
+private data class PendingSetWrite(
+    val exercise: ExerciseDef,
+    val slot: PlannedSlot?,
+    val isTimed: Boolean,
+    val loadKg: Double,
+    val addedKg: Double,
+    val plannedReps: Int?,
+    val manualReps: Int?,
+    val side: String?,
+    val tempoText: String?,
+    val plannedDurationS: Int?,
+    val actualDurationS: Int?,
+    val startedAtMs: Long,
+    val endedAtMs: Long,
+    val orderIdx: Int,
+    val samples: List<ImuSample>,
+    val hrSamples: List<HrSample>,
+    val cues: List<VoiceCue>,
+    val rating: SetRating?,
+    val planName: String?,
+    val planSessionName: String?,
+    val targets: SetTargets,
+)
+
 data class RecordState(
     val stage: Stage = Stage.SETUP,
     val planName: String? = null,
@@ -142,6 +180,15 @@ data class RecordState(
     val demoMode: Boolean = false,
     val sessionId: Long? = null,
     val setsCompleted: Int = 0,
+    /**
+     * Where the set-end durable write has got to.
+     *
+     * Not the same fact as `endingSet`, which is set when the set ends and is
+     * cleared only by the next `beginSet`, so it stays true for the whole of
+     * RESTING. This one goes back to NONE the moment the write lands, which is
+     * what Back needs to know: the stage is IN_SET for all three values.
+     */
+    val setWrite: SetWriteState = SetWriteState.NONE,
     val weightUnit: WeightUnit = WeightUnit.KG,
     /** Lifter body weight, the base load for pull-ups and dips; null until set. */
     val bodyWeightKg: Double? = null,
@@ -234,6 +281,20 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * starts two sessions and writes the same set twice.
      */
     private var endingSet = false
+
+    /**
+     * The set-end write's frozen input, kept until that write lands so a failed
+     * one can be retried from exactly what the lifter finished.
+     */
+    private var pendingWrite: PendingSetWrite? = null
+
+    /**
+     * The row id the set-end write already obtained, or null if it has not got
+     * that far. A retry that ignored this would insert the set a second time,
+     * under the same orderIdx, with its own copy of the gzipped stream, and
+     * nothing in the app can delete a set row.
+     */
+    private var writtenSetId: Long? = null
 
     /** All R-R intervals seen during the active session (sets + rests) for session HRV. */
     private val sessionRrMs = mutableListOf<Double>()
@@ -562,7 +623,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     /** Rest-screen correction when the sensor miscounted (or the set was manual). */
     fun overrideLastSetReps(reps: Int) {
         if (reps < 0) return
-        viewModelScope.launch {
+        // appScope, for the reason launchSetWrite is: a correction tapped on the
+        // rest screen and then abandoned by Back is a correction the pop
+        // cancels, and nothing anywhere can edit a stored set once this screen
+        // is gone. Main.immediate keeps it ordered against the other writers and
+        // keeps SetRatingTracker's fields on the thread that already reads them.
+        container.appScope.launch(Dispatchers.Main.immediate) {
             val s = stateFlow.value
             val failed = ratings.correctReps(reps, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
             stateFlow.value =
@@ -604,10 +670,31 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Finish the set: analyze, persist, and enter the rest screen (spec 4.1). */
     /**
-     * Finish the set, logging [rating] as part of the same tap. Analyze, persist,
-     * and go straight to rest.
+     * Finish the set, logging [rating] as part of the same tap: freeze
+     * everything the durable write needs, then run that write.
+     *
+     * Split in two on purpose. Everything above the launch is read from live
+     * state and from the clock, so it is captured once, here, and the write
+     * consumes the frozen copy. A retry that recomputed instead would re-read
+     * the clock: a 60 s plank ended at 45 s and retried 20 s later would store
+     * a 65 s hold that never happened, and would flip from a failed set to one
+     * that met its target, because the shortfall test compares against 90% of
+     * the prescription.
+     *
+     * [endingSet] is never cleared here, including when the write fails, and it
+     * still has two jobs once the set is over.
+     *
+     * It guards re-entry to this function: the effort grid is seven separately
+     * clickable tiles, and two fingers landing on two of them would otherwise
+     * run this twice and store the set twice.
+     *
+     * It also guards [addManualRep] across the frame in which the set ends.
+     * `+1 REP` is no longer drawn once the write starts — the screen gates that
+     * button on the write state — but the gate only takes effect at the next
+     * recomposition, and the button from the previous composition is on screen
+     * and hittable until then. A tap landing in that frame would count a rep
+     * onto a set whose count is already frozen into the write.
      */
     fun endSet(rating: SetRating? = null) {
         if (endingSet) return
@@ -638,146 +725,242 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 s.adHoc -> s.tempoInput.ifBlank { null }
                 else -> slot?.tempo
             }
-        val samples = imuBuffer.toList()
-        val hrSamples = hrBuffer.toList()
-        val cues = cueBuffer.toList()
-
-        viewModelScope.launch {
-            val targets =
+        val manualReps = if (s.manualSet) s.manualReps else null
+        pendingWrite =
+            PendingSetWrite(
+                exercise = exercise,
+                slot = slot,
+                isTimed = isTimed,
+                loadKg = loadKg,
+                addedKg = addedKg,
+                plannedReps = plannedReps,
+                manualReps = manualReps,
+                side = side,
+                tempoText = tempoText,
+                plannedDurationS = plannedDurationS,
+                actualDurationS = actualDurationS,
+                startedAtMs = setStartedAtMs,
+                endedAtMs = System.currentTimeMillis(),
+                orderIdx = s.setsCompleted,
+                samples = imuBuffer.toList(),
+                hrSamples = hrBuffer.toList(),
+                cues = cueBuffer.toList(),
+                rating = rating,
+                planName = s.planName.takeIf { !s.adHoc },
+                planSessionName = s.planSessionName.takeIf { !s.adHoc },
+                targets =
                 SetTargets(
                     plannedReps = plannedReps,
                     countedReps = if (s.manualSet) s.manualReps else null,
                     tempo = tempoText?.let { Tempo.parseOrNull(it) },
                     targetMeanConcentricVelocityMps = slot?.targetMeanConVelMps,
                     velocityLossStopPct = slot?.velocityLossStopPct,
-                )
-            val manualReps = if (s.manualSet) s.manualReps else null
-            // Sensor data is analyzed even on manually-counted sets — the manual
-            // count overrides the rep COUNT, but velocity/power metrics still come
-            // from the bar sensor when it was recording.
-            val analysis =
-                withContext(Dispatchers.Default) {
-                    when {
-                        isTimed -> SetAnalysis(
-                            emptyList(),
-                            0.0,
-                            null,
-                            null,
-                            timedVerdicts(actualDurationS, plannedDurationS),
-                        )
-                        samples.size >= 8 ->
-                            SetAnalyzer.analyze(samples, exercise.liftDirection(), loadKg, targets)
-                        manualReps != null ->
-                            SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))
-                        else -> SetAnalysis(emptyList(), 0.0, null, null, listOf("No sensor data recorded."))
-                    }
-                }
-            val sessionId =
-                stateFlow.value.sessionId ?: sessionRepository.startSession(
-                    planName = stateFlow.value.planName.takeIf { !stateFlow.value.adHoc },
-                    planSessionName = stateFlow.value.planSessionName.takeIf { !stateFlow.value.adHoc },
-                    startedAtMs = setStartedAtMs,
-                ).also { stateFlow.value = stateFlow.value.copy(sessionId = it) }
-
-            sessionRepository.ensureExerciseExists(exercise.id)
-            val setId = sessionRepository.recordSet(
-                sessionId = sessionId,
-                orderIdx = stateFlow.value.setsCompleted,
-                set =
-                CompletedSet(
-                    exerciseId = exercise.id,
-                    exerciseName = exercise.displayName,
-                    loadKg = loadKg,
-                    plannedLoadKg = slot?.plannedLoadKg,
-                    plannedReps = plannedReps,
-                    manualReps = manualReps,
-                    actualDurationS = actualDurationS,
-                    plannedDurationS = plannedDurationS,
-                    side = side,
-                    tempo = tempoText,
-                    targetMeanConVelMps = slot?.targetMeanConVelMps,
-                    velocityLossStopPct = slot?.velocityLossStopPct,
-                    plannedRestS = slot?.restS,
-                    startedAtMs = setStartedAtMs,
-                    endedAtMs = System.currentTimeMillis(),
-                    analysis = analysis,
-                    imuSamples = samples,
-                    hrSamples = hrSamples,
-                    voiceCues = cues,
                 ),
             )
+        launchSetWrite()
+    }
 
-            // Stopped early = failed. Judged only where the count is trustworthy:
-            // timed sets against the clock, manual/guided sets against the app's
-            // own rep count — never against a possibly-miscounted sensor total.
-            val stoppedEarly =
-                when {
-                    isTimed && plannedDurationS != null ->
-                        (actualDurationS ?: 0) < (plannedDurationS * TIMED_CLOSE_ENOUGH_FRACTION).toInt()
-                    manualReps != null && plannedReps != null -> manualReps < plannedReps
-                    else -> false
-                }
-            // The lifter's tap is authoritative for effort, but a set that ended
-            // short of its target is still a failed set — both facts are recorded.
-            val failed = ratings.onSetRecorded(setId, plannedReps, stoppedEarly, rating)
+    /**
+     * Store the set that failed to store, from the copy frozen when it ended.
+     * Nothing is recomputed and nothing is re-read from the clock.
+     */
+    fun retrySetWrite() {
+        if (stateFlow.value.setWrite != SetWriteState.FAILED) return
+        launchSetWrite()
+    }
 
-            val restS = slot?.restS ?: DEFAULT_REST_S
-            // queue[queueIndex + 1] has not been through startNextSet's bake
-            // yet, so its loadKg is still the plan's declaration. That is the
-            // field to seed from, not plannedLoadKg: plannedLoadKg is frozen at
-            // the plan's number and would discard an in-rest edit made to a set
-            // that then got postponed. Nothing else pins that ordering, and the
-            // seam's unit tests cannot see it break.
-            //
-            // The write half stays outside the seam: startNextSet does
-            // `loadKg = parseToKg(loadInput) ?: next.loadKg` on this same slot
-            // when the lifter taps through, so the string seeded below is read
-            // straight back as a declaration one set later. Nothing is lost
-            // there today, because 0 round-trips exactly through inputValue and
-            // parseToKg in both display units — but nothing pins that either.
-            val nextSlot = stateFlow.value.nextSlot
-            val seedKg =
-                SetLoadPolicy.seedAddedKg(
-                    hasPlannedNext = nextSlot != null,
-                    nextDeclaredAddedKg = nextSlot?.loadKg,
-                    // addedKg, never loadKg: the field holds what is ADDED, and
-                    // seeding it with the body-weight-inclusive total is what
-                    // made a loadless block climb set over set.
-                    lastAddedKg = addedKg,
-                )
-            stateFlow.value =
-                stateFlow.value.copy(
-                    stage = Stage.RESTING,
-                    restTotalS = restS,
-                    lastFeedback =
-                    SetFeedback(
-                        exerciseName = exercise.displayName,
-                        loadKg = loadKg,
-                        analysis = analysis,
-                        plannedReps = plannedReps,
-                        tempo = tempoText,
-                        actualDurationS = actualDurationS,
-                        plannedDurationS = plannedDurationS,
-                        side = side,
-                        explosive = exercise.kind == ExerciseKind.EXPLOSIVE,
-                        repsOverride = manualReps,
-                    ),
-                    lastSetRpe = rating?.rpe,
-                    lastSetFailed = failed,
-                    lastSetWarmup = rating?.warmup ?: false,
-                    restRemainingS = restS,
-                    setsCompleted = stateFlow.value.setsCompleted + 1,
-                    // Pre-fill next-set inputs so in-rest edits start from plan values.
-                    loadInput =
-                    seedKg?.let { stateFlow.value.weightUnit.inputValue(it) } ?: stateFlow.value.loadInput,
-                    repsInput = (stateFlow.value.nextSlot?.reps ?: plannedReps ?: 5).toString(),
-                    durationInput =
-                    (stateFlow.value.nextSlot?.durationS ?: plannedDurationS)?.toString()
-                        ?: stateFlow.value.durationInput,
-                    tempoInput = stateFlow.value.nextSlot?.tempo ?: tempoText ?: "",
-                )
-            startRestCountdown()
+    /**
+     * Run the durable write on a scope the record screen cannot take with it.
+     *
+     * On `appScope` rather than `viewModelScope`, because the pop that destroys
+     * this ViewModel cancels `viewModelScope` at whichever suspension point the
+     * write has reached: inside the analysis, between starting the session and
+     * inserting the set, or between the set row and its gzipped IMU stream.
+     * `appScope` is created once per process in `AppContainer` and is never
+     * cancelled.
+     *
+     * Dispatched on `Main.immediate`, which is the load-bearing half. `appScope`
+     * is `SupervisorJob() + Dispatchers.Default`, so launching unqualified would
+     * put every `stateFlow.value = stateFlow.value.copy(...)` below on a
+     * background thread. Those are non-atomic read-modify-writes, there are
+     * dozens of them in this file, and demo mode already writes to that flow off
+     * the main thread through `launchDemoStream`; adding a second off-main
+     * writer is how the RESTING transition gets lost and the screen strands on a
+     * set that was in fact written. `Main.immediate` keeps every one of them
+     * exactly where it is today, and keeps this write, [rateLastSet] and
+     * [overrideLastSetReps] in tap order now that all three have left
+     * `viewModelScope`.
+     *
+     * The catch is not optional. `appScope` has no `CoroutineExceptionHandler`,
+     * so anything escaping reaches the default uncaught handler and kills the
+     * process. That is what happens today on `viewModelScope` too, but it can
+     * now arrive after the screen is gone. Swallowing it silently would be worse
+     * than the crash, so the failure becomes a state the screen shows and a
+     * retry the lifter can tap, with the buffers still in memory behind it.
+     */
+    private fun launchSetWrite() {
+        val pending = pendingWrite ?: return
+        stateFlow.value = stateFlow.value.copy(setWrite = SetWriteState.IN_FLIGHT)
+        container.appScope.launch(Dispatchers.Main.immediate) {
+            try {
+                runSetWrite(pending)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // Deliberately broad. Whatever failed, the set is still only in
+                // memory, and the one thing that must not happen is the screen
+                // moving on as though it had been stored.
+                stateFlow.value = stateFlow.value.copy(setWrite = SetWriteState.FAILED)
+            }
         }
+    }
+
+    private suspend fun runSetWrite(p: PendingSetWrite) {
+        // Sensor data is analyzed even on manually-counted sets — the manual
+        // count overrides the rep COUNT, but velocity/power metrics still come
+        // from the bar sensor when it was recording.
+        val analysis =
+            withContext(Dispatchers.Default) {
+                when {
+                    p.isTimed -> SetAnalysis(
+                        emptyList(),
+                        0.0,
+                        null,
+                        null,
+                        timedVerdicts(p.actualDurationS, p.plannedDurationS),
+                    )
+                    p.samples.size >= 8 ->
+                        SetAnalyzer.analyze(p.samples, p.exercise.liftDirection(), p.loadKg, p.targets)
+                    p.manualReps != null ->
+                        SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))
+                    else -> SetAnalysis(emptyList(), 0.0, null, null, listOf("No sensor data recorded."))
+                }
+            }
+        // A session row created here and then left behind by a failed insert
+        // stays open with endedAtMs null. A retry reclaims it, because sessionId
+        // is read back from state; nothing reclaims it if the lifter never
+        // retries. Named in the commit body rather than covered by the word
+        // atomic: the transaction spans the set and its streams, not this.
+        val sessionId =
+            stateFlow.value.sessionId ?: sessionRepository.startSession(
+                planName = p.planName,
+                planSessionName = p.planSessionName,
+                startedAtMs = p.startedAtMs,
+            ).also { stateFlow.value = stateFlow.value.copy(sessionId = it) }
+
+        sessionRepository.ensureExerciseExists(p.exercise.id)
+
+        // Stopped early = failed. Judged only where the count is trustworthy:
+        // timed sets against the clock, manual/guided sets against the app's
+        // own rep count — never against a possibly-miscounted sensor total.
+        val stoppedEarly =
+            when {
+                p.isTimed && p.plannedDurationS != null ->
+                    (p.actualDurationS ?: 0) < (p.plannedDurationS * TIMED_CLOSE_ENOUGH_FRACTION).toInt()
+                p.manualReps != null && p.plannedReps != null -> p.manualReps < p.plannedReps
+                else -> false
+            }
+        // The lifter's tap is authoritative for effort, but a set that ended
+        // short of its target is still a failed set — both facts are recorded.
+        val failed = ratings.onSetRecorded(p.plannedReps, stoppedEarly, p.rating)
+
+        // Reusing an id already returned is what keeps a retry from writing the
+        // set twice. The rating travels with the row rather than following it as
+        // an update, so there is no second statement left to fail after the row
+        // has landed.
+        val setId =
+            writtenSetId ?: sessionRepository.recordSet(
+                sessionId = sessionId,
+                orderIdx = p.orderIdx,
+                set =
+                CompletedSet(
+                    exerciseId = p.exercise.id,
+                    exerciseName = p.exercise.displayName,
+                    loadKg = p.loadKg,
+                    plannedLoadKg = p.slot?.plannedLoadKg,
+                    plannedReps = p.plannedReps,
+                    manualReps = p.manualReps,
+                    actualDurationS = p.actualDurationS,
+                    plannedDurationS = p.plannedDurationS,
+                    side = p.side,
+                    tempo = p.tempoText,
+                    targetMeanConVelMps = p.slot?.targetMeanConVelMps,
+                    velocityLossStopPct = p.slot?.velocityLossStopPct,
+                    plannedRestS = p.slot?.restS,
+                    startedAtMs = p.startedAtMs,
+                    endedAtMs = p.endedAtMs,
+                    analysis = analysis,
+                    imuSamples = p.samples,
+                    hrSamples = p.hrSamples,
+                    voiceCues = p.cues,
+                    rpe = p.rating?.rpe,
+                    failed = failed,
+                    warmup = p.rating?.warmup == true,
+                ),
+            ).also { writtenSetId = it }
+        ratings.attachTo(setId)
+
+        val restS = p.slot?.restS ?: DEFAULT_REST_S
+        // queue[queueIndex + 1] has not been through startNextSet's bake
+        // yet, so its loadKg is still the plan's declaration. That is the
+        // field to seed from, not plannedLoadKg: plannedLoadKg is frozen at
+        // the plan's number and would discard an in-rest edit made to a set
+        // that then got postponed. Nothing else pins that ordering, and the
+        // seam's unit tests cannot see it break.
+        //
+        // The write half stays outside the seam: startNextSet does
+        // `loadKg = parseToKg(loadInput) ?: next.loadKg` on this same slot
+        // when the lifter taps through, so the string seeded below is read
+        // straight back as a declaration one set later. Nothing is lost
+        // there today, because 0 round-trips exactly through inputValue and
+        // parseToKg in both display units — but nothing pins that either.
+        val nextSlot = stateFlow.value.nextSlot
+        val seedKg =
+            SetLoadPolicy.seedAddedKg(
+                hasPlannedNext = nextSlot != null,
+                nextDeclaredAddedKg = nextSlot?.loadKg,
+                // addedKg, never loadKg: the field holds what is ADDED, and
+                // seeding it with the body-weight-inclusive total is what
+                // made a loadless block climb set over set.
+                lastAddedKg = p.addedKg,
+            )
+        stateFlow.value =
+            stateFlow.value.copy(
+                stage = Stage.RESTING,
+                setWrite = SetWriteState.NONE,
+                restTotalS = restS,
+                lastFeedback =
+                SetFeedback(
+                    exerciseName = p.exercise.displayName,
+                    loadKg = p.loadKg,
+                    analysis = analysis,
+                    plannedReps = p.plannedReps,
+                    tempo = p.tempoText,
+                    actualDurationS = p.actualDurationS,
+                    plannedDurationS = p.plannedDurationS,
+                    side = p.side,
+                    explosive = p.exercise.kind == ExerciseKind.EXPLOSIVE,
+                    repsOverride = p.manualReps,
+                ),
+                lastSetRpe = p.rating?.rpe,
+                lastSetFailed = failed,
+                lastSetWarmup = p.rating?.warmup ?: false,
+                restRemainingS = restS,
+                // Set from the frozen index rather than incremented, so a retry
+                // cannot count the same set twice.
+                setsCompleted = p.orderIdx + 1,
+                // Pre-fill next-set inputs so in-rest edits start from plan values.
+                loadInput =
+                seedKg?.let { stateFlow.value.weightUnit.inputValue(it) } ?: stateFlow.value.loadInput,
+                repsInput = (stateFlow.value.nextSlot?.reps ?: p.plannedReps ?: 5).toString(),
+                durationInput =
+                (stateFlow.value.nextSlot?.durationS ?: p.plannedDurationS)?.toString()
+                    ?: stateFlow.value.durationInput,
+                tempoInput = stateFlow.value.nextSlot?.tempo ?: p.tempoText ?: "",
+            )
+        pendingWrite = null
+        writtenSetId = null
+        startRestCountdown()
     }
 
     private fun startRestCountdown() {
@@ -804,7 +987,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * its target — that verdict comes from the rep count, not from an opinion.
      */
     fun rateLastSet(rpe: Int?, failed: Boolean, warmup: Boolean) {
-        viewModelScope.launch {
+        // appScope, as overrideLastSetReps: the rest screen is the only place a
+        // set's effort can be corrected, and the pop that leaves it cancelled
+        // the correction on the way out.
+        container.appScope.launch(Dispatchers.Main.immediate) {
             val effectiveFailed = ratings.rate(rpe, failed, warmup) ?: return@launch
             stateFlow.value =
                 stateFlow.value.copy(lastSetRpe = rpe, lastSetFailed = effectiveFailed, lastSetWarmup = warmup)
@@ -881,11 +1067,25 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * The stop is unconditional and needs no flag of its own.
      * [RecordingService.start] fires on every [beginSet], and [RecordingService.stop]
      * was reachable only from [finishSession] — so leaving by any other route
-     * left the service running with nothing else able to stop it. Nothing is
-     * protected by keeping it up: both sample collectors are `viewModelScope`-
-     * bound and are cancelled with it, and `imuBuffer`/`hrBuffer` go with this
-     * instance, so no recording survives for the service to keep alive.
+     * left the service running with nothing else able to stop it.
      * `stopService` on a service that was never started is a no-op.
+     *
+     * The reason given here for it being safe is no longer the whole truth, and
+     * is corrected rather than deleted. It used to read that no recording
+     * survives this instance, because both sample collectors are
+     * `viewModelScope`-bound and `imuBuffer`/`hrBuffer` go with the instance.
+     * The collectors are still cancelled, but [endSet] now copies those buffers
+     * into a [PendingSetWrite] BEFORE launching, and that write runs on
+     * `appScope`, so a set can still be in the middle of being stored at the
+     * moment this runs. Stopping the service here drops the process out of
+     * foreground priority for the few hundred milliseconds that write needs.
+     *
+     * Left unconditional anyway, deliberately. Whether Android actually kills a
+     * cached process inside that window cannot be measured without a device,
+     * and making the stop conditional to protect against something unmeasured
+     * would trade a notification bug that was observed for a data bug that was
+     * not. It is a field item on this commit rather than a change to this
+     * function.
      *
      * This writes nothing to the database, deliberately. The session row is
      * left open with `endedAtMs` null, which is the honest state and the only

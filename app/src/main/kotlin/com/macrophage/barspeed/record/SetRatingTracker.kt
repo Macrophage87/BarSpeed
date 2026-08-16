@@ -22,20 +22,37 @@ class SetRatingTracker(private val repository: SessionRepository) {
     private var plannedReps: Int? = null
 
     /**
-     * Attach [rating] to the freshly persisted set. [stoppedEarly] is the
-     * objective shortfall verdict, judged by the caller only where the rep or
-     * second count is trustworthy.
+     * Work out the failed verdict for a set that is about to be stored, and
+     * remember the two facts behind it. [stoppedEarly] is the objective
+     * shortfall verdict, judged by the caller only where the rep or second
+     * count is trustworthy.
+     *
+     * Writes nothing. The rating is now stored with the set row itself rather
+     * than updated onto it afterwards, so the caller passes the returned flag
+     * into the insert. This used to issue `rateSet` as a second statement, and
+     * only `if (rating != null || stoppedEarly)`; when that condition was false
+     * the values it skipped writing were exactly the row's defaults, so storing
+     * them unconditionally with the row stores the same thing. What it removes
+     * is the window in between, where a set the lifter had just tapped as
+     * failed existed in the database rated as nothing, permanently, because no
+     * screen can edit a set's rating once the rest screen is gone.
      */
-    suspend fun onSetRecorded(setId: Long, plannedReps: Int?, stoppedEarly: Boolean, rating: SetRating?): Boolean {
-        this.setId = setId
+    fun onSetRecorded(plannedReps: Int?, stoppedEarly: Boolean, rating: SetRating?): Boolean {
         this.plannedReps = plannedReps
         autoFailed = stoppedEarly
         tappedFailed = rating?.failed == true
-        val failed = tappedFailed || autoFailed
-        if (rating != null || stoppedEarly) {
-            repository.rateSet(setId, rpe = rating?.rpe, failed = failed, warmup = rating?.warmup == true)
-        }
-        return failed
+        return tappedFailed || autoFailed
+    }
+
+    /**
+     * Point the rest-screen corrections at the row that was just stored.
+     *
+     * Separate from [onSetRecorded] because the id does not exist until the
+     * insert returns, and because a set-end write that fails must not leave
+     * [rate] and [correctReps] aimed at a row that was never written.
+     */
+    fun attachTo(setId: Long) {
+        this.setId = setId
     }
 
     /** Correct how the set FELT. The shortfall verdict survives the correction. */

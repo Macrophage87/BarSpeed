@@ -87,13 +87,7 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
     // system gesture — and the lifter uses whichever is nearer the thumb, so a
     // guard on one is not a guard. Both ask [RecordExitPolicy] the same
     // question about the same stage, which is what stops them drifting apart.
-    // SetWriteState.NONE is a placeholder, and the only value passed anywhere at
-    // this commit. Nothing in the ViewModel tracks the set-end write yet, so
-    // ExitPrompt.SET_SAVING and SET_UNSAVED are unreachable from here and their
-    // wording below is dead until the commit that makes the write outlive this
-    // screen. Passing it explicitly is the point: the parameter is required, so
-    // the commit that starts tracking the write cannot forget this call site.
-    val prompt = RecordExitPolicy.promptFor(state.stage, SetWriteState.NONE)
+    val prompt = RecordExitPolicy.promptFor(state.stage, state.setWrite)
     var pendingExit by remember { mutableStateOf(ExitPrompt.NONE) }
     val onExitAction: (ExitAction) -> Unit = { action ->
         pendingExit = ExitPrompt.NONE
@@ -248,14 +242,15 @@ private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
         "Every completed set is already saved. Finishing writes the session's end time and its heart-rate " +
             "and HRV summary. Leaving without finishing leaves the session open, and nothing can finish it " +
             "later. Either way the rest of the planned sets are dropped."
-    // Says nothing about whether leaving is safe for the set, because at this
-    // commit it is not: the write still runs on a scope the pop cancels, and
-    // the commit that changes that also rewrites this string. Nothing renders
-    // it meanwhile -- see the note on the promptFor call above.
+    // Now says leaving is safe for the set, because as of this commit it is:
+    // the write runs on a scope the pop cannot cancel. That sentence was
+    // deliberately absent while the prompt was unreachable and the claim would
+    // have been false. It is the session, not the set, that is still at risk
+    // here, and the wording points at that instead.
     ExitPrompt.SET_SAVING ->
-        "This set is being written to your history now. Wait for the rest screen before finishing the " +
-            "session: finishing while a set is still saving leaves that set out of the session's " +
-            "heart-rate and HRV summary, and nothing rewrites it afterwards."
+        "This set is being written to your history now, and it will finish saving even if you leave. " +
+            "What will not finish is the session: closing it while a set is still saving leaves that set " +
+            "out of the session's heart-rate and HRV summary, and nothing rewrites it afterwards."
     ExitPrompt.SET_UNSAVED ->
         "This set could not be written to your history. It is still held in memory, so tapping SAVE THIS " +
             "SET AGAIN on this screen can still store it — freeing some space on the phone first if that " +
@@ -648,10 +643,16 @@ private fun ManualSetStage(state: RecordState, viewModel: RecordViewModel, slot:
             }
         }
         Spacer(Modifier.height(24.dp))
-        Button(onClick = viewModel::addManualRep, modifier = Modifier.fillMaxWidth().height(72.dp)) {
-            Text("+1 REP", style = MaterialTheme.typography.titleLarge)
+        // Gone once the set has ended, because the set is over and the count is
+        // frozen into the write. addManualRep already ignores taps from that
+        // moment, so leaving the button drawn would be a 72dp target that
+        // silently does nothing, right where the lifter's thumb already is.
+        if (state.setWrite == SetWriteState.NONE) {
+            Button(onClick = viewModel::addManualRep, modifier = Modifier.fillMaxWidth().height(72.dp)) {
+                Text("+1 REP", style = MaterialTheme.typography.titleLarge)
+            }
+            Spacer(Modifier.height(10.dp))
         }
-        Spacer(Modifier.height(10.dp))
         EndSetControl(state, viewModel)
     }
 }
@@ -937,10 +938,61 @@ private fun phaseLabel(phase: Phase): String = when (phase) {
  * is a failed set — offering "solid, had more in me" three reps into a five-rep
  * set would let an abandoned set be logged as a good one. Once the target is
  * met the effort grid takes over and rating IS ending.
+ *
+ * Once the set HAS ended, neither of those is the control any more, and the
+ * write's state decides what is. This is the single place all five in-set
+ * layouts route through, which is why the branch lives here rather than at each
+ * of them.
  */
 @Composable
 private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
-    if (state.setTargetMet) EndSetRpeGrid(state, viewModel) else EndSetEarlyButton(viewModel)
+    when (state.setWrite) {
+        SetWriteState.IN_FLIGHT -> SavingSetNotice()
+        SetWriteState.FAILED -> UnsavedSetNotice(viewModel)
+        SetWriteState.NONE ->
+            if (state.setTargetMet) EndSetRpeGrid(state, viewModel) else EndSetEarlyButton(viewModel)
+    }
+}
+
+/**
+ * Shown for the few hundred milliseconds the set takes to analyse, gzip and
+ * store. Deliberately not a control: there is nothing useful to tap, and the
+ * one thing a lifter might reach for — ending the set again — is already
+ * blocked in the ViewModel.
+ */
+@Composable
+private fun SavingSetNotice() {
+    Text(
+        "SAVING SET…",
+        style = MaterialTheme.typography.titleMedium,
+        color = BarColors.Sub,
+        letterSpacing = 2.sp,
+    )
+    Spacer(Modifier.height(6.dp))
+    SectionCaption("Keeping this screen open is not required — the set finishes saving either way")
+}
+
+/**
+ * The set ended and could not be stored. The reps, the sensor stream and the
+ * effort rating are all still in memory, so this offers the one action that can
+ * still save them.
+ *
+ * It replaces the effort grid rather than sitting under it. The grid ends a set,
+ * and this set is already over; leaving it drawn would offer a control that does
+ * nothing and hide the one that does.
+ */
+@Composable
+private fun UnsavedSetNotice(viewModel: RecordViewModel) {
+    Text("THIS SET DID NOT SAVE", style = MaterialTheme.typography.titleMedium, color = BarColors.Red)
+    Spacer(Modifier.height(6.dp))
+    SectionCaption("Still in memory. Freeing space on the phone may be what it needs")
+    Spacer(Modifier.height(10.dp))
+    Button(
+        onClick = viewModel::retrySetWrite,
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+    ) {
+        Text("SAVE THIS SET AGAIN", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    }
 }
 
 /**

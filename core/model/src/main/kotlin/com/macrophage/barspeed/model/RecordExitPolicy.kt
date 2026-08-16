@@ -13,19 +13,34 @@ enum class ExitAction {
      * Nothing of that set has reached the database: `beginSet` writes only to
      * in-memory buffers and `recordSet` is not called until the set ends, so
      * the loss is total and unrecoverable. Saving instead is deliberately NOT
-     * offered here — the durable write runs on `viewModelScope`, which the pop
-     * cancels, so a save button on this prompt would be a race rather than a
-     * feature. The record screen already carries a save-and-end control that is
-     * not a race; the prompt's text points at it instead.
+     * offered here; the record screen already carries a save-and-end control,
+     * and the prompt's text points at it.
+     *
+     * The reason for that used to be that a save button here would be a race,
+     * because the durable write ran on `viewModelScope` and the pop cancelled
+     * it. Both halves of that stopped being true when the write moved to the
+     * process-wide scope, and the conclusion inverts with them: a save from
+     * here would now complete. It is still not offered, for a different and
+     * smaller reason — this prompt is raised mid-set, where "save" would mean
+     * ending the set, and ending a set is a decision with a rating attached
+     * rather than a side effect of leaving.
+     *
+     * A set whose write is already running is not this prompt at all; see
+     * [ExitPrompt.SET_SAVING].
      */
     DISCARD_SET_AND_LEAVE,
 
     /**
      * Close the session row, and STAY on the screen.
      *
-     * Deliberately not a leave. `finishSession` writes on `viewModelScope` too,
-     * so popping in the same frame would race the write that closes the
-     * session. The FINISHED stage draws its own exits once that write lands.
+     * Deliberately not a leave. `finishSession` writes on `viewModelScope`, so
+     * popping in the same frame would race the write that closes the session.
+     * The FINISHED stage draws its own exits once that write lands.
+     *
+     * That is still true, and it is now the only writer on the record screen of
+     * which it is true: the set-end write and the two rest-screen corrections
+     * have moved to a scope the pop cannot cancel, and this one has not. It is
+     * the remaining half of the same problem rather than a settled case.
      */
     FINISH_SESSION,
 
@@ -144,9 +159,12 @@ object RecordExitPolicy {
      * credibility: a gate that fires where nothing is at risk teaches the
      * lifter to dismiss it without reading.
      *
-     * IN_SET is ranked first for consequence. Nothing of the set in progress
-     * has reached the database, so leaving destroys it outright, and on a
-     * session's first set the session row goes with it.
+     * IN_SET is ranked first for consequence. Nothing of a set still being
+     * performed has reached the database, so leaving destroys it outright, and
+     * on a session's first set the session row goes with it. That is true of
+     * [SetWriteState.NONE] and of [SetWriteState.FAILED]; it stopped being true
+     * of a set whose write is in flight, which is why the three are answered
+     * separately below.
      *
      * RESTING loses less and still loses something no reprocessing can get
      * back. Every set is durably written by then, but the session row is open,

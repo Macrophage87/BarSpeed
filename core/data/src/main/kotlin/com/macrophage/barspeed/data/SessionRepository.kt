@@ -36,11 +36,18 @@ data class CompletedSet(
     /** Spoken cues during the set, epoch-ms stamped for IMU cross-reference. */
     val voiceCues: List<VoiceCue> = emptyList(),
     /**
-     * How the set was rated at the moment it ended.
+     * How the set was rated at the moment it ended, stored with the row rather
+     * than updated onto it afterwards.
      *
-     * Accepted here but not yet stored: the next commit is what puts these on
-     * the row. The defaults match [SetRecordEntity]'s own, so an unrated set is
-     * stored exactly as it was before these existed.
+     * The effort tile IS the end-set control, so the rating is part of the same
+     * gesture that finished the set and is captured once. Writing it as a
+     * second statement left a window in which the row existed rated as nothing:
+     * a set the lifter tapped as failed would read as an unremarkable set if
+     * anything went wrong between the two, and no screen can edit a set's
+     * rating once the rest screen is gone.
+     *
+     * The defaults are the same values [SetRecordEntity] defaults to, so a set
+     * recorded without a rating is stored exactly as it was before.
      */
     val rpe: Int? = null,
     val failed: Boolean = false,
@@ -59,64 +66,82 @@ class SessionRepository(
             SessionEntity(startedAtMs = startedAtMs, planName = planName, planSessionName = planSessionName),
         )
 
+    /**
+     * Store one finished set: the row, every raw stream belonging to it, and
+     * the rating it ended with, in a single transactional DAO call.
+     *
+     * One call, not four. The row and its streams used to go in separately,
+     * which left a set row in history whose gzipped IMU stream could be
+     * missing -- the set reads as saved while the capture everything derived
+     * stays recoverable from is gone. Nothing in the repository interleaves
+     * with them now; whether the database commits them together is Room's
+     * `@Transaction` on [SessionDao.insertSetWithStreams], which no test here
+     * can observe.
+     */
     suspend fun recordSet(sessionId: Long, orderIdx: Int, set: CompletedSet): Long {
         val hr = set.hrSamples.map { it.bpm }
-        val setId =
-            sessionDao.insertSet(
-                SetRecordEntity(
-                    sessionId = sessionId,
-                    orderIdx = orderIdx,
-                    exerciseId = set.exerciseId,
-                    exerciseName = set.exerciseName,
-                    loadKg = set.loadKg,
-                    plannedLoadKg = set.plannedLoadKg,
-                    actualReps = set.manualReps ?: set.analysis.reps.size,
-                    repsManual = set.manualReps != null,
-                    plannedReps = set.plannedReps,
-                    actualDurationS = set.actualDurationS,
-                    plannedDurationS = set.plannedDurationS,
-                    side = set.side,
-                    tempo = set.tempo,
-                    targetMeanConVelMps = set.targetMeanConVelMps,
-                    velocityLossStopPct = set.velocityLossStopPct,
-                    plannedRestS = set.plannedRestS,
-                    startedAtMs = set.startedAtMs,
-                    endedAtMs = set.endedAtMs,
-                    analysisJson = json.encodeToString(SetAnalysis.serializer(), set.analysis),
-                    hrEndOfSetBpm = set.hrSamples.lastOrNull()?.bpm,
-                    hrAvgBpm = if (hr.isEmpty()) null else hr.average().toInt(),
-                    hrMaxBpm = hr.maxOrNull(),
-                ),
-            )
-        if (set.imuSamples.isNotEmpty()) {
-            sessionDao.insertRawStream(
-                RawStreamEntity(
-                    setId = setId,
-                    kind = RawStreamEntity.KIND_IMU,
-                    csvGzip = Gzip.compress(ImuCsv.encode(set.imuSamples)),
-                    sampleRateHz = set.analysis.sampleRateHz,
-                ),
-            )
+        // setId is stamped by the DAO once the row exists; these carry a
+        // placeholder until then.
+        val streams = buildList {
+            if (set.imuSamples.isNotEmpty()) {
+                add(
+                    RawStreamEntity(
+                        setId = 0L,
+                        kind = RawStreamEntity.KIND_IMU,
+                        csvGzip = Gzip.compress(ImuCsv.encode(set.imuSamples)),
+                        sampleRateHz = set.analysis.sampleRateHz,
+                    ),
+                )
+            }
+            if (set.hrSamples.isNotEmpty()) {
+                add(
+                    RawStreamEntity(
+                        setId = 0L,
+                        kind = RawStreamEntity.KIND_HRM,
+                        csvGzip = Gzip.compress(HrCsv.encode(set.hrSamples)),
+                    ),
+                )
+            }
+            if (set.voiceCues.isNotEmpty()) {
+                add(
+                    RawStreamEntity(
+                        setId = 0L,
+                        kind = RawStreamEntity.KIND_CUES,
+                        csvGzip = Gzip.compress(CueCsv.encode(set.voiceCues)),
+                    ),
+                )
+            }
         }
-        if (set.hrSamples.isNotEmpty()) {
-            sessionDao.insertRawStream(
-                RawStreamEntity(
-                    setId = setId,
-                    kind = RawStreamEntity.KIND_HRM,
-                    csvGzip = Gzip.compress(HrCsv.encode(set.hrSamples)),
-                ),
-            )
-        }
-        if (set.voiceCues.isNotEmpty()) {
-            sessionDao.insertRawStream(
-                RawStreamEntity(
-                    setId = setId,
-                    kind = RawStreamEntity.KIND_CUES,
-                    csvGzip = Gzip.compress(CueCsv.encode(set.voiceCues)),
-                ),
-            )
-        }
-        return setId
+        return sessionDao.insertSetWithStreams(
+            SetRecordEntity(
+                sessionId = sessionId,
+                orderIdx = orderIdx,
+                exerciseId = set.exerciseId,
+                exerciseName = set.exerciseName,
+                loadKg = set.loadKg,
+                plannedLoadKg = set.plannedLoadKg,
+                actualReps = set.manualReps ?: set.analysis.reps.size,
+                repsManual = set.manualReps != null,
+                plannedReps = set.plannedReps,
+                actualDurationS = set.actualDurationS,
+                plannedDurationS = set.plannedDurationS,
+                side = set.side,
+                rpe = set.rpe,
+                failed = set.failed,
+                warmup = set.warmup,
+                tempo = set.tempo,
+                targetMeanConVelMps = set.targetMeanConVelMps,
+                velocityLossStopPct = set.velocityLossStopPct,
+                plannedRestS = set.plannedRestS,
+                startedAtMs = set.startedAtMs,
+                endedAtMs = set.endedAtMs,
+                analysisJson = json.encodeToString(SetAnalysis.serializer(), set.analysis),
+                hrEndOfSetBpm = set.hrSamples.lastOrNull()?.bpm,
+                hrAvgBpm = if (hr.isEmpty()) null else hr.average().toInt(),
+                hrMaxBpm = hr.maxOrNull(),
+            ),
+            streams,
+        )
     }
 
     suspend fun endSession(sessionId: Long, endedAtMs: Long, hrvRmssdMs: Double? = null) {
