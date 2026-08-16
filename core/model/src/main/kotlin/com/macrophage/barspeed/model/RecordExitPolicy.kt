@@ -77,18 +77,31 @@ object RecordExitPolicy {
      * The prompt to raise before leaving [stage], or [ExitPrompt.NONE] to leave
      * at once.
      *
-     * This is a characterization of what ships today: Back pops the record
-     * screen from every stage, with no prompt anywhere, because the top bar's
-     * Back button sits outside every stage branch and no `BackHandler` exists
-     * to intercept the system gesture. The differentials that change it follow
-     * in their own commit.
+     * Three stages leave at once, and that is a decision rather than an
+     * omission. SETUP has started nothing. READY holds a chosen plan session
+     * and nothing else: the session row is not created until the first set is
+     * recorded, no set is in flight, and the foreground service has not been
+     * started — and it cannot be reached with sets already behind it, because
+     * `startNextSet` writes READY and calls `beginSet` in the same frame.
+     * FINISHED has already written everything and stopped the service.
+     * Prompting at any of the three would cost the prompt that matters its
+     * credibility: a gate that fires where nothing is at risk teaches the
+     * lifter to dismiss it without reading.
+     *
+     * IN_SET is ranked first for consequence. Nothing of the set in progress
+     * has reached the database, so leaving destroys it outright, and on a
+     * session's first set the session row goes with it.
+     *
+     * RESTING loses less and still loses something no reprocessing can get
+     * back. Every set is durably written by then, but the session row is open,
+     * and the R-R intervals collected across the rest window live only in
+     * memory — the per-set HR streams keep the in-set beats, nothing keeps
+     * these. The last set's rep count and effort rating also stop being
+     * correctable, because the only screen that can edit them is this one.
      */
     fun promptFor(stage: Stage): ExitPrompt = when (stage) {
-        Stage.SETUP,
-        Stage.READY,
-        Stage.IN_SET,
-        Stage.RESTING,
-        Stage.FINISHED,
-        -> ExitPrompt.NONE
+        Stage.SETUP, Stage.READY, Stage.FINISHED -> ExitPrompt.NONE
+        Stage.IN_SET -> ExitPrompt.SET_IN_PROGRESS
+        Stage.RESTING -> ExitPrompt.SESSION_OPEN
     }
 }
