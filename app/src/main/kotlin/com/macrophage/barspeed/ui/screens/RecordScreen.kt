@@ -88,9 +88,19 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
     // guard on one is not a guard. Both ask [RecordExitPolicy] the same
     // question about the same stage, which is what stops them drifting apart.
     val prompt = RecordExitPolicy.promptFor(state.stage, state.setWrite)
-    var pendingExit by remember { mutableStateOf(ExitPrompt.NONE) }
+    // Whether the gate is open, not which gate it is. Storing the prompt here
+    // latched the policy's answer at the moment Back was pressed, and the answer
+    // moves underneath it: Back during a set write raises SET_SAVING, which says
+    // the set "will finish saving even if you leave"; if that write then fails,
+    // the policy switches to SET_UNSAVED, whose actions do not include leaving
+    // the session open at all. A latched copy kept drawing the old wording AND
+    // the old buttons, so the lifter left on a promise that had stopped being
+    // true and was never offered the retry that still had the set in memory.
+    // Reading the live value means the dialog cannot describe a state the app is
+    // no longer in.
+    var exitOpen by remember { mutableStateOf(false) }
     val onExitAction: (ExitAction) -> Unit = { action ->
-        pendingExit = ExitPrompt.NONE
+        exitOpen = false
         when (action) {
             ExitAction.STAY -> Unit
             // Closes the session row and stays put; the write runs on
@@ -105,11 +115,13 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
         if (prompt == ExitPrompt.NONE) {
             navController.popBackStack()
         } else {
-            pendingExit = prompt
+            exitOpen = true
         }
     }
     BackHandler(enabled = prompt != ExitPrompt.NONE, onBack = onBack)
-    ExitDialog(pendingExit, onExitAction)
+    // A prompt that becomes NONE while the dialog is open closes it, which is
+    // the right outcome: NONE is the policy saying nothing is at risk any more.
+    ExitDialog(if (exitOpen) prompt else ExitPrompt.NONE, onExitAction)
 
     Scaffold(
         topBar = {
