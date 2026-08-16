@@ -54,6 +54,26 @@ interface SessionDao {
     @Insert
     suspend fun insertRawStream(stream: RawStreamEntity): Long
 
+    /**
+     * A set row and every raw stream belonging to it, in one transaction.
+     *
+     * The streams carry a placeholder [RawStreamEntity.setId]; the real id is
+     * only known once the row is inserted, so it is stamped here.
+     *
+     * Written as a loop over the existing single-row inserts rather than as a
+     * new list-taking `@Insert`, so that the DAO gains no abstract member: an
+     * abstract one would have to be implemented by every hand-written fake,
+     * which would force the commit that switches the caller to edit the test
+     * that guards it. Same shape as [PlanDao.activate], the only other
+     * `@Transaction` in this file.
+     */
+    @Transaction
+    suspend fun insertSetWithStreams(set: SetRecordEntity, streams: List<RawStreamEntity>): Long {
+        val setId = insertSet(set)
+        for (stream in streams) insertRawStream(stream.copy(setId = setId))
+        return setId
+    }
+
     @Query("SELECT * FROM sessions ORDER BY startedAtMs DESC")
     fun observeSessions(): Flow<List<SessionEntity>>
 

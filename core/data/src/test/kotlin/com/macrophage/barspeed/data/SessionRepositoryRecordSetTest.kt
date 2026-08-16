@@ -76,6 +76,22 @@ class SessionRepositoryRecordSetTest {
             return streams.size.toLong()
         }
 
+        /**
+         * Overridden only to record that it was called, then delegated to the
+         * real default body so the id-stamping under test is the DAO's and not
+         * a copy of it.
+         *
+         * Without this override the transaction boundary is invisible here. A
+         * fake that inherits the default runs that body against its own
+         * `insertSet` and `insertRawStream`, producing exactly the call
+         * sequence the un-transactional path produces -- so an assertion on
+         * those names alone stays green whether the write is wrapped or not.
+         */
+        override suspend fun insertSetWithStreams(set: SetRecordEntity, streams: List<RawStreamEntity>): Long {
+            calls += "insertSetWithStreams"
+            return super.insertSetWithStreams(set, streams)
+        }
+
         fun stream(kind: String): RawStreamEntity? = streams.firstOrNull { it.kind == kind }
 
         override fun observeSessions(): Flow<List<SessionEntity>> = flowOf(emptyList())
@@ -382,26 +398,34 @@ class SessionRepositoryRecordSetTest {
     // ---- call shape --------------------------------------------------------
 
     /**
-     * How the write is split across DAO calls, which is what decides whether it
-     * can be one transaction.
+     * The set row and every stream belonging to it must reach the DAO through
+     * one call, so that Room's `@Transaction` spans the whole write.
      *
-     * Today it cannot: the row goes in through `insertSet` and each stream
-     * through its own `insertRawStream`, with suspension points between them and
-     * no `@Transaction` anywhere on the path -- `PlanDao.activate` is the only
-     * one in the file. So a throw or a cancellation partway leaves a set row in
-     * history whose gzipped IMU stream, the artifact everything derived stays
+     * This does NOT verify that anything committed or rolled back. A fake
+     * cannot: the transaction is Room's, generated around the DAO method, and
+     * nothing at this seam executes SQLite. What it verifies is the property
+     * that carries atomicity -- that the repository has no interleaving point
+     * left between the row and its streams. Without that there is nothing for
+     * `@Transaction` to span, and a throw partway leaves a set row in history
+     * whose gzipped IMU stream, the artifact everything derived stays
      * recoverable from, is simply absent.
      *
-     * This assertion is the characterization of that. It is expected to be
-     * inverted by the commit that makes the write atomic, and it exists so that
-     * inverting it has to be deliberate.
+     * It is also what stops a fourth stream kind being added outside the
+     * wrapper later with nothing going red.
+     *
+     * The corrected pin. The version this replaces asserted the old sequence
+     * `insertSet` then three `insertRawStream`, and its commit body claimed it
+     * would be inverted by the transaction change. That claim was wrong and is
+     * retracted in this commit's body: the default `@Transaction` body issues
+     * exactly those same calls against the fake, so the old assertion passed
+     * both before and after the change and detected nothing.
      */
     @Test
-    fun `the row and each stream go in through separate DAO calls`() = runTest {
+    fun `the row and its streams reach the DAO as one transactional call`() = runTest {
         val dao = FakeSessionDao()
         repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet())
         assertEquals(
-            listOf("insertSet", "insertRawStream", "insertRawStream", "insertRawStream"),
+            listOf("insertSetWithStreams", "insertSet", "insertRawStream", "insertRawStream", "insertRawStream"),
             dao.calls,
         )
     }
