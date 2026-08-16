@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,9 +45,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.ExitAction
+import com.macrophage.barspeed.model.ExitPrompt
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlateMath
+import com.macrophage.barspeed.model.RecordExitPolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
+import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.record.PlannedSlot
@@ -54,7 +59,6 @@ import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
 import com.macrophage.barspeed.record.SetRating
-import com.macrophage.barspeed.record.Stage
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
 import com.macrophage.barspeed.ui.components.ProgressRing
@@ -78,12 +82,40 @@ private const val RING_WINDOW_SCALE = 1.5f
 fun RecordScreen(navController: NavController, viewModel: RecordViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
 
+    // Back has two routes out of this screen — the top bar's button and the
+    // system gesture — and the lifter uses whichever is nearer the thumb, so a
+    // guard on one is not a guard. Both ask [RecordExitPolicy] the same
+    // question about the same stage, which is what stops them drifting apart.
+    val prompt = RecordExitPolicy.promptFor(state.stage)
+    var pendingExit by remember { mutableStateOf(ExitPrompt.NONE) }
+    val onExitAction: (ExitAction) -> Unit = { action ->
+        pendingExit = ExitPrompt.NONE
+        when (action) {
+            ExitAction.STAY -> Unit
+            // Closes the session row and stays put; the write runs on
+            // viewModelScope, so popping here would race it.
+            ExitAction.FINISH_SESSION -> viewModel.finishSession()
+            ExitAction.DISCARD_SET_AND_LEAVE, ExitAction.LEAVE_SESSION_OPEN -> {
+                navController.popBackStack()
+            }
+        }
+    }
+    val onBack: () -> Unit = {
+        if (prompt == ExitPrompt.NONE) {
+            navController.popBackStack()
+        } else {
+            pendingExit = prompt
+        }
+    }
+    BackHandler(enabled = prompt != ExitPrompt.NONE, onBack = onBack)
+    ExitDialog(pendingExit, onExitAction)
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(titleFor(state)) },
                 navigationIcon = {
-                    TextButton(onClick = { navController.popBackStack() }) { Text("Back") }
+                    TextButton(onClick = onBack) { Text("Back") }
                 },
                 actions = {
                     Row(
@@ -122,6 +154,104 @@ private fun titleFor(state: RecordState): String = when (state.stage) {
     Stage.IN_SET -> ""
     Stage.RESTING -> "Rest"
     Stage.FINISHED -> "Session complete"
+}
+
+/**
+ * The gate on the way out, drawn from whatever [ExitPrompt] the policy named.
+ *
+ * The buttons come from `prompt.actions`, so the offered exits are the ones
+ * that module's tests pin; only the wording and the layout are decided here.
+ * Material3's `AlertDialog` has two button slots, not three, which is what
+ * splits the layout in two:
+ *
+ *  - One way out: it takes `confirmButton`, in red when it destroys something,
+ *    and the way back takes `dismissButton`. This is the delete-session
+ *    dialog's shape (`SessionDetailScreen`).
+ *  - Several ways out: they go in the body column and `confirmButton` carries
+ *    the way back, which is the switch-exercise dialog's shape above.
+ *
+ * `onDismissRequest` — the scrim tap and the back press that dismisses the
+ * dialog itself — maps to [ExitAction.STAY] in both shapes. Nothing here is
+ * covered by a test at any commit: `:app` has no test source set, so this
+ * mapping was verified by reading it, and by nothing else.
+ */
+@Composable
+private fun ExitDialog(prompt: ExitPrompt, onAction: (ExitAction) -> Unit) {
+    if (prompt == ExitPrompt.NONE) return
+    val leaves = prompt.actions.filter { it != ExitAction.STAY }
+    val single = leaves.singleOrNull()
+    if (single != null) {
+        AlertDialog(
+            onDismissRequest = { onAction(ExitAction.STAY) },
+            title = { Text(exitTitle(prompt)) },
+            text = { Text(exitBody(prompt), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub) },
+            confirmButton = { ExitButton(prompt, single, onAction) },
+            dismissButton = { ExitButton(prompt, ExitAction.STAY, onAction) },
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = { onAction(ExitAction.STAY) },
+            title = { Text(exitTitle(prompt)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(exitBody(prompt), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+                    leaves.forEach { action ->
+                        ExitButton(prompt, action, onAction, Modifier.fillMaxWidth())
+                    }
+                }
+            },
+            confirmButton = { ExitButton(prompt, ExitAction.STAY, onAction) },
+        )
+    }
+}
+
+@Composable
+private fun ExitButton(
+    prompt: ExitPrompt,
+    action: ExitAction,
+    onAction: (ExitAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    TextButton(onClick = { onAction(action) }, modifier = modifier) {
+        Text(exitLabel(prompt, action), color = exitColor(action))
+    }
+}
+
+private fun exitTitle(prompt: ExitPrompt): String = when (prompt) {
+    ExitPrompt.NONE -> ""
+    ExitPrompt.SET_IN_PROGRESS -> "Discard this set?"
+    ExitPrompt.SESSION_OPEN -> "Leave the session?"
+}
+
+private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
+    ExitPrompt.NONE -> ""
+    // Names the save-and-end control that is already on this screen, below the
+    // fold: without it the choice reads as "lose the set or stay", which is a
+    // false pair while a control that ends the set properly sits underneath.
+    ExitPrompt.SET_IN_PROGRESS ->
+        "Nothing about this set has been saved — the reps, the sensor data and the effort rating all go. " +
+            "To keep it, tap Keep recording and end the set with the effort grid (or END SET EARLY) at the " +
+            "bottom of this screen."
+    // No word here may imply the session can be picked up again: nothing reads
+    // an open session row back into this screen, and the next set would open a
+    // second one.
+    ExitPrompt.SESSION_OPEN ->
+        "Every completed set is already saved. Finishing writes the session's end time and its heart-rate " +
+            "and HRV summary. Leaving without finishing leaves the session open, and nothing can finish it " +
+            "later. Either way the rest of the planned sets are dropped."
+}
+
+private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (action) {
+    ExitAction.DISCARD_SET_AND_LEAVE -> "Discard set"
+    ExitAction.FINISH_SESSION -> "Finish session"
+    ExitAction.LEAVE_SESSION_OPEN -> "Leave without finishing"
+    ExitAction.STAY -> if (prompt == ExitPrompt.SET_IN_PROGRESS) "Keep recording" else "Keep resting"
+}
+
+private fun exitColor(action: ExitAction): Color = when (action) {
+    ExitAction.DISCARD_SET_AND_LEAVE -> BarColors.Red
+    ExitAction.LEAVE_SESSION_OPEN -> BarColors.Sub
+    else -> Color.Unspecified
 }
 
 @Composable

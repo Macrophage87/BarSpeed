@@ -23,6 +23,7 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.SetLoadPolicy
+import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.VoiceCue
@@ -34,8 +35,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-enum class Stage { SETUP, READY, IN_SET, RESTING, FINISHED }
 
 /**
  * How the set felt, tapped at the moment the set ends. The effort grid IS the
