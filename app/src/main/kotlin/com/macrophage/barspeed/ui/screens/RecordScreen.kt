@@ -1132,7 +1132,13 @@ private fun FeedbackChips(feedback: SetFeedback, hrBpm: Int?, hrvMs: Int? = null
                 },
             )
         }
-        analysis.tempoCompliance?.let { compliance ->
+        // No gradeable rep means no ratio to show. Drawing it anyway printed
+        // "Tempo 0/0 ✓" in the OK tone, because 0 == 0 -- a green tick over a
+        // set nothing graded. On the history screen that tick sits in the same
+        // Card as the "No reps detected" verdict; here the verdict text does
+        // not render for a rep set, so the tick appears beside a "0 ×" header
+        // with nothing to contradict it.
+        analysis.tempoCompliance?.takeIf { it.repsEvaluated > 0 }?.let { compliance ->
             val ok = compliance.repsFullyCompliant == compliance.repsEvaluated
             VerdictChip(
                 "Tempo ${compliance.repsFullyCompliant}/${compliance.repsEvaluated}" + if (ok) " ✓" else "",
@@ -1237,7 +1243,15 @@ private fun EccTempoChart(analysis: SetAnalysis, targetEccS: Double) {
     PowerLine(analysis)
     val worst = eccTimes.withIndex().maxByOrNull { kotlin.math.abs(it.value - targetEccS) }
     val insight =
-        if (worst == null || kotlin.math.abs(worst.value - targetEccS) <= TEMPO_TOLERANCE_S) {
+        if (worst == null) {
+            // Every rep was counted on the drive alone, so the chart above is
+            // empty. Saying "All reps on tempo" here states that an unmeasured
+            // phase was on tempo -- the same defect as the ratio, in words.
+            // Say only what is known: this branch is also reached when NOTHING
+            // was graded (an "X" up stroke leaves the eccentric as the only
+            // scored phase), so it must not claim the drive was graded either.
+            "Eccentric not measured this set."
+        } else if (kotlin.math.abs(worst.value - targetEccS) <= TEMPO_TOLERANCE_S) {
             "All reps on tempo."
         } else {
             val delta = targetEccS - worst.value

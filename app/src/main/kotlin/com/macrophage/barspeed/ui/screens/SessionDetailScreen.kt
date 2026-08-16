@@ -247,7 +247,10 @@ private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis) {
                 },
             )
         }
-        analysis.tempoCompliance?.let { compliance ->
+        // Same guard as the rest screen: 0/0 is not a score, and 0 == 0 drew it
+        // as a green tick. History reads stored analyses, so sets recorded
+        // before the denominator fix still show their old ratio here.
+        analysis.tempoCompliance?.takeIf { it.repsEvaluated > 0 }?.let { compliance ->
             val ok = compliance.repsFullyCompliant == compliance.repsEvaluated
             VerdictChip(
                 "Tempo ${compliance.repsFullyCompliant}/${compliance.repsEvaluated}" + if (ok) " ✓" else "",
