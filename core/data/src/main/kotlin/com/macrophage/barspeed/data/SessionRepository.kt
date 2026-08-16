@@ -144,8 +144,35 @@ class SessionRepository(
         )
     }
 
+    /**
+     * Close a session: stamp when it ended and summarise its heart rate.
+     *
+     * Written once per session or never. [SessionDao.updateSession] has one
+     * caller and it is this function, so nothing corrects these four columns
+     * afterwards, and a session that is already closed is therefore left exactly
+     * as it is.
+     *
+     * That guard is not only about a duplicated end time. [hrvRmssdMs] is an
+     * argument with a null default, copied onto the row unconditionally, so a
+     * caller that omits it used to erase a stored HRV -- the one figure here
+     * that cannot be rebuilt from anything durable, its input being R-R
+     * intervals collected across the rest windows and held in memory in `:app`.
+     * The heart-rate summary is recomputed from the set rows on every call, so a
+     * later close would also replace a correct summary with one drawn from a set
+     * list that has since changed.
+     *
+     * What it does not do, said plainly. Two callers already suspended inside
+     * this function can both read a null end time before either writes, and that
+     * is reachable: the rest screen's Finish button is an undebounced
+     * `TextButton`, so two taps launch two coroutines. The guard closes the
+     * sequential case, which is the common one; re-entry is refused in the
+     * ViewModel, which is where the concurrent case is actually closed. A
+     * `Mutex` here would be the wrong instrument for a residue whose whole harm
+     * is an end time and an HRV differing by the gap between two taps.
+     */
     suspend fun endSession(sessionId: Long, endedAtMs: Long, hrvRmssdMs: Double? = null) {
         val session = sessionDao.sessionById(sessionId) ?: return
+        if (session.endedAtMs != null) return
         val sets = sessionDao.setsForSession(sessionId)
         val avg = sets.mapNotNull { it.hrAvgBpm }
         sessionDao.updateSession(

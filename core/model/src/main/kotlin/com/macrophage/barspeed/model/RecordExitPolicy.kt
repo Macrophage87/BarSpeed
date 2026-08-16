@@ -266,14 +266,9 @@ object RecordExitPolicy {
             }
         Stage.RESTING ->
             when (close) {
-                // Every branch is the same answer in this commit, on purpose:
-                // the parameter arrives here before the behaviour does, so this
-                // commit changes nothing and the differentials that follow can
-                // be shown failing against it.
-                SessionCloseState.NONE,
-                SessionCloseState.IN_FLIGHT,
-                SessionCloseState.FAILED,
-                -> ExitPrompt.SESSION_OPEN
+                SessionCloseState.NONE -> ExitPrompt.SESSION_OPEN
+                SessionCloseState.IN_FLIGHT -> ExitPrompt.SESSION_CLOSING
+                SessionCloseState.FAILED -> ExitPrompt.SESSION_NOT_CLOSED
             }
     }
 }

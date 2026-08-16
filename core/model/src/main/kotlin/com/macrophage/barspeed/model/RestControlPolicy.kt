@@ -45,13 +45,16 @@ object RestControlPolicy {
      * be placed in every state rather than defaulting into all of them.
      */
     fun controls(close: SessionCloseState): Set<RestControl> = when (close) {
-        // Every branch is the same answer in this commit, on purpose: the
-        // decision arrives here before the behaviour does, so this commit
-        // changes nothing and the differentials that follow can be shown
-        // failing against it.
-        SessionCloseState.NONE,
-        SessionCloseState.IN_FLIGHT,
-        SessionCloseState.FAILED,
-        -> setOf(RestControl.START_NEXT_SET, RestControl.FINISH_SESSION)
+        SessionCloseState.NONE -> setOf(RestControl.START_NEXT_SET, RestControl.FINISH_SESSION)
+        // Empty, and empty is the answer rather than an omission. There is
+        // nothing useful to tap while the close is landing, and the one thing a
+        // lifter might reach for -- starting the next set -- is the thing that
+        // destroys a set here.
+        SessionCloseState.IN_FLIGHT -> emptySet()
+        // The session is open again, so continuing is legitimate. The retry
+        // replaces the finish rather than joining it: two controls that both
+        // close the session would be two ways to launch the same work, from
+        // different inputs, and one of them would be the wrong one.
+        SessionCloseState.FAILED -> setOf(RestControl.START_NEXT_SET, RestControl.RETRY_FINISH)
     }
 }
