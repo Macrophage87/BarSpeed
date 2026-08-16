@@ -51,14 +51,14 @@ If you are unsure whether a question is checkable or judgment, it is judgment. E
 - `./gradlew --version` exits 0 while every real task fails.
 - `-PjvmOnly` is a *presence* check, so `-PjvmOnly=false` still excludes the three Android modules.
 - `gh run list --commit <short-sha>` returns `[]`, which reads identically to "no CI ran". Require the full 40 characters.
-- A SHA on both `main` and a `claude/**` branch produces **two** `Build, lint, test` check-runs; a branch-only SHA produces **one**. Read every row or scope by branch — reading row [0] is a coin flip. Two runs of one workflow on one runner pool is a flake check, not independent evidence.
+- **Never infer anything from the NUMBER of runs — read the `event` field.** `ci.yml` fires on `push` (for `main` and `claude/**`) **and** `pull_request`, so a branch-only SHA can already carry two runs if that branch has an open PR, and landing on `main` adds a third — a count of two is not proof the SHA lives on two refs. `event` and `headBranch` are fields on `gh run list --json databaseId,event,headBranch,status,conclusion,url`, not on the narrower `commits/<SHA>/check-runs` object. Read every row's `event`, or scope by branch — reading row [0] is a coin flip. Two runs that really are one workflow on one runner pool for one SHA are a flake check, not independent evidence.
 - CI steps run sequentially with no `continue-on-error` and **ktlint + detekt runs first**, so a red run reporting a formatting error tells you nothing about tests, lint or the APK.
 
 ## Gate actions
 
 **Landing a commit on `main` and dispatching the Release workflow are gate actions.** Take them only when explicitly directed, and gate on CI as well as approval: an instruction, a stated Accept, and a green `Build, lint, test` on that exact SHA. Say plainly which condition failed.
 
-GitHub is not the backstop: protection on `main` requires the `Build, lint, test` context but has `enforce_admins=false` and **no review requirement**. Red commits have already reached `main`. The discipline comes from this loop.
+GitHub is a partial backstop now, not none: protection on `main` requires the `Build, lint, test` context and now also `enforce_admins` and `required_linear_history` — both true as of `gh api repos/Macrophage87/BarSpeed/branches/main/protection` (re-check; both were false when this file was first written) — but there is still **no review requirement**. A red commit reached `main` before enforce_admins was turned on. The discipline still comes primarily from this loop.
 
 Posting write-ups and naming `[Field]` items are **not** gate actions.
 
