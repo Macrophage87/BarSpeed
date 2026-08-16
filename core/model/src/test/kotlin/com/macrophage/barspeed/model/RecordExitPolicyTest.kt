@@ -8,10 +8,10 @@ import kotlin.test.assertTrue
 /**
  * What Back does on the record screen.
  *
- * The two `(pre-fix)` pins below characterize what ships today — Back leaves at
- * once from every stage, including the two that have something to lose. They
- * are inverted by the differentials in the next commit; the `(pre-fix)` naming
- * follows `SetLoadPolicyTest`.
+ * The two `(pre-fix)` pins this file was created with have been replaced by
+ * their inversions below, named in the commit body: `back leaves at once from a
+ * set in progress (pre-fix)` and `back leaves at once while resting (pre-fix)`.
+ * The naming follows `SetLoadPolicyTest`.
  */
 class RecordExitPolicyTest {
     @Test
@@ -27,13 +27,17 @@ class RecordExitPolicyTest {
     }
 
     @Test
-    fun `back leaves at once from a set in progress (pre-fix)`() {
-        assertEquals(ExitPrompt.NONE, RecordExitPolicy.promptFor(Stage.IN_SET))
+    fun `back offers to discard the set being recorded`() {
+        // Nothing of this set is in the database yet, and on the session's
+        // first set the session row does not exist either.
+        assertEquals(ExitPrompt.SET_IN_PROGRESS, RecordExitPolicy.promptFor(Stage.IN_SET))
     }
 
     @Test
-    fun `back leaves at once while resting (pre-fix)`() {
-        assertEquals(ExitPrompt.NONE, RecordExitPolicy.promptFor(Stage.RESTING))
+    fun `back offers to close or abandon the open session while resting`() {
+        // Every set is written; what is still open is the session row, and the
+        // rest-window R-R intervals behind its HRV exist only in memory.
+        assertEquals(ExitPrompt.SESSION_OPEN, RecordExitPolicy.promptFor(Stage.RESTING))
     }
 
     @Test
