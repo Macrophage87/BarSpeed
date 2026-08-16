@@ -38,7 +38,13 @@ data class PhaseComplianceResult(
     val worstDeviationS: Double,
     val repsWithinTolerance: Int,
     val repsEvaluated: Int,
-    /** False for pauses: measured and reported, but deliberately not scored. */
+    /**
+     * False for pauses -- measured and reported, but deliberately not scored --
+     * and false for a prescribed movement phase that no rep resolved, because a
+     * phase with nothing behind it cannot be graded. This is the flag the export
+     * turns into `scoredPhases`, the coach's only statement of what the set's
+     * ratio actually covers.
+     */
     val scored: Boolean = true,
 )
 
@@ -47,8 +53,16 @@ data class TempoComplianceResult(
     val prescribed: Tempo,
     val toleranceS: Double,
     val phases: List<PhaseComplianceResult>,
-    /** Reps where every SCORED (movement) phase was within tolerance. */
+    /**
+     * Reps within tolerance on every scored (movement) phase THAT REP
+     * RESOLVED. A phase the sensor never measured is not held against the
+     * lifter, so this is not a uniform bar across reps: a drive-only rep
+     * clears an easier one than a rep that resolved both. [phases] carries
+     * the per-phase counts, and [PhaseComplianceResult.scored] says which
+     * phases the set could be graded on at all.
+     */
     val repsFullyCompliant: Int,
+    /** Reps that resolved at least one scored phase. Reps that resolved none are excluded, not failed. */
     val repsEvaluated: Int,
     /** Prescribed eccentric:concentric contrast — the ratio the block trains. */
     val prescribedEccConRatio: Double? = null,
@@ -237,15 +251,19 @@ object SetAnalyzer {
                     repsWithinTolerance =
                     if (scorable) actuals.count { abs(it - def.prescribed!!) <= toleranceS } else 0,
                     repsEvaluated = if (scorable) actuals.size else 0,
-                    scored = scorable,
+                    scored = scorable && actuals.isNotEmpty(),
                 )
             }
         val scoredDefs = defs.filter { it.scored && it.prescribed != null }
+        // A rep is gradeable once at least one scored phase resolved for it.
+        // A rep that resolved none is an absence, not a failure; counting it
+        // as one is what graded a set of on-tempo drives as 0 of N.
+        val gradeable = reps.filter { rep -> scoredDefs.any { def -> def.actual(rep) != null } }
         val fullyCompliant =
-            reps.count { rep ->
+            gradeable.count { rep ->
                 scoredDefs.all { def ->
                     val actual = def.actual(rep)
-                    actual != null && abs(actual - def.prescribed!!) <= toleranceS
+                    actual == null || abs(actual - def.prescribed!!) <= toleranceS
                 }
             }
         return TempoComplianceResult(
@@ -253,7 +271,7 @@ object SetAnalyzer {
             toleranceS = toleranceS,
             phases = phaseResults,
             repsFullyCompliant = fullyCompliant,
-            repsEvaluated = reps.size,
+            repsEvaluated = gradeable.size,
             prescribedEccConRatio = ratioOf(schedule.eccentricS, schedule.concentricS),
             actualEccConRatio =
             ratioOf(

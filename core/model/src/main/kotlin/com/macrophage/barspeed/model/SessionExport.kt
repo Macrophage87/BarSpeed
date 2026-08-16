@@ -116,15 +116,28 @@ data class RepMetricsExport(
     @SerialName("meanConPower_w") val meanConPowerW: Double? = null,
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class TempoComplianceExport(
     val prescribed: String,
     @SerialName("tolerance_s") val toleranceS: Double,
-    /** Reps within tolerance on the SCORED phases; pauses are reported, not scored. */
+    /**
+     * Reps within tolerance on every scored phase THAT REP RESOLVED, out of
+     * [of], the reps that resolved at least one. Pauses are reported but
+     * never scored. A phase the sensor did not measure is not counted against
+     * the lifter and does not appear in [scoredPhases], so read that field to
+     * know what this ratio covers: on a slow concentric-first lift it is
+     * often the drive alone. `of: 0` means nothing was gradeable.
+     */
     val withinTolerance: Int,
     val of: Int,
-    /** Which phases were scored — the movement digits only. */
-    val scoredPhases: List<String> = emptyList(),
+    /**
+     * Which phases were scored — the movement digits only, and only those
+     * actually measured. Always written, including empty: the exporter drops
+     * defaults, and an absent key reads as "not stated" when it means
+     * "nothing was graded".
+     */
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val scoredPhases: List<String> = emptyList(),
     /** Prescribed eccentric:concentric contrast — what a tempo block actually trains. */
     val prescribedEccConRatio: Double? = null,
     val actualEccConRatio: Double? = null,
