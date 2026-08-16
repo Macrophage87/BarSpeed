@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.BlePermissionStep
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
 import com.macrophage.barspeed.model.ExitPrompt
@@ -64,6 +65,9 @@ import com.macrophage.barspeed.record.SetFeedback
 import com.macrophage.barspeed.record.SetRating
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
+import com.macrophage.barspeed.ui.components.LocalBlePermissionUi
+import com.macrophage.barspeed.ui.components.PermissionBanner
+import com.macrophage.barspeed.ui.components.PermissionBannerBody
 import com.macrophage.barspeed.ui.components.ProgressRing
 import com.macrophage.barspeed.ui.components.RepBars
 import com.macrophage.barspeed.ui.components.SectionCaption
@@ -326,15 +330,26 @@ private fun exitColor(action: ExitAction): Color = when (action) {
 @Composable
 private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
     if (!state.imuConnected) {
+        // The permission banner replaces this card's advice rather than sitting
+        // beside it. "Pair or power on the WitMotion sensor" names the two
+        // causes it cannot be when the permission is the cause, and a lifter
+        // who follows it changes a battery that was never flat. The demo chip
+        // below is a sibling in this Column and stays either way: it is the
+        // only demo toggle on this screen.
+        val permissionHeld by LocalBlePermissionUi.current.step.collectAsState()
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp)) {
                 Text("Bar sensor not connected", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "Pair or power on the WitMotion sensor, or enable demo mode to try the app " +
-                        "with synthesized data.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = BarColors.Sub,
-                )
+                if (permissionHeld == BlePermissionStep.GRANTED) {
+                    Text(
+                        "Pair or power on the WitMotion sensor, or enable demo mode to try the app " +
+                            "with synthesized data.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BarColors.Sub,
+                    )
+                } else {
+                    PermissionBannerBody(demoMode = state.demoMode)
+                }
                 FilterChip(
                     selected = state.demoMode,
                     onClick = viewModel::toggleDemoMode,
@@ -383,6 +398,11 @@ private fun AudioCueChip(state: RecordState, viewModel: RecordViewModel) {
 
 @Composable
 private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
+    // READY carries START SET, so it is the last screen before a set that would
+    // record nothing. It renders at most once per session -- startNextSet writes
+    // READY and calls beginSet in the same frame -- which is why RESTING carries
+    // this too.
+    PermissionBanner(demoMode = state.demoMode)
     val slot = state.currentSlot
     if (slot != null) {
         if (slot.isExerciseChange) {
@@ -1085,6 +1105,9 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel) {
 private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     RestHeader(state)
     Spacer(Modifier.height(6.dp))
+    // Sets two onwards start from here, not from READY, and this is the screen
+    // where the lifter has a rest period to spend fixing it.
+    PermissionBanner(demoMode = state.demoMode)
     // The effort tile is tapped mid-workout to end the set, so give a mistap
     // somewhere to go rather than baking it into the record.
     var changingEffort by remember(state.setsCompleted) { mutableStateOf(false) }

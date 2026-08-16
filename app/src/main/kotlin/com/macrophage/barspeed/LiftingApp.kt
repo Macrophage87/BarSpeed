@@ -27,6 +27,12 @@ class AppContainer(app: Application) {
     val bleScanner = BleScanner()
     val autoConnect = AutoConnectManager(app, deviceRegistry, appScope)
     val settings = SettingsStore(app)
+
+    /**
+     * Process-scoped, and holding enums only. See [BlePermissionGate] for why
+     * neither the Activity nor the launcher may be parked here.
+     */
+    val blePermissionGate = BlePermissionGate()
 }
 
 class LiftingApp : Application() {

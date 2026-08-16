@@ -38,6 +38,7 @@ import androidx.navigation.NavController
 import com.macrophage.barspeed.ble.ConnectionState
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
+import com.macrophage.barspeed.ui.components.PermissionBanner
 import com.macrophage.barspeed.ui.components.SectionCaption
 import com.macrophage.barspeed.ui.components.SensorDot
 import com.macrophage.barspeed.ui.components.Sparkline
@@ -138,6 +139,12 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
         ) {
+            // Above the hero card because this is the first screen of every
+            // cold launch and the one the first permission dialog opens over.
+            // Deliberately compact: this Column has no verticalScroll and the
+            // history LazyColumn below is unweighted, so anything added here
+            // comes out of the history list with no way to scroll it back.
+            PermissionBanner()
             HeroCard(state) { navController.navigate("record") }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {

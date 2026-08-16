@@ -29,6 +29,7 @@ import androidx.navigation.NavController
 import com.macrophage.barspeed.ble.ConnectionState
 import com.macrophage.barspeed.ble.DeviceRole
 import com.macrophage.barspeed.ui.components.ConnectionChip
+import com.macrophage.barspeed.ui.components.PermissionBanner
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +52,14 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            // The troubleshooting screen. The per-device reason line below is
+            // left alone rather than replaced: it reports one link's last
+            // failure and carries five other reasons besides this one, and it
+            // is driven by ConnectionState where this is driven by the gate.
+            // They disagree for up to one backoff period after a grant, because
+            // the client keeps its stale Failed until the next connect attempt.
+            PermissionBanner()
+            Spacer(Modifier.height(8.dp))
             Text("Paired sensors", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             if (known.isEmpty()) {
