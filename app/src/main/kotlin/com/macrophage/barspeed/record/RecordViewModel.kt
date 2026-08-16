@@ -865,9 +865,43 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             )
     }
 
+    /**
+     * The record flow's owner is going away: the "record" nav entry was popped
+     * — RecordScreen draws a Back button in the top bar in every stage — or the
+     * Activity is finishing.
+     *
+     * `viewModelScope` is ALREADY cancelled by the time this runs, so cleanup
+     * launched there would compile, run nothing, and report nothing.
+     * `ViewModel.clear()` closes the scope closeable and only then calls this;
+     * in lifecycle 2.8.7 that is `ViewModelImpl.clear()` walking
+     * `keyToCloseables`, where `viewModelScope` is registered under
+     * `...ViewModelCoroutineScope.JOB_KEY`, and `CloseableCoroutineScope.close`
+     * is a bare cancel of the context. Everything here is therefore called
+     * inline.
+     *
+     * The stop is unconditional and needs no flag of its own.
+     * [RecordingService.start] fires on every [beginSet], and [RecordingService.stop]
+     * was reachable only from [finishSession] — so leaving by any other route
+     * left the service running with nothing else able to stop it. Nothing is
+     * protected by keeping it up: both sample collectors are `viewModelScope`-
+     * bound and are cancelled with it, and `imuBuffer`/`hrBuffer` go with this
+     * instance, so no recording survives for the service to keep alive.
+     * `stopService` on a service that was never started is a no-op.
+     *
+     * This writes nothing to the database, deliberately. The session row is
+     * left open with `endedAtMs` null, which is the honest state and the only
+     * signal anywhere that the session was abandoned rather than finished.
+     * Closing it here would make the two shape-identical and permanently so:
+     * `SessionDao.updateSession` has one caller, so those columns are written
+     * once, and `SessionEntity.endedAtMs` has exactly one reader — `Exporters`,
+     * which builds the export under `explicitNulls = false` and so omits the
+     * key entirely while it is null. Closing an abandoned session is its own
+     * piece of work; see the commit body.
+     */
     override fun onCleared() {
         voice?.shutdown()
         voice = null
+        RecordingService.stop(getApplication())
         super.onCleared()
     }
 
