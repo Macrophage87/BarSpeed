@@ -62,6 +62,62 @@ enum class ExitPrompt(val actions: List<ExitAction>) {
 
     /** Every set is written, but the session row is still open. */
     SESSION_OPEN(listOf(ExitAction.FINISH_SESSION, ExitAction.LEAVE_SESSION_OPEN, ExitAction.STAY)),
+
+    /**
+     * The set has been ended and its durable write has not finished yet.
+     *
+     * [ExitAction.FINISH_SESSION] is deliberately absent, and that is the
+     * reason this member exists rather than reusing [SESSION_OPEN]. Closing the
+     * session reads back every set row to build the session's heart-rate
+     * summary, so a finish issued while a set insert is still outstanding
+     * computes that summary over a set list the set is missing from -- and the
+     * row is written once, so nothing corrects it afterwards.
+     *
+     * No action cancels the write. A prompt cannot offer to un-write a set
+     * whose insert is already in flight, and offering it would be a race
+     * dressed up as a choice.
+     */
+    SET_SAVING(listOf(ExitAction.LEAVE_SESSION_OPEN, ExitAction.STAY)),
+
+    /**
+     * The set was ended and its durable write failed.
+     *
+     * Distinct from [SET_IN_PROGRESS] even though the stage is the same and the
+     * actions match. The set is over, so the controls that end a set are gone;
+     * what the lifter has instead is a retry, and a prompt that pointed them at
+     * the effort grid here would name a control that is no longer on screen.
+     */
+    SET_UNSAVED(listOf(ExitAction.DISCARD_SET_AND_LEAVE, ExitAction.STAY)),
+}
+
+/**
+ * Where the set-end write has got to, which Back has to know about because the
+ * honest answer changes three times in the second or so after the effort tile
+ * is tapped.
+ *
+ * Deliberately three states rather than a flag. A boolean can say "saving or
+ * not", and the state that needs saying most -- the write came back and failed,
+ * the set is still only in memory -- is the one a boolean has to push into
+ * prose in `:app`, where nothing tests it.
+ *
+ * This is not [Stage]. The stage is `IN_SET` for all three: the record screen
+ * does not leave it until the write lands.
+ */
+enum class SetWriteState {
+    /** No set-end write is outstanding. Either none was started or one finished. */
+    NONE,
+
+    /** A set-end write is running now. */
+    IN_FLIGHT,
+
+    /**
+     * A set-end write came back failed and the set exists only in memory.
+     *
+     * Not folded into [NONE]. "Nothing is in flight" and "the last thing that
+     * flew was lost" are different facts, and only the second one is worth
+     * stopping the lifter over.
+     */
+    FAILED,
 }
 
 /**
@@ -98,10 +154,29 @@ object RecordExitPolicy {
      * memory — the per-set HR streams keep the in-set beats, nothing keeps
      * these. The last set's rep count and effort rating also stop being
      * correctable, because the only screen that can edit them is this one.
+     *
+     * [write] is required rather than defaulted so that a caller cannot keep
+     * compiling while silently answering the old question. It is read for
+     * `IN_SET` alone -- every other stage ignores it, which is pinned rather
+     * than assumed, because "cannot happen" and "is not looked at" are
+     * different guarantees and only the second one is this function's to make.
+     *
+     * As of this commit [write] is inert: all three states map to the prompt
+     * the stage alone gave. It is branched on rather than ignored because
+     * detekt's `UnusedParameter` rejects a parameter that is accepted and never
+     * read, and because an exhaustive `when` here means the commit that adds a
+     * state cannot leave it silently answered by a fallback. The mapping
+     * arrives two commits later, after the differentials that fail against
+     * this version.
      */
-    fun promptFor(stage: Stage): ExitPrompt = when (stage) {
+    fun promptFor(stage: Stage, write: SetWriteState): ExitPrompt = when (stage) {
         Stage.SETUP, Stage.READY, Stage.FINISHED -> ExitPrompt.NONE
-        Stage.IN_SET -> ExitPrompt.SET_IN_PROGRESS
+        Stage.IN_SET ->
+            when (write) {
+                SetWriteState.NONE -> ExitPrompt.SET_IN_PROGRESS
+                SetWriteState.IN_FLIGHT -> ExitPrompt.SET_IN_PROGRESS
+                SetWriteState.FAILED -> ExitPrompt.SET_IN_PROGRESS
+            }
         Stage.RESTING -> ExitPrompt.SESSION_OPEN
     }
 }

@@ -51,6 +51,7 @@ import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlateMath
 import com.macrophage.barspeed.model.RecordExitPolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
+import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.WeightUnit
@@ -86,7 +87,13 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
     // system gesture — and the lifter uses whichever is nearer the thumb, so a
     // guard on one is not a guard. Both ask [RecordExitPolicy] the same
     // question about the same stage, which is what stops them drifting apart.
-    val prompt = RecordExitPolicy.promptFor(state.stage)
+    // SetWriteState.NONE is a placeholder, and the only value passed anywhere at
+    // this commit. Nothing in the ViewModel tracks the set-end write yet, so
+    // ExitPrompt.SET_SAVING and SET_UNSAVED are unreachable from here and their
+    // wording below is dead until the commit that makes the write outlive this
+    // screen. Passing it explicitly is the point: the parameter is required, so
+    // the commit that starts tracking the write cannot forget this call site.
+    val prompt = RecordExitPolicy.promptFor(state.stage, SetWriteState.NONE)
     var pendingExit by remember { mutableStateOf(ExitPrompt.NONE) }
     val onExitAction: (ExitAction) -> Unit = { action ->
         pendingExit = ExitPrompt.NONE
@@ -221,6 +228,8 @@ private fun exitTitle(prompt: ExitPrompt): String = when (prompt) {
     ExitPrompt.NONE -> ""
     ExitPrompt.SET_IN_PROGRESS -> "Discard this set?"
     ExitPrompt.SESSION_OPEN -> "Leave the session?"
+    ExitPrompt.SET_SAVING -> "This set is still saving"
+    ExitPrompt.SET_UNSAVED -> "This set did not save"
 }
 
 private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
@@ -239,13 +248,36 @@ private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
         "Every completed set is already saved. Finishing writes the session's end time and its heart-rate " +
             "and HRV summary. Leaving without finishing leaves the session open, and nothing can finish it " +
             "later. Either way the rest of the planned sets are dropped."
+    // Says nothing about whether leaving is safe for the set, because at this
+    // commit it is not: the write still runs on a scope the pop cancels, and
+    // the commit that changes that also rewrites this string. Nothing renders
+    // it meanwhile -- see the note on the promptFor call above.
+    ExitPrompt.SET_SAVING ->
+        "This set is being written to your history now. Wait for the rest screen before finishing the " +
+            "session: finishing while a set is still saving leaves that set out of the session's " +
+            "heart-rate and HRV summary, and nothing rewrites it afterwards."
+    ExitPrompt.SET_UNSAVED ->
+        "This set could not be written to your history. It is still held in memory, so tapping SAVE THIS " +
+            "SET AGAIN on this screen can still store it — freeing some space on the phone first if that " +
+            "is what stopped it. Leaving now loses the reps, the sensor data and the effort rating."
 }
 
 private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (action) {
     ExitAction.DISCARD_SET_AND_LEAVE -> "Discard set"
     ExitAction.FINISH_SESSION -> "Finish session"
     ExitAction.LEAVE_SESSION_OPEN -> "Leave without finishing"
-    ExitAction.STAY -> if (prompt == ExitPrompt.SET_IN_PROGRESS) "Keep recording" else "Keep resting"
+    // Per prompt, not a two-way test with a fallback. The fallback read "Keep
+    // resting" for anything that was not a set in progress, so a new prompt got
+    // the rest screen's wording by default -- offered to a lifter standing over
+    // a loaded bar, with no compile error, no lint and no test to catch it.
+    ExitAction.STAY ->
+        when (prompt) {
+            ExitPrompt.NONE -> ""
+            ExitPrompt.SET_IN_PROGRESS -> "Keep recording"
+            ExitPrompt.SESSION_OPEN -> "Keep resting"
+            ExitPrompt.SET_SAVING -> "Stay here"
+            ExitPrompt.SET_UNSAVED -> "Keep this set"
+        }
 }
 
 private fun exitColor(action: ExitAction): Color = when (action) {
