@@ -3,6 +3,7 @@ package com.macrophage.barspeed.model
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -13,10 +14,10 @@ import kotlin.test.assertTrue
  * set in progress (pre-fix)` and `back leaves at once while resting (pre-fix)`.
  * The naming follows `SetLoadPolicyTest`.
  *
- * [SetWriteState] arrives inert: the pins in `the write state is not read yet`
- * below say so, and are themselves `(pre-fix)` -- they characterise a parameter
- * that is accepted and ignored, and two of them are expected to be replaced by
- * their inversions once the mapping lands.
+ * The two `(pre-fix)` pins added with [SetWriteState] -- `the write state is not
+ * read yet, in flight (pre-fix)` and `the write state is not read yet, failed
+ * (pre-fix)` -- have been replaced by their inversions below, named here for
+ * the same reason the first pair are.
  */
 class RecordExitPolicyTest {
     @Test
@@ -133,22 +134,74 @@ class RecordExitPolicyTest {
         )
     }
 
-    // ---- the write state, inert at this commit -----------------------------
+    // ---- the write state ---------------------------------------------------
 
     /**
-     * `(pre-fix)`. [SetWriteState] is accepted and not read. Both of these are
-     * expected to be replaced by their inversions two commits from now; they
-     * exist so that the change is a replaced assertion rather than a new one
-     * appearing beside silence.
+     * A set whose write is in flight must not be offered the discard prompt.
+     *
+     * That prompt's body tells the lifter that nothing about the set has been
+     * saved and that everything goes. Once the write outlives the screen that
+     * is false in the direction that reads as a bug: the lifter is told the set
+     * is destroyed, taps Discard, and finds it in their history.
      */
     @Test
-    fun `the write state is not read yet, in flight (pre-fix)`() {
-        assertEquals(ExitPrompt.SET_IN_PROGRESS, RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.IN_FLIGHT))
+    fun `back names the set as saving rather than as discardable`() {
+        assertEquals(ExitPrompt.SET_SAVING, RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.IN_FLIGHT))
     }
 
     @Test
-    fun `the write state is not read yet, failed (pre-fix)`() {
-        assertEquals(ExitPrompt.SET_IN_PROGRESS, RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.FAILED))
+    fun `a set still saving is never offered the discard prompt`() {
+        assertNotEquals(
+            ExitPrompt.SET_IN_PROGRESS,
+            RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.IN_FLIGHT),
+        )
+    }
+
+    /**
+     * A failed write is its own answer, not the in-progress one.
+     *
+     * The set is over by then, so the in-progress body would point the lifter
+     * at the effort grid and END SET EARLY -- controls that are no longer
+     * drawn. Naming a control that is not on screen is worse than naming none.
+     */
+    @Test
+    fun `back names the set as unsaved after the write failed`() {
+        assertEquals(ExitPrompt.SET_UNSAVED, RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.FAILED))
+    }
+
+    @Test
+    fun `a failed write does not reuse the in-progress prompt`() {
+        assertNotEquals(
+            ExitPrompt.SET_IN_PROGRESS,
+            RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.FAILED),
+        )
+    }
+
+    /**
+     * The three in-set answers must be three different prompts.
+     *
+     * Collapsing any two of them is how the wording goes wrong: each carries a
+     * different statement about where the set actually is, and a shared prompt
+     * can only be right about one of them.
+     */
+    @Test
+    fun `each write state gets its own answer in-set`() {
+        val answers = SetWriteState.entries.map { RecordExitPolicy.promptFor(Stage.IN_SET, it) }
+        assertEquals(answers.size, answers.toSet().size, "in-set prompts collapsed: $answers")
+    }
+
+    /**
+     * The ordering guard, asked of the policy rather than of the enum.
+     *
+     * The session's heart-rate summary is built by reading the set rows back,
+     * so a finish offered while an insert is outstanding summarises a list that
+     * set is missing from, once, with nothing to correct it afterwards.
+     */
+    @Test
+    fun `no finish is offered while a set write is in flight`() {
+        assertFalse(
+            ExitAction.FINISH_SESSION in RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.IN_FLIGHT).actions,
+        )
     }
 
     /**
