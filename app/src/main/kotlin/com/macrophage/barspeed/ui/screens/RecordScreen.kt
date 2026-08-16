@@ -50,6 +50,8 @@ import com.macrophage.barspeed.model.ExitPrompt
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlateMath
 import com.macrophage.barspeed.model.RecordExitPolicy
+import com.macrophage.barspeed.model.RestControl
+import com.macrophage.barspeed.model.RestControlPolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.Stage
@@ -87,7 +89,7 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
     // system gesture — and the lifter uses whichever is nearer the thumb, so a
     // guard on one is not a guard. Both ask [RecordExitPolicy] the same
     // question about the same stage, which is what stops them drifting apart.
-    val prompt = RecordExitPolicy.promptFor(state.stage, state.setWrite)
+    val prompt = RecordExitPolicy.promptFor(state.stage, state.setWrite, state.sessionClose)
     // Whether the gate is open, not which gate it is. Storing the prompt here
     // latched the policy's answer at the moment Back was pressed, and the answer
     // moves underneath it: Back during a set write raises SET_SAVING, which says
@@ -106,7 +108,13 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
             // Closes the session row and stays put; the write runs on
             // viewModelScope, so popping here would race it.
             ExitAction.FINISH_SESSION -> viewModel.finishSession()
-            ExitAction.DISCARD_SET_AND_LEAVE, ExitAction.LEAVE_SESSION_OPEN -> {
+            ExitAction.DISCARD_SET_AND_LEAVE,
+            ExitAction.LEAVE_SESSION_OPEN,
+            // Same navigation, a different promise. The close runs on a scope
+            // this pop cannot cancel, so leaving is safe and the session
+            // finishes either way; only the label the lifter read differs.
+            ExitAction.LEAVE_SESSION_CLOSING,
+            -> {
                 navController.popBackStack()
             }
         }
@@ -236,6 +244,8 @@ private fun exitTitle(prompt: ExitPrompt): String = when (prompt) {
     ExitPrompt.SESSION_OPEN -> "Leave the session?"
     ExitPrompt.SET_SAVING -> "This set is still saving"
     ExitPrompt.SET_UNSAVED -> "This set did not save"
+    ExitPrompt.SESSION_CLOSING -> "Finishing this session"
+    ExitPrompt.SESSION_NOT_CLOSED -> "This session did not finish"
 }
 
 private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
@@ -267,12 +277,28 @@ private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
         "This set could not be written to your history. It is still held in memory, so tapping SAVE THIS " +
             "SET AGAIN on this screen can still store it — freeing some space on the phone first if that " +
             "is what stopped it. Leaving now loses the reps, the sensor data and the effort rating."
+    // Says the finish lands either way, because it does: the close runs on a
+    // scope the pop cannot cancel. Nothing here offers to call it off — nothing
+    // can, and offering it would be a race dressed up as a choice.
+    ExitPrompt.SESSION_CLOSING ->
+        "You asked to finish this session and it is being written now. It will finish even if you leave, " +
+            "including the end time and the heart-rate and HRV summary. There is nothing left to decide here."
+    // The one prompt that must not undersell what is at stake. Session HRV is
+    // computed from beat-to-beat intervals collected across the whole session,
+    // rests included, and those are held in memory and nowhere else — the
+    // per-set heart-rate streams keep the in-set beats and nothing keeps these.
+    ExitPrompt.SESSION_NOT_CLOSED ->
+        "This session could not be closed, so it has no end time and no heart-rate or HRV summary. Tapping " +
+            "FINISH SESSION AGAIN on this screen can still write them — freeing some space on the phone " +
+            "first if that is what stopped it. Every set is already saved either way, but the session HRV " +
+            "is not held anywhere else and leaving now loses it."
 }
 
 private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (action) {
     ExitAction.DISCARD_SET_AND_LEAVE -> "Discard set"
     ExitAction.FINISH_SESSION -> "Finish session"
     ExitAction.LEAVE_SESSION_OPEN -> "Leave without finishing"
+    ExitAction.LEAVE_SESSION_CLOSING -> "Leave"
     // Per prompt, not a two-way test with a fallback. The fallback read "Keep
     // resting" for anything that was not a set in progress, so a new prompt got
     // the rest screen's wording by default -- offered to a lifter standing over
@@ -284,12 +310,14 @@ private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (ac
             ExitPrompt.SESSION_OPEN -> "Keep resting"
             ExitPrompt.SET_SAVING -> "Stay here"
             ExitPrompt.SET_UNSAVED -> "Keep this set"
+            ExitPrompt.SESSION_CLOSING -> "Wait here"
+            ExitPrompt.SESSION_NOT_CLOSED -> "Stay and retry"
         }
 }
 
 private fun exitColor(action: ExitAction): Color = when (action) {
     ExitAction.DISCARD_SET_AND_LEAVE -> BarColors.Red
-    ExitAction.LEAVE_SESSION_OPEN -> BarColors.Sub
+    ExitAction.LEAVE_SESSION_OPEN, ExitAction.LEAVE_SESSION_CLOSING -> BarColors.Sub
     else -> Color.Unspecified
 }
 
@@ -384,9 +412,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         }
         AudioCueChip(state, viewModel)
     }
-    TextButton(onClick = viewModel::finishSession, modifier = Modifier.fillMaxWidth()) {
-        Text("Finish session", color = BarColors.Sub)
-    }
+    SessionCloseControls(state, viewModel)
 }
 
 /** Equipment busy? Offer the session's other remaining exercises out of order. */
@@ -1111,17 +1137,11 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
             }
         }
         Spacer(Modifier.height(12.dp))
-        Button(
-            onClick = viewModel::startNextSet,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-        ) { Text("START NEXT SET") }
+        StartNextSetButton(state, viewModel)
     } else if (state.adHoc) {
         AdHocForm(state, viewModel)
         Spacer(Modifier.height(12.dp))
-        Button(
-            onClick = viewModel::startNextSet,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-        ) { Text("START NEXT SET") }
+        StartNextSetButton(state, viewModel)
     } else {
         Card(Modifier.fillMaxWidth()) {
             Text(
@@ -1132,9 +1152,52 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
             )
         }
     }
-    TextButton(onClick = viewModel::finishSession, modifier = Modifier.fillMaxWidth()) {
-        Text("Finish session", color = BarColors.Sub)
+    SessionCloseControls(state, viewModel)
+}
+
+/**
+ * Begin the next set, when beginning one is a thing that may be done.
+ *
+ * Both rest layouts route through this rather than drawing the button twice,
+ * which is what makes the gate a gate: a second copy is a second place for it to
+ * be missing from.
+ *
+ * `startNextSet` writes READY and calls `beginSet` in the same frame — the
+ * foreground service starts, the collectors attach, the stage becomes IN_SET. A
+ * close landing on top of that overwrites the stage with FINISHED and stops the
+ * service while the lifter is under a loaded bar with the buffers filling, on a
+ * screen that has no way to end a set.
+ */
+@Composable
+private fun StartNextSetButton(state: RecordState, viewModel: RecordViewModel) {
+    if (RestControl.START_NEXT_SET !in RestControlPolicy.controls(state.sessionClose)) return
+    Button(
+        onClick = viewModel::startNextSet,
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+    ) { Text("START NEXT SET") }
+}
+
+/**
+ * The controls that close the session, drawn from whatever [RestControlPolicy]
+ * says may be operated while the close is where it is.
+ *
+ * Asked of the policy rather than written as an `if` here, for the reason the
+ * exit gate is: `:app` has no test source set, so a condition written beside its
+ * caller cannot be tested at all. This is the same surface the gate covers, one
+ * layer in — guarding the way out while leaving these live is not a guard.
+ */
+@Composable
+private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel) {
+    val controls = RestControlPolicy.controls(state.sessionClose)
+    if (RestControl.FINISH_SESSION in controls) {
+        TextButton(onClick = viewModel::finishSession, modifier = Modifier.fillMaxWidth()) {
+            Text("Finish session", color = BarColors.Sub)
+        }
     }
+    // RestControl.RETRY_FINISH is not drawn yet. Nothing can produce a failed
+    // close until the close moves off viewModelScope, and a retry control with
+    // no failure able to reach it would be dead wording of exactly the kind
+    // SET_SAVING was for two commits. It arrives with its writer.
 }
 
 /** One tile of the effort grid: what gets stored plus the gym-facing wording. */

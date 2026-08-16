@@ -22,6 +22,7 @@ import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
+import com.macrophage.barspeed.model.SessionCloseState
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.Stage
@@ -189,6 +190,17 @@ data class RecordState(
      * what Back needs to know: the stage is IN_SET for all three values.
      */
     val setWrite: SetWriteState = SetWriteState.NONE,
+    /**
+     * Where the close of the session has got to.
+     *
+     * Independent of [setWrite], not a fourth value on it. Both can be
+     * outstanding at once in principle, and the record exit gate answers them
+     * with separate parameters so that pair stays representable.
+     *
+     * Nothing sets this to anything but NONE yet; the writer arrives with the
+     * commit that moves the close off `viewModelScope`.
+     */
+    val sessionClose: SessionCloseState = SessionCloseState.NONE,
     val weightUnit: WeightUnit = WeightUnit.KG,
     /** Lifter body weight, the base load for pull-ups and dips; null until set. */
     val bodyWeightKg: Double? = null,

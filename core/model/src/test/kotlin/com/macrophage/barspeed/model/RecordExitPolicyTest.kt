@@ -22,35 +22,50 @@ import kotlin.test.assertTrue
 class RecordExitPolicyTest {
     @Test
     fun `back leaves at once from setup`() {
-        assertEquals(ExitPrompt.NONE, RecordExitPolicy.promptFor(Stage.SETUP, SetWriteState.NONE))
+        assertEquals(
+            ExitPrompt.NONE,
+            RecordExitPolicy.promptFor(Stage.SETUP, SetWriteState.NONE, SessionCloseState.NONE),
+        )
     }
 
     @Test
     fun `back leaves at once from ready`() {
         // Nothing is at risk here: no session row exists until the first set is
         // recorded, no set is in flight, and the service has not been started.
-        assertEquals(ExitPrompt.NONE, RecordExitPolicy.promptFor(Stage.READY, SetWriteState.NONE))
+        assertEquals(
+            ExitPrompt.NONE,
+            RecordExitPolicy.promptFor(Stage.READY, SetWriteState.NONE, SessionCloseState.NONE),
+        )
     }
 
     @Test
     fun `back offers to discard the set being recorded`() {
         // Nothing of this set is in the database yet, and on the session's
         // first set the session row does not exist either.
-        assertEquals(ExitPrompt.SET_IN_PROGRESS, RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.NONE))
+        assertEquals(
+            ExitPrompt.SET_IN_PROGRESS,
+            RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.NONE, SessionCloseState.NONE),
+        )
     }
 
     @Test
     fun `back offers to close or abandon the open session while resting`() {
         // Every set is written; what is still open is the session row, and the
         // rest-window R-R intervals behind its HRV exist only in memory.
-        assertEquals(ExitPrompt.SESSION_OPEN, RecordExitPolicy.promptFor(Stage.RESTING, SetWriteState.NONE))
+        assertEquals(
+            ExitPrompt.SESSION_OPEN,
+            RecordExitPolicy.promptFor(Stage.RESTING, SetWriteState.NONE, SessionCloseState.NONE),
+        )
     }
 
     @Test
     fun `back leaves at once when the session is finished`() {
         // Everything is written and the service is stopped; leaving is what the
         // FINISHED stage's own Done button does.
-        assertEquals(ExitPrompt.NONE, RecordExitPolicy.promptFor(Stage.FINISHED, SetWriteState.NONE))
+        assertEquals(
+            ExitPrompt.NONE,
+            RecordExitPolicy.promptFor(Stage.FINISHED, SetWriteState.NONE, SessionCloseState.NONE),
+        )
     }
 
     @Test
@@ -146,14 +161,17 @@ class RecordExitPolicyTest {
      */
     @Test
     fun `back names the set as saving rather than as discardable`() {
-        assertEquals(ExitPrompt.SET_SAVING, RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.IN_FLIGHT))
+        assertEquals(
+            ExitPrompt.SET_SAVING,
+            RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.IN_FLIGHT, SessionCloseState.NONE),
+        )
     }
 
     @Test
     fun `a set still saving is never offered the discard prompt`() {
         assertNotEquals(
             ExitPrompt.SET_IN_PROGRESS,
-            RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.IN_FLIGHT),
+            RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.IN_FLIGHT, SessionCloseState.NONE),
         )
     }
 
@@ -166,14 +184,17 @@ class RecordExitPolicyTest {
      */
     @Test
     fun `back names the set as unsaved after the write failed`() {
-        assertEquals(ExitPrompt.SET_UNSAVED, RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.FAILED))
+        assertEquals(
+            ExitPrompt.SET_UNSAVED,
+            RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.FAILED, SessionCloseState.NONE),
+        )
     }
 
     @Test
     fun `a failed write does not reuse the in-progress prompt`() {
         assertNotEquals(
             ExitPrompt.SET_IN_PROGRESS,
-            RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.FAILED),
+            RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.FAILED, SessionCloseState.NONE),
         )
     }
 
@@ -186,7 +207,7 @@ class RecordExitPolicyTest {
      */
     @Test
     fun `each write state gets its own answer in-set`() {
-        val answers = SetWriteState.entries.map { RecordExitPolicy.promptFor(Stage.IN_SET, it) }
+        val answers = SetWriteState.entries.map { RecordExitPolicy.promptFor(Stage.IN_SET, it, SessionCloseState.NONE) }
         assertEquals(answers.size, answers.toSet().size, "in-set prompts collapsed: $answers")
     }
 
@@ -200,7 +221,8 @@ class RecordExitPolicyTest {
     @Test
     fun `no finish is offered while a set write is in flight`() {
         assertFalse(
-            ExitAction.FINISH_SESSION in RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.IN_FLIGHT).actions,
+            ExitAction.FINISH_SESSION in
+                RecordExitPolicy.promptFor(Stage.IN_SET, SetWriteState.IN_FLIGHT, SessionCloseState.NONE).actions,
         )
     }
 
@@ -216,11 +238,11 @@ class RecordExitPolicyTest {
     @Test
     fun `every stage but in-set answers the same whatever the write state`() {
         Stage.entries.filter { it != Stage.IN_SET }.forEach { stage ->
-            val expected = RecordExitPolicy.promptFor(stage, SetWriteState.NONE)
+            val expected = RecordExitPolicy.promptFor(stage, SetWriteState.NONE, SessionCloseState.NONE)
             SetWriteState.entries.forEach { write ->
                 assertEquals(
                     expected,
-                    RecordExitPolicy.promptFor(stage, write),
+                    RecordExitPolicy.promptFor(stage, write, SessionCloseState.NONE),
                     "$stage changed its answer for $write",
                 )
             }
@@ -233,9 +255,108 @@ class RecordExitPolicyTest {
         // becomes a silent exit.
         SetWriteState.entries.forEach { write ->
             assertFalse(
-                RecordExitPolicy.promptFor(Stage.IN_SET, write) == ExitPrompt.NONE,
+                RecordExitPolicy.promptFor(Stage.IN_SET, write, SessionCloseState.NONE) == ExitPrompt.NONE,
                 "IN_SET leaves without asking while the write is $write",
             )
+        }
+    }
+
+    // ---- the session close -------------------------------------------------
+
+    @Test
+    fun `the close state is not read yet, in flight (pre-fix)`() {
+        assertEquals(
+            ExitPrompt.SESSION_OPEN,
+            RecordExitPolicy.promptFor(Stage.RESTING, SetWriteState.NONE, SessionCloseState.IN_FLIGHT),
+        )
+    }
+
+    @Test
+    fun `the close state is not read yet, failed (pre-fix)`() {
+        assertEquals(
+            ExitPrompt.SESSION_OPEN,
+            RecordExitPolicy.promptFor(Stage.RESTING, SetWriteState.NONE, SessionCloseState.FAILED),
+        )
+    }
+
+    @Test
+    fun `a session being closed offers leaving and nothing else`() {
+        assertEquals(
+            listOf(ExitAction.LEAVE_SESSION_CLOSING, ExitAction.STAY),
+            ExitPrompt.SESSION_CLOSING.actions,
+        )
+    }
+
+    @Test
+    fun `a session being closed is never offered as one to leave open`() {
+        // "Leave without finishing" is false while a finish is in flight: the
+        // close lands whatever the lifter does from here, so offering it would
+        // be a choice with no effect dressed as a choice.
+        assertFalse(ExitAction.LEAVE_SESSION_OPEN in ExitPrompt.SESSION_CLOSING.actions)
+    }
+
+    @Test
+    fun `a close that failed offers leaving the session open`() {
+        // Here it is true: the close did not land, so the row really is open.
+        assertEquals(
+            listOf(ExitAction.LEAVE_SESSION_OPEN, ExitAction.STAY),
+            ExitPrompt.SESSION_NOT_CLOSED.actions,
+        )
+    }
+
+    @Test
+    fun `leaving a session that is closing is offered from exactly one prompt`() {
+        assertEquals(
+            listOf(ExitPrompt.SESSION_CLOSING),
+            ExitPrompt.entries.filter { ExitAction.LEAVE_SESSION_CLOSING in it.actions },
+        )
+    }
+
+    /**
+     * The mirror of the write-state pin, and the reason the two states are
+     * separate parameters rather than one merged enum.
+     *
+     * Merging them would make "a set write outstanding AND a close outstanding"
+     * unrepresentable, and would delete this property and its twin above by
+     * construction rather than by decision.
+     */
+    @Test
+    fun `every stage but resting answers the same whatever the close state`() {
+        Stage.entries.filter { it != Stage.RESTING }.forEach { stage ->
+            val expected = RecordExitPolicy.promptFor(stage, SetWriteState.NONE, SessionCloseState.NONE)
+            SessionCloseState.entries.forEach { close ->
+                assertEquals(
+                    expected,
+                    RecordExitPolicy.promptFor(stage, SetWriteState.NONE, close),
+                    "$stage changed its answer for $close",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `no close state leaves the lifter without a prompt while resting`() {
+        SessionCloseState.entries.forEach { close ->
+            assertFalse(
+                RecordExitPolicy.promptFor(Stage.RESTING, SetWriteState.NONE, close) == ExitPrompt.NONE,
+                "RESTING leaves without asking while the close is $close",
+            )
+        }
+    }
+
+    @Test
+    fun `the close state never changes the in-set answer`() {
+        // A close cannot be outstanding in IN_SET, and this function does not
+        // look -- the same guarantee the write-state pin makes the other way.
+        SetWriteState.entries.forEach { write ->
+            val expected = RecordExitPolicy.promptFor(Stage.IN_SET, write, SessionCloseState.NONE)
+            SessionCloseState.entries.forEach { close ->
+                assertEquals(
+                    expected,
+                    RecordExitPolicy.promptFor(Stage.IN_SET, write, close),
+                    "IN_SET/$write changed its answer for $close",
+                )
+            }
         }
     }
 }

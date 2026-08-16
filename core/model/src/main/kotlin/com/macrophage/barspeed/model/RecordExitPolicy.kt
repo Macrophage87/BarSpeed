@@ -54,6 +54,17 @@ enum class ExitAction {
      */
     LEAVE_SESSION_OPEN,
 
+    /**
+     * Leave while the session is being closed. The close lands either way.
+     *
+     * Separate from [LEAVE_SESSION_OPEN] because of what the label has to say,
+     * not because the navigation differs — both pop. "Leave without finishing"
+     * is false once a finish is in flight: the session is being finished, and
+     * nothing the lifter does from here stops that. Offering the other label
+     * would be a choice with no effect dressed as a choice.
+     */
+    LEAVE_SESSION_CLOSING,
+
     /** Dismiss the prompt. Every prompt offers it — a prompt with no way back is a trap. */
     STAY,
 }
@@ -103,6 +114,55 @@ enum class ExitPrompt(val actions: List<ExitAction>) {
      * the effort grid here would name a control that is no longer on screen.
      */
     SET_UNSAVED(listOf(ExitAction.DISCARD_SET_AND_LEAVE, ExitAction.STAY)),
+
+    /**
+     * A finish the lifter asked for is in flight and has not landed yet.
+     *
+     * The same shape as [SET_SAVING] and for the same reason: the work outlives
+     * the screen, so leaving is safe, and the only honest offers are to go or to
+     * wait. [ExitAction.FINISH_SESSION] is absent because it is already
+     * happening, and [ExitAction.LEAVE_SESSION_OPEN] is absent because the
+     * session is not going to be left open.
+     */
+    SESSION_CLOSING(listOf(ExitAction.LEAVE_SESSION_CLOSING, ExitAction.STAY)),
+
+    /**
+     * A finish the lifter asked for came back failed. The session is still open.
+     *
+     * [ExitAction.FINISH_SESSION] is deliberately absent even though finishing
+     * is exactly what failed, for the reason [SET_UNSAVED] withholds the
+     * controls that end a set: the retry is a control on the rest screen, next
+     * to the explanation of what went wrong, not a button in the gate the lifter
+     * is trying to leave through. Leaving here really does leave the session
+     * open, so that action returns.
+     */
+    SESSION_NOT_CLOSED(listOf(ExitAction.LEAVE_SESSION_OPEN, ExitAction.STAY)),
+}
+
+/**
+ * Where the close of the session has got to.
+ *
+ * A third fact rather than more values on [SetWriteState], because the two are
+ * independent: a set write and a session close can be outstanding at the same
+ * moment, and merging them into one enum would make that pair unrepresentable
+ * and would silently delete the guarantee that every stage but IN_SET answers
+ * the same whatever the write state.
+ *
+ * [FAILED] exists for the reason [SetWriteState.FAILED] does. "Nothing is being
+ * closed" and "the close came back failed" are different facts, and the second
+ * is the one worth stopping the lifter over: the session's HRV is computed from
+ * R-R intervals that are held in memory and nowhere else, so a close that did
+ * not land is the difference between having that number and never having it.
+ */
+enum class SessionCloseState {
+    /** No close is outstanding. Either none was asked for, or one finished. */
+    NONE,
+
+    /** A close is running now. */
+    IN_FLIGHT,
+
+    /** A close came back failed and the session row is still open. */
+    FAILED,
 }
 
 /**
@@ -173,11 +233,17 @@ object RecordExitPolicy {
      * these. The last set's rep count and effort rating also stop being
      * correctable, because the only screen that can edit them is this one.
      *
-     * [write] is required rather than defaulted so that a caller cannot keep
-     * compiling while silently answering the old question. It is read for
-     * `IN_SET` alone -- every other stage ignores it, which is pinned rather
-     * than assumed, because "cannot happen" and "is not looked at" are
-     * different guarantees and only the second one is this function's to make.
+     * [write] and [close] are required rather than defaulted so that a caller
+     * cannot keep compiling while silently answering the old question. [write]
+     * is read for `IN_SET` alone and [close] for `RESTING` alone -- every other
+     * stage ignores both, which is pinned rather than assumed, because "cannot
+     * happen" and "is not looked at" are different guarantees and only the
+     * second one is this function's to make.
+     *
+     * The two never contend. A set write is only outstanding in `IN_SET`, and a
+     * close is only outstanding once every set is written; they are separate
+     * parameters rather than one merged state precisely so that the pair can be
+     * represented and answered rather than assumed away.
      *
      * IN_SET therefore has three answers, not one, and the difference between
      * them is what the prompt is allowed to claim. Before the write starts,
@@ -190,7 +256,7 @@ object RecordExitPolicy {
      * over, so the controls the in-progress wording names are no longer drawn
      * and its own prompt points at the retry instead.
      */
-    fun promptFor(stage: Stage, write: SetWriteState): ExitPrompt = when (stage) {
+    fun promptFor(stage: Stage, write: SetWriteState, close: SessionCloseState): ExitPrompt = when (stage) {
         Stage.SETUP, Stage.READY, Stage.FINISHED -> ExitPrompt.NONE
         Stage.IN_SET ->
             when (write) {
@@ -198,6 +264,16 @@ object RecordExitPolicy {
                 SetWriteState.IN_FLIGHT -> ExitPrompt.SET_SAVING
                 SetWriteState.FAILED -> ExitPrompt.SET_UNSAVED
             }
-        Stage.RESTING -> ExitPrompt.SESSION_OPEN
+        Stage.RESTING ->
+            when (close) {
+                // Every branch is the same answer in this commit, on purpose:
+                // the parameter arrives here before the behaviour does, so this
+                // commit changes nothing and the differentials that follow can
+                // be shown failing against it.
+                SessionCloseState.NONE,
+                SessionCloseState.IN_FLIGHT,
+                SessionCloseState.FAILED,
+                -> ExitPrompt.SESSION_OPEN
+            }
     }
 }
