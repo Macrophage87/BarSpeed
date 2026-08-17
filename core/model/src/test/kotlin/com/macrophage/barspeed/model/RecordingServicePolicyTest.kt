@@ -6,12 +6,12 @@ import kotlin.test.assertEquals
 /**
  * When the recording foreground service runs.
  *
- * The two pins named `(pre-fix)` describe the behaviour shipping at
- * b53e2bd743e50fbbb0518be20f19d844a9eafaa5, which is the defect: the screen
- * going away stops the service whatever else is still running, and a write
- * landing never stops it. They are replaced by their inversions in the next
- * commit, which is a test-file-only commit and names the retirement in its
- * body. The naming follows `SetLoadPolicyTest` and `RecordExitPolicyTest`.
+ * The two pins this file was created with, `the screen going away stops the
+ * service even mid-write (pre-fix)` and `a completed write does not stop the
+ * service (pre-fix)`, have been retired and replaced by their inversions below,
+ * named in this commit's body. They described the behaviour shipping at
+ * b53e2bd743e50fbbb0518be20f19d844a9eafaa5, which is the defect. The naming
+ * follows `SetLoadPolicyTest` and `RecordExitPolicyTest`.
  */
 class RecordingServicePolicyTest {
     @Test
@@ -54,22 +54,49 @@ class RecordingServicePolicyTest {
     }
 
     @Test
-    fun `the screen going away stops the service even mid-write (pre-fix)`() {
-        // The defect. The set's samples are in memory and nowhere else at this
-        // moment, and the process loses the priority that was protecting them.
+    fun `the screen going away does not stop the service mid-write`() {
+        // The set's samples are in this process and nowhere else until the
+        // insert lands, and the in-memory copy dies with the ViewModel, so a
+        // process killed here loses the set with no retry left to offer.
         val t = RecordingServicePolicy.release(
             setOf(RecordingHold.SESSION, RecordingHold.SET_WRITE),
             RecordingHold.SESSION,
         )
-        assertEquals(FgsCommand.STOP, t.command)
+        assertEquals(FgsCommand.NONE, t.command)
         assertEquals(setOf(RecordingHold.SET_WRITE), t.held)
     }
 
     @Test
-    fun `a completed write does not stop the service (pre-fix)`() {
-        // The other half of the defect: nothing stops the service when the work
-        // that outlived the screen lands, because today only the screen stops it.
+    fun `the write landing stops the service the screen left running`() {
+        // The other half. Deferring the stop is only safe if something still
+        // issues it; the write's own completion is what does, on the success
+        // path and the failure path alike.
         val t = RecordingServicePolicy.release(setOf(RecordingHold.SET_WRITE), RecordingHold.SET_WRITE)
+        assertEquals(FgsCommand.STOP, t.command)
+        assertEquals(emptySet(), t.held)
+    }
+
+    @Test
+    fun `a finished session stops the service when the close lands, not before`() {
+        // onSessionClosed runs inside SessionCloser's try, so the screen's hold
+        // goes first and the close's finally follows. The stop must come from
+        // the second one: hrvRmssdMs is computed from R-R intervals held in
+        // memory and reaching storage nowhere else, and the exit prompt raised
+        // over this window promises the lifter the close lands either way.
+        val held = setOf(RecordingHold.SESSION, RecordingHold.SESSION_CLOSE)
+        val screen = RecordingServicePolicy.release(held, RecordingHold.SESSION)
+        assertEquals(FgsCommand.NONE, screen.command)
+        val close = RecordingServicePolicy.release(screen.held, RecordingHold.SESSION_CLOSE)
+        assertEquals(FgsCommand.STOP, close.command)
+        assertEquals(emptySet(), close.held)
+    }
+
+    @Test
+    fun `releasing a hold that was never held does not stop the service`() {
+        // STOP means the last reason to run just went away, so it cannot be
+        // emitted by a release that took nothing away. Without this a double
+        // release would stop a service a later hold still needs.
+        val t = RecordingServicePolicy.release(emptySet(), RecordingHold.SESSION)
         assertEquals(FgsCommand.NONE, t.command)
         assertEquals(emptySet(), t.held)
     }
