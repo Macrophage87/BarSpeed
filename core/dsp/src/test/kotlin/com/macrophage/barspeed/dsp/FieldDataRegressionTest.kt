@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.StartPhase
 import kotlin.math.abs
 import kotlin.test.Test
@@ -7,7 +8,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Regression fixtures from real gym sessions. Three failure modes are pinned:
+ * Regression fixtures from real gym sessions. Three failure modes are pinned,
+ * plus one control:
  *
  * 1. 10 Hz factory-default rate (the app failed to raise it — see
  *    WitmotionCommands.unlock): heavy attenuation, live tracker used to lock
@@ -18,6 +20,11 @@ import kotlin.test.assertTrue
  *    integrator past the ZUPT rejection band.
  * 3. Segmentation that does not agree with the lifter, in both directions —
  *    the `field-{ohp,bench,cablerow,facepull,pallof}-*` fixtures below.
+ * 4. A control: `field-still-0rep.csv`, 45 s of a sensor that did not move.
+ *    `field-backsquat-10hz-set5.csv` already asks whether reps are invented,
+ *    live and across a quiet stretch of a set that does contain reps; this one
+ *    extends that question to the batch path, to both opening phases, and to a
+ *    whole capture with no reps in it at all.
  *
  * ## Provenance of the seven 2026-08-17 fixtures
  *
@@ -438,5 +445,169 @@ class FieldDataRegressionTest {
         session20260817.forEach { fs ->
             assertMeasured(today.getValue(fs.file), quietRomFractions(fs), fs.file)
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Still-sensor control. Session of 2026-08-17 evening, app 0.1.38.
+    // ------------------------------------------------------------------
+
+    /**
+     * 45 s of a sensor lying on a flat surface with nothing lifted, recorded
+     * against a `seated_overhead_press` plan slot because that is the slot it
+     * was recorded into, not because a press happened. The lifter confirms the
+     * sensor never moved, and the app agreed in the field: the exported set
+     * carries no `repMetrics` and an empty `summary`.
+     *
+     * Three such sets were recorded back to back and one is landed. The seven
+     * BEHAVIOURAL answers below are identical on all three: 0 reps from either
+     * opening phase, 0 velocity samples that are not 0.0, null velocity loss,
+     * 0 live reps, a live phase of IDLE, and 0.0 net displacement. A second and
+     * third copy add no power to discriminate any of those. What is NOT
+     * identical is five per-file constants, all of them pinned below at set 1's
+     * value, with sets 2 and 3 in brackets: sample count 4440 (4496, 4504),
+     * measured rate 98.776 Hz (99.348, 99.413), live velocity 9.4316e-5 m/s
+     * (8.0856e-5, 1.3265e-4 — four orders outside the pin), and the pre-ZUPT
+     * displacement and final speed, 8.303 m and 0.351 m/s (6.387 m, 0.270 m/s;
+     * 5.719 m, 0.242 m/s).
+     *
+     * What this fixture cannot gate, so that nobody cites it as coverage it
+     * does not have:
+     *
+     * - A WIDENING of [DspConfig.stationaryGyroBandDps]. The gyro reads exactly
+     *   0.0000 on all 4440 samples of all three axes, so every band ABOVE ZERO
+     *   accepts every sample. Not every band: the predicate is a strict `<`, so
+     *   a band of exactly 0.0 excludes everything and reds all three tests
+     *   here. Widening is what a segmentation fix would do, and it is the case
+     *   this capture is blind to.
+     * - A WIDENING of [DspConfig.stationaryAccBandG]. Narrowing it, 0.05 to
+     *   0.0005, reds all three tests below; widening it to 0.5 reds ten
+     *   elsewhere and leaves all three green. The asymmetry is structural, not
+     *   incidental: every sample here is already quiet, so a stillness fixture
+     *   can only catch a predicate that wrongly EXCLUDES still data, never one
+     *   that wrongly INCLUDES data that moved.
+     * - The segmentation thresholds, at all. With velocity identically zero no
+     *   movement run can form at any of them. Measured: all three tests stay
+     *   green with the quiet predicate forced always-true, and under gyro band
+     *   12 and 20, accBand 0.5, pauseBandMps 0.003 and 0.30, startThresholdMps
+     *   0.10 to 0.02, minRomM 0.10 to 0.001, and anchorStabilityBandMps 0.02
+     *   to 1.0.
+     *
+     * What it does gate is the quiet/ZUPT zeroing path and the size of the
+     * front-end bias the correction is fed.
+     */
+    private val stillFile = "field-still-0rep.csv"
+
+    /** The load the set was recorded with. Nothing was lifted with it. */
+    private val stillLoadKg = 20.411656650451594
+
+    /**
+     * Velocity before the ZUPT stage, reproduced from the series the estimator
+     * publishes: [VelocitySeries.accelMps2] integrated trapezoidally at the
+     * measured rate is exactly the `rawV` [VelocityEstimator.estimate] hands to
+     * its drift correction, which is private. This is not a second
+     * implementation under test — it exists to measure the input that
+     * correction is fed, so that "the output is zero" can be shown to be earned
+     * rather than trivial.
+     */
+    private fun preZuptVelocity(s: VelocitySeries): DoubleArray {
+        val dt = 1.0 / s.sampleRateHz
+        val raw = DoubleArray(s.size)
+        for (i in 1 until s.size) raw[i] = raw[i - 1] + 0.5 * (s.accelMps2[i] + s.accelMps2[i - 1]) * dt
+        return raw
+    }
+
+    /** Signed displacement of [preZuptVelocity] over the whole set, metres. */
+    private fun preZuptDisplacementM(s: VelocitySeries): Double {
+        val raw = preZuptVelocity(s)
+        val dt = 1.0 / s.sampleRateHz
+        var d = 0.0
+        for (i in 1 until s.size) d += 0.5 * (raw[i] + raw[i - 1]) * dt
+        return d
+    }
+
+    @Test
+    fun `a motionless sensor produces no reps and not one non-zero velocity sample`() {
+        val samples = load(stillFile)
+        // Guards the fixture file itself. A truncated, resampled or re-encoded
+        // CSV would change this before it changed anything measured below.
+        assertEquals(4440, samples.size, "samples in the capture")
+
+        val series = VelocityEstimator.estimate(samples, DspConfig(), MovementPlane.VERTICAL)
+        // A count, not a tolerance. Every sample of this set comes out of the
+        // estimator as the literal double 0.0, so the strongest statement
+        // available is how many are not — and it is the statement that cannot
+        // be satisfied by data that moved a little. "Peak |v| below 0.01 m/s"
+        // would pass on a set with real motion in it.
+        assertEquals(0, series.velocityMps.count { it != 0.0 }, "velocity samples that are not exactly 0.0")
+
+        val analysis = SetAnalyzer.analyze(samples, StartPhase.ECCENTRIC, loadKg = stillLoadKg)
+        assertEquals(0, analysis.reps.size, "segmented reps; the sensor never moved")
+        // Neither opening phase may invent a rep. Pinned both ways because the
+        // rep-undercount work this fixture is the control for changes how
+        // phases are opened, and a control that only holds one way is half a
+        // control.
+        assertEquals(
+            0,
+            SetAnalyzer.analyze(samples, StartPhase.CONCENTRIC, loadKg = stillLoadKg).reps.size,
+            "segmented reps analysed concentric-first",
+        )
+        // Absence, not zero: with no reps there is no loss to report. A 0.0
+        // here would reach the export as "you lost no velocity" — a
+        // measurement — from a set that measured nothing.
+        assertEquals<Double?>(null, analysis.velocityLossPct, "velocity loss with no reps to compare")
+        // Exact double equality, against the `sampleRate_hz` this set's own
+        // meta.json published in the field: 4439 intervals over 44.940 s. The
+        // fixture reproduces the shipped app's figure to the bit.
+        assertEquals<Double>(98.77614597240766, analysis.sampleRateHz, "measured sample rate")
+    }
+
+    @Test
+    fun `the live tracker counts nothing and ends idle on a motionless sensor`() {
+        val samples = load(stillFile)
+        val tracker = StreamingSetTracker(StartPhase.ECCENTRIC)
+        var last = LiveSetState()
+        samples.forEach { last = tracker.feed(it) }
+        assertEquals(0, last.repCount, "live reps; the sensor never moved")
+        assertEquals(Phase.IDLE, last.phase, "live phase after 45 s of stillness")
+        // The streaming path does NOT clamp to zero the way the batch path
+        // does — it carries no retroactive correction — so it ends 45 s of
+        // stillness holding 0.094 mm/s. Pinned as the measured value rather
+        // than bounded, at five significant figures: 1e-9 is five orders below
+        // the figure itself and seven below `pauseBandMps`, so this is
+        // equality, not a band. It is recorded because it is the live readout's
+        // own noise floor on data with no motion in it at all.
+        assertEquals(9.4316e-5, last.velocityMps, 1e-9, "live velocity after 45 s of stillness")
+    }
+
+    @Test
+    fun `the same stillness drifts 8 metres before the ZUPT stage removes all of it`() {
+        val samples = load(stillFile)
+        val series = VelocityEstimator.estimate(samples, DspConfig(), MovementPlane.VERTICAL)
+
+        // Exactly zero, no tolerance: the corrected velocity array is all 0.0,
+        // so its integral is 0.0 and anything else is a change in behaviour.
+        assertEquals<Double>(0.0, netDisplacementM(series), "displacement after drift correction, metres")
+
+        // What that zero is worth. Left uncorrected, the same 45 s of stillness
+        // walks 8.3 m and finishes at 0.351 m/s — over three times
+        // `DspConfig.startThresholdMps` (0.10), so a movement run, from a
+        // sensor on a table. This is the pin that stops the assertion above
+        // being satisfied trivially: it reds if the front of the pipeline stops
+        // producing the bias, which would make "the output is zero" a statement
+        // about nothing.
+        // Deliberately NOT [assertMeasured]. Its stated justification is that
+        // every quantity pinned with it moves by 0.05 or more when the number
+        // of segmented reps changes by one, and this fixture's rep count is
+        // asserted to be zero, so that justification does not reach here.
+        // These two carry a tolerance for a different reason: they descend from
+        // the Math.sin/cos calls in [FrameTransform], which are specified only
+        // to within 1 ulp and so are not guaranteed bit-identical across JVMs.
+        // Exact equality would be a portability bet rather than a measurement.
+        // 1e-6 is three orders tighter than this file's 1e-3 convention and the
+        // measured values sit 3.8% and 0.8% into it; CI runs these same
+        // assertions on a different machine and JVM, which is the portability
+        // check itself rather than an argument about one.
+        assertEquals(8.3030422, preZuptDisplacementM(series), 1e-6, "pre-ZUPT displacement, metres")
+        assertEquals(0.3513516, abs(preZuptVelocity(series).last()), 1e-6, "pre-ZUPT final speed, m/s")
     }
 }
