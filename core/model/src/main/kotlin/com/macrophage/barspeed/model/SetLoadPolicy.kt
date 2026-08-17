@@ -89,10 +89,11 @@ object SetLoadPolicy {
      * then records 79.4 against a plannedLoadKg of 79.3786647517562, and the
      * session detail screen prints a deviation the lifter did not make.
      *
-     * [statedAddedKg] is what they actually said, null when they said nothing.
-     * Nothing reads it yet; the differentials that prove it must come first.
+     * [statedAddedKg] is what they actually said, null when they said nothing,
+     * and it is the only thing that displaces the declaration. An untouched
+     * field is no longer in the path at all.
      */
     @Suppress("UnusedParameter")
     fun carriedIntoNextSet(declaredAddedKg: Double?, typedAddedKg: Double?, statedAddedKg: Double?): Double? =
-        typedAddedKg ?: declaredAddedKg
+        statedAddedKg ?: declaredAddedKg
 }
