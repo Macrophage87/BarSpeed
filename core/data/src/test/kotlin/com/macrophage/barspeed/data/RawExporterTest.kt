@@ -180,10 +180,19 @@ class RawExporterTest {
     private suspend fun zipOf(
         rows: List<SetRecordEntity>,
         streams: Map<Long, List<RawStreamEntity>>,
+        zoneId: String? = null,
+        utcOffsetMinutes: Int? = null,
     ): Map<String, String> {
         val dao =
             FakeSessionDao(
-                session = SessionEntity(id = 1L, startedAtMs = 1_000L, endedAtMs = 46_000L),
+                session =
+                SessionEntity(
+                    id = 1L,
+                    startedAtMs = 1_000L,
+                    endedAtMs = 46_000L,
+                    zoneId = zoneId,
+                    utcOffsetMinutes = utcOffsetMinutes,
+                ),
                 rows = rows,
                 streams = streams,
             )
@@ -281,6 +290,66 @@ class RawExporterTest {
             ),
             manifest.keys,
         )
+    }
+
+    /**
+     * The manifest states the offset and zone beside the instant it qualifies.
+     *
+     * The raw zip has to stand on its own -- an analysis that opens only the
+     * CSVs has `epoch` and a pile of epoch-millisecond timestamps, and nothing
+     * that turns either into a time of day. The keys are flat here and nested
+     * in `session.json`, matching what the two documents already do with
+     * geometry, and named `timeZoneId` rather than `timeZone` so that one key
+     * name never means a string in one artifact and an object in the other.
+     */
+    @Test
+    fun `the manifest states the zone and offset the session was recorded on`() = runTest {
+        val manifest =
+            Json.parseToJsonElement(
+                zipOf(listOf(row(id = 5L)), emptyMap(), "America/New_York", -240).getValue("meta.json"),
+            ).jsonObject
+        assertEquals("1970-01-01T00:00:01Z", manifest.text("epoch"))
+        assertEquals("America/New_York", manifest.text("timeZoneId"))
+        assertEquals(-240.0, manifest.num("utcOffsetMinutes"))
+    }
+
+    /**
+     * Both artifacts in one zip say the same thing about the same session.
+     *
+     * They are built by different code -- `session.json` is serialized from a
+     * data class, `meta.json` is concatenated by hand -- off the same two
+     * columns, so a reader holding both must not be able to find them
+     * disagreeing. The same instrument as `the geometry is the same in both
+     * exports of one set`.
+     */
+    @Test
+    fun `both artifacts report the same zone and offset for one session`() = runTest {
+        val entries = zipOf(listOf(row(id = 5L)), emptyMap(), "Pacific/Chatham", 765)
+        val manifest = Json.parseToJsonElement(entries.getValue("meta.json")).jsonObject
+        val session = Json.parseToJsonElement(entries.getValue("session.json")).jsonObject
+        val zone = session.getValue("timeZone").jsonObject
+        assertEquals(manifest.text("timeZoneId"), zone.getValue("id").jsonPrimitive.content)
+        assertEquals(
+            manifest.num("utcOffsetMinutes")?.toInt(),
+            zone.getValue("utcOffsetMinutes").jsonPrimitive.content.toInt(),
+        )
+    }
+
+    /**
+     * A session with no stored zone writes neither key, and no null literal.
+     *
+     * `meta.json` is hand-concatenated, so an absent value written as `null`
+     * is a real possibility rather than a hypothetical -- and the file already
+     * carries a test asserting the string never appears. This is the state
+     * every session recorded before this change is in, permanently.
+     */
+    @Test
+    fun `a session with no stored zone states neither key`() = runTest {
+        val text = zipOf(listOf(row(id = 5L)), emptyMap()).getValue("meta.json")
+        val manifest = Json.parseToJsonElement(text).jsonObject
+        assertNull(manifest["timeZoneId"])
+        assertNull(manifest["utcOffsetMinutes"])
+        assertTrue("null" !in text, "the manifest must not write a null literal, got:\n$text")
     }
 
     @Test

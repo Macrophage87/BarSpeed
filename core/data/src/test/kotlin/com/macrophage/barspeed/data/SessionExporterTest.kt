@@ -226,14 +226,32 @@ class SessionExporterTest {
             csvGzip = Gzip.compress(CueCsv.encode(listOf(VoiceCue(1_100L, "Rep 1")))),
         )
 
-    private fun exporterOf(stored: SetRecordEntity): SessionExporter {
+    private fun exporterOf(
+        stored: SetRecordEntity,
+        zoneId: String? = null,
+        utcOffsetMinutes: Int? = null,
+    ): SessionExporter {
         val dao =
             FakeSessionDao(
-                session = SessionEntity(id = 1L, startedAtMs = 1_000L, endedAtMs = 61_000L),
+                session =
+                SessionEntity(
+                    id = 1L,
+                    startedAtMs = 1_000L,
+                    endedAtMs = 61_000L,
+                    zoneId = zoneId,
+                    utcOffsetMinutes = utcOffsetMinutes,
+                ),
                 rows = listOf(stored),
                 streams = mapOf(5L to listOf(cueStream)),
             )
         return SessionExporter(SessionRepository(dao, FakeExerciseDao()))
+    }
+
+    /** The export root for a session row carrying the given stored zone columns. */
+    private suspend fun rootWithZone(zoneId: String?, utcOffsetMinutes: Int?): JsonObject {
+        val exporter =
+            exporterOf(row(analysis(3), actualReps = 3, repsManual = false), zoneId, utcOffsetMinutes)
+        return Json.parseToJsonElement(exporter.exportJson(1L, includeRepDetail = true)!!).jsonObject
     }
 
     private fun exporter(analysis: SetAnalysis, actualReps: Int, repsManual: Boolean): SessionExporter =
@@ -313,6 +331,63 @@ class SessionExporterTest {
             setOf("schemaVersion", "startedAt", "endedAt", "exercises"),
             rootObject().keys,
         )
+    }
+
+    /**
+     * A session recorded in New York in August publishes the zone it was
+     * recorded in and the offset that applied.
+     *
+     * This is the whole of issue 75 in one assertion. Without it a reader has a
+     * correct UTC instant and no way to turn it into a time of day, and the
+     * downstream tool that consumes this export says so itself: it treats the
+     * Z-suffixed clock as local with the designator stripped, and its own
+     * data-quality section records that whether that clock is true UTC is not
+     * established by anything it can see.
+     *
+     * Read as a nested object rather than as loose keys, for the reason issue
+     * 73 settled one level down: an offset present with no zone is a half
+     * answer a reader cannot complete, and nesting makes the absence atomic.
+     */
+    @Test
+    fun `a session publishes the zone and offset it was recorded on`() = runTest {
+        val zone = rootWithZone("America/New_York", -240).getValue("timeZone").jsonObject
+        assertEquals("America/New_York", zone.getValue("id").jsonPrimitive.content)
+        assertEquals(-240, zone.getValue("utcOffsetMinutes").jsonPrimitive.content.toInt())
+    }
+
+    /**
+     * A zero offset is written, not dropped as a default.
+     *
+     * London in winter is on UTC. The exporter runs with
+     * `encodeDefaults = false`, so this is the case that vanishes the moment
+     * the offset field acquires a Kotlin default of 0 -- and it vanishes
+     * silently, reading to a consumer as "the app did not say" for every
+     * session recorded in the one zone whose offset happens to equal the type
+     * default. The direct analogue of `a geometry false reaches the wire
+     * instead of being dropped as a default`.
+     */
+    @Test
+    fun `a zero offset reaches the wire instead of being dropped as a default`() = runTest {
+        val text =
+            exporterOf(row(analysis(3), actualReps = 3, repsManual = false), "Europe/London", 0)
+                .exportJson(1L, includeRepDetail = true)!!
+        assertTrue("\"utcOffsetMinutes\": 0" in text, "expected a written zero offset, got:\n$text")
+    }
+
+    /**
+     * A row carrying only one of the two columns publishes no zone at all.
+     *
+     * Nothing writes such a row -- `startSession` writes the pair or neither --
+     * but the columns are separately nullable because Room offers nothing else,
+     * so the state exists in the database and the exporter has to have an
+     * answer for it. Half an answer is worse than none: a reader given an
+     * offset with no zone cannot tell whether the zone was withheld or the
+     * offset invented.
+     */
+    @Test
+    fun `a half-stated zone publishes nothing`() = runTest {
+        assertNull(rootWithZone("America/New_York", null)["timeZone"])
+        assertNull(rootWithZone(null, -240)["timeZone"])
     }
 
     // ---- issue 73: what the export says about how the set was measured -----
