@@ -24,6 +24,7 @@ import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SessionCloseState
+import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.Stage
@@ -116,6 +117,8 @@ data class ExerciseChoice(val exerciseId: String, val displayName: String, val s
  */
 private data class PendingSetWrite(
     val exercise: ExerciseDef,
+    /** [exercise]'s direction and mounting, frozen with everything else. */
+    val geometry: ResolvedGeometry,
     val slot: PlannedSlot?,
     val isTimed: Boolean,
     val loadKg: Double,
@@ -759,6 +762,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         pendingWrite =
             PendingSetWrite(
                 exercise = exercise,
+                // The slot's own description when the set came from a plan, so
+                // what is stored is what flattenPlan resolved and what
+                // SetAnalyzer was handed. An ad-hoc set has no plan to
+                // describe, so its geometry is the built-in definition's.
+                geometry = slot?.geometry ?: SetGeometryPolicy.describe(exercise, null),
                 slot = slot,
                 isTimed = isTimed,
                 loadKg = loadKg,
@@ -935,6 +943,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     startedAtMs = p.startedAtMs,
                     endedAtMs = p.endedAtMs,
                     analysis = analysis,
+                    geometry = p.geometry,
                     imuSamples = p.samples,
                     hrSamples = p.hrSamples,
                     voiceCues = p.cues,

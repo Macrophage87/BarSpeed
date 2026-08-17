@@ -3,10 +3,13 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.VelocityEstimator
 import com.macrophage.barspeed.model.ExerciseExport
+import com.macrophage.barspeed.model.GeometryExport
+import com.macrophage.barspeed.model.GeometrySourceExport
 import com.macrophage.barspeed.model.HrSessionSummary
 import com.macrophage.barspeed.model.HrSetSummary
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RepMetricsExport
+import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.SetExport
 import com.macrophage.barspeed.model.SetSummaryExport
@@ -124,6 +127,16 @@ class SessionExporter(
             // requested leaves the summary-only reader holding the numbers with
             // the warning removed.
             repMetricsComplete = if (reps.isNotEmpty()) reps.size == record.actualReps else null,
+            // The input the tempo verdict above was reached from. Published
+            // because tempoCompliance is not checkable without it: the digits
+            // are positional, so which stroke is the eccentric follows from the
+            // drive direction and the plane rather than from the digit order.
+            //
+            // Absent when the row carries none, and never defaulted in. Every
+            // set recorded before this column existed is permanently in that
+            // state, and a fabricated "vertical, drive up, sensor on the bar"
+            // would read identically to a squat that really was measured so.
+            geometry = sessionRepository.decodeGeometry(record)?.let(::geometryExport),
             repMetrics =
             if (includeRepDetail && reps.isNotEmpty()) {
                 reps.map {
@@ -155,6 +168,32 @@ class SessionExporter(
             ),
         )
     }
+
+    /**
+     * Into the plan's own vocabulary, so a reader holding both schemas reads
+     * `"concentric": "down"` the same way in each.
+     *
+     * [ResolvedGeometry] speaks in the app's terms because it records what the
+     * app used; this is the one place the two vocabularies meet.
+     */
+    private fun geometryExport(g: ResolvedGeometry) = GeometryExport(
+        startsWith = g.startsWith.name.lowercase(),
+        concentric = if (g.concentricUp) "up" else "down",
+        plane = if (g.horizontal) "horizontal" else "vertical",
+        sensorOnStack = g.sensorOnStack,
+        sensorInverted = g.sensorInverted,
+        travelRatio = g.travelRatio,
+        kind = g.kind.name.lowercase(),
+        bodyweight = g.bodyweight,
+        source =
+        GeometrySourceExport(
+            startsWith = g.sources.startsWith.name.lowercase(),
+            concentric = g.sources.concentric.name.lowercase(),
+            plane = g.sources.plane.name.lowercase(),
+            kind = g.sources.kind.name.lowercase(),
+            travelRatio = g.sources.travelRatio.name.lowercase(),
+        ),
+    )
 
     private fun List<Double>.averageOrNull(): Double? = if (isEmpty()) null else average()
 
@@ -231,6 +270,13 @@ class RawExporter(
         fun str(key: String, value: String?) = value?.let { fields += "\"$key\": \"${it.replace("\"", "'")}\"" }
         fun flag(key: String, value: Boolean) = if (value) fields += "\"$key\": true" else Unit
 
+        // Not [flag]. That one omits a false, which is right for warmup and
+        // failed -- absence there reads correctly as "not flagged" -- and wrong
+        // for geometry, where a reader that cannot see the key has to decide
+        // whether the sensor was on a stack, and "the app did not say" and
+        // "the app said no" are different answers.
+        fun bool(key: String, value: Boolean) = fields.add("\"$key\": $value")
+
         num("set", idx + 1)
         str("exercise", record.exerciseId)
         num("load_kg", record.loadKg)
@@ -244,6 +290,26 @@ class RawExporter(
         flag("warmup", record.warmup)
         flag("repsManual", record.repsManual)
         str("tempoPrescribed", record.tempo)
+        // Which way the lift moved and how the sensor was mounted.
+        //
+        // This manifest is the only thing a reader who opens the CSVs alone
+        // has: the samples are device-frame and carry no phase labels, so
+        // without this there is nothing to tell an eccentric from a concentric.
+        // On a leg curl or a pushdown the down stroke is the drive, and no
+        // accelerometer trace says so.
+        //
+        // Omitted entirely for a set that carries no stored geometry, which is
+        // every set recorded before the column existed.
+        sessionRepository.decodeGeometry(record)?.let { g ->
+            str("startsWith", g.startsWith.name.lowercase())
+            str("concentric", if (g.concentricUp) "up" else "down")
+            str("plane", if (g.horizontal) "horizontal" else "vertical")
+            bool("sensorOnStack", g.sensorOnStack)
+            bool("sensorInverted", g.sensorInverted)
+            num("travelRatio", g.travelRatio)
+            str("kind", g.kind.name.lowercase())
+            bool("bodyweight", g.bodyweight)
+        }
         num("startedAt_ms", record.startedAtMs)
         num("endedAt_ms", record.endedAtMs)
         // Decoded once and shared. Two figures below are read off the same

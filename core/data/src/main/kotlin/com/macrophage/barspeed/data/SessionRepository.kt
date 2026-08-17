@@ -146,6 +146,11 @@ class SessionRepository(
                 startedAtMs = set.startedAtMs,
                 endedAtMs = set.endedAtMs,
                 analysisJson = json.encodeToString(SetAnalysis.serializer(), set.analysis),
+                // Written only when the caller states one. There is no default
+                // to fall back on: an invented geometry reads exactly like a
+                // measured one and would be believed.
+                geometryJson =
+                set.geometry?.let { json.encodeToString(ResolvedGeometry.serializer(), it) },
                 hrEndOfSetBpm = set.hrSamples.lastOrNull()?.bpm,
                 hrAvgBpm = if (hr.isEmpty()) null else hr.average().toInt(),
                 hrMaxBpm = hr.maxOrNull(),
