@@ -410,8 +410,31 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         if (slot.isExerciseChange) {
             MoveSensorCard(slot.exercise.displayName)
         }
-        SlotCard(slot, heading = "Up next", unit = state.weightUnit, highlight = true)
+        SlotCard(
+            slot,
+            heading = "Up next",
+            unit = state.weightUnit,
+            highlight = true,
+            plateLoadKgOverride = state.statedLoadKg,
+        )
         SwitchExerciseSection(state, viewModel)
+        Spacer(Modifier.height(8.dp))
+        // The only load input a plan set gets. READY renders at most once per
+        // session -- startNextSet writes READY and calls beginSet in the same
+        // frame -- so without this, set 1 is the one set of a plan session the
+        // lifter cannot say anything about, and it records the prescription
+        // whatever went on the bar.
+        Text(
+            "Adjust this set (deviations are recorded)",
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+        OutlinedTextField(
+            value = state.loadInput,
+            onValueChange = viewModel::updateLoadInput,
+            label = { Text("Load (${state.weightUnit.suffix})") },
+            modifier = Modifier.fillMaxWidth(),
+        )
     } else {
         AdHocForm(state, viewModel)
     }
@@ -865,7 +888,13 @@ private fun InSetHeader(state: RecordState, slot: PlannedSlot?) {
     // is on screen while the set that will carry that number is being done, so
     // a second reading of the load here would be a number the row does not
     // contain. `slot` is state.currentSlot at all five call sites.
-    val loadKg = SetLoadPolicy.resolve(state.adHoc, slot?.loadKg, state.weightUnit.parseToKg(state.loadInput), null)
+    val loadKg =
+        SetLoadPolicy.resolve(
+            state.adHoc,
+            slot?.loadKg,
+            state.weightUnit.parseToKg(state.loadInput),
+            state.statedLoadKg,
+        )
     val side = if (state.adHoc) state.sideInput else slot?.side
     val parts =
         listOfNotNull(
@@ -1159,6 +1188,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
             heading = "Up next · Set ${next.setIndexInExercise + 1} of ${next.setsInExercise}",
             unit = state.weightUnit,
             highlight = true,
+            plateLoadKgOverride = state.statedLoadKg,
         )
         SwitchExerciseSection(state, viewModel)
         Spacer(Modifier.height(8.dp))
@@ -1736,7 +1766,13 @@ private fun powerSummary(analysis: SetAnalysis): String? {
 }
 
 @Composable
-private fun SlotCard(slot: PlannedSlot, heading: String, unit: WeightUnit, highlight: Boolean = false) {
+private fun SlotCard(
+    slot: PlannedSlot,
+    heading: String,
+    unit: WeightUnit,
+    highlight: Boolean = false,
+    plateLoadKgOverride: Double? = null,
+) {
     val shape = RoundedCornerShape(16.dp)
     val border =
         if (highlight) Modifier.border(1.dp, BarColors.Volt.copy(alpha = 0.25f), shape) else Modifier
@@ -1772,8 +1808,15 @@ private fun SlotCard(slot: PlannedSlot, heading: String, unit: WeightUnit, highl
                 Spacer(Modifier.height(4.dp))
                 Text("“$notes”", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
             }
+            // The plate line is an INSTRUCTION, not a description: the title
+            // above keeps stating what the plan asked for, but telling the
+            // lifter to load 100 while they have said 90 would be telling them
+            // to do the wrong thing. This also opens a case that could not
+            // arise before -- a barbell slot the plan gave no load for now
+            // draws a line once the lifter states one -- which is wanted:
+            // there was nothing to compute from before, and there is now.
             if (slot.exercise.usesBarbell) {
-                slot.loadKg?.takeIf { it > 0 }?.let { loadKg ->
+                (plateLoadKgOverride ?: slot.loadKg)?.takeIf { it > 0 }?.let { loadKg ->
                     plateLine(loadKg, unit)?.let {
                         Spacer(Modifier.height(4.dp))
                         Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Blue)

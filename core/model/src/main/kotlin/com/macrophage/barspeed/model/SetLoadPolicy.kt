@@ -40,20 +40,14 @@ object SetLoadPolicy {
      * set up. That is what lets a plan set honour a load the lifter gave while
      * still refusing to read a value left behind by an earlier set.
      *
-     * Nothing consumes it yet. The call sites pass it and this function ignores
-     * it, so that the differentials proving the precedence can fail before the
-     * one-line change that makes them pass. The suppression below and this
-     * paragraph both go with that change.
-     *
      * A 0 returned here is a real measurement of the added load, not a stand-in
      * for an unknown one, so it is a number rather than a null. Nothing
      * downstream reads it as data that was not collected: `SetAnalyzer` guards
      * bar power with `takeIf { it > 0 }`, so a zero added load on a non-
      * body-weight set suppresses the power figure instead of publishing 0 W.
      */
-    @Suppress("UnusedParameter")
     fun resolve(adHoc: Boolean, plannedAddedKg: Double?, typedAddedKg: Double?, statedAddedKg: Double?): Double =
-        if (adHoc) typedAddedKg ?: 0.0 else plannedAddedKg ?: 0.0
+        if (adHoc) typedAddedKg ?: 0.0 else statedAddedKg ?: plannedAddedKg ?: 0.0
 
     /**
      * The load to pre-fill the editable load field with before the next set, or

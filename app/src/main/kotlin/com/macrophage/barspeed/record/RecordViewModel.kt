@@ -622,6 +622,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     queue = queue,
                     queueIndex = 0,
                     adHoc = false,
+                    // Empty, not the plan's number rendered through
+                    // inputValue: that render is lossy, and seeding the field
+                    // with it would put a display-quantised value one keystroke
+                    // away from being recorded as the lifter's own. Empty also
+                    // stops the field opening on "60" -- or on whatever the
+                    // last session left -- under a card stating the plan's
+                    // load, which is #22's shape in an editable box.
+                    loadInput = "",
                     statedLoadKg = null,
                 )
         }
@@ -917,7 +925,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val slot = s.currentSlot
         val isTimed = s.currentIsTimed
         val addedKg =
-            SetLoadPolicy.resolve(s.adHoc, slot?.loadKg, s.weightUnit.parseToKg(s.loadInput), null)
+            SetLoadPolicy.resolve(s.adHoc, slot?.loadKg, s.weightUnit.parseToKg(s.loadInput), s.statedLoadKg)
         // Pull-ups and dips move the lifter: the plan's number is what was ADDED
         // (negative when a band or machine assists), so the load that actually
         // travelled is body weight plus that.
