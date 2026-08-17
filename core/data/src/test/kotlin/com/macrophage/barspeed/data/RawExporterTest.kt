@@ -256,6 +256,33 @@ class RawExporterTest {
         assertEquals(samples.last().timestampMs, decoded.last().timestampMs)
     }
 
+    /**
+     * The manifest's top-level keys, exactly.
+     *
+     * The test above asserts every value but would go on passing after a key
+     * was added, and this file is the only definition `meta.json` has --
+     * `docs/schemas/` holds the plan and the session export and nothing for
+     * this document. So an exact key set is the whole of its published shape,
+     * and adding to it is a deliberate act rather than a side effect.
+     */
+    @Test
+    fun `the manifest states exactly the top-level keys it states today`() = runTest {
+        val manifest = meta(listOf(row(id = 5L)), emptyMap())
+        assertEquals(
+            setOf(
+                "epoch",
+                "appVersion",
+                "sensorModel",
+                "analysisFile",
+                "csvHeaderImu",
+                "csvHeaderHrm",
+                "csvHeaderCues",
+                "sets",
+            ),
+            manifest.keys,
+        )
+    }
+
     @Test
     fun `sets are numbered from one in the order they were performed`() = runTest {
         val manifest =

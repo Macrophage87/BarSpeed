@@ -19,6 +19,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -262,6 +263,57 @@ class SessionExporterTest {
     /** The first set object of the export, as it lands on the wire. */
     private suspend fun setObject(includeRepDetail: Boolean = true): JsonObject =
         exerciseObject(includeRepDetail).getValue("sets").jsonArray.single().jsonObject
+
+    /** The whole export object, as it lands on the wire. */
+    private suspend fun rootObject(includeRepDetail: Boolean = true): JsonObject {
+        val text = exporter(analysis(3), actualReps = 3, repsManual = false).exportJson(1L, includeRepDetail)!!
+        return Json.parseToJsonElement(text).jsonObject
+    }
+
+    // ---- issue 75: what the export says about WHEN the session happened -----
+
+    /**
+     * Both session-level instants are rendered UTC with a `Z` designator.
+     *
+     * Pinned as exact strings before anything moves, because the rendering is
+     * not a choice the exporter makes and could be changed by accident.
+     * `Instant.toString()` is `DateTimeFormatter.ISO_INSTANT`, which emits UTC
+     * whatever the default zone is -- verified by running it under
+     * `-Duser.timezone=America/New_York`, not by reading the javadoc. So the
+     * `Z` is honest and these values are correct instants; what they do not
+     * carry is the offset the device was on, which is issue 75.
+     *
+     * The fixture's 1000 ms and 61000 ms are epoch millis, so these are the
+     * first minute of 1970 and nothing about that is arbitrary.
+     */
+    @Test
+    fun `the session instants are rendered as UTC with a Z designator`() = runTest {
+        val root = rootObject()
+        assertEquals("1970-01-01T00:00:01Z", root.getValue("startedAt").jsonPrimitive.content)
+        assertEquals("1970-01-01T00:01:01Z", root.getValue("endedAt").jsonPrimitive.content)
+    }
+
+    /**
+     * The root object's keys, exactly.
+     *
+     * The same instrument as `the exercise object states only its id and its
+     * sets`, one level up: an exact set, because the point is what is ABSENT.
+     * A containment assertion would go on passing after a key was added, and
+     * the root object is the published contract's top level -- a key appearing
+     * there without `docs/schemas/session-export.schema.json` and its example
+     * moving in the same commit is a contract break that ajv would catch only
+     * because the schema sets `additionalProperties: false`.
+     *
+     * `notes` is absent from this fixture's session row and `explicitNulls =
+     * false` drops it, so the absent-optional keys are part of what is pinned.
+     */
+    @Test
+    fun `the export root states exactly the keys it states today`() = runTest {
+        assertEquals(
+            setOf("schemaVersion", "startedAt", "endedAt", "exercises"),
+            rootObject().keys,
+        )
+    }
 
     // ---- issue 73: what the export says about how the set was measured -----
 

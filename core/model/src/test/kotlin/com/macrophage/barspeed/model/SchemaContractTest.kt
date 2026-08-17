@@ -94,6 +94,27 @@ class SchemaContractTest {
     }
 
     /**
+     * The session export requires exactly three keys of a reader, and no more.
+     *
+     * Every version of this contract so far has claimed to be additive -- 1.2's
+     * own description says a 1.1 reader "works unchanged". That claim is only
+     * checkable against something, and this is it: a key added to `required`
+     * makes every export written by an older app version invalid, and a key
+     * REMOVED from it silently relaxes what a consumer may assume. Neither is
+     * visible in a diff of the properties block, which is where the eye goes.
+     *
+     * Deliberately not derived from [SessionExport]'s non-nullable fields. A
+     * descriptor-derived assertion would follow a Kotlin nullability change
+     * silently, which is the drift this pin exists to catch.
+     */
+    @Test
+    fun `the session export requires exactly the three keys it requires today`() {
+        val required = schema("session-export.schema.json")["required"]!!
+            .jsonArray.map { it.jsonPrimitive.content }.toSet()
+        assertEquals(setOf("schemaVersion", "startedAt", "exercises"), required, "export required keys drifted")
+    }
+
+    /**
      * The exported geometry speaks the plan's vocabulary, and must go on doing
      * so. A consumer holding both schemas reads `"concentric": "down"` the same
      * way in each; a divergence would make the export's own declaration
