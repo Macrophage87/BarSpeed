@@ -20,8 +20,8 @@ android {
         applicationId = "com.macrophage.barspeed"
         minSdk = 26
         targetSdk = 35
-        versionCode = 38
-        versionName = "0.1.37"
+        versionCode = 39
+        versionName = "0.1.38"
     }
 
     signingConfigs {
