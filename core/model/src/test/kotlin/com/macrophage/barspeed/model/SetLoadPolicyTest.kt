@@ -41,6 +41,28 @@ class SetLoadPolicyTest {
     }
 
     /**
+     * The #44 scenario as it behaves today. The plan says 100 kg, the bar has
+     * 90, and there is nowhere to say so. A typed 90 is not a stale default --
+     * it is the shape a deliberate correction would take -- and it is still not
+     * consulted, because on a plan set the text field is not evidence.
+     */
+    @Test
+    fun `resolve ignores a typed correction on a plan set`() {
+        assertEquals(100.0, SetLoadPolicy.resolve(adHoc = false, plannedAddedKg = 100.0, typedAddedKg = 90.0))
+    }
+
+    /**
+     * adHoc short-circuits before the plan is consulted at all. Nothing
+     * populates plannedAddedKg on an ad-hoc set today, so this pins the branch
+     * rather than a reachable state -- and it is the branch a fourth input must
+     * not disturb.
+     */
+    @Test
+    fun `resolve prefers the typed load on an ad-hoc set even when a load is planned`() {
+        assertEquals(60.0, SetLoadPolicy.resolve(adHoc = true, plannedAddedKg = 100.0, typedAddedKg = 60.0))
+    }
+
+    /**
      * A plan set that names no load added nothing, and the load text field is
      * not evidence about it. The field defaults to "60", startPlanSession never
      * resets it, and a plan session's READY screen does not draw it at all — so
