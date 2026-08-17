@@ -49,7 +49,7 @@ fun PermissionBanner(demoMode: Boolean = false, modifier: Modifier = Modifier) {
     if (step == BlePermissionStep.GRANTED) return
     Card(modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(Modifier.padding(12.dp)) {
-            PermissionBannerBody(demoMode, headline = true)
+            PermissionBannerBody(step, demoMode, headline = true)
         }
     }
 }
@@ -59,11 +59,19 @@ fun PermissionBanner(demoMode: Boolean = false, modifier: Modifier = Modifier) {
  * card around it: the record screen's "Bar sensor not connected" card, whose
  * advice this replaces. [headline] is dropped there because that card carries
  * its own title.
+ *
+ * [step] is passed in rather than collected here. RecordScreen's SETUP stage
+ * already reads the same `StateFlow` to decide whether to draw this at all;
+ * an independent `collectAsState` here gave that decision and this body two
+ * separate `MutableState`s over one flow, so a recomposition triggered by one
+ * could render this for a frame with the other's stale value -- the SETUP
+ * card's title reading "not connected" over an empty body being the visible
+ * case. One subscription now, owned by the caller that decides whether to draw
+ * at all; see [PermissionBanner] for the one caller that still owns it here.
  */
 @Composable
-fun PermissionBannerBody(demoMode: Boolean = false, headline: Boolean = false) {
+fun PermissionBannerBody(step: BlePermissionStep, demoMode: Boolean = false, headline: Boolean = false) {
     val ui = LocalBlePermissionUi.current
-    val step by ui.step.collectAsState()
     if (step == BlePermissionStep.GRANTED) return
 
     Column {

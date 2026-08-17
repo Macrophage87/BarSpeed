@@ -348,7 +348,7 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
                         color = BarColors.Sub,
                     )
                 } else {
-                    PermissionBannerBody(demoMode = state.demoMode)
+                    PermissionBannerBody(step = permissionHeld, demoMode = state.demoMode)
                 }
                 FilterChip(
                     selected = state.demoMode,
