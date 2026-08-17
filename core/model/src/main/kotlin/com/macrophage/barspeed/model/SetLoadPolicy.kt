@@ -73,4 +73,26 @@ object SetLoadPolicy {
      */
     fun seedAddedKg(hasPlannedNext: Boolean, nextDeclaredAddedKg: Double?, lastAddedKg: Double?): Double? =
         if (hasPlannedNext) nextDeclaredAddedKg ?: 0.0 else lastAddedKg
+
+    /**
+     * The added load the upcoming planned slot carries once the lifter taps
+     * through to it, replacing what the plan declared.
+     *
+     * [declaredAddedKg] is the slot's own load, still the plan's number because
+     * this slot has not been through this function yet.
+     *
+     * [typedAddedKg] is the rest screen's load field parsed. It is what the
+     * carry reads today and the reason #45 exists: the field was seeded from
+     * the declaration through inputValue, which quantises to 0.1 of the DISPLAY
+     * unit, so reading it back replaces the plan's own number with a rounded
+     * one even when the lifter never touched the box. A plan declaring 175 lb
+     * then records 79.4 against a plannedLoadKg of 79.3786647517562, and the
+     * session detail screen prints a deviation the lifter did not make.
+     *
+     * [statedAddedKg] is what they actually said, null when they said nothing.
+     * Nothing reads it yet; the differentials that prove it must come first.
+     */
+    @Suppress("UnusedParameter")
+    fun carriedIntoNextSet(declaredAddedKg: Double?, typedAddedKg: Double?, statedAddedKg: Double?): Double? =
+        typedAddedKg ?: declaredAddedKg
 }

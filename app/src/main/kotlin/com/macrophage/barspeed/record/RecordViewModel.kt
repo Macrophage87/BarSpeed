@@ -312,7 +312,12 @@ private fun advancedState(s: RecordState): RecordState {
     if (s.adHoc || next == null) return s.copy(stage = Stage.READY, statedLoadKg = null)
     val edited =
         next.copy(
-            loadKg = s.weightUnit.parseToKg(s.loadInput) ?: next.loadKg,
+            loadKg =
+            SetLoadPolicy.carriedIntoNextSet(
+                declaredAddedKg = next.loadKg,
+                typedAddedKg = s.weightUnit.parseToKg(s.loadInput),
+                statedAddedKg = s.statedLoadKg,
+            ),
             reps = if (next.isTimed) next.reps else s.repsInput.toIntOrNull() ?: next.reps,
             durationS = if (next.isTimed) s.durationInput.toIntOrNull() ?: next.durationS else next.durationS,
             tempo = s.tempoInput.ifBlank { null } ?: next.tempo,
