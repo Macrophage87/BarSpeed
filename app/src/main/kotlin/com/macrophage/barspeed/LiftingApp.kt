@@ -33,6 +33,13 @@ class AppContainer(app: Application) {
      * neither the Activity nor the launcher may be parked here.
      */
     val blePermissionGate = BlePermissionGate()
+
+    /**
+     * Process-scoped for the same reason [appScope] is: it answers a question
+     * asked while the record screen's ViewModel is being destroyed, about work
+     * that outlives it. See [RecordingHolds].
+     */
+    val recordingHolds = RecordingHolds(app)
 }
 
 class LiftingApp : Application() {

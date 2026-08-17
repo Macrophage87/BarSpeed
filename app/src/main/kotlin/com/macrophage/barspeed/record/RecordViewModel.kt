@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
-import com.macrophage.barspeed.RecordingService
 import com.macrophage.barspeed.VoiceCounter
 import com.macrophage.barspeed.ble.ConnectionState
 import com.macrophage.barspeed.data.CompletedSet
@@ -22,6 +21,7 @@ import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
+import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.SessionCloseState
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetWriteState
@@ -308,8 +308,17 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      */
     private var writtenSetId: Long? = null
 
+    /**
+     * Why the foreground service is running, for the whole process.
+     *
+     * Not a field of this ViewModel's own, and that is the point: the question
+     * it answers is asked in [onCleared], as this instance is being destroyed,
+     * about work that outlives it.
+     */
+    private val holds = container.recordingHolds
+
     /** Closing the session, on the scope this screen going away cannot cancel. */
-    private val closer = SessionCloser(sessionRepository, container.appScope)
+    private val closer = SessionCloser(sessionRepository, container.appScope, holds)
 
     /** All R-R intervals seen during the active session (sets + rests) for session HRV. */
     private val sessionRrMs = mutableListOf<Double>()
@@ -530,7 +539,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val guidedSet = !s.currentIsTimed && exercise.kind != ExerciseKind.EXPLOSIVE && guidedTempo != null
         if (guidedSet) manualSet = true
         setStartedAtMs = System.currentTimeMillis()
-        RecordingService.start(getApplication())
+        // Every set, not just the first. All three catch clauses in
+        // RecordingService.onStartCommand end in stopSelf(startId), so a start
+        // that was refused leaves nothing running and this is the only retry.
+        holds.acquire(RecordingHold.SESSION)
 
         val timedTargetS = s.currentTimedTargetS
         collectJob =
@@ -812,10 +824,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * now arrive after the screen is gone. Swallowing it silently would be worse
      * than the crash, so the failure becomes a state the screen shows and a
      * retry the lifter can tap, with the buffers still in memory behind it.
+     *
+     * The hold is what keeps the process worth as much to Android as the work
+     * is worth to the lifter. Surviving the pop was only half the problem: the
+     * write can outlive the screen and still be running when [onCleared] gives
+     * the foreground service up, and everything it is carrying — the samples,
+     * the rating, the wall times — exists in this process and nowhere else
+     * until the insert lands.
      */
     private fun launchSetWrite() {
         val pending = pendingWrite ?: return
         stateFlow.value = stateFlow.value.copy(setWrite = SetWriteState.IN_FLIGHT)
+        holds.acquire(RecordingHold.SET_WRITE)
         container.appScope.launch(Dispatchers.Main.immediate) {
             try {
                 runSetWrite(pending)
@@ -826,6 +846,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 // memory, and the one thing that must not happen is the screen
                 // moving on as though it had been stored.
                 stateFlow.value = stateFlow.value.copy(setWrite = SetWriteState.FAILED)
+            } finally {
+                // Both terminal branches. A write that failed is still a write
+                // that is over: if the lifter is still here their own hold keeps
+                // the service up behind SAVE THIS SET AGAIN, and if they have
+                // gone the buffers went with the ViewModel and there is nothing
+                // left for the service to protect.
+                holds.release(RecordingHold.SET_WRITE)
             }
         }
     }
@@ -1095,8 +1122,21 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = stateFlow.value.copy(sessionClose = close)
     }
 
+    /**
+     * The session is closed. The screen has no further use for the service.
+     *
+     * [RecordingHold.SESSION] rather than the close's own hold, and getting that
+     * wrong is a real hazard rather than a naming quibble: this runs inside
+     * [SessionCloser]'s try, so its `finally` releases
+     * [RecordingHold.SESSION_CLOSE] a moment later and that release is what
+     * emits the stop. Releasing the close's hold here instead would leave the
+     * screen's hold held with nothing able to give it up, and `FinishedStage`
+     * navigates on a tap and never on its own — so the lifter would sit on the
+     * finished-session screen with a "Recording session" notification that
+     * nothing takes down.
+     */
     private fun onSessionClosed() {
-        RecordingService.stop(getApplication())
+        holds.release(RecordingHold.SESSION)
         stateFlow.value =
             stateFlow.value.copy(stage = Stage.FINISHED, sessionClose = SessionCloseState.NONE)
     }
@@ -1135,10 +1175,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * is a bare cancel of the context. Everything here is therefore called
      * inline.
      *
-     * The stop is unconditional and needs no flag of its own.
-     * [RecordingService.start] fires on every [beginSet], and [RecordingService.stop]
-     * was reachable only from [finishSession] — so leaving by any other route
-     * left the service running with nothing else able to stop it.
+     * The stop is routed through `RecordingHolds` as of this commit, and the
+     * behaviour is unchanged by that: `RecordingServicePolicy` still answers a
+     * released [RecordingHold.SESSION] with a stop whatever else is running, so
+     * this is the same unconditional stop it was, reached through a seam that
+     * can be tested. `RecordingService.start` fires on every [beginSet], and
+     * the stop was reachable only from [finishSession] — so leaving by any
+     * other route left the service running with nothing else able to stop it.
      * `stopService` on a service that was never started is a no-op.
      *
      * The reason given here for it being safe is no longer the whole truth, and
@@ -1149,14 +1192,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * into a [PendingSetWrite] BEFORE launching, and that write runs on
      * `appScope`, so a set can still be in the middle of being stored at the
      * moment this runs. Stopping the service here drops the process out of
-     * foreground priority for the few hundred milliseconds that write needs.
+     * foreground priority for as long as that write still needs.
      *
-     * Left unconditional anyway, deliberately. Whether Android actually kills a
-     * cached process inside that window cannot be measured without a device,
-     * and making the stop conditional to protect against something unmeasured
-     * would trade a notification bug that was observed for a data bug that was
-     * not. It is a field item on this commit rather than a change to this
-     * function.
+     * Still unconditional at THIS commit, which introduces the seam without
+     * changing what it decides. The two pins named `(pre-fix)` in
+     * `RecordingServicePolicyTest` are what say so, and the commit that inverts
+     * them is the one that closes this.
      *
      * This writes nothing to the database, and that is now a settled ruling
      * rather than deferred work. The session row is left open with `endedAtMs`
@@ -1192,7 +1233,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         voice?.shutdown()
         voice = null
-        RecordingService.stop(getApplication())
+        holds.release(RecordingHold.SESSION)
         super.onCleared()
     }
 

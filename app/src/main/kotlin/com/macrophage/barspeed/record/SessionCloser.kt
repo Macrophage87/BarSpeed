@@ -1,7 +1,9 @@
 package com.macrophage.barspeed.record
 
+import com.macrophage.barspeed.RecordingHolds
 import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.hrm.Hrv
+import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.SessionCloseState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -55,6 +57,7 @@ private data class PendingSessionClose(
 class SessionCloser(
     private val repository: SessionRepository,
     private val scope: CoroutineScope,
+    private val holds: RecordingHolds,
 ) {
     /**
      * True once a close has been asked for, and never cleared.
@@ -100,6 +103,13 @@ class SessionCloser(
     private fun run(onState: (SessionCloseState) -> Unit, onClosed: () -> Unit) {
         val p = pending ?: return
         onState(SessionCloseState.IN_FLIGHT)
+        // Taken before the launch and given up in the finally below, so the
+        // process keeps foreground-service priority for as long as the close is
+        // outstanding. The prompt this window raises offers the lifter a labelled
+        // exit that promises the close lands either way; dropping priority on the
+        // way out is what would make that promise false, and hrvRmssdMs is the
+        // column that cannot be rebuilt from anything durable.
+        holds.acquire(RecordingHold.SESSION_CLOSE)
         scope.launch(Dispatchers.Main.immediate) {
             try {
                 p.sessionId?.let { repository.endSession(it, p.endedAtMs, p.hrvRmssdMs) }
@@ -116,6 +126,13 @@ class SessionCloser(
                 // account of why. The failure becomes a state the screen shows,
                 // with the frozen close still behind it.
                 onState(SessionCloseState.FAILED)
+            } finally {
+                // Both terminal branches, which is why it is a finally and not a
+                // line at the end of the try. A failed close still ends the
+                // close: if the lifter is still here the screen's own hold keeps
+                // the service up for the retry, and if they are gone there is
+                // nothing left to protect.
+                holds.release(RecordingHold.SESSION_CLOSE)
             }
         }
     }
