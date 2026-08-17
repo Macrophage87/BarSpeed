@@ -260,7 +260,7 @@
         },
         "repMetricsComplete": {
           "type": "boolean",
-          "description": "False when the per-rep array does not cover every performed rep \u2014 the sensor segmenter resolved fewer (or more) than the lifter/voice counted. Per-rep detail is then a sample of the set, not the set, and the summary and tempo compliance are drawn from that sample too."
+          "description": "False when the sensor segmenter resolved a different number of reps than the set records \u2014 fewer, or more, than the lifter or the voice guide counted. Everything derived from the segmented reps is then drawn from a sample of the set rather than from the set: velocityLoss_pct, tempoCompliance, summary, and the repMetrics array where one is present. Read false as a caveat on those figures whether or not per-rep detail was requested. True is weaker than it looks: when repsManual is false the recorded count IS the segmenter's count, so the two agree by construction and this says nothing independent. Absent means the segmenter resolved no reps at all, which is a third state and not a synonym for false \u2014 nothing derived from reps is published either, so there is no figure left to qualify."
         }
       }
     },

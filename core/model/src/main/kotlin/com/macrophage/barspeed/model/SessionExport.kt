@@ -77,10 +77,23 @@ data class SetExport(
     /** Spoken cues with epoch-ms stamps, cross-referenceable with the raw IMU stream (detailed export only). */
     val voiceCues: List<VoiceCue>? = null,
     /**
-     * False when the per-rep array does not cover every performed rep — the
-     * sensor segmenter found a different number than the lifter/voice counted.
-     * Per-rep detail is then a sample, not the set, and summaries built from it
-     * (velocity loss, tempo compliance) are drawn from that sample too.
+     * False when the sensor segmenter resolved a different number of reps than
+     * the set records — the lifter or the voice guide counted something else.
+     *
+     * Stated without reference to [repMetrics], deliberately. Everything drawn
+     * from the segmented reps carries this caveat — [velocityLossPct],
+     * [tempoCompliance] and [summary] as much as the per-rep array — and those
+     * three are published whether or not per-rep detail was asked for, so a
+     * caveat that only appears alongside the array leaves the summary-only
+     * reader holding the numbers without the warning.
+     *
+     * True is weaker than it looks and should not be read as an independent
+     * check: when [repsManual] is false the stored rep count IS the segmenter's
+     * count, so the two agree by construction. Only false carries information
+     * the reader could not derive from [repsManual] alone.
+     *
+     * Null is a third state, not a synonym for false: the segmenter resolved no
+     * reps at all, so there is no figure left to qualify.
      */
     val repMetricsComplete: Boolean? = null,
     /** Always-included summary across reps. */
