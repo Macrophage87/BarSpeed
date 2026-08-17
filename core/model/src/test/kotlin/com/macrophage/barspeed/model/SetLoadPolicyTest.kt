@@ -292,6 +292,70 @@ class SetLoadPolicyTest {
     }
 
     /**
+     * #45. The lifter never touched the load field, so what the next set
+     * records must be the plan's own number, bit for bit -- not what survived
+     * being rendered into a text box and read back out.
+     *
+     * The two cases are the same defect from opposite sides: a plan declared in
+     * pounds loses precision on a kg display, and a plan declared in kilograms
+     * loses it on an lb display. Neither display unit is the safe one.
+     */
+    @Test
+    fun `an untouched field carries the plan's declared load unchanged`() {
+        val declaredInLb = 175 / WeightUnit.LB_PER_KG
+        assertEquals(
+            declaredInLb,
+            SetLoadPolicy.carriedIntoNextSet(
+                declaredAddedKg = declaredInLb,
+                typedAddedKg = WeightUnit.KG.parseToKg(WeightUnit.KG.inputValue(declaredInLb)),
+                statedAddedKg = null,
+            ),
+        )
+        assertEquals(
+            100.0,
+            SetLoadPolicy.carriedIntoNextSet(
+                declaredAddedKg = 100.0,
+                typedAddedKg = WeightUnit.LB.parseToKg(WeightUnit.LB.inputValue(100.0)),
+                statedAddedKg = null,
+            ),
+        )
+    }
+
+    /**
+     * A load the lifter did state is carried, and it is theirs rather than the
+     * plan's -- so the deviation the session detail screen then shows is a real
+     * one.
+     */
+    @Test
+    fun `a stated load is what the next set carries`() {
+        val declaredInLb = 175 / WeightUnit.LB_PER_KG
+        assertEquals(
+            90.0,
+            SetLoadPolicy.carriedIntoNextSet(
+                declaredAddedKg = declaredInLb,
+                typedAddedKg = WeightUnit.KG.parseToKg(WeightUnit.KG.inputValue(declaredInLb)),
+                statedAddedKg = 90.0,
+            ),
+        )
+    }
+
+    /**
+     * A slot the plan gave no load for carries none. Green before this change
+     * and green after: the elvis chain must not turn a declared absence into a
+     * number.
+     */
+    @Test
+    fun `a loadless next slot carries no load`() {
+        assertNull(
+            SetLoadPolicy.carriedIntoNextSet(
+                declaredAddedKg = null,
+                typedAddedKg = null,
+                statedAddedKg = null,
+            ),
+        )
+    }
+
+    /**
      * The switch-exercise route. jumpToExercise has no last load to offer, so
      * the seed is driven entirely by what the exercise it landed on declares —
      * and a loadless one must clear the field rather than leave the previous
