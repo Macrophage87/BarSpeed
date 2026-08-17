@@ -62,13 +62,13 @@ fun PermissionBannerBody(demoMode: Boolean = false, headline: Boolean = false) {
     Column {
         if (headline) {
             Text(
-                "Bar sensor blocked",
+                bannerHeadline(step),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = BarColors.Amber,
             )
         }
-        Text(consequence(demoMode), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+        Text(consequence(demoMode, step), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
         if (step == BlePermissionStep.SETTINGS_ONLY || step == BlePermissionStep.ASK_AGAIN_OR_SETTINGS) {
             Text(
                 "If no dialog appears, turn it on in Settings → Permissions → ${permissionLabel()}.",
@@ -105,9 +105,34 @@ private fun permissionLabel(): String =
         "Location"
     }
 
-private fun consequence(demoMode: Boolean): String {
+/**
+ * The headline, which must not claim a denial before one has happened.
+ *
+ * AWAITING_ANSWER is the state the very first frame of a cold launch draws in:
+ * `MainActivity.onCreate` calls `ensureAsked` before `setContent`, so the
+ * system dialog is up or about to be before the lifter has answered anything.
+ * "Bar sensor blocked" there asserts what the lifter did from a state that
+ * records only that nobody has answered yet. The other three steps keep their
+ * wording unchanged.
+ */
+private fun bannerHeadline(step: BlePermissionStep): String = if (step == BlePermissionStep.AWAITING_ANSWER) {
+    "Bar sensor permission"
+} else {
+    "Bar sensor blocked"
+}
+
+private fun consequence(demoMode: Boolean, step: BlePermissionStep): String {
     val name = permissionLabel()
     return when {
+        // Same reasoning as bannerHeadline: nothing has been denied yet, so
+        // "is denied" / "cannot reach" would be false here. State only that a
+        // request is outstanding.
+        step == BlePermissionStep.AWAITING_ANSWER ->
+            if (demoMode) {
+                "BarSpeed is asking for $name. Demo mode does not need it."
+            } else {
+                "BarSpeed is asking for $name…"
+            }
         // Never a recommendation to use demo instead: what demo writes into a
         // set is a separate and unaddressed question.
         demoMode -> "$name is denied, so the bar sensor cannot be reached. Demo mode does not use it."
