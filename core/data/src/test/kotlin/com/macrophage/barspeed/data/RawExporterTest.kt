@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SyntheticSets
+import com.macrophage.barspeed.dsp.VelocityEstimator
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import kotlinx.coroutines.flow.Flow
@@ -253,16 +254,37 @@ class RawExporterTest {
      * the same double, because both are intervals-over-span across the same
      * samples. Pinned in [com.macrophage.barspeed.dsp.SampleRateTest] on the
      * DSP side; pinned here as what reaches the manifest.
+     *
+     * The stored rate is therefore computed from the fixture rather than
+     * chosen. Writing a round 100.0 beside a stream whose actual span gives
+     * 100.00000000000001 describes a set this app cannot produce -- the stored
+     * figure is never an independent number, it is this same arithmetic over
+     * this same stream -- and a pin built on an impossible pairing tests
+     * nothing about the real one. Asserting the exact double, not a band, so
+     * the two sources have to agree to the last bit.
      */
     @Test
     fun `an analysed set publishes the rate it was analysed at`() = runTest {
         val samples = stillSamples(20.0)
+        val analysedRate =
+            VelocityEstimator.measureSampleRate(
+                samples.size,
+                (samples.last().timestampMs - samples.first().timestampMs) / 1000.0,
+            )
+        assertTrue(analysedRate in 99.0..101.0, "the fixture must stream ~100 Hz, got $analysedRate")
         val manifest =
             meta(
-                listOf(row(id = 5L, exerciseId = "back_squat", durationS = null, analysis = analysedAt(100.0))),
-                mapOf(5L to listOf(imuStream(5L, samples, storedRate = 100.0))),
+                listOf(
+                    row(
+                        id = 5L,
+                        exerciseId = "back_squat",
+                        durationS = null,
+                        analysis = analysedAt(analysedRate),
+                    ),
+                ),
+                mapOf(5L to listOf(imuStream(5L, samples, storedRate = analysedRate))),
             )
-        assertEquals(100.0, manifest.set(0).num("sampleRate_hz"))
+        assertEquals(analysedRate, manifest.set(0).num("sampleRate_hz"))
     }
 
     /**
