@@ -8,6 +8,7 @@ import com.macrophage.barspeed.model.GeometrySourceExport
 import com.macrophage.barspeed.model.HrSessionSummary
 import com.macrophage.barspeed.model.HrSetSummary
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RepMetricsExport
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SessionExport
@@ -48,6 +49,12 @@ class SessionExporter(
         return SessionExport(
             startedAt = Instant.ofEpochMilli(session.startedAtMs).toString(),
             endedAt = session.endedAtMs?.let { Instant.ofEpochMilli(it).toString() },
+            // The two instants above are UTC and stay that way; this is what
+            // makes them readable as a time of day. Taken from the row rather
+            // than from ZoneId.systemDefault(): the exporting device's zone
+            // now is not evidence of the zone the session was recorded in, and
+            // a session recorded before these columns existed has no answer.
+            timeZone = RecordedTimeZone.of(session.zoneId, session.utcOffsetMinutes),
             planRef =
             listOfNotNull(session.planName, session.planSessionName)
                 .takeIf { it.isNotEmpty() }?.joinToString(" / "),
@@ -222,6 +229,19 @@ class RawExporter(
         val out = ByteArrayOutputStream()
         val meta = StringBuilder()
         meta.append("{\n  \"epoch\": \"${Instant.ofEpochMilli(session.startedAtMs)}\",\n")
+        // Beside the instant they qualify. The zip has to stand on its own: an
+        // analysis that opens only the CSVs has `epoch` and a pile of epoch
+        // milliseconds, and nothing that turns either into a local time of day.
+        //
+        // Flat keys here and a nested object in session.json, which is what the
+        // two documents already do with geometry. `timeZoneId` rather than
+        // `timeZone` so one key name never means a string in one artifact and
+        // an object in the other. Omitted entirely when the session carries no
+        // zone -- this file writes no null literals.
+        RecordedTimeZone.of(session.zoneId, session.utcOffsetMinutes)?.let { zone ->
+            meta.append("  \"utcOffsetMinutes\": ${zone.utcOffsetMinutes},\n")
+            meta.append("  \"timeZoneId\": \"${zone.id.replace("\"", "'")}\",\n")
+        }
         meta.append("  \"appVersion\": \"$appVersion\",\n  \"sensorModel\": \"WitMotion WT901BLECL\",\n")
         meta.append("  \"analysisFile\": \"session.json\",\n")
         meta.append("  \"csvHeaderImu\": \"${ImuCsv.HEADER}\",\n  \"csvHeaderHrm\": \"${HrCsv.HEADER}\",\n")

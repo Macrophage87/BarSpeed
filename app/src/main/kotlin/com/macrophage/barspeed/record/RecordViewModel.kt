@@ -22,6 +22,7 @@ import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
+import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SessionCloseState
@@ -41,6 +42,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.ZoneId
 
 /**
  * How the set felt, tapped at the moment the set ends. The effort grid IS the
@@ -149,13 +151,29 @@ private data class PendingSetWrite(
  * platform call it makes is visible in isolation and so that the argument list
  * does not sit inside [RecordViewModel] -- a class detekt already measures as
  * being at its size limit, where every future addition competes for room.
+ *
+ * [ZoneId.systemDefault] is the only thing here that cannot be tested: it reads
+ * the device setting, and no test in this repository runs on a device. What is
+ * done WITH it -- resolving the offset that applied at this session's own start
+ * instant, and refusing to report one at all when the id will not resolve --
+ * is [RecordedTimeZone.resolve], which is pure and pinned in `:core:model`.
+ *
+ * Resolved against [PendingSetWrite.startedAtMs] rather than against the
+ * current clock. The two are minutes apart in practice, but a zone's offset is
+ * a function of the instant -- America/New_York is -04:00 in August and -05:00
+ * in January -- so asking about the session's own instant is both free and the
+ * only form that cannot be wrong for a set recorded across a transition.
+ *
+ * Read here, at the moment the session row is created, and never afterwards. A
+ * zone read at export time would be the zone the phone is in then, which is a
+ * different fact wearing the same name.
  */
 private suspend fun openSession(repository: SessionRepository, p: PendingSetWrite): Long {
     return repository.startSession(
         planName = p.planName,
         planSessionName = p.planSessionName,
         startedAtMs = p.startedAtMs,
-        timeZone = null,
+        timeZone = RecordedTimeZone.resolve(ZoneId.systemDefault().id, p.startedAtMs),
     )
 }
 
