@@ -3,6 +3,7 @@ package com.macrophage.barspeed.model
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -58,6 +59,39 @@ class WeightUnitTest {
         assertNull(WeightUnit.KG.parseToKg("   "))
         assertNull(WeightUnit.KG.parseToKg("-"))
         assertEquals(0.0, WeightUnit.KG.parseToKg("0"))
+    }
+
+    /**
+     * The round trip a load makes when it passes through a load field:
+     * inputValue to seed the text, parseToKg to read the text back. It is the
+     * identity for some loads and not for others, and which is which is a
+     * property of the load AND the display unit together -- never of the
+     * display unit alone.
+     *
+     * A plan declaring 175 lb stores 79.3786647517562 kg. Shown in kg that
+     * comes back as 79.4; shown in lb it comes back bit-identical. But a kg
+     * display is not the lossy one and an lb display is not the safe one: 100
+     * kg shown in lb comes back as 100.01711758721281, and 45.359237 kg -- 100
+     * lb by the international definition -- is not exact even in lb, because
+     * LB_PER_KG is 2.2046226218, truncated from 2.20462262184878. The lb
+     * identity holds at this enum's own fixed points and nowhere else.
+     *
+     * Whatever the field round-trips, the recorded load must not depend on it.
+     * That is what the next-set carry stops doing.
+     */
+    @Test
+    fun `the load field round trip is not the identity`() {
+        val declaredInLb = 175 / WeightUnit.LB_PER_KG
+        assertEquals(79.4, WeightUnit.KG.parseToKg(WeightUnit.KG.inputValue(declaredInLb)))
+        assertNotEquals(declaredInLb, WeightUnit.KG.parseToKg(WeightUnit.KG.inputValue(declaredInLb)))
+        assertEquals(declaredInLb, WeightUnit.LB.parseToKg(WeightUnit.LB.inputValue(declaredInLb)))
+
+        assertEquals(100.0, WeightUnit.KG.parseToKg(WeightUnit.KG.inputValue(100.0)))
+        assertEquals(100.01711758721281, WeightUnit.LB.parseToKg(WeightUnit.LB.inputValue(100.0)))
+
+        val hundredLbExact = 45.359237
+        assertEquals("100", WeightUnit.LB.inputValue(hundredLbExact))
+        assertNotEquals(hundredLbExact, WeightUnit.LB.parseToKg(WeightUnit.LB.inputValue(hundredLbExact)))
     }
 
     @Test
