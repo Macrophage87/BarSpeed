@@ -16,28 +16,68 @@ import kotlin.test.assertNull
 class SetLoadPolicyTest {
     @Test
     fun `resolve uses the plan's declared load`() {
-        assertEquals(100.0, SetLoadPolicy.resolve(adHoc = false, plannedAddedKg = 100.0, typedAddedKg = 60.0))
+        assertEquals(
+            100.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = 100.0,
+                typedAddedKg = 60.0,
+                statedAddedKg = null,
+            ),
+        )
     }
 
     @Test
     fun `resolve honours a plan set that declares zero`() {
         // "load_kg": 0 is explicit bodyweight, distinct from declaring nothing.
-        assertEquals(0.0, SetLoadPolicy.resolve(adHoc = false, plannedAddedKg = 0.0, typedAddedKg = 60.0))
+        assertEquals(
+            0.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = 0.0,
+                typedAddedKg = 60.0,
+                statedAddedKg = null,
+            ),
+        )
     }
 
     @Test
     fun `resolve keeps a negative declared load for assisted work`() {
-        assertEquals(-20.0, SetLoadPolicy.resolve(adHoc = false, plannedAddedKg = -20.0, typedAddedKg = 60.0))
+        assertEquals(
+            -20.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = -20.0,
+                typedAddedKg = 60.0,
+                statedAddedKg = null,
+            ),
+        )
     }
 
     @Test
     fun `resolve uses the typed load for an ad-hoc set`() {
-        assertEquals(60.0, SetLoadPolicy.resolve(adHoc = true, plannedAddedKg = null, typedAddedKg = 60.0))
+        assertEquals(
+            60.0,
+            SetLoadPolicy.resolve(
+                adHoc = true,
+                plannedAddedKg = null,
+                typedAddedKg = 60.0,
+                statedAddedKg = null,
+            ),
+        )
     }
 
     @Test
     fun `resolve treats an unparseable typed load as zero`() {
-        assertEquals(0.0, SetLoadPolicy.resolve(adHoc = true, plannedAddedKg = null, typedAddedKg = null))
+        assertEquals(
+            0.0,
+            SetLoadPolicy.resolve(
+                adHoc = true,
+                plannedAddedKg = null,
+                typedAddedKg = null,
+                statedAddedKg = null,
+            ),
+        )
     }
 
     /**
@@ -48,7 +88,15 @@ class SetLoadPolicyTest {
      */
     @Test
     fun `resolve ignores a typed correction on a plan set`() {
-        assertEquals(100.0, SetLoadPolicy.resolve(adHoc = false, plannedAddedKg = 100.0, typedAddedKg = 90.0))
+        assertEquals(
+            100.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = 100.0,
+                typedAddedKg = 90.0,
+                statedAddedKg = null,
+            ),
+        )
     }
 
     /**
@@ -59,22 +107,51 @@ class SetLoadPolicyTest {
      */
     @Test
     fun `resolve prefers the typed load on an ad-hoc set even when a load is planned`() {
-        assertEquals(60.0, SetLoadPolicy.resolve(adHoc = true, plannedAddedKg = 100.0, typedAddedKg = 60.0))
+        assertEquals(
+            60.0,
+            SetLoadPolicy.resolve(
+                adHoc = true,
+                plannedAddedKg = 100.0,
+                typedAddedKg = 60.0,
+                statedAddedKg = null,
+            ),
+        )
     }
 
     /**
      * A plan set that names no load added nothing, and the load text field is
-     * not evidence about it. The field defaults to "60", startPlanSession never
-     * resets it, and a plan session's READY screen does not draw it at all — so
-     * whatever it holds when a loadless set is recorded came from somewhere
-     * else entirely.
+     * not evidence about it.
      */
     @Test
     fun `resolve records no added load when the plan set declares none`() {
-        assertEquals(0.0, SetLoadPolicy.resolve(adHoc = false, plannedAddedKg = null, typedAddedKg = 60.0))
+        assertEquals(
+            0.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = null,
+                typedAddedKg = 60.0,
+                statedAddedKg = null,
+            ),
+        )
         // Nor from a field left holding the previous exercise's load.
-        assertEquals(0.0, SetLoadPolicy.resolve(adHoc = false, plannedAddedKg = null, typedAddedKg = 48.0))
-        assertEquals(0.0, SetLoadPolicy.resolve(adHoc = false, plannedAddedKg = null, typedAddedKg = null))
+        assertEquals(
+            0.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = null,
+                typedAddedKg = 48.0,
+                statedAddedKg = null,
+            ),
+        )
+        assertEquals(
+            0.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = null,
+                typedAddedKg = null,
+                statedAddedKg = null,
+            ),
+        )
     }
 
     @Test
@@ -142,7 +219,15 @@ class SetLoadPolicyTest {
         val afterSwitch =
             SetLoadPolicy.seedAddedKg(hasPlannedNext = true, nextDeclaredAddedKg = null, lastAddedKg = null)
         assertEquals(0.0, afterSwitch)
-        assertEquals(0.0, SetLoadPolicy.resolve(adHoc = false, plannedAddedKg = afterSwitch, typedAddedKg = 100.0))
+        assertEquals(
+            0.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = afterSwitch,
+                typedAddedKg = 100.0,
+                statedAddedKg = null,
+            ),
+        )
     }
 
     /**
@@ -154,7 +239,12 @@ class SetLoadPolicyTest {
      */
     @Test
     fun `a loadless plan block does not compound set over set`() {
-        var added = SetLoadPolicy.resolve(adHoc = false, plannedAddedKg = null, typedAddedKg = 60.0)
+        var added = SetLoadPolicy.resolve(
+            adHoc = false,
+            plannedAddedKg = null,
+            typedAddedKg = 60.0,
+            statedAddedKg = null,
+        )
         assertEquals(0.0, added, "set 1")
         repeat(2) { i ->
             val seed =
@@ -162,7 +252,12 @@ class SetLoadPolicyTest {
             assertEquals(0.0, seed, "seed after set ${i + 1}")
             // startNextSet bakes the seeded field back into the slot, so the
             // following set sees it as a NON-null declaration.
-            added = SetLoadPolicy.resolve(adHoc = false, plannedAddedKg = seed, typedAddedKg = seed)
+            added = SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = seed,
+                typedAddedKg = seed,
+                statedAddedKg = null,
+            )
             assertEquals(0.0, added, "set ${i + 2}")
         }
     }

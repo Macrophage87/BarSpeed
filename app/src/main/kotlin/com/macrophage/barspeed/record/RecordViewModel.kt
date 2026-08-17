@@ -177,6 +177,151 @@ private suspend fun openSession(repository: SessionRepository, p: PendingSetWrit
     )
 }
 
+/**
+ * The state "Equipment busy? Switch exercise" leaves behind.
+ *
+ * A free function taking what it needs, rather than a method, for the reason
+ * [openSession] gives: [RecordViewModel] is a class detekt measures as being at
+ * its size limit, where every addition competes for room.
+ *
+ * [fixed] is non-empty because jumpToExercise returns before reaching here when
+ * the chosen exercise has no sets left, so there is always a planned next set.
+ * upcomingIndex is queueIndex + 1 from the rest screen and queueIndex from
+ * READY: either way this slot has not been through the bake at startNextSet's
+ * load carry, so its loadKg is still the plan's declaration rather than a value
+ * the app wrote back.
+ *
+ * [RecordState.statedLoadKg] is cleared because the set being set up has just
+ * changed. A load typed for the exercise the lifter was about to do is not a
+ * statement about the one they switched to, and this route is reachable from
+ * READY, where that typed value is the one the set would be recorded with.
+ */
+private fun jumpedState(s: RecordState, done: List<PlannedSlot>, fixed: List<PlannedSlot>): RecordState {
+    val upcoming = fixed.first()
+    val seedKg =
+        SetLoadPolicy.seedAddedKg(
+            hasPlannedNext = true,
+            nextDeclaredAddedKg = upcoming.loadKg,
+            lastAddedKg = null,
+        )
+    return s.copy(
+        queue = done + fixed,
+        // Refresh the editable inputs so they describe the new upcoming set.
+        loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
+        statedLoadKg = null,
+        repsInput = upcoming.reps?.toString() ?: s.repsInput,
+        durationInput = upcoming.durationS?.toString() ?: s.durationInput,
+        tempoInput = upcoming.tempo ?: "",
+    )
+}
+
+/**
+ * The rest-screen state the set just written leaves behind. Free function for
+ * [openSession]'s reason.
+ *
+ * queue[queueIndex + 1] has not been through startNextSet's bake yet, so its
+ * loadKg is still the plan's declaration. That is the field to seed from, not
+ * plannedLoadKg: plannedLoadKg is frozen at the plan's number and would discard
+ * an in-rest edit made to a set that then got postponed. Nothing else pins that
+ * ordering, and the seam's unit tests cannot see it break.
+ *
+ * The write half stays outside the seam: startNextSet carries a load into this
+ * same slot when the lifter taps through, so what is seeded below is read back
+ * as a declaration one set later.
+ *
+ * [RecordState.statedLoadKg] is cleared because the set being set up has just
+ * changed: a load typed for the set that has now been written is not a
+ * statement about the next one, and the field is re-seeded from the plan in the
+ * same breath.
+ */
+private fun restingState(
+    s: RecordState,
+    p: PendingSetWrite,
+    analysis: SetAnalysis,
+    failed: Boolean,
+    restS: Int,
+): RecordState {
+    val nextSlot = s.nextSlot
+    val seedKg =
+        SetLoadPolicy.seedAddedKg(
+            hasPlannedNext = nextSlot != null,
+            nextDeclaredAddedKg = nextSlot?.loadKg,
+            // addedKg, never loadKg: the field holds what is ADDED, and seeding
+            // it with the body-weight-inclusive total is what made a loadless
+            // block climb set over set.
+            lastAddedKg = p.addedKg,
+        )
+    return s.copy(
+        stage = Stage.RESTING,
+        setWrite = SetWriteState.NONE,
+        restTotalS = restS,
+        lastFeedback =
+        SetFeedback(
+            exerciseName = p.exercise.displayName,
+            loadKg = p.loadKg,
+            analysis = analysis,
+            plannedReps = p.plannedReps,
+            tempo = p.tempoText,
+            actualDurationS = p.actualDurationS,
+            plannedDurationS = p.plannedDurationS,
+            side = p.side,
+            explosive = p.exercise.kind == ExerciseKind.EXPLOSIVE,
+            repsOverride = p.manualReps,
+        ),
+        lastSetRpe = p.rating?.rpe,
+        lastSetFailed = failed,
+        lastSetWarmup = p.rating?.warmup ?: false,
+        restRemainingS = restS,
+        // Set from the frozen index rather than incremented, so a retry cannot
+        // count the same set twice.
+        setsCompleted = p.orderIdx + 1,
+        // Pre-fill next-set inputs so in-rest edits start from plan values.
+        loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
+        statedLoadKg = null,
+        repsInput = (nextSlot?.reps ?: p.plannedReps ?: 5).toString(),
+        durationInput = (nextSlot?.durationS ?: p.plannedDurationS)?.toString() ?: s.durationInput,
+        tempoInput = nextSlot?.tempo ?: p.tempoText ?: "",
+    )
+}
+
+/**
+ * The state starting an ad-hoc session leaves behind. Free function for
+ * [openSession]'s reason, and because the added argument would push the call
+ * past 120 characters: the wrap costs five code lines against the size limit
+ * where moving the whole expression out costs none.
+ *
+ * [RecordState.statedLoadKg] is cleared to keep one rule rather than to close a
+ * reachable defect: resolve reads the typed field, never the stated one, on an
+ * ad-hoc set.
+ */
+private fun adHocSessionState(s: RecordState): RecordState =
+    s.copy(stage = Stage.READY, adHoc = true, queue = emptyList(), statedLoadKg = null)
+
+/**
+ * The state tapping through to the next planned set leaves behind, with any
+ * in-rest edits applied. Free function for [openSession]'s reason.
+ *
+ * [RecordState.statedLoadKg] is cleared in BOTH branches. The plan branch
+ * consumes it into the slot and must not leave it to be read again one set
+ * later; the ad-hoc branch never reads it, and clearing it there keeps "the set
+ * being set up changed" and "statedLoadKg is null" one rule rather than a rule
+ * with an exception.
+ */
+private fun advancedState(s: RecordState): RecordState {
+    val next = s.nextSlot
+    if (s.adHoc || next == null) return s.copy(stage = Stage.READY, statedLoadKg = null)
+    val edited =
+        next.copy(
+            loadKg = s.weightUnit.parseToKg(s.loadInput) ?: next.loadKg,
+            reps = if (next.isTimed) next.reps else s.repsInput.toIntOrNull() ?: next.reps,
+            durationS = if (next.isTimed) s.durationInput.toIntOrNull() ?: next.durationS else next.durationS,
+            tempo = s.tempoInput.ifBlank { null } ?: next.tempo,
+        )
+    val queue = s.queue.toMutableList()
+    queue[s.queueIndex + 1] = edited
+    return s.copy(queue = queue, queueIndex = s.queueIndex + 1, stage = Stage.READY, statedLoadKg = null)
+}
+
 data class RecordState(
     val stage: Stage = Stage.SETUP,
     val planName: String? = null,
@@ -188,6 +333,19 @@ data class RecordState(
     val exerciseOptions: List<ExerciseDef> = ExerciseDef.SEED,
     val selectedExerciseId: String = ExerciseDef.SEED.first().id,
     val loadInput: String = "60",
+    /**
+     * The added load the lifter typed for the set now being set up, in kg, and
+     * null when they have typed nothing for it.
+     *
+     * A different fact from [loadInput], which is one string reused across
+     * every set of a session and holds a value from an earlier set until
+     * something re-seeds it. This has no default that means anything, is
+     * written only by [RecordViewModel.updateLoadInput] -- a keystroke -- and
+     * is cleared by every path that changes which set is being set up. Seeding
+     * the text does NOT set it, and that separation is what makes a forgotten
+     * clear cost a stale string on screen rather than a stale recorded load.
+     */
+    val statedLoadKg: Double? = null,
     val repsInput: String = "5",
     val durationInput: String = "60",
     /** Ad-hoc unilateral side: null (bilateral), "left", or "right". */
@@ -464,6 +622,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     queue = queue,
                     queueIndex = 0,
                     adHoc = false,
+                    statedLoadKg = null,
                 )
         }
     }
@@ -488,33 +647,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 val prevId = if (i == 0) done.lastOrNull()?.exercise?.id else reordered[i - 1].exercise.id
                 slot.copy(isExerciseChange = prevId != null && prevId != slot.exercise.id)
             }
-        // Non-empty because the empty-target case returned above, so there is
-        // always a planned next set here. upcomingIndex is queueIndex + 1 from
-        // the rest screen and queueIndex from READY: either way this slot has
-        // not been through the bake at startNextSet's `loadKg = parseToKg(
-        // loadInput) ?: next.loadKg`, so its loadKg is still the plan's
-        // declaration rather than a value the app wrote back.
-        val upcoming = fixed.first()
-        val seedKg =
-            SetLoadPolicy.seedAddedKg(
-                hasPlannedNext = true,
-                nextDeclaredAddedKg = upcoming.loadKg,
-                lastAddedKg = null,
-            )
-        stateFlow.value =
-            s.copy(
-                queue = done + fixed,
-                // Refresh the editable inputs so they describe the new upcoming set.
-                loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
-                repsInput = upcoming.reps?.toString() ?: s.repsInput,
-                durationInput = upcoming.durationS?.toString() ?: s.durationInput,
-                tempoInput = upcoming.tempo ?: "",
-            )
+        stateFlow.value = jumpedState(s, done, fixed)
     }
 
     fun startAdHocSession() {
         sessionRrMs.clear()
-        stateFlow.value = stateFlow.value.copy(stage = Stage.READY, adHoc = true, queue = emptyList())
+        stateFlow.value = adHocSessionState(stateFlow.value)
     }
 
     fun selectExercise(id: String) {
@@ -522,7 +660,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateLoadInput(text: String) {
-        stateFlow.value = stateFlow.value.copy(loadInput = text)
+        val s = stateFlow.value
+        stateFlow.value = s.copy(loadInput = text, statedLoadKg = s.weightUnit.parseToKg(text))
     }
 
     fun updateRepsInput(text: String) {
@@ -778,7 +917,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val slot = s.currentSlot
         val isTimed = s.currentIsTimed
         val addedKg =
-            SetLoadPolicy.resolve(s.adHoc, slot?.loadKg, s.weightUnit.parseToKg(s.loadInput))
+            SetLoadPolicy.resolve(s.adHoc, slot?.loadKg, s.weightUnit.parseToKg(s.loadInput), null)
         // Pull-ups and dips move the lifter: the plan's number is what was ADDED
         // (negative when a band or machine assists), so the load that actually
         // travelled is body weight plus that.
@@ -988,63 +1127,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         ratings.attachTo(setId)
 
         val restS = p.slot?.restS ?: DEFAULT_REST_S
-        // queue[queueIndex + 1] has not been through startNextSet's bake
-        // yet, so its loadKg is still the plan's declaration. That is the
-        // field to seed from, not plannedLoadKg: plannedLoadKg is frozen at
-        // the plan's number and would discard an in-rest edit made to a set
-        // that then got postponed. Nothing else pins that ordering, and the
-        // seam's unit tests cannot see it break.
-        //
-        // The write half stays outside the seam: startNextSet does
-        // `loadKg = parseToKg(loadInput) ?: next.loadKg` on this same slot
-        // when the lifter taps through, so the string seeded below is read
-        // straight back as a declaration one set later. Nothing is lost
-        // there today, because 0 round-trips exactly through inputValue and
-        // parseToKg in both display units — but nothing pins that either.
-        val nextSlot = stateFlow.value.nextSlot
-        val seedKg =
-            SetLoadPolicy.seedAddedKg(
-                hasPlannedNext = nextSlot != null,
-                nextDeclaredAddedKg = nextSlot?.loadKg,
-                // addedKg, never loadKg: the field holds what is ADDED, and
-                // seeding it with the body-weight-inclusive total is what
-                // made a loadless block climb set over set.
-                lastAddedKg = p.addedKg,
-            )
-        stateFlow.value =
-            stateFlow.value.copy(
-                stage = Stage.RESTING,
-                setWrite = SetWriteState.NONE,
-                restTotalS = restS,
-                lastFeedback =
-                SetFeedback(
-                    exerciseName = p.exercise.displayName,
-                    loadKg = p.loadKg,
-                    analysis = analysis,
-                    plannedReps = p.plannedReps,
-                    tempo = p.tempoText,
-                    actualDurationS = p.actualDurationS,
-                    plannedDurationS = p.plannedDurationS,
-                    side = p.side,
-                    explosive = p.exercise.kind == ExerciseKind.EXPLOSIVE,
-                    repsOverride = p.manualReps,
-                ),
-                lastSetRpe = p.rating?.rpe,
-                lastSetFailed = failed,
-                lastSetWarmup = p.rating?.warmup ?: false,
-                restRemainingS = restS,
-                // Set from the frozen index rather than incremented, so a retry
-                // cannot count the same set twice.
-                setsCompleted = p.orderIdx + 1,
-                // Pre-fill next-set inputs so in-rest edits start from plan values.
-                loadInput =
-                seedKg?.let { stateFlow.value.weightUnit.inputValue(it) } ?: stateFlow.value.loadInput,
-                repsInput = (stateFlow.value.nextSlot?.reps ?: p.plannedReps ?: 5).toString(),
-                durationInput =
-                (stateFlow.value.nextSlot?.durationS ?: p.plannedDurationS)?.toString()
-                    ?: stateFlow.value.durationInput,
-                tempoInput = stateFlow.value.nextSlot?.tempo ?: p.tempoText ?: "",
-            )
+        stateFlow.value = restingState(stateFlow.value, p, analysis, failed, restS)
         pendingWrite = null
         writtenSetId = null
         startRestCountdown()
@@ -1087,22 +1170,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     /** Advance to the next planned set, applying any in-rest load/rep edits. */
     fun startNextSet() {
         restJob?.cancel()
-        val s = stateFlow.value
-        if (!s.adHoc && s.nextSlot != null) {
-            val next = s.nextSlot!!
-            val edited =
-                next.copy(
-                    loadKg = s.weightUnit.parseToKg(s.loadInput) ?: next.loadKg,
-                    reps = if (next.isTimed) next.reps else s.repsInput.toIntOrNull() ?: next.reps,
-                    durationS = if (next.isTimed) s.durationInput.toIntOrNull() ?: next.durationS else next.durationS,
-                    tempo = s.tempoInput.ifBlank { null } ?: next.tempo,
-                )
-            val queue = s.queue.toMutableList()
-            queue[s.queueIndex + 1] = edited
-            stateFlow.value = s.copy(queue = queue, queueIndex = s.queueIndex + 1, stage = Stage.READY)
-        } else {
-            stateFlow.value = s.copy(stage = Stage.READY)
-        }
+        stateFlow.value = advancedState(stateFlow.value)
         beginSet()
     }
 

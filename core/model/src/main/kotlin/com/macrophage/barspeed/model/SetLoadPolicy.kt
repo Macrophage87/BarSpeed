@@ -28,10 +28,22 @@ object SetLoadPolicy {
      *
      * [typedAddedKg] is the load text field already parsed, null when it is
      * blank or not a number. It is consulted only for ad-hoc sets, where it is
-     * the only declaration there is. On a plan set it is not evidence: the
-     * field defaults to "60", starting a plan session does not reset it, and a
-     * plan session's READY stage draws no load field at all — so whatever it
-     * holds when a loadless set is recorded came from somewhere else.
+     * the only declaration there is. On a plan set it is not evidence, and
+     * [statedAddedKg] rather than this parameter is what carries a number the
+     * lifter gave for a planned set.
+     *
+     * [statedAddedKg] is the added load the lifter typed FOR THE SET BEING SET
+     * UP, and null when they have typed nothing for it. It is a different fact
+     * from [typedAddedKg], which is one string reused across every set of a
+     * session: this one has no default that means anything, is written only by
+     * a keystroke, and is cleared by every path that changes which set is being
+     * set up. That is what lets a plan set honour a load the lifter gave while
+     * still refusing to read a value left behind by an earlier set.
+     *
+     * Nothing consumes it yet. The call sites pass it and this function ignores
+     * it, so that the differentials proving the precedence can fail before the
+     * one-line change that makes them pass. The suppression below and this
+     * paragraph both go with that change.
      *
      * A 0 returned here is a real measurement of the added load, not a stand-in
      * for an unknown one, so it is a number rather than a null. Nothing
@@ -39,7 +51,8 @@ object SetLoadPolicy {
      * bar power with `takeIf { it > 0 }`, so a zero added load on a non-
      * body-weight set suppresses the power figure instead of publishing 0 W.
      */
-    fun resolve(adHoc: Boolean, plannedAddedKg: Double?, typedAddedKg: Double?): Double =
+    @Suppress("UnusedParameter")
+    fun resolve(adHoc: Boolean, plannedAddedKg: Double?, typedAddedKg: Double?, statedAddedKg: Double?): Double =
         if (adHoc) typedAddedKg ?: 0.0 else plannedAddedKg ?: 0.0
 
     /**

@@ -865,7 +865,7 @@ private fun InSetHeader(state: RecordState, slot: PlannedSlot?) {
     // is on screen while the set that will carry that number is being done, so
     // a second reading of the load here would be a number the row does not
     // contain. `slot` is state.currentSlot at all five call sites.
-    val loadKg = SetLoadPolicy.resolve(state.adHoc, slot?.loadKg, state.weightUnit.parseToKg(state.loadInput))
+    val loadKg = SetLoadPolicy.resolve(state.adHoc, slot?.loadKg, state.weightUnit.parseToKg(state.loadInput), null)
     val side = if (state.adHoc) state.sideInput else slot?.side
     val parts =
         listOfNotNull(
