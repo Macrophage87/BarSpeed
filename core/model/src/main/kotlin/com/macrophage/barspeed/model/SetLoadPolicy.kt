@@ -81,19 +81,17 @@ object SetLoadPolicy {
      * [declaredAddedKg] is the slot's own load, still the plan's number because
      * this slot has not been through this function yet.
      *
-     * [typedAddedKg] is the rest screen's load field parsed. It is what the
-     * carry reads today and the reason #45 exists: the field was seeded from
+     * The rest screen's load field is deliberately NOT a parameter. It used to
+     * be what this read, and that is the whole of #45: the field is seeded from
      * the declaration through inputValue, which quantises to 0.1 of the DISPLAY
-     * unit, so reading it back replaces the plan's own number with a rounded
+     * unit, so reading it back replaced the plan's own number with a rounded
      * one even when the lifter never touched the box. A plan declaring 175 lb
-     * then records 79.4 against a plannedLoadKg of 79.3786647517562, and the
-     * session detail screen prints a deviation the lifter did not make.
+     * recorded 79.4 against a plannedLoadKg of 79.3786647517562, and the
+     * session detail screen printed a deviation the lifter did not make.
      *
      * [statedAddedKg] is what they actually said, null when they said nothing,
      * and it is the only thing that displaces the declaration. An untouched
      * field is no longer in the path at all.
      */
-    @Suppress("UnusedParameter")
-    fun carriedIntoNextSet(declaredAddedKg: Double?, typedAddedKg: Double?, statedAddedKg: Double?): Double? =
-        statedAddedKg ?: declaredAddedKg
+    fun carriedIntoNextSet(declaredAddedKg: Double?, statedAddedKg: Double?): Double? = statedAddedKg ?: declaredAddedKg
 }

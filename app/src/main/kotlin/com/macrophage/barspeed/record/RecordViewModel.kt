@@ -315,7 +315,6 @@ private fun advancedState(s: RecordState): RecordState {
             loadKg =
             SetLoadPolicy.carriedIntoNextSet(
                 declaredAddedKg = next.loadKg,
-                typedAddedKg = s.weightUnit.parseToKg(s.loadInput),
                 statedAddedKg = s.statedLoadKg,
             ),
             reps = if (next.isTimed) next.reps else s.repsInput.toIntOrNull() ?: next.reps,

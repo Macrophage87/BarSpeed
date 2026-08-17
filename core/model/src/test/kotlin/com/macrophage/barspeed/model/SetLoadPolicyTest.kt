@@ -296,9 +296,12 @@ class SetLoadPolicyTest {
      * records must be the plan's own number, bit for bit -- not what survived
      * being rendered into a text box and read back out.
      *
-     * The two cases are the same defect from opposite sides: a plan declared in
-     * pounds loses precision on a kg display, and a plan declared in kilograms
-     * loses it on an lb display. Neither display unit is the safe one.
+     * What this holds is the bit-for-bit return itself: rounding the result
+     * to 0.1 reds this test and nothing else. The two declared values are
+     * ones a load field would have damaged -- 175 lb stored as kilograms,
+     * and a round 100 kg -- but no seed and no parse appear here any more,
+     * because neither is in the code path. The round trip they used to
+     * exercise is pinned in WeightUnitTest instead.
      */
     @Test
     fun `an untouched field carries the plan's declared load unchanged`() {
@@ -307,7 +310,6 @@ class SetLoadPolicyTest {
             declaredInLb,
             SetLoadPolicy.carriedIntoNextSet(
                 declaredAddedKg = declaredInLb,
-                typedAddedKg = WeightUnit.KG.parseToKg(WeightUnit.KG.inputValue(declaredInLb)),
                 statedAddedKg = null,
             ),
         )
@@ -315,7 +317,6 @@ class SetLoadPolicyTest {
             100.0,
             SetLoadPolicy.carriedIntoNextSet(
                 declaredAddedKg = 100.0,
-                typedAddedKg = WeightUnit.LB.parseToKg(WeightUnit.LB.inputValue(100.0)),
                 statedAddedKg = null,
             ),
         )
@@ -333,7 +334,6 @@ class SetLoadPolicyTest {
             90.0,
             SetLoadPolicy.carriedIntoNextSet(
                 declaredAddedKg = declaredInLb,
-                typedAddedKg = WeightUnit.KG.parseToKg(WeightUnit.KG.inputValue(declaredInLb)),
                 statedAddedKg = 90.0,
             ),
         )
@@ -349,7 +349,6 @@ class SetLoadPolicyTest {
         assertNull(
             SetLoadPolicy.carriedIntoNextSet(
                 declaredAddedKg = null,
-                typedAddedKg = null,
                 statedAddedKg = null,
             ),
         )
