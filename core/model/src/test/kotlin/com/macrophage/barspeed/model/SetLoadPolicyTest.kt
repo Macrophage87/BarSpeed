@@ -154,6 +154,109 @@ class SetLoadPolicyTest {
         )
     }
 
+    /**
+     * #44. The plan says 100 kg, the bar has 90, and the lifter says so. What
+     * is recorded is 90 -- the load that actually travelled -- while
+     * plannedLoadKg stays at the plan's 100, so the deviation is visible
+     * afterwards instead of being erased.
+     */
+    @Test
+    fun `a plan set records the load the lifter stated for it`() {
+        assertEquals(
+            90.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = 100.0,
+                typedAddedKg = 60.0,
+                statedAddedKg = 90.0,
+            ),
+        )
+    }
+
+    /**
+     * Zero is a statement. A lifter who strips the bar has said the added load
+     * was nothing, and that is different from having said nothing at all --
+     * which is null and leaves the plan standing. Guards the precedence against
+     * being written as a truthiness test on the stated value.
+     */
+    @Test
+    fun `a stated load of zero is a statement, not an absence`() {
+        assertEquals(
+            0.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = 100.0,
+                typedAddedKg = 60.0,
+                statedAddedKg = 0.0,
+            ),
+        )
+    }
+
+    /**
+     * Assisted work states negative added load. A lifter who needed more band
+     * than the plan asked for has to be able to say -30 where it said -20, so
+     * the sign must survive the same path a positive load takes.
+     */
+    @Test
+    fun `a negative stated load is kept for assisted work`() {
+        assertEquals(
+            -30.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = -20.0,
+                typedAddedKg = 60.0,
+                statedAddedKg = -30.0,
+            ),
+        )
+    }
+
+    /**
+     * The near neighbour. On an ad-hoc set the typed field IS the declaration,
+     * so a stated load must not displace it -- green before this change and
+     * green after, and it is what makes selectExercise safe to leave without a
+     * clear.
+     */
+    @Test
+    fun `an ad-hoc set is unaffected by a stated load`() {
+        assertEquals(
+            60.0,
+            SetLoadPolicy.resolve(
+                adHoc = true,
+                plannedAddedKg = null,
+                typedAddedKg = 60.0,
+                statedAddedKg = 90.0,
+            ),
+        )
+    }
+
+    /**
+     * #22 stands. A plan set the lifter said nothing about still ignores the
+     * text field, whether the plan declared a load or declared none. Green
+     * before this change and green after: what #44 adds is a separate fact, not
+     * a new reading of loadInput.
+     */
+    @Test
+    fun `a plan set that states nothing still ignores the typed field`() {
+        assertEquals(
+            100.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = 100.0,
+                typedAddedKg = 60.0,
+                statedAddedKg = null,
+            ),
+        )
+        assertEquals(
+            0.0,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = null,
+                typedAddedKg = 60.0,
+                statedAddedKg = null,
+            ),
+        )
+    }
+
     @Test
     fun `seedAddedKg prefers the next slot's declared load`() {
         assertEquals(
