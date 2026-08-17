@@ -28,6 +28,24 @@ data class SessionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val startedAtMs: Long,
     val endedAtMs: Long? = null,
+    /**
+     * The device's time-zone id when this session was created, and the UTC
+     * offset in effect at [startedAtMs] — see
+     * [com.macrophage.barspeed.model.RecordedTimeZone], which is the pair these
+     * two columns hold.
+     *
+     * Two columns rather than one JSON blob, unlike [SetRecordEntity.geometryJson]:
+     * these are two scalars, so columns cost nothing extra and there is no
+     * decode-failure path to reason about.
+     *
+     * Both null means the row predates the capture, which is permanent — the
+     * offset a past session was recorded on is not stored in any artifact, not
+     * in the raw CSVs either, so unlike anything the DSP derives it cannot be
+     * recomputed later. Nothing writes one without the other; a row holding
+     * only one is read as not captured rather than half believed.
+     */
+    val zoneId: String? = null,
+    val utcOffsetMinutes: Int? = null,
     val planName: String? = null,
     val planSessionName: String? = null,
     val notes: String? = null,

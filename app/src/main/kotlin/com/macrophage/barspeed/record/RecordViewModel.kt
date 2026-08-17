@@ -7,6 +7,7 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.VoiceCounter
 import com.macrophage.barspeed.ble.ConnectionState
 import com.macrophage.barspeed.data.CompletedSet
+import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.dsp.LiveSetState
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
@@ -140,6 +141,23 @@ private data class PendingSetWrite(
     val planSessionName: String?,
     val targets: SetTargets,
 )
+
+/**
+ * Open the session row the first set of a session hangs off.
+ *
+ * A free function taking what it needs, rather than a method, so that the one
+ * platform call it makes is visible in isolation and so that the argument list
+ * does not sit inside [RecordViewModel] -- a class detekt already measures as
+ * being at its size limit, where every future addition competes for room.
+ */
+private suspend fun openSession(repository: SessionRepository, p: PendingSetWrite): Long {
+    return repository.startSession(
+        planName = p.planName,
+        planSessionName = p.planSessionName,
+        startedAtMs = p.startedAtMs,
+        timeZone = null,
+    )
+}
 
 data class RecordState(
     val stage: Stage = Stage.SETUP,
@@ -895,11 +913,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // retries. Named in the commit body rather than covered by the word
         // atomic: the transaction spans the set and its streams, not this.
         val sessionId =
-            stateFlow.value.sessionId ?: sessionRepository.startSession(
-                planName = p.planName,
-                planSessionName = p.planSessionName,
-                startedAtMs = p.startedAtMs,
-            ).also { stateFlow.value = stateFlow.value.copy(sessionId = it) }
+            stateFlow.value.sessionId
+                ?: openSession(sessionRepository, p).also { stateFlow.value = stateFlow.value.copy(sessionId = it) }
 
         sessionRepository.ensureExerciseExists(p.exercise.id)
 

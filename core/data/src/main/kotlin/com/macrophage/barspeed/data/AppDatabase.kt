@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         RawStreamEntity::class,
         CustomExerciseEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -93,6 +93,33 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        /**
+         * v9: the device's time zone and the UTC offset a session was recorded
+         * on, as two columns on sessions.
+         *
+         * Nullable with no default, so existing rows are untouched and read
+         * back as "not captured". Backfilling was considered and refused for
+         * the same reason [MIGRATION_7_8] refused it, and more sharply: the
+         * only offset available at migration time is the one the device is on
+         * NOW, and stamping that onto sessions recorded arbitrarily far in the
+         * past would be right for most of them and silently wrong for any
+         * recorded in another zone — while looking exactly like a value that
+         * had been measured.
+         *
+         * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2]
+         * already does. Nothing in this repository can execute either of them:
+         * there are no migration tests, no committed schema baseline for any
+         * version, and no instrumented tests at all, so the first time this
+         * runs is on the lifter's phone against their real history.
+         */
+        private val MIGRATION_8_9 =
+            object : Migration(8, 9) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE sessions ADD COLUMN zoneId TEXT")
+                    db.execSQL("ALTER TABLE sessions ADD COLUMN utcOffsetMinutes INTEGER")
+                }
+            }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "accelerometer_lifting.db")
                 .addMigrations(
@@ -103,6 +130,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
+                    MIGRATION_8_9,
                 )
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()

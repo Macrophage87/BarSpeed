@@ -15,6 +15,28 @@ data class SessionExport(
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val schemaVersion: String = SCHEMA_VERSION,
     val startedAt: String,
     val endedAt: String? = null,
+    /**
+     * Where the device was and what UTC offset it was on when this session was
+     * recorded, so a reader can recover the local time of day it happened at.
+     *
+     * [startedAt] and [endedAt] are UTC instants and stay that way: they are
+     * correct, and a conforming reader gets the same moment out of them either
+     * rendered with an offset or rendered with a `Z`. What it cannot get out of
+     * them is the time on the wall, and time of day is a training variable —
+     * it separates a fasted early session from an evening one and is how a
+     * session lines up against sleep.
+     *
+     * Absent means the session was recorded before the app captured this, and
+     * that is permanent for those sessions. Nothing durable — not the session
+     * row, not the set rows, not the raw IMU, heart-rate or cue CSVs, all of
+     * which carry epoch milliseconds — records the offset a past session was
+     * on, so it cannot be recomputed the way a DSP figure can. Filling it in at
+     * export time from the device's current zone was refused deliberately: it
+     * would be right for a session recorded in the zone the phone is in now,
+     * silently wrong for one recorded before a flight, and indistinguishable
+     * from a value that was actually measured.
+     */
+    val timeZone: RecordedTimeZone? = null,
     val planRef: String? = null,
     val notes: String? = null,
     val heartRate: HrSessionSummary? = null,
@@ -32,9 +54,20 @@ data class SessionExport(
          * existing key changed type or stopped being written, so a reader
          * written against 1.1 works unchanged against 1.2. The key is absent on
          * sets recorded before the app captured it.
+         *
+         * 1.3 — a session may carry [timeZone], the device's zone and the UTC
+         * offset in effect when it was recorded. Purely additive on the same
+         * terms: `startedAt` and `endedAt` are byte-for-byte what 1.2 wrote,
+         * still UTC with a `Z`, so a 1.2 reader works unchanged against 1.3.
+         * Re-rendering them with an offset was considered and refused — both
+         * forms are the same instant to a conforming parser, so it would buy a
+         * correct reader nothing, while a reader that strips the designator
+         * would silently start treating a local time as UTC and lose the
+         * instant altogether. The key is absent on sessions recorded before the
+         * app captured it.
          */
-        const val SCHEMA_VERSION = "1.2"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2")
+        const val SCHEMA_VERSION = "1.3"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3")
 
         /**
          * Which phase a rep opened with, lowercased [StartPhase] names. 1:1

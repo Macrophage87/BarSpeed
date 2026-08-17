@@ -5,6 +5,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
@@ -71,10 +72,34 @@ class SessionRepository(
 ) {
     val sessions: Flow<List<SessionEntity>> = sessionDao.observeSessions()
 
-    suspend fun startSession(planName: String?, planSessionName: String?, startedAtMs: Long): Long =
-        sessionDao.insertSession(
-            SessionEntity(startedAtMs = startedAtMs, planName = planName, planSessionName = planSessionName),
+    /**
+     * Open a session row.
+     *
+     * [timeZone] is the device's zone and UTC offset as the caller observed
+     * them, and it has no default on purpose: a defaulted parameter is one a
+     * call site can silently stop passing, and this is a fact that exists only
+     * at recording time. Null is a legitimate value — it means the caller could
+     * not establish one — but it has to be written out.
+     */
+    suspend fun startSession(
+        planName: String?,
+        planSessionName: String?,
+        startedAtMs: Long,
+        timeZone: RecordedTimeZone?,
+    ): Long {
+        return sessionDao.insertSession(
+            SessionEntity(
+                startedAtMs = startedAtMs,
+                // Written as a pair or not at all. The columns are separately
+                // nullable because Room has no other option, but a row carrying
+                // an offset and no zone is a state nothing here produces.
+                zoneId = timeZone?.id,
+                utcOffsetMinutes = timeZone?.utcOffsetMinutes,
+                planName = planName,
+                planSessionName = planSessionName,
+            ),
         )
+    }
 
     /**
      * Store one finished set: the row, every raw stream belonging to it, and
