@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -1455,10 +1457,40 @@ private fun RestHeader(state: RecordState) {
     }
 }
 
+/**
+ * The verdict pills for the set just finished.
+ *
+ * A [FlowRow], because the pill count is variable and the width they are given
+ * is not. Five can be emitted at once -- held, tempo, velocity loss, heart rate,
+ * HRV -- and they are laid out inside [RestHeader]'s column, which is measured
+ * with what is left of the row: the screen width less the 16dp screen padding
+ * either side, less the 110dp ring, less the 16dp the gap Spacer contributes.
+ * On a 411dp-wide phone that arithmetic gives 253dp and on a 360dp one 202dp,
+ * and a plain `Row` does not wrap: children that do not fit are placed past its
+ * own width rather than moved to a second line. The field report for v0.1.37 is
+ * "the heart rate marker doesn't fit on the page and runs to the side"; heart
+ * rate is the fourth pill of the five, and HRV the fifth.
+ *
+ * Wrapping rather than widening, because no width is safe: the pill text is
+ * data-dependent (a three-digit heart rate, a two-digit rep count either side of
+ * the tempo ratio) and nothing bounds it. Wrapping usually costs the header no
+ * height at all: the ring is 110dp and the column beside it comes to about
+ * 100dp with a single-line title and two pill rows, so the ring is still what
+ * sets the row's height. A third pill row, or a title long enough to wrap,
+ * grows it -- which is why the header keeps the ring and gives the pills the
+ * whole of the remaining column.
+ *
+ * The `@OptIn` is on this function alone, not the file or the module, which is
+ * how `PlanDetailScreen` already carries the same import for the same reason.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FeedbackChips(feedback: SetFeedback, hrBpm: Int?, hrvMs: Int? = null) {
     val analysis = feedback.analysis
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         feedback.actualDurationS?.let { actual ->
             val planned = feedback.plannedDurationS
             VerdictChip(
