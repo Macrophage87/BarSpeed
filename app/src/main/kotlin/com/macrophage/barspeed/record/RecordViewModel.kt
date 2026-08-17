@@ -929,7 +929,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val slot = s.currentSlot
         val isTimed = s.currentIsTimed
         val addedKg =
-            SetLoadPolicy.resolve(s.adHoc, slot?.loadKg, s.weightUnit.parseToKg(s.loadInput), s.statedLoadKg)
+            SetLoadPolicy.resolve(
+                adHoc = s.adHoc,
+                plannedAddedKg = slot?.loadKg,
+                typedAddedKg = s.weightUnit.parseToKg(s.loadInput),
+                statedAddedKg = s.statedLoadKg,
+            )
         // Pull-ups and dips move the lifter: the plan's number is what was ADDED
         // (negative when a band or machine assists), so the load that actually
         // travelled is body weight plus that.

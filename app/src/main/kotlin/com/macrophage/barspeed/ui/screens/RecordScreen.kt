@@ -890,10 +890,10 @@ private fun InSetHeader(state: RecordState, slot: PlannedSlot?) {
     // contain. `slot` is state.currentSlot at all five call sites.
     val loadKg =
         SetLoadPolicy.resolve(
-            state.adHoc,
-            slot?.loadKg,
-            state.weightUnit.parseToKg(state.loadInput),
-            state.statedLoadKg,
+            adHoc = state.adHoc,
+            plannedAddedKg = slot?.loadKg,
+            typedAddedKg = state.weightUnit.parseToKg(state.loadInput),
+            statedAddedKg = state.statedLoadKg,
         )
     val side = if (state.adHoc) state.sideInput else slot?.side
     val parts =
