@@ -35,12 +35,19 @@ import com.macrophage.barspeed.ui.BarColors
  * streaming does not touch the sensor and works with every BLE permission
  * denied, so "sets record with no bar-speed data" would be false next to a chip
  * reading "Demo mode ON".
+ *
+ * The 8dp gap below is carried on the modifier here, not by a `Spacer` at the
+ * call site, so it exists exactly when the banner draws. Devices used to pair
+ * its own `Spacer` with this call, which paid the gap even when this returned
+ * early on GRANTED; Home and the two record stages carried none, so the same
+ * banner landed flush against the next element there. One call site now
+ * matches the other four.
  */
 @Composable
 fun PermissionBanner(demoMode: Boolean = false, modifier: Modifier = Modifier) {
     val step by LocalBlePermissionUi.current.step.collectAsState()
     if (step == BlePermissionStep.GRANTED) return
-    Card(modifier.fillMaxWidth()) {
+    Card(modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(Modifier.padding(12.dp)) {
             PermissionBannerBody(demoMode, headline = true)
         }

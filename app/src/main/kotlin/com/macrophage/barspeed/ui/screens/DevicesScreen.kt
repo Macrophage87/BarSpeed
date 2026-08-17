@@ -58,8 +58,9 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
             // is driven by ConnectionState where this is driven by the gate.
             // They disagree for up to one backoff period after a grant, because
             // the client keeps its stale Failed until the next connect attempt.
+            // No Spacer here: PermissionBanner carries its own trailing gap so
+            // one is not paid when the banner draws nothing (GRANTED).
             PermissionBanner()
-            Spacer(Modifier.height(8.dp))
             Text("Paired sensors", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             if (known.isEmpty()) {
