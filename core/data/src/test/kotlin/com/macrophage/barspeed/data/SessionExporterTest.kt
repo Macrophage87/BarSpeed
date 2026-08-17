@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -182,6 +185,55 @@ class SessionExporterTest {
     ): SetExport = exporter(analysis, actualReps, repsManual)
         .buildExport(1L, includeRepDetail)!!
         .exercises.single().sets.single()
+
+    /** The first exercise object of the export, as it lands on the wire. */
+    private suspend fun exerciseObject(includeRepDetail: Boolean = true): JsonObject {
+        val text = exporter(analysis(3), actualReps = 3, repsManual = false).exportJson(1L, includeRepDetail)!!
+        return Json.parseToJsonElement(text).jsonObject.getValue("exercises").jsonArray.single().jsonObject
+    }
+
+    /** The first set object of the export, as it lands on the wire. */
+    private suspend fun setObject(includeRepDetail: Boolean = true): JsonObject =
+        exerciseObject(includeRepDetail).getValue("sets").jsonArray.single().jsonObject
+
+    // ---- issue 73: what the export says about how the set was measured -----
+
+    /**
+     * The exercise object states an id and a list of sets, and nothing else.
+     *
+     * Pinned as an exact key set rather than as a pair of `assertTrue`s
+     * because the point is the absence, not the presence: an exercise object
+     * that grew a third key would still pass a containment assertion. The
+     * downstream tool that reads this export withheld four of its five tempo
+     * charts over exactly this key set.
+     */
+    @Test
+    fun `the exercise object states only its id and its sets`() = runTest {
+        assertEquals(setOf("exercise", "sets"), exerciseObject().keys)
+    }
+
+    /**
+     * No set states the direction or geometry its numbers were measured with.
+     *
+     * The export publishes `tempoCompliance`, whose phase labels come from
+     * `TempoSchedule.of(tempo, direction)` -- so it ships a verdict that
+     * depends entirely on which stroke is the eccentric while withholding the
+     * three facts that decided it. A reader cannot check the app's own work.
+     *
+     * Asserted on parsed keys, not on the JSON text. "concentric" and
+     * "eccentric" both occur as `scoredPhases` values, so a substring search
+     * would report the geometry as present when only the verdict is.
+     */
+    @Test
+    fun `no set states the direction or geometry it was measured with`() = runTest {
+        val keys = setObject().keys
+        val geometry =
+            setOf(
+                "geometry", "startsWith", "concentric", "plane",
+                "sensorOnStack", "sensorInverted", "travelRatio", "kind", "bodyweight",
+            )
+        assertEquals(emptySet(), keys intersect geometry, "the set object grew a geometry key: $keys")
+    }
 
     // ---- what the two modes differ by, and what they must not -------------
 
