@@ -1103,6 +1103,36 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel) {
     }
 }
 
+/**
+ * The screen between sets, ordered by what the lifter has to reach rather than
+ * by when it happened.
+ *
+ * The rest countdown and START NEXT SET are the two things this screen exists
+ * for, and they were at opposite ends of it. Everything about the set that had
+ * just finished -- the effort line, the rep-correction row and a rep-quality
+ * card carrying a 64dp chart -- sat between the countdown and the next-set
+ * block, so the button that starts the set was below all of it. The field
+ * report for v0.1.37 is "try to get the rest dialog to fit on one page without
+ * scrolling"; that report, not this arithmetic, is the evidence it did not fit,
+ * because `:app` has no test source set and nothing here has been measured on a
+ * device.
+ *
+ * So the next-set half now comes first and the last-set half second. The
+ * distance the button moves up is exactly the height of the block that used to
+ * precede it -- summing the declared and default heights of that block gives
+ * roughly 270dp with a chart and roughly 90dp without -- and it is bought
+ * without removing a control, hiding one behind a disclosure or shrinking any
+ * text. The screen still scrolls: a per-rep chart and a rest countdown do not
+ * both fit above the fold on a phone. What is below the fold is now the detail
+ * rather than the control.
+ *
+ * [SessionCloseControls] stays where it has always been, directly under
+ * [StartNextSetButton], and that is deliberate rather than incidental. In
+ * `SessionCloseState.FAILED` it draws THIS SESSION DID NOT FINISH and the retry;
+ * moving it to the foot of the screen would put the one control that recovers an
+ * unclosed session underneath the chart, which is the defect this change is
+ * fixing, one control over.
+ */
 @Composable
 private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     RestHeader(state)
@@ -1110,18 +1140,15 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // Sets two onwards start from here, not from READY, and this is the screen
     // where the lifter has a rest period to spend fixing it.
     PermissionBanner(demoMode = state.demoMode)
-    // The effort tile is tapped mid-workout to end the set, so give a mistap
-    // somewhere to go rather than baking it into the record.
-    var changingEffort by remember(state.setsCompleted) { mutableStateOf(false) }
-    LoggedEffortLine(state) { changingEffort = !changingEffort }
-    if (changingEffort) {
-        RpeSelector(state, viewModel) { changingEffort = false }
-    }
-    state.lastFeedback?.let { RepCorrectionRow(it, viewModel) }
-    Spacer(Modifier.height(6.dp))
-    state.lastFeedback?.let { RepQualityCard(it) }
-    Spacer(Modifier.height(4.dp))
+    NextSetBlock(state, viewModel)
+    SessionCloseControls(state, viewModel)
+    Spacer(Modifier.height(16.dp))
+    LastSetDetail(state, viewModel)
+}
 
+/** What happens next: the prescription, the deviations, and the way into it. */
+@Composable
+private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
     val next = state.nextSlot
     if (!state.adHoc && next != null) {
         if (next.isExerciseChange) {
@@ -1179,7 +1206,35 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
             )
         }
     }
-    SessionCloseControls(state, viewModel)
+}
+
+/**
+ * How the set just finished went: the effort logged for it, the rep count and
+ * the per-rep chart.
+ *
+ * Below the next-set block rather than above it. The one-line summary of all
+ * three is already at the top of the screen in [RestHeader] -- the exercise, the
+ * rep count and the load in words, the tempo ratio, the velocity loss and the
+ * heart rate as chips -- so what moves down here is the detail behind a summary
+ * that stays above the fold, not the summary itself.
+ *
+ * The corrections stay one scroll away for the whole rest period rather than
+ * being hidden: `changingEffort` moved down with the line it belongs to, still
+ * keyed on `setsCompleted`, so an open effort grid closes when the next set ends
+ * rather than carrying a stale set's selection into the following rest.
+ */
+@Composable
+private fun LastSetDetail(state: RecordState, viewModel: RecordViewModel) {
+    // The effort tile is tapped mid-workout to end the set, so give a mistap
+    // somewhere to go rather than baking it into the record.
+    var changingEffort by remember(state.setsCompleted) { mutableStateOf(false) }
+    LoggedEffortLine(state) { changingEffort = !changingEffort }
+    if (changingEffort) {
+        RpeSelector(state, viewModel) { changingEffort = false }
+    }
+    state.lastFeedback?.let { RepCorrectionRow(it, viewModel) }
+    Spacer(Modifier.height(6.dp))
+    state.lastFeedback?.let { RepQualityCard(it) }
 }
 
 /**
