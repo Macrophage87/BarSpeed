@@ -1175,29 +1175,31 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * is a bare cancel of the context. Everything here is therefore called
      * inline.
      *
-     * The stop is routed through `RecordingHolds` as of this commit, and the
-     * behaviour is unchanged by that: `RecordingServicePolicy` still answers a
-     * released [RecordingHold.SESSION] with a stop whatever else is running, so
-     * this is the same unconditional stop it was, reached through a seam that
-     * can be tested. `RecordingService.start` fires on every [beginSet], and
-     * the stop was reachable only from [finishSession] — so leaving by any
-     * other route left the service running with nothing else able to stop it.
-     * `stopService` on a service that was never started is a no-op.
+     * This gives up the screen's reason to run the foreground service. It no
+     * longer stops it. `RecordingService.start` fires on every [beginSet], and
+     * the stop was once reachable only from [finishSession] — so leaving by any
+     * other route left the service running with nothing else able to stop it —
+     * but the stop now comes from whichever reason is the last to go away, and
+     * on this path that is usually the set write, a moment later.
      *
-     * The reason given here for it being safe is no longer the whole truth, and
-     * is corrected rather than deleted. It used to read that no recording
-     * survives this instance, because both sample collectors are
-     * `viewModelScope`-bound and `imuBuffer`/`hrBuffer` go with the instance.
-     * The collectors are still cancelled, but [endSet] now copies those buffers
-     * into a [PendingSetWrite] BEFORE launching, and that write runs on
-     * `appScope`, so a set can still be in the middle of being stored at the
-     * moment this runs. Stopping the service here drops the process out of
-     * foreground priority for as long as that write still needs.
+     * The history is kept because both halves of it were true in turn. This
+     * function used to explain that stopping here was safe because no recording
+     * survives the instance: both sample collectors are `viewModelScope`-bound
+     * and `imuBuffer`/`hrBuffer` go with it. That stopped being true when
+     * [endSet] began copying those buffers into a [PendingSetWrite] BEFORE
+     * launching a write that runs on `appScope` — a set can be in the middle of
+     * being stored at the moment this runs, and its samples are in this process
+     * and nowhere else until the insert lands. The correction was recorded and
+     * the stop left unconditional anyway, deferred to a field measurement. What
+     * changed is not that the measurement arrived. It is that the same window
+     * opened over the session close, which the screen advertises as safe to
+     * leave in as many words, over an `hrvRmssdMs` that no later reprocessing
+     * can rebuild.
      *
-     * Still unconditional at THIS commit, which introduces the seam without
-     * changing what it decides. The two pins named `(pre-fix)` in
-     * `RecordingServicePolicyTest` are what say so, and the commit that inverts
-     * them is the one that closes this.
+     * Deferred, never skipped. The two writes that can outlive this screen give
+     * their reasons up in a `finally`, so a write that failed releases exactly
+     * as a write that landed, and the "Recording session" notification cannot
+     * be stranded by anything short of the process dying.
      *
      * This writes nothing to the database, and that is now a settled ruling
      * rather than deferred work. The session row is left open with `endedAtMs`

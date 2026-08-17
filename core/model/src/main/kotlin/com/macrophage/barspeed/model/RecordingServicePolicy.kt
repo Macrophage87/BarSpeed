@@ -29,11 +29,17 @@ enum class RecordingHold(val armsService: Boolean) {
      * The record screen is live and a set has been begun.
      *
      * Acquired on every `beginSet`, released when the screen goes away or the
-     * session is closed. This is the only hold that is not scoped to a
-     * coroutine, and so the only one that can be left held: nothing releases it
-     * on a task swipe, and a foreground service recreated by START_STICKY after
-     * a process kill comes back with no holder able to release anything. Both
-     * are stated rather than fixed here; see the commit body.
+     * session is closed.
+     *
+     * This is the only hold that is not scoped to a coroutine, and so the only
+     * one that can be left held. [SET_WRITE] and [SESSION_CLOSE] are given up
+     * in a `finally` that covers both terminal branches of the work they
+     * describe, so short of the process dying they cannot leak. This one is a
+     * flag in all but name, and it has two known non-release paths, neither of
+     * them closed here and neither of them new: nothing releases it on a task
+     * swipe, and a foreground service that START_STICKY recreates after a
+     * process kill comes back with no holder able to release anything at all.
+     * Both are stated rather than fixed; see the commit body.
      */
     SESSION(armsService = true),
 
@@ -117,14 +123,25 @@ object RecordingServicePolicy {
     /**
      * Give up [hold], and say whether the service must now stop.
      *
-     * STOP whenever the released hold is [RecordingHold.SESSION], which is
-     * where the screen going away stops the service today, whatever else is
-     * still running. That is the behaviour this file was extracted from and it
-     * is wrong; the two pins naming it `(pre-fix)` are what says so, and they
-     * are replaced by their inversions in the commit that fixes it.
+     * STOP exactly when the last reason to run goes away, rather than when the
+     * screen leaves. The screen leaving used to be the whole rule, and that is
+     * the defect: a set-end write and a session close both outlive the record
+     * screen by design, and stopping the service under them drops the process
+     * out of foreground priority while the only copy of a set's samples, or the
+     * only copy of a session's R-R intervals, is still in memory.
+     *
+     * "The last reason" is measured on what this call actually took away, which
+     * is why an empty result is not enough on its own. A release of something
+     * that was not held changes nothing, so it may not report that everything
+     * just ended; `onCleared` runs after `onSessionClosed` on the finish path,
+     * so that double release is the ordinary case rather than an edge, and
+     * answering STOP to it would tear down a service the next hold still needs.
      */
-    fun release(held: Set<RecordingHold>, hold: RecordingHold): HoldTransition = HoldTransition(
-        held = held - hold,
-        command = if (hold == RecordingHold.SESSION) FgsCommand.STOP else FgsCommand.NONE,
-    )
+    fun release(held: Set<RecordingHold>, hold: RecordingHold): HoldTransition {
+        val remaining = held - hold
+        return HoldTransition(
+            held = remaining,
+            command = if (remaining.isEmpty() && held.isNotEmpty()) FgsCommand.STOP else FgsCommand.NONE,
+        )
+    }
 }
