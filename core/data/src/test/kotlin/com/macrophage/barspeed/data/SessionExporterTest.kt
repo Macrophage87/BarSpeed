@@ -320,4 +320,81 @@ class SessionExporterTest {
         assertTrue("repMetricsComplete" !in text, "expected the key to be absent entirely, got:\n$text")
         assertTrue("null" !in text, "the exporter must never write a null literal, got:\n$text")
     }
+
+    // ---- issue 32: the caveat must travel with the numbers it qualifies ----
+
+    /**
+     * The summary-only export ships the numbers and withholds the warning.
+     *
+     * A standard lift is manually counted by construction: the bar sensor is
+     * record-only and the lifter or the voice guide does the counting, so the
+     * stored count and the segmenter's count are two independent opinions and
+     * they routinely differ. Ten reps recorded, three segmented, and
+     * `summary.json` states velocity loss, tempo compliance and a full summary
+     * block computed over those three -- while the one field that says so is
+     * suppressed because per-rep detail was not requested.
+     *
+     * The reader has no way to notice. There is no `repMetrics` array in this
+     * artifact to count against, and an absent flag renders identically to a
+     * flag that was never applicable.
+     */
+    @Test
+    fun `a summary export states that its numbers do not cover the whole set`() = runTest {
+        val summary = setOf(analysis(3), actualReps = 10, repsManual = true, includeRepDetail = false)
+        // The numbers, present and drawn from three reps out of ten.
+        assertEquals(10, summary.reps)
+        assertEquals(16.7, summary.velocityLossPct)
+        assertEquals(3, summary.tempoCompliance?.of)
+        assertEquals(0.55, summary.summary.meanConVelMps)
+        // The caveat that qualifies them.
+        assertEquals(false, summary.repMetricsComplete)
+    }
+
+    /** The same statement in the other direction: coverage confirmed, not merely unstated. */
+    @Test
+    fun `a summary export states when its numbers do cover the whole set`() = runTest {
+        val summary = setOf(analysis(5), actualReps = 5, repsManual = true, includeRepDetail = false)
+        assertEquals(true, summary.repMetricsComplete)
+    }
+
+    /**
+     * The two artifacts describe one set and must not disagree about it.
+     *
+     * This is the assertion that survives a future refactor of either branch:
+     * whatever the flag says, both exports of the same set say the same thing,
+     * because the level of detail requested is not a fact about how the lifter
+     * trained. Written over all three states -- disagreeing counts, agreeing
+     * counts, and no segmented reps -- so it cannot pass by both sides being
+     * null.
+     */
+    @Test
+    fun `the coverage flag is the same in both exports of one set`() = runTest {
+        val cases =
+            listOf(
+                Triple(analysis(3), 10, false),
+                Triple(analysis(5), 5, true),
+                Triple(analysis(0), 12, null),
+            )
+        for ((a, recorded, expected) in cases) {
+            val summary = setOf(a, actualReps = recorded, repsManual = true, includeRepDetail = false)
+            val detailed = setOf(a, actualReps = recorded, repsManual = true, includeRepDetail = true)
+            assertEquals(expected, summary.repMetricsComplete, "summary export, $recorded recorded")
+            assertEquals(expected, detailed.repMetricsComplete, "detailed export, $recorded recorded")
+        }
+    }
+
+    /**
+     * The wire form, because that is what a coach opens. `explicitNulls = false`
+     * drops a null, so the assertion has to be that the key is present with the
+     * value false -- not merely that the object decoded to something.
+     */
+    @Test
+    fun `the summary JSON carries the coverage flag beside the figures it qualifies`() = runTest {
+        val text =
+            exporter(analysis(3), actualReps = 10, repsManual = true)
+                .exportJson(1L, includeRepDetail = false)!!
+        assertTrue("\"repMetricsComplete\": false" in text, "expected the caveat in the wire form, got:\n$text")
+        assertTrue("\"velocityLoss_pct\"" in text, "the figure the caveat qualifies should be here too")
+        assertTrue("\"repMetrics\"" !in text, "summary-only export must still omit the per-rep array")
+    }
 }
