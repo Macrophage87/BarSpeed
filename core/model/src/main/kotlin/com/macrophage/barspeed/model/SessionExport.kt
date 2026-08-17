@@ -26,9 +26,25 @@ data class SessionExport(
          * phases report null instead of 0, tempo compliance scores movement
          * digits only, and repMetricsComplete says whether the per-rep array
          * covers the whole set.
+         *
+         * 1.2 — a set may carry the direction and geometry it was measured
+         * with, and where each of those values came from. Purely additive: no
+         * existing key changed type or stopped being written, so a reader
+         * written against 1.1 works unchanged against 1.2. The key is absent on
+         * sets recorded before the app captured it.
          */
-        const val SCHEMA_VERSION = "1.1"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1")
+        const val SCHEMA_VERSION = "1.2"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2")
+
+        /**
+         * Which phase a rep opened with, lowercased [StartPhase] names. 1:1
+         * with the enum, so it is pinned in both directions rather than only
+         * against the published schema.
+         */
+        val VALID_STARTS_WITH = setOf("eccentric", "concentric")
+
+        /** How a geometry value was arrived at, lowercased [GeometrySource] names. */
+        val VALID_GEOMETRY_SOURCES = setOf("declared", "seeded", "inferred", "default")
     }
 }
 
@@ -96,8 +112,81 @@ data class SetExport(
      * reps at all, so there is no figure left to qualify.
      */
     val repMetricsComplete: Boolean? = null,
+    /**
+     * The direction and geometry this set's numbers were measured with.
+     *
+     * Absent means the set was recorded before the app stored it. Absent does
+     * NOT mean vertical, drive-up, sensor-on-the-bar: a wrong declaration is
+     * worse than no declaration, so nothing is defaulted in.
+     */
+    val geometry: GeometryExport? = null,
     /** Always-included summary across reps. */
     val summary: SetSummaryExport,
+)
+
+/**
+ * How the lift moved and how the sensor was mounted, as the app resolved it for
+ * this set — not as a plan declared it, because the app applies a precedence
+ * chain and a plan's text may have been overridden.
+ *
+ * This is what makes the rest of the set checkable. [SetExport.tempoPrescribed]
+ * is positional notation — digit 1 is the down stroke, digit 3 the up stroke —
+ * so which stroke is the eccentric follows from [concentric] and [plane], not
+ * from the digit order. Without those, [SetExport.tempoCompliance] is a verdict
+ * whose input the reader cannot see.
+ *
+ * **Every field is required, and none has a Kotlin default.** The exporter
+ * writes JSON with `encodeDefaults = false`, so a field defaulted to `false`
+ * would be dropped from the wire and its absence would read as "not stated"
+ * when it meant "stated false" — the exact defect this object exists to fix.
+ * Contrast [SetExport.failed] and [SetExport.warmup], where false is the
+ * unremarkable normal and omission reads correctly.
+ */
+@Serializable
+data class GeometryExport(
+    /** Which phase opened each rep: "eccentric" or "concentric". */
+    val startsWith: String,
+    /** Which way the driving phase moved: "up" or "down". */
+    val concentric: String,
+    /** The plane the LIFTER moved in: "vertical" or "horizontal". */
+    val plane: String,
+    /**
+     * True when the sensor rode a cable weight stack. The stack travels
+     * vertically however the lifter moves, so this overrides [plane] for the
+     * axis that was actually measured.
+     */
+    val sensorOnStack: Boolean,
+    /** True when the sensor moved opposite to the load the lifter drove. */
+    val sensorInverted: Boolean,
+    /**
+     * Lifter-side travel per unit of sensor travel. Every velocity and range of
+     * motion in this set is lifter-side, so on a 2:1 pulley they are twice what
+     * the sensor saw.
+     */
+    val travelRatio: Double,
+    /** How the movement is performed: "dynamic", "hold", "carry" or "explosive". */
+    val kind: String,
+    /** True when the lifter's own body was the load, so load_kg includes body weight. */
+    val bodyweight: Boolean,
+    /** Where each of the resolvable values came from. */
+    val source: GeometrySourceExport,
+)
+
+/**
+ * Declared, seeded, inferred or default, per value.
+ *
+ * Three of [GeometryExport]'s eight values are missing here on purpose:
+ * `sensorOnStack`, `sensorInverted` and `bodyweight` are non-nullable booleans
+ * in the plan format, so a declared `false` and an omitted key are the same
+ * value and no source can be told apart. Stating one would be an invention.
+ */
+@Serializable
+data class GeometrySourceExport(
+    val startsWith: String,
+    val concentric: String,
+    val plane: String,
+    val kind: String,
+    val travelRatio: String,
 )
 
 @Serializable

@@ -80,6 +80,18 @@ data class SetRecordEntity(
     val endedAtMs: Long,
     /** kotlinx-serialized [com.macrophage.barspeed.dsp.SetAnalysis]. */
     val analysisJson: String,
+    /**
+     * kotlinx-serialized [com.macrophage.barspeed.model.ResolvedGeometry] — the
+     * direction and sensor mounting this set was analysed against.
+     *
+     * Stored as one JSON column rather than eight typed ones, following
+     * [analysisJson]: nothing queries these in SQL, and a ninth value added
+     * later then costs no further migration. Null means the row predates the
+     * capture, which is a real and permanent state — the geometry of a set
+     * already recorded cannot be recovered, and guessing it from the exercise
+     * id would publish a declaration the app never made.
+     */
+    val geometryJson: String? = null,
     val hrEndOfSetBpm: Int? = null,
     val hrAvgBpm: Int? = null,
     val hrMaxBpm: Int? = null,

@@ -2,6 +2,7 @@ package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.model.PlanSessionDef
+import com.macrophage.barspeed.model.SetGeometryPolicy
 
 /** Fraction of a timed target that still counts as having made the hold. */
 const val TIMED_CLOSE_ENOUGH_FRACTION = 0.9
@@ -13,31 +14,18 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
         val base = exerciseById(exerciseDef.exercise)
         // Plan-declared direction beats seed defaults and name inference: the
         // same movement pattern starts at the top on one machine and the
-        // bottom on another, and no signal processing can tell which.
-        // An omitted key must fall back to what `base` already says, not to the
-        // Kotlin default: overwriting with the default discards the built-in
-        // definition. travelRatio and plane are nullable on the wire, so they
-        // can express "omitted" and are written that way here. sensorInverted,
-        // sensorOnStack and bodyweight cannot -- they are non-nullable Boolean
-        // on PlanExerciseDef, so an omitted key and a declared false are
-        // the same value, and there is nothing for `?:` to test. That is
-        // latent today because no SEED entry sets any of the three; the first
-        // one that does (pull_up, dip, seated_row) makes it live.
-        val exercise =
-            base.copy(
-                startsWith = exerciseDef.startPhaseOverride ?: base.startsWith,
-                concentricUp = exerciseDef.concentric?.let { it == "up" } ?: base.concentricUp,
-                kind = exerciseDef.effectiveKind,
-                sensorInverted = exerciseDef.sensorInverted,
-                travelRatio = exerciseDef.travelRatio ?: base.travelRatio,
-                horizontal = exerciseDef.plane?.let { it == "horizontal" } ?: base.horizontal,
-                sensorOnStack = exerciseDef.sensorOnStack,
-                bodyweight = exerciseDef.bodyweight,
-            )
+        // bottom on another, and no signal processing can tell which. The
+        // precedence itself now lives in SetGeometryPolicy, in a module that
+        // has tests; this file had none and could not be run against.
+        val exercise = SetGeometryPolicy.resolve(base, exerciseDef)
+        // Described from the definition that was resolved, not from the plan,
+        // so what the export publishes is what the DSP was handed.
+        val geometry = SetGeometryPolicy.describe(exercise, exerciseDef)
         exerciseDef.sets.forEachIndexed { setIdx, set ->
             slots +=
                 PlannedSlot(
                     exercise = exercise,
+                    geometry = geometry,
                     setIndexInExercise = setIdx,
                     setsInExercise = exerciseDef.sets.size,
                     reps = set.reps,

@@ -14,9 +14,10 @@
     "schemaVersion": {
       "enum": [
         "1.0",
-        "1.1"
+        "1.1",
+        "1.2"
       ],
-      "description": "1.1: velocityLoss_pct is best-to-LAST rep; unmeasured phases are null rather than 0; tempo compliance scores movement digits only; repMetricsComplete reports per-rep coverage."
+      "description": "1.1: velocityLoss_pct is best-to-LAST rep; unmeasured phases are null rather than 0; tempo compliance scores movement digits only; repMetricsComplete reports per-rep coverage. 1.2: a set may carry `geometry`, the resolved direction and sensor mounting its numbers were measured with, plus the provenance of each value. Purely additive — no key from 1.1 changed type or stopped being written, so a 1.1 reader works unchanged against a 1.2 export."
     },
     "startedAt": {
       "type": "string",
@@ -258,11 +259,119 @@
           "type": "boolean",
           "description": "True when reps were entered or corrected manually rather than sensor-counted."
         },
+        "geometry": {
+          "$ref": "#/$defs/geometry"
+        },
         "repMetricsComplete": {
           "type": "boolean",
           "description": "False when the sensor segmenter resolved a different number of reps than the set records \u2014 fewer, or more, than the lifter or the voice guide counted. Everything derived from the segmented reps is then drawn from a sample of the set rather than from the set: velocityLoss_pct, tempoCompliance, summary, and the repMetrics array where one is present. Read false as a caveat on those figures whether or not per-rep detail was requested. True is weaker than it looks: when repsManual is false the recorded count IS the segmenter's count, so the two agree by construction and this says nothing independent. Absent means the segmenter resolved no reps at all, which is a third state and not a synonym for false \u2014 nothing derived from reps is published either, so there is no figure left to qualify."
         }
       }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How the lift moved and how the sensor was mounted for this set, AS THE APP RESOLVED IT — not as a plan declared it, because a declaration may have been overridden by the app's precedence chain and an ad-hoc set has no plan at all. This is what makes the rest of the set checkable: tempoPrescribed is POSITIONAL notation (digit 1 = the down stroke, digit 3 = the up stroke), so which stroke is the eccentric follows from `concentric` and `plane`, not from the digit order — on a leg curl or a pushdown the down stroke is the concentric. Without this object, tempoCompliance is a verdict whose input the reader cannot see. Absent means the set was recorded before the app stored this; absent must NOT be read as vertical/drive-up/sensor-on-the-bar, because a wrong declaration is worse than none. Present means all nine keys are present: the object is written whole or not at all, including the booleans when they are false.",
+      "required": [
+        "startsWith",
+        "concentric",
+        "plane",
+        "sensorOnStack",
+        "sensorInverted",
+        "travelRatio",
+        "kind",
+        "bodyweight",
+        "source"
+      ],
+      "properties": {
+        "startsWith": {
+          "enum": [
+            "eccentric",
+            "concentric"
+          ],
+          "description": "Which phase opened every rep of this set. A squat starts eccentric; a deadlift or a press from the rack starts concentric."
+        },
+        "concentric": {
+          "enum": [
+            "up",
+            "down"
+          ],
+          "description": "Which way the driving phase moved. 'down' for leg curls, lat pulldowns and pushdowns. Independent of startsWith, and it is what decides which tempo digit is the eccentric on vertical work."
+        },
+        "plane": {
+          "enum": [
+            "vertical",
+            "horizontal"
+          ],
+          "description": "The plane the LIFTER moved in. On 'horizontal' there is no up or down, so the tempo digits revert to the classic phase reading: digit 1 = eccentric, digit 3 = concentric. This is the lifter's plane, not necessarily the sensor's — see sensorOnStack."
+        },
+        "sensorOnStack": {
+          "type": "boolean",
+          "description": "True when the sensor rode a cable weight stack. The stack travels VERTICALLY however the lifter moves, so this overrides `plane` for the axis that was actually measured: a seated row with this true is a vertical measurement of a horizontal exercise."
+        },
+        "sensorInverted": {
+          "type": "boolean",
+          "description": "True when the sensor moved OPPOSITE to the load the lifter drove — the usual case with a sensor on a cable stack. Measured motion was flipped back into the lifter's frame before analysis."
+        },
+        "travelRatio": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Lifter-side travel per unit of sensor travel; 1 for a direct mount, 2 for a 2:1 pulley. Every velocity and rom_m in this set is LIFTER-side, so on a 2:1 pulley they are twice what the sensor saw. Published alongside sensorInverted because the two are one multiplier: reading either alone gives the wrong scale."
+        },
+        "kind": {
+          "enum": [
+            "dynamic",
+            "hold",
+            "carry",
+            "explosive"
+          ],
+          "description": "How the movement is performed. Decides whether a tempo applies at all, whether peak rather than mean velocity is the headline, and whether the set is measured on the clock."
+        },
+        "bodyweight": {
+          "type": "boolean",
+          "description": "True when the lifter's own body was the load. load_kg then INCLUDES body weight, while plannedLoad_kg is the added load alone — the two keys mean different things on such a set, and this is the only field that says so."
+        },
+        "source": {
+          "$ref": "#/$defs/geometrySource"
+        }
+      }
+    },
+    "geometrySource": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where each resolvable geometry value came from, so a guess is not read as a declaration. 'declared' = a plan stated it; 'seeded' = the app's built-in definition of a lift it ships; 'inferred' = guessed by matching words in the exercise id, which gets ordinary names wrong; 'default' = nothing supplied it and no inference for that value exists, so the type default stood. NOTE the three values missing here — sensorOnStack, sensorInverted and bodyweight carry no source, because they are non-nullable booleans in the plan format: a declared false and an omitted key are the same value and the app cannot tell them apart. Stating a source for them would be an invention.",
+      "required": [
+        "startsWith",
+        "concentric",
+        "plane",
+        "kind",
+        "travelRatio"
+      ],
+      "properties": {
+        "startsWith": {
+          "$ref": "#/$defs/sourceValue"
+        },
+        "concentric": {
+          "$ref": "#/$defs/sourceValue"
+        },
+        "plane": {
+          "$ref": "#/$defs/sourceValue"
+        },
+        "kind": {
+          "$ref": "#/$defs/sourceValue"
+        },
+        "travelRatio": {
+          "$ref": "#/$defs/sourceValue"
+        }
+      }
+    },
+    "sourceValue": {
+      "enum": [
+        "declared",
+        "seeded",
+        "inferred",
+        "default"
+      ]
     },
     "repMetrics": {
       "type": "object",

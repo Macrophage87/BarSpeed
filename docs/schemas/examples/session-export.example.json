@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.2",
   "startedAt": "2026-07-18T17:04:00Z",
   "endedAt": "2026-07-18T18:11:00Z",
   "planRef": "Hypertrophy Block W3 / Lower A",
@@ -18,6 +18,23 @@
           "tempoPrescribed": "4010",
           "tempoCompliance": { "prescribed": "4010", "tolerance_s": 0.5, "withinTolerance": 4, "of": 5 },
           "velocityLoss_pct": 14.2,
+          "geometry": {
+            "startsWith": "eccentric",
+            "concentric": "up",
+            "plane": "vertical",
+            "sensorOnStack": false,
+            "sensorInverted": false,
+            "travelRatio": 1,
+            "kind": "dynamic",
+            "bodyweight": false,
+            "source": {
+              "startsWith": "seeded",
+              "concentric": "seeded",
+              "plane": "seeded",
+              "kind": "seeded",
+              "travelRatio": "seeded"
+            }
+          },
           "hr": { "endOfSetBpm": 148, "avgBpm": 131, "maxBpm": 152 },
           "repMetrics": [
             { "ecc_s": 3.9, "bottomPause_s": 0.2, "con_s": 0.8, "topPause_s": 1.1, "meanConVel_mps": 0.52, "peakConVel_mps": 0.85, "meanEccVel_mps": -0.16, "rom_m": 0.61, "peakPower_w": 980.2 },
@@ -27,6 +44,45 @@
             { "ecc_s": 3.2, "bottomPause_s": 0.1, "con_s": 1.3, "topPause_s": 0.9, "meanConVel_mps": 0.45, "peakConVel_mps": 0.74, "meanEccVel_mps": -0.17, "rom_m": 0.6, "peakPower_w": 905.6 }
           ],
           "summary": { "meanConVel_mps": 0.48, "peakConVel_mps": 0.85, "meanEcc_s": 3.74, "meanCon_s": 1.02, "meanRom_m": 0.6 }
+        }
+      ]
+    },
+    {
+      "exercise": "seated_leg_curl",
+      "sets": [
+        {
+          "load_kg": 45,
+          "load_lb": 99.2,
+          "reps": 10,
+          "plannedReps": 10,
+          "rest_s": 90,
+          "tempoPrescribed": "1030",
+          "tempoCompliance": {
+            "prescribed": "1030",
+            "tolerance_s": 0.5,
+            "withinTolerance": 7,
+            "of": 10,
+            "scoredPhases": ["eccentric", "concentric"],
+            "prescribedEccConRatio": 3.0
+          },
+          "geometry": {
+            "startsWith": "concentric",
+            "concentric": "down",
+            "plane": "vertical",
+            "sensorOnStack": true,
+            "sensorInverted": true,
+            "travelRatio": 1,
+            "kind": "dynamic",
+            "bodyweight": false,
+            "source": {
+              "startsWith": "declared",
+              "concentric": "declared",
+              "plane": "default",
+              "kind": "inferred",
+              "travelRatio": "default"
+            }
+          },
+          "summary": { "meanConVel_mps": 0.41, "peakConVel_mps": 0.66, "meanEcc_s": 2.8, "meanCon_s": 1.1, "meanRom_m": 0.34 }
         }
       ]
     }

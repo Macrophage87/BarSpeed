@@ -92,4 +92,89 @@ class SchemaContractTest {
             "the exporter writes ${SessionExport.SCHEMA_VERSION}, which its own schema rejects",
         )
     }
+
+    /**
+     * The exported geometry speaks the plan's vocabulary, and must go on doing
+     * so. A consumer holding both schemas reads `"concentric": "down"` the same
+     * way in each; a divergence would make the export's own declaration
+     * unreadable against the plan that produced it.
+     */
+    @Test
+    fun `the exported geometry uses exactly the vocabularies the plan declares in`() {
+        val geometry = schema("session-export.schema.json")["\$defs"]!!.jsonObject["geometry"]!!
+            .jsonObject["properties"]!!.jsonObject
+        assertEquals(
+            PlanFile.VALID_CONCENTRIC,
+            enumOf(geometry["concentric"]!!.jsonObject),
+            "the export and the plan disagree on drive-direction values",
+        )
+        assertEquals(
+            PlanFile.VALID_PLANES,
+            enumOf(geometry["plane"]!!.jsonObject),
+            "the export and the plan disagree on plane values",
+        )
+        assertEquals(
+            PlanFile.VALID_KINDS,
+            enumOf(geometry["kind"]!!.jsonObject),
+            "the export and the plan disagree on kind values",
+        )
+        assertEquals(
+            SessionExport.VALID_STARTS_WITH,
+            enumOf(geometry["startsWith"]!!.jsonObject),
+            "startsWith values drifted",
+        )
+    }
+
+    /**
+     * The start phase and the provenance vocabulary are both 1:1 with a Kotlin
+     * enum, so both are pinned in both directions. Adding a [StartPhase] or a
+     * [GeometrySource] without publishing it would ship a value the schema
+     * rejects, and the assertion above would not notice.
+     */
+    @Test
+    fun `the published start phases and geometry sources are exactly the enums`() {
+        assertEquals(
+            StartPhase.entries.map { it.name.lowercase() }.toSet(),
+            SessionExport.VALID_STARTS_WITH,
+            "VALID_STARTS_WITH and StartPhase disagree",
+        )
+        assertEquals(
+            GeometrySource.entries.map { it.name.lowercase() }.toSet(),
+            SessionExport.VALID_GEOMETRY_SOURCES,
+            "VALID_GEOMETRY_SOURCES and GeometrySource disagree",
+        )
+        val sourceValue = schema("session-export.schema.json")["\$defs"]!!.jsonObject["sourceValue"]!!.jsonObject
+        assertEquals(
+            SessionExport.VALID_GEOMETRY_SOURCES,
+            enumOf(sourceValue),
+            "geometry source values drifted",
+        )
+    }
+
+    /**
+     * Present-or-absent as a unit. The exporter writes JSON with
+     * `encodeDefaults = false`, so any geometry field that acquired a Kotlin
+     * default would silently vanish from the wire and read as "not stated" —
+     * which is the defect this object was added to remove. Marking all nine
+     * required is what makes a dropped key a schema violation rather than a
+     * quiet reinterpretation.
+     */
+    @Test
+    fun `every geometry key is required, so a dropped false cannot read as unstated`() {
+        val geometry = schema("session-export.schema.json")["\$defs"]!!.jsonObject["geometry"]!!.jsonObject
+        val required = geometry["required"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
+        assertEquals(geometry["properties"]!!.jsonObject.keys, required, "a geometry key is optional")
+        val source = schema("session-export.schema.json")["\$defs"]!!.jsonObject["geometrySource"]!!.jsonObject
+        val sourceRequired = source["required"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
+        assertEquals(source["properties"]!!.jsonObject.keys, sourceRequired, "a geometry source key is optional")
+        // The three that carry no provenance, named so their absence is a
+        // decision on the record rather than an oversight: they are
+        // non-nullable booleans in the plan format, so a declared false and an
+        // omitted key are the same value.
+        assertEquals(
+            setOf("sensorOnStack", "sensorInverted", "bodyweight"),
+            geometry["properties"]!!.jsonObject.keys - sourceRequired - setOf("source"),
+            "the set of values carrying no provenance changed",
+        )
+    }
 }

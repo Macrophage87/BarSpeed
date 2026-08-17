@@ -143,21 +143,23 @@ class SessionExporterTest {
         verdicts = listOf("Bar speed held up well."),
     )
 
-    private fun row(analysis: SetAnalysis, actualReps: Int, repsManual: Boolean) = SetRecordEntity(
-        id = 5L,
-        sessionId = 1L,
-        orderIdx = 0,
-        exerciseId = "back_squat",
-        exerciseName = "Back Squat",
-        loadKg = 100.0,
-        actualReps = actualReps,
-        repsManual = repsManual,
-        plannedReps = 10,
-        tempo = "2-0-1-0",
-        startedAtMs = 1_000L,
-        endedAtMs = 61_000L,
-        analysisJson = json.encodeToString(SetAnalysis.serializer(), analysis),
-    )
+    private fun row(analysis: SetAnalysis, actualReps: Int, repsManual: Boolean, geometryJson: String? = null) =
+        SetRecordEntity(
+            id = 5L,
+            sessionId = 1L,
+            orderIdx = 0,
+            exerciseId = "back_squat",
+            exerciseName = "Back Squat",
+            loadKg = 100.0,
+            actualReps = actualReps,
+            repsManual = repsManual,
+            plannedReps = 10,
+            tempo = "2-0-1-0",
+            startedAtMs = 1_000L,
+            endedAtMs = 61_000L,
+            analysisJson = json.encodeToString(SetAnalysis.serializer(), analysis),
+            geometryJson = geometryJson,
+        )
 
     private val cueStream =
         RawStreamEntity(
@@ -167,15 +169,24 @@ class SessionExporterTest {
             csvGzip = Gzip.compress(CueCsv.encode(listOf(VoiceCue(1_100L, "Rep 1")))),
         )
 
-    private fun exporter(analysis: SetAnalysis, actualReps: Int, repsManual: Boolean): SessionExporter {
+    private fun exporterOf(stored: SetRecordEntity): SessionExporter {
         val dao =
             FakeSessionDao(
                 session = SessionEntity(id = 1L, startedAtMs = 1_000L, endedAtMs = 61_000L),
-                rows = listOf(row(analysis, actualReps, repsManual)),
+                rows = listOf(stored),
                 streams = mapOf(5L to listOf(cueStream)),
             )
         return SessionExporter(SessionRepository(dao, FakeExerciseDao()))
     }
+
+    private fun exporter(analysis: SetAnalysis, actualReps: Int, repsManual: Boolean): SessionExporter =
+        exporterOf(row(analysis, actualReps, repsManual))
+
+    /** The single set of an export built over a row carrying [geometryJson]. */
+    private suspend fun setWithGeometry(geometryJson: String?): SetExport =
+        exporterOf(row(analysis(3), actualReps = 3, repsManual = false, geometryJson = geometryJson))
+            .buildExport(1L, includeRepDetail = true)!!
+            .exercises.single().sets.single()
 
     private suspend fun setOf(
         analysis: SetAnalysis,
@@ -233,6 +244,38 @@ class SessionExporterTest {
                 "sensorOnStack", "sensorInverted", "travelRatio", "kind", "bodyweight",
             )
         assertEquals(emptySet(), keys intersect geometry, "the set object grew a geometry key: $keys")
+    }
+
+    /**
+     * A row that carries no stored geometry publishes none — no key, not an
+     * object full of plausible defaults.
+     *
+     * This is the permanent state of every set recorded before the app began
+     * storing it, the whole of the field session that found this included. It
+     * cannot be repaired: only exerciseId links a stored set back to a plan,
+     * the plan may have been archived or re-imported since, and an ad-hoc set
+     * had no plan at all — so a backfill would publish a declaration nobody
+     * made.
+     */
+    @Test
+    fun `a set with no stored geometry publishes no geometry`() = runTest {
+        assertNull(setWithGeometry(null).geometry)
+    }
+
+    /**
+     * A stored geometry that will not decode is the same answer: absent.
+     *
+     * Deliberately not distinguished from "never stored". Both mean the app
+     * cannot say how this set was measured, and the alternative — a default
+     * object standing in for a corrupt one — is the failure mode this whole
+     * change exists to remove. The second case is the subtler one: valid JSON
+     * that is missing required fields, which a lenient decoder would happily
+     * fill in.
+     */
+    @Test
+    fun `a stored geometry that will not decode publishes no geometry`() = runTest {
+        assertNull(setWithGeometry("{ not json").geometry)
+        assertNull(setWithGeometry("""{"startsWith":"ECCENTRIC"}""").geometry)
     }
 
     // ---- what the two modes differ by, and what they must not -------------

@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         RawStreamEntity::class,
         CustomExerciseEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -76,6 +76,23 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        /**
+         * v8: the resolved direction and sensor geometry a set was analysed
+         * against, as one JSON column on set_records.
+         *
+         * Nullable with no default, so existing rows are left exactly as they
+         * are and read back as "not captured". Backfilling was considered and
+         * refused: only exerciseId links a stored set to a plan, the plan may
+         * have been archived or re-imported since, and ad-hoc sets have no plan
+         * at all — so a backfill would publish a declaration nobody made.
+         */
+        private val MIGRATION_7_8 =
+            object : Migration(7, 8) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN geometryJson TEXT")
+                }
+            }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "accelerometer_lifting.db")
                 .addMigrations(
@@ -85,6 +102,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
+                    MIGRATION_7_8,
                 )
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()

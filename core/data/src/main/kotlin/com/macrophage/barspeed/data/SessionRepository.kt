@@ -5,6 +5,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,15 @@ data class CompletedSet(
     val startedAtMs: Long,
     val endedAtMs: Long,
     val analysis: SetAnalysis,
+    /**
+     * The direction and sensor geometry [analysis] was produced with.
+     *
+     * Captured at set end rather than looked up later: the resolution combines
+     * a plan's declarations with the built-in definition, and neither the plan
+     * nor the built-in list is guaranteed to still say the same thing when the
+     * session is exported.
+     */
+    val geometry: ResolvedGeometry? = null,
     val imuSamples: List<ImuSample>,
     val hrSamples: List<HrSample>,
     /** Spoken cues during the set, epoch-ms stamped for IMU cross-reference. */
@@ -206,6 +216,22 @@ class SessionRepository(
 
     fun decodeAnalysis(entity: SetRecordEntity): SetAnalysis? = try {
         json.decodeFromString(SetAnalysis.serializer(), entity.analysisJson)
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * The geometry this set was analysed against, or null when the row does not
+     * carry one.
+     *
+     * Null covers two cases and deliberately does not distinguish them: a row
+     * written before the column existed, and a column that will not decode.
+     * Both mean the same thing to a reader — the app cannot say how this set
+     * was measured — and both must stay absent rather than fall back to a
+     * plausible-looking default.
+     */
+    fun decodeGeometry(entity: SetRecordEntity): ResolvedGeometry? = try {
+        entity.geometryJson?.let { json.decodeFromString(ResolvedGeometry.serializer(), it) }
     } catch (e: Exception) {
         null
     }

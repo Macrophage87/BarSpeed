@@ -22,6 +22,7 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.RecordingHold
+import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SessionCloseState
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetWriteState
@@ -49,6 +50,8 @@ data class SetRating(val rpe: Int?, val failed: Boolean, val warmup: Boolean)
 /** One planned set, flattened from the plan into an ordered queue. */
 data class PlannedSlot(
     val exercise: ExerciseDef,
+    /** [exercise]'s direction and sensor mounting, with where each value came from. */
+    val geometry: ResolvedGeometry,
     val setIndexInExercise: Int,
     val setsInExercise: Int,
     val reps: Int?,
