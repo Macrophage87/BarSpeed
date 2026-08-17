@@ -114,8 +114,14 @@ class SessionExporter(
             // The stored rep count comes from the lifter or the voice guide; the
             // sensor segmenter is a separate opinion. Say so when they disagree
             // rather than letting a short per-rep array look like the whole set.
-            repMetricsComplete =
-            if (includeRepDetail && reps.isNotEmpty()) reps.size == record.actualReps else null,
+            //
+            // Gated on the reps, never on the export mode. The three figures
+            // this qualifies -- velocityLoss_pct, tempoCompliance and summary --
+            // are published in both artifacts and all three are computed from
+            // this same list, so a caveat keyed on whether per-rep detail was
+            // requested leaves the summary-only reader holding the numbers with
+            // the warning removed.
+            repMetricsComplete = if (reps.isNotEmpty()) reps.size == record.actualReps else null,
             repMetrics =
             if (includeRepDetail && reps.isNotEmpty()) {
                 reps.map {
