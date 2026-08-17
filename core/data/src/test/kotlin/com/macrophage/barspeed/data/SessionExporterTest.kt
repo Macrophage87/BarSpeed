@@ -8,6 +8,7 @@ import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.GeometrySource
 import com.macrophage.barspeed.model.GeometrySources
 import com.macrophage.barspeed.model.ResolvedGeometry
+import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.SetExport
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
@@ -309,6 +310,25 @@ class SessionExporterTest {
         val root = rootObject()
         assertEquals("1970-01-01T00:00:01Z", root.getValue("startedAt").jsonPrimitive.content)
         assertEquals("1970-01-01T00:01:01Z", root.getValue("endedAt").jsonPrimitive.content)
+    }
+
+    /**
+     * The version on the wire is the version the model declares.
+     *
+     * `schemaVersion` is the only field carrying `@EncodeDefault(ALWAYS)`,
+     * because an export without its version cannot be read by anything that has
+     * to tell one version's field meanings from another's. This asserts the
+     * mechanism still works end to end: the exporter never sets the field, so
+     * it arrives entirely by that annotation, and losing the annotation would
+     * drop the key from every export the app produces without failing anything
+     * else.
+     */
+    @Test
+    fun `the exported document declares the schema version the model does`() = runTest {
+        assertEquals(
+            SessionExport.SCHEMA_VERSION,
+            rootObject().getValue("schemaVersion").jsonPrimitive.content,
+        )
     }
 
     /**

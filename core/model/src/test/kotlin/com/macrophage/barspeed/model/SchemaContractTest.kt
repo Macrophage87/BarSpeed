@@ -94,6 +94,35 @@ class SchemaContractTest {
     }
 
     /**
+     * The published example is an example of what the exporter actually emits.
+     *
+     * Found by mutation testing, not by reading: reverting
+     * [SessionExport.SCHEMA_VERSION] from 1.3 to 1.2 left the entire suite
+     * green. The version assertion above only requires that the version the
+     * exporter writes is SOMEWHERE in the supported set, and an older version
+     * is always still in it — so the exporter could stamp 1.2 on a document
+     * carrying a key that only exists in 1.3, and a consumer reading the
+     * version to decide how to interpret the payload would be told the wrong
+     * answer by the one field whose whole job is to be right about that.
+     *
+     * Pinned through the example rather than as a bare literal so the check has
+     * a second job: the example is the document a reader is pointed at, and one
+     * still advertising a version the code no longer writes is drift of exactly
+     * the kind this class exists to catch. Bumping the version now requires
+     * updating the example in the same change, which was already the rule and
+     * was enforced by nothing.
+     */
+    @Test
+    fun `the published example declares the version the exporter writes`() {
+        val example = schema("examples/session-export.example.json")
+        assertEquals(
+            SessionExport.SCHEMA_VERSION,
+            example["schemaVersion"]!!.jsonPrimitive.content,
+            "the published example and SessionExport.SCHEMA_VERSION disagree",
+        )
+    }
+
+    /**
      * The session export requires exactly three keys of a reader, and no more.
      *
      * Every version of this contract so far has claimed to be additive -- 1.2's
