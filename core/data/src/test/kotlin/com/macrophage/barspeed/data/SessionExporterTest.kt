@@ -4,7 +4,12 @@ import com.macrophage.barspeed.dsp.PhaseComplianceResult
 import com.macrophage.barspeed.dsp.RepAnalysis
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.TempoComplianceResult
+import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.GeometrySource
+import com.macrophage.barspeed.model.GeometrySources
+import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SetExport
+import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +21,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -161,6 +167,56 @@ class SessionExporterTest {
             geometryJson = geometryJson,
         )
 
+    /**
+     * A plan-declared seated leg curl: the drive goes DOWN, off a cable stack
+     * through a 2:1 pulley. Values chosen so no two fields share a value and
+     * no field sits on its type default, so a mapping that crossed two of them
+     * cannot pass.
+     */
+    private val legCurl =
+        ResolvedGeometry(
+            startsWith = StartPhase.CONCENTRIC,
+            concentricUp = false,
+            horizontal = false,
+            sensorOnStack = true,
+            sensorInverted = true,
+            travelRatio = 2.0,
+            kind = ExerciseKind.DYNAMIC,
+            bodyweight = false,
+            sources =
+            GeometrySources(
+                startsWith = GeometrySource.DECLARED,
+                concentric = GeometrySource.DECLARED,
+                plane = GeometrySource.DEFAULT,
+                kind = GeometrySource.INFERRED,
+                travelRatio = GeometrySource.DECLARED,
+            ),
+        )
+
+    /** An ordinary barbell squat: every boolean false, which is a statement here. */
+    private val squat =
+        ResolvedGeometry(
+            startsWith = StartPhase.ECCENTRIC,
+            concentricUp = true,
+            horizontal = false,
+            sensorOnStack = false,
+            sensorInverted = false,
+            travelRatio = 1.0,
+            kind = ExerciseKind.DYNAMIC,
+            bodyweight = false,
+            sources =
+            GeometrySources(
+                startsWith = GeometrySource.SEEDED,
+                concentric = GeometrySource.SEEDED,
+                plane = GeometrySource.SEEDED,
+                kind = GeometrySource.SEEDED,
+                travelRatio = GeometrySource.SEEDED,
+            ),
+        )
+
+    /** [legCurl] in the form a Room row holds it. */
+    private val storedLegCurl = json.encodeToString(ResolvedGeometry.serializer(), legCurl)
+
     private val cueStream =
         RawStreamEntity(
             id = 9L,
@@ -224,26 +280,121 @@ class SessionExporterTest {
     }
 
     /**
-     * No set states the direction or geometry its numbers were measured with.
-     *
-     * The export publishes `tempoCompliance`, whose phase labels come from
-     * `TempoSchedule.of(tempo, direction)` -- so it ships a verdict that
-     * depends entirely on which stroke is the eccentric while withholding the
-     * three facts that decided it. A reader cannot check the app's own work.
+     * The geometry is one nested key on the set, and never a scatter of loose
+     * ones beside `reps` and `load_kg`.
      *
      * Asserted on parsed keys, not on the JSON text. "concentric" and
      * "eccentric" both occur as `scoredPhases` values, so a substring search
      * would report the geometry as present when only the verdict is.
      */
     @Test
-    fun `no set states the direction or geometry it was measured with`() = runTest {
-        val keys = setObject().keys
-        val geometry =
+    fun `the geometry is nested, never loose keys on the set`() = runTest {
+        val loose =
             setOf(
-                "geometry", "startsWith", "concentric", "plane",
-                "sensorOnStack", "sensorInverted", "travelRatio", "kind", "bodyweight",
+                "startsWith",
+                "concentric",
+                "plane",
+                "sensorOnStack",
+                "sensorInverted",
+                "travelRatio",
+                "kind",
+                "bodyweight",
             )
-        assertEquals(emptySet(), keys intersect geometry, "the set object grew a geometry key: $keys")
+        assertEquals(emptySet(), setObject().keys intersect loose)
+    }
+
+    /**
+     * A leg curl declared by the plan, as it reaches the reader.
+     *
+     * This is the case that withheld four of five tempo charts downstream. The
+     * tempo digits are POSITIONAL -- digit 1 is the down stroke -- so on a lift
+     * whose drive goes DOWN, digit 1 is the CONCENTRIC and a three-second
+     * eccentric is written 1030, not 3010. Nothing in the raw signal can
+     * settle that; two direction tests were built downstream and both failed.
+     * Every value here is published in the plan's own vocabulary so a reader
+     * holding both schemas reads them the same way.
+     */
+    @Test
+    fun `a set states the direction and geometry it was measured with`() = runTest {
+        val g = setWithGeometry(storedLegCurl).geometry
+        assertNotNull(g, "the set published no geometry at all")
+        assertEquals("concentric", g.startsWith)
+        assertEquals("down", g.concentric)
+        assertEquals("vertical", g.plane)
+        assertEquals(true, g.sensorOnStack)
+        assertEquals(true, g.sensorInverted)
+        assertEquals(2.0, g.travelRatio)
+        assertEquals("dynamic", g.kind)
+        assertEquals(false, g.bodyweight)
+    }
+
+    /**
+     * Where each value came from, because a consumer treats a guess and a
+     * declaration differently.
+     *
+     * Five values carry a source and three do not. The three are not an
+     * oversight: `sensorOnStack`, `sensorInverted` and `bodyweight` are
+     * non-nullable booleans in the plan format, so a declared false and an
+     * omitted key are the same value and the app cannot tell them apart.
+     */
+    @Test
+    fun `the geometry says where each resolvable value came from`() = runTest {
+        val g = setWithGeometry(storedLegCurl).geometry
+        assertNotNull(g)
+        assertEquals("declared", g.source.startsWith)
+        assertEquals("declared", g.source.concentric)
+        assertEquals("default", g.source.plane)
+        assertEquals("inferred", g.source.kind)
+        assertEquals("declared", g.source.travelRatio)
+    }
+
+    /**
+     * A false is written, not dropped.
+     *
+     * The exporter encodes with `encodeDefaults = false`, so a geometry field
+     * carrying a Kotlin default of `false` would vanish from the wire and its
+     * absence would read as "the app did not say" when it meant "the app said
+     * no". That is the defect this object exists to remove, reintroduced by
+     * one character at a declaration site, and only the wire form can catch it
+     * -- a decoded object shows `false` either way.
+     */
+    @Test
+    fun `a geometry false reaches the wire instead of being dropped as a default`() = runTest {
+        val text =
+            exporterOf(
+                row(
+                    analysis(3),
+                    actualReps = 3,
+                    repsManual = false,
+                    geometryJson = json.encodeToString(ResolvedGeometry.serializer(), squat),
+                ),
+            ).exportJson(1L, includeRepDetail = false)!!
+        assertTrue("\"sensorOnStack\": false" in text, "a stated false was dropped, got:\n$text")
+        assertTrue("\"sensorInverted\": false" in text, "a stated false was dropped, got:\n$text")
+        assertTrue("\"bodyweight\": false" in text, "a stated false was dropped, got:\n$text")
+    }
+
+    /**
+     * How a set was measured is not a fact about how much detail was asked
+     * for, so both artifacts say the same thing.
+     *
+     * Equality alone would be satisfied by both sides being absent, which is
+     * exactly the state this is meant to move away from, so the stated case
+     * asserts presence in both modes before comparing them and the unstated
+     * case asserts absence in both.
+     */
+    @Test
+    fun `the geometry is the same in both exports of one set`() = runTest {
+        val stub = row(analysis(3), actualReps = 3, repsManual = false, geometryJson = storedLegCurl)
+        val summary = exporterOf(stub).buildExport(1L, false)!!.exercises.single().sets.single()
+        val detailed = exporterOf(stub).buildExport(1L, true)!!.exercises.single().sets.single()
+        assertNotNull(summary.geometry, "the summary export withheld the geometry")
+        assertNotNull(detailed.geometry, "the detailed export withheld the geometry")
+        assertEquals(detailed.geometry, summary.geometry)
+
+        val bare = row(analysis(3), actualReps = 3, repsManual = false, geometryJson = null)
+        assertNull(exporterOf(bare).buildExport(1L, false)!!.exercises.single().sets.single().geometry)
+        assertNull(exporterOf(bare).buildExport(1L, true)!!.exercises.single().sets.single().geometry)
     }
 
     /**

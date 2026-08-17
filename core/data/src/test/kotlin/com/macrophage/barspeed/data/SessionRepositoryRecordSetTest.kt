@@ -4,8 +4,12 @@ import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.RepAnalysis
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.model.ExerciseDef
+import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.GeometrySource
+import com.macrophage.barspeed.model.GeometrySources
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.flow.Flow
@@ -176,12 +180,34 @@ class SessionRepositoryRecordSetTest {
         verdicts = listOf("Bar speed held up well."),
     )
 
+    /** A plan-declared seated leg curl: drive DOWN, sensor on a 2:1 cable stack. */
+    private val legCurlGeometry =
+        ResolvedGeometry(
+            startsWith = StartPhase.CONCENTRIC,
+            concentricUp = false,
+            horizontal = false,
+            sensorOnStack = true,
+            sensorInverted = true,
+            travelRatio = 2.0,
+            kind = ExerciseKind.DYNAMIC,
+            bodyweight = false,
+            sources =
+            GeometrySources(
+                startsWith = GeometrySource.DECLARED,
+                concentric = GeometrySource.DECLARED,
+                plane = GeometrySource.DEFAULT,
+                kind = GeometrySource.INFERRED,
+                travelRatio = GeometrySource.DECLARED,
+            ),
+        )
+
     private fun completedSet(
         manualReps: Int? = null,
         analysis: SetAnalysis = analysis(),
         imuSamples: List<ImuSample> = imu,
         hrSamples: List<HrSample> = hr,
         voiceCues: List<VoiceCue> = cues,
+        geometry: ResolvedGeometry? = null,
     ) = CompletedSet(
         exerciseId = "back_squat",
         exerciseName = "Back Squat",
@@ -199,6 +225,7 @@ class SessionRepositoryRecordSetTest {
         startedAtMs = 1_000L,
         endedAtMs = 2_000L,
         analysis = analysis,
+        geometry = geometry,
         imuSamples = imuSamples,
         hrSamples = hrSamples,
         voiceCues = voiceCues,
@@ -342,6 +369,36 @@ class SessionRepositoryRecordSetTest {
         val set = completedSet()
         repository.recordSet(sessionId = 1L, orderIdx = 0, set = set)
         assertEquals(set.analysis, repository.decodeAnalysis(dao.sets.single()))
+    }
+
+    /**
+     * The direction and mounting the analysis ran with is stored with the row,
+     * and its absence is stored as absence.
+     *
+     * Written as one test over both states on purpose. Asserting only the
+     * stored case would pass a repository that wrote a plausible default for
+     * every set, which is the failure this whole change exists to remove --
+     * a fabricated "vertical, drive up, sensor on the bar" is the most
+     * reassuring wrong answer available, and it is indistinguishable from a
+     * squat that really was measured that way.
+     *
+     * It has to be captured here rather than looked up at export time: the
+     * resolution combines a plan's declarations with the built-in definition,
+     * and neither is guaranteed to still say the same thing weeks later when
+     * the session is shared.
+     */
+    @Test
+    fun `the geometry the set was analysed against is stored, and its absence is not filled in`() = runTest {
+        val stated = FakeSessionDao()
+        val repository = repo(stated)
+        repository.recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(geometry = legCurlGeometry))
+        assertEquals(legCurlGeometry, repository.decodeGeometry(stated.sets.single()))
+
+        val unstated = FakeSessionDao()
+        val other = repo(unstated)
+        other.recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(geometry = null))
+        assertNull(unstated.sets.single().geometryJson, "an unstated geometry was filled in")
+        assertNull(other.decodeGeometry(unstated.sets.single()))
     }
 
     // ---- heart rate --------------------------------------------------------

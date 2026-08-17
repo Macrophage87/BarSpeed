@@ -4,8 +4,13 @@ import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SyntheticSets
 import com.macrophage.barspeed.dsp.VelocityEstimator
+import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.GeometrySource
+import com.macrophage.barspeed.model.GeometrySources
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.ResolvedGeometry
+import com.macrophage.barspeed.model.StartPhase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -109,6 +114,31 @@ class RawExporterTest {
 
     private fun analysedAt(rateHz: Double) = SetAnalysis(emptyList(), rateHz, null, null, emptyList())
 
+    /**
+     * A plan-declared seated leg curl: the drive goes DOWN, off a cable stack
+     * through a 2:1 pulley. Every value differs from every other, so a
+     * descriptor that crossed two of them cannot pass.
+     */
+    private val legCurl =
+        ResolvedGeometry(
+            startsWith = StartPhase.CONCENTRIC,
+            concentricUp = false,
+            horizontal = false,
+            sensorOnStack = true,
+            sensorInverted = true,
+            travelRatio = 2.0,
+            kind = ExerciseKind.DYNAMIC,
+            bodyweight = false,
+            sources =
+            GeometrySources(
+                startsWith = GeometrySource.DECLARED,
+                concentric = GeometrySource.DECLARED,
+                plane = GeometrySource.DEFAULT,
+                kind = GeometrySource.INFERRED,
+                travelRatio = GeometrySource.DECLARED,
+            ),
+        )
+
     private fun row(
         id: Long,
         exerciseId: String = "plank",
@@ -116,6 +146,7 @@ class RawExporterTest {
         durationS: Int? = 45,
         analysis: SetAnalysis = timedAnalysis(),
         orderIdx: Int = 0,
+        geometry: ResolvedGeometry? = null,
     ) = SetRecordEntity(
         id = id,
         sessionId = 1L,
@@ -128,6 +159,7 @@ class RawExporterTest {
         startedAtMs = 1_000L,
         endedAtMs = 46_000L,
         analysisJson = json.encodeToString(SetAnalysis.serializer(), analysis),
+        geometryJson = geometry?.let { json.encodeToString(ResolvedGeometry.serializer(), it) },
     )
 
     private fun imuStream(setId: Long, samples: List<ImuSample>, storedRate: Double?) = RawStreamEntity(
@@ -492,5 +524,51 @@ class RawExporterTest {
                 mapOf(5L to listOf(imuStream(5L, stillSamples(45.0).take(1), storedRate = 0.0))),
             )
         assertNull(manifest.set(0)["rollExcursion_deg"])
+    }
+
+    // ---- issue 73: the zip has to stand on its own -------------------------
+
+    /**
+     * The manifest states which way the lift moved and how the sensor was
+     * mounted.
+     *
+     * This file's whole purpose is that the zip stands alone: an analysis that
+     * opens only the CSVs must still be able to tell left from right. Such a
+     * reader has no phase labels at all -- it has raw device-frame samples and
+     * this descriptor -- so direction matters more here than anywhere else in
+     * the export, not less. On a leg curl or a pushdown the down stroke is the
+     * concentric, and nothing in the accelerometer trace says so.
+     */
+    @Test
+    fun `the manifest states the direction and mounting each set was measured with`() = runTest {
+        val manifest = meta(listOf(row(id = 5L, geometry = legCurl)), emptyMap())
+        val set = manifest.set(0)
+        assertEquals("concentric", set.text("startsWith"))
+        assertEquals("down", set.text("concentric"))
+        assertEquals("vertical", set.text("plane"))
+        assertEquals(2.0, set.num("travelRatio"))
+        assertEquals("dynamic", set.text("kind"))
+    }
+
+    /**
+     * A stated false is written; an unstated geometry writes nothing.
+     *
+     * `flag()` omits a false, which is right for `warmup` and `failed` where
+     * absence reads correctly as "not flagged", and wrong here: a reader that
+     * cannot see `sensorOnStack` has to decide whether the sensor was on a
+     * stack, and "the app did not say" and "the app said no" are different
+     * answers. Written as one test over both states so it cannot pass by the
+     * keys being absent in both.
+     */
+    @Test
+    fun `a stated geometry false is written, while an unstated geometry writes nothing`() = runTest {
+        val stated = meta(listOf(row(id = 5L, geometry = legCurl.copy(sensorInverted = false))), emptyMap()).set(0)
+        assertEquals(false, stated["sensorInverted"]?.jsonPrimitive?.content?.toBoolean())
+        assertEquals(true, stated["sensorOnStack"]?.jsonPrimitive?.content?.toBoolean())
+
+        val unstated = meta(listOf(row(id = 5L, geometry = null)), emptyMap()).set(0)
+        for (key in listOf("startsWith", "concentric", "plane", "sensorOnStack", "sensorInverted", "travelRatio")) {
+            assertNull(unstated[key], "an unstated geometry wrote $key")
+        }
     }
 }
