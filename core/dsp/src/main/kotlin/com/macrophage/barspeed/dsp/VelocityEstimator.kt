@@ -128,11 +128,41 @@ object VelocityEstimator {
         return kotlin.math.cos(theta) to kotlin.math.sin(theta)
     }
 
-    /** Span-based rate: (n-1)/span. Robust against burst arrivals, unlike median dt. */
-    fun measureSampleRate(sampleCount: Int, spanS: Double): Double {
-        if (sampleCount < 2 || spanS <= 0.0) return DEFAULT_HZ
+    /**
+     * The mean arrival rate of these samples, or null when they cannot state
+     * one: (n-1)/span, clamped to a plausible band.
+     *
+     * Computed from the span rather than from consecutive deltas because BLE
+     * delivers several samples under one arrival timestamp, so a median-of-dt
+     * estimator returns 0 on real input.
+     *
+     * Null for a single sample, and null when every sample shares one arrival
+     * stamp, because both are genuinely unmeasurable rather than slow. Use this
+     * wherever the figure is PUBLISHED -- an unknown rate must reach the reader
+     * as an absent key, never as a number they will divide by.
+     *
+     * What this measures is the rate the samples ARRIVED at, which equals the
+     * rate the sensor sampled at only if none were dropped. Nothing in
+     * [ImuSample] can express a gap, so a dropout reads here as a slower
+     * sensor and there is no way to tell the two apart from the stream alone.
+     */
+    fun measuredSampleRateOrNull(sampleCount: Int, spanS: Double): Double? {
+        if (sampleCount < 2 || spanS <= 0.0) return null
         return ((sampleCount - 1) / spanS).coerceIn(MIN_PLAUSIBLE_HZ, MAX_PLAUSIBLE_HZ)
     }
+
+    /**
+     * Span-based rate: (n-1)/span. Robust against burst arrivals, unlike median dt.
+     *
+     * Falls back to [DEFAULT_HZ] when the samples cannot state a rate, which is
+     * a fabricated number and is deliberate here: the integrator needs some dt
+     * to proceed with, and [estimate] refuses streams under eight samples
+     * anyway. Never use this for a figure that leaves the app -- reach for
+     * [measuredSampleRateOrNull] there, which says null instead of inventing
+     * 100 Hz.
+     */
+    fun measureSampleRate(sampleCount: Int, spanS: Double): Double =
+        measuredSampleRateOrNull(sampleCount, spanS) ?: DEFAULT_HZ
 
     internal fun isQuietSample(sample: ImuSample, config: DspConfig): Boolean =
         abs(FrameTransform.accMagnitudeG(sample) - 1.0) < config.stationaryAccBandG &&

@@ -4,6 +4,7 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -23,6 +24,12 @@ import kotlin.test.assertTrue
  * correct for an integrator that must have some dt to proceed with, and wrong
  * for anything that publishes the figure as fact. Pinned here so the difference
  * cannot be refactored away silently.
+ *
+ * [VelocityEstimator.measuredSampleRateOrNull] is the same arithmetic with that
+ * fallback removed, for callers that publish rather than integrate. The two are
+ * asserted against each other rather than against literals, so the only thing
+ * that can ever differ between them is what they do when there is nothing to
+ * measure.
  */
 class SampleRateTest {
     @Test
@@ -104,6 +111,54 @@ class SampleRateTest {
         assertEquals(samples.size, decoded.size)
         val span = (decoded.last().timestampMs - decoded.first().timestampMs) / 1000.0
         assertEquals(analysed, VelocityEstimator.measureSampleRate(decoded.size, span))
+    }
+
+    // ---- the nullable sibling ----------------------------------------------
+
+    /**
+     * Same arithmetic, same clamp, and null exactly where the other one
+     * fabricates.
+     *
+     * Written as a comparison against [VelocityEstimator.measureSampleRate]
+     * rather than against literals, so the two cannot drift apart: whatever the
+     * formula becomes, the only difference between them stays the fallback.
+     */
+    @Test
+    fun `the nullable rate agrees with the defaulting one wherever a rate exists`() {
+        val cases =
+            listOf(
+                101 to 1.0,
+                51 to 1.0,
+                2 to 0.02,
+                4_500 to 45.0,
+                2 to 600.0,
+                10_000 to 0.001,
+            )
+        for ((n, span) in cases) {
+            assertEquals(
+                VelocityEstimator.measureSampleRate(n, span),
+                VelocityEstimator.measuredSampleRateOrNull(n, span),
+                "n=$n span=$span",
+            )
+        }
+    }
+
+    /**
+     * The whole reason the sibling exists: where the defaulting form invents
+     * 100 Hz, this one declines to answer.
+     *
+     * A single sample, and a stream whose samples all share one arrival stamp,
+     * are the two cases a raw export actually hits -- the first from a set that
+     * barely started, the second in principle from one BLE notification -- and
+     * in both the manifest must omit the key rather than publish a divisor.
+     */
+    @Test
+    fun `the nullable rate is null exactly where the other fabricates a default`() {
+        val unmeasurable = listOf(0 to 1.0, 1 to 0.0, 1 to 5.0, 4_500 to 0.0, 4_500 to -1.0)
+        for ((n, span) in unmeasurable) {
+            assertNull(VelocityEstimator.measuredSampleRateOrNull(n, span), "n=$n span=$span")
+            assertEquals(100.0, VelocityEstimator.measureSampleRate(n, span), "n=$n span=$span")
+        }
     }
 
     /** Bursts of [perBurst] samples sharing one arrival stamp, as the BLE link delivers them. */

@@ -4,6 +4,7 @@ import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.model.ExerciseExport
 import com.macrophage.barspeed.model.HrSessionSummary
 import com.macrophage.barspeed.model.HrSetSummary
+import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RepMetricsExport
 import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.SetExport
@@ -244,19 +245,36 @@ class RawExporter(
         str("tempoPrescribed", record.tempo)
         num("startedAt_ms", record.startedAtMs)
         num("endedAt_ms", record.endedAtMs)
+        // Decoded once and shared. Two figures below are read off the same
+        // stream, and decoding it twice would gzip-inflate and parse a set's
+        // whole IMU capture a second time for no gain.
+        val samples = imuSamples(streams)
         num("sampleRate_hz", streams.firstOrNull { it.kind == RawStreamEntity.KIND_IMU }?.sampleRateHz)
         // Attitude excursion decides which analysis is even valid on this set:
         // a rail-guided machine barely rotates and integrates cleanly, while a
         // barbell tumbling through 300 degrees leaks gravity into every sample.
-        rollExcursionDeg(streams)?.let { num("rollExcursion_deg", Math.round(it * 10.0) / 10.0) }
+        rollExcursionDeg(samples)?.let { num("rollExcursion_deg", Math.round(it * 10.0) / 10.0) }
         fields += "\"files\": [${files.joinToString(", ") { "\"$it\"" }}]"
         return "    {${fields.joinToString(", ")}}"
     }
 
-    private fun rollExcursionDeg(streams: List<RawStreamEntity>): Double? {
+    /**
+     * This set's IMU capture, or null when there is nothing readable to work
+     * from -- no stream, a stream that will not decode, or a stream with no
+     * data rows.
+     *
+     * The decode stays inside `runCatching`: gzip inflating is not the only way
+     * this fails. [ImuCsv.decode] parses each row and throws on a malformed
+     * one, and a manifest is not worth failing an entire export over.
+     */
+    private fun imuSamples(streams: List<RawStreamEntity>): List<ImuSample>? {
         val imu = streams.firstOrNull { it.kind == RawStreamEntity.KIND_IMU } ?: return null
         val samples = runCatching { ImuCsv.decode(Gzip.decompress(imu.csvGzip)) }.getOrNull() ?: return null
-        if (samples.isEmpty()) return null
+        return samples.ifEmpty { null }
+    }
+
+    private fun rollExcursionDeg(samples: List<ImuSample>?): Double? {
+        if (samples.isNullOrEmpty()) return null
         val rolls = samples.map { it.rollDeg }
         return rolls.max() - rolls.min()
     }

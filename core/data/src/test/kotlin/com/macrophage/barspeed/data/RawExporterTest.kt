@@ -326,4 +326,31 @@ class RawExporterTest {
         val manifest = meta(listOf(row(id = 5L)), mapOf(5L to listOf(hrStream(5L))))
         assertNull(manifest.set(0)["rollExcursion_deg"])
     }
+
+    /**
+     * A stream whose CSV will not parse must not take the whole export down
+     * with it.
+     *
+     * Gzip inflating is not the only way this fails: `ImuCsv.decode` parses
+     * every row and throws on a malformed one, so a single corrupt line in one
+     * set's capture would otherwise cost the lifter the export of the entire
+     * session -- including the sets that are perfectly intact. The bytes still
+     * reach the zip, because the file is written from the inflated text without
+     * being parsed, so the capture stays recoverable by hand.
+     */
+    @Test
+    fun `a stream that will not parse still exports, without the figures read from it`() = runTest {
+        val corrupt =
+            RawStreamEntity(
+                id = 3L,
+                setId = 5L,
+                kind = RawStreamEntity.KIND_IMU,
+                csvGzip = Gzip.compress(ImuCsv.HEADER + "\n1000,0.1,not-a-number\n"),
+                sampleRateHz = 98.5,
+            )
+        val entries = zipOf(listOf(row(id = 5L)), mapOf(5L to listOf(corrupt)))
+        val manifest = Json.parseToJsonElement(entries.getValue("meta.json")).jsonObject
+        assertTrue("set01_plank_imu.csv" in entries.keys, "the raw bytes must still be exported")
+        assertNull(manifest.set(0)["rollExcursion_deg"], "nothing was read, so nothing is claimed")
+    }
 }
