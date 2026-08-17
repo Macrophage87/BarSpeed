@@ -17,6 +17,7 @@ import java.io.ByteArrayInputStream
 import java.util.zip.ZipInputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -352,5 +353,122 @@ class RawExporterTest {
         val manifest = Json.parseToJsonElement(entries.getValue("meta.json")).jsonObject
         assertTrue("set01_plank_imu.csv" in entries.keys, "the raw bytes must still be exported")
         assertNull(manifest.set(0)["rollExcursion_deg"], "nothing was read, so nothing is claimed")
+    }
+
+    // ---- issue 31: a rate the stream can state, or no rate at all ----------
+
+    /**
+     * A plank recorded with the sensor on has a real IMU stream and no
+     * analysis, and the manifest must describe the stream it shipped.
+     *
+     * The capture is unconditional: the collector runs for every set and the
+     * buffer fills at 100 Hz whether or not the set is one the segmenter will
+     * look at. The analysis is not -- a timed set takes the first branch and
+     * stores a placeholder whose sample rate is zero -- and that placeholder is
+     * what the raw stream row copies and what the manifest publishes. So a
+     * 45-second hold ships 4,500 real samples beside "sampleRate_hz": 0.0.
+     *
+     * Zero is the one value that cannot be true here. It is also precisely the
+     * number ImuCsv's header tells a reader to divide sample_idx by, so a coach
+     * either divides by zero or throws away a good stream. The rate is sitting
+     * in the file the key describes: timestamp_ms is written on every row.
+     */
+    @Test
+    fun `a timed set publishes the rate its own stream shows`() = runTest {
+        val samples = stillSamples(45.0)
+        val manifest =
+            meta(
+                listOf(row(id = 5L, durationS = 45, analysis = timedAnalysis())),
+                mapOf(5L to listOf(imuStream(5L, samples, storedRate = 0.0))),
+            )
+        assertEquals(4_500, samples.size)
+        val rate = manifest.set(0).num("sampleRate_hz")
+        assertNotNull(rate, "a set that shipped 4,500 samples must state their rate")
+        assertTrue(rate in 99.0..101.0, "expected ~100 Hz from the stream itself, got $rate")
+    }
+
+    /**
+     * The other half of the same fix, and the reason it is not a `> 0` guard on
+     * the stored value: what cannot be measured must be omitted, not replaced
+     * with a plausible number.
+     *
+     * One sample has no span, so there is no rate to state. The manifest has to
+     * say nothing -- absence is how every other unknown in this document is
+     * expressed -- rather than publish either the stored 0.0 or the 100 Hz that
+     * the integrator's own estimator would have invented.
+     */
+    @Test
+    fun `a stream too short to state a rate publishes none`() = runTest {
+        val manifest =
+            meta(
+                listOf(row(id = 5L)),
+                mapOf(5L to listOf(imuStream(5L, stillSamples(45.0).take(1), storedRate = 0.0))),
+            )
+        assertNull(manifest.set(0)["sampleRate_hz"])
+    }
+
+    /**
+     * The same, for a stream whose samples all arrived under one timestamp.
+     * Span zero, nothing to measure, nothing to say.
+     */
+    @Test
+    fun `a stream with no span publishes no rate`() = runTest {
+        val oneInstant =
+            List(200) { ImuSample(7_000L, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0) }
+        val manifest =
+            meta(listOf(row(id = 5L)), mapOf(5L to listOf(imuStream(5L, oneInstant, storedRate = 0.0))))
+        assertNull(manifest.set(0)["sampleRate_hz"])
+    }
+
+    /**
+     * The structural version, over every set in a session: whatever else the
+     * manifest says, it never publishes a rate of zero.
+     *
+     * Written across a mixed session -- a timed hold with a stream, a
+     * one-sample stream, and a sensorless set with no stream at all -- because
+     * the defect only appears on the sets the segmenter never looked at, and a
+     * single-set assertion is how it survived this long.
+     */
+    @Test
+    fun `no set in the manifest publishes a rate of zero`() = runTest {
+        val manifest =
+            meta(
+                listOf(
+                    row(id = 5L, exerciseId = "plank", orderIdx = 0),
+                    row(id = 6L, exerciseId = "carry", orderIdx = 1),
+                    row(id = 7L, exerciseId = "situp", orderIdx = 2, durationS = null),
+                ),
+                mapOf(
+                    5L to listOf(imuStream(5L, stillSamples(45.0), storedRate = 0.0)),
+                    6L to listOf(imuStream(6L, stillSamples(45.0).take(1), storedRate = 0.0)),
+                    7L to listOf(hrStream(7L)),
+                ),
+            )
+        for (i in 0..2) {
+            val rate = manifest.set(i).num("sampleRate_hz")
+            assertTrue(rate == null || rate > 0.0, "set ${i + 1} published sampleRate_hz=$rate")
+        }
+    }
+
+    /**
+     * The near neighbour, folded in on the coordinator's ruling and named as
+     * beyond issue 31's scope.
+     *
+     * `rollExcursion_deg` is read off the same stream by the same helper and
+     * carries the same fault in a smaller costume: one sample has a maximum
+     * roll equal to its minimum, so the range comes out 0.0 and the manifest
+     * states that the set did not rotate. It did not measure whether the set
+     * rotated. Attitude excursion is what a reader uses to decide whether the
+     * integration on this set is trustworthy at all, so a fabricated 0.0 reads
+     * as the most reassuring answer available.
+     */
+    @Test
+    fun `a single-sample stream states no roll excursion`() = runTest {
+        val manifest =
+            meta(
+                listOf(row(id = 5L)),
+                mapOf(5L to listOf(imuStream(5L, stillSamples(45.0).take(1), storedRate = 0.0))),
+            )
+        assertNull(manifest.set(0)["rollExcursion_deg"])
     }
 }
