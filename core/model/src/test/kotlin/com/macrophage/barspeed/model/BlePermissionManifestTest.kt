@@ -18,10 +18,11 @@ import kotlin.test.assertTrue
  * `BLUETOOTH_SCAN` from the manifest and `:app:lintDebug` stayed BUILD SUCCESSFUL
  * with zero issues naming it.
  *
- * This commit pins only what the manifest says today, in literals. The policy
- * functions that will be checked against these facts do not exist yet; they arrive
- * in the next commit and are cross-checked here without these assertions changing,
- * so the fixed point is set before there is anything to bend it towards.
+ * This class pins what the manifest says today, in literals, and is
+ * cross-checked against BlePermissionPolicy below without those assertions
+ * changing -- the fixed point was set before there was anything to bend it
+ * towards, in dd3a095, which lifted the permission decisions this checks into
+ * BlePermissionPolicy.
  *
  * What this can prove is narrow and worth stating: it compares the manifest against
  * Kotlin, so it catches the two files diverging and nothing else. An identical typo
@@ -134,9 +135,10 @@ class BlePermissionManifestTest {
 
     private companion object {
         /**
-         * What `MainActivity.requestBlePermissions` passes to the launcher today,
-         * across API 26-35. Literals, deliberately: this is the characterization,
-         * and it is what the policy added next has to keep producing.
+         * What `MainActivity` passed to the launcher across API 26-35 before
+         * dd3a095 moved the decision into `BlePermissionPolicy.runtimePermissions`.
+         * Literals, deliberately: this is the characterization the policy has to
+         * keep producing, pinned before the policy existed to check it against.
          */
         val REQUESTED =
             listOf(
