@@ -46,7 +46,7 @@ If you are unsure whether a question is checkable or judgment, it is judgment. E
 
 ## What green does not mean
 
-- **`:app`, `:core:ble` and `:core:data` have no test source sets, and there is no `androidTest` directory anywhere.** A green `./gradlew test` **compiled** those modules and asserted nothing about them. Refuse "tests pass" as evidence for a change in any of the three, and say so.
+- **`:app` and `:core:ble` have no test source sets, and there is no `androidTest` directory anywhere.** A green `./gradlew test` **compiled** those two modules and asserted nothing about them. `:core:data` is different — it has had a test source set since `d69f299`/`52ccb55` (36 tests, 72 executions across `testDebugUnitTest`/`testReleaseUnitTest`) — but both its test classes run against a `FakeSessionDao`, never real Room, so "tests pass" there is evidence for `SessionRepository`'s own mapping, not for anything the GATT stack, Room or the platform did. Refuse "tests pass" as evidence of platform behaviour for a change in any of the three, and say so.
 - **A task reported `UP-TO-DATE` or `FROM-CACHE` has not run.** `./gradlew -PjvmOnly test` can report BUILD SUCCESSFUL in seconds having executed no test at all. Require `--rerun-tasks` whenever a number matters, and read the task list rather than the last line.
 - `./gradlew --version` exits 0 while every real task fails.
 - `-PjvmOnly` is a *presence* check, so `-PjvmOnly=false` still excludes the three Android modules.

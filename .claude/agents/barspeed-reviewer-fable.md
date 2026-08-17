@@ -44,7 +44,7 @@ Your output must be **decisive**. A verdict that lists thirty findings and does 
 
 ## What green does not mean
 
-- **`:app`, `:core:ble` and `:core:data` have no test source sets, and there is no `androidTest` directory anywhere.** A green `./gradlew test` compiled them and asserted nothing. Refuse "tests pass" as evidence for a change in any of the three.
+- **`:app` and `:core:ble` have no test source sets, and there is no `androidTest` directory anywhere.** `:core:data` does — since `d69f299`/`52ccb55` (36 tests, 72 executions) — but its tests take a fake DAO and never touch Room, so a green `./gradlew test` still asserts nothing about platform behaviour for any of the three. Refuse "tests pass" as evidence of platform behaviour for a change in any of them.
 - **`UP-TO-DATE` and `FROM-CACHE` mean nothing ran.** Require `--rerun-tasks` when a number matters, and read the task list rather than the last line.
 - `gh run list --commit <short-sha>` returns `[]`, indistinguishable from "no CI ran" — require the full 40 characters. Never infer a SHA lives on two refs from a count of two runs: `ci.yml` also fires on `pull_request`, so a branch-only SHA with an open PR already carries two before it ever reaches `main`. Read the `event` field (`gh run list --json ...,event,...`, not the narrower `check-runs` endpoint, which has no `event`) — two runs that really are one workflow twice for one SHA are a flake check, not independent evidence.
 - CI runs sequentially with no `continue-on-error` and **ktlint + detekt first**, so a red run reporting a formatting error tells you nothing downstream.
