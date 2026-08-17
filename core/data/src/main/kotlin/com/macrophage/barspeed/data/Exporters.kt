@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.ImuCsv
+import com.macrophage.barspeed.dsp.VelocityEstimator
 import com.macrophage.barspeed.model.ExerciseExport
 import com.macrophage.barspeed.model.HrSessionSummary
 import com.macrophage.barspeed.model.HrSetSummary
@@ -249,7 +250,33 @@ class RawExporter(
         // stream, and decoding it twice would gzip-inflate and parse a set's
         // whole IMU capture a second time for no gain.
         val samples = imuSamples(streams)
-        num("sampleRate_hz", streams.firstOrNull { it.kind == RawStreamEntity.KIND_IMU }?.sampleRateHz)
+        // Measured from the stream this key describes, not read off the row.
+        //
+        // What this states is the mean rate at which the rows in that file
+        // ARRIVED -- (n-1) intervals over the span of their timestamps -- and
+        // not the rate the sensor sampled at. The two are equal only if nothing
+        // was dropped, and a dropout cannot be seen from the stream.
+        //
+        // Reading it off the row published a zero for every set the segmenter
+        // never analysed, because those sets store a placeholder analysis while
+        // the capture runs regardless. Deriving it here costs a set the DSP did
+        // measure nothing at all: the stored figure came from this same
+        // arithmetic over these same samples, and the CSV round trip preserves
+        // both terms exactly.
+        //
+        // The stored value survives only as a fallback for a stream that will
+        // not parse, and only when it is itself positive. Where neither can
+        // state a rate the key is omitted: this manifest expresses every other
+        // unknown by omission, and a rate is a number the reader divides by.
+        val measuredRate =
+            samples?.let {
+                VelocityEstimator.measuredSampleRateOrNull(
+                    it.size,
+                    (it.last().timestampMs - it.first().timestampMs) / 1000.0,
+                )
+            }
+        val storedRate = streams.firstOrNull { it.kind == RawStreamEntity.KIND_IMU }?.sampleRateHz
+        num("sampleRate_hz", (measuredRate ?: storedRate)?.takeIf { it > 0.0 })
         // Attitude excursion decides which analysis is even valid on this set:
         // a rail-guided machine barely rotates and integrates cleanly, while a
         // barbell tumbling through 300 degrees leaks gravity into every sample.
@@ -273,8 +300,18 @@ class RawExporter(
         return samples.ifEmpty { null }
     }
 
+    /**
+     * How far the sensor's roll swept across the set, or null when the stream
+     * cannot say.
+     *
+     * Two samples minimum. One sample has a maximum equal to its minimum, so
+     * the range comes out 0.0 and the manifest would state that the set did not
+     * rotate -- when what happened is that nothing measured whether it did.
+     * This figure decides whether a reader trusts the integration on a set at
+     * all, and a fabricated zero is the most reassuring answer available.
+     */
     private fun rollExcursionDeg(samples: List<ImuSample>?): Double? {
-        if (samples.isNullOrEmpty()) return null
+        if (samples == null || samples.size < 2) return null
         val rolls = samples.map { it.rollDeg }
         return rolls.max() - rolls.min()
     }
