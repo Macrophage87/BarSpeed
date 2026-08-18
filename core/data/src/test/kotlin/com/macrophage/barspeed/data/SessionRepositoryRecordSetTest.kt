@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -520,6 +521,55 @@ class SessionRepositoryRecordSetTest {
         )
         assertEquals(8, dao.sets.single().actualReps)
         assertEquals(emptyList(), dao.streams.map { it.kind })
+    }
+
+    // ---- the CSV round trip recovery will depend on ------------------------
+
+    /**
+     * A set rebuilt from the canonical CSV stores the same bytes as the live one.
+     *
+     * Nothing in the app does this today, and it is pinned before anything does,
+     * because it is the property that any recovery of an interrupted set rests
+     * on. If a capture that has been through [ImuCsv.encode] and back is not the
+     * same input to [SessionRepository.recordSet] as the list the collector
+     * built, then a set recovered from a file is a different set from the one
+     * the lifter performed, and no amount of care at the recovery end fixes
+     * that.
+     *
+     * Byte identity of `csvGzip`, not sample equality, and the difference is the
+     * whole value of the test. [ImuSample] equality passes on a re-encode that
+     * rounds differently -- the decoder parses `0.010000` and `0.01` to the same
+     * Double -- while the stored artifact differs. It is the artifact that is
+     * shipped to an LLM and compared against a `field-*.csv` fixture, so the
+     * artifact is what has to match.
+     *
+     * All three streams, not just the IMU one. `HrCsv` renders R-R intervals
+     * through `%.1f` and `CueCsv` strips commas from cue text; both are lossy
+     * transformations that a round trip exposes only if it is asserted on.
+     */
+    @Test
+    fun `a set rebuilt from canonical CSV stores byte-identical streams`() = runTest {
+        val live = FakeSessionDao().apply { nextSetId = 31L }
+        val reread = FakeSessionDao().apply { nextSetId = 31L }
+        val set = completedSet()
+        repo(live).recordSet(sessionId = 1L, orderIdx = 0, set = set)
+        repo(reread).recordSet(
+            sessionId = 1L,
+            orderIdx = 0,
+            set =
+            set.copy(
+                imuSamples = ImuCsv.decode(ImuCsv.encode(set.imuSamples)),
+                hrSamples = HrCsv.decode(HrCsv.encode(set.hrSamples)),
+                voiceCues = CueCsv.decode(CueCsv.encode(set.voiceCues)),
+            ),
+        )
+        for (kind in listOf(RawStreamEntity.KIND_IMU, RawStreamEntity.KIND_HRM, RawStreamEntity.KIND_CUES)) {
+            assertContentEquals(
+                requireNotNull(live.stream(kind)).csvGzip,
+                requireNotNull(reread.stream(kind)).csvGzip,
+                "the $kind stream differs after a canonical CSV round trip",
+            )
+        }
     }
 
     // ---- call shape --------------------------------------------------------
