@@ -8,6 +8,9 @@ import com.macrophage.barspeed.VoiceCounter
 import com.macrophage.barspeed.ble.ConnectionState
 import com.macrophage.barspeed.data.CompletedSet
 import com.macrophage.barspeed.data.SessionRepository
+import com.macrophage.barspeed.data.SetJournal
+import com.macrophage.barspeed.data.SetJournalHeader
+import com.macrophage.barspeed.data.SetJournalStore
 import com.macrophage.barspeed.dsp.LiveSetState
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
@@ -178,6 +181,49 @@ private suspend fun openSession(repository: SessionRepository, p: PendingSetWrit
         timeZone = RecordedTimeZone.resolve(ZoneId.systemDefault().id, p.startedAtMs),
     )
 }
+
+/**
+ * Open the durable capture for a set that is about to begin.
+ *
+ * A free function taking what it needs, for the reason [openSession] gives:
+ * [RecordViewModel] is a class detekt measures as being at its size limit,
+ * where every addition competes for room.
+ *
+ * Everything here is read at the moment the set starts, because that is the
+ * only moment some of it is true. [RecordState.imuConnected] in particular is
+ * what lets a capture holding zero samples be read correctly: zero with the
+ * sensor connected is a failure, zero without one is the expected outcome of a
+ * manually counted set, and no stream can tell those apart afterwards.
+ *
+ * [RecordState.sessionId] is null for the first set of a session and that null
+ * is carried rather than smoothed over. No session row exists until the first
+ * set has been durably written -- which is exactly why losing the first set
+ * loses the session too, and why the capture has to name the session by the
+ * clock instead.
+ *
+ * Returns null when the disk refuses, and the caller records the set anyway.
+ * A journal that cannot be opened is the situation before this existed; it
+ * must not also be a reason not to lift.
+ */
+private fun openJournal(
+    store: SetJournalStore,
+    s: RecordState,
+    exercise: ExerciseDef,
+    sessionStartedAtMs: Long,
+    startedAtMs: Long,
+): SetJournal? = store.open(
+    SetJournalHeader(
+        exerciseId = exercise.id,
+        exerciseName = exercise.displayName,
+        sessionId = s.sessionId,
+        sessionStartedAtMs = sessionStartedAtMs,
+        startedAtMs = startedAtMs,
+        orderIdx = s.setsCompleted,
+        imuConnected = s.imuConnected,
+        planName = s.planName.takeIf { !s.adHoc },
+        planSessionName = s.planSessionName.takeIf { !s.adHoc },
+    ),
+)
 
 /**
  * The state "Equipment busy? Switch exercise" leaves behind.
@@ -490,6 +536,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var demoJob: Job? = null
     private var guidedCadence: GuidedCadenceRunner? = null
     private var setStartedAtMs = 0L
+
+    /** When this session began, for grouping a session's captures on disk. */
+    private var sessionStartedAtMs = 0L
+
+    /**
+     * The set being performed right now, on disk.
+     *
+     * Null when no set is running, or when the disk refused to open one. It
+     * outlives [endSet] deliberately: the set being over and the set being
+     * stored are a whole durable write apart, and this is what covers that gap.
+     */
+    private var journal: SetJournal? = null
     private val ratings = SetRatingTracker(sessionRepository)
 
     /**
@@ -620,6 +678,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun startPlanSession(planSession: PlanSessionDef) {
         viewModelScope.launch {
             sessionRrMs.clear()
+            sessionStartedAtMs = System.currentTimeMillis()
             val queue = sessionRepository.flattenPlan(planSession)
             stateFlow.value =
                 stateFlow.value.copy(
@@ -666,6 +725,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startAdHocSession() {
         sessionRrMs.clear()
+        sessionStartedAtMs = System.currentTimeMillis()
         stateFlow.value = adHocSessionState(stateFlow.value)
     }
 
@@ -734,6 +794,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val guidedSet = !s.currentIsTimed && exercise.kind != ExerciseKind.EXPLOSIVE && guidedTempo != null
         if (guidedSet) manualSet = true
         setStartedAtMs = System.currentTimeMillis()
+        if (sessionStartedAtMs == 0L) sessionStartedAtMs = setStartedAtMs
+        // Opened before the collectors below start, so no sample can arrive
+        // with nowhere durable to go. A null here is the disk refusing, which
+        // is the state this whole mechanism replaces -- it must not also stop
+        // the set being recorded in memory as it always was.
+        journal = openJournal(container.setJournals, s, exercise, sessionStartedAtMs, setStartedAtMs)
         // Every set, not just the first. All three catch clauses in
         // RecordingService.onStartCommand end in stopSelf(startId), so a start
         // that was refused leaves nothing running and this is the only retry.
@@ -749,6 +815,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             viewModelScope.launch {
                 autoConnect.hrSamples.collect { hr ->
                     hrBuffer += hr
+                    journal?.appendHr(hr)
                     stateFlow.value = stateFlow.value.copy(hrBpm = hr.bpm)
                 }
             }
@@ -791,6 +858,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun onSample(sample: ImuSample) {
         imuBuffer += sample
+        journal?.appendImu(sample)
         val live = tracker?.feed(sample) ?: return
         stateFlow.value = stateFlow.value.copy(live = live)
         // Manual/guided sets: the app (or the lifter) is the counter — the
@@ -817,14 +885,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                             guidedPhaseTotal = total,
                         )
                 },
-                onRepCounted = { rep -> stateFlow.value = stateFlow.value.copy(manualReps = rep) },
+                onRepCounted = { rep ->
+                    journal?.appendRepMark(System.currentTimeMillis())
+                    stateFlow.value = stateFlow.value.copy(manualReps = rep)
+                },
                 onFinished = { stateFlow.value = stateFlow.value.copy(guidedFinished = true) },
             ).also { it.start(schedule, plannedReps) }
     }
 
     /** Speak an in-set cue and log it on the sample clock (see VoiceCue). */
     private fun speakCue(text: String) {
-        cueBuffer += VoiceCue(System.currentTimeMillis(), text)
+        val cue = VoiceCue(System.currentTimeMillis(), text)
+        cueBuffer += cue
+        journal?.appendCue(cue)
         voice?.speak(text)
     }
 
@@ -838,6 +911,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // could swap the effort grid back in for a set that is over.
         if (endingSet) return
         val count = s.manualReps + 1
+        // The one fact in a set that no reprocessing of any stream can rebuild.
+        // The sensor records what the bar did; it never records what the lifter
+        // decided a rep was worth.
+        journal?.appendRepMark(System.currentTimeMillis())
         stateFlow.value = s.copy(manualReps = count)
         announceRepMilestones(count)
     }
@@ -1068,6 +1145,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun runSetWrite(p: PendingSetWrite) {
+        // The set is over, so nothing more will be appended: release the file
+        // handles and let everything queued reach the filesystem. Deliberately
+        // NOT a delete. The capture has to outlive this write and die only when
+        // the row lands, because if this write is what fails the capture is the
+        // only copy left -- and on a retry the lifter may well have walked away
+        // between the two.
+        journal?.close()
         // Sensor data is analyzed even on manually-counted sets — the manual
         // count overrides the rep COUNT, but velocity/power metrics still come
         // from the bar sensor when it was recording.
@@ -1149,6 +1233,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 ),
             ).also { writtenSetId = it }
         ratings.attachTo(setId)
+        // The row and every stream belonging to it are in one transactional
+        // call above, so reaching here is the first moment the capture is
+        // genuinely redundant. Discarded rather than left to accumulate: an
+        // orphan that outlives the set it duplicates would offer the lifter a
+        // recovery for a set they already have.
+        journal?.discard()
+        journal = null
 
         val restS = p.slot?.restS ?: DEFAULT_REST_S
         stateFlow.value = restingState(stateFlow.value, p, analysis, failed, restS)

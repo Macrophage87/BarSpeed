@@ -4,11 +4,14 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
+import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.SessionEntity
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -46,6 +49,46 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     val imuState = container.autoConnect.imuState
     val hrmState = container.autoConnect.hrmState
+
+    /**
+     * Sets that were interrupted before they could be stored.
+     *
+     * A flow of its own rather than another arm of [state], and the separation
+     * is deliberate. [state] is built by combining flows the database and the
+     * settings store already publish; this is a directory scan with no
+     * observer behind it, and folding it in would mean re-scanning the disk
+     * every time the weight unit changed.
+     *
+     * Never merged into [HomeState.history] either. A history row carries a
+     * set count and a per-set velocity sparkline, and an interrupted set has
+     * neither -- rendering one as a history row would put invented numbers on
+     * screen next to real ones.
+     */
+    private val interruptedFlow = MutableStateFlow<List<OrphanedSet>>(emptyList())
+    val interrupted: StateFlow<List<OrphanedSet>> = interruptedFlow
+
+    init {
+        refreshInterrupted()
+    }
+
+    /** Re-scan private storage. Cheap: an empty root is the normal case. */
+    fun refreshInterrupted() {
+        viewModelScope.launch {
+            interruptedFlow.value = withContext(Dispatchers.IO) { container.setJournals.orphans() }
+        }
+    }
+
+    /**
+     * Throw an interrupted capture away, at the lifter's word and never on a
+     * timer. Nothing else deletes one: a capture the lifter has not ruled on
+     * outlives any number of launches.
+     */
+    fun discardInterrupted(orphan: OrphanedSet) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { container.setJournals.discard(orphan) }
+            refreshInterrupted()
+        }
+    }
 
     val state =
         combine(

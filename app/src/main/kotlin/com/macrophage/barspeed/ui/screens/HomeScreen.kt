@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,9 +34,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.ble.ConnectionState
+import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.PermissionBanner
@@ -89,6 +92,11 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
     val state by viewModel.state.collectAsState()
     val imuState by viewModel.imuState.collectAsState()
     val hrmState by viewModel.hrmState.collectAsState()
+    val interrupted by viewModel.interrupted.collectAsState()
+    // Re-scanned every time this screen is composed, not only on first launch:
+    // a set interrupted by a crash that left the process alive would otherwise
+    // stay invisible until the app was killed and started again.
+    LaunchedEffect(Unit) { viewModel.refreshInterrupted() }
     var showBodyWeight by remember { mutableStateOf(false) }
     if (showBodyWeight) {
         BodyWeightDialog(
@@ -145,6 +153,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
             // history LazyColumn below is unweighted, so anything added here
             // comes out of the history list with no way to scroll it back.
             PermissionBanner()
+            InterruptedSetNotice(interrupted, viewModel::discardInterrupted)
             HeroCard(state) { navController.navigate("record") }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -274,4 +283,83 @@ private fun volumeValue(volumeKg: Double, unit: WeightUnit): String = when (unit
 private fun volumeUnit(unit: WeightUnit): String = when (unit) {
     WeightUnit.KG -> "t"
     WeightUnit.LB -> "k lb"
+}
+
+/**
+ * Sets that were interrupted before they could be stored.
+ *
+ * Drawn above the hero card, and above everything else on this screen, because
+ * a capture the lifter has not ruled on outranks starting a new session. It
+ * costs two history rows when it appears: the Column it sits in has no scroll
+ * and the history list below is unweighted. That trade is taken deliberately
+ * and it is paid only in the rare case, since this draws nothing at all when
+ * there is nothing to report.
+ *
+ * Not a [HistoryCard]. A history row carries a set count and a velocity
+ * sparkline; an interrupted set has been through no analysis and has neither,
+ * and rendering one as history would put invented figures beside real ones.
+ *
+ * The two numbers shown are the ones that let the lifter check this against
+ * their own memory of what happened: how many sensor samples reached the disk,
+ * and when the last of them did. Neither is stated when the sensor was not
+ * connected -- a count of zero would otherwise read as a measurement, when what
+ * it means is that there was nothing to measure.
+ */
+@Composable
+private fun InterruptedSetNotice(interrupted: List<OrphanedSet>, onDiscard: (OrphanedSet) -> Unit) {
+    if (interrupted.isEmpty()) return
+    val clock = DateTimeFormatter.ofPattern("HH:mm:ss")
+    Column(modifier = Modifier.fillMaxWidth()) {
+        for (orphan in interrupted) {
+            Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(
+                        "INTERRUPTED SET",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = BarColors.Amber,
+                        letterSpacing = 2.sp,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(orphan.header.exerciseName, style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        interruptedDetail(orphan, clock),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BarColors.Sub,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    SectionCaption("Kept on this phone. Nothing deletes it but you")
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = { onDiscard(orphan) }) {
+                        Text("DISCARD THIS CAPTURE", color = BarColors.Red)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * What survived, in the terms the field check reads.
+ *
+ * The sample count and the last sample's wall clock are what distinguish a
+ * capture that genuinely reached the filesystem from one the app merely
+ * remembered. With no sensor connected there is no count to give and the card
+ * says so in words rather than printing a zero.
+ */
+private fun interruptedDetail(orphan: OrphanedSet, clock: DateTimeFormatter): String {
+    val reps = orphan.repMarks.size
+    val parts =
+        listOfNotNull(
+            if (orphan.header.imuConnected) {
+                "${orphan.imuSamples.size} sensor samples"
+            } else {
+                "no sensor connected"
+            },
+            orphan.imuSamples.lastOrNull()?.let {
+                "last at ${clock.format(Instant.ofEpochMilli(it.timestampMs).atZone(ZoneId.systemDefault()))}"
+            },
+            if (reps > 0) "$reps reps counted" else null,
+        )
+    return parts.joinToString(" · ")
 }
