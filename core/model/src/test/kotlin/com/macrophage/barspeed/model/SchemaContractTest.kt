@@ -46,6 +46,28 @@ class SchemaContractTest {
         assertEquals(PlanFile.VALID_SIDES, enumOf(set["side"]!!.jsonObject), "side values drifted")
     }
 
+    /**
+     * The exercise-level `bodyweight` description states, in so many words,
+     * that the set's own load "may be NEGATIVE for band or machine
+     * assistance" — and [PlanFile.validate] already accepts a negative
+     * load_kg/load_lb whenever the exercise is bodyweight. An unconditional
+     * `minimum: 0` on the set's load properties contradicts that, so a plan
+     * generator that conforms to the schema exactly cannot write the one
+     * document its own description says is legal (#39).
+     */
+    @Test
+    fun `a set's load has no floor, so bodyweight assistance can be declared negative`() {
+        val set = schema("plan.schema.json")["\$defs"]!!.jsonObject["set"]!!.jsonObject["properties"]!!.jsonObject
+        assertTrue(
+            "minimum" !in set["load_kg"]!!.jsonObject,
+            "load_kg still forbids the negative load bodyweight assistance requires",
+        )
+        assertTrue(
+            "minimum" !in set["load_lb"]!!.jsonObject,
+            "load_lb still forbids the negative load bodyweight assistance requires",
+        )
+    }
+
     @Test
     fun `the declarable kinds are exactly the kinds the app can track`() {
         // Every other plan vocabulary is a bare set of strings with nothing on
