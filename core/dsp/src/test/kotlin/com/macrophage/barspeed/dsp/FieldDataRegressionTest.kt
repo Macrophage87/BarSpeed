@@ -26,21 +26,20 @@ import kotlin.test.assertTrue
  *    extends that question to the batch path, to both opening phases, and to a
  *    whole capture with no reps in it at all.
  *
- * ## Provenance of the seven 2026-08-17 fixtures
+ * ## Provenance of the seven fixtures from the 17-set 0.1.37 session
  *
- * One session, 17 sets, WitMotion WT901BLECL, recorded on app 0.1.37 — the
- * version this commit builds. `repsManual` is true on all 17 sets: the lifter
- * counted, so this is the first capture this repo has had with a known answer.
- * The seven files here are seven of those sets, copied byte for byte out of the
- * session's raw export; nothing was re-encoded, resampled or trimmed.
+ * One session, 17 sets, WitMotion WT901BLECL, recorded on app 0.1.37.
+ * `repsManual` is true on all 17 sets: the lifter counted, so this is the first
+ * capture this repo has had with a known answer. The seven files here are seven
+ * of those sets, copied byte for byte out of the session's raw export; nothing
+ * was re-encoded, resampled or trimmed.
  *
  * What the session says as a whole: the lifter performed 158 reps and the
  * analyzer segmented 143, and the error is not one-signed. Rotating
  * free-weight lifts lose reps (overhead press 17 of 32, bench 13 of 18) and
  * stack-mounted cable work invents them (face pull 38 for 36, pallof 50 for
  * 48); the seated cable row lands on 25 for 24 with misses and inventions in
- * the same sets. `sample_idx` is contiguous in all seven files, so nothing was
- * dropped between the sensor and the CSV — none of this is a BLE gap.
+ * the same sets.
  *
  * The opening phase each fixture is analysed with is not a guess. The plan's
  * declared geometry is not in the export (it is from this session that issue 73
