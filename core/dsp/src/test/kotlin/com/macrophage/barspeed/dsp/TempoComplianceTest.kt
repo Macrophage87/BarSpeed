@@ -34,16 +34,27 @@ class TempoComplianceTest {
     )
 
     /**
-     * Case B: four drive-only reps. The 5 s lowering over 0.4 m is not rejected
-     * at the peak-velocity test -- its peak is 0.4 * PI / 10 = 0.126 m/s against
-     * a 0.10 m/s run threshold -- it fails to resolve as a run at all and is
-     * absorbed into the bottom pause, which the drive-only pin below asserts so
-     * that the figure is checked rather than merely claimed.
+     * Case B: four drive-only reps, the fixture the absence path is guarded on.
+     *
+     * The lowering was 5 s over 0.4 m and is now 8 s over the same 0.4 m. That
+     * is not a fixture edited to keep a test green, and the difference is the
+     * point: a 5 s lowering has a half-sine peak of 0.4 * PI / 10 = 0.126 m/s,
+     * over the 0.10 m/s floor the anchor rule now protects, so it RESOLVES and
+     * this set stopped being drive-only at all. AnchorAcceptanceTest pins that
+     * recovery on the old timing, as the evidence it is real. At 8 s the peak is
+     * 0.079 m/s, under the floor and under the run threshold, so the lowering is
+     * unmeasurable for a reason the anchor rule does not touch -- which is what
+     * a guard for the absence path needs.
+     *
+     * Every figure this file asserts about case B is identical before and after
+     * the anchor change at 8 s. The absence path is still guarded by a fixture
+     * that reaches it, and is no longer guarded by one that reached it only
+     * because a real lowering was being erased.
      */
     private fun caseB(tempo: String = "3010") = SetAnalyzer.analyze(
         SyntheticSets.generate(
             List(4) {
-                SyntheticSets.RepSpec(eccS = 5.0, bottomPauseS = 0.5, conS = 0.8, topPauseS = 1.0, romM = 0.4)
+                SyntheticSets.RepSpec(eccS = 8.0, bottomPauseS = 0.5, conS = 0.8, topPauseS = 1.0, romM = 0.4)
             },
             sampleRateHz = 50.0,
             seed = 1234,
@@ -60,20 +71,21 @@ class TempoComplianceTest {
     @Test
     fun `per-phase compliance already excludes unmeasured reps`() {
         val c = assertNotNull(fixtureA().tempoCompliance)
-        // Three of seven reps resolved an eccentric; one of those three was in
-        // tolerance. Both figures come from the measured reps only, and neither
-        // may move when the set-level denominator is corrected.
-        assertEquals(3, phase(c, "eccentric").repsEvaluated, "eccentric denominator")
-        assertEquals(1, phase(c, "eccentric").repsWithinTolerance, "eccentric numerator")
-        assertEquals(7, phase(c, "concentric").repsEvaluated, "concentric denominator")
+        // Four of eight reps resolved an eccentric and none of the four was in
+        // tolerance. Both figures come from the measured reps only. The
+        // numerator falling from 1 of 3 to 0 of 4 is not the lift getting
+        // worse: the rep that used to be on tempo read 2.87 s against a 3 s
+        // target, and the eccentrics now measured run 0.99 to 5.01 s, so the
+        // set is graded on more of itself and likes it less. Nobody timed those
+        // phases, so neither reading is validated -- see issue #47.
+        assertEquals(4, phase(c, "eccentric").repsEvaluated, "eccentric denominator")
+        assertEquals(0, phase(c, "eccentric").repsWithinTolerance, "eccentric numerator")
+        assertEquals(8, phase(c, "concentric").repsEvaluated, "concentric denominator")
         assertEquals(5, phase(c, "concentric").repsWithinTolerance, "concentric numerator")
-        // RED until the fix. Three of the seven reps resolved an eccentric,
-        // and their drives averaged 1.92 s against 1.41 s across all seven, so
-        // dividing the three eccentrics by the seven concentrics reports 1.99
-        // for a contrast that measures 1.46 on the reps it was taken from --
-        // a 36% overstatement, on this capture. The sign is not general: the
-        // three cable captures in FieldDataRegressionTest understate.
-        assertEquals(1.46, c.actualEccConRatio, "measured ecc:con contrast")
+        // Both means are taken over the reps that resolved an eccentric, and
+        // that is now four of eight rather than three of seven. The pairing is
+        // unchanged; what moved is which reps there are to pair.
+        assertEquals(1.1, c.actualEccConRatio, "measured ecc:con contrast")
     }
 
     @Test
@@ -84,8 +96,8 @@ class TempoComplianceTest {
         assertEquals(
             listOf(
                 "High velocity loss (79.4%) — significant fatigue this set.",
-                "Tempo (eccentric): 1/3 reps on tempo; worst was 1.98 s too fast (target 3.00 s).",
-                "Tempo (concentric): 5/7 reps on tempo; worst was 1.53 s too slow (target 1.00 s).",
+                "Tempo (eccentric): 0/4 reps on tempo; worst was 2.01 s too slow (target 3.00 s).",
+                "Tempo (concentric): 5/8 reps on tempo; worst was 2.96 s too slow (target 1.00 s).",
             ),
             fixtureA().verdicts,
         )
@@ -102,7 +114,7 @@ class TempoComplianceTest {
         // Where the unresolved lowering ended up: absorbed into the bottom pause
         // rather than discarded, which is why the eccentric reads as absent and
         // not as short. Pinned so the figure in the KDoc above is checked.
-        assertEquals(6.9, phase(c, "bottomPause").actualMeanS, "the lowering was absorbed into the pause")
+        assertEquals(9.9, phase(c, "bottomPause").actualMeanS, "the lowering was absorbed into the pause")
         // Nothing is said about the eccentric, because the verdict loop is
         // guarded on repsEvaluated > 0. The set-level ratio is the only place
         // this set is described, which is why getting it wrong is silent.
@@ -143,14 +155,13 @@ class TempoComplianceTest {
     @Test
     fun `a mixed set counts every rep that resolved a scored phase`() {
         val c = assertNotNull(fixtureA().tempoCompliance)
-        // Reps 0, 1, 5 and 6 have no eccentric but were driven within tolerance,
-        // so they are graded on the concentric alone. Of the three that resolved
-        // both, rep 2 misses the concentric only, rep 3 the eccentric only, and
-        // rep 4 misses both -- which is what reconciles 1 of 3 eccentrics with
-        // 5 of 7 concentrics and 4 of 7 reps overall. Dropping the four
-        // unmeasured reps instead would report 0 of 3 and discard real
-        // evidence.
-        assertEquals(7, c.repsEvaluated, "every rep resolved at least one scored phase")
+        // Four of the eight reps have no eccentric but were driven within
+        // tolerance, so they are graded on the concentric alone; the other four
+        // resolved both and none was in tolerance on the eccentric. That
+        // reconciles 0 of 4 eccentrics with 5 of 8 concentrics and 4 of 8 reps
+        // overall. Dropping the four unmeasured reps instead would report 0 of
+        // 4 and discard real evidence.
+        assertEquals(8, c.repsEvaluated, "every rep resolved at least one scored phase")
         assertEquals(4, c.repsFullyCompliant, "four reps were in tolerance on all they resolved")
     }
 
@@ -181,17 +192,18 @@ class TempoComplianceTest {
 
     @Test
     fun `the eccentric caption names the rep's place in the set`() {
-        // RED until the fix. Fixture A in the words the lifter reads on the
-        // rest screen. The rep described is the FIFTH of seven; three reps
-        // resolved an eccentric and it is the third of those, so today the
-        // filtered index names it "Rep 3" -- a rep whose eccentric was 2.87 s,
-        // near enough the 3 s target, and which the card is now blaming.
+        // Fixture A in the words the lifter reads on the rest screen. The rep
+        // named is the FOURTH of eight, by its position in the set and not by
+        // its position in the filtered list of measured eccentrics -- which is
+        // what this pin exists for, and is unchanged.
         //
-        // The suffix goes with it for the same reason. Third of three measured
-        // is last of three measured, so today a set with two whole reps after
-        // it is called fatigued.
+        // What changed is which rep is worst. Rep 4 resolves a 5.01 s eccentric
+        // where it resolved none before, and 5.01 s against a 3 s target beats
+        // the 1.0 s that used to win. No suffix, because rep 4 of 8 is not the
+        // last rep performed. Whether a 5.01 s eccentric is what the lifter did
+        // is established by nothing here.
         assertEquals(
-            "Rep 5 eccentric 1.0 s — 2.0 s too fast.",
+            "Rep 4 eccentric 5.0 s — 2.0 s too slow.",
             CoachingRules.eccentricTempoInsight(fixtureA().reps, 3.0, 0.5),
         )
     }

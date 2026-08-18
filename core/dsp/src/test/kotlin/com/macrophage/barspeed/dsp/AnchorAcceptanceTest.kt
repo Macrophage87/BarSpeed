@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.StartPhase
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,10 +11,10 @@ import kotlin.test.assertEquals
  *
  * An accelerometer cannot tell rest from constant velocity: both read zero
  * linear acceleration. So [VelocityEstimator] cannot decide from the sample and
- * decides from the anchor history instead. Today it asks one question -- is this
- * window within [DspConfig.anchorRejectThresholdMps] of the previous anchor --
- * and that is an absolute bar speed, so a steady phase slower than it is
- * accepted as a zero and subtracted away as drift.
+ * decides from the anchor history instead. It used to ask one question -- is
+ * this window within an absolute 0.15 m/s of the previous anchor -- and
+ * 0.15 m/s is a real bar speed, so any steady phase slower than it was accepted
+ * as a zero and subtracted away as drift.
  *
  * The synthetic below isolates the mechanism with no fixture, no ground truth
  * and no hardware: 3 s at rest, a 0.2 s ramp, 4 s at constant velocity, a 0.2 s
@@ -21,10 +22,19 @@ import kotlin.test.assertEquals
  * acts. A synthetic is not a lift; nothing here is evidence about a lifter, it
  * is evidence about the accept rule.
  *
- * These pins are characterization, marked (pre-fix): they record where the cliff
- * IS, not where it should be, so a change that moves it has to say so. The
- * LOCATION is pinned and not merely its existence -- 0.15 m/s is erased, 0.16 is
- * preserved, and [DspConfig.anchorRejectThresholdMps] is 0.15.
+ * The rule now asks two questions instead, and the pins below record the answer
+ * as a LOCATION rather than as an improvement: a steady phase is erased below
+ * 0.10 m/s and preserved at and above it, and 0.10 is not a number anyone typed
+ * into a comparison. It is the maximum of the two caps taken together, and the
+ * pin showing 0.10 m/s accepted at EXACTLY 2.0 s of gap and refused at 1.9 s
+ * and at 2.1 s is that maximum showing through: the floor is the single point
+ * where the two caps cross.
+ *
+ * What has NOT changed is pinned too, so it cannot be claimed away: below the
+ * floor a steady phase is still erased, and 0.05 m/s still reports 0.2 per cent
+ * of its travel. The rule bounds how slow a movement has to be before it can be
+ * taken for a pause. It does not tell rest from constant velocity, because
+ * nothing reading an accelerometer can.
  */
 class AnchorAcceptanceTest {
     /**
@@ -87,19 +97,22 @@ class AnchorAcceptanceTest {
     }
 
     @Test
-    fun `a steady descent slower than the rejection threshold is subtracted away as drift (pre-fix)`() {
-        // Erased. 0.05 m/s reports NOTHING AT ALL: its ramps are 0.25 m/s^2,
-        // inside stationaryAccBandG, so the whole capture is one quiet run and
-        // there is no ramp left over to survive.
-        assertEquals(0.0000, recoveredFraction(0.05), 5e-4, "0.05 m/s descent, fraction recovered")
-        assertEquals(0.0384, recoveredFraction(0.10), 5e-4, "0.10 m/s descent, fraction recovered")
-        assertEquals(0.0422, recoveredFraction(0.14), 5e-4, "0.14 m/s descent, fraction recovered")
-        assertEquals(0.0427, recoveredFraction(0.15), 5e-4, "0.15 m/s descent, fraction recovered")
-        // Preserved. The step between 0.15 and 0.16 is the whole finding and it
-        // sits exactly on the constant asserted below.
+    fun `a steady descent is preserved at and above the floor and erased below it`() {
+        // Still erased, and this is the honest limit of the change rather than
+        // an oversight. 0.05 m/s reports 0.2 per cent of its travel and 0.08
+        // reports 10 per cent; both are under the floor, and at 0.05 the ramps
+        // are 0.25 m/s^2, inside stationaryAccBandG, so the capture is one
+        // unbroken quiet run with no ramp left over to survive.
+        assertEquals(0.0015, recoveredFraction(0.05), 5e-4, "0.05 m/s descent, fraction recovered")
+        assertEquals(0.0975, recoveredFraction(0.08), 5e-4, "0.08 m/s descent, fraction recovered")
+        // Preserved from the floor upward. The cliff has moved from between
+        // 0.15 and 0.16 to between 0.08 and 0.10, and 0.10, 0.14 and 0.15 are
+        // the three speeds that changed side.
+        assertEquals(0.9993, recoveredFraction(0.10), 5e-4, "0.10 m/s descent, fraction recovered")
+        assertEquals(0.9993, recoveredFraction(0.14), 5e-4, "0.14 m/s descent, fraction recovered")
+        assertEquals(0.9993, recoveredFraction(0.15), 5e-4, "0.15 m/s descent, fraction recovered")
         assertEquals(0.9993, recoveredFraction(0.16), 5e-4, "0.16 m/s descent, fraction recovered")
         assertEquals(0.9995, recoveredFraction(0.20), 5e-4, "0.20 m/s descent, fraction recovered")
-        assertEquals(0.15, DspConfig().anchorRejectThresholdMps, "the constant the cliff sits on")
     }
 
     @Test
@@ -114,35 +127,92 @@ class AnchorAcceptanceTest {
     }
 
     @Test
-    fun `reported peak velocity is half the true velocity below the cliff (pre-fix)`() {
-        // The same defect read as the number a lifter would see rather than as a
-        // fraction: below the cliff the reported peak is half the speed the
-        // sensor actually travelled at, and above it, right.
+    fun `reported peak velocity is the true velocity at and above the floor`() {
+        // The same behaviour read as the number a lifter would see rather than
+        // as a fraction. A 3 s eccentric over the 0.333-0.345 m bench ROM this
+        // corpus has actually measured is 0.111-0.115 m/s: it used to be
+        // reported at half speed and is now reported whole.
         fun peakOverTrue(v: Double): Double {
             val s = series(v)
             return (1 until s.size).maxOf { abs(s.velocityMps[it]) } / v
         }
-        assertEquals(0.5068, peakOverTrue(0.10), 5e-4, "0.10 m/s, reported peak as a fraction of true")
-        assertEquals(0.5068, peakOverTrue(0.15), 5e-4, "0.15 m/s, reported peak as a fraction of true")
+        assertEquals(1.0098, peakOverTrue(0.10), 5e-4, "0.10 m/s, reported peak as a fraction of true")
+        assertEquals(1.0098, peakOverTrue(0.15), 5e-4, "0.15 m/s, reported peak as a fraction of true")
         assertEquals(1.0098, peakOverTrue(0.16), 5e-4, "0.16 m/s, reported peak as a fraction of true")
+        // Below the floor it is still short, and shorter than it was is not the
+        // point -- 0.72 of true against 0.51 before. Refusing an anchor leaves
+        // drift where accepting one left nothing, and on a phase this slow the
+        // drift is the larger term. Neither number is a measurement of a lift.
+        assertEquals(0.7183, peakOverTrue(0.05), 5e-4, "0.05 m/s, reported peak as a fraction of true")
     }
 
     @Test
-    fun `the accept rule is one function and both paths ask it (pre-fix)`() {
-        // The rule as it stands: an absolute cap on the velocity step, with no
-        // reference to how long ago the previous anchor was. dtS is accepted and
-        // ignored, which is the whole of the defect stated as a signature.
+    fun `the accept rule is a band in velocity and elapsed time and the floor is where it closes`() {
+        // The rule as behaviour rather than as arithmetic. Accepting an anchor
+        // declares dv of velocity change, dt seconds after the last one, to
+        // have been drift; that is allowed only if the implied bias rate is
+        // small enough AND the travel it erases is small enough.
         val c = DspConfig()
-        assertEquals(true, VelocityEstimator.anchorAcceptable(0.14, 0.3, c), "0.14 m/s step, 0.3 s ago")
-        assertEquals(true, VelocityEstimator.anchorAcceptable(0.15, 0.3, c), "0.15 m/s step, 0.3 s ago")
-        assertEquals(false, VelocityEstimator.anchorAcceptable(0.16, 0.3, c), "0.16 m/s step, 0.3 s ago")
-        // Elapsed time changes nothing today. A 0.14 m/s step is drift whether
-        // it appeared over a third of a second or over half a minute, and a
-        // 0.16 m/s step is movement either way.
-        listOf(0.05, 0.3, 1.0, 4.0, 30.0).forEach { dt ->
-            assertEquals(true, VelocityEstimator.anchorAcceptable(0.14, dt, c), "0.14 m/s step after $dt s")
-            assertEquals(false, VelocityEstimator.anchorAcceptable(0.16, dt, c), "0.16 m/s step after $dt s")
+        fun ok(dv: Double, dt: Double) = VelocityEstimator.anchorAcceptable(dv, dt, c)
+
+        // The rate cap binds at short gaps: 0.02 m/s is too large a step to
+        // have been drift in 0.3 s and small enough to have been drift in 0.5 s.
+        assertEquals(false, ok(0.02, 0.3), "0.02 m/s step, 0.3 s ago")
+        assertEquals(true, ok(0.02, 0.5), "0.02 m/s step, 0.5 s ago")
+        // The displacement cap binds at long gaps, and a small step clears both.
+        assertEquals(true, ok(0.05, 1.0), "0.05 m/s step, 1.0 s ago")
+        assertEquals(true, ok(0.05, 4.0), "0.05 m/s step, 4.0 s ago")
+
+        // The floor is the single point where the two caps cross: 0.10 m/s is
+        // acceptable at EXACTLY one gap and refused on both sides of it. That
+        // is what makes 0.10 a maximum rather than a threshold, and it is the
+        // property an absolute cap could not have had.
+        assertEquals(true, ok(0.10, 2.0), "0.10 m/s step, exactly 2.0 s ago")
+        assertEquals(false, ok(0.10, 1.9), "0.10 m/s step, 1.9 s ago")
+        assertEquals(false, ok(0.10, 2.1), "0.10 m/s step, 2.1 s ago")
+
+        // Nothing above the floor is acceptable at any gap whatever. That is
+        // the guarantee, and all three of these were accepted before.
+        listOf(0.05, 0.3, 1.0, 2.0, 4.0, 30.0).forEach { dt ->
+            assertEquals(false, ok(0.11, dt), "0.11 m/s step after $dt s")
+            assertEquals(false, ok(0.14, dt), "0.14 m/s step after $dt s")
+            assertEquals(false, ok(0.16, dt), "0.16 m/s step after $dt s")
         }
+    }
+
+    @Test
+    fun `a lowering too slow to resolve now resolves, and its unanchored tail invents a rep`() {
+        // Four synthetic reps, each a 5 s lowering over 0.4 m: mean 0.080 m/s,
+        // and because the profile is a half sine its peak is 0.126 m/s, over
+        // the floor. Every one used to be subtracted away and absorbed into the
+        // bottom pause, which read 6.9 s -- the pause WAS the lowering. Three of
+        // the four now resolve, at 4.24 s against a true 5.0 s.
+        val samples = SyntheticSets.generate(
+            List(4) {
+                SyntheticSets.RepSpec(eccS = 5.0, bottomPauseS = 0.5, conS = 0.8, topPauseS = 1.0, romM = 0.4)
+            },
+            sampleRateHz = 50.0,
+            seed = 1234,
+            eccentricFirst = false,
+        )
+        val analysis = SetAnalyzer.analyze(samples, LiftDirection(startsWith = StartPhase.CONCENTRIC))
+        assertEquals(3, analysis.reps.count { it.eccS != null }, "reps that resolved an eccentric, of 4 performed")
+        analysis.reps.mapNotNull { it.eccS }.forEach {
+            assertEquals(4.24, it, 5e-3, "resolved eccentric seconds, against a true 5.0")
+        }
+        // And the cost, pinned rather than left to be found later. The fourth
+        // lowering is the last movement in the capture, so no later quiet window
+        // anchors it; applyZupt holds the offset constant after the final anchor
+        // and the residual reads as an UP run of 0.301 m, which the segmenter
+        // pairs into a fifth rep on a set of four.
+        //
+        // That is the constant-offset extrapolation, not this accept rule. The
+        // tail was flat before because the erasure reached it too, so the fix
+        // exposes a defect rather than causing one -- which is not a defence,
+        // only a statement of where to go and fix it. Raised separately.
+        assertEquals(5, analysis.reps.size, "segmented reps; the synthetic contains 4")
+        assertEquals(3.06, analysis.reps.last().conS, 5e-3, "the phantom fifth rep is a 3 s drive")
+        assertEquals(0.301, analysis.reps.last().romM, 5e-4, "the phantom fifth rep, metres")
     }
 
     @Test
