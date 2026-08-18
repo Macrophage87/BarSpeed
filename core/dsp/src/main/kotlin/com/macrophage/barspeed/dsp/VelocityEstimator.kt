@@ -39,10 +39,10 @@ data class VelocitySeries(
  *
  * Pipeline: world-frame rotation and gravity removal → low-pass filter →
  * trapezoidal integration → ZUPT-style piecewise-linear drift correction using
- * quiet windows as zero-velocity anchors. Quiet windows whose raw velocity is
- * far from the previous anchor are really slow motion (a controlled eccentric
- * produces near-zero acceleration too) and are rejected as anchors — the
- * discriminator is velocity, not acceleration alone.
+ * quiet windows as zero-velocity anchors. A controlled eccentric produces
+ * near-zero acceleration too, so acceleration alone cannot place the anchors;
+ * the discriminator is the integrated velocity, in [anchorAcceptable], which
+ * bounds how much travel an anchor is allowed to declare to have been drift.
  */
 object VelocityEstimator {
     fun estimate(
@@ -173,16 +173,38 @@ object VelocityEstimator {
      * with two copies of the same expression, one in each file, with nothing
      * asserting they agreed. This is that expression, once.
      *
-     * [dtS] is accepted and not read. That is the defect stated as a signature:
-     * the rule is an absolute cap on a velocity step, so it cannot tell a third
-     * of a second of accumulated bias from half a minute of it, and a steady
-     * phase slower than the cap is indistinguishable from a pause at any gap.
-     * The parameter is here so both call sites can be unified before the rule
-     * changes; the suppression goes when the rule starts reading it.
+     * Two caps, and the answer is yes only if both hold.
+     *
+     * The BIAS-RATE cap. If the sensor was at rest at both anchors then [dvMps]
+     * is accumulated integration error, and that error grows no faster than the
+     * accelerometer bias. The limit is `floor^2 / (2 * minRomM)` m/s^2, which is
+     * 0.05 at the shipped defaults; the only capture in the corpus with no
+     * motion in it drifts at 0.0078 m/s^2 mean and 0.0115 m/s^2 across its worst
+     * 0.3 s block, so the cap sits above the worst rate anyone has measured by
+     * more than a factor of four, and refuses none of that capture's anchors.
+     *
+     * The ERASED-DISPLACEMENT cap. `0.5 * dv * dt` is exactly the travel the
+     * piecewise-linear offset below removes over the interval -- the area of the
+     * ramp -- and it may not exceed [DspConfig.minRomM], the least distance this
+     * pipeline is willing to call a rep.
+     *
+     * The rate cap binds at short gaps and the displacement cap at long ones, so
+     * `min(R*dt, 2B/dt)` peaks at `sqrt(2*B*R)`, which is identically
+     * [DspConfig.anchorSlowPhaseFloorMps]. That is the whole guarantee: no
+     * steady phase at or above the floor can be mistaken for a pause at ANY gap
+     * length. An absolute threshold could not say that -- it had one number for
+     * a third of a second of bias and half a minute of it, so it had to be set
+     * wide enough for the worst gap, and 0.15 m/s is a real bar speed.
+     *
+     * What this does NOT do is tell rest from constant velocity, which no
+     * accelerometer can. It bounds how fast a movement has to be before the
+     * question is allowed to arise.
      */
-    @Suppress("UnusedParameter")
-    internal fun anchorAcceptable(dvMps: Double, dtS: Double, config: DspConfig): Boolean =
-        dvMps <= config.anchorRejectThresholdMps
+    internal fun anchorAcceptable(dvMps: Double, dtS: Double, config: DspConfig): Boolean {
+        val floor = config.anchorSlowPhaseFloorMps
+        val biasRateCapMps2 = floor * floor / (2.0 * config.minRomM)
+        return dvMps <= biasRateCapMps2 * dtS && 0.5 * dvMps * dtS <= config.minRomM
+    }
 
     internal fun isQuietSample(sample: ImuSample, config: DspConfig): Boolean =
         abs(FrameTransform.accMagnitudeG(sample) - 1.0) < config.stationaryAccBandG &&
@@ -213,13 +235,18 @@ object VelocityEstimator {
         val n = rawV.size
         val anchors = mutableListOf(Anchor(0, rawV[0]))
         // Walk quiet regions in windows of minStationaryS. A window anchors only if
-        // (a) raw velocity is noise-flat across it (true pause, not slow motion) and
-        // (b) its raw value is near the previous anchor (drift, not displacement).
+        // (a) raw velocity is noise-flat across it and (b) [anchorAcceptable] will
+        // have the velocity step it declares to be drift. Note (a) is satisfied
+        // MAXIMALLY by constant velocity — rawV is flat there, so hi - lo is about
+        // zero — which is why (b) carries the whole discrimination and why it has
+        // to be more than an absolute threshold.
         // Exception: after ANCHOR STARVATION (a long stretch with no acceptable
         // anchor — e.g. continuous press cycling where accel bias drifts rawV far
-        // past the rejection band) the next flat window re-anchors regardless of
-        // (b). Tempo work pauses every few seconds, so starvation never triggers
-        // there and slow eccentrics keep being rejected as anchors.
+        // past the caps) the next flat window re-anchors regardless of (b). That
+        // escape is deliberately NOT gated by (b): gating it takes the corpus
+        // from 19 to 58 in absolute rep-count error. It is also the one route by
+        // which a slow phase can still be erased, 0 to 7 times per capture, and
+        // that is a separate defect from this one.
         var i = 1
         while (i < n) {
             if (!quiet[i]) {

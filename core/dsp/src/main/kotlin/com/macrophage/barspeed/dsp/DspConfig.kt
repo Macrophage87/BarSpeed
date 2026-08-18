@@ -23,11 +23,16 @@ data class DspConfig(
     /** Gyro magnitude limit for quiet detection (deg/s). */
     val stationaryGyroBandDps: Double = 10.0,
     /**
-     * A quiet window whose raw velocity differs from the previous anchor by more
-     * than this is really slow motion (e.g. a 4 s eccentric) and is rejected as
-     * a ZUPT anchor (m/s).
+     * The slowest sustained phase the drift correction promises not to erase
+     * (m/s). See [VelocityEstimator.anchorAcceptable], which derives both of its
+     * caps from this and [minRomM]; no steady phase at or above this speed can
+     * be taken for a pause at any anchor gap.
+     *
+     * Set equal to [startThresholdMps] rather than chosen: a phase slower than
+     * the movement threshold is not a phase this pipeline would count, so there
+     * is nothing below it left to protect.
      */
-    val anchorRejectThresholdMps: Double = 0.15,
+    val anchorSlowPhaseFloorMps: Double = 0.10,
     /**
      * Raw velocity must be this flat across an anchor window to count as a true
      * pause; a slow eccentric ramps faster than this while a real pause is

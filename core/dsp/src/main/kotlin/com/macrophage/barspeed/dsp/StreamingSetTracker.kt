@@ -147,12 +147,16 @@ class StreamingSetTracker(
             quietWindowLo = minOf(quietWindowLo, rawV)
             quietWindowHi = maxOf(quietWindowHi, rawV)
             if (timeS - quietWindowStartS >= config.minStationaryS) {
-                // Anchor only on flat, near-anchor windows: a slow eccentric is
-                // IMU-quiet and flat near its velocity peak, but sits a real
-                // bar-speed away from the last anchor. Exception: after ANCHOR
-                // STARVATION (no anchor for many seconds — residual drift may
-                // have outrun the rejection band) the next flat window
-                // re-anchors, or the tracker locks into a phantom phase.
+                // Anchor only on flat windows [VelocityEstimator.anchorAcceptable]
+                // will have: a slow eccentric is IMU-quiet and flat near its
+                // velocity peak, so flatness alone accepts it. Exception: after
+                // ANCHOR STARVATION (no anchor for many seconds — residual drift
+                // may have outrun the caps) the next flat window re-anchors, or
+                // the tracker locks into a phantom phase.
+                // The batch path applies the SAME rule via the same function, and
+                // its correction is retroactive while this one is not, so the two
+                // still disagree on a capture. What they can no longer do is
+                // disagree about which windows are anchors.
                 val stable = quietWindowHi - quietWindowLo <= config.anchorStabilityBandMps
                 val elapsedS = timeS - anchorTimeS
                 val nearPrev = VelocityEstimator.anchorAcceptable(abs(rawV - anchorOffset), elapsedS, config)
