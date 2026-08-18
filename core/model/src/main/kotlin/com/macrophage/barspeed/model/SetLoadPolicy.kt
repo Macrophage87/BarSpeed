@@ -94,4 +94,38 @@ object SetLoadPolicy {
      * field is no longer in the path at all.
      */
     fun carriedIntoNextSet(declaredAddedKg: Double?, statedAddedKg: Double?): Double? = statedAddedKg ?: declaredAddedKg
+
+    /**
+     * The load actually borne by a lifter's body on a body-weight movement:
+     * their own mass plus whatever was added, which the plan and the lifter
+     * may state as negative for band or machine assistance. Loaded work has
+     * no body in the path, so this is [addedKg] unchanged.
+     *
+     * [bodyWeightKg] null means the lifter has never recorded a body weight
+     * -- #61's silent-default gap, not fixed here. The body-weight term is
+     * simply 0 in that state, so a body-weight set with no recorded body
+     * weight records its added load alone. This function does not widen
+     * that gap or narrow it: whatever [bodyWeightKg] holds when it runs is
+     * exactly what both the actual load and its paired planned load below
+     * are computed from, so the two stay on the same scale regardless of
+     * whether it is null.
+     */
+    fun totalKg(bodyweight: Boolean, bodyWeightKg: Double?, addedKg: Double): Double =
+        if (bodyweight) (bodyWeightKg ?: 0.0) + addedKg else addedKg
+
+    /**
+     * The planned load to store beside [totalKg] when a finished set is
+     * written, so the two are comparable.
+     *
+     * (pre-fix): passes [plannedAddedKg] through unconverted. That is what
+     * RecordViewModel wrote directly before this decision moved here --
+     * PlannedSlot.plannedLoadKg, the plan's own added-load declaration,
+     * handed to storage with no regard for [bodyweight]. On a body-weight
+     * set that pairs a TOTAL actual load against an ADDED-only planned one,
+     * and SessionDetailScreen's exact `!=` reads every compliant set as a
+     * deviation the lifter never made. #25.
+     */
+    @Suppress("UnusedParameter")
+    fun recordedPlannedLoadKg(bodyweight: Boolean, bodyWeightKg: Double?, plannedAddedKg: Double?): Double? =
+        plannedAddedKg
 }

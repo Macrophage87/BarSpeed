@@ -125,6 +125,8 @@ private data class PendingSetWrite(
     val slot: PlannedSlot?,
     val isTimed: Boolean,
     val loadKg: Double,
+    /** Paired with [loadKg] by [SetLoadPolicy.recordedPlannedLoadKg], same scale. */
+    val plannedLoadKg: Double?,
     val addedKg: Double,
     val plannedReps: Int?,
     val manualReps: Int?,
@@ -938,7 +940,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Pull-ups and dips move the lifter: the plan's number is what was ADDED
         // (negative when a band or machine assists), so the load that actually
         // travelled is body weight plus that.
-        val loadKg = if (exercise.bodyweight) (s.bodyWeightKg ?: 0.0) + addedKg else addedKg
+        val loadKg = SetLoadPolicy.totalKg(exercise.bodyweight, s.bodyWeightKg, addedKg)
+        // Paired on the same scale as loadKg above, from the same bodyWeightKg
+        // reading, so a compliant set cannot disagree with itself: #25.
+        val plannedLoadKg =
+            SetLoadPolicy.recordedPlannedLoadKg(exercise.bodyweight, s.bodyWeightKg, slot?.plannedLoadKg)
         val plannedReps = if (s.adHoc) s.repsInput.toIntOrNull() else slot?.reps
         val side = if (s.adHoc) s.sideInput else slot?.side
         val plannedDurationS = if (isTimed) s.currentTimedTargetS else null
@@ -962,6 +968,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 slot = slot,
                 isTimed = isTimed,
                 loadKg = loadKg,
+                plannedLoadKg = plannedLoadKg,
                 addedKg = addedKg,
                 plannedReps = plannedReps,
                 manualReps = manualReps,
@@ -1119,7 +1126,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     exerciseId = p.exercise.id,
                     exerciseName = p.exercise.displayName,
                     loadKg = p.loadKg,
-                    plannedLoadKg = p.slot?.plannedLoadKg,
+                    plannedLoadKg = p.plannedLoadKg,
                     plannedReps = p.plannedReps,
                     manualReps = p.manualReps,
                     actualDurationS = p.actualDurationS,

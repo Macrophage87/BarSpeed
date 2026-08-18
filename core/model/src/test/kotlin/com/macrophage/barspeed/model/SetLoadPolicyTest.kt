@@ -7,11 +7,13 @@ import kotlin.test.assertNull
 /**
  * The load rules the record flow applies.
  *
- * The two `(pre-fix)` characterization pins this file was created with have
- * been replaced by their inversions below, named in the commit body:
- * `resolve reads the typed field for a loadless plan set (pre-fix)` and
- * `seedAddedKg carries the last load forward for a loadless next slot
- * (pre-fix)`.
+ * Three `(pre-fix)` characterization pins have been through this file: two
+ * from before, already replaced by their inversions and named in the commit
+ * body -- `resolve reads the typed field for a loadless plan set (pre-fix)`
+ * and `seedAddedKg carries the last load forward for a loadless next slot
+ * (pre-fix)` -- and a third below, `recordedPlannedLoadKg passes the plan's
+ * added declaration through unconverted (pre-fix)`, added for #25 and not
+ * yet inverted.
  */
 class SetLoadPolicyTest {
     @Test
@@ -426,5 +428,62 @@ class SetLoadPolicyTest {
             )
             assertEquals(0.0, added, "set ${i + 2}")
         }
+    }
+
+    @Test
+    fun `totalKg adds body weight for a body-weight movement`() {
+        assertEquals(100.0, SetLoadPolicy.totalKg(bodyweight = true, bodyWeightKg = 80.0, addedKg = 20.0))
+    }
+
+    @Test
+    fun `totalKg leaves a loaded movement's added kg unchanged`() {
+        assertEquals(100.0, SetLoadPolicy.totalKg(bodyweight = false, bodyWeightKg = 80.0, addedKg = 100.0))
+    }
+
+    /**
+     * Assisted body-weight work states negative added load, same as
+     * [resolve] already keeps for it. The sign has to survive the sum with
+     * body weight the same way, or an assisted set would record the wrong
+     * total on the one path that most needs it right.
+     */
+    @Test
+    fun `totalKg keeps a negative added load for assisted body-weight work`() {
+        assertEquals(60.0, SetLoadPolicy.totalKg(bodyweight = true, bodyWeightKg = 80.0, addedKg = -20.0))
+    }
+
+    /**
+     * #61, not fixed here. With no recorded body weight the added-only value
+     * is what gets stored, exactly as `RecordViewModel`'s inline expression
+     * already did before this function existed -- this pin holds that this
+     * function does not change that default, only where it lives.
+     */
+    @Test
+    fun `totalKg treats a missing body weight as zero, same as loadKg always has`() {
+        assertEquals(20.0, SetLoadPolicy.totalKg(bodyweight = true, bodyWeightKg = null, addedKg = 20.0))
+    }
+
+    /**
+     * (pre-fix). #25: RecordViewModel wrote `plannedLoadKg = slot?.plannedLoadKg`
+     * directly, with no regard for whether the exercise was body-weight. This
+     * pin characterizes exactly that before the decision moves off of it.
+     */
+    @Test
+    fun `recordedPlannedLoadKg passes the plan's added declaration through unconverted (pre-fix)`() {
+        assertEquals(
+            -20.0,
+            SetLoadPolicy.recordedPlannedLoadKg(bodyweight = true, bodyWeightKg = 80.0, plannedAddedKg = -20.0),
+        )
+    }
+
+    /**
+     * A plan slot that declared no load has no planned load to pair, on
+     * either scale -- distinct from a plan slot that declared zero, which
+     * [totalKg] would still add body weight to.
+     */
+    @Test
+    fun `recordedPlannedLoadKg carries a loadless declaration as no planned load`() {
+        assertNull(
+            SetLoadPolicy.recordedPlannedLoadKg(bodyweight = true, bodyWeightKg = 80.0, plannedAddedKg = null),
+        )
     }
 }
