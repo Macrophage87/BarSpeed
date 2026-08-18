@@ -5,6 +5,7 @@ import com.macrophage.barspeed.model.Tempo
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 /**
  * Tempo compliance on sets where a phase was never measured.
@@ -192,6 +193,29 @@ class TempoComplianceTest {
         assertEquals(
             "Rep 5 eccentric 1.0 s — 2.0 s too fast.",
             CoachingRules.eccentricTempoInsight(fixtureA().reps, 3.0, 0.5),
+        )
+    }
+
+    @Test
+    fun `a set that measured no eccentric publishes no ratio at all`() {
+        // Found by mutation testing, not by reading. Deleting the empty-
+        // population guard from the paired ratio left all 505 tests green
+        // while turning this null into 0.0: `average()` over no reps is NaN,
+        // `NaN <= 0.0` is false so the divide guard passes it through, and
+        // `Math.round(NaN)` is 0. The absence would reach the export as a
+        // contrast of zero, which reads as a lifter who dropped the load as
+        // fast as they lifted it -- the one reading this field must never
+        // produce, and the reason the guard is there rather than tidy.
+        //
+        // Two routes to it, both pinned: a set whose reps all resolved on the
+        // drive alone, and a set the segmenter found nothing in.
+        assertNull(
+            assertNotNull(caseB().tempoCompliance).actualEccConRatio,
+            "drive-only set: no eccentric was measured, so there is no contrast",
+        )
+        assertNull(
+            SetAnalyzer.complianceFor(Tempo.parse("3010"), 0.5, emptyList()).actualEccConRatio,
+            "no reps at all",
         )
     }
 
