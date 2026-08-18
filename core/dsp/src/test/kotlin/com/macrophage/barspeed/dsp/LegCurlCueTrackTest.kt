@@ -1,9 +1,9 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.StartPhase
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Seated leg curl at prescribed 1030, three sets, 2026-08-18 (app 0.1.39), with
@@ -43,25 +43,29 @@ import kotlin.test.assertTrue
  *
  * The lifter, on this machine: "my legs are always pushing down on the machine,
  * which will affect the eccentric/concentric readings and result in a 'mushy'
- * reading." The measurement agrees. Median bottom-turnaround dwell over the
- * session, from the app's own export:
+ * reading."
  *
- * - single leg press  1.18 s
- * - leg press         0.16 s
- * - seated leg curl   **0.04 s**
+ * An earlier version of this KDoc said the measurement agreed, and gave
+ * per-machine turnaround dwells of 1.18, 0.16 and 0.04 s read off the exported
+ * bottomPause_s. That comparison is WITHDRAWN. Those are pipeline outputs, not
+ * measurements of a turnaround. The test below pins the discrepancy instead,
+ * which is the more useful fact: across these three sets bottomPause_s reads a
+ * median of 0.04 s where an estimator that never touches the integrator reads
+ * 0.131 s, and the same field reaches 3.01 s on a set whose entire prescribed
+ * cadence is five seconds. See #93.
  *
- * Forty milliseconds. The hamstrings stay loaded through the reversal, so the
- * stack never settles and velocity crosses zero without stopping there.
+ * So nothing here establishes that this machine settles less than any other.
+ * What survives is narrower and still enough: whatever the reversal does, it
+ * lasts on the order of a tenth of a second, which is short against a 3 s
+ * phase however it compares to a leg press.
  *
- * That matters for what the failing assertion below is EVIDENCE OF. Phase
- * boundaries land where |v| crosses the dead band, and RepSegmentation already
- * declares that the clipping grows with the prescribed duration. What nobody
- * has separated is how much of the clip is that, and how much is a reversal
- * with no dwell to key on at all. This fixture does not settle it and no
- * assertion here should be read as settling it. See #92, which files the
- * modelling gap: nothing in the geometry model can express whether the load
- * comes off at the turnaround, and a bottomPause_s of 0.04 on a machine that
- * cannot pause is an absence rendered as a measurement.
+ * That matters for what the eccentric pin below is EVIDENCE OF. Phase
+ * boundaries land where |v| crosses the dead band, and RepSegmentation declares
+ * the clipping grows with the prescribed duration. Whether a reversal with
+ * little dwell contributes as well is NOT separable on this corpus -- the dwell
+ * axis has no spread in it to separate on -- so no assertion here should be
+ * read as attributing the clip to either. See #47 for that analysis and #92 for
+ * the modelling gap underneath it.
  */
 class LegCurlCueTrackTest {
     private fun res(n: String) = javaClass.getResourceAsStream("/$n")!!.readBytes().decodeToString()
@@ -126,18 +130,66 @@ class LegCurlCueTrackTest {
     }
 
     @Test
-    fun `the turnaround dwell this machine allows is effectively zero`() {
-        // Not a defect in itself, and the reason the fixture is hard rather than
-        // merely wrong. Asserted from the pipeline because there is nothing else
-        // to ask, and asserted loosely because it is a statement about the
-        // machine, not about a threshold: every set turns around in well under
-        // the 0.16 s the leg press takes and the 1.18 s the single-leg press does.
-        sets.forEach { (name, _, kg) ->
-            val pauses = analyze(name, kg).reps.map { it.bottomPauseS }.sorted()
-            assertTrue(
-                pauses[pauses.size / 2] < 0.10,
-                "$name: median bottom-turnaround dwell ${pauses[pauses.size / 2]} s",
-            )
+    fun `bottomPause_s and the raw signal disagree about the turnaround (pre-fix)`() {
+        // This used to assert that bottomPause_s stayed under 0.10 s and read
+        // that as the machine never settling. bottomPause_s is not a
+        // measurement of a turnaround, so the assertion is replaced by the
+        // comparison that shows why -- which is also the stronger pin, because
+        // it fails if EITHER quantity moves.
+        //
+        // The estimator below is deliberately upstream of everything under
+        // suspicion: filtered world-vertical linear acceleration, no
+        // integration, no ZUPT, no segmentation, no dead band. The longest
+        // stretch of not-accelerating around the cue-defined end of the
+        // eccentric is what a settling implement looks like. Validated on
+        // synthetic sets whose dwell is set by construction, where it recovers
+        // 0.00, 0.25, 0.50, 1.00 and 2.00 s to within 30 ms.
+        val raw = sets.flatMap { (name, _, _) -> rawTurnaroundDwellS(name) }.sorted()
+        val pipeline = sets.flatMap { (name, _, kg) -> analyze(name, kg).reps.map { it.bottomPauseS } }.sorted()
+        assertEquals(33, raw.size, "cued eccentrics with a turnaround after them")
+        assertEquals(0.131, raw[raw.size / 2], 5e-3, "median turnaround, from the raw signal")
+        assertEquals(0.04, pipeline[pipeline.size / 2], 5e-3, "median bottomPause_s over the same reps")
+        // And why the median hides it: the field absorbs whatever sits between
+        // reps, so on a set whose whole prescribed cadence is 5 s it reports a
+        // single pause of 3.01 s. See #93.
+        assertEquals(3.01, pipeline.max(), 5e-3, "largest bottomPause_s across the three sets")
+    }
+
+    /**
+     * Longest stretch around the cue-defined end of each eccentric where the
+     * filtered world-vertical linear acceleration stays inside a narrow band,
+     * in seconds. Upstream of the integrator, so it is independent of every
+     * defect this fixture is an instrument for.
+     */
+    private fun rawTurnaroundDwellS(name: String): List<Double> {
+        val c = DspConfig()
+        val samples = load("$name.csv")
+        val hz = VelocityEstimator.measureSampleRate(
+            samples.size,
+            (samples.last().timestampMs - samples.first().timestampMs) / 1000.0,
+        )
+        val filter = Biquad.lowPass(c.lowPassCutoffHz, hz)
+        val acc = DoubleArray(samples.size) {
+            filter.process(FrameTransform.verticalLinearAccelMps2(samples[it], c.gravityMps2))
+        }
+        val t0 = samples.first().timestampMs
+        val moves = cues("$name-cues.csv").filter { it.second == "Up" || it.second == "Down" }
+        return moves.filter { it.second == "Up" }.mapNotNull { e ->
+            val next = moves.firstOrNull { it.first > e.first } ?: return@mapNotNull null
+            val end = (next.first - t0) / 1000.0
+            var best = 0
+            var run = 0
+            for (i in acc.indices) {
+                val t = i / hz
+                if (t < end - 0.2 || t > end + 1.0) continue
+                if (abs(acc[i]) < 0.15) {
+                    run++
+                    if (run > best) best = run
+                } else {
+                    run = 0
+                }
+            }
+            best / hz
         }
     }
 
@@ -196,9 +248,11 @@ class LegCurlCueTrackTest {
         //
         // Nothing about WHICH defect owns the clip is asserted. RepSegmentation
         // declares one mechanism -- phase boundaries land where |v| crosses the
-        // dead band, and the clipping grows with the prescribed duration -- and
-        // this machine supplies a second, a 0.04 s turnaround that never
-        // unloads. They are confounded on this capture. See #47.
+        // dead band, and the clipping grows with the prescribed duration. A
+        // reversal with little dwell is a candidate second one. The two cannot
+        // be told apart on this corpus, which carries no spread on the dwell
+        // axis to tell them apart with, so this pin attributes the clip to
+        // neither. See #47.
         val measured = sets.flatMap { (name, _, kg) -> analyze(name, kg).reps.mapNotNull { it.eccS } }
         assertEquals(22, measured.size, "reps that resolved an eccentric, of 36 segmented and 36 performed")
         assertEquals(1.439, measured.average(), 5e-4, "mean resolved eccentric; the cue track says 3.003 s")
