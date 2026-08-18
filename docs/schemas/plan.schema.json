@@ -192,13 +192,11 @@
         },
         "load_kg": {
           "type": "number",
-          "minimum": 0,
-          "description": "Load in kilograms. Provide at most one of load_kg / load_lb; omit both for bodyweight."
+          "description": "Load in kilograms. Provide at most one of load_kg / load_lb; omit both for bodyweight. May be negative on a bodyweight exercise (see bodyweight): a band or assist machine subtracts from body weight."
         },
         "load_lb": {
           "type": "number",
-          "minimum": 0,
-          "description": "Load in pounds; converted to kg on import. Provide at most one of load_kg / load_lb; omit both for bodyweight."
+          "description": "Load in pounds; converted to kg on import. Provide at most one of load_kg / load_lb; omit both for bodyweight. May be negative on a bodyweight exercise (see bodyweight): a band or assist machine subtracts from body weight."
         },
         "side": {
           "enum": [

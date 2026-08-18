@@ -135,6 +135,23 @@
               "rest_s": 180
             }
           ]
+        },
+        {
+          "exercise": "band_assisted_pull_up",
+          "bodyweight": true,
+          "notes": "Band assist; negative load_kg is the band's help subtracted from body weight, not an added plate.",
+          "sets": [
+            {
+              "reps": 6,
+              "load_kg": -20,
+              "rest_s": 120
+            },
+            {
+              "reps": 6,
+              "load_kg": -20,
+              "rest_s": 120
+            }
+          ]
         }
       ]
     }
