@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.macrophage.barspeed.dsp.CoachingRules
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.model.BlePermissionStep
 import com.macrophage.barspeed.model.ExerciseKind
@@ -1696,30 +1697,9 @@ private fun EccTempoChart(analysis: SetAnalysis, targetEccS: Double) {
     )
     Spacer(Modifier.height(6.dp))
     PowerLine(analysis)
-    val worst = eccTimes.withIndex().maxByOrNull { kotlin.math.abs(it.value - targetEccS) }
-    val insight =
-        if (worst == null) {
-            // Every rep was counted on the drive alone, so the chart above is
-            // empty. Saying "All reps on tempo" here states that an unmeasured
-            // phase was on tempo -- the same defect as the ratio, in words.
-            // Say only what is known: this branch is also reached when NOTHING
-            // was graded (an "X" up stroke leaves the eccentric as the only
-            // scored phase), so it must not claim the drive was graded either.
-            "Eccentric not measured this set."
-        } else if (kotlin.math.abs(worst.value - targetEccS) <= TEMPO_TOLERANCE_S) {
-            "All reps on tempo."
-        } else {
-            val delta = targetEccS - worst.value
-            String.format(
-                Locale.US,
-                "Rep %d eccentric %.1f s — %.1f s too %s.%s",
-                worst.index + 1,
-                worst.value,
-                kotlin.math.abs(delta),
-                if (delta > 0) "fast" else "slow",
-                if (delta > 0 && worst.index == eccTimes.lastIndex) " Fatigue showing." else "",
-            )
-        }
+    // The wording lives in :core:dsp beside the verdicts rendered below it, so
+    // that it is reachable by a test. This module has no test source set.
+    val insight = CoachingRules.eccentricTempoInsight(analysis.reps, targetEccS, TEMPO_TOLERANCE_S)
     Text(insight, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     analysis.verdicts.take(2).forEach {
         Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)

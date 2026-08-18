@@ -451,6 +451,38 @@ class FieldDataRegressionTest {
     }
 
     @Test
+    fun `the rest-screen eccentric caption each capture produces today`() {
+        // What the card under the eccentric chart says about each capture, at
+        // a 3 s target and the screen's own 0.5 s tolerance. Pinned because
+        // the ordinal in it is read off the FILTERED list of measured
+        // eccentrics: on a capture where the unmeasured reps come first, the
+        // rep named is not the rep meant. Face pull is the clearest -- the
+        // slow rep it describes is the twelfth of thirteen.
+        //
+        // The suffix is pinned with the sentence rather than separately. It is
+        // gated on the worst rep being LAST IN THE FILTERED LIST, which on the
+        // same captures is not the last rep performed, so a claim about
+        // fatigue is being made about a rep partway through the set.
+        val today =
+            mapOf(
+                "field-ohp-rotating-8rep.csv" to "Rep 2 eccentric 2.3 s — 0.7 s too fast.",
+                "field-ohp-rotating-8rep-b.csv" to "Rep 4 eccentric 0.9 s — 2.1 s too fast. Fatigue showing.",
+                "field-bench-rotating-6rep-ok.csv" to "Rep 6 eccentric 4.6 s — 1.6 s too slow.",
+                "field-bench-rotating-6rep.csv" to "Rep 2 eccentric 1.5 s — 1.5 s too fast. Fatigue showing.",
+                "field-cablerow-static-8rep.csv" to "Rep 2 eccentric 1.0 s — 2.0 s too fast.",
+                "field-facepull-static-12rep.csv" to "Rep 2 eccentric 0.6 s — 2.4 s too fast. Fatigue showing.",
+                "field-pallof-static-12rep.csv" to "Rep 6 eccentric 0.7 s — 2.4 s too fast.",
+            )
+        session20260817.forEach { fs ->
+            assertEquals(
+                today.getValue(fs.file),
+                CoachingRules.eccentricTempoInsight(analyze(fs.file, "3010").reps, 3.0, 0.5),
+                "${fs.file}: rest-screen eccentric caption",
+            )
+        }
+    }
+
+    @Test
     fun `fabricated reps accrue their ROM while the IMU reads still (pre-fix)`() {
         // The sharpest per-rep signal this session produced for a rep that did
         // not happen. See [quietRomFractions]: distance credited to a rep while

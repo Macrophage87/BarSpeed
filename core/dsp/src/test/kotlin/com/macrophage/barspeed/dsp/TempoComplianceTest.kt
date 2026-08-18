@@ -171,4 +171,28 @@ class TempoComplianceTest {
         assertEquals(0, c.repsEvaluated, "no reps to grade")
         assertEquals(0, c.repsFullyCompliant, "nothing graded")
     }
+
+    @Test
+    fun `the eccentric caption names a rep of the filtered list, not of the set`() {
+        // Fixture A in the same words the lifter reads on the rest screen. The
+        // rep this describes is the fifth of seven; three reps resolved an
+        // eccentric and it is the third of those, so the filtered index names
+        // it "Rep 3". The suffix follows the same list: third of three is last
+        // of three, so a set with two more reps after it is called fatigued.
+        assertEquals(
+            "Rep 3 eccentric 1.0 s — 2.0 s too fast. Fatigue showing.",
+            CoachingRules.eccentricTempoInsight(fixtureA().reps, 3.0, 0.5),
+        )
+    }
+
+    @Test
+    fun `a drive-only set's caption says the eccentric was not measured`() {
+        // Case B: nothing to name, and the branch must not say "All reps on
+        // tempo" over an empty chart. Green before and after the ordinal fix;
+        // it guards the absence path against being collapsed into the others.
+        assertEquals(
+            "Eccentric not measured this set.",
+            CoachingRules.eccentricTempoInsight(caseB().reps, 3.0, 0.5),
+        )
+    }
 }

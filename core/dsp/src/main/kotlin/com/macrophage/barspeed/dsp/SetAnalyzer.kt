@@ -353,5 +353,47 @@ object CoachingRules {
         return out
     }
 
+    /**
+     * The one-line caption under the rest screen's eccentric-time chart, and
+     * under the same chart on the session detail screen.
+     *
+     * Lifted verbatim out of `RecordScreen.EccTempoChart` so that it can be
+     * tested at all: `:app` has no test source set, so while this decision
+     * lived there nothing could execute it. It sits beside [verdicts] because
+     * the same card renders both, two lines apart.
+     *
+     * This is a transcription and carries the behaviour it had in `:app`
+     * unchanged, including the rep ordinal, which is taken from the position
+     * in the FILTERED list of measured eccentrics rather than from the rep's
+     * position in the set. That is issue #33 and it is corrected separately,
+     * against pins written red first.
+     */
+    fun eccentricTempoInsight(reps: List<RepAnalysis>, targetEccS: Double, toleranceS: Double): String {
+        val eccTimes = reps.mapNotNull { it.eccS }
+        val worst = eccTimes.withIndex().maxByOrNull { abs(it.value - targetEccS) }
+        return if (worst == null) {
+            // Every rep was counted on the drive alone, so the chart above is
+            // empty. Saying "All reps on tempo" here states that an unmeasured
+            // phase was on tempo -- the same defect as the ratio, in words.
+            // Say only what is known: this branch is also reached when NOTHING
+            // was graded (an "X" up stroke leaves the eccentric as the only
+            // scored phase), so it must not claim the drive was graded either.
+            "Eccentric not measured this set."
+        } else if (abs(worst.value - targetEccS) <= toleranceS) {
+            "All reps on tempo."
+        } else {
+            val delta = targetEccS - worst.value
+            String.format(
+                java.util.Locale.US,
+                "Rep %d eccentric %.1f s — %.1f s too %s.%s",
+                worst.index + 1,
+                worst.value,
+                abs(delta),
+                if (delta > 0) "fast" else "slow",
+                if (delta > 0 && worst.index == eccTimes.lastIndex) " Fatigue showing." else "",
+            )
+        }
+    }
+
     private fun fmt(x: Double) = String.format(java.util.Locale.US, "%.2f", x)
 }
