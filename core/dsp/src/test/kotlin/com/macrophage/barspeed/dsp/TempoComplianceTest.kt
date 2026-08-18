@@ -66,7 +66,13 @@ class TempoComplianceTest {
         assertEquals(1, phase(c, "eccentric").repsWithinTolerance, "eccentric numerator")
         assertEquals(7, phase(c, "concentric").repsEvaluated, "concentric denominator")
         assertEquals(5, phase(c, "concentric").repsWithinTolerance, "concentric numerator")
-        assertEquals(1.99, c.actualEccConRatio, "measured ecc:con contrast")
+        // RED until the fix. Three of the seven reps resolved an eccentric,
+        // and their drives averaged 1.92 s against 1.41 s across all seven, so
+        // dividing the three eccentrics by the seven concentrics reports 1.99
+        // for a contrast that measures 1.46 on the reps it was taken from --
+        // a 36% overstatement, on this capture. The sign is not general: the
+        // three cable captures in FieldDataRegressionTest understate.
+        assertEquals(1.46, c.actualEccConRatio, "measured ecc:con contrast")
     }
 
     @Test
@@ -173,14 +179,18 @@ class TempoComplianceTest {
     }
 
     @Test
-    fun `the eccentric caption names a rep of the filtered list, not of the set`() {
-        // Fixture A in the same words the lifter reads on the rest screen. The
-        // rep this describes is the fifth of seven; three reps resolved an
-        // eccentric and it is the third of those, so the filtered index names
-        // it "Rep 3". The suffix follows the same list: third of three is last
-        // of three, so a set with two more reps after it is called fatigued.
+    fun `the eccentric caption names the rep's place in the set`() {
+        // RED until the fix. Fixture A in the words the lifter reads on the
+        // rest screen. The rep described is the FIFTH of seven; three reps
+        // resolved an eccentric and it is the third of those, so today the
+        // filtered index names it "Rep 3" -- a rep whose eccentric was 2.87 s,
+        // near enough the 3 s target, and which the card is now blaming.
+        //
+        // The suffix goes with it for the same reason. Third of three measured
+        // is last of three measured, so today a set with two whole reps after
+        // it is called fatigued.
         assertEquals(
-            "Rep 3 eccentric 1.0 s — 2.0 s too fast. Fatigue showing.",
+            "Rep 5 eccentric 1.0 s — 2.0 s too fast.",
             CoachingRules.eccentricTempoInsight(fixtureA().reps, 3.0, 0.5),
         )
     }

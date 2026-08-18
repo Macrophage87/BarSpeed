@@ -169,7 +169,7 @@
             },
             "actualEccConRatio": {
               "type": "number",
-              "description": "Measured eccentric:concentric contrast. Diagnostic, not a corrected score: the measurement bias is multiplicative."
+              "description": "Measured eccentric:concentric contrast, over the reps that resolved both phases. Reps counted on the drive alone are excluded from both means, so this need not cover every rep of the set."
             }
           }
         },

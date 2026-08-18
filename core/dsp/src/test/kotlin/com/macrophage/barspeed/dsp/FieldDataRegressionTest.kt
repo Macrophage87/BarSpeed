@@ -416,29 +416,37 @@ class FieldDataRegressionTest {
     }
 
     @Test
-    fun `the ecc con ratio each capture publishes today, and over how many reps`() {
-        // What `actualEccConRatio` reports for each capture under a 3010
-        // prescription, beside the number of reps that resolved an eccentric
-        // at all. Four captures resolved one for every rep; three did not, and
-        // on those the published figure divides a mean taken over the reps
-        // that HAVE an eccentric by a mean taken over EVERY rep's concentric.
+    fun `the ecc con ratio each capture publishes, and over how many reps`() {
+        // RED until the fix. What `actualEccConRatio` must report for each
+        // capture under a 3010 prescription -- both means taken over the SAME
+        // reps, the ones that resolved an eccentric -- beside how many reps
+        // that was. Four captures resolved one for every rep and are controls:
+        // paired and unpaired coincide there, so they may not move at all.
+        //
+        // The three that did not are the differential, and the error they
+        // carry today is NOT one-signed. Cable row publishes 3.22 where the
+        // paired figure is 3.42 and pallof press publishes 1.07 where it is
+        // 1.60, both understatements; face pull publishes 0.68 against 0.79.
+        // Which way it goes depends on whether the reps that resolved an
+        // eccentric also had slower-than-average drives, and nothing controls
+        // that.
         //
         // The rep counts are pinned with the ratios deliberately: a change
         // that moves a ratio by resolving a different number of eccentrics is
         // a segmentation change, not an arithmetic one, and without the count
         // beside it the two are indistinguishable from the failure message.
-        val today =
+        val expected =
             mapOf(
                 "field-ohp-rotating-8rep.csv" to (3 to 3.33),
                 "field-ohp-rotating-8rep-b.csv" to (4 to 1.08),
                 "field-bench-rotating-6rep-ok.csv" to (6 to 3.32),
                 "field-bench-rotating-6rep.csv" to (2 to 2.11),
-                "field-cablerow-static-8rep.csv" to (4 to 3.22),
-                "field-facepull-static-12rep.csv" to (2 to 0.68),
-                "field-pallof-static-12rep.csv" to (7 to 1.07),
+                "field-cablerow-static-8rep.csv" to (4 to 3.42),
+                "field-facepull-static-12rep.csv" to (2 to 0.79),
+                "field-pallof-static-12rep.csv" to (7 to 1.6),
             )
         session20260817.forEach { fs ->
-            val (withEcc, ratio) = today.getValue(fs.file)
+            val (withEcc, ratio) = expected.getValue(fs.file)
             val analysis = analyze(fs.file, "3010")
             val compliance = assertNotNull(analysis.tempoCompliance, "${fs.file}: compliance")
             assertEquals(
@@ -451,31 +459,37 @@ class FieldDataRegressionTest {
     }
 
     @Test
-    fun `the rest-screen eccentric caption each capture produces today`() {
-        // What the card under the eccentric chart says about each capture, at
-        // a 3 s target and the screen's own 0.5 s tolerance. Pinned because
-        // the ordinal in it is read off the FILTERED list of measured
-        // eccentrics: on a capture where the unmeasured reps come first, the
-        // rep named is not the rep meant. Face pull is the clearest -- the
-        // slow rep it describes is the twelfth of thirteen.
+    fun `the rest-screen eccentric caption each capture produces`() {
+        // RED until the fix, on two of the seven. The card under the eccentric
+        // chart, at a 3 s target and the screen own 0.5 s tolerance, must name
+        // the rep by its position in the SET. Today it names its position in
+        // the filtered list of measured eccentrics, so on a capture where the
+        // unmeasured reps come first the rep named is not the rep meant: face
+        // pull says "Rep 2" about the twelfth rep of thirteen.
         //
-        // The suffix is pinned with the sentence rather than separately. It is
-        // gated on the worst rep being LAST IN THE FILTERED LIST, which on the
-        // same captures is not the last rep performed, so a claim about
-        // fatigue is being made about a rep partway through the set.
-        val today =
+        // The suffix is pinned in the same sentence rather than separately,
+        // because the two are one claim to the lifter. It must mean the last
+        // rep PERFORMED. Gated on the last rep MEASURED, as it is today, it
+        // fires on face pull rep 12 of 13 and on the bursty overhead press
+        // rep 5 of 7 -- calling a set fatigued from a rep partway through it.
+        //
+        // Five captures are controls and may not move, two of them with the
+        // suffix present: it is meant to go on firing where the worst rep
+        // really was the last one performed, and a change that silently
+        // disabled it would show here.
+        val expected =
             mapOf(
                 "field-ohp-rotating-8rep.csv" to "Rep 2 eccentric 2.3 s — 0.7 s too fast.",
                 "field-ohp-rotating-8rep-b.csv" to "Rep 4 eccentric 0.9 s — 2.1 s too fast. Fatigue showing.",
                 "field-bench-rotating-6rep-ok.csv" to "Rep 6 eccentric 4.6 s — 1.6 s too slow.",
                 "field-bench-rotating-6rep.csv" to "Rep 2 eccentric 1.5 s — 1.5 s too fast. Fatigue showing.",
                 "field-cablerow-static-8rep.csv" to "Rep 2 eccentric 1.0 s — 2.0 s too fast.",
-                "field-facepull-static-12rep.csv" to "Rep 2 eccentric 0.6 s — 2.4 s too fast. Fatigue showing.",
-                "field-pallof-static-12rep.csv" to "Rep 6 eccentric 0.7 s — 2.4 s too fast.",
+                "field-facepull-static-12rep.csv" to "Rep 12 eccentric 0.6 s — 2.4 s too fast.",
+                "field-pallof-static-12rep.csv" to "Rep 8 eccentric 0.7 s — 2.4 s too fast.",
             )
         session20260817.forEach { fs ->
             assertEquals(
-                today.getValue(fs.file),
+                expected.getValue(fs.file),
                 CoachingRules.eccentricTempoInsight(analyze(fs.file, "3010").reps, 3.0, 0.5),
                 "${fs.file}: rest-screen eccentric caption",
             )
