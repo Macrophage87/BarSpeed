@@ -2,6 +2,7 @@ package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.hrm.HrTrust
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
@@ -114,7 +115,14 @@ class SessionRepository(
      * can observe.
      */
     suspend fun recordSet(sessionId: Long, orderIdx: Int, set: CompletedSet): Long {
-        val hr = set.hrSamples.map { it.bpm }
+        // Summarised over the samples the strap's own report supports, not
+        // over every sample that arrived. A bpm of zero is the strap saying it
+        // has no reading, and a reported R-R interval of zero is a claim that
+        // no time passed between two beats; averaging either in as a value is
+        // how a strap lying on a table came to publish a plausible resting
+        // heart rate. What is stored is untouched -- the gzipped stream below
+        // keeps every sample, zeros included.
+        val hr = HrTrust.summarize(set.hrSamples)
         // setId is stamped by the DAO once the row exists; these carry a
         // placeholder until then.
         val streams = buildList {
@@ -176,9 +184,9 @@ class SessionRepository(
                 // measured one and would be believed.
                 geometryJson =
                 set.geometry?.let { json.encodeToString(ResolvedGeometry.serializer(), it) },
-                hrEndOfSetBpm = set.hrSamples.lastOrNull()?.bpm,
-                hrAvgBpm = if (hr.isEmpty()) null else hr.average().toInt(),
-                hrMaxBpm = hr.maxOrNull(),
+                hrEndOfSetBpm = hr.endOfSetBpm,
+                hrAvgBpm = hr.avgBpm,
+                hrMaxBpm = hr.maxBpm,
             ),
             streams,
         )
