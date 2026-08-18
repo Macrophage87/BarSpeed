@@ -7,13 +7,12 @@ import kotlin.test.assertNull
 /**
  * The load rules the record flow applies.
  *
- * Three `(pre-fix)` characterization pins have been through this file: two
- * from before, already replaced by their inversions and named in the commit
- * body -- `resolve reads the typed field for a loadless plan set (pre-fix)`
- * and `seedAddedKg carries the last load forward for a loadless next slot
- * (pre-fix)` -- and a third below, `recordedPlannedLoadKg passes the plan's
- * added declaration through unconverted (pre-fix)`, added for #25 and not
- * yet inverted.
+ * Three `(pre-fix)` characterization pins have been through this file, all
+ * now replaced by their inversions, named in the commit bodies that made
+ * each replacement true: `resolve reads the typed field for a loadless plan
+ * set (pre-fix)`, `seedAddedKg carries the last load forward for a loadless
+ * next slot (pre-fix)`, and `recordedPlannedLoadKg passes the plan's added
+ * declaration through unconverted (pre-fix)` (#25).
  */
 class SetLoadPolicyTest {
     @Test
@@ -463,14 +462,16 @@ class SetLoadPolicyTest {
     }
 
     /**
-     * (pre-fix). #25: RecordViewModel wrote `plannedLoadKg = slot?.plannedLoadKg`
-     * directly, with no regard for whether the exercise was body-weight. This
-     * pin characterizes exactly that before the decision moves off of it.
+     * #25. 80 kg lifter, band-assisted pull-up, plan declares -20 kg added,
+     * run exactly as prescribed. Before the fix this pairs loadKg 60.0
+     * (SetLoadPolicy.totalKg, body weight plus added) against an unconverted
+     * plannedLoadKg of -20.0, and SessionDetailScreen's exact `!=` reads an
+     * 80 kg deviation the lifter never made.
      */
     @Test
-    fun `recordedPlannedLoadKg passes the plan's added declaration through unconverted (pre-fix)`() {
+    fun `recordedPlannedLoadKg pairs the plan's declaration on the same scale as the actual load`() {
         assertEquals(
-            -20.0,
+            60.0,
             SetLoadPolicy.recordedPlannedLoadKg(bodyweight = true, bodyWeightKg = 80.0, plannedAddedKg = -20.0),
         )
     }

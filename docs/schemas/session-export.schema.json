@@ -17,9 +17,10 @@
         "1.1",
         "1.2",
         "1.3",
-        "1.4"
+        "1.4",
+        "1.5"
       ],
-      "description": "1.1: velocityLoss_pct is best-to-LAST rep; unmeasured phases are null rather than 0; tempo compliance scores movement digits only; repMetricsComplete reports per-rep coverage. 1.2: a set may carry `geometry`, the resolved direction and sensor mounting its numbers were measured with, plus the provenance of each value. Purely additive — no key from 1.1 changed type or stopped being written, so a 1.1 reader works unchanged against a 1.2 export. 1.3: a session may carry `timeZone`, the device's zone and UTC offset when it was recorded. Also purely additive — `startedAt` and `endedAt` are unchanged and still UTC with a `Z` — so a 1.2 reader works unchanged against a 1.3 export. 1.4: a set's `hr` block is published only from the samples the strap's own report supports. `avgBpm` and `maxBpm` are taken over those samples rather than over every sample; `endOfSetBpm` is present only when the set's FINAL sample is one of them, and is never backfilled from an earlier one; and the whole block is absent when the strap reported nothing usable. NOT purely additive: no key changed type or stopped being written, but `avgBpm` and `maxBpm` are computed over a different population and `endOfSetBpm` names a different sample, so a 1.3 reader comparing these figures across versions is comparing different quantities."
+      "description": "1.1: velocityLoss_pct is best-to-LAST rep; unmeasured phases are null rather than 0; tempo compliance scores movement digits only; repMetricsComplete reports per-rep coverage. 1.2: a set may carry `geometry`, the resolved direction and sensor mounting its numbers were measured with, plus the provenance of each value. Purely additive — no key from 1.1 changed type or stopped being written, so a 1.1 reader works unchanged against a 1.2 export. 1.3: a session may carry `timeZone`, the device's zone and UTC offset when it was recorded. Also purely additive — `startedAt` and `endedAt` are unchanged and still UTC with a `Z` — so a 1.2 reader works unchanged against a 1.3 export. 1.4: a set's `hr` block is published only from the samples the strap's own report supports. `avgBpm` and `maxBpm` are taken over those samples rather than over every sample; `endOfSetBpm` is present only when the set's FINAL sample is one of them, and is never backfilled from an earlier one; and the whole block is absent when the strap reported nothing usable. NOT purely additive: no key changed type or stopped being written, but `avgBpm` and `maxBpm` are computed over a different population and `endOfSetBpm` names a different sample, so a 1.3 reader comparing these figures across versions is comparing different quantities. 1.5: on a body-weight set, `plannedLoad_kg` is paired on the same scale as `load_kg` — the plan's declared added load plus the same body weight, rather than the added load alone. NOT purely additive for the same reason 1.4 was not: no key changes type or stops being written, but the VALUE `plannedLoad_kg` carries for a body-weight set changes meaning, so a 1.4 reader comparing it against `load_kg` on such a set is comparing quantities that used to disagree on purpose and now do not."
     },
     "startedAt": {
       "type": "string",
@@ -356,7 +357,7 @@
         },
         "bodyweight": {
           "type": "boolean",
-          "description": "True when the lifter's own body was the load. load_kg then INCLUDES body weight, while plannedLoad_kg is the added load alone — the two keys mean different things on such a set, and this is the only field that says so."
+          "description": "True when the lifter's own body was the load. load_kg then INCLUDES body weight, and as of schema 1.5 plannedLoad_kg is paired on the same scale — the plan's declared added load plus the same body weight — so the two remain directly comparable on such a set."
         },
         "source": {
           "$ref": "#/$defs/geometrySource"
