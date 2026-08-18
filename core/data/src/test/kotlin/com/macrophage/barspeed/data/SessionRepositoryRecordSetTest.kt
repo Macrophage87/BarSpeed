@@ -602,48 +602,95 @@ class SessionRepositoryRecordSetTest {
         assertEquals(listOf("cable_fly"), exercises.inserted.map { it.id })
     }
 
-    // ---- heart rate: the unworn strap, as it is summarised today ------------
+    // ---- heart rate: the unworn strap ---------------------------------------
 
     /**
-     * Characterization, not specification. These three tests record what the
-     * app published for session 28 -- a strap that sat on a table for the whole
-     * session, confirmed by the lifter -- so that the change to it is visible
-     * as a diff rather than described in a commit message.
+     * A strap that sat on a table for three sets publishes no heart rate for
+     * the two sets where nothing it reported is a measurement.
      *
-     * The figures below are the ones in the shipped export. Read them as the
-     * defect: a coaching consumer handed `avgBpm 46` reads a well-rested
-     * athlete, and nothing in the artifact distinguishes it from one.
+     * These three assertions were the characterization of what shipped -- the
+     * figures below used to be 49/31/50, 47/48/49 and 46/46/47 -- and this
+     * commit inverts them. Set 3 is deliberately NOT inverted all the way: 47
+     * of its 91 samples carry plausible-band R-R, nothing here reaches them,
+     * and its mean and maximum still come out at 46. That remainder is issue
+     * #83 and it is asserted rather than hidden, so that the size of this
+     * change cannot be mistaken.
      */
     @Test
-    fun `unworn set 1 publishes 49 end, 31 avg and 50 max today`() = runTest {
+    fun `unworn set 1 publishes no heart rate`() = runTest {
         val dao = FakeSessionDao()
         repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(hrSamples = HrFixtures.unworn(1)))
         val row = dao.sets.single()
-        // 26 samples of bpm 0 are averaged in as a value, which is what drags
-        // the mean to 31 while the maximum stands at 50.
-        assertEquals(49, row.hrEndOfSetBpm)
-        assertEquals(31, row.hrAvgBpm)
-        assertEquals(50, row.hrMaxBpm)
+        assertNull(row.hrEndOfSetBpm)
+        assertNull(row.hrAvgBpm)
+        assertNull(row.hrMaxBpm)
     }
 
     @Test
-    fun `unworn set 2 publishes 47 end, 48 avg and 49 max today`() = runTest {
+    fun `unworn set 2 publishes no heart rate`() = runTest {
         val dao = FakeSessionDao()
         repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(hrSamples = HrFixtures.unworn(2)))
         val row = dao.sets.single()
-        assertEquals(47, row.hrEndOfSetBpm)
-        assertEquals(48, row.hrAvgBpm)
-        assertEquals(49, row.hrMaxBpm)
+        assertNull(row.hrEndOfSetBpm)
+        assertNull(row.hrAvgBpm)
+        assertNull(row.hrMaxBpm)
     }
 
     @Test
-    fun `unworn set 3 publishes 46 end, 46 avg and 47 max today`() = runTest {
+    fun `unworn set 3 loses its end-of-set reading and keeps 46 avg and 46 max`() = runTest {
         val dao = FakeSessionDao()
         repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(hrSamples = HrFixtures.unworn(3)))
         val row = dao.sets.single()
-        assertEquals(46, row.hrEndOfSetBpm)
-        assertEquals(46, row.hrAvgBpm)
-        assertEquals(47, row.hrMaxBpm)
+        // Was 46: its final sample reports a zero-length R-R interval.
+        assertNull(row.hrEndOfSetBpm)
+        assertEquals(46, row.hrAvgBpm, "issue #83: 47 samples still carry plausible-band R-R")
+        // Was 47, off a sample that reports an impossible interval beside it.
+        assertEquals(46, row.hrMaxBpm)
+    }
+
+    // ---- heart rate: what a sample has to be to count ----------------------
+
+    @Test
+    fun `a bpm of zero is not averaged in as a value`() = runTest {
+        val dao = FakeSessionDao()
+        val samples =
+            listOf(
+                HrSample(1_000L, bpm = 100, rrIntervalsMs = listOf(600.0)),
+                HrSample(1_500L, bpm = 0, rrIntervalsMs = emptyList()),
+                HrSample(2_000L, bpm = 120, rrIntervalsMs = listOf(500.0)),
+            )
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(hrSamples = samples))
+        // (100 + 120) / 2, not (100 + 0 + 120) / 3 = 73.
+        assertEquals(110, dao.sets.single().hrAvgBpm)
+    }
+
+    @Test
+    fun `a sample reporting an impossible interval does not raise the maximum`() = runTest {
+        val dao = FakeSessionDao()
+        val samples =
+            listOf(
+                HrSample(1_000L, bpm = 100, rrIntervalsMs = listOf(600.0)),
+                HrSample(1_500L, bpm = 190, rrIntervalsMs = listOf(0.0)),
+                HrSample(2_000L, bpm = 120, rrIntervalsMs = listOf(500.0)),
+            )
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(hrSamples = samples))
+        assertEquals(120, dao.sets.single().hrMaxBpm)
+    }
+
+    @Test
+    fun `the end-of-set reading is omitted when the final sample is untrusted`() = runTest {
+        val dao = FakeSessionDao()
+        val samples =
+            listOf(
+                HrSample(1_000L, bpm = 100, rrIntervalsMs = listOf(600.0)),
+                HrSample(1_500L, bpm = 118, rrIntervalsMs = listOf(500.0)),
+                HrSample(2_000L, bpm = 46, rrIntervalsMs = listOf(0.0)),
+            )
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(hrSamples = samples))
+        val row = dao.sets.single()
+        assertNull(row.hrEndOfSetBpm, "not backfilled from the last trusted sample")
+        assertEquals(109, row.hrAvgBpm, "the rest of the summary survives")
+        assertEquals(118, row.hrMaxBpm)
     }
 
     /**

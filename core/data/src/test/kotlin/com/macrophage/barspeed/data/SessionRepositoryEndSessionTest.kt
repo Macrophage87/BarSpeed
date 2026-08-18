@@ -1,5 +1,7 @@
 package com.macrophage.barspeed.data
 
+import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.HrSample
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -146,6 +148,30 @@ class SessionRepositoryEndSessionTest {
         analysisJson = "{}",
         hrAvgBpm = hrAvgBpm,
         hrMaxBpm = hrMaxBpm,
+    )
+
+    private fun completedSet(hrSamples: List<HrSample>) = CompletedSet(
+        exerciseId = "seated_overhead_press",
+        exerciseName = "Seated overhead press",
+        loadKg = 25.0,
+        plannedLoadKg = null,
+        plannedReps = 8,
+        tempo = null,
+        targetMeanConVelMps = null,
+        velocityLossStopPct = null,
+        plannedRestS = null,
+        startedAtMs = 1_000L,
+        endedAtMs = 2_000L,
+        analysis =
+        SetAnalysis(
+            reps = emptyList(),
+            sampleRateHz = 99.0,
+            velocityLossPct = null,
+            tempoCompliance = null,
+            verdicts = emptyList(),
+        ),
+        imuSamples = emptyList(),
+        hrSamples = hrSamples,
     )
 
     private fun repo(dao: SessionDao) = SessionRepository(dao, FakeExerciseDao())
@@ -368,14 +394,18 @@ class SessionRepositoryEndSessionTest {
     }
 
     /**
-     * Characterization of session 28, the strap that sat on a table.
+     * Session 28's three rows, as `recordSet` wrote them before this change,
+     * aggregating to a session heart rate that is entirely plausible and
+     * entirely fictional.
      *
-     * The three rows are what `recordSet` writes for its three sets today. They
-     * aggregate to a session heart rate that is entirely plausible and entirely
-     * fictional, which is the defect at session scope.
+     * Named `today` when it was added a commit ago, which was wrong of me: this
+     * function's arithmetic is not what changes, its INPUT is. Hand-fed rows go
+     * on averaging exactly like this forever, so the name promised a change
+     * that will never arrive here. The end-to-end test below is where the
+     * session figure actually moves.
      */
     @Test
-    fun `the unworn session publishes 41 avg and 50 max today`() = runTest {
+    fun `three contaminated set rows average to a plausible session heart rate`() = runTest {
         val dao =
             FakeSessionDao(
                 seedSessions = listOf(session()),
@@ -390,5 +420,33 @@ class SessionRepositoryEndSessionTest {
 
         assertEquals(41, dao.updates.single().hrAvgBpm)
         assertEquals(50, dao.updates.single().hrMaxBpm)
+    }
+
+    /**
+     * The session figure, end to end: three real sets recorded and the session
+     * closed over whatever rows they produced.
+     *
+     * This is the one that moves, and it is the reason a single bad set matters
+     * at session scope. `endSession` averages the per-set means, so before this
+     * change one set of 72 samples reporting bpm 0 pulled the session mean to
+     * 41 while the session maximum stood at 50 -- a well-rested athlete, from a
+     * strap on a table.
+     *
+     * After it, two of the three sets contribute nothing at all and the session
+     * reports what the one remaining set supports. That remaining figure is
+     * still wrong, and issue #83 is where it is tracked; what this pins is that
+     * the sets which measured nothing are skipped rather than counted.
+     */
+    @Test
+    fun `the unworn session aggregates only the set that still summarises`() = runTest {
+        val dao = FakeSessionDao(seedSessions = listOf(session()))
+        val repository = repo(dao)
+        HrFixtures.allUnworn().forEachIndexed { index, samples ->
+            repository.recordSet(sessionId = 1L, orderIdx = index, set = completedSet(samples))
+        }
+        repository.endSession(1L, endedAtMs = 9_000L)
+
+        assertEquals(46, dao.updates.single().hrAvgBpm)
+        assertEquals(46, dao.updates.single().hrMaxBpm)
     }
 }
