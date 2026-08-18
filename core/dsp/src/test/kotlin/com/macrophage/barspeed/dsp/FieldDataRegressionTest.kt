@@ -446,6 +446,46 @@ class FieldDataRegressionTest {
         }
     }
 
+    @Test
+    fun `live rep counts on the seven captures (pre-fix)`() {
+        // What StreamingSetTracker counts on these captures TODAY, against the
+        // count the lifter performed. Four of the seven are wrong, in both
+        // directions, and they must stay wrong until the change that fixes
+        // them: this is characterization, not a target.
+        //
+        // It exists because the batch pins above cover only half the surface
+        // the quiet-detection constants move, and the missing half is the half
+        // the lifter watches during the set. Measured: at
+        // `DspConfig.stationaryGyroBandDps` 12 the live count on
+        // field-ohp-rotating-8rep-b falls from 5 to 4 against a truth of 8 --
+        // further from the lifter, while the batch counts on that same
+        // mutation improve -- and nothing in the suite went red, because no
+        // test pinned a live count on any of these seven.
+        //
+        // The live tracker is not the batch analyzer with a different clock,
+        // and these disagree in both directions on the same capture. The
+        // pallof press is the sharpest: 9 live and 13 batch for 12 performed,
+        // so the lifter watching the screen and the coach reading the export
+        // are told different wrong things about one set.
+        val liveToday =
+            mapOf(
+                "field-ohp-rotating-8rep.csv" to (4 to 8),
+                "field-ohp-rotating-8rep-b.csv" to (5 to 8),
+                "field-bench-rotating-6rep-ok.csv" to (5 to 6),
+                "field-bench-rotating-6rep.csv" to (1 to 6),
+                "field-cablerow-static-8rep.csv" to (8 to 8),
+                "field-facepull-static-12rep.csv" to (13 to 12),
+                "field-pallof-static-12rep.csv" to (9 to 12),
+            )
+        session20260817.forEach { fs ->
+            val (live, performed) = liveToday.getValue(fs.file)
+            val tracker = StreamingSetTracker(fs.startsWith)
+            var last = LiveSetState()
+            load(fs.file).forEach { last = tracker.feed(it) }
+            assertEquals(live, last.repCount, "${fs.file}: live reps; the lifter performed $performed")
+        }
+    }
+
     // ------------------------------------------------------------------
     // Still-sensor control. Session of 2026-08-17 evening, app 0.1.38.
     // ------------------------------------------------------------------
