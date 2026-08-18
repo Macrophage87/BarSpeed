@@ -128,6 +128,24 @@ class AnchorAcceptanceTest {
     }
 
     @Test
+    fun `the accept rule is one function and both paths ask it (pre-fix)`() {
+        // The rule as it stands: an absolute cap on the velocity step, with no
+        // reference to how long ago the previous anchor was. dtS is accepted and
+        // ignored, which is the whole of the defect stated as a signature.
+        val c = DspConfig()
+        assertEquals(true, VelocityEstimator.anchorAcceptable(0.14, 0.3, c), "0.14 m/s step, 0.3 s ago")
+        assertEquals(true, VelocityEstimator.anchorAcceptable(0.15, 0.3, c), "0.15 m/s step, 0.3 s ago")
+        assertEquals(false, VelocityEstimator.anchorAcceptable(0.16, 0.3, c), "0.16 m/s step, 0.3 s ago")
+        // Elapsed time changes nothing today. A 0.14 m/s step is drift whether
+        // it appeared over a third of a second or over half a minute, and a
+        // 0.16 m/s step is movement either way.
+        listOf(0.05, 0.3, 1.0, 4.0, 30.0).forEach { dt ->
+            assertEquals(true, VelocityEstimator.anchorAcceptable(0.14, dt, c), "0.14 m/s step after $dt s")
+            assertEquals(false, VelocityEstimator.anchorAcceptable(0.16, dt, c), "0.16 m/s step after $dt s")
+        }
+    }
+
+    @Test
     fun `the still capture measures the drift rate any anchor rule has to tolerate`() {
         // The calibration source, pinned so it cannot move silently. This is the
         // only capture in the corpus with no motion in it, so it is the only

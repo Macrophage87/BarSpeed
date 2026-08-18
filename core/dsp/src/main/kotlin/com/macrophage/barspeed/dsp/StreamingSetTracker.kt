@@ -154,8 +154,9 @@ class StreamingSetTracker(
                 // have outrun the rejection band) the next flat window
                 // re-anchors, or the tracker locks into a phantom phase.
                 val stable = quietWindowHi - quietWindowLo <= config.anchorStabilityBandMps
-                val nearPrev = abs(rawV - anchorOffset) <= config.anchorRejectThresholdMps
-                val starved = timeS - anchorTimeS > ANCHOR_STARVATION_S
+                val elapsedS = timeS - anchorTimeS
+                val nearPrev = VelocityEstimator.anchorAcceptable(abs(rawV - anchorOffset), elapsedS, config)
+                val starved = elapsedS > ANCHOR_STARVATION_S
                 if (stable && (nearPrev || starved)) {
                     anchorOffset = rawV
                     anchorTimeS = timeS

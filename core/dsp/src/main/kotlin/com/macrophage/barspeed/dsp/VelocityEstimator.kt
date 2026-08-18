@@ -164,6 +164,26 @@ object VelocityEstimator {
     fun measureSampleRate(sampleCount: Int, spanS: Double): Double =
         measuredSampleRateOrNull(sampleCount, spanS) ?: DEFAULT_HZ
 
+    /**
+     * May a quiet window be taken as a zero-velocity anchor, given that
+     * accepting it declares [dvMps] of velocity change since the previous
+     * anchor, [dtS] seconds ago, to have been drift rather than movement?
+     *
+     * The batch and streaming paths ask the same question and used to answer it
+     * with two copies of the same expression, one in each file, with nothing
+     * asserting they agreed. This is that expression, once.
+     *
+     * [dtS] is accepted and not read. That is the defect stated as a signature:
+     * the rule is an absolute cap on a velocity step, so it cannot tell a third
+     * of a second of accumulated bias from half a minute of it, and a steady
+     * phase slower than the cap is indistinguishable from a pause at any gap.
+     * The parameter is here so both call sites can be unified before the rule
+     * changes; the suppression goes when the rule starts reading it.
+     */
+    @Suppress("UnusedParameter")
+    internal fun anchorAcceptable(dvMps: Double, dtS: Double, config: DspConfig): Boolean =
+        dvMps <= config.anchorRejectThresholdMps
+
     internal fun isQuietSample(sample: ImuSample, config: DspConfig): Boolean =
         abs(FrameTransform.accMagnitudeG(sample) - 1.0) < config.stationaryAccBandG &&
             FrameTransform.gyroMagnitudeDps(sample) < config.stationaryGyroBandDps
@@ -217,8 +237,9 @@ object VelocityEstimator {
                     val mid = (windowStart + j) / 2
                     val stable = hi - lo <= config.anchorStabilityBandMps
                     val last = anchors.last()
-                    val nearPrev = abs(rawV[mid] - last.rawValue) <= config.anchorRejectThresholdMps
-                    val starved = timeS[mid] - timeS[last.index] > ANCHOR_STARVATION_S
+                    val elapsedS = timeS[mid] - timeS[last.index]
+                    val nearPrev = anchorAcceptable(abs(rawV[mid] - last.rawValue), elapsedS, config)
+                    val starved = elapsedS > ANCHOR_STARVATION_S
                     if (stable && (nearPrev || starved)) {
                         anchors += Anchor(mid, rawV[mid])
                     }
