@@ -790,4 +790,66 @@ class SessionExporterTest {
         assertTrue("\"velocityLoss_pct\"" in text, "the figure the caveat qualifies should be here too")
         assertTrue("\"repMetrics\"" !in text, "summary-only export must still omit the per-rep array")
     }
+
+    // ---- heart rate ---------------------------------------------------------
+
+    /**
+     * A summary carrying a mean and a maximum but no end-of-set reading still
+     * publishes its `hr` block.
+     *
+     * That row shape is not hypothetical: it is what a set produces when its
+     * final sample is not a measurement, and session 28's third set is exactly
+     * it -- null, 46, 46. The exporter gates the block on ANY of the three
+     * columns being present, and nothing exercised that gate. Narrowing it to
+     * ALL THREE deletes the block entirely for this shape, silently, and the
+     * set would export as though no strap had been connected.
+     *
+     * Asserted on the emitted JSON as well as on the object, because the JSON
+     * is what a consumer reads and `explicitNulls = false` is what turns the
+     * absent reading into an absent key rather than a null.
+     */
+    @Test
+    fun `a set with no end-of-set reading still exports its mean and maximum`() = runTest {
+        val stored =
+            row(analysis(3), actualReps = 3, repsManual = false)
+                .copy(hrEndOfSetBpm = null, hrAvgBpm = 46, hrMaxBpm = 46)
+        val exported =
+            exporterOf(stored).buildExport(1L, includeRepDetail = true)!!
+                .exercises.single().sets.single()
+        val hr = assertNotNull(exported.hr, "the hr block was dropped")
+        assertNull(hr.endOfSetBpm)
+        assertEquals(46, hr.avgBpm)
+        assertEquals(46, hr.maxBpm)
+
+        val text = exporterOf(stored).exportJson(1L, includeRepDetail = true)!!
+        val block =
+            Json.parseToJsonElement(text).jsonObject["exercises"]!!.jsonArray.single()
+                .jsonObject["sets"]!!.jsonArray.single().jsonObject["hr"]!!.jsonObject
+        assertEquals(setOf("avgBpm", "maxBpm"), block.keys, "the absent reading was published as a key")
+        assertEquals("46", block["avgBpm"]!!.jsonPrimitive.content)
+    }
+
+    /**
+     * A set that summarised to nothing at all publishes no `hr` block.
+     *
+     * The other side of the same gate. An empty object here would read as "a
+     * heart rate was measured and every figure happened to be missing", which
+     * is a different claim from "there is nothing to say".
+     */
+    @Test
+    fun `a set that summarised to nothing publishes no hr block`() = runTest {
+        val stored =
+            row(analysis(3), actualReps = 3, repsManual = false)
+                .copy(hrEndOfSetBpm = null, hrAvgBpm = null, hrMaxBpm = null)
+        val exported =
+            exporterOf(stored).buildExport(1L, includeRepDetail = true)!!
+                .exercises.single().sets.single()
+        assertNull(exported.hr)
+
+        val text = exporterOf(stored).exportJson(1L, includeRepDetail = true)!!
+        val setObject =
+            Json.parseToJsonElement(text).jsonObject["exercises"]!!.jsonArray.single()
+                .jsonObject["sets"]!!.jsonArray.single().jsonObject
+        assertTrue("hr" !in setObject.keys, "an empty hr block was published")
+    }
 }

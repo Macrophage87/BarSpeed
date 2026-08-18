@@ -335,4 +335,60 @@ class SessionRepositoryEndSessionTest {
         assertEquals(12_000L, dao.updates.single().endedAtMs)
         assertEquals(41.5, dao.updates.single().hrvRmssdMs)
     }
+
+    // ---- heart rate across the session -------------------------------------
+
+    /**
+     * A set that recorded no heart rate is skipped, not counted as a zero.
+     *
+     * `endSession` reaches the per-set columns through `mapNotNull`, so this
+     * already holds -- it is pinned because it is the whole mechanism by which
+     * a withheld set stays out of the session figure. Nothing else has to know
+     * about trust for the session average to be right about it, and if this
+     * ever became `map { it ?: 0 }` the session number would go quietly wrong
+     * in the direction that looks like a well-rested athlete.
+     */
+    @Test
+    fun `sets carrying no heart rate are skipped by the session average, not counted as zero`() = runTest {
+        val dao =
+            FakeSessionDao(
+                seedSessions = listOf(session()),
+                seedSets =
+                listOf(
+                    setRow(1L, orderIdx = 0, hrAvgBpm = 120, hrMaxBpm = 150),
+                    setRow(2L, orderIdx = 1, hrAvgBpm = null, hrMaxBpm = null),
+                    setRow(3L, orderIdx = 2, hrAvgBpm = 140, hrMaxBpm = 165),
+                ),
+            )
+        repo(dao).endSession(1L, endedAtMs = 9_000L)
+
+        // (120 + 140) / 2, not (120 + 0 + 140) / 3 = 86.
+        assertEquals(130, dao.updates.single().hrAvgBpm)
+        assertEquals(165, dao.updates.single().hrMaxBpm)
+    }
+
+    /**
+     * Characterization of session 28, the strap that sat on a table.
+     *
+     * The three rows are what `recordSet` writes for its three sets today. They
+     * aggregate to a session heart rate that is entirely plausible and entirely
+     * fictional, which is the defect at session scope.
+     */
+    @Test
+    fun `the unworn session publishes 41 avg and 50 max today`() = runTest {
+        val dao =
+            FakeSessionDao(
+                seedSessions = listOf(session()),
+                seedSets =
+                listOf(
+                    setRow(1L, orderIdx = 0, hrAvgBpm = 31, hrMaxBpm = 50),
+                    setRow(2L, orderIdx = 1, hrAvgBpm = 48, hrMaxBpm = 49),
+                    setRow(3L, orderIdx = 2, hrAvgBpm = 46, hrMaxBpm = 47),
+                ),
+            )
+        repo(dao).endSession(1L, endedAtMs = 9_000L)
+
+        assertEquals(41, dao.updates.single().hrAvgBpm)
+        assertEquals(50, dao.updates.single().hrMaxBpm)
+    }
 }

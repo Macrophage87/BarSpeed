@@ -443,17 +443,42 @@ class SessionRepositoryRecordSetTest {
         assertEquals(set.imuSamples, ImuCsv.decode(text))
     }
 
+    /**
+     * Fed the WORST stream on hand, not a healthy one, and that is the whole
+     * point of the test.
+     *
+     * The summary columns are entitled to ignore a sample that reports bpm 0 or
+     * an R-R interval of zero. The stream is not. This gzipped CSV is the only
+     * copy of what the strap actually sent, and a stream quietly filtered to
+     * the samples the summary believed would be indistinguishable from a
+     * stream off a strap that behaved -- the evidence that the session was
+     * mismeasured would be gone, and with it any chance of reprocessing it.
+     *
+     * With `completedSet()`'s default samples this test could not tell: all
+     * three are trustworthy, so filtering them changes nothing and the
+     * assertion held whether or not the property did. Session 28's first set
+     * has 26 samples reporting bpm 0 and 46 reporting a zero-length R-R, so
+     * dropping either kind is now visible.
+     */
     @Test
     fun `the heart-rate stream keeps every beat and its rr intervals`() = runTest {
         val dao = FakeSessionDao().apply { nextSetId = 31L }
-        val set = completedSet()
+        val set = completedSet(hrSamples = HrFixtures.unworn(1))
         repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = set)
         val stream = requireNotNull(dao.stream(RawStreamEntity.KIND_HRM))
         assertEquals(31L, stream.setId)
         // The sample rate belongs to the IMU stream; an HR stream has no such rate
         // and says so with null rather than with a number that means nothing.
         assertNull(stream.sampleRateHz)
-        assertEquals(set.hrSamples, HrCsv.decode(Gzip.decompress(stream.csvGzip)))
+        val decoded = HrCsv.decode(Gzip.decompress(stream.csvGzip))
+        assertEquals(72, decoded.size, "the persisted stream lost samples")
+        assertEquals(26, decoded.count { it.bpm == 0 }, "the persisted stream lost its zero-bpm samples")
+        assertEquals(
+            46,
+            decoded.count { it.rrIntervalsMs == listOf(0.0) },
+            "the persisted stream lost its zero-length R-R samples",
+        )
+        assertEquals(set.hrSamples, decoded)
     }
 
     @Test
@@ -575,5 +600,79 @@ class SessionRepositoryRecordSetTest {
         repository.ensureExerciseExists("cable_fly")
         repository.ensureExerciseExists("cable_fly")
         assertEquals(listOf("cable_fly"), exercises.inserted.map { it.id })
+    }
+
+    // ---- heart rate: the unworn strap, as it is summarised today ------------
+
+    /**
+     * Characterization, not specification. These three tests record what the
+     * app published for session 28 -- a strap that sat on a table for the whole
+     * session, confirmed by the lifter -- so that the change to it is visible
+     * as a diff rather than described in a commit message.
+     *
+     * The figures below are the ones in the shipped export. Read them as the
+     * defect: a coaching consumer handed `avgBpm 46` reads a well-rested
+     * athlete, and nothing in the artifact distinguishes it from one.
+     */
+    @Test
+    fun `unworn set 1 publishes 49 end, 31 avg and 50 max today`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(hrSamples = HrFixtures.unworn(1)))
+        val row = dao.sets.single()
+        // 26 samples of bpm 0 are averaged in as a value, which is what drags
+        // the mean to 31 while the maximum stands at 50.
+        assertEquals(49, row.hrEndOfSetBpm)
+        assertEquals(31, row.hrAvgBpm)
+        assertEquals(50, row.hrMaxBpm)
+    }
+
+    @Test
+    fun `unworn set 2 publishes 47 end, 48 avg and 49 max today`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(hrSamples = HrFixtures.unworn(2)))
+        val row = dao.sets.single()
+        assertEquals(47, row.hrEndOfSetBpm)
+        assertEquals(48, row.hrAvgBpm)
+        assertEquals(49, row.hrMaxBpm)
+    }
+
+    @Test
+    fun `unworn set 3 publishes 46 end, 46 avg and 47 max today`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(hrSamples = HrFixtures.unworn(3)))
+        val row = dao.sets.single()
+        assertEquals(46, row.hrEndOfSetBpm)
+        assertEquals(46, row.hrAvgBpm)
+        assertEquals(47, row.hrMaxBpm)
+    }
+
+    /**
+     * The worn control, summarised the way the app summarises it today.
+     *
+     * Every one of these seventeen sets is a real measurement and every figure
+     * here is correct. They are pinned before anything moves so that a rule
+     * aimed at the unworn capture cannot quietly cost a worn one: what must not
+     * change is not an average in the abstract, it is these numbers.
+     */
+    @Test
+    fun `the worn control summarises to seventeen sets of real heart rate`() = runTest {
+        val published =
+            HrFixtures.allWorn().map { samples ->
+                val dao = FakeSessionDao()
+                repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(hrSamples = samples))
+                val row = dao.sets.single()
+                Triple(row.hrEndOfSetBpm, row.hrAvgBpm, row.hrMaxBpm)
+            }
+        assertEquals(
+            listOf(
+                Triple(102, 98, 110), Triple(110, 101, 114), Triple(110, 103, 116),
+                Triple(120, 105, 120), Triple(113, 108, 115), Triple(111, 104, 111),
+                Triple(113, 102, 113), Triple(104, 105, 110), Triple(111, 110, 115),
+                Triple(112, 106, 113), Triple(108, 106, 111), Triple(105, 103, 110),
+                Triple(112, 108, 116), Triple(128, 125, 134), Triple(110, 118, 125),
+                Triple(122, 118, 124), Triple(120, 117, 122),
+            ),
+            published,
+        )
     }
 }
