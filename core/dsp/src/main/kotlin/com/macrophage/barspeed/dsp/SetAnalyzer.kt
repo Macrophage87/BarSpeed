@@ -66,7 +66,17 @@ data class TempoComplianceResult(
     val repsEvaluated: Int,
     /** Prescribed eccentric:concentric contrast — the ratio the block trains. */
     val prescribedEccConRatio: Double? = null,
-    /** Measured eccentric:concentric contrast, comparable to the prescribed one. */
+    /**
+     * Measured eccentric:concentric contrast, in the same units as the
+     * prescribed one.
+     *
+     * Taken over the reps that resolved BOTH phases. A rep counted on the
+     * drive alone contributes to neither mean, so this need not cover every
+     * rep of the set, and nothing published beside it says how many reps it
+     * did cover -- that gap is issue #88. Null when no rep resolved an
+     * eccentric at all, which is a different fact from a low ratio and must
+     * stay distinguishable from one.
+     */
     val actualEccConRatio: Double? = null,
 )
 
@@ -273,19 +283,39 @@ object SetAnalyzer {
             repsFullyCompliant = fullyCompliant,
             repsEvaluated = gradeable.size,
             prescribedEccConRatio = ratioOf(schedule.eccentricS, schedule.concentricS),
-            actualEccConRatio =
-            ratioOf(
-                reps.mapNotNull { it.eccS }.takeIf { it.isNotEmpty() }?.average(),
-                reps.map { it.conS }.takeIf { it.isNotEmpty() }?.average(),
-            ),
+            actualEccConRatio = pairedEccConRatio(reps),
         )
     }
 
     /**
+     * The set's measured ecc:con contrast, over the reps that resolved both
+     * phases.
+     *
+     * Both means must be taken over the SAME reps. Dividing the mean of the
+     * eccentrics that resolved by the mean of every rep's concentric produces
+     * a number describing no rep that happened, and the error is not
+     * one-signed: it depends on whether the reps that resolved an eccentric
+     * also had slower-than-average drives. On the committed captures it ran
+     * from a 36% overstatement to a 33% understatement. Issue #46.
+     */
+    private fun pairedEccConRatio(reps: List<RepAnalysis>): Double? {
+        val paired = reps.filter { it.eccS != null }
+        if (paired.isEmpty()) return null
+        return ratioOf(paired.mapNotNull { it.eccS }.average(), paired.map { it.conS }.average())
+    }
+
+    /**
      * Ecc:con contrast — the thing a tempo block actually trains. Report it,
-     * but do not treat it as a corrected score: the measured bias is
-     * multiplicative, not a constant offset, so a 2x spread in prescribed
-     * ratios came back as a 1.26x spread in measured ones on field data.
+     * but do not read it as a corrected compliance score: it says what the
+     * contrast was, not whether the prescription was met.
+     *
+     * An earlier version of this comment claimed a measured multiplicative
+     * bias — "a 2x spread in prescribed ratios came back as a 1.26x spread in
+     * measured ones on field data". Retracted. Nothing here derives it, and it
+     * cannot be derived here even in principle: the measured ratio does not
+     * depend on the prescription at all, so checking that claim needs field
+     * sets recorded to different prescribed tempos, and no committed capture
+     * carries the tempo it was performed to.
      */
     private fun ratioOf(ecc: Double?, con: Double?): Double? {
         if (ecc == null || con == null || con <= 0.0) return null
@@ -362,15 +392,19 @@ object CoachingRules {
      * lived there nothing could execute it. It sits beside [verdicts] because
      * the same card renders both, two lines apart.
      *
-     * This is a transcription and carries the behaviour it had in `:app`
-     * unchanged, including the rep ordinal, which is taken from the position
-     * in the FILTERED list of measured eccentrics rather than from the rep's
-     * position in the set. That is issue #33 and it is corrected separately,
-     * against pins written red first.
+     * The rep is named by its own [RepAnalysis.index], not by its position
+     * among the reps that resolved an eccentric, and "Fatigue showing." means
+     * the last rep PERFORMED rather than the last one measured. Those differ
+     * exactly when the unmeasured reps are the late ones, which is the common
+     * case: issue #33.
      */
     fun eccentricTempoInsight(reps: List<RepAnalysis>, targetEccS: Double, toleranceS: Double): String {
-        val eccTimes = reps.mapNotNull { it.eccS }
-        val worst = eccTimes.withIndex().maxByOrNull { abs(it.value - targetEccS) }
+        // Carry each rep's own ordinal through the filter. Reps counted on the
+        // drive alone are not charted and cannot be named, but they are still
+        // reps, and the ones after them keep their place in the set.
+        val measured = reps.mapNotNull { rep -> rep.eccS?.let { rep.index to it } }
+        val lastRepIndex = reps.lastOrNull()?.index
+        val worst = measured.maxByOrNull { abs(it.second - targetEccS) }
         return if (worst == null) {
             // Every rep was counted on the drive alone, so the chart above is
             // empty. Saying "All reps on tempo" here states that an unmeasured
@@ -379,18 +413,23 @@ object CoachingRules {
             // was graded (an "X" up stroke leaves the eccentric as the only
             // scored phase), so it must not claim the drive was graded either.
             "Eccentric not measured this set."
-        } else if (abs(worst.value - targetEccS) <= toleranceS) {
+        } else if (abs(worst.second - targetEccS) <= toleranceS) {
+            // Covers only the reps that resolved an eccentric, which is issue
+            // #89 and is not addressed here.
             "All reps on tempo."
         } else {
-            val delta = targetEccS - worst.value
+            val delta = targetEccS - worst.second
             String.format(
                 java.util.Locale.US,
                 "Rep %d eccentric %.1f s — %.1f s too %s.%s",
-                worst.index + 1,
-                worst.value,
+                worst.first + 1,
+                worst.second,
                 abs(delta),
                 if (delta > 0) "fast" else "slow",
-                if (delta > 0 && worst.index == eccTimes.lastIndex) " Fatigue showing." else "",
+                // The last rep of the set, not the last one measured. A rep
+                // partway through a set says nothing about fatigue at the end
+                // of it.
+                if (delta > 0 && worst.first == lastRepIndex) " Fatigue showing." else "",
             )
         }
     }
