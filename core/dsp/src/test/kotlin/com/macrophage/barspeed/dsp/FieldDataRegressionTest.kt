@@ -510,9 +510,23 @@ class FieldDataRegressionTest {
         // only two reps under 0.12 m/s mean velocity); they read 0.734 and
         // 0.954. Against that, the highest reading among reps with no reason to
         // be doubted is 0.650, face pull rep 9. A gap of 0.084 on four
-        // examples is not a rule, and the reason is known: a slow cable rep is
-        // IMU-quiet too, which is exactly why VelocityEstimator cannot use
-        // acceleration alone to place its anchors.
+        // examples is not a rule. The reason the signal exists at all is that a
+        // slow cable rep is IMU-quiet too.
+        //
+        // What this comment used to say next -- that this is exactly why
+        // VelocityEstimator cannot use acceleration alone to place its anchors
+        // -- is FALSE and is withdrawn here. Traced on this capture: inside the
+        // reported concentrics of reps 6 and 8 the estimator accepts NO anchor
+        // and refuses three apiece, so nothing there was erased by an anchor.
+        // The nearest accepted anchors bracket gaps of 15.3 s and 6.3 s, which
+        // makes those two reps an anchor DEFICIT, not an intrusion.
+        //
+        // The quantity is also agnostic between the two readings it gets put
+        // to. It is the share of REPORTED travel accrued on IMU-quiet samples,
+        // and a genuinely slow rep is IMU-quiet, so a fix that stopped erasing
+        // slow phases would push these numbers UP rather than down. It cannot
+        // separate unremoved drift from a real slow rep, and neither reading
+        // should be asserted from it alone.
         //
         // Pinned as measured values so that a fix which stops fabricating reps
         // moves them visibly. An earlier report of this signal put it at 94-98%
