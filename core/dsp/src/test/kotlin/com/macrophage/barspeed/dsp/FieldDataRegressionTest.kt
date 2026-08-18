@@ -2,9 +2,11 @@ package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.StartPhase
+import com.macrophage.barspeed.model.Tempo
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -206,6 +208,19 @@ class FieldDataRegressionTest {
     private fun analyze(file: String) =
         fixture(file).let { SetAnalyzer.analyze(load(it.file), it.startsWith, loadKg = it.loadKg) }
 
+    /**
+     * As [analyze], with a prescription attached. `tempoCompliance` is null
+     * without one, so the set-level figures cannot be read at all otherwise.
+     */
+    private fun analyze(file: String, tempo: String) = fixture(file).let {
+        SetAnalyzer.analyze(
+            load(it.file),
+            it.startsWith,
+            loadKg = it.loadKg,
+            targets = SetTargets(tempo = Tempo.parse(tempo), toleranceS = 0.5),
+        )
+    }
+
     /** The series [SetAnalyzer] runs on, for facts it does not publish. */
     private fun series(fs: FieldSet): VelocitySeries {
         val direction = LiftDirection(startsWith = fs.startsWith)
@@ -397,6 +412,41 @@ class FieldDataRegressionTest {
             val measured = phaseAsymmetriesM(fs)
             assertEquals(reps, measured.size, "${fs.file}: reps that resolved an eccentric")
             assertMeasured(listOf(worst), listOf(measured.max()), "${fs.file}: worst asymmetry")
+        }
+    }
+
+    @Test
+    fun `the ecc con ratio each capture publishes today, and over how many reps`() {
+        // What `actualEccConRatio` reports for each capture under a 3010
+        // prescription, beside the number of reps that resolved an eccentric
+        // at all. Four captures resolved one for every rep; three did not, and
+        // on those the published figure divides a mean taken over the reps
+        // that HAVE an eccentric by a mean taken over EVERY rep's concentric.
+        //
+        // The rep counts are pinned with the ratios deliberately: a change
+        // that moves a ratio by resolving a different number of eccentrics is
+        // a segmentation change, not an arithmetic one, and without the count
+        // beside it the two are indistinguishable from the failure message.
+        val today =
+            mapOf(
+                "field-ohp-rotating-8rep.csv" to (3 to 3.33),
+                "field-ohp-rotating-8rep-b.csv" to (4 to 1.08),
+                "field-bench-rotating-6rep-ok.csv" to (6 to 3.32),
+                "field-bench-rotating-6rep.csv" to (2 to 2.11),
+                "field-cablerow-static-8rep.csv" to (4 to 3.22),
+                "field-facepull-static-12rep.csv" to (2 to 0.68),
+                "field-pallof-static-12rep.csv" to (7 to 1.07),
+            )
+        session20260817.forEach { fs ->
+            val (withEcc, ratio) = today.getValue(fs.file)
+            val analysis = analyze(fs.file, "3010")
+            val compliance = assertNotNull(analysis.tempoCompliance, "${fs.file}: compliance")
+            assertEquals(
+                withEcc,
+                analysis.reps.count { it.eccS != null },
+                "${fs.file}: reps that resolved an eccentric, of ${analysis.reps.size} segmented",
+            )
+            assertEquals(ratio, compliance.actualEccConRatio, "${fs.file}: published ecc:con ratio")
         }
     }
 
