@@ -117,15 +117,13 @@ object SetLoadPolicy {
      * The planned load to store beside [totalKg] when a finished set is
      * written, so the two are comparable.
      *
-     * (pre-fix): passes [plannedAddedKg] through unconverted. That is what
-     * RecordViewModel wrote directly before this decision moved here --
-     * PlannedSlot.plannedLoadKg, the plan's own added-load declaration,
-     * handed to storage with no regard for [bodyweight]. On a body-weight
-     * set that pairs a TOTAL actual load against an ADDED-only planned one,
-     * and SessionDetailScreen's exact `!=` reads every compliant set as a
-     * deviation the lifter never made. #25.
+     * Runs [plannedAddedKg] through the same [totalKg] that computed the
+     * actual load, from the same [bodyWeightKg] reading, so a set recorded
+     * exactly as the plan prescribed cannot disagree with itself. A null
+     * [plannedAddedKg] -- a plan slot that declared no load at all -- stays
+     * null rather than becoming a declared zero: there is no planned load to
+     * pair on either scale. #25.
      */
-    @Suppress("UnusedParameter")
     fun recordedPlannedLoadKg(bodyweight: Boolean, bodyWeightKg: Double?, plannedAddedKg: Double?): Double? =
-        plannedAddedKg
+        plannedAddedKg?.let { totalKg(bodyweight, bodyWeightKg, it) }
 }
