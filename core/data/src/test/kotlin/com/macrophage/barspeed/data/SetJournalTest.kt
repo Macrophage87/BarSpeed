@@ -227,4 +227,151 @@ class SetJournalTest {
         assertTrue(!orphan.directory.exists(), "the capture is still on disk")
         assertEquals(emptyList(), store.orphans())
     }
+
+    // ---- what a killed process leaves behind --------------------------------
+
+    /**
+     * The sharpest hazard in the whole design.
+     *
+     * A process killed mid-append leaves a final line with fewer fields than
+     * the format has columns. `ImuCsv.decode` does `require(f.size >= 10)` and
+     * THROWS on exactly that line, so handing it the file whole discards the
+     * entire capture over its last forty bytes -- two minutes of lifting lost
+     * to the one line nobody finished writing.
+     *
+     * The complete samples are kept and the partial one is dropped. Not
+     * repaired, not guessed at: a half-written row is not a measurement.
+     */
+    @Test
+    fun `a capture cut off mid-line keeps every complete sample`() = runTest {
+        onDisk(imuText = ImuCsv.encode(imu) + "1020,0.0345678,-0.04")
+        assertEquals(imu.size, store().orphans().single().imuSamples.size)
+    }
+
+    @Test
+    fun `a capture cut off mid-line still reports the rest of its streams`() = runTest {
+        onDisk(imuText = ImuCsv.encode(imu) + "1020,0.03", cueText = CueCsv.encode(cues))
+        val found = store().orphans().single()
+        assertEquals(imu.size, found.imuSamples.size)
+        assertEquals(cues, found.cues)
+    }
+
+    /**
+     * A directory with no header is refused outright rather than given an
+     * invented one.
+     *
+     * A placeholder identity is this repository's dominant defect wearing a
+     * helpful face: the card would name an exercise nobody performed, at a time
+     * nobody lifted, and the lifter would have no way to tell that from a real
+     * find. Absence has to stay absence.
+     */
+    @Test
+    fun `a capture with no header is not offered for recovery`() = runTest {
+        onDisk(header = null, cueText = CueCsv.encode(cues), imuText = ImuCsv.encode(imu))
+        assertEquals(emptyList(), store().orphans())
+    }
+
+    @Test
+    fun `a capture whose header will not parse is not offered for recovery`() = runTest {
+        val dir = onDisk(header = null, cueText = CueCsv.encode(cues))
+        File(dir, SetJournalStore.HEADER_FILE).writeText("{ this is not json")
+        assertEquals(emptyList(), store().orphans())
+    }
+
+    /**
+     * A capture written by a future version of this app is refused rather than
+     * read optimistically.
+     *
+     * A file format has no compiler behind it. The version is the only thing
+     * that stops a layout change being read as data, and reading it
+     * optimistically would publish samples that were never sampled.
+     */
+    @Test
+    fun `a capture written by a newer journal format is refused, not parsed`() = runTest {
+        onDisk(
+            header = header().copy(journalVersion = SetJournalStore.JOURNAL_VERSION + 1),
+            imuText = ImuCsv.encode(imu),
+        )
+        assertEquals(emptyList(), store().orphans())
+    }
+
+    // ---- fidelity -----------------------------------------------------------
+
+    /**
+     * The journal must not be lossier than the format the set would have been
+     * stored in.
+     *
+     * Asserted as the bytes `recordSet` would gzip, because that is the artifact
+     * that ships to an LLM and gets compared against a field fixture -- not as
+     * sample equality, which passes on a re-encode that merely rounds
+     * differently. The fixture carries seven decimals precisely so that a
+     * writer using the four-place gyro format for the accelerometer columns is
+     * visible here instead of coincidentally equal.
+     */
+    @Test
+    fun `journalled samples re-encode to the bytes the live buffer would have stored`() = runTest {
+        val store = store()
+        val journal = requireNotNull(store.open(header()))
+        imu.forEach { journal.appendImu(it) }
+        journal.sync()
+        assertEquals(ImuCsv.encode(imu), ImuCsv.encode(store.orphans().single().imuSamples))
+    }
+
+    // ---- lifecycle ----------------------------------------------------------
+
+    /**
+     * Closing is not storing.
+     *
+     * The set being over and the set being safe are different facts a whole
+     * durable write apart, and the window between them is the one this branch
+     * exists to close. A journal destroyed when the set ended would be gone
+     * exactly while the write that replaces it is still in flight -- and if
+     * that write is what failed, nothing anywhere would hold the capture.
+     */
+    @Test
+    fun `a closed journal is still on disk, because the set is over and not yet stored`() = runTest {
+        val store = store()
+        val journal = requireNotNull(store.open(header()))
+        journal.appendCue(cues.first())
+        journal.close()
+        assertTrue(journal.directory.exists(), "closing the journal destroyed the capture")
+        assertEquals(1, store.orphans().size, "the capture is on disk but no longer offered")
+    }
+
+    @Test
+    fun `discarding a closed journal is what finally removes it`() = runTest {
+        val store = store()
+        val journal = requireNotNull(store.open(header()))
+        journal.appendCue(cues.first())
+        journal.close()
+        journal.discard()
+        assertTrue(!journal.directory.exists(), "the stored set left its capture behind")
+        assertEquals(emptyList(), store.orphans())
+    }
+
+    // ---- the count no stream can rebuild ------------------------------------
+
+    /**
+     * The rep count is the one thing in the window no reprocessing can recover.
+     *
+     * The sensor records what the bar did; it never records what the lifter
+     * decided a rep was worth. A spoken cue is not evidence of one either --
+     * the guide says "Rep 1" on a schedule, whether or not anybody moved.
+     */
+    @Test
+    fun `a rep the lifter counted is recoverable as a mark with its own clock`() = runTest {
+        val store = store()
+        val journal = requireNotNull(store.open(header()))
+        journal.appendCue(VoiceCue(1_050L, "Rep 1"))
+        journal.appendRepMark(1_100L)
+        journal.appendRepMark(1_900L)
+        journal.sync()
+        val found = store.orphans().single()
+        assertEquals(listOf(1_100L, 1_900L), found.repMarks)
+        assertEquals(
+            listOf(VoiceCue(1_050L, "Rep 1")),
+            found.cues,
+            "a cue the app spoke was counted as a rep the lifter performed",
+        )
+    }
 }
