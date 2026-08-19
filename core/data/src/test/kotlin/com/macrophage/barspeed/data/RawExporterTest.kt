@@ -774,4 +774,127 @@ class RawExporterTest {
         RawExporter(repo, exporter, appVersion = "0.1.37", dispatcher = recording).buildZip(1L)
         assertTrue(recording.dispatched, "buildZip never dispatched through the injected dispatcher")
     }
+
+    // ---- issue #29/#90: minBpm reaches session.json through the fold -------
+
+    /**
+     * The other end of the fold, discharged directly rather than trusted by
+     * inspection: `session.json`'s `hr.minBpm`, inside the same zip whose
+     * per-set loop is what computed it, matches what that set's raw HRM
+     * stream actually supports -- proof the value crossing from buildZip's
+     * loop into SessionExporter through minBpmOverride is the right one, not
+     * only that some value arrives.
+     *
+     * The row carries no stored hrEndOfSetBpm/hrAvgBpm/hrMaxBpm, so a passing
+     * assertion also confirms the gate's fourth clause: minBpm alone is
+     * enough to publish the block.
+     */
+    @Test
+    fun `session json's minBpm is the fold's value, not a second inflate`() = runTest {
+        val entries = zipOf(listOf(row(id = 5L)), mapOf(5L to listOf(hrStream(5L))))
+        val session = Json.parseToJsonElement(entries.getValue("session.json")).jsonObject
+        val hr =
+            session.getValue("exercises").jsonArray.single().jsonObject
+                .getValue("sets").jsonArray.single().jsonObject.getValue("hr").jsonObject
+        assertEquals(setOf("minBpm"), hr.keys, "only the fold's value should be present")
+        assertEquals(120, hr.getValue("minBpm").jsonPrimitive.content.toInt())
+    }
+
+    /**
+     * A single set cannot tell "the fold supplied 120" apart from "the fold
+     * was silently skipped and SessionExporter inflated the same bytes
+     * itself and got 120 anyway" -- both paths read the same underlying
+     * stream, so they agree by construction. Two sets with two different
+     * streams can: if minBpmBySet were built with the wrong key, or the fold
+     * dropped and the fallback mis-keyed some other way, this is where it
+     * would show up as one set's figure appearing on the other's.
+     */
+    @Test
+    fun `two sets' minBpm figures are not swapped with each other`() = runTest {
+        // Two samples each, deliberately not identical: a swapped field
+        // (avgBpm read where minBpm belongs) would pass with hrStream's
+        // single-sample fixture, where min, mean and max coincide. 100/140
+        // makes min 100 and avg 120 -- different numbers -- so extracting the
+        // wrong one from HrTrust.summarize would also be caught here, not
+        // only a set's figure landing on the wrong set.
+        val hrVaried =
+            RawStreamEntity(
+                id = 3L,
+                setId = 6L,
+                kind = RawStreamEntity.KIND_HRM,
+                csvGzip =
+                Gzip.compress(
+                    HrCsv.encode(listOf(HrSample(1_000L, 100, listOf(500.0)), HrSample(2_000L, 140, listOf(500.0)))),
+                ),
+            )
+        val entries =
+            zipOf(
+                listOf(row(id = 5L, orderIdx = 0), row(id = 6L, orderIdx = 1)),
+                mapOf(5L to listOf(hrStream(5L)), 6L to listOf(hrVaried)),
+            )
+        val session = Json.parseToJsonElement(entries.getValue("session.json")).jsonObject
+        val setExports = session.getValue("exercises").jsonArray.single().jsonObject.getValue("sets").jsonArray
+        val minBpms =
+            setExports.map { it.jsonObject.getValue("hr").jsonObject.getValue("minBpm").jsonPrimitive.content.toInt() }
+        assertEquals(listOf(120, 100), minBpms, "each set's minBpm should be its own trusted minimum")
+    }
+
+    /**
+     * The fold path's own version of the pin `04b9b79` put on the standalone
+     * path: `buildZip`'s loop folds the HRM stream's minimum into
+     * `minBpmBySet` as it inflates each set's streams once, and a
+     * `rest_before_hrm` stream sitting in the same list must not be the one
+     * that lands there. The two kind strings are not merely different --
+     * `"rest_before_hrm"` ends in `"hrm"`, so a match written as `contains`
+     * or `endsWith` instead of `==` would pass this exact fixture.
+     *
+     * The impostor is listed LAST, not first. The fold has no `firstOrNull`
+     * to fool by position -- it is a straight per-stream map write, so
+     * whichever matching stream is processed last is the one that survives
+     * in `minBpmBySet`. Putting the real HRM stream first and the impostor
+     * last is the ordering that actually exercises a loosened match: with
+     * the impostor first this fixture would still read 120 by coincidence,
+     * because the real stream, processed second, would overwrite it even
+     * under a broadened match -- proving nothing about the match itself.
+     */
+    @Test
+    fun `a rest window stream does not reach the fold's minBpm`() = runTest {
+        val restSamples = listOf(HrSample(1_000L, 44, listOf(1_350.0)), HrSample(2_000L, 47, listOf(1_270.0)))
+        val entries =
+            zipOf(
+                listOf(row(id = 5L)),
+                mapOf(5L to listOf(hrStream(5L), restStream(5L, restSamples))),
+            )
+        val session = Json.parseToJsonElement(entries.getValue("session.json")).jsonObject
+        val hr =
+            session.getValue("exercises").jsonArray.single().jsonObject
+                .getValue("sets").jsonArray.single().jsonObject.getValue("hr").jsonObject
+        assertEquals(
+            120,
+            hr.getValue("minBpm").jsonPrimitive.content.toInt(),
+            "a rest-window stream reached the fold's minBpm",
+        )
+    }
+
+    /**
+     * And with no HRM stream in the set at all, a lone `rest_before_hrm`
+     * stream does not stand in for one: `minBpmBySet` stays null for that
+     * set (never populated, since the fold's `when` never matches
+     * `KIND_REST_BEFORE_HRM`), and with every other hr column also unset the
+     * gate publishes no `hr` block rather than one built from the wrong
+     * stream.
+     */
+    @Test
+    fun `a rest window stream alone does not substitute for a missing HRM stream in the fold`() = runTest {
+        val restSamples = listOf(HrSample(1_000L, 44, listOf(1_350.0)))
+        val entries =
+            zipOf(
+                listOf(row(id = 5L)),
+                mapOf(5L to listOf(restStream(5L, restSamples))),
+            )
+        val session = Json.parseToJsonElement(entries.getValue("session.json")).jsonObject
+        val setExport =
+            session.getValue("exercises").jsonArray.single().jsonObject.getValue("sets").jsonArray.single().jsonObject
+        assertTrue("hr" !in setExport.keys, "a rest-window stream alone produced an hr block")
+    }
 }

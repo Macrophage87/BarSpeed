@@ -54,7 +54,24 @@ class SessionExporter(
         },
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    suspend fun buildExport(sessionId: Long, includeRepDetail: Boolean): SessionExport? = withContext(dispatcher) {
+    /**
+     * [minBpmOverride] is the fold for issue #29's double decompression, not
+     * a general-purpose cache: when a set's id is a key in this map, its
+     * value -- possibly null, meaning computed and nothing was trusted -- is
+     * used as-is instead of this class inflating that set's own HRM stream
+     * itself. [RawExporter] is the only caller that supplies it, because it
+     * has already inflated that same stream once to write the zip's raw CSV
+     * entry, and a second inflate here would buy nothing. The standalone
+     * `exportJson`/`buildExport` path -- summary and detailed JSON shared
+     * from the session-detail screen, with no zip involved -- passes none,
+     * and every set falls back to inflating its own stream, unchanged from
+     * before this parameter existed.
+     */
+    suspend fun buildExport(
+        sessionId: Long,
+        includeRepDetail: Boolean,
+        minBpmOverride: Map<Long, Int?> = emptyMap(),
+    ): SessionExport? = withContext(dispatcher) {
         val session = sessionRepository.session(sessionId) ?: return@withContext null
         val sets = sessionRepository.sets(sessionId)
 
@@ -63,7 +80,7 @@ class SessionExporter(
             byExercise.map { (exerciseId, records) ->
                 ExerciseExport(
                     exercise = exerciseId,
-                    sets = records.map { record -> setExport(record, includeRepDetail) },
+                    sets = records.map { record -> setExport(record, includeRepDetail, minBpmOverride) },
                 )
             }
         SessionExport(
@@ -93,17 +110,28 @@ class SessionExporter(
         )
     }
 
-    suspend fun exportJson(sessionId: Long, includeRepDetail: Boolean): String? = withContext(dispatcher) {
-        buildExport(sessionId, includeRepDetail)?.let { json.encodeToString(SessionExport.serializer(), it) }
+    suspend fun exportJson(
+        sessionId: Long,
+        includeRepDetail: Boolean,
+        minBpmOverride: Map<Long, Int?> = emptyMap(),
+    ): String? = withContext(dispatcher) {
+        buildExport(sessionId, includeRepDetail, minBpmOverride)
+            ?.let { json.encodeToString(SessionExport.serializer(), it) }
     }
 
-    private suspend fun setExport(record: SetRecordEntity, includeRepDetail: Boolean): SetExport {
+    private suspend fun setExport(
+        record: SetRecordEntity,
+        includeRepDetail: Boolean,
+        minBpmOverride: Map<Long, Int?>,
+    ): SetExport {
         val analysis = sessionRepository.decodeAnalysis(record)
         val reps = analysis?.reps.orEmpty()
-        // Fetched unconditionally now, not only when includeRepDetail: minBpm
-        // below needs this set's raw streams every time, and detailed export
-        // already paid for this call, so hoisting it here saves the DAO a
-        // second round trip on that path rather than costing one on the other.
+        // Cues are still fetched here even when RawExporter already fetched
+        // this same set's streams for the zip entries -- named, not fixed:
+        // RawExporter's own inflate is for the raw CSV text, this one for
+        // parsed VoiceCue objects, and threading that through too was judged
+        // more machinery than issue #29 asked for. minBpm is the one this
+        // issue named, and that one no longer inflates a second time.
         val streams = sessionRepository.rawStreams(record.id)
         val voiceCues =
             if (includeRepDetail) {
@@ -113,7 +141,7 @@ class SessionExporter(
             } else {
                 null
             }
-        val minBpm = minBpm(streams)
+        val minBpm = if (record.id in minBpmOverride) minBpmOverride.getValue(record.id) else minBpm(streams)
         return SetExport(
             loadKg = record.loadKg,
             loadLb = Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0,
@@ -226,17 +254,14 @@ class SessionExporter(
      * gate cannot assume this figure and its three siblings move together,
      * because they are answered by two different clocks.
      *
-     * Decompresses and parses the stream unconditionally -- a new per-set
-     * cost on a function neither caller in SessionDetailViewModel wraps off
-     * the main thread (issue #29). Small next to the IMU decode
-     * RawExporter.imuSamples already does there -- a real per-set HRM
-     * stream gzips to a few hundred bytes against a 100 Hz IMU stream's tens
-     * of thousands -- but real, and issue #29 carries the measurement rather
-     * than this comment repeating it.
-     *
-     * A malformed or absent stream yields null rather than failing the
-     * export, the same shape [RawExporter.imuSamples] already uses for the
-     * IMU side.
+     * Reached only when [setExport] has no [minBpmOverride] entry for this
+     * set -- the standalone `exportJson`/`buildExport` path, summary and
+     * detailed JSON with no zip involved. [RawExporter] never reaches this
+     * function: it inflates the same HRM stream once, to write the zip's raw
+     * CSV entry, and supplies the result through the override instead of
+     * asking this class to inflate it again. A malformed or absent stream
+     * yields null rather than failing the export, the same shape
+     * [RawExporter]'s IMU decode uses.
      */
     private fun minBpm(streams: List<RawStreamEntity>): Int? =
         streams.firstOrNull { it.kind == RawStreamEntity.KIND_HRM }
@@ -290,10 +315,22 @@ class RawExporter(
     private val appVersion: String,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
+    /**
+     * Issue #29's fold, in one place: each set's streams are fetched once and
+     * each stream's bytes are inflated once, here, in this loop -- not once
+     * for the raw zip entry and again for whatever structured figure needs
+     * it. The IMU decode this used to duplicate (`imuSamples`, its own
+     * separate inflate) is gone; the text this loop already holds is parsed
+     * directly. The HRM decode is folded the same way, but crosses into
+     * [SessionExporter]: `minBpm` is computed here, from the text this loop
+     * already holds, and handed to [SessionExporter.exportJson] through
+     * [SessionExporter.buildExport]'s `minBpmOverride`, rather than letting
+     * that call inflate the same stream a second time the way it did when
+     * minBpm was added for issue #90.
+     */
     suspend fun buildZip(sessionId: Long): ByteArray? = withContext(dispatcher) {
         val session = sessionRepository.session(sessionId) ?: return@withContext null
         val sets = sessionRepository.sets(sessionId)
-        val sessionJson = sessionExporter.exportJson(sessionId, includeRepDetail = true)
         val out = ByteArrayOutputStream()
         val meta = StringBuilder()
         meta.append("{\n  \"epoch\": \"${Instant.ofEpochMilli(session.startedAtMs)}\",\n")
@@ -318,26 +355,39 @@ class RawExporter(
 
         ZipOutputStream(out).use { zip ->
             val setLines = mutableListOf<String>()
+            // Every set gets an entry, even null, so setExport's `record.id in
+            // minBpmOverride` check (rather than a value-nullity check) can tell
+            // "computed here, nothing trusted" apart from "not computed here".
+            val minBpmBySet = mutableMapOf<Long, Int?>()
             for ((idx, record) in sets.withIndex()) {
                 val streams = sessionRepository.rawStreams(record.id)
                 val files = mutableListOf<String>()
+                var imuText: String? = null
                 for (stream in streams) {
                     val name = "set%02d_%s_%s.csv".format(idx + 1, record.exerciseId, stream.kind)
+                    val text = Gzip.decompress(stream.csvGzip)
                     zip.putNextEntry(ZipEntry(name))
-                    zip.write(Gzip.decompress(stream.csvGzip).toByteArray(Charsets.UTF_8))
+                    zip.write(text.toByteArray(Charsets.UTF_8))
                     zip.closeEntry()
                     files += name
+                    when (stream.kind) {
+                        RawStreamEntity.KIND_IMU -> imuText = text
+                        RawStreamEntity.KIND_HRM -> minBpmBySet[record.id] = minBpmFrom(text)
+                    }
                 }
+                if (record.id !in minBpmBySet) minBpmBySet[record.id] = null
                 // The raw zip has to stand on its own: an analysis that opens
                 // only the CSVs must still be able to tell left from right, a
                 // warm-up from a working set, and which sets were rotating
                 // enough for attitude error to matter.
-                setLines += buildSetDescriptor(idx, record, streams, files)
+                setLines += buildSetDescriptor(idx, record, streams, files, imuText)
             }
             meta.append(setLines.joinToString(",\n")).append("\n  ]\n}\n")
             zip.putNextEntry(ZipEntry("meta.json"))
             zip.write(meta.toString().toByteArray(Charsets.UTF_8))
             zip.closeEntry()
+            val sessionJson =
+                sessionExporter.exportJson(sessionId, includeRepDetail = true, minBpmOverride = minBpmBySet)
             sessionJson?.let {
                 zip.putNextEntry(ZipEntry("session.json"))
                 zip.write(it.toByteArray(Charsets.UTF_8))
@@ -347,11 +397,19 @@ class RawExporter(
         out.toByteArray()
     }
 
+    /**
+     * A malformed HRM stream yields null rather than failing the export, the
+     * same shape [imuSamples] uses for the IMU side.
+     */
+    private fun minBpmFrom(hrText: String): Int? =
+        runCatching { HrCsv.decode(hrText) }.getOrNull()?.let { HrTrust.summarize(it).minBpm }
+
     private fun buildSetDescriptor(
         idx: Int,
         record: SetRecordEntity,
         streams: List<RawStreamEntity>,
         files: List<String>,
+        imuText: String?,
     ): String {
         val fields = mutableListOf<String>()
         fun num(key: String, value: Any?) = value?.let { fields += "\"$key\": $it" }
@@ -400,10 +458,11 @@ class RawExporter(
         }
         num("startedAt_ms", record.startedAtMs)
         num("endedAt_ms", record.endedAtMs)
-        // Decoded once and shared. Two figures below are read off the same
-        // stream, and decoding it twice would gzip-inflate and parse a set's
-        // whole IMU capture a second time for no gain.
-        val samples = imuSamples(streams)
+        // Parsed from the text buildZip's own loop already inflated -- not
+        // re-inflated here, and shared with sampleRate_hz and
+        // rollExcursion_deg below besides: decoding a whole IMU capture even
+        // once more for either figure would buy nothing.
+        val samples = imuSamples(imuText)
         // Measured from the stream this key describes, not read off the row.
         //
         // What this states is the mean rate at which the rows in that file
@@ -440,17 +499,19 @@ class RawExporter(
     }
 
     /**
-     * This set's IMU capture, or null when there is nothing readable to work
-     * from -- no stream, a stream that will not decode, or a stream with no
-     * data rows.
+     * This set's IMU capture, parsed from the text [buildZip]'s own loop
+     * already inflated -- never re-inflated here -- or null when there is
+     * nothing readable to work from: no stream (so no text), text that will
+     * not decode, or a decode with no data rows.
      *
-     * The decode stays inside `runCatching`: gzip inflating is not the only way
-     * this fails. [ImuCsv.decode] parses each row and throws on a malformed
-     * one, and a manifest is not worth failing an entire export over.
+     * The decode stays inside `runCatching`: a gzip round trip is not the
+     * only way this fails. [ImuCsv.decode] parses each row and throws on a
+     * malformed one, and a manifest is not worth failing an entire export
+     * over.
      */
-    private fun imuSamples(streams: List<RawStreamEntity>): List<ImuSample>? {
-        val imu = streams.firstOrNull { it.kind == RawStreamEntity.KIND_IMU } ?: return null
-        val samples = runCatching { ImuCsv.decode(Gzip.decompress(imu.csvGzip)) }.getOrNull() ?: return null
+    private fun imuSamples(imuText: String?): List<ImuSample>? {
+        if (imuText == null) return null
+        val samples = runCatching { ImuCsv.decode(imuText) }.getOrNull() ?: return null
         return samples.ifEmpty { null }
     }
 
