@@ -178,11 +178,34 @@ object SetAnalyzer {
         // Bar power P = m(g + a)v over the drive. Only defensible when the drive
         // lifts the load against gravity — a cammed machine whose drive goes
         // down carries no such relationship, so leave power unreported there.
-        // ...and not through a cable: the sensor is on the stack, not on the
-        // load the lifter feels, so m(g+a)v is not that lifter's power.
+        //
+        // The second clause excludes SIGN-INVERTED setups, not cable ones. An
+        // earlier comment here said it kept power off cable machines; it does
+        // not, and a low pulley with sensorInverted = false has always passed
+        // it. Whether a stack-mounted setup should publish power at all is
+        // issue 116; on the conservation argument below it now can.
         val effectiveLoad = loadKg?.takeIf { it > 0 && direction.concentricUp && !direction.sensorInverted }
+        // The series was mapped into the LIFTER's frame at analyze(), scaling
+        // both velocity and acceleration by travelRatio. loadKg was not: it is
+        // the mass on the stack. Multiplying them would combine the handle's
+        // motion with the stack's mass — two different bodies — and would give
+        // r*(m*g*v) + r^2*(m*a*v), inflating a 2:1 pulley's peak from 482 W to
+        // 1056 W. Issue 26.
+        //
+        // So divide the motion back to the frame the mass is in. Power is
+        // conserved across an ideal pulley — a 2:1 halves the force and doubles
+        // the travel — so this is the lifter's output measured at the stack,
+        // not a stack-only quantity. Exact, and a no-op at ratio 1.0.
+        //
+        // It ignores pulley friction, which means it slightly UNDERSTATES what
+        // the lifter produced. That is left as a known bias rather than
+        // corrected by an unmeasured constant, which would replace it with an
+        // invented one.
         val conPower = effectiveLoad?.let { load ->
-            conRange.map { i -> load * (config.gravityMps2 + series.accelMps2[i]) * v[i] }
+            val ratio = direction.travelRatio
+            conRange.map { i ->
+                load * (config.gravityMps2 + series.accelMps2[i] / ratio) * (v[i] / ratio)
+            }
         }
         val peakPower = conPower?.max()
         val meanConPower = conPower?.average()
