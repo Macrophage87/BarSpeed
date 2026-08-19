@@ -1,5 +1,8 @@
 package com.macrophage.barspeed.record
 
+import com.macrophage.barspeed.dsp.CadenceBeat
+import com.macrophage.barspeed.dsp.CadencePlan
+import com.macrophage.barspeed.dsp.GuidedCadence
 import com.macrophage.barspeed.dsp.TempoSchedule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -10,15 +13,17 @@ import kotlinx.coroutines.launch
  * Voice-guided cadence. The runner plays the tempo prescription and counts the
  * reps; the lifter just follows the voice.
  *
- * **The metronome plays exactly what the tempo string asks for.** The digits are
- * positional — down, bottom pause, up, top pause — and each gets its prescribed
- * seconds and nothing more. The rep call is spoken at the START of the closing
- * phase rather than added after it, so it costs no time. Only when a
- * prescription leaves no gap at all between the last stroke and the next rep is
- * a one-second breath inserted, enough to say "Rep four" without the next call
- * cutting it off. An earlier version allotted a flat 3 s to everything after the
- * first stroke, which made every tempo unachievable and scored the surplus as
- * the athlete's error.
+ * What it plays comes from [CadencePlan], which is pure and lives in
+ * `:core:dsp` where a test can reach it. This class is the player: it walks the
+ * beats, sleeps a second at a time, pushes the label and countdown, and speaks.
+ * It decides no timing of its own.
+ *
+ * That split is the point. This file has no test source set, so the arithmetic
+ * that used to live here could not be asserted — and for every set the app ever
+ * paced it added a second the prescription did not ask for, which is issue 106.
+ * An earlier version allotted a flat 3 s to everything after the first stroke,
+ * which made every tempo unachievable and scored the surplus as the athlete's
+ * error.
  *
  * The order of the strokes, their prescribed seconds and the words used for
  * them all come from [TempoSchedule], which resolves the tempo digits against
@@ -27,8 +32,19 @@ import kotlinx.coroutines.launch
  */
 class GuidedCadenceRunner(
     private val scope: CoroutineScope,
-    /** Guided cadence is an audio feature: it speaks even with the count toggle off. */
-    private val speak: (String) -> Unit,
+    /**
+     * Guided cadence is an audio feature: it speaks even with the count toggle
+     * off.
+     *
+     * Two arguments, and the split is load-bearing. The first is the CUE — the
+     * phase that was called, which is what gets written to the set's cue track
+     * and is a persisted format every cue-track consumer parses. The second is
+     * the UTTERANCE actually spoken, which may carry a rep announcement along
+     * with the cue. Merging the announcement into the logged cue would rename
+     * "Down" to "Down, Rep 1" in every capture made afterwards and break every
+     * one of those consumers.
+     */
+    private val speak: (cue: String, utterance: String) -> Unit,
     /** Pushes the on-screen phase label + countdown (label, remaining, total). */
     private val update: (String, Int, Int) -> Unit,
     /** Called each time a full rep cycle completes, with the running count. */
@@ -45,33 +61,32 @@ class GuidedCadenceRunner(
     fun start(schedule: TempoSchedule, plannedReps: Int?) {
         job =
             scope.launch {
-                speak("Ready")
-                countdownPhase("GET READY", GUIDED_LEAD_IN_S)
-                val firstS = (schedule.first.seconds ?: 1.0).toInt().coerceAtLeast(1)
-                val secondS = (schedule.second.seconds ?: 1.0).toInt().coerceAtLeast(1)
-                val firstPause = schedule.pauseAfterFirstS.toInt()
-                // Something has to carry the rep call; borrow the closing pause
-                // when the prescription provides one, otherwise add a single second.
-                val closing = maxOf(schedule.pauseAfterSecondS.toInt(), GUIDED_REP_CALL_S)
+                speak("Ready", "Ready")
+                countdownPhase("GET READY", GuidedCadence.LEAD_IN_S)
+                val plan = CadencePlan.of(schedule)
                 var rep = 1
+                var pending: String? = null
                 while (true) {
-                    stroke(schedule.first.label, firstS)
-                    pause(firstPause)
-                    stroke(schedule.second.label, secondS)
-                    onRepCounted(rep)
-                    val done = plannedReps != null && rep >= plannedReps
-                    when {
-                        done -> speak("Done")
-                        plannedReps != null && rep == plannedReps - 1 -> speak("Last rep")
-                        else -> speak("Rep $rep")
+                    for ((index, beat) in plan.beats.withIndex()) {
+                        val announcement = pending?.takeIf { index == plan.announceOnBeat }
+                        if (announcement != null) pending = null
+                        play(beat, announcement)
+                        if (index != plan.repCompleteAfterBeat) continue
+                        onRepCounted(rep)
+                        if (plannedReps != null && rep >= plannedReps) {
+                            speak("Done", "Done")
+                            update("DONE", 0, 1)
+                            onFinished()
+                            return@launch
+                        }
+                        pending =
+                            when {
+                                plan.announceOnBeat == null -> null
+                                plannedReps != null && rep == plannedReps - 1 -> "Last rep"
+                                else -> "Rep $rep"
+                            }
+                        rep++
                     }
-                    if (done) {
-                        update("DONE", 0, 1)
-                        onFinished()
-                        return@launch
-                    }
-                    countdownPhase("BREATHE", closing)
-                    rep++
                 }
             }
     }
@@ -81,25 +96,38 @@ class GuidedCadenceRunner(
         job = null
     }
 
-    private suspend fun pause(seconds: Int) {
-        if (seconds <= 0) return
-        speak("Hold")
-        countdownPhase("HOLD", seconds)
-    }
-
     /**
-     * One movement stroke. Strokes long enough to lose your place in are counted
-     * out loud ("Down, one, two, three"); a one-second drive just gets its call.
+     * Play one beat, optionally opening with a rep announcement.
+     *
+     * The announcement is merged into the beat's own call rather than spoken
+     * separately: TTS runs with QUEUE_FLUSH, so a second utterance a moment
+     * later would cancel the first. Strokes long enough to lose your place in
+     * are counted out loud ("Down, one, two, three"); a one-second drive just
+     * gets its call.
      */
-    private suspend fun stroke(label: String, seconds: Int) {
-        speak(label.lowercase().replaceFirstChar { it.uppercase() })
-        update(label, seconds, seconds)
-        val countAloud = seconds >= COUNT_ALOUD_FROM_S
-        for (second in 1..seconds) {
+    private suspend fun play(beat: CadenceBeat, announcement: String?) {
+        // The announcement rides the utterance, never the cue.
+        val cue = beat.spokenLabel
+        if (cue != null) {
+            speak(cue, if (announcement != null) "$cue, $announcement" else cue)
+        } else if (announcement != null) {
+            speak(announcement, announcement)
+        }
+        if (!beat.isStroke) {
+            countdownPhase(beat.label, beat.seconds)
+            return
+        }
+        update(beat.label, beat.seconds, beat.seconds)
+        val countAloud = beat.seconds >= GuidedCadence.COUNT_ALOUD_FROM_S
+        for (second in 1..beat.seconds) {
             delay(1_000)
-            if (second < seconds) {
-                if (countAloud) speak("$second")
-                update(label, seconds - second, seconds)
+            if (second < beat.seconds) {
+                // Only give up the count when an announcement actually took
+                // its place: rep 1 has none pending, and a one-rep set never
+                // has one at all.
+                val gaveUpCount = beat.suppressFirstCount && announcement != null && second == 1
+                if (countAloud && !gaveUpCount) speak("$second", "$second")
+                update(beat.label, beat.seconds - second, beat.seconds)
             }
         }
     }
@@ -113,12 +141,7 @@ class GuidedCadenceRunner(
     }
 
     companion object {
-        const val GUIDED_LEAD_IN_S = 5
-
-        /** Seconds borrowed from (not added to) the closing pause for the rep call. */
-        const val GUIDED_REP_CALL_S = 1
-
-        /** Strokes at least this long get counted out loud second by second. */
-        const val COUNT_ALOUD_FROM_S = 2
+        /** Retained for callers; the cadence constants live in [GuidedCadence]. */
+        const val GUIDED_LEAD_IN_S = GuidedCadence.LEAD_IN_S
     }
 }

@@ -33,6 +33,13 @@ data class TempoSchedule(
 
     val concentricS: Double? get() = if (first.isConcentric) first.seconds else second.seconds
 
+    /**
+     * Seconds one rep is prescribed to take: both strokes and both pauses. An
+     * explosive stroke has no prescribed seconds and contributes none.
+     */
+    val prescribedCycleS: Double
+        get() = (first.seconds ?: 0.0) + pauseAfterFirstS + (second.seconds ?: 0.0) + pauseAfterSecondS
+
     companion object {
         fun of(tempo: Tempo, direction: LiftDirection): TempoSchedule {
             val horizontal = direction.plane == MovementPlane.HORIZONTAL

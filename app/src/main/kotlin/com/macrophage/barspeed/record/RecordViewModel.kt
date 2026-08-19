@@ -925,12 +925,20 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             ).also { it.start(schedule, plannedReps) }
     }
 
-    /** Speak an in-set cue and log it on the sample clock (see VoiceCue). */
-    private fun speakCue(text: String) {
-        val cue = VoiceCue(System.currentTimeMillis(), text)
+    /**
+     * Speak an in-set cue and log it on the sample clock (see VoiceCue).
+     *
+     * [cueText] is what goes on the record: the phase that was called. It is a
+     * persisted format -- every cue-track fixture and parser matches these
+     * strings exactly -- so it must not pick up whatever else the voice happens
+     * to say at the same moment. [utterance] is what is spoken, and may carry a
+     * rep announcement alongside the cue.
+     */
+    private fun speakCue(cueText: String, utterance: String = cueText) {
+        val cue = VoiceCue(System.currentTimeMillis(), cueText)
         cueBuffer += cue
         journal?.appendCue(cue)
-        voice?.speak(text)
+        voice?.speak(utterance)
     }
 
     /** Tap-to-count for sensorless sets; announces milestones like sensor reps. */
