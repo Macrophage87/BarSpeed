@@ -106,7 +106,7 @@ class LiveCapCalibrationTest {
      * every capture and has been mutation-checked.
      */
     private fun liveRuns(samples: List<ImuSample>, d: LiftDirection, c: DspConfig): List<LiveRun> {
-        val tracker = StreamingSetTracker(d.startsWith, c, velocityScale = d.sensorToLifter)
+        val tracker = StreamingSetTracker.forLift(d, c)
         val dt = 1.0 / VelocityEstimator.measureSampleRate(
             samples.size,
             (samples.last().timestampMs - samples.first().timestampMs) / 1000.0,
@@ -146,7 +146,7 @@ class LiveCapCalibrationTest {
         runs.filter { qualifies(it, c) }.forEach { r ->
             val overCap = r.displacementM > c.maxRunDisplacementM
             if (mode == 2 && overCap) return@forEach
-            val concentric = r.type == 1
+            val concentric = (r.type == 1) == d.driveIsPositive
             if (d.startsWith == StartPhase.ECCENTRIC) {
                 if (!concentric) {
                     pending = true
@@ -191,10 +191,10 @@ class LiveCapCalibrationTest {
                 largestRemovedM = maxOf(largestRemovedM, it.displacementM)
             }
         }
-        assertEquals(9, removed, "counted reps the bound removes")
+        assertEquals(7, removed, "counted reps the bound removes")
         // Every one, not most. The smallest is 3.3x its own set median, which no
         // reference error of at most 1.65x can explain away.
-        assertEquals(9, removedOutOfFamily, "of those, how many are out of family with their own set")
+        assertEquals(7, removedOutOfFamily, "of those, how many are out of family with their own set")
         assertEquals(3.3, smallestRemovedRatio, 0.05, "the least extreme removal, as a multiple of its set median")
         assertEquals(20.376, largestRemovedM, 5e-3, "the largest removal, metres")
     }
@@ -212,8 +212,8 @@ class LiveCapCalibrationTest {
             inFamilyToday += countedReps(runs, d, c, 0).count { !outOfFamily(it, ref) }
             inFamilyCapped += countedReps(runs, d, c, 1).count { !outOfFamily(it, ref) }
         }
-        assertEquals(61, inFamilyToday, "in-family counted reps today")
-        assertEquals(61, inFamilyCapped, "in-family counted reps with the bound applied")
+        assertEquals(63, inFamilyToday, "in-family counted reps today")
+        assertEquals(63, inFamilyCapped, "in-family counted reps with the bound applied")
     }
 
     @Test

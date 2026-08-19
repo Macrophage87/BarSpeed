@@ -141,7 +141,7 @@ class LiveUnderCountAttributionTest {
      * each red it.
      */
     private fun liveRuns(samples: List<ImuSample>, d: LiftDirection, c: DspConfig): Pair<List<LiveRun>, Int> {
-        val tracker = StreamingSetTracker(d.startsWith, c, velocityScale = d.sensorToLifter)
+        val tracker = StreamingSetTracker.forLift(d, c)
         val dt = 1.0 / VelocityEstimator.measureSampleRate(
             samples.size,
             (samples.last().timestampMs - samples.first().timestampMs) / 1000.0,
@@ -186,7 +186,7 @@ class LiveUnderCountAttributionTest {
         var reps = 0
         var armingDrops = 0
         runs.filter { qualifies(it, c) && it.displacementM <= c.maxRunDisplacementM }.forEach { r ->
-            val concentric = r.type == 1
+            val concentric = (r.type == 1) == d.driveIsPositive
             if (d.startsWith == StartPhase.ECCENTRIC) {
                 if (!concentric) {
                     pending = true
@@ -231,12 +231,12 @@ class LiveUnderCountAttributionTest {
         // 90, not the 88 issue 94 states. Its own table sums to 90; the total
         // row was added up wrong, and the counts are identical at the SHA that
         // issue names.
-        assertEquals(81, live, "reps the live counter reports")
+        assertEquals(74, live, "reps the live counter reports")
         // 98, not the 111 issue 94 states, and the same arithmetic slip. Batch
         // matching the performed total exactly was never true.
         assertEquals(98, batch, "reps the batch analyzer reports")
-        assertEquals(32, absoluteError, "absolute live error")
-        assertEquals(30, performed - live, "net live deficit")
+        assertEquals(39, absoluteError, "absolute live error")
+        assertEquals(37, performed - live, "net live deficit")
     }
 
     @Test
@@ -263,7 +263,7 @@ class LiveUnderCountAttributionTest {
         }
         assertEquals(14, eccPerformed - eccLive, "net deficit on eccentric-first captures")
         assertEquals(5, eccArmingDrops, "drives discarded for want of a qualified eccentric before them")
-        assertEquals(16, conPerformed - conLive, "net deficit on concentric-first captures")
+        assertEquals(23, conPerformed - conLive, "net deficit on concentric-first captures")
         // Zero by construction rather than by luck: the concentric-first branch
         // of onQualifiedRun has no arming state that can be missing.
         assertEquals(0, conArmingDrops, "arming drops on concentric-first captures")

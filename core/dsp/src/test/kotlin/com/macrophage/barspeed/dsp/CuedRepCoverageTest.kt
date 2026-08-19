@@ -16,9 +16,9 @@ import kotlin.test.assertTrue
  *
  * The plan was a metric separating real counted reps from artefact counted reps
  * by displacement, judged against a reference. It is not built, because there
- * is almost nothing left to separate: of 44 counted reps across the seven
- * cue-tracked captures, 43 fall inside a rep the metronome called. Issue 86
- * removed the artefact population it was designed for -- nine reps built from
+ * is nothing left to separate: of 37 counted reps across the seven cue-tracked
+ * captures, ALL 37 fall inside a rep the metronome called. Issue 86 removed
+ * most of the artefact population it was designed for -- seven reps built from
  * runs of 3.3x to 27x their set median -- and a bound fitted to the one
  * survivor would be fitted to noise.
  *
@@ -112,7 +112,7 @@ class CuedRepCoverageTest {
      */
     private fun countedReps(fixture: String, d: LiftDirection, c: DspConfig): List<CountedRep> {
         val samples = load(fixture)
-        val tracker = StreamingSetTracker(d.startsWith, c, velocityScale = d.sensorToLifter)
+        val tracker = StreamingSetTracker.forLift(d, c)
         val dt = 1.0 / VelocityEstimator.measureSampleRate(
             samples.size,
             (samples.last().timestampMs - samples.first().timestampMs) / 1000.0,
@@ -137,7 +137,7 @@ class CuedRepCoverageTest {
                 val qualified = displacement >= c.minRomM && durationS >= c.minPhaseS &&
                     displacement <= c.maxRunDisplacementM
                 if (qualified) {
-                    val concentric = type == 1
+                    val concentric = (type == 1) == d.driveIsPositive
                     if (d.startsWith == StartPhase.ECCENTRIC) {
                         if (!concentric) {
                             pending = true
@@ -184,7 +184,7 @@ class CuedRepCoverageTest {
         // like.
         val c = DspConfig()
         cueTracked.forEach { (fixture, d, _) ->
-            val tracker = StreamingSetTracker(d.startsWith, c, velocityScale = d.sensorToLifter)
+            val tracker = StreamingSetTracker.forLift(d, c)
             var last = LiveSetState()
             load(fixture).forEach { last = tracker.feed(it) }
             assertEquals(last.repCount, countedReps(fixture, d, c).size, "$fixture: rebuilt against shipped")
@@ -202,24 +202,26 @@ class CuedRepCoverageTest {
             counted += reps.size
             called += reps.size - uncalled(fixture, d, c, tol).size
         }
-        assertEquals(44, counted, "counted reps across the seven cue-tracked captures")
-        assertEquals(43, called, "of those, reps landing inside a cued rep window")
+        assertEquals(37, counted, "counted reps across the seven cue-tracked captures")
+        assertEquals(37, called, "of those, reps landing inside a cued rep window")
     }
 
     @Test
-    fun `the one counted rep nobody called is small and late`() {
-        // The entire artefact population where truth exists. 0.125 m over 1.08 s,
-        // arriving 1.6 s after the last window closes on a set whose smallest
-        // called rep is 0.334 m. One example is not a population, which is why
-        // no bound is fitted to it.
+    fun `no counted rep is one nobody called`() {
+        // There is no artefact population left where truth exists. Every rep
+        // the counter reports lands inside a rep the metronome called.
+        //
+        // There used to be exactly one -- 0.125 m over 1.08 s on
+        // field-legcurl-1030-12rep-c, arriving after the last window closed --
+        // and issue 102 removed it along with the other reps that were being
+        // taken off the return stroke. It is recorded here because a count of
+        // zero says nothing about what it replaced.
         val c = DspConfig()
         val tol = CueTrack.WINDOW_TOLERANCE_MS.toLong()
         val strays = cueTracked.flatMap { (fixture, d, _) ->
             uncalled(fixture, d, c, tol).map { fixture to it }
         }
-        assertEquals(1, strays.size, "counted reps outside every cued window")
-        assertEquals("field-legcurl-1030-12rep-c", strays.single().first)
-        assertEquals(0.125, strays.single().second.displacementM, 5e-3, "its displacement, metres")
+        assertEquals(0, strays.size, "counted reps outside every cued window")
     }
 
     @Test
@@ -249,9 +251,10 @@ class CuedRepCoverageTest {
     }
 
     @Test
-    fun `the batch reference calls fourteen of fifteen real reps out of family`() {
+    fun `every rep the batch reference rejects is one the metronome called`() {
         // Why no metric is built on that reference, measured rather than
-        // suspected. "Out of family" is LiveCapCalibrationTest's own rule --
+        // suspected: it rejects six counted reps and the metronome called all
+        // six of them. "Out of family" is LiveCapCalibrationTest's own rule --
         // more than twice, or less than a third of, the set's BATCH median rep
         // ROM -- applied to the captures where the metronome says what happened.
         val c = DspConfig()
@@ -278,10 +281,10 @@ class CuedRepCoverageTest {
                 }
             }
         }
-        assertEquals(15, outOfFamily, "counted reps the batch reference rejects")
-        assertEquals(14, outOfFamilyCalled, "of those, reps the metronome actually called")
-        assertEquals(29, inFamily, "counted reps the batch reference accepts")
-        assertEquals(29, inFamilyCalled, "of those, reps the metronome actually called")
+        assertEquals(6, outOfFamily, "counted reps the batch reference rejects")
+        assertEquals(6, outOfFamilyCalled, "of those, reps the metronome actually called")
+        assertEquals(31, inFamily, "counted reps the batch reference accepts")
+        assertEquals(31, inFamilyCalled, "of those, reps the metronome actually called")
     }
 
     @Test
@@ -306,8 +309,8 @@ class CuedRepCoverageTest {
                 if (!out) inFamily++
             }
         }
-        val corpusCounted = 81
-        val corpusInFamily = 61
+        val corpusCounted = 74
+        val corpusInFamily = 63
         assertEquals(37, corpusCounted - counted, "counted reps on captures with no cue track")
         assertEquals(32, corpusInFamily - inFamily, "of those, in family by the batch reference")
         assertEquals(
@@ -338,16 +341,18 @@ class CuedRepCoverageTest {
             }
         }
         assertEquals(64, cued, "cued reps across the seven")
-        assertEquals(28, empty, "cued reps that produced no counted rep")
+        assertEquals(27, empty, "cued reps that produced no counted rep")
         assertEquals(28, barbellCued, "cued reps on the four barbell captures")
         assertEquals(14, barbellEmpty, "of those, exactly half produced nothing")
     }
 
     @Test
-    fun `double counting inside one cued rep happens only where the drive goes down`() {
-        // Issue 102's differential. The live tracker is never told which way the
-        // drive moves, and every window holding two counted reps is on a leg
-        // curl. Four barbell captures produce none.
+    fun `no cued rep is counted twice, on either kind of lift`() {
+        // This WAS issue 102's differential: seven windows on the leg curls held
+        // two counted reps each against none on the four barbell captures,
+        // because the tracker could not be told which way the drive moves. It
+        // can now, and the seven are gone. Kept as a regression guard, and as
+        // the record that the differential was real when it was measured.
         val c = DspConfig()
         val tol = CueTrack.WINDOW_TOLERANCE_MS.toLong()
         var legCurlDoubled = 0
@@ -356,7 +361,7 @@ class CuedRepCoverageTest {
             val doubled = hits(fixture, d, c, tol).count { it > 1 }
             if (d === legCurl) legCurlDoubled += doubled else barbellDoubled += doubled
         }
-        assertEquals(7, legCurlDoubled, "cued reps counted twice on drive-down lifts")
+        assertEquals(0, legCurlDoubled, "cued reps counted twice, since issue 102")
         assertEquals(0, barbellDoubled, "and none at all on drive-up lifts")
     }
 
@@ -368,7 +373,7 @@ class CuedRepCoverageTest {
         // makes neighbours overlap by 1200 ms and a rep near a boundary can be
         // claimed by either. That is a reason not to go there, not a finding.
         val c = DspConfig()
-        listOf(0L, 150L, 300L).forEach { tolMs ->
+        fun tally(tolMs: Long): Triple<Int, Int, Int> {
             var called = 0
             var empty = 0
             var doubled = 0
@@ -378,17 +383,22 @@ class CuedRepCoverageTest {
                 empty += h.count { it == 0 }
                 doubled += h.count { it > 1 }
             }
-            assertEquals(43, called, "reps in a window at $tolMs ms")
-            assertEquals(28, empty, "empty windows at $tolMs ms")
-            assertEquals(7, doubled, "doubled windows at $tolMs ms")
+            return Triple(called, empty, doubled)
         }
+        // The shipped tolerance and zero agree exactly.
+        assertEquals(Triple(37, 27, 0), tally(0L), "at 0 ms")
+        assertEquals(Triple(37, 27, 0), tally(CueTrack.WINDOW_TOLERANCE_MS.toLong()), "at 150 ms")
+        // 300 ms does NOT agree, and the earlier claim that it did was measured
+        // on a tracker configuration the app stopped producing at issue 102.
+        // One rep now sits close enough to a boundary that the earlier window
+        // claims it, so one window doubles and its neighbour starves. The same
+        // count of matched reps, attributed differently.
+        assertEquals(Triple(37, 28, 1), tally(300L), "at 300 ms one rep is re-attributed")
         // Why 600 ms is excluded, measured rather than argued. Windows are
         // contiguous by construction -- one cycle wide, starting one cycle
         // apart -- so any positive tolerance lets neighbours overlap, and a rep
         // in the overlap is taken by the earlier window while the later one
-        // starves. Up to 300 ms no rep moves. At 600 ms five windows stop being
-        // empty and five reps are re-attributed to a neighbour, which changes
-        // the answer without measuring anything new.
+        // starves. No rep moves at the shipped 150 ms; one moves at 300 ms.
         var called600 = 0
         var empty600 = 0
         var doubled600 = 0
@@ -398,9 +408,9 @@ class CuedRepCoverageTest {
             empty600 += h.count { it == 0 }
             doubled600 += h.count { it > 1 }
         }
-        assertEquals(43, called600, "the same reps are still matched at 600 ms")
-        assertEquals(23, empty600, "but five windows stop being empty")
-        assertEquals(2, doubled600, "and five of the seven doublings dissolve")
+        assertEquals(37, called600, "the same reps are still matched at 600 ms")
+        assertEquals(27, empty600, "and the 300 ms re-attribution happens to undo itself")
+        assertEquals(0, doubled600, "so 600 ms agrees with 150 by coincidence, not by being better")
     }
 
     @Test

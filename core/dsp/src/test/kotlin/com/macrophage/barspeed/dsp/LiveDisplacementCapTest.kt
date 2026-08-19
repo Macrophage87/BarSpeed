@@ -20,7 +20,7 @@ import kotlin.test.assertEquals
  *
  * Across the fifteen captures here the live path still produces TWELVE
  * qualified runs beyond 2.0 m, and none of them now increments the rep count.
- * NINE did before the bound was applied.
+ * SEVEN did before the bound was applied.
  *
  * The twelve split ELEVEN concentric to ONE eccentric. Of the eleven, nine
  * completed a rep and two arrived with nothing armed. So the three that never
@@ -119,7 +119,7 @@ class LiveDisplacementCapTest {
      * captures, which is how that detail was found.
      */
     private fun liveRuns(samples: List<ImuSample>, d: LiftDirection, c: DspConfig): Pair<List<LiveRun>, Int> {
-        val tracker = StreamingSetTracker(d.startsWith, c, velocityScale = d.sensorToLifter)
+        val tracker = StreamingSetTracker.forLift(d, c)
         val dt = 1.0 / VelocityEstimator.measureSampleRate(
             samples.size,
             (samples.last().timestampMs - samples.first().timestampMs) / 1000.0,
@@ -170,7 +170,7 @@ class LiveDisplacementCapTest {
         var fromOverCap = 0
         runs.filter { qualifies(it, c) && (!capped || it.displacementM <= c.maxRunDisplacementM) }.forEach { r ->
             val overCap = r.displacementM > c.maxRunDisplacementM
-            val concentric = r.type == 1
+            val concentric = (r.type == 1) == d.driveIsPositive
             if (d.startsWith == StartPhase.ECCENTRIC) {
                 if (!concentric) {
                     pending = true
@@ -198,7 +198,7 @@ class LiveDisplacementCapTest {
         var unarmed = 0
         runs.filter { qualifies(it, c) }.forEach { r ->
             val over = r.displacementM > c.maxRunDisplacementM
-            val concentric = r.type == 1
+            val concentric = (r.type == 1) == d.driveIsPositive
             if (over) if (concentric) con++ else ecc++
             if (d.startsWith == StartPhase.ECCENTRIC) {
                 if (!concentric) {
@@ -235,7 +235,7 @@ class LiveDisplacementCapTest {
     }
 
     @Test
-    fun `census of what the bound would remove - nine reps from twelve runs`() {
+    fun `census of what the bound would remove - seven reps from twelve runs`() {
         val c = DspConfig()
         var overCapRuns = 0
         var repsFromOverCap = 0
@@ -256,7 +256,7 @@ class LiveDisplacementCapTest {
         // The runs are still there. The bound does not stop them forming, it
         // stops them being counted, which is the whole of the change.
         assertEquals(12, overCapRuns, "qualified live runs beyond maxRunDisplacementM")
-        // NINE, not twelve. The twelve are eleven concentric and one eccentric;
+        // SEVEN, not twelve. The twelve are nine drives and three returns;
         // of the eleven, two arrive with nothing armed, so three never reach a
         // counter whatever this bound does. Earlier figures of twelve and of
         // eight were reported against this defect; both measured something real
@@ -272,7 +272,7 @@ class LiveDisplacementCapTest {
         // `the rebuilt live runs reproduce the rep count of the tracker` is the
         // test that discriminates, by tying the bounded replay to the shipped
         // counter. Between the two, these nine no longer become reps.
-        assertEquals(9, repsFromOverCap, "live reps whose completing run was over the cap")
+        assertEquals(7, repsFromOverCap, "live reps whose completing run was over the cap")
         // The decomposition itself, pinned rather than left in prose: it was
         // reported wrong once, as "three eccentrics", and prose is not checkable.
         var con = 0
@@ -285,9 +285,9 @@ class LiveDisplacementCapTest {
             ecc += b
             unarmed += u
         }
-        assertEquals(11, con, "over-cap runs that are concentric")
-        assertEquals(1, ecc, "over-cap runs that are eccentric")
-        assertEquals(2, unarmed, "over-cap concentrics arriving with nothing armed")
+        assertEquals(9, con, "over-cap runs that are the drive")
+        assertEquals(3, ecc, "over-cap runs that are the return")
+        assertEquals(2, unarmed, "over-cap drives arriving with nothing armed")
         assertEquals(con + ecc, overCapRuns, "the split must account for every over-cap run")
         assertEquals(32.558, worstM, 5e-3, "worst over-cap run, metres")
         assertEquals(24.31, worstS, 5e-3, "worst over-cap run, seconds")
