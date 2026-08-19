@@ -5,6 +5,7 @@ import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 /** Metrics for one segmented rep. Durations in seconds, velocities in m/s. */
 @Serializable
@@ -320,6 +321,38 @@ object SetAnalyzer {
     private fun ratioOf(ecc: Double?, con: Double?): Double? {
         if (ecc == null || con == null || con <= 0.0) return null
         return round2(ecc / con)
+    }
+
+    /**
+     * How far the reps of one set disagree with each other about range of
+     * motion, as a percentage of the mean, or null when the set cannot say.
+     *
+     * A machine has ONE travel and a lifter range of motion varies a little,
+     * so a large spread is a statement about the measurement rather than about
+     * the lifter. Published beside meanRom_m so a consumer can see how much the
+     * mean is worth; see issue 74, of which it is the readable half.
+     *
+     * NULL below two reps, never 0.0 and never 100.0. Dispersion over a single
+     * rep is undefined, and rendering an undefined figure as a number is the
+     * defect this repo keeps re-learning.
+     *
+     * Population rather than sample deviation: the reps of the set ARE the
+     * population, and there is no wider one being estimated.
+     *
+     * WHAT IT CANNOT TELL YOU. It cannot separate a segmenter that mismeasured
+     * a good set from a lifter whose range genuinely varied, and no capture in
+     * this corpus can settle that -- the only machine here with an
+     * independently known travel is the leg curl rail. A large value says the
+     * derived channels rest on displacements that disagree; it does not say
+     * which rep is wrong.
+     */
+    fun romSpreadPct(reps: List<RepAnalysis>): Double? {
+        if (reps.size < 2) return null
+        val roms = reps.map { it.romM }
+        val mean = roms.average()
+        if (mean <= 0.0) return null
+        val variance = roms.sumOf { (it - mean) * (it - mean) } / roms.size
+        return round1(sqrt(variance) / mean * 100.0)
     }
 
     private fun round1(x: Double) = Math.round(x * 10.0) / 10.0
