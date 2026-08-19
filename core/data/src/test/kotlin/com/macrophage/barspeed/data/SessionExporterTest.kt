@@ -654,6 +654,33 @@ class SessionExporterTest {
         assertEquals(raw, summary.peakConVelMps)
     }
 
+    /**
+     * EVERY field the summary block publishes, for one fixed input.
+     *
+     * This exists so that "purely additive" can be MEASURED rather than
+     * asserted. Every version-log entry in this repo that claims a change is
+     * additive claims it in prose; the schema contract checks the version enum
+     * and the example, and nothing checks that the existing values survived. A
+     * commit that adds a key to this block has to leave all seven of these
+     * untouched, and if it does not, this fails and says which one moved.
+     *
+     * Named field by field rather than compared against a constructed object,
+     * because an object comparison would follow a default change silently --
+     * the same reason the required-keys pin below is not derived from Kotlin
+     * nullability.
+     */
+    @Test
+    fun `every existing summary figure, so an additive change can be shown to be additive`() = runTest {
+        val summary = setOf(analysis(3), actualReps = 3, repsManual = false, includeRepDetail = true).summary
+        assertEquals(0.55, summary.meanConVelMps, "mean concentric velocity")
+        assertEquals(0.9, summary.peakConVelMps, "peak concentric velocity")
+        assertEquals(2.0, summary.meanEccS, "mean eccentric seconds")
+        assertEquals(1.0, summary.meanConS, "mean concentric seconds")
+        assertEquals(0.5, summary.meanRomM, "mean range of motion")
+        assertEquals(800.0, summary.peakPowerW, "peak power")
+        assertEquals(500.0, summary.meanConPowerW, "mean concentric power")
+    }
+
     // ---- the coverage flag as it stands ------------------------------------
 
     /**
