@@ -35,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +49,7 @@ import androidx.navigation.NavController
 import com.macrophage.barspeed.dsp.CoachingRules
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.model.BlePermissionStep
+import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
 import com.macrophage.barspeed.model.ExitPrompt
@@ -56,6 +58,8 @@ import com.macrophage.barspeed.model.PlateMath
 import com.macrophage.barspeed.model.RecordExitPolicy
 import com.macrophage.barspeed.model.RestControl
 import com.macrophage.barspeed.model.RestControlPolicy
+import com.macrophage.barspeed.model.SensorAdvice
+import com.macrophage.barspeed.model.SensorAdvicePolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.Stage
@@ -152,8 +156,8 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(end = 16.dp),
                     ) {
-                        SensorDot("IMU", state.imuConnected || state.demoMode, connecting = state.imuConnecting)
-                        SensorDot("HRM", state.hrmConnected, connecting = state.hrmConnecting)
+                        SensorDot("IMU", state.imuState, demoActive = state.demoMode)
+                        SensorDot("HRM", state.hrmState)
                     }
                 },
             )
@@ -334,19 +338,49 @@ private fun exitColor(action: ExitAction): Color = when (action) {
 private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
     if (!state.imuConnected) {
         // The permission banner replaces this card's advice rather than sitting
-        // beside it. "Pair or power on the WitMotion sensor" names the two
-        // causes it cannot be when the permission is the cause, and a lifter
-        // who follows it changes a battery that was never flat. The demo chip
-        // below is a sibling in this Column and stays either way: it is the
-        // only demo toggle on this screen.
+        // beside it. The demo chip below is a sibling in this Column and stays
+        // either way: it is the only demo toggle on this screen.
         val permissionHeld by LocalBlePermissionUi.current.step.collectAsState()
+        // Latched, not read straight from state.imuState: AutoConnectManager's
+        // else branch retries immediately after every Failed -- calls
+        // connect(), which sets Connecting, before any backoff delay runs --
+        // so a direct read would flip this text back to the generic advice on
+        // every single retry.
+        //
+        // rememberSaveable, not remember: the sensor's own state has not
+        // changed across a rotation or a transient process death, so the
+        // advice earned before the recreation still applies, and this is
+        // deliberately kept rather than reset by either. It does not survive
+        // leaving this `if` block -- state.stage moving past SETUP, or
+        // navigating away from Record -- which discards it the same way any
+        // composable's local state is discarded; the next time this block is
+        // entered it reinitializes from whatever state.imuState holds then.
+        //
+        // The effect only reacts to Failed, deliberately: imuConnected and
+        // imuState are written from the same source in the same
+        // RecordState.copy(), so the instant imuState becomes Connected this
+        // whole block -- rememberSaveable included -- has already left
+        // composition, one recomposition before a Connected arm here could
+        // run. What resets imuAdvice on a real connect is the block being
+        // gone, not this effect.
+        //
+        // Exposure this trades for: once latched to UNRESPONSIVE it stays
+        // UNRESPONSIVE across Connecting and Disconnected, clearing only on a
+        // Failed with linkEstablished = false or on leaving this block. A
+        // sensor that answered and then went flat mid-session reports
+        // Disconnected, and this still reads "the sensor answered and then
+        // stopped responding" instead of naming the battery.
+        var imuAdvice by rememberSaveable { mutableStateOf(SensorAdvicePolicy.forState(state.imuState)) }
+        LaunchedEffect(state.imuState) {
+            val s = state.imuState
+            if (s is ConnectionState.Failed) imuAdvice = SensorAdvicePolicy.forState(s)
+        }
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp)) {
                 Text("Bar sensor not connected", style = MaterialTheme.typography.titleSmall)
                 if (permissionHeld == BlePermissionStep.GRANTED) {
                     Text(
-                        "Pair or power on the WitMotion sensor, or enable demo mode to try the app " +
-                            "with synthesized data.",
+                        imuAdviceText(imuAdvice),
                         style = MaterialTheme.typography.bodySmall,
                         color = BarColors.Sub,
                     )
@@ -388,6 +422,25 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
     }
     Spacer(Modifier.height(8.dp))
     AudioCueChip(state, viewModel)
+}
+
+/**
+ * Prose for [SensorAdvice]. PAIR_OR_POWER covers more than its name says:
+ * `GattClient.connect()` also fails with "Bluetooth unavailable" (no adapter
+ * on this device) and "Bad device address" (the stored pairing is corrupted)
+ * -- neither of which pairing or powering the sensor fixes, which is why the
+ * text below also names checking the phone's own Bluetooth. Both are
+ * provable preconditions read straight off the three early returns in
+ * `GattClient.connect()`, not a claim about which cause a lifter hits more
+ * often; this repository has never measured that.
+ */
+private fun imuAdviceText(advice: SensorAdvice): String = when (advice) {
+    SensorAdvice.PAIR_OR_POWER ->
+        "Pair or power on the WitMotion sensor, or check the phone's own Bluetooth. " +
+            "You can also enable demo mode to try the app with synthesized data."
+    SensorAdvice.UNRESPONSIVE ->
+        "The sensor answered and then stopped responding -- pairing again is unlikely to help. " +
+            "Power-cycle it, or enable demo mode to try the app with synthesized data."
 }
 
 @Composable

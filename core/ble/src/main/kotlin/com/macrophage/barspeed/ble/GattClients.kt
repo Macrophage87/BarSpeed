@@ -184,7 +184,13 @@ abstract class GattClient(protected val context: Context) {
                 }
                 val characteristic = findNotifyCharacteristic(g)
                 if (characteristic == null) {
-                    stateFlow.value = ConnectionState.Failed("Expected service/characteristic not found")
+                    // Discovery itself succeeded -- status is GATT_SUCCESS, checked
+                    // above -- so a device answered and returned a GATT profile that
+                    // does not match what this app expects. That is a real fact
+                    // about the sensor, not the connection, which is why this is
+                    // the one site in this file that claims linkEstablished.
+                    stateFlow.value =
+                        ConnectionState.Failed("Expected service/characteristic not found", linkEstablished = true)
                     return
                 }
                 try {

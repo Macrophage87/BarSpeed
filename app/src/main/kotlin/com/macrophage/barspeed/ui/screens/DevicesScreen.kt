@@ -83,12 +83,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                             Text(device.name, style = MaterialTheme.typography.titleSmall)
                             Text("${device.role} · ${device.address}", style = MaterialTheme.typography.bodySmall)
                             if (state is ConnectionState.Failed) {
-                                // This screen is the only surface that *does*
-                                // show why, which is a choice rather than a
-                                // constraint: Home and Record draw
-                                // SensorDot(label, connected, connecting), and
-                                // widening it to carry ConnectionState is four
-                                // call sites plus the view model, not done here.
+                                // This screen is the only surface that shows the reason string.
                                 Text(
                                     state.reason,
                                     color = MaterialTheme.colorScheme.error,

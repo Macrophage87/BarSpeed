@@ -38,7 +38,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.data.OrphanedSet
-import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.PermissionBanner
@@ -120,16 +119,8 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 8.dp),
                     ) {
-                        SensorDot(
-                            "IMU",
-                            imuState is ConnectionState.Connected,
-                            connecting = imuState is ConnectionState.Connecting,
-                        )
-                        SensorDot(
-                            "HRM",
-                            hrmState is ConnectionState.Connected,
-                            connecting = hrmState is ConnectionState.Connecting,
-                        )
+                        SensorDot("IMU", imuState)
+                        SensorDot("HRM", hrmState)
                         TextButton(onClick = { showBodyWeight = true }) {
                             Text(
                                 state.bodyWeightKg?.let { "BW ${state.weightUnit.inputValue(it)}" } ?: "Set BW",

@@ -37,18 +37,33 @@ fun VerdictChip(text: String, tone: ChipTone, modifier: Modifier = Modifier) {
     )
 }
 
-/** Status-bar style connection dot: volt when live, amber while reconnecting, grey when off. */
+/**
+ * Status-bar style connection dot: volt when live, amber while reconnecting,
+ * red on a failure, grey when never tried. [demoActive] overrides to volt
+ * regardless of [state] -- demo mode fabricates samples with no sensor
+ * present, and the dot exists to answer "is a sensor talking to me," which
+ * demo mode is deliberately lying about everywhere else on screen too.
+ */
 @Composable
-fun SensorDot(label: String, connected: Boolean, modifier: Modifier = Modifier, connecting: Boolean = false) {
+fun SensorDot(label: String, state: ConnectionState, modifier: Modifier = Modifier, demoActive: Boolean = false) {
+    // The when below has a subject, deliberately, so a fifth ConnectionState
+    // variant fails this compile instead of falling into a silent else.
+    // demoActive is checked outside it because it is not a fact about state.
+    val color =
+        if (demoActive) {
+            BarColors.Volt
+        } else {
+            when (state) {
+                is ConnectionState.Connected -> BarColors.Volt
+                is ConnectionState.Connecting -> BarColors.Amber
+                is ConnectionState.Failed -> BarColors.Red
+                is ConnectionState.Disconnected -> BarColors.Ghost
+            }
+        }
     Text(
         "$label ●",
         style = MaterialTheme.typography.bodySmall,
-        color =
-        when {
-            connected -> BarColors.Volt
-            connecting -> BarColors.Amber
-            else -> BarColors.Ghost
-        },
+        color = color,
         modifier = modifier,
     )
 }

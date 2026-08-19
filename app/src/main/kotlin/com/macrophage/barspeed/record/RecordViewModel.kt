@@ -431,6 +431,9 @@ data class RecordState(
     val imuConnecting: Boolean = false,
     val hrmConnected: Boolean = false,
     val hrmConnecting: Boolean = false,
+    /** The dot and the SETUP advice both need the whole state, not just these booleans. */
+    val imuState: ConnectionState = ConnectionState.Disconnected,
+    val hrmState: ConnectionState = ConnectionState.Disconnected,
     val demoMode: Boolean = false,
     val sessionId: Long? = null,
     val setsCompleted: Int = 0,
@@ -604,6 +607,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     stateFlow.value.copy(
                         imuConnected = s is ConnectionState.Connected,
                         imuConnecting = s is ConnectionState.Connecting,
+                        imuState = s,
                     )
             }
         }
@@ -613,6 +617,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     stateFlow.value.copy(
                         hrmConnected = s is ConnectionState.Connected,
                         hrmConnecting = s is ConnectionState.Connecting,
+                        hrmState = s,
                     )
             }
         }
