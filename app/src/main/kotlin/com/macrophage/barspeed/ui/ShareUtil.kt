@@ -4,14 +4,28 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Shares exports via the system share sheet using a cache-backed FileProvider URI. */
 object ShareUtil {
-    fun shareFile(context: Context, fileName: String, bytes: ByteArray, mimeType: String) {
-        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
-        val file = File(dir, fileName)
-        file.writeBytes(bytes)
+    /**
+     * suspend, not a plain function, so the blocking write below cannot land
+     * back on Main by a caller forgetting to wrap it -- the same shape issue
+     * #29 fixed for SessionExporter/RawExporter, applied to the one file
+     * write this issue's own filed body also named. Only the write is
+     * wrapped in Dispatchers.IO; the Intent/chooser building and
+     * startActivity resume on whatever dispatcher called this, unchanged
+     * from before, matching SessionDetailViewModel.savePendingTo's existing
+     * shape of wrapping only the blocking part.
+     */
+    suspend fun shareFile(context: Context, fileName: String, bytes: ByteArray, mimeType: String) {
+        val file =
+            withContext(Dispatchers.IO) {
+                val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+                File(dir, fileName).apply { writeBytes(bytes) }
+            }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val intent =
             Intent(Intent.ACTION_SEND).apply {
@@ -31,6 +45,6 @@ object ShareUtil {
         context.startActivity(chooser)
     }
 
-    fun shareJson(context: Context, fileName: String, json: String) =
+    suspend fun shareJson(context: Context, fileName: String, json: String) =
         shareFile(context, fileName, json.toByteArray(Charsets.UTF_8), "application/json")
 }

@@ -71,6 +71,7 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
     val session by viewModel.session.collectAsState()
     val weightUnit by viewModel.weightUnit.collectAsState()
     val sets by viewModel.sets.collectAsState()
+    val exporting by viewModel.exporting.collectAsState()
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     if (showDeleteConfirm) {
@@ -137,16 +138,28 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
 
             SectionCaption("Share")
             Spacer(Modifier.height(4.dp))
+            // Disabled while exporting, all six buttons on this screen -- not
+            // only the one tapped. A single shared pendingSave field backs
+            // every Save-to-phone tap, so a second tap on ANY of the six
+            // while the first is still building can overwrite that field
+            // before the first tap's picker has read it, not only a second
+            // tap on the same button. See SessionDetailViewModel.exporting.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = { viewModel.shareJson(false) }, modifier = Modifier.weight(1f)) {
-                    Text("JSON")
-                }
-                OutlinedButton(onClick = { viewModel.shareJson(true) }, modifier = Modifier.weight(1f)) {
-                    Text("Detailed")
-                }
-                OutlinedButton(onClick = { viewModel.shareRawZip() }, modifier = Modifier.weight(1f)) {
-                    Text("Raw CSV")
-                }
+                OutlinedButton(
+                    onClick = { viewModel.shareJson(false) },
+                    enabled = !exporting,
+                    modifier = Modifier.weight(1f),
+                ) { Text("JSON") }
+                OutlinedButton(
+                    onClick = { viewModel.shareJson(true) },
+                    enabled = !exporting,
+                    modifier = Modifier.weight(1f),
+                ) { Text("Detailed") }
+                OutlinedButton(
+                    onClick = { viewModel.shareRawZip() },
+                    enabled = !exporting,
+                    modifier = Modifier.weight(1f),
+                ) { Text("Raw CSV") }
             }
             Spacer(Modifier.height(8.dp))
             SectionCaption("Save to phone")
@@ -154,14 +167,17 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
                     onClick = { viewModel.prepareJsonSave(false) { saveJsonLauncher.launch(it) } },
+                    enabled = !exporting,
                     modifier = Modifier.weight(1f),
                 ) { Text("JSON") }
                 OutlinedButton(
                     onClick = { viewModel.prepareJsonSave(true) { saveJsonLauncher.launch(it) } },
+                    enabled = !exporting,
                     modifier = Modifier.weight(1f),
                 ) { Text("Detailed") }
                 OutlinedButton(
                     onClick = { viewModel.prepareRawZipSave { saveZipLauncher.launch(it) } },
+                    enabled = !exporting,
                     modifier = Modifier.weight(1f),
                 ) { Text("Raw CSV") }
             }
