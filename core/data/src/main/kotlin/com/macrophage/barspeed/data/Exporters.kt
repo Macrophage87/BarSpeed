@@ -25,6 +25,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.time.Instant
+import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -314,6 +315,23 @@ class RawExporter(
     private val sessionExporter: SessionExporter,
     private val appVersion: String,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /**
+     * BEST_SPEED, not the ZipOutputStream default (DEFAULT_COMPRESSION):
+     * measured on issue #29's own 17-set composite, DEFLATE at the default
+     * level cost 503-614 ms (min 503, 7 trials); BEST_SPEED cost 119-204 ms
+     * (min 119) for a 25.5% larger archive (1,671,929 B against 1,332,338
+     * B). No change to what a reader gets out of the zip: a Deflater level
+     * only decides how hard the algorithm looks for redundancy, never the
+     * decompressed bytes, so every entry is still the identical plain-text
+     * CSV it always was. A constructor parameter, not a hardcoded call,
+     * because a level is otherwise unreadable back out of a zip archive --
+     * only the compression METHOD is recorded in the format, not the level
+     * -- so a test that wants to prove which level actually ran needs to
+     * hold two real archives built at two known levels apart, not infer one
+     * from output size against a hand-built reference with different
+     * entries and therefore different overhead.
+     */
+    private val zipCompressionLevel: Int = Deflater.BEST_SPEED,
 ) {
     /**
      * Issue #29's fold, in one place: each set's streams are fetched once and
@@ -353,7 +371,9 @@ class RawExporter(
         meta.append("  \"csvHeaderCues\": \"${CueCsv.HEADER}\",\n")
         meta.append("  \"sets\": [\n")
 
-        ZipOutputStream(out).use { zip ->
+        // zipCompressionLevel is documented on the constructor parameter, not
+        // repeated here.
+        ZipOutputStream(out).apply { setLevel(zipCompressionLevel) }.use { zip ->
             val setLines = mutableListOf<String>()
             // Every set gets an entry, even null, so setExport's `record.id in
             // minBpmOverride` check (rather than a value-nullity check) can tell

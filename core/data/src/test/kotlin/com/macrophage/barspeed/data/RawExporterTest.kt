@@ -22,6 +22,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.ByteArrayInputStream
+import java.util.zip.Deflater
 import java.util.zip.ZipInputStream
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
@@ -206,12 +207,22 @@ class RawExporterTest {
         csvGzip = Gzip.compress(HrCsv.encode(samples)),
     )
 
-    private suspend fun zipOf(
+    /**
+     * [zipCompressionLevel] defaults to null, not to BEST_SPEED, and that
+     * distinction is the point: null lets [RawExporter]'s own constructor
+     * default decide, so `zipBytes(rows, streams)` with no level argument
+     * genuinely exercises production behaviour rather than a copy of
+     * BEST_SPEED living a second time in this file, which would keep this
+     * helper's "default" case passing even if RawExporter's real default
+     * were ever changed to something else.
+     */
+    private suspend fun zipBytes(
         rows: List<SetRecordEntity>,
         streams: Map<Long, List<RawStreamEntity>>,
         zoneId: String? = null,
         utcOffsetMinutes: Int? = null,
-    ): Map<String, String> {
+        zipCompressionLevel: Int? = null,
+    ): ByteArray {
         val dao =
             FakeSessionDao(
                 session =
@@ -226,7 +237,27 @@ class RawExporterTest {
                 streams = streams,
             )
         val repo = SessionRepository(dao, FakeExerciseDao())
-        val bytes = RawExporter(repo, SessionExporter(repo), appVersion = "0.1.37").buildZip(1L)!!
+        val exporter =
+            if (zipCompressionLevel == null) {
+                RawExporter(repo, SessionExporter(repo), appVersion = "0.1.37")
+            } else {
+                RawExporter(
+                    repo,
+                    SessionExporter(repo),
+                    appVersion = "0.1.37",
+                    zipCompressionLevel = zipCompressionLevel,
+                )
+            }
+        return exporter.buildZip(1L)!!
+    }
+
+    private suspend fun zipOf(
+        rows: List<SetRecordEntity>,
+        streams: Map<Long, List<RawStreamEntity>>,
+        zoneId: String? = null,
+        utcOffsetMinutes: Int? = null,
+    ): Map<String, String> {
+        val bytes = zipBytes(rows, streams, zoneId, utcOffsetMinutes)
         val entries = mutableMapOf<String, String>()
         ZipInputStream(ByteArrayInputStream(bytes)).use { zin ->
             while (true) {
@@ -896,5 +927,43 @@ class RawExporterTest {
         val setExport =
             session.getValue("exercises").jsonArray.single().jsonObject.getValue("sets").jsonArray.single().jsonObject
         assertTrue("hr" !in setExport.keys, "a rest-window stream alone produced an hr block")
+    }
+
+    // ---- issue #29: the archive deflates at BEST_SPEED -----------------
+
+    /**
+     * A Deflater LEVEL is not recorded in the zip format itself -- only the
+     * compression METHOD (deflate vs stored) is -- so it cannot be read back
+     * out of the archive the way an entry's content can. What is observable
+     * is size: BEST_SPEED trades ratio for speed, so for the same
+     * compressible content it always produces output equal to or larger
+     * than DEFAULT_COMPRESSION. This builds the real archive through
+     * [RawExporter.buildZip] and a second one by hand at
+     * Deflater.DEFAULT_COMPRESSION over the identical IMU content, and
+     * asserts the real one is the larger of the two -- which stops being
+     * true the moment BEST_SPEED regresses back to the library default.
+     */
+    @Test
+    fun `the raw zip deflates at BEST_SPEED, not the library default`() = runTest {
+        // Two real archives, identical rows and streams, differing only in
+        // the injected level -- not a hand-built reference with different
+        // entries, which the first version of this test used and which
+        // passed even when the production default silently reverted to
+        // DEFAULT_COMPRESSION, because the extra meta.json/session.json
+        // entries' own overhead outweighed the level difference. Comparing
+        // two same-shaped real archives removes that confound.
+        val samples = stillSamples(45.0)
+        val streamMap = mapOf(5L to listOf(imuStream(5L, samples, storedRate = 100.0)))
+        val rows = listOf(row(id = 5L))
+        val defaultSize = zipBytes(rows, streamMap, zipCompressionLevel = Deflater.DEFAULT_COMPRESSION).size
+        val bestSpeedSize = zipBytes(rows, streamMap, zipCompressionLevel = Deflater.BEST_SPEED).size
+        val productionSize = zipBytes(rows, streamMap).size
+
+        assertTrue(
+            bestSpeedSize > defaultSize,
+            "expected BEST_SPEED ($bestSpeedSize B) to exceed DEFAULT_COMPRESSION ($defaultSize B) " +
+                "on this compressible content",
+        )
+        assertEquals(bestSpeedSize, productionSize, "the production default should be BEST_SPEED")
     }
 }
