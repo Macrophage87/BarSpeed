@@ -35,26 +35,47 @@ object Hrv {
      * "agreement" is a coherent idea at all -- a lone ectopic or
      * dropped-beat spike cannot supply a second point that agrees with it,
      * because by definition it is a one-off. Reusing [MAX_JUMP_FRACTION] for
-     * the confirmation test adds no threshold tuned to any one capture; the
-     * distinctness check exists because this strap re-sends its last
-     * completed R-R at a fixed cadence when no new beat has arrived (issue
-     * #81) -- a repeated notification is the same beat, not independent
-     * evidence of a shift. Verified against the worn control: without the
-     * distinctness check, a real cadence-resent duplicate pair (757.8 ms
-     * twice, worn set 13) supplies exactly that false confirmation.
+     * the confirmation test adds no threshold tuned to any one capture.
+     *
+     * THE DISTINCTNESS CHECK IS NOW DEAD FROM BOTH CALL SITES, AND IS KEPT
+     * DELIBERATELY. It exists because this strap re-sends its last completed
+     * R-R at a fixed cadence when no new beat has arrived (issue #81) -- a
+     * repeated notification is the same beat, not independent evidence of a
+     * shift. Since #81 those repeats are removed at ingest by
+     * [RrIngest.newBeats], so nothing reaching this function from
+     * `RecordViewModel` or `SessionCloser` can have two numerically identical
+     * ADJACENT values any more, and this clause cannot fire for them. It stays
+     * because [Hrv] is public API of this module and the per-set HRM CSVs
+     * persisted on disk still contain every repeat by design; anything
+     * reprocessing those still needs it. Two anecdotes that used to justify it
+     * are now false as stated and are deleted rather than reworded: they
+     * described pairs that no longer reach here.
+     *
+     * KNOWN WRONG BEHAVIOUR, LEFT ON PURPOSE. Two identical adjacent values can
+     * still reach here from a strap that puts more than one interval in a
+     * notification, by more than one route: both beats in a single
+     * notification, or a shared value straddling the boundary between two
+     * notifications that are not themselves equal. Those are genuine beats, and
+     * this clause would refuse them as confirmation on grounds that no longer
+     * apply, dropping a real re-anchor. Not fixed here -- it would change
+     * segmentation for every caller in a commit whose subject is ingest, and
+     * nothing can exercise it: 0 of the 2,184 notifications across all 20
+     * committed captures carry more than one interval. It triggers on a strap
+     * that batches, which this one has never been observed to do.
      *
      * The new segment starts at the CONFIRMING beat, not the rejected
      * candidate. The candidate is evidence a shift happened; it is never
      * used as data. This matters beyond conservatism: a single misdetection
      * can split one true beat into two implausible-looking halves rather
      * than reporting a heart-rate change at all. On the worn control's own
-     * set 1, a dip to 496.1 ms is followed by 792.0 ms twice (the second a
-     * cadence-resent duplicate of the first) before recovering through
-     * 635.7 ms -- and 496.1 + 792.0 = 1288.1, close to double the ~645 ms
-     * local baseline, the signature of exactly that split. Anchoring on
-     * 792.0 would splice a spurious jump into every RMSSD computed from
+     * set 1, a dip to 496.1 ms is followed by 792.0 ms before recovering
+     * through 635.7 ms -- and 496.1 + 792.0 = 1288.1, close to double the
+     * ~645 ms local baseline, the signature of exactly that split. Anchoring
+     * on 792.0 would splice a spurious jump into every RMSSD computed from
      * this set from here on; anchoring on 635.7, the beat that actually
-     * confirmed the shift, does not.
+     * confirmed the shift, does not. (Before #81 the 792.0 was reported twice
+     * in a row; the second report is removed at ingest now and the outcome is
+     * unchanged.)
      */
     internal fun segments(rrMs: List<Double>): List<List<Double>> {
         val plausible = rrMs.filter { it in MIN_RR_MS..MAX_RR_MS }

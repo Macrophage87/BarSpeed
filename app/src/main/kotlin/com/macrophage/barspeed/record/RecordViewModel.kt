@@ -593,6 +593,26 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Recent beats only, for the live rolling HRV readout. */
     private val recentRrMs = ArrayDeque<Double>()
+
+    /**
+     * The last heart-rate notification that carried R-R intervals, at any stage.
+     *
+     * [RrIngest] needs it to tell a notification that brought a new beat from
+     * one re-sending the last. Deliberately NOT cleared when a session starts:
+     * a beat that completed before the session began is not new merely because
+     * [sessionRrMs] is.
+     *
+     * Nor cleared across a dropout, and that is right rather than merely
+     * tolerable. A strap that has lost contact holds its last value and keeps
+     * re-sending it -- which is why the unworn capture collapses from 46, 91
+     * and 91 intervals to 1, 1 and 6. Resetting on reconnect would let the
+     * first notification back count a beat the strap had already reported.
+     *
+     * Advanced through [RrIngest.nextPrevious] rather than assigned here, so
+     * the one rule about when the reference moves has one implementation. This
+     * file has no test source set behind it; that function does.
+     */
+    private var lastHrSample: HrSample? = null
     private var voice: VoiceCounter? = null
     private var lastCountedPhase: Phase = Phase.IDLE
     private var lastSpokenSecond = 0
@@ -635,9 +655,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             autoConnect.hrSamples.collect { hr ->
                 // Which beats this notification brought, decided in :core:hrm
-                // where a test can reach the rule. Today it answers "all of
-                // them", which is what these lines did before they were a call.
-                val beats = RrIngest.newBeats(hr)
+                // where a test can reach the rule. This strap re-sends its last
+                // completed R-R when no beat has arrived (#81), and counting
+                // those again deflates every HRV the app publishes.
+                val beats = RrIngest.newBeats(lastHrSample, hr)
+                lastHrSample = RrIngest.nextPrevious(lastHrSample, hr)
                 if (beats.isNotEmpty()) {
                     recentRrMs.addAll(beats)
                     while (recentRrMs.size > ROLLING_HRV_BEATS) recentRrMs.removeFirst()
