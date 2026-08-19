@@ -59,6 +59,7 @@ class HrTrustTest {
         assertNull(summary.endOfSetBpm)
         assertNull(summary.avgBpm)
         assertNull(summary.maxBpm)
+        assertNull(summary.minBpm)
         assertEquals(0, summary.trustedSamples)
         assertEquals(3, summary.totalSamples)
     }
@@ -74,6 +75,19 @@ class HrTrustTest {
         // heart rate this stream actually supports is 120.
         val summary = HrTrust.summarize(listOf(sample(100, 600.0), sample(190, 0.0), sample(120, 500.0)))
         assertEquals(120, summary.maxBpm)
+    }
+
+    /**
+     * The minimum's own version of the maximum test above -- same list shape,
+     * opposite extremum, so a fix that only filters the maximum's population
+     * and not the minimum's cannot pass both.
+     */
+    @Test
+    fun `an untrusted sample does not lower the minimum`() {
+        // The 40 is reported alongside an impossible interval; the lowest
+        // heart rate this stream actually supports is 100.
+        val summary = HrTrust.summarize(listOf(sample(120, 600.0), sample(40, 0.0), sample(100, 500.0)))
+        assertEquals(100, summary.minBpm)
     }
 
     @Test
@@ -101,6 +115,7 @@ class HrTrustTest {
         assertNull(summary.endOfSetBpm)
         assertEquals(109, summary.avgBpm, "the rest of the summary survives")
         assertEquals(118, summary.maxBpm)
+        assertEquals(100, summary.minBpm)
     }
 
     @Test
@@ -109,6 +124,7 @@ class HrTrustTest {
         assertEquals(141, summary.endOfSetBpm)
         assertEquals(137, summary.avgBpm)
         assertEquals(150, summary.maxBpm)
+        assertEquals(120, summary.minBpm)
         assertEquals(3, summary.trustedSamples)
     }
 }

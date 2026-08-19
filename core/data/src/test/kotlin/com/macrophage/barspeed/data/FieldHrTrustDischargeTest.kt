@@ -50,6 +50,7 @@ class FieldHrTrustDischargeTest {
             val summary = HrTrust.summarize(set)
             assertNotNull(summary.avgBpm, "worn set ${index + 1} lost its mean")
             assertNotNull(summary.maxBpm, "worn set ${index + 1} lost its maximum")
+            assertNotNull(summary.minBpm, "worn set ${index + 1} lost its minimum")
             assertNotNull(summary.endOfSetBpm, "worn set ${index + 1} lost its end-of-set reading")
             assertEquals(set.size, summary.trustedSamples, "worn set ${index + 1} lost samples")
         }
@@ -106,14 +107,18 @@ class FieldHrTrustDischargeTest {
     /**
      * Set 3 is not closed by this change and the number that survives is
      * recorded here so the remainder is not mistaken for a fix. 47 of its 91
-     * samples carry plausible-band R-R, so a mean and a maximum still come out.
-     * Issue #83.
+     * samples carry plausible-band R-R, so a mean, a maximum AND a minimum
+     * still come out -- all three from the same 47 identical readings, so a
+     * set-level minBpm inherits this exact, already-published gap rather than
+     * creating a new one: this set already publishes avgBpm 46 and maxBpm 46
+     * today. Issue #83.
      */
     @Test
     fun `the third unworn set still summarises to a plausible resting heart rate`() {
         val summary = HrTrust.summarize(HrFixtures.unworn(3))
         assertEquals(46, summary.avgBpm)
         assertEquals(46, summary.maxBpm)
+        assertEquals(46, summary.minBpm, "same 47 samples as avg/max, so the same fabricated-looking floor")
         assertTrue(summary.endOfSetBpm == null, "its final sample is untrusted")
         assertEquals(47, summary.trustedSamples)
         assertEquals(91, summary.totalSamples)

@@ -18,11 +18,12 @@ data class HrStreamSummary(
     val endOfSetBpm: Int?,
     val avgBpm: Int?,
     val maxBpm: Int?,
+    val minBpm: Int?,
     val trustedSamples: Int,
     val totalSamples: Int,
 ) {
     companion object {
-        val NOTHING = HrStreamSummary(null, null, null, trustedSamples = 0, totalSamples = 0)
+        val NOTHING = HrStreamSummary(null, null, null, null, trustedSamples = 0, totalSamples = 0)
     }
 }
 
@@ -70,12 +71,19 @@ object HrTrust {
     /**
      * Summarise one set's stream over its trusted samples only.
      *
-     * The mean and the maximum are taken over the trusted samples and nothing
-     * else. A maximum is an extremum, so a single untrusted sample sets it
-     * permanently -- that is how one set of session 28 published avgBpm 31
-     * beside maxBpm 50, both from the same 72 samples. The cost of excluding
-     * them is that a true peak landing in a sample that also carries an
-     * impossible R-R is lost and the reported maximum understates the set.
+     * The mean, the maximum and the minimum are taken over the trusted samples
+     * and nothing else -- the same [trusted] list, filtered once, feeds all
+     * three. Both extrema carry the same exposure: a single untrusted sample
+     * sets one of them permanently, which is how one set of session 28
+     * published avgBpm 31 beside maxBpm 50, both from the same 72 samples,
+     * before this filter existed. A stray low reading is no less plausible a
+     * strap artifact than a stray high one -- issue #82's gap (a sample with no
+     * R-R interval at all is trusted on bpm alone) can hand either extremum a
+     * single-sample outlier, so [HrStreamSummary.minBpm] is computed by the
+     * identical rule as [HrStreamSummary.maxBpm], not a stricter or looser one.
+     * The cost of excluding an untrusted sample is that a true extreme landing
+     * in a sample that also carries an impossible R-R is lost, and the reported
+     * range understates the set on both ends.
      *
      * [HrStreamSummary.endOfSetBpm] is the last sample's bpm, and only when
      * that sample is itself trusted. It is not backfilled from an earlier
@@ -98,6 +106,7 @@ object HrTrust {
             endOfSetBpm = samples.last().takeIf(::isTrusted)?.bpm,
             avgBpm = if (bpm.isEmpty()) null else bpm.average().toInt(),
             maxBpm = bpm.maxOrNull(),
+            minBpm = bpm.minOrNull(),
             trustedSamples = trusted.size,
             totalSamples = samples.size,
         )
