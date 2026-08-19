@@ -54,7 +54,7 @@ data class DspConfig(
      * does not degrade gracefully -- it fails on a subset of reps and is roughly
      * right on the rest. Eight drive runs there clear every other gate and are
      * stopped only by this one, and they carry 0.031 to 0.067 m against a batch
-     * median rep ROM of 0.466 m: **7% to 14% of the truth.** The smallest rep
+     * median rep ROM of 0.489 m: **7% to 14% of the truth.** The smallest rep
      * that does count carries 0.101 m. There is no continuum between them.
      *
      * Lowering this to 0.03 would admit all eight. Each would then publish a
