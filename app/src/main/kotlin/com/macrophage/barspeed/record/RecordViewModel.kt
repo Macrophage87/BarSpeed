@@ -822,7 +822,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun beginSet() {
         val s = stateFlow.value
         val exercise = currentExercise(s)
-        val tracker = StreamingSetTracker(exercise.startsWith, velocityScale = exercise.sensorToLifter)
+        val tracker = StreamingSetTracker.forLift(exercise.liftDirection())
         this.tracker = tracker
         imuBuffer.clear()
         hrBuffer.clear()

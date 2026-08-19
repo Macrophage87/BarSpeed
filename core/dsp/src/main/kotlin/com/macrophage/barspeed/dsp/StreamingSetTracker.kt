@@ -32,7 +32,23 @@ class StreamingSetTracker(
      * to the live velocity so the on-screen phase is the lifter's, not the stack's.
      */
     private val velocityScale: Double = 1.0,
+    /**
+     * True when the drive moves in the positive direction --
+     * [LiftDirection.driveIsPositive]. A leg curl and a lat pulldown drive
+     * DOWN, and without this the tracker completes every rep on the return.
+     *
+     * Deliberately NOT folded into [velocityScale]. That maps sensor motion
+     * into the lifter's frame -- cable inversion and pulley ratio -- while this
+     * says which way the lifter drives. On a leg curl both are negative and
+     * their product is positive, so a single combined factor would cancel and
+     * look correct while reporting the wrong stroke. One number, two jobs, in
+     * the class least able to show it.
+     */
+    private val driveIsPositive: Boolean = true,
 ) {
+    /** +1 when the drive moves up, -1 when it moves down. */
+    private val driveSign: Double = if (driveIsPositive) 1.0 else -1.0
+
     private var filter = Biquad.lowPass(config.lowPassCutoffHz, expectedSampleRateHz)
 
     // The sensor samples uniformly, but two things make arrival timestamps
@@ -184,9 +200,9 @@ class StreamingSetTracker(
         if (type == runType) {
             if (type != 0) {
                 runPeak = maxOf(runPeak, abs(v))
-                runVelocitySum += v
+                runVelocitySum += v * driveSign
                 runSampleCount++
-                runVelocityMax = maxOf(runVelocityMax, v)
+                runVelocityMax = maxOf(runVelocityMax, v * driveSign)
                 runDisplacement += abs(v) * frameIntervalS
             }
             return
@@ -205,14 +221,14 @@ class StreamingSetTracker(
         runType = type
         runStartS = timeS
         runPeak = abs(v)
-        runVelocitySum = v
+        runVelocitySum = v * driveSign
         runSampleCount = 1
-        runVelocityMax = v
+        runVelocityMax = v * driveSign
         runDisplacement = abs(v) * frameIntervalS
     }
 
     private fun onQualifiedRun(direction: Int) {
-        val concentric = direction == 1
+        val concentric = (direction == 1) == driveIsPositive
         if (startsWith == StartPhase.ECCENTRIC) {
             // Pair phases: down arms the rep, the following up completes it.
             if (!concentric) {
@@ -232,7 +248,23 @@ class StreamingSetTracker(
         repPeaks += runVelocityMax
     }
 
-    private companion object {
+    companion object {
+        /**
+         * Build a tracker for a declared lift.
+         *
+         * The call site in `:app` has an `ExerciseDef` in hand and `:app` has no
+         * test source set, so anything decided there cannot be asserted. This
+         * factory is where the mapping from a declared lift to tracker
+         * parameters lives, in a module a test can reach.
+         */
+        fun forLift(direction: LiftDirection, config: DspConfig = DspConfig()): StreamingSetTracker =
+            StreamingSetTracker(
+                startsWith = direction.startsWith,
+                config = config,
+                velocityScale = direction.sensorToLifter,
+                driveIsPositive = true,
+            )
+
         const val RATE_WARMUP_SAMPLES = 24
         const val RATE_WARMUP_SPAN_S = 1.0
         const val MIN_FRAME_INTERVAL_S = 1.0 / 250.0

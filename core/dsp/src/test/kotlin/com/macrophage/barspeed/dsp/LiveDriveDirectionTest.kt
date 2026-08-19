@@ -4,6 +4,7 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * What the live tracker counts, and whose velocity it publishes, on a lift whose
@@ -56,7 +57,7 @@ class LiveDriveDirectionTest {
     )
 
     private fun state(fixture: String, d: LiftDirection): LiveSetState {
-        val tracker = StreamingSetTracker(d.startsWith, DspConfig(), velocityScale = d.sensorToLifter)
+        val tracker = StreamingSetTracker.forLift(d)
         var last = LiveSetState()
         load(fixture).forEach { last = tracker.feed(it) }
         return last
@@ -71,7 +72,7 @@ class LiveDriveDirectionTest {
     /** Arrival time of the sample completing each counted rep. */
     private fun repEndsMs(fixture: String, d: LiftDirection): List<Long> {
         val samples = load(fixture)
-        val tracker = StreamingSetTracker(d.startsWith, DspConfig(), velocityScale = d.sensorToLifter)
+        val tracker = StreamingSetTracker.forLift(d)
         val ends = mutableListOf<Long>()
         var seen = 0
         samples.forEachIndexed { i, s ->
@@ -138,6 +139,25 @@ class LiveDriveDirectionTest {
         assertEquals(0.128, s.repMeanVelocities.first(), 5e-3, "first published mean")
         assertEquals(0.078, s.repMeanVelocities.last(), 5e-3, "last published mean")
         assertEquals(0.266, s.repPeakVelocities.first(), 5e-3, "first published peak")
+    }
+
+    @Test
+    fun `whatever the drive direction, the published velocities read as a drive`() {
+        // The invariant a naive fix breaks. runVelocityMax is a SIGNED maximum,
+        // so pointing the counter at DOWN runs without also expressing velocity
+        // in the drive frame publishes negative means and a "peak" that is the
+        // slowest instant of the stroke -- smaller than the mean it sits beside.
+        // Green before and after the change; red for the one-line version of it.
+        (driveDown.map { it to legCurl } + driveUp.map { it to press }).forEach { (fixture, d) ->
+            val s = state(fixture, d)
+            s.repMeanVelocities.forEachIndexed { i, mean ->
+                assertTrue(mean > 0.0, "$fixture rep ${i + 1}: mean $mean must read as a drive")
+                assertTrue(
+                    s.repPeakVelocities[i] >= mean,
+                    "$fixture rep ${i + 1}: peak ${s.repPeakVelocities[i]} below mean $mean",
+                )
+            }
+        }
     }
 
     @Test
