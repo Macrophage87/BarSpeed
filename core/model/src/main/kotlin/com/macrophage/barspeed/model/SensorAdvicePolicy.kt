@@ -13,13 +13,20 @@ enum class SensorAdvice {
  * Which advice a [ConnectionState] earns, for the one screen that shows
  * more than a dot.
  *
- * Returns [SensorAdvice.PAIR_OR_POWER] unconditionally for now -- a
- * genuinely true identity lift, not a placeholder: nothing today reads
- * [ConnectionState.Failed.linkEstablished], so every disconnected state
- * already earns the same generic advice this returns. The next commit reds
- * a test that requires this to change; the one after makes it change.
+ * Takes the whole state, not just [ConnectionState.Failed]'s reason, because
+ * the card this feeds is gated on `!imuConnected` and reaches Connecting and
+ * Disconnected too -- both keep the advice they already had, unchanged,
+ * because neither promises anything more specific is true than "not
+ * connected yet." Only [ConnectionState.Failed.linkEstablished] changes the
+ * answer, deliberately: keying on the reason string instead would pass every
+ * test in this file that uses two different strings and still be wrong,
+ * which is why one test holds the string fixed and varies only the boolean.
  */
 object SensorAdvicePolicy {
-    @Suppress("UnusedParameter", "UNUSED_PARAMETER") // Read starting the next commit.
-    fun forState(state: ConnectionState): SensorAdvice = SensorAdvice.PAIR_OR_POWER
+    fun forState(state: ConnectionState): SensorAdvice = when (state) {
+        is ConnectionState.Failed ->
+            if (state.linkEstablished) SensorAdvice.UNRESPONSIVE else SensorAdvice.PAIR_OR_POWER
+        is ConnectionState.Connected, is ConnectionState.Connecting, is ConnectionState.Disconnected ->
+            SensorAdvice.PAIR_OR_POWER
+    }
 }
