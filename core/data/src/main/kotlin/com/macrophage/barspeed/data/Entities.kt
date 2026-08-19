@@ -130,7 +130,7 @@ data class SetRecordEntity(
 data class RawStreamEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val setId: Long,
-    /** One of: imu, hrm, cues. */
+    /** One of: imu, hrm, rest_before_hrm, cues. */
     val kind: String,
     /** Gzipped CSV in the canonical format (see ImuCsv / HrCsv / CueCsv). */
     val csvGzip: ByteArray,
@@ -143,6 +143,32 @@ data class RawStreamEntity(
     companion object {
         const val KIND_IMU = "imu"
         const val KIND_HRM = "hrm"
+
+        /**
+         * Heart rate recorded during the rest window BEFORE this set, issue
+         * #90.
+         *
+         * The direction is in the name because a filename is read before a
+         * timestamp is. `set02_bench_press_rest_before_hrm.csv` sitting beside
+         * `set02_bench_press_hrm.csv` has to say which side of the set it
+         * covers without being decoded first; "rest_hrm" would have read as
+         * "the rest of set 2" and been ambiguous about the very thing the
+         * design turns on.
+         *
+         * It attaches FORWARD -- to the set that follows the window rather
+         * than the one that precedes it -- because a rest window is only
+         * complete when the next set begins. Attaching backwards would mean
+         * writing onto a row that already exists: a second, non-atomic write
+         * path. Attaching forwards puts these samples in the same
+         * [SessionDao.insertSetWithStreams] transaction as the set's own
+         * streams. The direction is chosen by atomicity, not by how it reads.
+         *
+         * A DIFFERENT POPULATION FROM [KIND_HRM], and nothing may blur them.
+         * `Exporters.minBpm` selects on equality with [KIND_HRM] and is pinned
+         * against exactly this kind reaching it.
+         */
+        const val KIND_REST_BEFORE_HRM = "rest_before_hrm"
+
         const val KIND_CUES = "cues"
     }
 }

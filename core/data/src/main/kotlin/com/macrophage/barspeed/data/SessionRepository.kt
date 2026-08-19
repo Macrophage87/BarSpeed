@@ -45,6 +45,23 @@ data class CompletedSet(
     val geometry: ResolvedGeometry? = null,
     val imuSamples: List<ImuSample>,
     val hrSamples: List<HrSample>,
+    /**
+     * Heart rate recorded during the rest window BEFORE this set, issue #90.
+     *
+     * Empty when nothing was captured -- no strap, or the first set of a
+     * session begun without a READY window. Empty is not zero and is not a
+     * measurement; it simply writes no stream.
+     *
+     * RAW, and that is a requirement rather than an incidental. These samples
+     * must be every notification the strap sent, duplicates included, the same
+     * way [hrSamples] is. Issue #81 de-duplicates the two ANALYSIS
+     * accumulators and deliberately leaves the raw capture untouched, because
+     * the raw capture is the only irreplaceable artifact and a later reader may
+     * know more than this code does. A de-duplicated stream stored here would
+     * look entirely plausible and would silently destroy the only data anyone
+     * could ever use to measure #81's cost at resting heart rates.
+     */
+    val restHrSamples: List<HrSample> = emptyList(),
     /** Spoken cues during the set, epoch-ms stamped for IMU cross-reference. */
     val voiceCues: List<VoiceCue> = emptyList(),
     /**
