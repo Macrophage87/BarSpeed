@@ -20,11 +20,11 @@ import kotlin.test.assertEquals
  *
  * The three differ in one way that matters more than the arithmetic. `kind` and
  * `usesBarbell` are re-derived from the id on every read
- * (`SessionRepository.kt:160`, `:162`, `:169`, `:171`), so correcting them
- * corrects history too. `startsWith` is not: `SessionRepository.kt:182` writes
+ * (`SessionRepository.kt:286`, `:288`, `:295`, `:297`), so correcting them
+ * corrects history too. `startsWith` is not: `SessionRepository.kt:308` writes
  * `inferStartPhase(id).name` into a `CustomExerciseEntity` the first time an id
- * is seen, `:159` reads it back forever after, and `ExerciseDao`
- * (`Daos.kt:88-101`) has no update path. That column is written once.
+ * is seen, `:285` reads it back forever after, and `ExerciseDao`
+ * (`Daos.kt:109-121`) has no update path. That column is written once.
  */
 class ExerciseIdInferenceCharacterizationTest {
     private data class Row(
@@ -181,12 +181,22 @@ class ExerciseIdInferenceCharacterizationTest {
 
             // --- "pull" reaches inside "pulldown", which is the movement's
             // own name. A lat pulldown begins with the drive, so CONCENTRIC is
-            // right today and whole-token matching would lose it. These rows do
-            // not move, because "pulldown" joins the hint list. ---
+            // right today and whole-token matching would lose it. These three
+            // rows do not move, because "pulldown" joins the hint list. ---
             Row("lat_pulldown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
             Row("pulldown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
             Row("cable_pulldown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, false),
-            Row("tricep_pushdown", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
+
+            // --- issue #59: "pushdown" was never on the list, so a tricep
+            // pushdown -- which also begins with the drive -- fell to the
+            // ECCENTRIC default. This row MOVES: "pushdown" joins the hint
+            // list beside "pulldown". Only the start PHASE moves here --
+            // concentricUp still defaults to true (drive-up) because it is
+            // never inferred from the id (see ExerciseDef.concentricUp), so a
+            // plan using this id still needs "concentric": "down" declared to
+            // get the tempo digits and drive direction right; this row only
+            // fixes which phase is counted and announced first. ---
+            Row("tricep_pushdown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
 
             // --- ordinary ids that must not move ---
             Row("seated_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
