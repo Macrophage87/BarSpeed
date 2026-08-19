@@ -638,8 +638,23 @@ class FieldDataRegressionTest {
                 "field-facepull-static-12rep.csv" to (11 to 12),
                 "field-pallof-static-12rep.csv" to (12 to 12),
             )
+        // The `performed` half of that map was a hand count with nothing behind
+        // it. Four of these seven now have the metronome cue track beside them,
+        // so for those the hand count is checked against what the app actually
+        // called. BarbellCueTrackTest asserts the same equality from its side;
+        // between them the two figures cannot drift apart unnoticed.
+        val cueTracked = setOf(
+            "field-ohp-rotating-8rep",
+            "field-ohp-rotating-8rep-b",
+            "field-bench-rotating-6rep-ok",
+            "field-bench-rotating-6rep",
+        )
         session20260817.forEach { fs ->
             val (live, performed) = liveToday.getValue(fs.file)
+            val base = fs.file.removeSuffix(".csv")
+            if (base in cueTracked) {
+                assertEquals(performed, CueTrack.calledReps(base), "${fs.file}: hand count against the metronome")
+            }
             val tracker = StreamingSetTracker(fs.startsWith)
             var last = LiveSetState()
             load(fs.file).forEach { last = tracker.feed(it) }
