@@ -199,7 +199,7 @@ data class ExerciseDef(
                 // Movements whose own name is one word containing another hint.
                 // Substring matching reached inside them for free and whole-token
                 // matching cannot, so they are listed rather than lost.
-                "pulldown", "pullup", "chinup",
+                "pulldown", "pullup", "chinup", "pushdown",
             )
 
         /**
@@ -209,11 +209,11 @@ data class ExerciseDef(
          * first, so bare "press" stays eccentric-first.
          *
          * This is the one inference whose result is written down. The others are
-         * recomputed from the id on every read, but SessionRepository.kt:182
+         * recomputed from the id on every read, but SessionRepository.kt:308
          * stores this in a CustomExerciseEntity the first time an id is used and
          * ExerciseDao has no statement that would update it, so an id already
          * seen keeps whatever this returned then. A plan-declared `"start"`
-         * overrides it per exercise; nothing overrides it for an ad-hoc set.
+         * overrides it per exercise.
          */
         fun inferStartPhase(id: String): StartPhase {
             val tokens = tokens(id)
