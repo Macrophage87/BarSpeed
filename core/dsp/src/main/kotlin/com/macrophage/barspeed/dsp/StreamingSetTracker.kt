@@ -198,7 +198,8 @@ class StreamingSetTracker(
             val qualified =
                 runPeak >= config.startThresholdMps &&
                     duration >= config.minPhaseS &&
-                    runDisplacement >= config.minRomM
+                    runDisplacement >= config.minRomM &&
+                    runDisplacement <= config.maxRunDisplacementM
             if (qualified) onQualifiedRun(runType)
         }
         runType = type
