@@ -17,8 +17,10 @@ import kotlin.test.assertTrue
  * repository that decides it locally, and it decides it wrong for a leg curl.
  * Issue 102.
  *
- * These pins record the behaviour before that is corrected. Nothing here is a
- * target.
+ * The counts here are what the tracker reports once it is told. They are
+ * LOWER than before on drive-down lifts, and that is the point: the count was
+ * the near-cancellation of double-counted reps against uncounted ones, and
+ * coverage rather than the total is what improves.
  *
  * ## Ground truth
  *
@@ -109,16 +111,21 @@ class LiveDriveDirectionTest {
     }
 
     @Test
-    fun `what the live counter reports on a drive-down lift (pre-fix)`() {
-        assertEquals(listOf(10, 9, 11), driveDown.map { state(it, legCurl).repCount }, "leg curl counts")
+    fun `what the live counter reports on a drive-down lift`() {
+        assertEquals(listOf(8, 6, 9), driveDown.map { state(it, legCurl).repCount }, "leg curl counts")
         assertEquals(listOf(3, 5, 5, 1), driveUp.map { state(it, press).repCount }, "press counts")
     }
 
     @Test
-    fun `how well those counts cover the reps that were called (pre-fix)`() {
+    fun `how well those counts cover the reps that were called`() {
         // in-window, covered exactly once, uncovered, covered twice.
+        // Not a subtraction of duplicates. Counting the drive instead of the
+        // return counts a different set of runs: 11 cued reps gain their first
+        // coverage and 10 lose their only coverage, so the windows covered
+        // EXACTLY ONCE go 15 -> 23 of 36 while the raw count falls 29 -> 23.
+        // Coverage is the figure that improves; the count is a consequence.
         assertEquals(
-            listOf(29, 15, 14, 7),
+            listOf(23, 23, 13, 0),
             coverage(driveDown, legCurl).toList(),
             "leg curl: 36 cued reps",
         )
@@ -130,15 +137,15 @@ class LiveDriveDirectionTest {
     }
 
     @Test
-    fun `the per-rep velocities the tracker publishes for a leg curl (pre-fix)`() {
+    fun `the per-rep velocities the tracker publishes for a leg curl`() {
         // LiveSetState calls these the CONCENTRIC mean and peak. On this lift
         // the concentric goes down, and the runs these are taken from go up.
         val s = state("field-legcurl-1030-12rep", legCurl)
-        assertEquals(10, s.repMeanVelocities.size, "one mean per counted rep")
-        assertEquals(10, s.repPeakVelocities.size, "one peak per counted rep")
-        assertEquals(0.128, s.repMeanVelocities.first(), 5e-3, "first published mean")
-        assertEquals(0.078, s.repMeanVelocities.last(), 5e-3, "last published mean")
-        assertEquals(0.266, s.repPeakVelocities.first(), 5e-3, "first published peak")
+        assertEquals(8, s.repMeanVelocities.size, "one mean per counted rep")
+        assertEquals(8, s.repPeakVelocities.size, "one peak per counted rep")
+        assertEquals(0.219, s.repMeanVelocities.first(), 5e-3, "first published mean")
+        assertEquals(0.197, s.repMeanVelocities.last(), 5e-3, "last published mean")
+        assertEquals(0.300, s.repPeakVelocities.first(), 5e-3, "first published peak")
     }
 
     @Test
@@ -156,6 +163,32 @@ class LiveDriveDirectionTest {
                     s.repPeakVelocities[i] >= mean,
                     "$fixture rep ${i + 1}: peak ${s.repPeakVelocities[i]} below mean $mean",
                 )
+            }
+        }
+    }
+
+    @Test
+    fun `drive direction must not reach the instantaneous velocity readout`() {
+        // The guard on the design choice. Folding the drive sign into
+        // velocityScale instead of keeping it separate produces identical rep
+        // counts and identical per-rep figures -- it is invisible in every
+        // other assertion in this file -- but it negates LiveSetState's
+        // velocityMps, the number on screen while the bar is moving. That is a
+        // LIFTER-frame quantity: down reads negative on a leg curl however the
+        // drive happens to point. Only the per-rep summaries are in the drive
+        // frame.
+        driveDown.forEach { fixture ->
+            val told = StreamingSetTracker.forLift(legCurl)
+            val untold = StreamingSetTracker(
+                startsWith = legCurl.startsWith,
+                config = DspConfig(),
+                velocityScale = legCurl.sensorToLifter,
+                driveIsPositive = true,
+            )
+            load(fixture).forEach { sample ->
+                val a = told.feed(sample).velocityMps
+                val b = untold.feed(sample).velocityMps
+                assertEquals(b, a, 1e-12, "$fixture: drive direction changed the published velocity")
             }
         }
     }
