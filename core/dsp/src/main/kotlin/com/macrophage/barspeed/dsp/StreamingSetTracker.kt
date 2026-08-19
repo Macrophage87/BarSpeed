@@ -262,7 +262,7 @@ class StreamingSetTracker(
                 startsWith = direction.startsWith,
                 config = config,
                 velocityScale = direction.sensorToLifter,
-                driveIsPositive = true,
+                driveIsPositive = direction.driveIsPositive,
             )
 
         const val RATE_WARMUP_SAMPLES = 24
