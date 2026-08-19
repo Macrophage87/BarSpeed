@@ -11,6 +11,8 @@ import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.StartPhase
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -21,6 +23,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.ByteArrayInputStream
 import java.util.zip.ZipInputStream
+import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -81,6 +84,25 @@ class RawExporterTest {
         override suspend fun sessionsInRange(fromMs: Long, toMs: Long): List<SessionEntity> = emptyList()
 
         override suspend fun deleteSession(id: Long) = Unit
+    }
+
+    /**
+     * Records whether anything ever asked it to dispatch, then hands the work
+     * to a real dispatcher so the coroutine actually completes. The seam issue
+     * #29 needed: proof that [RawExporter.buildZip] and [SessionExporter]'s
+     * functions honour an injected dispatcher, without Robolectric or an
+     * Android `Looper` -- plain `kotlinx-coroutines-core`, the same machinery
+     * [runTest] already depends on.
+     */
+    private class RecordingDispatcher(private val real: CoroutineDispatcher = Dispatchers.Default) :
+        CoroutineDispatcher() {
+        var dispatched = false
+            private set
+
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            dispatched = true
+            real.dispatch(context, block)
+        }
     }
 
     private class FakeExerciseDao : ExerciseDao {
@@ -725,5 +747,31 @@ class RawExporterTest {
         for (key in listOf("startsWith", "concentric", "plane", "sensorOnStack", "sensorInverted", "travelRatio")) {
             assertNull(unstated[key], "an unstated geometry wrote $key")
         }
+    }
+
+    // ---- issue #29: buildZip must actually leave the caller's dispatcher ---
+
+    /**
+     * The seam issue #29 needed and this repository did not have: proof, not
+     * an assertion by reading, that [RawExporter.buildZip] dispatches through
+     * whatever it is given rather than running inline on the caller's
+     * dispatcher. Before the dispatcher parameter existed, nothing here or in
+     * [SessionExporterTest] could have failed this test even if [buildZip]'s
+     * body ran entirely on the caller's own dispatcher, because nothing
+     * called [RecordingDispatcher.dispatch] to find out.
+     */
+    @Test
+    fun `buildZip dispatches through its injected dispatcher`() = runTest {
+        val dao =
+            FakeSessionDao(
+                session = SessionEntity(id = 1L, startedAtMs = 1_000L, endedAtMs = 46_000L),
+                rows = listOf(row(id = 5L)),
+                streams = emptyMap(),
+            )
+        val repo = SessionRepository(dao, FakeExerciseDao())
+        val recording = RecordingDispatcher()
+        val exporter = SessionExporter(repo, dispatcher = recording)
+        RawExporter(repo, exporter, appVersion = "0.1.37", dispatcher = recording).buildZip(1L)
+        assertTrue(recording.dispatched, "buildZip never dispatched through the injected dispatcher")
     }
 }

@@ -18,6 +18,9 @@ import com.macrophage.barspeed.model.SetExport
 import com.macrophage.barspeed.model.SetSummaryExport
 import com.macrophage.barspeed.model.TempoComplianceExport
 import com.macrophage.barspeed.model.WeightUnit
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
@@ -25,7 +28,21 @@ import java.time.Instant
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/** Builds the LLM-facing session export JSON (docs/schemas/session-export.schema.json). */
+/**
+ * Builds the LLM-facing session export JSON (docs/schemas/session-export.schema.json).
+ *
+ * [dispatcher] is where issue #29 lives: neither this class nor [RawExporter]
+ * used to switch dispatcher at all, so every caller ran the whole of this
+ * work -- CSV decode, gzip inflate, JSON serialization -- on whatever context
+ * it happened to be launched from, which for every production caller is
+ * `viewModelScope`'s `Dispatchers.Main.immediate`. Wrapping here, not at each
+ * call site, is deliberate: that is the exact shape that produced #29 in the
+ * first place, where one call site (`SessionDetailViewModel.savePendingTo`)
+ * remembered to wrap and four others did not. `Default`, not `IO`: this work
+ * is CPU-bound, and Room's own suspend DAO calls dispatch on their own
+ * executor regardless of what this wraps them in, so the choice here decides
+ * only what thread the codec work runs on.
+ */
 @OptIn(ExperimentalSerializationApi::class)
 class SessionExporter(
     private val sessionRepository: SessionRepository,
@@ -35,9 +52,10 @@ class SessionExporter(
             encodeDefaults = false
             explicitNulls = false
         },
+    private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    suspend fun buildExport(sessionId: Long, includeRepDetail: Boolean): SessionExport? {
-        val session = sessionRepository.session(sessionId) ?: return null
+    suspend fun buildExport(sessionId: Long, includeRepDetail: Boolean): SessionExport? = withContext(dispatcher) {
+        val session = sessionRepository.session(sessionId) ?: return@withContext null
         val sets = sessionRepository.sets(sessionId)
 
         val byExercise = sets.groupBy { it.exerciseId }
@@ -48,7 +66,7 @@ class SessionExporter(
                     sets = records.map { record -> setExport(record, includeRepDetail) },
                 )
             }
-        return SessionExport(
+        SessionExport(
             startedAt = Instant.ofEpochMilli(session.startedAtMs).toString(),
             endedAt = session.endedAtMs?.let { Instant.ofEpochMilli(it).toString() },
             // The two instants above are UTC and stay that way; this is what
@@ -75,8 +93,9 @@ class SessionExporter(
         )
     }
 
-    suspend fun exportJson(sessionId: Long, includeRepDetail: Boolean): String? =
+    suspend fun exportJson(sessionId: Long, includeRepDetail: Boolean): String? = withContext(dispatcher) {
         buildExport(sessionId, includeRepDetail)?.let { json.encodeToString(SessionExport.serializer(), it) }
+    }
 
     private suspend fun setExport(record: SetRecordEntity, includeRepDetail: Boolean): SetExport {
         val analysis = sessionRepository.decodeAnalysis(record)
@@ -269,9 +288,10 @@ class RawExporter(
     private val sessionRepository: SessionRepository,
     private val sessionExporter: SessionExporter,
     private val appVersion: String,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    suspend fun buildZip(sessionId: Long): ByteArray? {
-        val session = sessionRepository.session(sessionId) ?: return null
+    suspend fun buildZip(sessionId: Long): ByteArray? = withContext(dispatcher) {
+        val session = sessionRepository.session(sessionId) ?: return@withContext null
         val sets = sessionRepository.sets(sessionId)
         val sessionJson = sessionExporter.exportJson(sessionId, includeRepDetail = true)
         val out = ByteArrayOutputStream()
@@ -324,7 +344,7 @@ class RawExporter(
                 zip.closeEntry()
             }
         }
-        return out.toByteArray()
+        out.toByteArray()
     }
 
     private fun buildSetDescriptor(

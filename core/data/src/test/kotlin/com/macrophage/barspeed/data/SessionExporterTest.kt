@@ -14,6 +14,8 @@ import com.macrophage.barspeed.model.SetExport
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.VoiceCue
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -22,6 +24,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -84,6 +87,23 @@ class SessionExporterTest {
         override suspend fun sessionsInRange(fromMs: Long, toMs: Long): List<SessionEntity> = emptyList()
 
         override suspend fun deleteSession(id: Long) = Unit
+    }
+
+    /**
+     * Records whether anything ever asked it to dispatch, then hands the work
+     * to a real dispatcher so the coroutine actually completes. See
+     * [RawExporterTest]'s own copy for the reasoning; each test file here
+     * carries its own fakes.
+     */
+    private class RecordingDispatcher(private val real: CoroutineDispatcher = Dispatchers.Default) :
+        CoroutineDispatcher() {
+        var dispatched = false
+            private set
+
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            dispatched = true
+            real.dispatch(context, block)
+        }
     }
 
     private class FakeExerciseDao : ExerciseDao {
@@ -241,6 +261,7 @@ class SessionExporterTest {
         zoneId: String? = null,
         utcOffsetMinutes: Int? = null,
         extraStreams: List<RawStreamEntity> = emptyList(),
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
     ): SessionExporter {
         val dao =
             FakeSessionDao(
@@ -255,7 +276,7 @@ class SessionExporterTest {
                 rows = listOf(stored),
                 streams = mapOf(5L to listOf(cueStream) + extraStreams),
             )
-        return SessionExporter(SessionRepository(dao, FakeExerciseDao()))
+        return SessionExporter(SessionRepository(dao, FakeExerciseDao()), dispatcher = dispatcher)
     }
 
     /** The export root for a session row carrying the given stored zone columns. */
@@ -1030,5 +1051,26 @@ class SessionExporterTest {
             Json.parseToJsonElement(text).jsonObject["exercises"]!!.jsonArray.single()
                 .jsonObject["sets"]!!.jsonArray.single().jsonObject
         assertTrue("hr" !in setObject.keys, "an empty hr block was published")
+    }
+
+    // ---- issue #29: exportJson/buildExport must actually dispatch ----------
+
+    /**
+     * The seam issue #29 needed: proof that both entry points honour an
+     * injected dispatcher rather than running inline on the caller's. Two
+     * assertions, not one, because [exportJson] and [buildExport] are two
+     * separate `withContext` calls -- one dropping its wrapper would not
+     * necessarily red the other.
+     */
+    @Test
+    fun `exportJson and buildExport both dispatch through their injected dispatcher`() = runTest {
+        val stored = row(analysis(3), actualReps = 3, repsManual = false)
+        val recordingForJson = RecordingDispatcher()
+        exporterOf(stored, dispatcher = recordingForJson).exportJson(1L, includeRepDetail = false)
+        assertTrue(recordingForJson.dispatched, "exportJson never dispatched through the injected dispatcher")
+
+        val recordingForBuild = RecordingDispatcher()
+        exporterOf(stored, dispatcher = recordingForBuild).buildExport(1L, includeRepDetail = false)
+        assertTrue(recordingForBuild.dispatched, "buildExport never dispatched through the injected dispatcher")
     }
 }
