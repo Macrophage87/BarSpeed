@@ -143,6 +143,8 @@ private data class PendingSetWrite(
     val orderIdx: Int,
     val samples: List<ImuSample>,
     val hrSamples: List<HrSample>,
+    /** The rest window before this set, frozen with everything else. */
+    val restHrSamples: List<HrSample>,
     val cues: List<VoiceCue>,
     val rating: SetRating?,
     val planName: String?,
@@ -530,6 +532,24 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private val imuBuffer = mutableListOf<ImuSample>()
     private val hrBuffer = mutableListOf<HrSample>()
 
+    /**
+     * Heart rate arriving while no set is running -- the READY window before
+     * the first set, and every rest window after one. Issue #90.
+     *
+     * RAW. These are the notifications as received, duplicates and all, taken
+     * from the sample the collector was handed rather than from the
+     * de-duplicated beats it derives beside them. Issue #81 removes re-sent
+     * intervals from the two ANALYSIS accumulators and deliberately leaves
+     * every raw capture untouched; this is a raw capture. Storing the
+     * de-duplicated form here would look entirely plausible and would destroy
+     * the only data anyone could use to measure #81's cost at resting rates.
+     *
+     * Cleared when the set that carries it is frozen for writing, not when the
+     * next one begins: the window belongs to the set that FOLLOWS it, so it
+     * has to survive from the end of one set to the freeze of the next.
+     */
+    private val restHrBuffer = mutableListOf<HrSample>()
+
     /** Spoken cues this set, epoch-ms stamped for IMU cross-reference in exports. */
     private val cueBuffer = mutableListOf<VoiceCue>()
     private var tracker: StreamingSetTracker? = null
@@ -660,6 +680,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 // those again deflates every HRV the app publishes.
                 val beats = RrIngest.newBeats(lastHrSample, hr)
                 lastHrSample = RrIngest.nextPrevious(lastHrSample, hr)
+                // The raw notification, not `beats`. This buffer is a capture,
+                // not an analysis, and the de-duplication above must not reach
+                // it -- see restHrBuffer's own note. This collector runs at
+                // every stage; the in-set collector below owns IN_SET, so the
+                // guard here is what keeps the two captures disjoint.
+                if (stateFlow.value.stage in setOf(Stage.READY, Stage.RESTING)) restHrBuffer += hr
                 if (beats.isNotEmpty()) {
                     recentRrMs.addAll(beats)
                     while (recentRrMs.size > ROLLING_HRV_BEATS) recentRrMs.removeFirst()
@@ -710,6 +736,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun startPlanSession(planSession: PlanSessionDef) {
         viewModelScope.launch {
             sessionRrMs.clear()
+            // A new session does not inherit the last one's trailing rest
+            // window. That window belongs to no set of either session and is
+            // the one gap this design leaves open, tracked separately; letting
+            // it drift forward would attach it to the wrong session entirely.
+            restHrBuffer.clear()
             sessionStartedAtMs = System.currentTimeMillis()
             val queue = sessionRepository.flattenPlan(planSession)
             stateFlow.value =
@@ -757,6 +788,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startAdHocSession() {
         sessionRrMs.clear()
+        restHrBuffer.clear()
         sessionStartedAtMs = System.currentTimeMillis()
         stateFlow.value = adHocSessionState(stateFlow.value)
     }
@@ -1098,6 +1130,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 orderIdx = s.setsCompleted,
                 samples = imuBuffer.toList(),
                 hrSamples = hrBuffer.toList(),
+                restHrSamples = restHrBuffer.toList(),
                 cues = cueBuffer.toList(),
                 rating = rating,
                 planName = s.planName.takeIf { !s.adHoc },
@@ -1111,6 +1144,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     velocityLossStopPct = slot?.velocityLossStopPct,
                 ),
             )
+        // Cleared once it is FROZEN into the pending write, not when the next
+        // set begins. The window belongs to the set that follows it, so it has
+        // to survive from one set ending to the next one being written -- and
+        // clearing it here rather than at beginSet means a retry replays the
+        // frozen copy rather than a buffer that kept filling behind it.
+        restHrBuffer.clear()
         launchSetWrite()
     }
 
@@ -1266,6 +1305,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     geometry = p.geometry,
                     imuSamples = p.samples,
                     hrSamples = p.hrSamples,
+                    restHrSamples = p.restHrSamples,
                     voiceCues = p.cues,
                     rpe = p.rating?.rpe,
                     failed = failed,

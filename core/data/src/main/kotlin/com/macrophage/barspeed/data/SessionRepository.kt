@@ -162,6 +162,15 @@ class SessionRepository(
                     ),
                 )
             }
+            if (set.restHrSamples.isNotEmpty()) {
+                add(
+                    RawStreamEntity(
+                        setId = 0L,
+                        kind = RawStreamEntity.KIND_REST_BEFORE_HRM,
+                        csvGzip = Gzip.compress(HrCsv.encode(set.restHrSamples)),
+                    ),
+                )
+            }
             if (set.voiceCues.isNotEmpty()) {
                 add(
                     RawStreamEntity(
