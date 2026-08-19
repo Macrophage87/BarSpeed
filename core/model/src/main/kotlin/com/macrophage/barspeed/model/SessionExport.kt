@@ -66,8 +66,8 @@ data class SessionExport(
          * instant altogether. The key is absent on sessions recorded before the
          * app captured it.
          */
-        const val SCHEMA_VERSION = "1.6"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6")
+        const val SCHEMA_VERSION = "1.7"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7")
 
         /**
          * Which phase a rep opened with, lowercased [StartPhase] names. 1:1
@@ -290,4 +290,14 @@ data class HrSetSummary(
     val endOfSetBpm: Int? = null,
     val avgBpm: Int? = null,
     val maxBpm: Int? = null,
+    /**
+     * The lowest bpm this set's trusted samples support -- the same
+     * population [avgBpm] and [maxBpm] are drawn from, never the whole
+     * stream. :core:model has no dependency on :core:data, so the reasoning
+     * lives where the divergence is concrete: SessionExporter.setExport in
+     * :core:data computes this one figure fresh from the set's raw HRM
+     * stream at export time, while its three siblings here are read off
+     * columns frozen at record time.
+     */
+    val minBpm: Int? = null,
 )

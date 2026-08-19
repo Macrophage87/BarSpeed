@@ -7,6 +7,7 @@ import com.macrophage.barspeed.dsp.TempoComplianceResult
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.GeometrySource
 import com.macrophage.barspeed.model.GeometrySources
+import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.SetExport
@@ -227,10 +228,19 @@ class SessionExporterTest {
             csvGzip = Gzip.compress(CueCsv.encode(listOf(VoiceCue(1_100L, "Rep 1")))),
         )
 
+    /** A raw HRM stream whose trusted minimum -- 90 -- appears in no stored column any test here uses. */
+    private fun hrStream(samples: List<HrSample>) = RawStreamEntity(
+        id = 11L,
+        setId = 5L,
+        kind = RawStreamEntity.KIND_HRM,
+        csvGzip = Gzip.compress(HrCsv.encode(samples)),
+    )
+
     private fun exporterOf(
         stored: SetRecordEntity,
         zoneId: String? = null,
         utcOffsetMinutes: Int? = null,
+        extraStreams: List<RawStreamEntity> = emptyList(),
     ): SessionExporter {
         val dao =
             FakeSessionDao(
@@ -243,7 +253,7 @@ class SessionExporterTest {
                     utcOffsetMinutes = utcOffsetMinutes,
                 ),
                 rows = listOf(stored),
-                streams = mapOf(5L to listOf(cueStream)),
+                streams = mapOf(5L to listOf(cueStream) + extraStreams),
             )
         return SessionExporter(SessionRepository(dao, FakeExerciseDao()))
     }
@@ -827,9 +837,14 @@ class SessionExporterTest {
      * That row shape is not hypothetical: it is what a set produces when its
      * final sample is not a measurement, and session 28's third set is exactly
      * it -- null, 46, 46. The exporter gates the block on ANY of the three
-     * columns being present, and nothing exercised that gate. Narrowing it to
-     * ALL THREE deletes the block entirely for this shape, silently, and the
-     * set would export as though no strap had been connected.
+     * stored columns, or the freshly computed minBpm, being present, and
+     * nothing exercised that gate. Narrowing it to ALL FOUR deletes the block
+     * entirely for this shape, silently, and the set would export as though
+     * no strap had been connected.
+     *
+     * No raw HRM stream is wired for this set, so minBpm is null here too --
+     * this test is about the three stored columns, not the fourth source;
+     * that one gets its own tests below.
      *
      * Asserted on the emitted JSON as well as on the object, because the JSON
      * is what a consumer reads and `explicitNulls = false` is what turns the
@@ -847,6 +862,7 @@ class SessionExporterTest {
         assertNull(hr.endOfSetBpm)
         assertEquals(46, hr.avgBpm)
         assertEquals(46, hr.maxBpm)
+        assertNull(hr.minBpm, "no raw stream was wired for this set")
 
         val text = exporterOf(stored).exportJson(1L, includeRepDetail = true)!!
         val block =
@@ -854,6 +870,72 @@ class SessionExporterTest {
                 .jsonObject["sets"]!!.jsonArray.single().jsonObject["hr"]!!.jsonObject
         assertEquals(setOf("avgBpm", "maxBpm"), block.keys, "the absent reading was published as a key")
         assertEquals("46", block["avgBpm"]!!.jsonPrimitive.content)
+    }
+
+    /**
+     * minBpm comes from this set's own raw HRM stream, decoded fresh at
+     * export time -- not from any stored column, and not the same population
+     * a reader might assume from [avgBpm]/[maxBpm] alone.
+     *
+     * The stored row and the raw stream disagree on purpose: the row's three
+     * columns are 148/131/152, none of which is anywhere near the stream's
+     * trusted minimum of 90. If minBpm were somehow deriving from the stored
+     * row -- copied from one of the other three, or computed from a stale
+     * cache of the same numbers -- this would either fail to compile the
+     * assertion below or produce one of 148, 131 or 152 instead of 90.
+     */
+    @Test
+    fun `a set's minBpm comes from its raw HRM stream, not the stored row`() = runTest {
+        val samples =
+            listOf(
+                HrSample(1_000L, 130, listOf(600.0)),
+                HrSample(2_000L, 90, listOf(650.0)),
+                HrSample(3_000L, 110, listOf(700.0)),
+            )
+        val stored =
+            row(analysis(3), actualReps = 3, repsManual = false)
+                .copy(hrEndOfSetBpm = 148, hrAvgBpm = 131, hrMaxBpm = 152)
+        val exported =
+            exporterOf(stored, extraStreams = listOf(hrStream(samples)))
+                .buildExport(1L, includeRepDetail = true)!!
+                .exercises.single().sets.single()
+        val hr = assertNotNull(exported.hr)
+        assertEquals(148, hr.endOfSetBpm)
+        assertEquals(131, hr.avgBpm)
+        assertEquals(152, hr.maxBpm)
+        assertEquals(90, hr.minBpm, "the stream's trusted minimum, not any of the stored columns")
+    }
+
+    /**
+     * The gate's fourth clause, discharged directly: a set whose three
+     * stored columns are all null -- nothing trusted at record time, or a
+     * session that predates minBpm entirely -- still publishes an `hr` block
+     * when its raw stream has a trusted minimum today. Reverting the gate to
+     * check only the three stored columns would drop this block silently;
+     * this is the test that reds if that happens.
+     */
+    @Test
+    fun `a set with nothing stored still publishes minBpm from its raw stream`() = runTest {
+        val stored =
+            row(analysis(3), actualReps = 3, repsManual = false)
+                .copy(hrEndOfSetBpm = null, hrAvgBpm = null, hrMaxBpm = null)
+        val samples = listOf(HrSample(1_000L, 100, listOf(600.0)))
+        val exported =
+            exporterOf(stored, extraStreams = listOf(hrStream(samples)))
+                .buildExport(1L, includeRepDetail = true)!!
+                .exercises.single().sets.single()
+        val hr = assertNotNull(exported.hr, "the hr block was dropped despite a trusted raw stream")
+        assertNull(hr.endOfSetBpm)
+        assertNull(hr.avgBpm)
+        assertNull(hr.maxBpm)
+        assertEquals(100, hr.minBpm)
+
+        val text =
+            exporterOf(stored, extraStreams = listOf(hrStream(samples))).exportJson(1L, includeRepDetail = true)!!
+        val block =
+            Json.parseToJsonElement(text).jsonObject["exercises"]!!.jsonArray.single()
+                .jsonObject["sets"]!!.jsonArray.single().jsonObject["hr"]!!.jsonObject
+        assertEquals(setOf("minBpm"), block.keys, "minBpm should be the only key this set can support")
     }
 
     /**

@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.VelocityEstimator
+import com.macrophage.barspeed.hrm.HrTrust
 import com.macrophage.barspeed.model.ExerciseExport
 import com.macrophage.barspeed.model.GeometryExport
 import com.macrophage.barspeed.model.GeometrySourceExport
@@ -80,15 +81,20 @@ class SessionExporter(
     private suspend fun setExport(record: SetRecordEntity, includeRepDetail: Boolean): SetExport {
         val analysis = sessionRepository.decodeAnalysis(record)
         val reps = analysis?.reps.orEmpty()
+        // Fetched unconditionally now, not only when includeRepDetail: minBpm
+        // below needs this set's raw streams every time, and detailed export
+        // already paid for this call, so hoisting it here saves the DAO a
+        // second round trip on that path rather than costing one on the other.
+        val streams = sessionRepository.rawStreams(record.id)
         val voiceCues =
             if (includeRepDetail) {
-                sessionRepository.rawStreams(record.id)
-                    .firstOrNull { it.kind == RawStreamEntity.KIND_CUES }
+                streams.firstOrNull { it.kind == RawStreamEntity.KIND_CUES }
                     ?.let { CueCsv.decode(Gzip.decompress(it.csvGzip)) }
                     ?.takeIf { it.isNotEmpty() }
             } else {
                 null
             }
+        val minBpm = minBpm(streams)
         return SetExport(
             loadKg = record.loadKg,
             loadLb = Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0,
@@ -117,9 +123,18 @@ class SessionExporter(
                 )
             },
             velocityLossPct = analysis?.velocityLossPct,
+            // minBpm in this list is load-bearing, not defensive padding: it is
+            // computed fresh, below, from this set's raw stream, while the
+            // other three are read off columns frozen at record time. Those two
+            // sources can disagree about whether there is anything to report at
+            // all -- an old session predating minBpm's existence has no way for
+            // its frozen columns to predict it -- so this cannot assume all
+            // four move together, and listOfNotNull is what lets a fourth
+            // condition join the other three without tripping detekt's
+            // ComplexCondition on a fourth `||`.
             hr =
-            if (record.hrEndOfSetBpm != null || record.hrAvgBpm != null || record.hrMaxBpm != null) {
-                HrSetSummary(record.hrEndOfSetBpm, record.hrAvgBpm, record.hrMaxBpm)
+            if (listOfNotNull(record.hrEndOfSetBpm, record.hrAvgBpm, record.hrMaxBpm, minBpm).isNotEmpty()) {
+                HrSetSummary(record.hrEndOfSetBpm, record.hrAvgBpm, record.hrMaxBpm, minBpm)
             } else {
                 null
             },
@@ -177,6 +192,37 @@ class SessionExporter(
             ),
         )
     }
+
+    /**
+     * A set's lowest trusted bpm, read from its own raw HRM stream rather
+     * than the stored row -- the only way this figure can exist for a
+     * session recorded before it did. [SetRecordEntity.hrEndOfSetBpm],
+     * hrAvgBpm and hrMaxBpm are frozen at whatever HrTrust.isTrusted meant
+     * when SessionRepository.recordSet ran; this is computed under whatever
+     * it means right now, at export time. That is a real divergence if
+     * isTrusted is ever changed later, and it is also exactly what buys
+     * retroactive coverage: an old session gets a minBpm computed under
+     * today's rule from data it already has, rather than one frozen under a
+     * rule that predates the concept of minBpm entirely. [setExport]'s hr
+     * gate cannot assume this figure and its three siblings move together,
+     * because they are answered by two different clocks.
+     *
+     * Decompresses and parses the stream unconditionally -- a new per-set
+     * cost on a function neither caller in SessionDetailViewModel wraps off
+     * the main thread (issue #29). Small next to the IMU decode
+     * RawExporter.imuSamples already does there -- a real per-set HRM
+     * stream gzips to a few hundred bytes against a 100 Hz IMU stream's tens
+     * of thousands -- but real, and issue #29 carries the measurement rather
+     * than this comment repeating it.
+     *
+     * A malformed or absent stream yields null rather than failing the
+     * export, the same shape [RawExporter.imuSamples] already uses for the
+     * IMU side.
+     */
+    private fun minBpm(streams: List<RawStreamEntity>): Int? =
+        streams.firstOrNull { it.kind == RawStreamEntity.KIND_HRM }
+            ?.let { stream -> runCatching { HrCsv.decode(Gzip.decompress(stream.csvGzip)) }.getOrNull() }
+            ?.let { HrTrust.summarize(it).minBpm }
 
     /**
      * Into the plan's own vocabulary, so a reader holding both schemas reads
