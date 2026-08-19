@@ -45,7 +45,10 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
             viewModelScope.launch {
                 container.bleScanner.scan()
                     .catch { e ->
-                        scanError.value = e.message
+                        // A null message renders nothing through DevicesScreen's
+                        // scanError?.let{}, so a scan that failed looks identical
+                        // to one that simply found no devices.
+                        scanError.value = e.message ?: "Scan failed (no reason reported)"
                         scanning.value = false
                     }
                     .collect { device ->

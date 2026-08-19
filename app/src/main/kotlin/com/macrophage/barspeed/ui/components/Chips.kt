@@ -62,10 +62,12 @@ fun SensorDot(label: String, connected: Boolean, modifier: Modifier = Modifier, 
  * the branches are exhaustive over [ConnectionState] so a new state has to be
  * decided rather than falling into the grey. The reason string itself is
  * rendered by the caller — the pill is too narrow for a framework diagnostic.
- * [ConnectionState.Failed] has seven producers in `GattClients.kt` carrying
+ * [ConnectionState.Failed] has ten producers in `GattClients.kt` carrying
  * six distinct reasons, and exactly one of them interpolates a raw GATT status
  * integer (the service-discovery failure); an earlier version of this comment
- * said two of three, which was wrong on both numbers.
+ * said seven producers, before three more call sites gained a catch for the
+ * same permission-revoked race `connect()` already guarded against, all three
+ * reusing the existing reason string rather than adding a new one.
  */
 @Composable
 fun ConnectionChip(label: String, state: ConnectionState, modifier: Modifier = Modifier) {
