@@ -939,6 +939,76 @@ class SessionExporterTest {
     }
 
     /**
+     * minBpm reads the HRM stream and ONLY the HRM stream.
+     *
+     * `raw_streams.kind` is a free-form column, so a set can carry a stream of
+     * any kind at all, and `Exporters.minBpm` selects with
+     * `firstOrNull { it.kind == KIND_HRM }`. This pins that selection against a
+     * kind that does not exist yet: heart-rate samples recorded during the REST
+     * window before a set are a different population from the set's own, and
+     * folding them into a figure published under the set's name would be the
+     * mixed-population defect this repository has already shipped once.
+     *
+     * Written before the rest stream exists, deliberately -- the kind here is a
+     * literal rather than a constant, so this test does not need the feature it
+     * guards, and it reds if the selection is ever widened to match on a
+     * prefix, on "contains hrm", or on anything but equality.
+     *
+     * The two streams disagree by design: the set's own trusted minimum is 100,
+     * the impostor's is 44. Publishing 44 would be the failure.
+     */
+    @Test
+    fun `a stream of another kind cannot reach minBpm`() = runTest {
+        val ownSamples = listOf(HrSample(5_000L, 100, listOf(600.0)))
+        val restSamples =
+            listOf(HrSample(1_000L, 44, listOf(1_350.0)), HrSample(2_000L, 47, listOf(1_270.0)))
+        val impostor =
+            RawStreamEntity(
+                id = 12L,
+                setId = 5L,
+                kind = "rest_before_hrm",
+                csvGzip = Gzip.compress(HrCsv.encode(restSamples)),
+            )
+        val stored =
+            row(analysis(3), actualReps = 3, repsManual = false)
+                .copy(hrEndOfSetBpm = null, hrAvgBpm = null, hrMaxBpm = null)
+        val exported =
+            // Impostor FIRST. With the real stream first this passed under a
+            // widened selection too -- firstOrNull took the right stream by
+            // position rather than by kind, so the pin was asserting the order
+            // of a list whose order the caller chooses arbitrarily.
+            exporterOf(stored, extraStreams = listOf(impostor, hrStream(ownSamples)))
+                .buildExport(1L, includeRepDetail = true)!!
+                .exercises.single().sets.single()
+        val hr = assertNotNull(exported.hr)
+        assertEquals(100, hr.minBpm, "a non-HRM stream reached the set's published minimum")
+    }
+
+    /**
+     * And with no HRM stream at all, a stream of another kind does not stand in
+     * for one: the block is absent rather than filled from the wrong stream.
+     */
+    @Test
+    fun `a stream of another kind does not substitute for a missing HRM stream`() = runTest {
+        val restSamples = listOf(HrSample(1_000L, 44, listOf(1_350.0)))
+        val impostor =
+            RawStreamEntity(
+                id = 12L,
+                setId = 5L,
+                kind = "rest_before_hrm",
+                csvGzip = Gzip.compress(HrCsv.encode(restSamples)),
+            )
+        val stored =
+            row(analysis(3), actualReps = 3, repsManual = false)
+                .copy(hrEndOfSetBpm = null, hrAvgBpm = null, hrMaxBpm = null)
+        val exported =
+            exporterOf(stored, extraStreams = listOf(impostor))
+                .buildExport(1L, includeRepDetail = true)!!
+                .exercises.single().sets.single()
+        assertNull(exported.hr, "a non-HRM stream produced an hr block on its own")
+    }
+
+    /**
      * A set that summarised to nothing at all publishes no `hr` block.
      *
      * The other side of the same gate. An empty object here would read as "a
