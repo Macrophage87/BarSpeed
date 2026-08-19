@@ -1,7 +1,5 @@
 package com.macrophage.barspeed.dsp
 
-import kotlin.math.max
-
 /**
  * One beat of a guided rep: a label held for a whole number of seconds.
  *
@@ -106,17 +104,29 @@ data class CadencePlan(
             val firstS = strokeSeconds(schedule.first.seconds)
             val secondS = strokeSeconds(schedule.second.seconds)
             val firstPause = schedule.pauseAfterFirstS.toInt()
-            // Something has to carry the rep call; borrow the closing pause when
-            // the prescription provides one, otherwise add a single second.
-            val closing = max(schedule.pauseAfterSecondS.toInt(), ANNOUNCE_BEAT_S)
+            // The prescription decides this, and nothing else may add to it.
+            val closing = schedule.pauseAfterSecondS.toInt()
 
             val beats = mutableListOf<CadenceBeat>()
             beats += stroke(schedule.first.label, firstS)
             if (firstPause > 0) beats += CadenceBeat(HOLD, firstPause, "Hold", isStroke = false)
             beats += stroke(schedule.second.label, secondS)
             val repCompleteAfter = beats.lastIndex
-            beats += CadenceBeat(BREATHE, closing, null, isStroke = false)
-            return CadencePlan(beats, repCompleteAfter, beats.lastIndex, announceMerged = false)
+            if (closing > 0) beats += CadenceBeat(BREATHE, closing, null, isStroke = false)
+
+            // The rep call rides a closing pause when the prescription provides
+            // one long enough to say it in.
+            if (closing >= ANNOUNCE_BEAT_S) {
+                return CadencePlan(beats, repCompleteAfter, beats.lastIndex, announceMerged = false)
+            }
+            // Otherwise it opens the next rep's first stroke, which gives up its
+            // first count to make room. Only a stroke that HAS a count can.
+            if (firstS >= MERGE_MIN_STROKE_S) {
+                beats[0] = beats[0].copy(suppressFirstCount = true)
+                return CadencePlan(beats, repCompleteAfter, announceOnBeat = 0, announceMerged = true)
+            }
+            // Nowhere left to put it. The screen still carries the rep number.
+            return CadencePlan(beats, repCompleteAfter, announceOnBeat = null, announceMerged = false)
         }
 
         private fun stroke(label: String, seconds: Int) = CadenceBeat(
