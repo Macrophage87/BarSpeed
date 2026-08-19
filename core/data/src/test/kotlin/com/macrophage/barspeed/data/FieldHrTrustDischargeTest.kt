@@ -5,6 +5,7 @@ import com.macrophage.barspeed.model.HrSample
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -102,6 +103,39 @@ class FieldHrTrustDischargeTest {
         val trusted = HrFixtures.allUnworn().map { set -> set.count { HrTrust.isTrusted(it) } }
         assertEquals(listOf(0, 0, 47), trusted)
         assertEquals(listOf(72, 91, 91), HrFixtures.allUnworn().map { it.size })
+    }
+
+    /**
+     * WHAT AN UNWORN STRAP PUBLISHES TODAY, all three figures, pinned before
+     * anything moves so the differential shows exactly what changes.
+     *
+     * Three, not two. #79 left avgBpm and maxBpm; #90 part B added minBpm over
+     * the same trusted list, so a set recorded with the strap on a table now
+     * publishes THREE believable resting figures where it published two. That
+     * was my change and it enlarged this issue rather than being found in it.
+     */
+    @Test
+    fun `the unworn set publishes three figures today, and they agree with each other`() {
+        val summary = HrTrust.summarize(HrFixtures.unworn(3))
+        assertEquals(46, summary.avgBpm)
+        assertEquals(46, summary.maxBpm)
+        assertEquals(46, summary.minBpm)
+        assertEquals(47, summary.trustedSamples, "the samples the sample-level rule cannot reach")
+        assertEquals(91, summary.totalSamples)
+    }
+
+    /**
+     * And the other two unworn sets publish nothing already, so the whole of
+     * this issue is one set. The firing evidence for any rule here is n=1.
+     */
+    @Test
+    fun `the other two unworn sets already publish nothing`() {
+        for (set in listOf(1, 2)) {
+            val summary = HrTrust.summarize(HrFixtures.unworn(set))
+            assertNull(summary.avgBpm, "unworn set $set")
+            assertNull(summary.maxBpm, "unworn set $set")
+            assertNull(summary.minBpm, "unworn set $set")
+        }
     }
 
     /**
