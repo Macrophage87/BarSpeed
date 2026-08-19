@@ -209,6 +209,7 @@ class SessionRepositoryRecordSetTest {
         hrSamples: List<HrSample> = hr,
         voiceCues: List<VoiceCue> = cues,
         geometry: ResolvedGeometry? = null,
+        restHrSamples: List<HrSample> = emptyList(),
     ) = CompletedSet(
         exerciseId = "back_squat",
         exerciseName = "Back Squat",
@@ -229,6 +230,7 @@ class SessionRepositoryRecordSetTest {
         geometry = geometry,
         imuSamples = imuSamples,
         hrSamples = hrSamples,
+        restHrSamples = restHrSamples,
         voiceCues = voiceCues,
     )
 
@@ -613,6 +615,90 @@ class SessionRepositoryRecordSetTest {
         repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet())
         assertEquals(
             listOf(RawStreamEntity.KIND_IMU, RawStreamEntity.KIND_HRM, RawStreamEntity.KIND_CUES),
+            dao.streams.map { it.kind },
+        )
+    }
+
+    /**
+     * The rest window before a set becomes a fourth stream on that set's row,
+     * written in the same insert as the other three.
+     *
+     * Order is asserted because the manifest lists files in stream order and a
+     * reader of the zip sees them that way: the set's own capture first, then
+     * the window that preceded it, then what the app said. Rest AFTER own is
+     * deliberate -- the set is the subject of the row and the rest window is
+     * context for it.
+     */
+    @Test
+    fun `the rest window before a set is written as a fourth stream`() = runTest {
+        val dao = FakeSessionDao()
+        val rest = listOf(HrSample(500L, 64, listOf(937.5)), HrSample(1_000L, 63, listOf(952.4)))
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(restHrSamples = rest))
+        assertEquals(
+            listOf(
+                RawStreamEntity.KIND_IMU,
+                RawStreamEntity.KIND_HRM,
+                RawStreamEntity.KIND_REST_BEFORE_HRM,
+                RawStreamEntity.KIND_CUES,
+            ),
+            dao.streams.map { it.kind },
+        )
+    }
+
+    /**
+     * The stream round-trips through the canonical HR CSV, unchanged.
+     *
+     * DUPLICATES SURVIVE, and that is the assertion that matters. The fixture
+     * repeats 937.5 ms three times, which is what this strap does when no new
+     * beat has arrived (issue #81). The analysis accumulators de-duplicate
+     * that; the raw capture must not, because it is the only irreplaceable
+     * artifact and because a de-duplicated rest stream would be the only
+     * evidence anyone could ever use to measure #81's cost at resting rates,
+     * destroyed while looking entirely plausible.
+     */
+    @Test
+    fun `the rest stream keeps every notification, duplicates included`() = runTest {
+        val dao = FakeSessionDao()
+        val rest =
+            listOf(
+                HrSample(500L, 64, listOf(937.5)),
+                HrSample(1_000L, 64, listOf(937.5)),
+                HrSample(1_500L, 64, listOf(937.5)),
+                HrSample(2_000L, 63, listOf(952.4)),
+            )
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(restHrSamples = rest))
+        val stream = dao.streams.single { it.kind == RawStreamEntity.KIND_REST_BEFORE_HRM }
+        assertEquals(rest, HrCsv.decode(Gzip.decompress(stream.csvGzip)))
+        assertEquals(4, HrCsv.decode(Gzip.decompress(stream.csvGzip)).size, "a duplicate was collapsed")
+    }
+
+    /** No rest window captured writes no stream at all -- absence, not an empty file. */
+    @Test
+    fun `a set with no rest window writes only its own three streams`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(restHrSamples = emptyList()))
+        assertEquals(
+            listOf(RawStreamEntity.KIND_IMU, RawStreamEntity.KIND_HRM, RawStreamEntity.KIND_CUES),
+            dao.streams.map { it.kind },
+        )
+    }
+
+    /**
+     * A set with a rest window and no strap during the set itself still stores
+     * the rest window. The two are separate captures and one does not gate the
+     * other.
+     */
+    @Test
+    fun `a rest window is stored even when the set itself recorded no heart rate`() = runTest {
+        val dao = FakeSessionDao()
+        val rest = listOf(HrSample(500L, 58, listOf(1_034.5)))
+        repo(dao).recordSet(
+            sessionId = 1L,
+            orderIdx = 0,
+            set = completedSet(hrSamples = emptyList(), restHrSamples = rest),
+        )
+        assertEquals(
+            listOf(RawStreamEntity.KIND_IMU, RawStreamEntity.KIND_REST_BEFORE_HRM, RawStreamEntity.KIND_CUES),
             dao.streams.map { it.kind },
         )
     }

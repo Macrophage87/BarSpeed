@@ -177,6 +177,13 @@ class RawExporterTest {
         csvGzip = Gzip.compress(HrCsv.encode(listOf(HrSample(1_000L, 120, listOf(500.0))))),
     )
 
+    private fun restStream(setId: Long, samples: List<HrSample>) = RawStreamEntity(
+        id = 4L,
+        setId = setId,
+        kind = RawStreamEntity.KIND_REST_BEFORE_HRM,
+        csvGzip = Gzip.compress(HrCsv.encode(samples)),
+    )
+
     private suspend fun zipOf(
         rows: List<SetRecordEntity>,
         streams: Map<Long, List<RawStreamEntity>>,
@@ -216,6 +223,58 @@ class RawExporterTest {
     private fun JsonObject.num(key: String): Double? = get(key)?.jsonPrimitive?.content?.toDouble()
 
     private fun JsonObject.text(key: String): String? = get(key)?.jsonPrimitive?.content
+
+    /**
+     * What the archive looks like once a rest window is stored, which is the
+     * whole visible result of issue #90 part 1.
+     *
+     * The exporter needs no change to produce this: it names every stream
+     * `set%02d_<exercise>_<kind>.csv` and loops over all of them, so the kind
+     * string alone decides the filename. That is why the kind carries the
+     * DIRECTION -- a coach opening this zip sees
+     * `set01_plank_rest_before_hrm.csv` beside `set01_plank_hrm.csv` and can
+     * tell which side of the set each covers without decoding either.
+     *
+     * The manifest's top-level keys do not move; the file appears inside the
+     * set's own `files` array. `meta.json` has no published schema, so this
+     * test and its neighbours are the only statement of that shape.
+     */
+    @Test
+    fun `a stored rest window appears in the zip and in the manifest`() = runTest {
+        val rest = listOf(HrSample(200L, 64, listOf(937.5)), HrSample(700L, 63, listOf(952.4)))
+        val entries =
+            zipOf(
+                listOf(row(id = 5L)),
+                mapOf(
+                    5L to listOf(
+                        imuStream(5L, stillSamples(45.0), storedRate = 100.0),
+                        hrStream(5L),
+                        restStream(5L, rest),
+                    ),
+                ),
+            )
+        assertEquals(
+            setOf(
+                "set01_plank_imu.csv",
+                "set01_plank_hrm.csv",
+                "set01_plank_rest_before_hrm.csv",
+                "meta.json",
+                "session.json",
+            ),
+            entries.keys,
+        )
+        assertEquals(
+            rest,
+            HrCsv.decode(entries.getValue("set01_plank_rest_before_hrm.csv")),
+            "the rest capture did not survive the archive intact",
+        )
+        val manifest = Json.parseToJsonElement(entries.getValue("meta.json")).jsonObject
+        assertEquals(
+            listOf("set01_plank_imu.csv", "set01_plank_hrm.csv", "set01_plank_rest_before_hrm.csv"),
+            manifest.set(0).getValue("files").jsonArray.map { it.jsonPrimitive.content },
+        )
+        assertEquals(HrCsv.HEADER, manifest.text("csvHeaderHrm"), "the rest CSV shares the HRM header")
+    }
 
     // ---- the manifest as a document ----------------------------------------
 
