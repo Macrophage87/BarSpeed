@@ -52,15 +52,29 @@ class PowerTravelRatioTest {
     }
 
     @Test
-    fun `a declared pulley ratio scales the published power (pre-fix)`() {
-        // The defect. mappedToLifter multiplies BOTH velocity and acceleration
-        // by travelRatio, while loadKg is left in the sensor's frame, so
-        // P = r*(m*g*v) + r^2*(m*a*v). The gravity term scales once and the
-        // inertial term twice, which is why peak moves further than mean.
-        assertEquals(1055.8, meanPeakW(2.0), 0.05, "2:1 pulley, peak, W")
-        assertEquals(596.0, meanConW(2.0), 0.05, "2:1 pulley, mean concentric, W")
-        assertEquals(233.6, meanPeakW(0.5), 0.05, "1:2 pulley, peak, W")
-        assertEquals(152.9, meanConW(0.5), 0.05, "1:2 pulley, mean concentric, W")
+    fun `a declared pulley ratio does not change the power published`() {
+        // Power is conserved across an ideal pulley: a 2:1 halves the force at
+        // the handle and doubles its travel, so the watts are the same measured
+        // at either end. The published figure must therefore not move when only
+        // the ratio is declared.
+        //
+        // Before this was fixed it moved a long way. mappedToLifter multiplies
+        // BOTH velocity and acceleration by travelRatio while loadKg is left in
+        // the sensor's frame, giving P = r*(m*g*v) + r^2*(m*a*v): the gravity
+        // term scaled once and the inertial term twice. A 2:1 read 1055.8 W
+        // peak against 481.8, and a 1:2 read 233.6.
+        assertEquals(481.8, meanPeakW(2.0), 0.05, "2:1 pulley, peak, W")
+        assertEquals(481.8, meanPeakW(0.5), 0.05, "1:2 pulley, peak, W")
+
+        // Mean concentric power is not identical across ratios, and that is the
+        // segmentation shift pinned below rather than a residue of the defect:
+        // the drive span is chosen on the scaled series, so it covers slightly
+        // different samples. Within two per cent of the direct-drive figure.
+        assertEquals(297.4, meanConW(2.0), 0.05, "2:1 pulley, mean concentric, W")
+        assertEquals(306.1, meanConW(0.5), 0.05, "1:2 pulley, mean concentric, W")
+        listOf(meanConW(2.0), meanConW(0.5)).forEach {
+            assertEquals(1.0, it / meanConW(1.0), 0.02, "mean power within 2% of the 1:1 figure")
+        }
     }
 
     @Test
