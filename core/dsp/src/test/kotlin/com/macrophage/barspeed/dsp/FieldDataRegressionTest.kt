@@ -174,7 +174,12 @@ class FieldDataRegressionTest {
         val tracker = StreamingSetTracker(StartPhase.CONCENTRIC)
         var last = LiveSetState()
         samples.forEach { last = tracker.feed(it) }
-        assertEquals(2, last.repCount, "live count should match the 2 real presses")
+        // The live tracker counts ONE where the batch analyzer above segments
+        // two. It is not that the second press is unreal -- batch measures it
+        // at 0.484 m -- it is that the live RUN carrying it travels past
+        // `maxRunDisplacementM`, so live declines to count a rep it cannot
+        // bound. Losing it is the intended cost, not a side effect.
+        assertEquals(1, last.repCount, "live reps; the lifter performed 2")
     }
 
     @Test
@@ -185,7 +190,8 @@ class FieldDataRegressionTest {
         val tracker = StreamingSetTracker(StartPhase.CONCENTRIC)
         var last = LiveSetState()
         samples.forEach { last = tracker.feed(it) }
-        assertEquals(5, last.repCount, "live rep count; the lifter performed 8")
+        // Was 5. Two of those five completed on runs past `maxRunDisplacementM`.
+        assertEquals(3, last.repCount, "live rep count; the lifter performed 8")
         assertTrue(abs(last.velocityMps) < 0.25, "velocity drifted: ${last.velocityMps}")
     }
 
@@ -609,15 +615,26 @@ class FieldDataRegressionTest {
         // pallof press was the sharpest at 9 live against 13 batch for 12
         // performed; live now reads 12, which is the lifter count, while batch
         // still reads 13 — the gap did not close, it moved into the export.
-        // The cable row goes the other way, 8 to 7 against a truth of 8.
-        // Across the seven, absolute live error falls from 10 to 8.
+        // The cable row went the other way, 8 to 7 against a truth of 8.
+        // Those two sentences describe an EARLIER change and are left as its
+        // record; the map below no longer holds the values they were written
+        // against, because bounding run displacement moves the overhead press
+        // 4 -> 3 and the cable row 7 -> 5.
+        //
+        // Summed over these seven, |live - performed| RISES 15 -> 18 under
+        // that bound. That is the expected direction and the whole argument
+        // for the change is that it is not the figure to optimise: the three
+        // reps it removes completed on runs travelling past
+        // `maxRunDisplacementM`, which the batch path has never once produced
+        // in 213 runs. A count that is nearer the truth by including
+        // increments nothing can bound is nearer by accident.
         val liveToday =
             mapOf(
-                "field-ohp-rotating-8rep.csv" to (4 to 8),
+                "field-ohp-rotating-8rep.csv" to (3 to 8),
                 "field-ohp-rotating-8rep-b.csv" to (5 to 8),
                 "field-bench-rotating-6rep-ok.csv" to (5 to 6),
                 "field-bench-rotating-6rep.csv" to (1 to 6),
-                "field-cablerow-static-8rep.csv" to (7 to 8),
+                "field-cablerow-static-8rep.csv" to (5 to 8),
                 "field-facepull-static-12rep.csv" to (11 to 12),
                 "field-pallof-static-12rep.csv" to (12 to 12),
             )

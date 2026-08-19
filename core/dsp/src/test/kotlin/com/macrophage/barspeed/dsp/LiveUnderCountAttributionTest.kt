@@ -9,10 +9,16 @@ import kotlin.test.assertEquals
 /**
  * WHY the live rep counter misses reps, decomposed. Issue 94.
  *
- * The counter the lifter watches during a set reports 90 reps across this
- * corpus against 111 the lifter performed. This pins what that number is made
- * of, because it is made of at least three different things and issue 94 was
- * filed describing one.
+ * The counter the lifter watches during a set reports 81 reps across this
+ * corpus against 111 the lifter performed (both pinned below, in `the corpus
+ * totals`). This pins what that number is made of, because it is made of at
+ * least three different things and issue 94 was filed describing one.
+ *
+ * Those two figures moved when the displacement bound of issue 86 landed in
+ * the commit after this one: live was 90 and absolute error 23 before it. The
+ * prose here was NOT updated with the assertions the first time and shipped
+ * four stale numbers; they are corrected below and each now cites the
+ * assertion that holds it.
  *
  * NOTHING IS FIXED HERE. These are characterization pins.
  *
@@ -20,21 +26,29 @@ import kotlin.test.assertEquals
  *
  * Issue 94 states 88 live and a batch total of 111. Both are arithmetic errors
  * in the issue body: its own per-capture table sums to 90 and to 98. Measured
- * at the SHA that issue names and again at this one, live and batch are
+ * at the SHA that issue names and again at this one, live and batch were
  * IDENTICAL -- nothing regressed and nothing was recovered between them, the
- * totals were added up wrong. Absolute live error, 23, was right.
+ * totals were added up wrong. Absolute live error, 23, was right AT THAT TIME.
+ * It is 32 here, pinned at `assertEquals(32, absoluteError)`, because the
+ * bound removes reps; that is the intended cost of issue 86, not a regression.
  *
  * ## Three mechanisms, not one
  *
- * ARMING ASYMMETRY accounts for over half the eccentric-first loss and none of
+ * ARMING ASYMMETRY accounts for part of the eccentric-first loss and none of
  * the concentric-first loss. onQualifiedRun requires a qualified down run
  * before any up run counts, so a qualified drive arriving unarmed is discarded
- * in silence. Seven times, all on eccentric-first captures, by construction.
+ * in silence. FIVE times, all on eccentric-first captures, by construction,
+ * against an eccentric-first net deficit of 14 -- so roughly a third of that
+ * half, not the majority an earlier version of this comment claimed. Both are
+ * pinned in `arming asymmetry` below. Before the bound the figures were seven
+ * of thirteen.
  *
- * A SECOND, UNIDENTIFIED LOSS costs the concentric-first captures 8 reps with
- * no arming involved. On the three captures with a cue track, every rep the
- * lifter performed produced a qualified movement run in its window, so the loss
- * is downstream of run formation AND downstream of the three lower bounds.
+ * A SECOND, UNIDENTIFIED LOSS costs the concentric-first captures 16 reps with
+ * no arming involved -- pinned below, and doubled from 8 by the bound, which
+ * makes this the LARGER of the two strands rather than the smaller. On the
+ * three captures with a cue track, every rep the lifter performed produced a
+ * qualified movement run in its window, so the loss is downstream of run
+ * formation AND downstream of the three lower bounds.
  *
  * A PHANTOM: field-backsquat-10hz-set5 reports one rep against a performed
  * count of zero, from a run well inside maxRunDisplacementM. Issue 86 is about
@@ -171,7 +185,7 @@ class LiveUnderCountAttributionTest {
         var pending = false
         var reps = 0
         var armingDrops = 0
-        runs.filter { qualifies(it, c) }.forEach { r ->
+        runs.filter { qualifies(it, c) && it.displacementM <= c.maxRunDisplacementM }.forEach { r ->
             val concentric = r.type == 1
             if (d.startsWith == StartPhase.ECCENTRIC) {
                 if (!concentric) {
@@ -217,16 +231,16 @@ class LiveUnderCountAttributionTest {
         // 90, not the 88 issue 94 states. Its own table sums to 90; the total
         // row was added up wrong, and the counts are identical at the SHA that
         // issue names.
-        assertEquals(90, live, "reps the live counter reports")
+        assertEquals(81, live, "reps the live counter reports")
         // 98, not the 111 issue 94 states, and the same arithmetic slip. Batch
         // matching the performed total exactly was never true.
         assertEquals(98, batch, "reps the batch analyzer reports")
-        assertEquals(23, absoluteError, "absolute live error, which issue 94 had right")
-        assertEquals(21, performed - live, "net live deficit")
+        assertEquals(32, absoluteError, "absolute live error")
+        assertEquals(30, performed - live, "net live deficit")
     }
 
     @Test
-    fun `arming asymmetry costs eccentric-first lifts half their deficit and concentric-first none (pre-fix)`() {
+    fun `arming asymmetry costs eccentric-first lifts part of their deficit and concentric-first none (pre-fix)`() {
         val c = DspConfig()
         var eccPerformed = 0
         var eccLive = 0
@@ -247,9 +261,9 @@ class LiveUnderCountAttributionTest {
                 conArmingDrops += drops
             }
         }
-        assertEquals(13, eccPerformed - eccLive, "net deficit on eccentric-first captures")
-        assertEquals(7, eccArmingDrops, "drives discarded for want of a qualified eccentric before them")
-        assertEquals(8, conPerformed - conLive, "net deficit on concentric-first captures")
+        assertEquals(14, eccPerformed - eccLive, "net deficit on eccentric-first captures")
+        assertEquals(5, eccArmingDrops, "drives discarded for want of a qualified eccentric before them")
+        assertEquals(16, conPerformed - conLive, "net deficit on concentric-first captures")
         // Zero by construction rather than by luck: the concentric-first branch
         // of onQualifiedRun has no arming state that can be missing.
         assertEquals(0, conArmingDrops, "arming drops on concentric-first captures")

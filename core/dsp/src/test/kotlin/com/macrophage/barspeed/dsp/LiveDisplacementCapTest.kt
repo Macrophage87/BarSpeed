@@ -7,81 +7,58 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * The live rep counter has no upper bound on how far a movement run may travel;
- * the batch analyzer has one. This pins the consequence. IT DOES NOT FIX IT,
- * and the reason is the interesting part.
+ * The live rep counter had no upper bound on how far a movement run may travel;
+ * the batch analyzer has one. This pinned the consequence, and now pins the
+ * repair: the runs are still produced, and none of them becomes a rep.
  *
  * RepSegmentation demotes a run displacing beyond [DspConfig.maxRunDisplacementM]
  * -- 2.0 m -- on the ground that no real barbell phase travels that far.
- * StreamingSetTracker qualifies a run on three LOWER bounds and no upper one, so
- * a drift run becomes a rep the moment anything terminates it. See issue 86.
+ * StreamingSetTracker qualified a run on three LOWER bounds and no upper one, so
+ * a drift run became a rep the moment anything terminated it. See issue 86.
  *
  * ## What is measured
  *
- * Across the fifteen captures here the live path produces TWELVE qualified runs
- * beyond 2.0 m, of which NINE go on to increment the rep count. The worst
- * travels 32.6 m over 24.3 s. Over the same fifteen the batch path demotes
- * NOTHING: its 213 movement runs top out at 1.982 m, so the cap has never once
- * fired where it actually lives.
+ * Across the fifteen captures here the live path still produces TWELVE
+ * qualified runs beyond 2.0 m, and none of them now increments the rep count.
+ * NINE did before the bound was applied.
  *
- * ## Why the obvious fix is not applied
+ * The twelve split ELEVEN concentric to ONE eccentric. Of the eleven, nine
+ * completed a rep and two arrived with nothing armed. So the three that never
+ * reached a counter are two CONCENTRICS plus the single eccentric, and this
+ * bound's effect on the ARMING path is nil on this corpus. An earlier version
+ * of this comment said the three were all eccentrics "which only arm a rep";
+ * that was wrong, and it was contradicted at the time by a green assertion in
+ * [LiveCapCalibrationTest] counting exactly one over-cap down run.
  *
- * Three findings, each of which alone would stop the one-line change.
+ * The largest of the twelve travels 32.558 m over 24.31 s, on
+ * field-bench-rotating-6rep -- and it is one of the two that arrived with
+ * nothing armed, so it never produced a rep and is NOT an instance of what
+ * this bound removes. The largest run that does cost a rep travels 20.376 m,
+ * pinned in [LiveCapCalibrationTest].
  *
- * FIRST, the constant is inert where it lives. 2.0 m has never demoted a run on
- * this corpus, so reusing it in the live path would promote an uncalibrated
- * number to a place where it WOULD fire.
+ * Over the same fifteen the batch path demotes NOTHING: its 213 movement runs
+ * top out at 1.982 m, so the shared constant has never once fired where it
+ * originally lived.
  *
- * SECOND, the same number does not mean the same thing in the two places. Batch
- * measures a completed run after retroactive drift correction; live measures an
- * uncorrected series carrying only a causal step offset. On the same captures
- * the live median run displacement runs 1.5 to 3.5 times the batch median, and
- * the tail is far worse than any constant factor -- 32.6 m live against 0.350 m
- * batch on field-bench-rotating-6rep. A 2.0 m live bound is roughly a 0.6 to
- * 1.3 m batch bound. The per-capture pair below makes that divergence visible
- * rather than a claim.
+ * ## What the bound costs
  *
- * THIRD, and this decides it: applying the bound today takes the number the
- * lifter watches FURTHER from the truth. All nine phantom reps are compensating
- * for an under-count -- not most, all nine -- so suppressing them moves live
- * absolute error from 23 to 32 across the fifteen captures, worse on six and
- * better on none. On the cable row the lifter would go from seeing 7 of 8 to
- * seeing 5 of 8. That under-count is issue 94, and it is the blocker.
+ * It takes the number the lifter watches FURTHER from the truth: live absolute
+ * error over the fifteen goes 23 to 32 (pinned in [LiveUnderCountAttributionTest]),
+ * worse on six captures and better on none -- that per-capture split is
+ * UNPINNED, quoted from a one-off measurement. On the cable row the lifter goes from seeing 7 of 8 to seeing 5 of 8.
+ * That under-count is issue 94 and it is not fixed here. The trade is
+ * deliberate: an increment the lifter hears should correspond to something
+ * that happened, and a count that lands nearer the truth by including a 20 m
+ * run lands there by accident.
  *
- * That is a sharper case than one this corpus has already ruled on.
- * FieldDataRegressionTest pins the cable row resolving 8 for 8 by cancelling
- * misses against drift as a DEFECT rather than a success -- a wrong mechanism
- * reaching a right number. Here the mechanism is equally wrong, but removing it
- * would actively move a number the lifter reads mid-set in the WRONG direction.
- * Same logic, harder case, and it argues for the under-count first.
+ * ## Which variant ships
  *
- * ## What right looks like
- *
- * A bound on DURATION, not displacement. Live displacement is the integral of a
- * series the live path cannot correct; live duration is the sample clock and is
- * untouched by drift, so it is the quantity worth bounding. Measured over the
- * 176 QUALIFIED LIVE runs -- a different population from the 213 batch runs
- * above, and the two are easy to confuse: plausible ones have a median of
- * 1.98 s and a maximum of 5.94 s, and the twelve over-cap runs have a median
- * of 6.96 s.
- *
- * The value should be the anchor-starvation interval, 6 s. A run outlasting the
- * point at which the drift correction itself declares residual drift has outrun
- * the rejection band is drift by the declaration of the pipeline, which is an
- * argument rather than a fit. On this corpus it catches 7 of the 12 and none of
- * the 164 plausible runs.
- *
- * It is NOT applied yet because 5.94 against 6.00 is a one per cent margin,
- * fitted to captures containing no eccentric slower than 3 s. Issue 47 asks for
- * 4010 and 6010 sets, and a 6 s prescribed eccentric will exceed a 6 s run
- * bound. The falsifier is already written and already booked: any qualified run
- * on that capture exceeding the bound while being a real phase.
- *
- * ## One hazard for whoever fixes it
- *
- * Suppress the REP, not the arming. An over-cap eccentric that is simply
- * discarded takes with it the arming for the following concentric, and the next
- * legitimate rep is lost with it. Measured: that fires once on this corpus.
+ * The over-cap run fails qualification outright, so it neither counts a rep nor
+ * arms the next one -- mode 2 in [LiveCapCalibrationTest]'s comparison. Mode 1,
+ * blocking only the count and leaving the arming intact, is the alternative.
+ * The two are count-identical on all fifteen captures, because the only
+ * over-cap eccentric falls on a concentric-first capture where arming is never
+ * consulted, so the corpus cannot separate them and the choice is structural.
  *
  * ## What this does NOT cover
  *
@@ -177,12 +154,21 @@ class LiveDisplacementCapTest {
 
     private fun qualifies(r: LiveRun, c: DspConfig) = r.displacementM >= c.minRomM && r.durationS >= c.minPhaseS
 
-    /** Replays the tracker pairing, returning reps and how many came from an over-cap run. */
-    private fun replay(runs: List<LiveRun>, d: LiftDirection, c: DspConfig): Pair<Int, Int> {
+    /**
+     * Replays the tracker pairing, returning reps and how many came from an
+     * over-cap run.
+     *
+     * [capped] selects which tracker is modelled: false is the unbounded one,
+     * true is the one this change produces. The census below needs BOTH -- ask
+     * a capped replay how many of its reps came from over-cap runs and the
+     * answer is zero however broken the tracker is, which is a check that
+     * cannot fail.
+     */
+    private fun replay(runs: List<LiveRun>, d: LiftDirection, c: DspConfig, capped: Boolean): Pair<Int, Int> {
         var pending = false
         var reps = 0
         var fromOverCap = 0
-        runs.filter { qualifies(it, c) }.forEach { r ->
+        runs.filter { qualifies(it, c) && (!capped || it.displacementM <= c.maxRunDisplacementM) }.forEach { r ->
             val overCap = r.displacementM > c.maxRunDisplacementM
             val concentric = r.type == 1
             if (d.startsWith == StartPhase.ECCENTRIC) {
@@ -201,6 +187,32 @@ class LiveDisplacementCapTest {
         return reps to fromOverCap
     }
 
+    /**
+     * The over-cap runs split by type, and how many over-cap CONCENTRICS arrive
+     * with nothing armed. Returns (concentric, eccentric, concentricUnarmed).
+     */
+    private fun overCapSplit(runs: List<LiveRun>, d: LiftDirection, c: DspConfig): Triple<Int, Int, Int> {
+        var pending = false
+        var con = 0
+        var ecc = 0
+        var unarmed = 0
+        runs.filter { qualifies(it, c) }.forEach { r ->
+            val over = r.displacementM > c.maxRunDisplacementM
+            val concentric = r.type == 1
+            if (over) if (concentric) con++ else ecc++
+            if (d.startsWith == StartPhase.ECCENTRIC) {
+                if (!concentric) {
+                    pending = true
+                } else if (pending) {
+                    pending = false
+                } else if (over) {
+                    unarmed++
+                }
+            }
+        }
+        return Triple(con, ecc, unarmed)
+    }
+
     private fun batchRunDisplacements(file: String, d: LiftDirection, c: DspConfig): List<Double> {
         val s = VelocityEstimator.estimate(load(file), c, d.measuredPlane).mappedToLifter(d.sensorToLifter)
         return RepSegmenter.classifyRuns(s, c)
@@ -217,12 +229,13 @@ class LiveDisplacementCapTest {
         val c = DspConfig()
         corpus.forEach { (file, d, _) ->
             val (runs, liveReps) = liveRuns(load(file), d, c)
-            assertEquals(liveReps, replay(runs, d, c).first, "$file: rebuilt reps against the tracker count")
+            val rebuilt = replay(runs, d, c, capped = true).first
+            assertEquals(liveReps, rebuilt, "$file: rebuilt reps against the tracker count")
         }
     }
 
     @Test
-    fun `the live counter builds reps from runs the batch path would discard (pre-fix)`() {
+    fun `census of what the bound would remove - nine reps from twelve runs`() {
         val c = DspConfig()
         var overCapRuns = 0
         var repsFromOverCap = 0
@@ -232,7 +245,7 @@ class LiveDisplacementCapTest {
             val (runs, _) = liveRuns(load(file), d, c)
             val over = runs.filter { qualifies(it, c) && it.displacementM > c.maxRunDisplacementM }
             overCapRuns += over.size
-            repsFromOverCap += replay(runs, d, c).second
+            repsFromOverCap += replay(runs, d, c, capped = false).second
             over.forEach {
                 if (it.displacementM > worstM) {
                     worstM = it.displacementM
@@ -240,12 +253,42 @@ class LiveDisplacementCapTest {
                 }
             }
         }
+        // The runs are still there. The bound does not stop them forming, it
+        // stops them being counted, which is the whole of the change.
         assertEquals(12, overCapRuns, "qualified live runs beyond maxRunDisplacementM")
-        // NINE, not twelve: an over-cap ECCENTRIC only arms a rep, it does not
-        // count one, so three of the twelve never reach the counter at all.
-        // Earlier figures of twelve and of eight were reported against this
-        // defect; both measured something real that was not the count.
+        // NINE, not twelve. The twelve are eleven concentric and one eccentric;
+        // of the eleven, two arrive with nothing armed, so three never reach a
+        // counter whatever this bound does. Earlier figures of twelve and of
+        // eight were reported against this defect; both measured something real
+        // that was not the count.
+        //
+        // Measured on the UNBOUNDED replay, so this is what the bound WOULD
+        // remove, not a reading of the shipped tracker -- it is green both
+        // before and after the fix and discriminates nothing on its own. It is
+        // written that way on purpose: asking a BOUNDED replay how many of its
+        // reps came from over-cap runs returns zero however broken the tracker
+        // is, which is a check that cannot fail.
+        //
+        // `the rebuilt live runs reproduce the rep count of the tracker` is the
+        // test that discriminates, by tying the bounded replay to the shipped
+        // counter. Between the two, these nine no longer become reps.
         assertEquals(9, repsFromOverCap, "live reps whose completing run was over the cap")
+        // The decomposition itself, pinned rather than left in prose: it was
+        // reported wrong once, as "three eccentrics", and prose is not checkable.
+        var con = 0
+        var ecc = 0
+        var unarmed = 0
+        corpus.forEach { (file, d, _) ->
+            val (runs, _) = liveRuns(load(file), d, c)
+            val (a, b, u) = overCapSplit(runs, d, c)
+            con += a
+            ecc += b
+            unarmed += u
+        }
+        assertEquals(11, con, "over-cap runs that are concentric")
+        assertEquals(1, ecc, "over-cap runs that are eccentric")
+        assertEquals(2, unarmed, "over-cap concentrics arriving with nothing armed")
+        assertEquals(con + ecc, overCapRuns, "the split must account for every over-cap run")
         assertEquals(32.558, worstM, 5e-3, "worst over-cap run, metres")
         assertEquals(24.31, worstS, 5e-3, "worst over-cap run, seconds")
     }
@@ -301,5 +344,130 @@ class LiveDisplacementCapTest {
             assertEquals(eLive, if (live.isEmpty()) 0.0 else live[live.size / 2], 5e-3, "$file: live median")
             assertEquals(eBatch, if (batch.isEmpty()) 0.0 else batch[batch.size / 2], 5e-3, "$file: batch median")
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Two synthetic pins. The corpus above cannot reach either behaviour:
+    // it holds one over-cap eccentric and it never varies DspConfig.
+    // ------------------------------------------------------------------
+
+    /**
+     * An over-cap ECCENTRIC followed by an in-family CONCENTRIC. SyntheticSets
+     * gives a rep one ROM for both phases, and it is production code, so this
+     * splices the head of a 3.0 m rep (lead-in, eccentric, bottom pause: 4.5 s
+     * at 100 Hz) onto a concentric-first 0.6 m rep.
+     */
+    private fun overCapEccentricThenNormalConcentric(): List<ImuSample> {
+        val head = SyntheticSets.generate(
+            listOf(SyntheticSets.RepSpec(eccS = 2.0, bottomPauseS = 1.0, conS = 2.0, topPauseS = 1.5, romM = 3.0)),
+            leadInS = 1.5,
+            leadOutS = 0.0,
+            eccentricFirst = true,
+        ).take(450)
+        val tail = SyntheticSets.generate(
+            listOf(SyntheticSets.RepSpec(eccS = 2.0, bottomPauseS = 1.0, conS = 1.0, topPauseS = 1.5, romM = 0.6)),
+            leadInS = 0.0,
+            leadOutS = 1.5,
+            eccentricFirst = false,
+        ).map { it.copy(timestampMs = it.timestampMs + 4500L) }
+        return head + tail
+    }
+
+    private fun bigConcentric() = SyntheticSets.generate(
+        listOf(SyntheticSets.RepSpec(eccS = 2.0, bottomPauseS = 1.0, conS = 2.0, topPauseS = 1.5, romM = 3.0)),
+        eccentricFirst = false,
+    )
+
+    @Test
+    fun `an over-cap eccentric arms nothing, so the concentric after it is no rep`() {
+        // The eccentric half of the rule. Bounding only the concentric reds
+        // nothing on the corpus -- every over-cap run there but one is
+        // concentric -- so without this the eccentric half could be reverted
+        // and CI would stay green.
+        //
+        // Measured runs: eccentric 3.020 m, then concentric 0.590 m, which is
+        // an ordinary rep by displacement. Before the bound the eccentric armed
+        // and the concentric completed a rep. After it, the eccentric does not
+        // qualify, so nothing is armed and the concentric finds no pending
+        // phase. Losing that concentric is the cost of mode 2 and this is the
+        // only place in the suite where that cost is visible at all.
+        val tracker = StreamingSetTracker(StartPhase.ECCENTRIC)
+        var last = LiveSetState()
+        overCapEccentricThenNormalConcentric().forEach { last = tracker.feed(it) }
+        assertEquals(0, last.repCount, "over-cap eccentric must not arm the concentric behind it")
+    }
+
+    @Test
+    fun `the live bound reads the config, not a hard-coded 2 point 0`() {
+        // Nothing else in :core:dsp constructs a non-default DspConfig, so
+        // replacing config.maxRunDisplacementM with the literal 2.0 passes the
+        // whole suite -- and the central claim of this change is that the live
+        // path bounds runs by the SAME constant the batch path does.
+        //
+        // The run is 3.034 m: over the default bound, under a 4.0 m one.
+        val samples = bigConcentric()
+        var last = LiveSetState()
+        val strict = StreamingSetTracker(StartPhase.CONCENTRIC)
+        samples.forEach { last = strict.feed(it) }
+        assertEquals(0, last.repCount, "3.0 m run must not count under the default 2.0 m bound")
+
+        // Green both before and after the bound exists, by construction: it
+        // pins WHERE the number comes from, not whether the bound is applied.
+        val loose = StreamingSetTracker(StartPhase.CONCENTRIC, DspConfig(maxRunDisplacementM = 4.0))
+        var lastLoose = LiveSetState()
+        samples.forEach { lastLoose = loose.feed(it) }
+        assertEquals(1, lastLoose.repCount, "the same run must count when the config allows 4.0 m")
+    }
+
+    /**
+     * Samples built from a designed velocity profile: a = dv/dt, azG = 1 + a/g.
+     * SyntheticSets cannot express this one -- every phase it emits returns to
+     * rest through the dead band, and what is needed here is a run that ends
+     * WITHOUT passing through it.
+     */
+    private fun fromVelocity(v: List<Double>, dt: Double = 0.01): List<ImuSample> {
+        val g = 9.80665
+        return v.indices.map { i ->
+            val a = if (i + 1 < v.size) (v[i + 1] - v[i]) / dt else 0.0
+            ImuSample(
+                timestampMs = (i * dt * 1000).toLong(),
+                axG = 0.0,
+                ayG = 0.0,
+                azG = 1.0 + a / g,
+                wxDps = 0.0,
+                wyDps = 0.0,
+                wzDps = 0.0,
+                rollDeg = 0.0,
+                pitchDeg = 0.0,
+                yawDeg = 0.0,
+            )
+        }
+    }
+
+    @Test
+    fun `an over-cap run is bounded even when the next run starts without a pause`() {
+        // The bound is read at a run END, where `runType` is the run being
+        // judged and `type` is the run about to start. Keying it on `type`
+        // instead -- exempting a run whose successor is another movement run --
+        // passes every other test in this module, because no over-cap run in
+        // the corpus is followed directly by a movement run. Measured: 14 such
+        // direct sign flips across 307 run ends, none of them over-cap.
+        //
+        // So this constructs the missing combination: a 2.713 m drive that
+        // reverses to -1 m/s in a single sample, giving no dead-band sample
+        // between the two runs. The reversal survives the 8 Hz low-pass.
+        val v = mutableListOf<Double>()
+        repeat(200) { v += 0.0 }
+        repeat(20) { v += 1.0 * (it + 1) / 20.0 }
+        repeat(280) { v += 1.0 }
+        v += -1.0
+        repeat(60) { v += -1.0 }
+        repeat(20) { v += -1.0 * (20 - it - 1) / 20.0 }
+        repeat(300) { v += 0.0 }
+
+        val tracker = StreamingSetTracker(StartPhase.CONCENTRIC)
+        var last = LiveSetState()
+        fromVelocity(v).forEach { last = tracker.feed(it) }
+        assertEquals(0, last.repCount, "an over-cap drive must not count because its successor starts at once")
     }
 }
