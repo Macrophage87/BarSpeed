@@ -19,6 +19,7 @@ import com.macrophage.barspeed.dsp.StreamingSetTracker
 import com.macrophage.barspeed.dsp.TempoSchedule
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.hrm.Hrv
+import com.macrophage.barspeed.hrm.RrIngest
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.HrSample
@@ -628,12 +629,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Passive HR display even outside sets; R-R intervals feed the HRV readouts.
         viewModelScope.launch {
             autoConnect.hrSamples.collect { hr ->
-                if (hr.rrIntervalsMs.isNotEmpty()) {
-                    recentRrMs.addAll(hr.rrIntervalsMs)
+                // Which beats this notification brought, decided in :core:hrm
+                // where a test can reach the rule. Today it answers "all of
+                // them", which is what these lines did before they were a call.
+                val beats = RrIngest.newBeats(hr)
+                if (beats.isNotEmpty()) {
+                    recentRrMs.addAll(beats)
                     while (recentRrMs.size > ROLLING_HRV_BEATS) recentRrMs.removeFirst()
                     val inSession =
                         stateFlow.value.stage in setOf(Stage.READY, Stage.IN_SET, Stage.RESTING)
-                    if (inSession) sessionRrMs += hr.rrIntervalsMs
+                    if (inSession) sessionRrMs += beats
                 }
                 stateFlow.value =
                     stateFlow.value.copy(

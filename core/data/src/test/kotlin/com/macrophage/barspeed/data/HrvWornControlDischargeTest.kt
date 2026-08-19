@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.hrm.Hrv
+import com.macrophage.barspeed.hrm.RrIngest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -23,7 +24,19 @@ import kotlin.test.assertEquals
  * silently change underneath it.
  */
 class HrvWornControlDischargeTest {
-    private fun rrOf(set: Int): List<Double> = HrFixtures.worn(set).flatMap { it.rrIntervalsMs }
+    /**
+     * Through the ingest seam, NOT straight off the fixture.
+     *
+     * This read `flatMap { it.rrIntervalsMs }` and was a check that could not
+     * fail: it pinned sixteen published figures to 1e-9 while bypassing the one
+     * decision that determines all of them, so the whole file would have stayed
+     * green while every number it names moved. Routing through
+     * [RrIngest.newBeats] costs nothing today -- the batch form IS
+     * `flatMap { it.rrIntervalsMs }` at this commit, so not one expected value
+     * below changes -- and it means the commit that fixes issue #81 reds exactly
+     * the figures it moves, in a diff that shows only real movement.
+     */
+    private fun rrOf(set: Int): List<Double> = RrIngest.newBeats(HrFixtures.worn(set))
 
     @Test
     fun `sixteen of the seventeen worn sets publish this rmssd, set one excluded on purpose`() {
