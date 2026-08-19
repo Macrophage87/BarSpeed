@@ -256,12 +256,25 @@ class SessionExporterTest {
         csvGzip = Gzip.compress(HrCsv.encode(samples)),
     )
 
+    /**
+     * A strap that has lost contact, in the shape the real capture takes:
+     * three distinct intervals held across a long span, so a budget exists and
+     * is far too small. Modelled on unworn set 3 of session 28, which scores
+     * 0.171 against a cut of 0.35.
+     */
+    private fun lostContactStream(): List<HrSample> = List(20) { HrSample(it * 500L, 46, listOf(1_902.3)) } +
+        List(20) { HrSample(10_000L + it * 500L, 46, listOf(1_607.4)) } +
+        List(20) { HrSample(20_000L + it * 500L, 46, listOf(1_003.9)) }
+
     private fun exporterOf(
         stored: SetRecordEntity,
         zoneId: String? = null,
         utcOffsetMinutes: Int? = null,
         extraStreams: List<RawStreamEntity> = emptyList(),
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
+        sessionAvgBpm: Int? = null,
+        sessionMaxBpm: Int? = null,
+        sessionHrvRmssdMs: Double? = null,
     ): SessionExporter {
         val dao =
             FakeSessionDao(
@@ -272,6 +285,9 @@ class SessionExporterTest {
                     endedAtMs = 61_000L,
                     zoneId = zoneId,
                     utcOffsetMinutes = utcOffsetMinutes,
+                    hrAvgBpm = sessionAvgBpm,
+                    hrMaxBpm = sessionMaxBpm,
+                    hrvRmssdMs = sessionHrvRmssdMs,
                 ),
                 rows = listOf(stored),
                 streams = mapOf(5L to listOf(cueStream) + extraStreams),
@@ -1027,6 +1043,109 @@ class SessionExporterTest {
                 .buildExport(1L, includeRepDetail = true)!!
                 .exercises.single().sets.single()
         assertNull(exported.hr, "a non-HRM stream produced an hr block on its own")
+    }
+
+    /**
+     * THE EXPORT-PATH GATE, which nothing pinned until this test existed.
+     *
+     * This is the retroactive half of issue #83 and the largest claim its
+     * commit makes: three of the four figures come from FROZEN columns written
+     * when the set was recorded, so a set already on disk keeps exporting them
+     * unless the export asks the stored stream the same question. Reverting the
+     * gate red no test at all before this one.
+     *
+     * The stored row says 46/46/46 -- the unworn shape -- and the stream it
+     * came from cannot account for its own elapsed time. The whole block goes,
+     * not merely the recomputed minimum.
+     */
+    @Test
+    fun `a stored row whose stream cannot track a heart publishes no hr block`() = runTest {
+        // The real unworn shape, not a perfectly held one: a detector that has
+        // lost contact emits a HANDFUL of distinct values over a long span. A
+        // single repeated value produces no budget at all and is deliberately
+        // not silenced, so a fixture built that way would test nothing here.
+        val lost = lostContactStream()
+        val stored =
+            row(analysis(3), actualReps = 3, repsManual = false)
+                .copy(hrEndOfSetBpm = 46, hrAvgBpm = 46, hrMaxBpm = 46)
+        val exported =
+            exporterOf(stored, extraStreams = listOf(hrStream(lost)))
+                .buildExport(1L, includeRepDetail = true)!!
+                .exercises.single().sets.single()
+        assertNull(exported.hr, "the frozen columns survived a stream that tracks nothing")
+    }
+
+    /**
+     * And the block is NOT withheld when the stream is fine, which is the other
+     * half of the same gate: without this a rule that silenced everything would
+     * pass the test above.
+     */
+    @Test
+    fun `a stored row whose stream does track a heart keeps its hr block`() = runTest {
+        val beats =
+            (0 until 60).map { i ->
+                val rr = if (i % 2 == 0) 800.0 else 800.9765625
+                HrSample((i * 800L), 75, listOf(rr))
+            }
+        val stored =
+            row(analysis(3), actualReps = 3, repsManual = false)
+                .copy(hrEndOfSetBpm = 76, hrAvgBpm = 75, hrMaxBpm = 78)
+        val exported =
+            exporterOf(stored, extraStreams = listOf(hrStream(beats)))
+                .buildExport(1L, includeRepDetail = true)!!
+                .exercises.single().sets.single()
+        val hr = assertNotNull(exported.hr, "a healthy stream lost its block")
+        assertEquals(75, hr.avgBpm)
+    }
+
+    /**
+     * THE SESSION BLOCK IS AGGREGATED FROM THE SET ROWS, so it must not outlive
+     * them. A session whose every set has been silenced published avgBpm and
+     * maxBpm from columns aggregated out of figures this export no longer
+     * carries -- the session asserting what all of its sets have withdrawn.
+     */
+    @Test
+    fun `a session whose every set is silenced publishes no session heart rate`() = runTest {
+        val lost = lostContactStream()
+        val stored =
+            row(analysis(3), actualReps = 3, repsManual = false)
+                .copy(hrEndOfSetBpm = 46, hrAvgBpm = 46, hrMaxBpm = 46)
+        val exported =
+            exporterOf(stored, extraStreams = listOf(hrStream(lost)), sessionAvgBpm = 46, sessionMaxBpm = 46)
+                .buildExport(1L, includeRepDetail = true)!!
+        assertNull(exported.heartRate, "the session outlived every set it was aggregated from")
+
+        // AND THE FIGURE THE GATE IS WRONG ABOUT, in the same test because it
+        // is the same gate. hrvRmssd_ms rides in this block and is NOT
+        // aggregated from the set rows -- its input spans READY, IN_SET and
+        // RESTING while the gate reads only the per-set IN_SET streams. This
+        // was the only path through the gate with nothing asserting on it,
+        // which is how a decision made for one figure comes to be assumed for
+        // three. Behaviour deliberate and unchanged; the note is at the gate.
+        val hrvOnly =
+            exporterOf(stored, extraStreams = listOf(hrStream(lost)), sessionHrvRmssdMs = 42.5)
+                .buildExport(1L, includeRepDetail = true)!!
+        assertNull(hrvOnly.heartRate, "an HRV figure outlived every set, on streams it was not computed from")
+    }
+
+    /**
+     * A set whose raw stream is NOT STORED cannot be evaluated, and is left
+     * exactly as it was. Issue #83's retroactive reach stops at the sets whose
+     * streams survive; this pins that boundary rather than leaving it implied,
+     * and it is why the schema entry says an absent minBpm is a statement about
+     * the archive rather than about the heart.
+     */
+    @Test
+    fun `a set with no stored stream is left alone by the gate`() = runTest {
+        val stored =
+            row(analysis(3), actualReps = 3, repsManual = false)
+                .copy(hrEndOfSetBpm = 46, hrAvgBpm = 46, hrMaxBpm = 46)
+        val exported =
+            exporterOf(stored).buildExport(1L, includeRepDetail = true)!!
+                .exercises.single().sets.single()
+        val hr = assertNotNull(exported.hr, "a set with no stream to judge was silenced on no evidence")
+        assertEquals(46, hr.avgBpm)
+        assertNull(hr.minBpm, "and it still has no minimum, because there is no stream to take one from")
     }
 
     /**

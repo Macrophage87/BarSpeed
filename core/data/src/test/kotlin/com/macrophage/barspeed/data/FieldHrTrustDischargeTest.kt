@@ -1,9 +1,11 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.hrm.HrTrust
+import com.macrophage.barspeed.hrm.RrIngest
 import com.macrophage.barspeed.model.HrSample
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -57,6 +59,11 @@ class FieldHrTrustDischargeTest {
         }
     }
 
+    /**
+     * And the seventeen worn sets publish exactly what they published before.
+     * This is the assertion that would have stopped the two rules withdrawn
+     * before this one; it is cheap to write and it is the whole gate.
+     */
     @Test
     fun `every worn figure is identical to the one published today`() {
         HrFixtures.allWorn().forEachIndexed { index, set ->
@@ -96,6 +103,210 @@ class FieldHrTrustDischargeTest {
         assertEquals(0, bpm.count { it < 70 }, "the worn control now has resting-rate samples")
     }
 
+    // ---- the elapsed-time budget, discharged against the whole control -----
+
+    /**
+     * WHAT THE RULE COSTS THE WORN CONTROL: nothing, and this is the assertion
+     * that decides whether it may ship at all. Two rules before it were
+     * withdrawn only once run against these seventeen sets.
+     */
+    @Test
+    fun `every worn set accounts for its own elapsed time, and none is withheld`() {
+        val fractions = HrFixtures.allWorn().map { HrTrust.accountedFraction(it)!! }
+        assertEquals(0.858, fractions.min(), 0.002, "the worst worn set")
+        assertEquals(0.963, fractions.max(), 0.002, "the best worn set")
+        assertTrue(
+            fractions.all { it >= HrTrust.MIN_ACCOUNTED_FRACTION },
+            "a worn set would be silenced: ${fractions.filter { it < HrTrust.MIN_ACCOUNTED_FRACTION }}",
+        )
+        assertEquals(
+            List(HrFixtures.WORN_SETS) { true },
+            HrFixtures.allWorn().map { HrTrust.tracksAHeart(it) },
+        )
+        assertEquals(2.45, fractions.min() / HrTrust.MIN_ACCOUNTED_FRACTION, 0.02, "the margin the cut buys")
+    }
+
+    /**
+     * And what it reaches: the one unworn set that still publishes. Firing
+     * evidence is n=1, which is the whole of what this corpus can offer.
+     */
+    @Test
+    fun `the unworn set that still publishes accounts for almost none of its time`() {
+        val fraction = HrTrust.accountedFraction(HrFixtures.unworn(3))!!
+        assertEquals(0.171, fraction, 0.002)
+        assertTrue(fraction < HrTrust.MIN_ACCOUNTED_FRACTION)
+        assertFalse(HrTrust.tracksAHeart(HrFixtures.unworn(3)))
+        assertEquals(2.05, HrTrust.MIN_ACCOUNTED_FRACTION / fraction, 0.03, "the margin on the other side")
+    }
+
+    /**
+     * THE MECHANISM CLAIM THAT WAS HERE IS DELETED, not reworded.
+     *
+     * It asserted that the fastest worn sets score worst, because a shortfall
+     * needed dropped beats and a drop needed a heart above 120 bpm. Ten of the
+     * seventeen worn sets contain no interval under 500 ms at all -- no
+     * collision is possible in them -- and every one still falls short. This
+     * pins the falsification so the claim cannot come back.
+     */
+    @Test
+    fun `sets in which no beat collision is possible still fall short`() {
+        val noCollision =
+            HrFixtures.allWorn().filter { set ->
+                set.filter(HrTrust::isTrusted).none { it.rrIntervalsMs.single() < 500.0 }
+            }
+        assertEquals(10, noCollision.size, "how many worn sets cannot drop a beat at all")
+        assertTrue(
+            noCollision.all { HrTrust.accountedFraction(it)!! < 1.0 },
+            "a set with no possible collision accounted for all its time, so drops could explain it",
+        )
+    }
+
+    /**
+     * THE MECHANISM THAT LOOKS RIGHT AND IS NOT, pinned so its numbers cannot
+     * drift into looking better than they are.
+     *
+     * Tie-removal alone -- the obvious replacement for the falsified drop
+     * story -- predicts the MEAN shortfall almost exactly and the ORDERING not
+     * at all. Worn set 08 is among the least variable sets, so it is predicted
+     * to fall shortest; it falls shortest by the least. A mechanism
+     * whose average is right and whose ordering is backwards is a fit wearing a
+     * derivation's clothes, and this is here because the numbers are tempting.
+     */
+    @Test
+    fun `tie removal predicts the mean shortfall and not the ordering`() {
+        val q = 1000.0 / 1024.0
+        val observed = mutableListOf<Double>()
+        val predicted = mutableListOf<Double>()
+        HrFixtures.allWorn().forEach { set ->
+            val trusted = set.filter(HrTrust::isTrusted)
+            val beats = RrIngest.newBeats(trusted)
+            val diffs = (1 until beats.size).map { beats[it] - beats[it - 1] }
+            val sigma = kotlin.math.sqrt(diffs.sumOf { it * it } / diffs.size)
+            val span = (trusted.last().timestampMs - trusted.first().timestampMs) + beats.first()
+            observed += 1.0 - beats.sum() / span
+            predicted += (trusted.size - 1) * (q / (sigma * kotlin.math.sqrt(2.0))) * beats.average() / span
+        }
+        assertEquals(0.0880, observed.average(), 0.001, "mean observed shortfall")
+        assertEquals(0.0811, predicted.average(), 0.001, "mean predicted by tie removal alone")
+
+        val mo = observed.average()
+        val mp = predicted.average()
+        val cov = observed.indices.sumOf { (observed[it] - mo) * (predicted[it] - mp) }
+        val denom =
+            kotlin.math.sqrt(observed.sumOf { (it - mo) * (it - mo) } * predicted.sumOf { (it - mp) * (it - mp) })
+        assertEquals(0.145, cov / denom, 0.01, "correlation of ordering, which is the part that fails")
+    }
+
+    /**
+     * THE GUARD'S THREE NUMBERS, PINNED, AND THE DEFINITION OF "WINDOW" FIXED
+     * WITH THEM.
+     *
+     * They were prose in a KDoc and they are definition-dependent: a window
+     * whose span is measured between its own first and last DISTINCT beats
+     * gives one pair of figures, and one measured over the trusted samples the
+     * window was cut from gives another -- 0.3551/0.4547 against 0.3521/0.4028.
+     * The guard is sound under both readings, which is the point of asserting
+     * both rather than picking the flattering one.
+     *
+     * What matters is the ordering, not the digits: two distinct beats can
+     * bring a worn window within a hair of the cut, three cannot.
+     */
+    @Test
+    fun `two distinct beats come within a hair of the cut and three do not`() {
+        fun worstWindow(size: Int): Double {
+            var worst = Double.MAX_VALUE
+            HrFixtures.allWorn().forEach { set ->
+                val trusted = set.filter(HrTrust::isTrusted)
+                val beats = RrIngest.newBeats(trusted)
+                val stamps =
+                    trusted.filterIndexed { i, s ->
+                        i == 0 || s.rrIntervalsMs != trusted[i - 1].rrIntervalsMs
+                    }
+                for (start in 0..beats.size - size) {
+                    val window = beats.subList(start, start + size)
+                    val span =
+                        (stamps[start + size - 1].timestampMs - stamps[start].timestampMs) + window.first()
+                    if (span > 0) worst = minOf(worst, window.sum() / span)
+                }
+            }
+            return worst
+        }
+        val two = worstWindow(2)
+        val three = worstWindow(3)
+        assertTrue(two < 0.36, "the worst two-beat window is no longer near the cut: $two")
+        assertTrue(three > two, "three beats stopped being safer than two")
+        assertTrue(
+            three > HrTrust.MIN_ACCOUNTED_FRACTION * 1.1,
+            "the worst three-beat window lost its margin over the cut: $three",
+        )
+        assertEquals(3, HrTrust.MIN_DISTINCT_BEATS, "the guard moved off the size these numbers justify")
+    }
+
+    /**
+     * THE HOLD, AS A GATE RATHER THAN AS A PROMISE.
+     *
+     * What bounds this rule's false positives is the variability of a worn
+     * stream, and [HrTrust.silencingSigmaMs] is the sigma at which one would be
+     * silenced. The lowest any set of session 26 reaches is 6.58 ms.
+     *
+     * An earlier version of this test asserted only that no sample is below
+     * 70 bpm -- a strict subset of what this class already asserts, so it added
+     * nothing and would have stayed GREEN when the resting capture arrived. The
+     * hold it was supposed to enforce would have been theatre.
+     *
+     * This one asserts sigma AND the fraction together, and it does so over
+     * SESSION 26 only. Dropping a capture into this directory does not reach
+     * it; the captures that discharged the hold are gated in
+     * [FieldHrRestingBandTest].
+     */
+    @Test
+    fun `every worn set clears both the variability floor and the cut`() {
+        val q = 1000.0 / 1024.0
+        HrFixtures.allWorn().forEachIndexed { index, set ->
+            val beats = RrIngest.newBeats(set.filter(HrTrust::isTrusted))
+            val diffs = (1 until beats.size).map { beats[it] - beats[it - 1] }
+            val sigma = kotlin.math.sqrt(diffs.sumOf { it * it } / diffs.size)
+            val fraction = HrTrust.accountedFraction(set)!!
+            assertTrue(sigma > 5.0, "set ${index + 1} sigma $sigma is approaching the metronome end")
+            assertTrue(fraction >= HrTrust.MIN_ACCOUNTED_FRACTION, "set ${index + 1} would be silenced")
+            assertTrue(
+                fraction > 1.0 - q / (sigma * kotlin.math.sqrt(2.0)) - 0.15,
+                "set ${index + 1} falls further short than its own variability explains",
+            )
+        }
+        assertEquals(
+            6.58,
+            HrFixtures.allWorn().minOf { set ->
+                val beats = RrIngest.newBeats(set.filter(HrTrust::isTrusted))
+                val diffs = (1 until beats.size).map { beats[it] - beats[it - 1] }
+                kotlin.math.sqrt(diffs.sumOf { it * it } / diffs.size)
+            },
+            0.02,
+            "the lowest variability any worn set reaches",
+        )
+    }
+
+    /**
+     * The fraction is NOT scale-free, which was asserted before it was
+     * measured. Truncated to their first three distinct beats the worn sets
+     * spread far wider than whole sets do. Real worn sets carry at least 62
+     * distinct beats against the unworn set's 3, so the operating margin is the
+     * whole-set one -- but the short-stream weakness is pinned rather than
+     * described.
+     */
+    @Test
+    fun `the fraction is noisier on short streams, and the control is never short`() {
+        // Counted the way accountedFraction counts: trusted samples first, THEN
+        // de-duplicated. Over ALL samples the unworn set yields 6 rather than
+        // 3, and measuring it the other way would describe a different stream
+        // from the one the rule reads.
+        fun distinctBeats(set: List<HrSample>) = RrIngest.newBeats(set.filter(HrTrust::isTrusted)).size
+        val worn = HrFixtures.allWorn().map(::distinctBeats)
+        assertEquals(62, worn.min(), "the shortest worn set, in distinct beats")
+        assertEquals(3, distinctBeats(HrFixtures.unworn(3)), "and the unworn set the rule reaches")
+        assertTrue(worn.min() > 20 * distinctBeats(HrFixtures.unworn(3)), "the two populations stopped being far apart")
+    }
+
     // ---- the unworn capture: what the rule actually reaches ----------------
 
     @Test
@@ -106,21 +317,27 @@ class FieldHrTrustDischargeTest {
     }
 
     /**
-     * WHAT AN UNWORN STRAP PUBLISHES TODAY, all three figures, pinned before
-     * anything moves so the differential shows exactly what changes.
+     * THE DIFFERENTIAL. The unworn set published avgBpm 46, maxBpm 46 and
+     * minBpm 46 -- three mutually agreeing, entirely believable resting figures
+     * from a strap on a table. It now publishes none of them.
      *
-     * Three, not two. #79 left avgBpm and maxBpm; #90 part B added minBpm over
-     * the same trusted list, so a set recorded with the strap on a table now
-     * publishes THREE believable resting figures where it published two. That
-     * was my change and it enlarged this issue rather than being found in it.
+     * Three, not two, and the third is mine: #79 left avgBpm and maxBpm
+     * reachable, and #90 part B then added minBpm over the same trusted list.
+     * My change enlarged this issue by one field.
+     *
+     * The counts stay, because they are not published anywhere and they are how
+     * a reader sees the decision was made over the same 47 samples as before --
+     * the samples are still trusted individually; it is the STREAM that cannot
+     * show it was measuring a heart.
      */
     @Test
-    fun `the unworn set publishes three figures today, and they agree with each other`() {
+    fun `the unworn set publishes none of its three figures`() {
         val summary = HrTrust.summarize(HrFixtures.unworn(3))
-        assertEquals(46, summary.avgBpm)
-        assertEquals(46, summary.maxBpm)
-        assertEquals(46, summary.minBpm)
-        assertEquals(47, summary.trustedSamples, "the samples the sample-level rule cannot reach")
+        assertNull(summary.avgBpm, "an unworn strap still published a mean")
+        assertNull(summary.maxBpm, "an unworn strap still published a maximum")
+        assertNull(summary.minBpm, "an unworn strap still published a minimum")
+        assertNull(summary.endOfSetBpm)
+        assertEquals(47, summary.trustedSamples, "the sample-level decision is unchanged")
         assertEquals(91, summary.totalSamples)
     }
 
@@ -148,13 +365,13 @@ class FieldHrTrustDischargeTest {
      * today. Issue #83.
      */
     @Test
-    fun `the third unworn set still summarises to a plausible resting heart rate`() {
+    fun `the third unworn set no longer summarises to anything`() {
         val summary = HrTrust.summarize(HrFixtures.unworn(3))
-        assertEquals(46, summary.avgBpm)
-        assertEquals(46, summary.maxBpm)
-        assertEquals(46, summary.minBpm, "same 47 samples as avg/max, so the same fabricated-looking floor")
-        assertTrue(summary.endOfSetBpm == null, "its final sample is untrusted")
-        assertEquals(47, summary.trustedSamples)
+        assertNull(summary.avgBpm)
+        assertNull(summary.maxBpm)
+        assertNull(summary.minBpm)
+        assertTrue(summary.endOfSetBpm == null)
+        assertEquals(47, summary.trustedSamples, "the sample-level decision is unchanged")
         assertEquals(91, summary.totalSamples)
     }
 }

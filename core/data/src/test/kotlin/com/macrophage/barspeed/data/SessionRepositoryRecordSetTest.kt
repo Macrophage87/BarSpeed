@@ -773,15 +773,16 @@ class SessionRepositoryRecordSetTest {
     }
 
     @Test
-    fun `unworn set 3 loses its end-of-set reading and keeps 46 avg and 46 max`() = runTest {
+    fun `unworn set 3 stores no heart rate at all`() = runTest {
         val dao = FakeSessionDao()
         repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(hrSamples = HrFixtures.unworn(3)))
         val row = dao.sets.single()
-        // Was 46: its final sample reports a zero-length R-R interval.
+        // Issue #83. These were null, 46 and 46: the 47 samples carrying
+        // plausible-band R-R survived the sample-level rule, and the stream
+        // they came from covers only 17% of the time the set lasted.
         assertNull(row.hrEndOfSetBpm)
-        assertEquals(46, row.hrAvgBpm, "issue #83: 47 samples still carry plausible-band R-R")
-        // Was 47, off a sample that reports an impossible interval beside it.
-        assertEquals(46, row.hrMaxBpm)
+        assertNull(row.hrAvgBpm)
+        assertNull(row.hrMaxBpm)
     }
 
     // ---- heart rate: what a sample has to be to count ----------------------

@@ -432,13 +432,17 @@ class SessionRepositoryEndSessionTest {
      * 41 while the session maximum stood at 50 -- a well-rested athlete, from a
      * strap on a table.
      *
-     * After it, two of the three sets contribute nothing at all and the session
-     * reports what the one remaining set supports. That remaining figure is
-     * still wrong, and issue #83 is where it is tracked; what this pins is that
-     * the sets which measured nothing are skipped rather than counted.
+     * After issue #83, ALL THREE contribute nothing: the two that were already
+     * silent, and the third whose stream cannot show it was tracking a heart.
+     * The session therefore reports no heart rate at all, which is the correct
+     * answer for a session recorded with the strap on a table.
+     *
+     * The name and this paragraph both said "the one remaining set" until #83
+     * landed and left them describing a set that no longer contributes -- three
+     * siblings were renamed in the same change and this one was missed.
      */
     @Test
-    fun `the unworn session aggregates only the set that still summarises`() = runTest {
+    fun `the unworn session aggregates nothing, because no set of it summarises`() = runTest {
         val dao = FakeSessionDao(seedSessions = listOf(session()))
         val repository = repo(dao)
         HrFixtures.allUnworn().forEachIndexed { index, samples ->
@@ -446,7 +450,9 @@ class SessionRepositoryEndSessionTest {
         }
         repository.endSession(1L, endedAtMs = 9_000L)
 
-        assertEquals(46, dao.updates.single().hrAvgBpm)
-        assertEquals(46, dao.updates.single().hrMaxBpm)
+        // Issue #83: the one unworn set that still summarised no longer does,
+        // so the session it was the only contributor to summarises to nothing.
+        assertNull(dao.updates.single().hrAvgBpm)
+        assertNull(dao.updates.single().hrMaxBpm)
     }
 }
