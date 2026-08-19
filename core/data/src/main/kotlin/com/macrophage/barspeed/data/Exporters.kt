@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.ImuCsv
+import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.VelocityEstimator
 import com.macrophage.barspeed.model.ExerciseExport
 import com.macrophage.barspeed.model.GeometryExport
@@ -170,6 +171,7 @@ class SessionExporter(
                 meanEccS = reps.mapNotNull { it.eccS }.averageOrNull()?.round2(),
                 meanConS = reps.map { it.conS }.averageOrNull()?.round2(),
                 meanRomM = reps.map { it.romM }.averageOrNull()?.round3(),
+                romSpreadPct = SetAnalyzer.romSpreadPct(reps),
                 peakPowerW = reps.mapNotNull { it.peakPowerW }.maxOrNull(),
                 meanConPowerW = reps.mapNotNull { it.meanConPowerW }.averageOrNull()?.round1(),
             ),

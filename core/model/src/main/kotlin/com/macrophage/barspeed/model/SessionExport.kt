@@ -66,8 +66,8 @@ data class SessionExport(
          * instant altogether. The key is absent on sessions recorded before the
          * app captured it.
          */
-        const val SCHEMA_VERSION = "1.5"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5")
+        const val SCHEMA_VERSION = "1.6"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6")
 
         /**
          * Which phase a rep opened with, lowercased [StartPhase] names. 1:1
@@ -229,6 +229,13 @@ data class SetSummaryExport(
     @SerialName("meanEcc_s") val meanEccS: Double? = null,
     @SerialName("meanCon_s") val meanConS: Double? = null,
     @SerialName("meanRom_m") val meanRomM: Double? = null,
+    /**
+     * How far the reps of this set disagree with each other about rom_m: the
+     * population standard deviation as a percentage of [meanRomM]. Absent,
+     * never 0, below two reps or when the reps average no displacement --
+     * dispersion is undefined there. See SetAnalyzer.romSpreadPct.
+     */
+    @SerialName("romSpread_pct") val romSpreadPct: Double? = null,
     /** Best instantaneous concentric power across the set, watts. */
     @SerialName("peakPower_w") val peakPowerW: Double? = null,
     /** Mean of per-rep average concentric power, watts. */
