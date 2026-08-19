@@ -55,24 +55,6 @@ data class HrStreamSummary(
  */
 object HrTrust {
     /**
-     * True when [sample] carries nothing that a working sensor cannot produce.
-     *
-     * A bpm at or below zero is the strap's own no-reading sentinel. A reported
-     * R-R interval at or below zero is a claim that no time passed between two
-     * beats, which no beat detector can mean literally; the bpm arriving in the
-     * same notification is not treated as independent of it.
-     *
-     * KNOWN GAP, and it is why this returns true more often than it looks like
-     * it should: a sample carrying NO R-R interval at all passes on its bpm
-     * alone, because `all` over an empty list is vacuously true. The R-R
-     * evidence is the only evidence this function has, and a strap that streams
-     * a plausible bpm with the R-R Present flag clear defeats it entirely. That
-     * combination has never been observed in any capture held here, and its
-     * likelihood is unmeasured rather than low. Tracked as issue #82; the
-     * sensor-contact bits are the only remaining signal for it and they are
-     * discarded before anything is persisted.
-     */
-    /**
      * THE DISCRIMINANT IS VARIABILITY, AND THIS IS THE FIRST THING TO KNOW
      * ABOUT IT. A heart's successive intervals differ from each other; a strap
      * that has lost contact holds one interval and re-sends it, so its series
@@ -92,6 +74,15 @@ object HrTrust {
      * The raw capture keeps every sample either way, so nothing is destroyed --
      * but that is the recovery, not a defence. It is a known limitation of the
      * rule and not a property of hearts.
+     *
+     * AND MOVING THE CUT CANNOT FIX IT, which is worth saying here because the
+     * cut is the first thing a maintainer will reach for. This rule cannot
+     * distinguish a paced rhythm from a held, re-sent value: on the axis it
+     * measures the two genuinely look the same, near-zero variability in both
+     * cases, and no threshold separates two populations that overlap at the
+     * point of measurement. A remedy would have to come from outside the
+     * series -- a per-user opt-out, or a signal the strap gives about what it
+     * is tracking -- not from a different number here.
      *
      * It is measured through a TIME BUDGET rather than by computing a variance
      * directly, and that is deliberate. A budget needs no window, no minimum
@@ -221,6 +212,24 @@ object HrTrust {
         return fraction >= MIN_ACCOUNTED_FRACTION
     }
 
+    /**
+     * True when [sample] carries nothing that a working sensor cannot produce.
+     *
+     * A bpm at or below zero is the strap's own no-reading sentinel. A reported
+     * R-R interval at or below zero is a claim that no time passed between two
+     * beats, which no beat detector can mean literally; the bpm arriving in the
+     * same notification is not treated as independent of it.
+     *
+     * KNOWN GAP, and it is why this returns true more often than it looks like
+     * it should: a sample carrying NO R-R interval at all passes on its bpm
+     * alone, because `all` over an empty list is vacuously true. The R-R
+     * evidence is the only evidence this function has, and a strap that streams
+     * a plausible bpm with the R-R Present flag clear defeats it entirely. That
+     * combination has never been observed in any capture held here, and its
+     * likelihood is unmeasured rather than low. Tracked as issue #82; the
+     * sensor-contact bits are the only remaining signal for it and they are
+     * discarded before anything is persisted.
+     */
     fun isTrusted(sample: HrSample): Boolean = sample.bpm > 0 && sample.rrIntervalsMs.all { it > 0.0 }
 
     /**
@@ -255,6 +264,18 @@ object HrTrust {
      */
     fun summarize(samples: List<HrSample>): HrStreamSummary {
         if (samples.isEmpty()) return HrStreamSummary.NOTHING
+        // A stream whose own beats cannot account for the time it covers
+        // publishes nothing, however plausible each sample looks alone. Issue
+        // #83: a strap on a table produced avgBpm 46, maxBpm 46 and minBpm 46
+        // from 47 samples that every sample-level test passes.
+        //
+        // The counts are still reported, and deliberately: the sample-level
+        // decision has not moved, and a reader comparing trustedSamples with
+        // three null figures can see that this was a decision about the STREAM
+        // rather than about its samples.
+        if (!tracksAHeart(samples)) {
+            return HrStreamSummary(null, null, null, null, samples.count(::isTrusted), samples.size)
+        }
         val trusted = samples.filter(::isTrusted)
         val bpm = trusted.map { it.bpm }
         return HrStreamSummary(

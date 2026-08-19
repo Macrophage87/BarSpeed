@@ -97,8 +97,30 @@ class SessionExporter(
             listOfNotNull(session.planName, session.planSessionName)
                 .takeIf { it.isNotEmpty() }?.joinToString(" / "),
             notes = session.notes,
+            // The session block is aggregated from the set rows, so it must not
+            // outlive them. When a session HAS sets and not one of them can
+            // still say anything about heart rate, its frozen columns were
+            // aggregated from figures this export no longer publishes, and
+            // publishing them would leave the session asserting what every one
+            // of its sets has withdrawn. That is the retroactive half of issue
+            // #83: for sessions already recorded, these columns are the only
+            // place the unworn figures survive.
+            //
+            // THE PAIR IS RIGHT FOR TWO OF THE THREE FIGURES AND WRONG FOR THE
+            // THIRD. avgBpm and maxBpm ARE aggregated from the set rows, so
+            // withholding them with the rows is the same quantity. hrvRmssdMs
+            // is not: `RecordViewModel` accumulates its input across READY,
+            // IN_SET and RESTING, while this gate reads only the per-set IN_SET
+            // streams. A session whose in-set streams are all silenced but
+            // whose rest windows were sound loses a figure this gate never
+            // looked at. No capture held here separates the two populations --
+            // a strap on a table is on a table for the rests too -- so the
+            // outcome is right on the one session that fires it, for a reason
+            // narrower than the gate states.
             heartRate =
-            if (session.hrAvgBpm != null || session.hrMaxBpm != null || session.hrvRmssdMs != null) {
+            if (exercises.isNotEmpty() && exercises.all { it.sets.all { set -> set.hr == null } }) {
+                null
+            } else if (session.hrAvgBpm != null || session.hrMaxBpm != null || session.hrvRmssdMs != null) {
                 HrSessionSummary(
                     avgBpm = session.hrAvgBpm,
                     maxBpm = session.hrMaxBpm,
@@ -142,7 +164,26 @@ class SessionExporter(
             } else {
                 null
             }
-        val minBpm = if (record.id in minBpmOverride) minBpmOverride.getValue(record.id) else minBpm(streams)
+        // Issue #83 reaches ALREADY-RECORDED sets here, not only new ones.
+        // endOfSetBpm, avgBpm and maxBpm are frozen columns written when the
+        // set was recorded; gating only the record path would leave every set
+        // already on disk exporting them unchanged. So the stored stream is
+        // asked the same question here.
+        //
+        // Decoded ONCE and both answers taken from it. minBpm used to inflate
+        // this stream on its own; adding a second inflate for the verdict
+        // would have reintroduced exactly the double decompression issue #29
+        // removed, in the commit whose KDoc above records that it was removed.
+        val hrSamples =
+            streams.firstOrNull { it.kind == RawStreamEntity.KIND_HRM }
+                ?.let { stream -> runCatching { HrCsv.decode(Gzip.decompress(stream.csvGzip)) }.getOrNull() }
+        val streamTracksAHeart = hrSamples?.let { HrTrust.tracksAHeart(it) }
+        val minBpm =
+            if (record.id in minBpmOverride) {
+                minBpmOverride.getValue(record.id)
+            } else {
+                hrSamples?.let { HrTrust.summarize(it).minBpm }
+            }
         return SetExport(
             loadKg = record.loadKg,
             loadLb = Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0,
@@ -181,7 +222,10 @@ class SessionExporter(
             // condition join the other three without tripping detekt's
             // ComplexCondition on a fourth `||`.
             hr =
-            if (listOfNotNull(record.hrEndOfSetBpm, record.hrAvgBpm, record.hrMaxBpm, minBpm).isNotEmpty()) {
+            if (
+                streamTracksAHeart != false &&
+                listOfNotNull(record.hrEndOfSetBpm, record.hrAvgBpm, record.hrMaxBpm, minBpm).isNotEmpty()
+            ) {
                 HrSetSummary(record.hrEndOfSetBpm, record.hrAvgBpm, record.hrMaxBpm, minBpm)
             } else {
                 null
