@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import com.macrophage.barspeed.hrm.HeartRateMeasurementParser
 import com.macrophage.barspeed.hrm.HeartRateProfile
 import com.macrophage.barspeed.model.BlePermissionPolicy
+import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.witmotion.WitmotionCommands

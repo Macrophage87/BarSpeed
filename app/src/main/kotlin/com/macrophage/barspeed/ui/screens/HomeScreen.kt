@@ -37,8 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.macrophage.barspeed.ble.ConnectionState
 import com.macrophage.barspeed.data.OrphanedSet
+import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.PermissionBanner

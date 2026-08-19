@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.ble
 
 import android.content.Context
+import com.macrophage.barspeed.model.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext

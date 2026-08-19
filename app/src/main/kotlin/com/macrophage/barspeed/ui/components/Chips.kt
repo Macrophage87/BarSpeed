@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.macrophage.barspeed.ble.ConnectionState
+import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.ui.BarColors
 
 private const val CHIP_BG_ALPHA = 0.15f

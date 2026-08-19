@@ -5,7 +5,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.VoiceCounter
-import com.macrophage.barspeed.ble.ConnectionState
 import com.macrophage.barspeed.data.CompletedSet
 import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.data.SetJournal
@@ -20,6 +19,7 @@ import com.macrophage.barspeed.dsp.TempoSchedule
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.hrm.Hrv
 import com.macrophage.barspeed.hrm.RrIngest
+import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.HrSample

@@ -12,16 +12,6 @@ data class KnownDevice(
     val role: DeviceRole,
 )
 
-sealed interface ConnectionState {
-    data object Disconnected : ConnectionState
-
-    data object Connecting : ConnectionState
-
-    data class Connected(val deviceName: String, val batteryPct: Int? = null) : ConnectionState
-
-    data class Failed(val reason: String) : ConnectionState
-}
-
 data class DiscoveredDevice(
     val address: String,
     val name: String,
