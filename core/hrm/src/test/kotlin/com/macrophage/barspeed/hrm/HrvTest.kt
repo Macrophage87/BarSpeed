@@ -104,13 +104,19 @@ class HrvTest {
     }
 
     /**
-     * NOT a red differential -- this is vacuously true today, because
-     * segments() never splits anything yet, for any input. Its value is as
-     * a mutation detector for the distinctness guard added with the fix:
-     * deleting `next != v` from the confirmation test is predicted to red
-     * this assertion (see the fix commit for the measured result), because
-     * a strap that re-sends its last completed R-R at a fixed cadence
-     * (issue #81) would otherwise supply its own confirmation for free.
+     * A live mutation detector for the distinctness guard, and no longer the
+     * vacuous placeholder this comment used to describe. It was written before
+     * #27 landed, when segments() could not split anything for any input and
+     * this assertion could not fail; both halves of that are now false.
+     * Measured, not predicted: deleting `next != v` from the confirmation test
+     * reds this assertion and nothing else, 1 of 38.
+     *
+     * What it guards: a strap re-sending its last completed R-R at a fixed
+     * cadence (issue #81) would otherwise supply its own confirmation for
+     * free. Since #81 those re-sends are removed at ingest, so this path is
+     * unreachable from the app's own call sites -- but it is reachable from
+     * here, and from anything reprocessing the persisted per-set CSVs, which
+     * still contain every repeat by design.
      */
     @Test
     fun `a resent duplicate cannot confirm a re-anchor on its own`() {

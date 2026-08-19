@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.data
 
+import com.macrophage.barspeed.hrm.RrIngest
 import com.macrophage.barspeed.model.HrSample
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -159,7 +160,18 @@ class FieldHrDuplicationTest {
         assertEquals(16, ratios.count { it > 1.00 })
         assertEquals(13, ratios.count { it > 1.05 })
         assertEquals(11, ratios.count { it > 1.10 })
-        assertEquals(1.085, ratios[8], 0.001, "set 9, the one nearest the 1.10 line")
+        // Set 9 is the only set within 1% of the 1.10 line, so it is the only
+        // one the boundary term can move across it: 1.0965 raw against 1.085
+        // corrected, and its own first R-R of 553.7 ms is that 1%. Both
+        // conventions are asserted here because a bare ratio is the same
+        // hazard as a bare test total -- the RAW count is 12 over 1.10 and the
+        // CORRECTED count, which is the one this file uses throughout, is 11.
+        assertEquals(1.085, ratios[8], 0.001, "set 9, boundary-corrected")
+        assertEquals(553.7, rr(HrFixtures.worn(9)).first(), 0.05, "set 9's first R-R, the boundary term")
+        val raw =
+            HrFixtures.allWorn().map { s -> rr(s).sum() / (s.last().timestampMs - s.first().timestampMs) }
+        assertEquals(1.0965, raw[8], 0.001, "set 9, raw, no boundary term")
+        assertEquals(12, raw.count { it > 1.10 }, "the raw count, which is not the one used here")
         assertEquals(0.957, ratios.min(), 0.001, "set 14, the only set under 1.00")
     }
 
@@ -226,23 +238,23 @@ class FieldHrDuplicationTest {
     }
 
     /**
-     * The density law checked where the resend mechanism CANNOT fire.
+     * The density law checked where re-sends are all but suppressed.
      *
-     * A resend needs a notification window with no beat in it. At or above 120
-     * bpm the beat interval is at or below the ~500 ms cadence, so there are no
-     * empty windows and every adjacent-identical pair in that regime is a
-     * genuine pair of consecutive beats. That makes this regime an independent
-     * measurement of the tie rate with no duplication in it at all -- the only
-     * such measurement this corpus contains.
+     * A re-send needs a notification window with no beat in it. Restricted to
+     * adjacent pairs where BOTH samples report 120 bpm or more, the beat
+     * interval is at or under the ~500 ms cadence and the cadence model predicts
+     * 0.1 re-sends across all 263 such pairs. Not zero, and the word matters:
+     * this regime is near-resend-free rather than resend-free, so at most a
+     * fraction of one of the 27 ties here is a re-send. It is still the closest
+     * this corpus comes to measuring the genuine tie rate uncontaminated.
      *
      * Measured 10.3%. The density law, given that regime's own tight scale of
-     * 5.82 ms, predicts 11.9%. Agreement to 16% in the regime where the Laplace
-     * tail approximation is under the most strain, and it is the strongest
-     * confirmation available that the law is describing beats rather than
-     * artefacts.
+     * 5.82 ms, predicts 11.9%. Agreement to 16% where the Laplace tail
+     * approximation is under the most strain, and note the SIGN: measured is
+     * BELOW predicted. Extra duplication hiding here would push it above.
      */
     @Test
-    fun `above 120 bpm, where no resend is possible, the tie rate is what the law predicts`() {
+    fun `above 120 bpm, where re-sends are near-suppressed, the tie rate matches the law`() {
         var pairs = 0
         var ties = 0
         for (s in HrFixtures.allWorn()) {
@@ -270,7 +282,187 @@ class FieldHrDuplicationTest {
         }
         val sigma = sqrt(fast.sumOf { it * it } / fast.size)
         assertEquals(5.82, sigma, 0.01)
-        assertEquals(0.119, laplace() / sigma, 0.002, "what the law predicts where no resend can fire")
+        assertEquals(0.119, laplace() / sigma, 0.002, "what the law predicts in this regime")
+
+        // The premise, as a number rather than a word: the cadence model still
+        // predicts a fraction of a re-send among these pairs, not none.
+        val modelled =
+            HrFixtures.allWorn().sumOf { set ->
+                (1 until set.size).sumOf { i ->
+                    if (set[i].bpm >= 120 && set[i - 1].bpm >= 120) {
+                        maxOf(0.0, 1.0 - 500.0 / set[i - 1].rrIntervalsMs.single())
+                    } else {
+                        0.0
+                    }
+                }
+            }
+        assertEquals(0.1, modelled, 0.1, "re-sends predicted in the near-suppressed regime")
+        assertTrue(
+            ties.toDouble() / pairs < laplace() / sigma,
+            "measured tie rate is above predicted, which is the signature of extra duplication",
+        )
+    }
+
+    // ---- what the rule actually removes ------------------------------------
+
+    /**
+     * The rule, run over the control it was designed against.
+     *
+     * 327 notifications removed of 1930. That is the number, and the two
+     * assertions beside it are what it costs and what it buys: about 141 of
+     * those were real beats, and the budget stops claiming time that was never
+     * lived through.
+     */
+    @Test
+    fun `the rule removes 327 of the 1930 worn notifications`() {
+        assertEquals(1603, HrFixtures.allWorn().sumOf { RrIngest.newBeats(it).size })
+        assertEquals(
+            List(HrFixtures.WORN_SETS) { true },
+            HrFixtures.allWorn().map { RrIngest.newBeats(it).size < it.size },
+            "a worn set lost nothing, so the rule stopped firing",
+        )
+    }
+
+    /**
+     * The rule reduces the UNWORN capture to almost nothing -- a side effect,
+     * stated at its true size rather than a flattering one.
+     *
+     * A strap on a table has no signal, so its detector holds one value and
+     * re-sends it. Counted in INTERVALS, not notifications, because the two
+     * differ here: unworn set 1 is 72 notifications carrying only 46 intervals.
+     * 46, 91 and 91 collapse to 1, 1 and 6.
+     *
+     * ONLY ONE OF THE THREE YIELDS AN HRV TODAY, AND AFTER THE RULE NONE DOES.
+     * "Yields", not "publishes": no per-set HRV reaches any export. This test
+     * was named with the wrong verb in the same commit that corrected four
+     * other sites of it, which is how a class-fix announces itself complete
+     * while adding an instance.
+     * Sets 1 and 2 already come back null from Hrv.rmssdMs, their streams
+     * failing the plausibility band outright, so the rule changes nothing for
+     * them. Set 3 gives 52.97 ms today and null after. So: one figure removed,
+     * not three -- and all three null afterwards, which is the stronger and
+     * also the true statement of where this leaves the negative control.
+     *
+     * NOT a fix for issue #83 and must not be recorded as one. #83 is about an
+     * unworn strap being DETECTABLE as unworn; this rule detects nothing, it
+     * deletes a degenerate stream because the stream is degenerate. A worn
+     * resting strap reports beats that vary and does not collapse this way --
+     * exactly the case no capture here covers.
+     */
+    @Test
+    fun `the rule removes the one HRV the unworn capture still yields`() {
+        assertEquals(
+            listOf(46, 91, 91),
+            HrFixtures.allUnworn().map { set -> set.sumOf { it.rrIntervalsMs.size } },
+        )
+        assertEquals(listOf(1, 1, 6), HrFixtures.allUnworn().map { RrIngest.newBeats(it).size })
+    }
+
+    /**
+     * WHAT THE RULE COSTS IS NOT A CONSTANT. It rises steeply with heart rate,
+     * and a single aggregate hides that.
+     *
+     * The removal count comes from [RrIngest] itself rather than from a copy of
+     * its predicate written out here. That matters: with the comparison
+     * restated inline, loosening the shipped rule to a 1.0 ms tolerance moved
+     * the beat series 1611 to 1549 and red 8 executions elsewhere while leaving
+     * THIS test -- the one whose subject is what the rule costs -- green.
+     *
+     * Of what the rule removes, the share that was a genuine consecutive beat
+     * rather than a re-send. The genuine share is the CADENCE MODEL's estimate,
+     * so these decompose its total of 151.0 and not the density law's 140.7;
+     * the two disagree by 10.3 beats and neither is authoritative. Grouped by
+     * each SET's median heart rate:
+     *
+     *   below 110 bpm    204 removed, about 34% genuine
+     *   110 to 120 bpm    93 removed, about 60% genuine
+     *   120 bpm and up    30 removed, about 86% genuine
+     *
+     * Grouping by each SET's median averages a set that spans the boundary. The
+     * finer per-notification bucketing is pinned by its own test below.
+     *
+     * Above about 120 bpm the beat interval is at or under the ~500 ms cadence,
+     * so there is little left to re-send and nearly everything the rule deletes
+     * is real: it is close to pure cost there. A rest-heavy session is where it
+     * pays and a short, hard, high-rate one is where it does not. That is a
+     * real trade, not a rounding error, and it belongs beside any aggregate.
+     */
+    @Test
+    fun `what the rule costs rises steeply with heart rate`() {
+        fun profile(lo: Int, hi: Int): Pair<Int, Double> {
+            var removed = 0
+            var repeats = 0.0
+            for (s in HrFixtures.allWorn()) {
+                val median = s.map { it.bpm }.sorted()[s.size / 2]
+                if (median < lo || median >= hi) continue
+                removed += s.sumOf { it.rrIntervalsMs.size } - RrIngest.newBeats(s).size
+                for (i in 1 until s.size) {
+                    repeats += maxOf(0.0, 1.0 - 500.0 / s[i - 1].rrIntervalsMs.single())
+                }
+            }
+            return removed to (removed - repeats) / removed
+        }
+        val slow = profile(0, 110)
+        val mid = profile(110, 120)
+        val fast = profile(120, 999)
+        assertEquals(204, slow.first)
+        assertEquals(93, mid.first)
+        assertEquals(30, fast.first)
+        assertEquals(0.34, slow.second, 0.02)
+        assertEquals(0.60, mid.second, 0.02)
+        assertEquals(0.86, fast.second, 0.02, "above the cadence the rule is near pure cost")
+        assertTrue(fast.second > slow.second, "the cost stopped depending on heart rate")
+
+        // The cadence model's TOTAL, asserted rather than left to be summed out
+        // of the buckets. Prose elsewhere says two estimators disagree and both
+        // are pinned; without this line only one of them was, and the other was
+        // recoverable from three products and three tolerances -- which is a
+        // derivation, not a pin.
+        val removed = slow.first + mid.first + fast.first
+        val genuine = slow.first * slow.second + mid.first * mid.second + fast.first * fast.second
+        assertEquals(327, removed)
+        assertEquals(151.0, genuine, 1.0, "cadence-model genuine ties, the other estimator's total")
+    }
+
+    /**
+     * The same profile bucketed by the heart rate at the EARLIER notification of
+     * each pair rather than by its set's median.
+     *
+     * Finer, because a set spanning the 120 bpm boundary is averaged by the
+     * median and split by this. It sharpens the same shape rather than
+     * contradicting it, which is the only reason it is worth having: two
+     * conventions agreeing is evidence the shape is in the data and not in the
+     * grouping.
+     *
+     * Pinned because it was quoted in prose. It was deleted from RrIngest's
+     * KDoc under the rule that an unpinned number should not ship, and it
+     * survived one file over inside this one -- so either it earns an assertion
+     * or it goes the same way. This is the assertion.
+     */
+    @Test
+    fun `bucketing by each notification rather than each set sharpens the same profile`() {
+        fun profile(lo: Int, hi: Int): Pair<Int, Double> {
+            var removed = 0
+            var repeats = 0.0
+            for (s in HrFixtures.allWorn()) {
+                for (i in 1 until s.size) {
+                    if (s[i - 1].bpm < lo || s[i - 1].bpm >= hi) continue
+                    if (s[i].rrIntervalsMs == s[i - 1].rrIntervalsMs) removed++
+                    repeats += maxOf(0.0, 1.0 - 500.0 / s[i - 1].rrIntervalsMs.single())
+                }
+            }
+            return removed to (removed - repeats) / removed
+        }
+        val slow = profile(0, 110)
+        val mid = profile(110, 120)
+        val fast = profile(120, 999)
+        assertEquals(206, slow.first)
+        assertEquals(93, mid.first)
+        assertEquals(28, fast.first)
+        assertEquals(0.300, slow.second, 0.002)
+        assertEquals(0.660, mid.second, 0.002)
+        assertEquals(0.991, fast.second, 0.002)
+        assertTrue(fast.second > mid.second && mid.second > slow.second, "the profile inverted")
     }
 
     /**
@@ -284,10 +476,14 @@ class FieldHrDuplicationTest {
      * three to six times tighter. Summing per set gives 140.7, a 63% difference,
      * and this was caught in review rather than by me.
      *
-     * With T = 140.7 the ledger closes on every side. Repeats are 327 - 140.7 =
-     * 186.3 against a cadence model predicting 176.0, and lost beats are 186.3 -
-     * 177.9 = 8.4 against the same model predicting 9.7. Four estimators that
-     * share no assumptions, agreeing to within 13%.
+     * With T = 140.7, repeats are 327 - 140.7 = 186.3 against a cadence model
+     * predicting 176.0.
+     *
+     * The lost-beat figure below is asserted so it cannot drift, and NOTHING
+     * PUBLISHED DEPENDS ON IT. It is a difference of two estimates and is
+     * smaller than the gap between them, so no closure is claimed for it and
+     * none is needed: only repeats-minus-lost-beats reaches any figure, and
+     * the elapsed-time budget measures that directly.
      *
      * The consequence is that collapsing all 327 removes about 141 real beats,
      * 43% of what it removes. That is the cost of the rule, and it is a cost.

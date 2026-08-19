@@ -5,13 +5,21 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * [RrIngest] as it behaves TODAY: every reported interval is taken as a beat.
+ * [RrIngest]: which beats a notification brought.
  *
- * These pin the rule currently in force, so the commit moving it out of
- * `RecordViewModel` can be shown to have moved it rather than changed it. Two
- * are marked (pre-fix) and assert the wrong answer on purpose: they are green
- * now and issue #81's fix overturns them, which is how the fix is made to say
- * which behaviour it changed.
+ * A notification identical to the last one that carried intervals brought no
+ * new beat -- the strap re-sends its last completed R-R on its own cadence when
+ * none has arrived (issue #81). Everything else it carries is new.
+ *
+ * Every assertion goes through the BATCH form, including the ones about a
+ * single notification, because that form's signature does not change when the
+ * rule does. Writing four of them against the one-notification form was an
+ * oversight that made the fix fail to COMPILE rather than fail an assertion.
+ *
+ * The multi-interval cases are synthetic and have to be: 0 of the 2,184
+ * notifications across all 20 committed captures carry more than one interval.
+ * They pin the intended contract and they are the only thing that does -- two
+ * semantically different rules otherwise pass every test in this repository.
  */
 class RrIngestTest {
     private fun sample(atMs: Long, bpm: Int, vararg rr: Double) =
@@ -19,17 +27,17 @@ class RrIngestTest {
 
     @Test
     fun `the first notification of a stream contributes everything it carries`() {
-        assertEquals(listOf(800.0), RrIngest.newBeats(sample(0, 75, 800.0)))
+        assertEquals(listOf(800.0), RrIngest.newBeats(listOf(sample(0, 75, 800.0))))
     }
 
     @Test
     fun `a notification carrying no intervals contributes nothing`() {
-        assertEquals(emptyList(), RrIngest.newBeats(sample(500, 75)))
+        assertEquals(emptyList(), RrIngest.newBeats(listOf(sample(500, 75))))
     }
 
     @Test
     fun `two intervals in one notification are two beats`() {
-        assertEquals(listOf(420.0, 425.0), RrIngest.newBeats(sample(500, 143, 420.0, 425.0)))
+        assertEquals(listOf(420.0, 425.0), RrIngest.newBeats(listOf(sample(500, 143, 420.0, 425.0))))
     }
 
     /**
@@ -44,27 +52,27 @@ class RrIngestTest {
      */
     @Test
     fun `two identical intervals inside one notification are two beats`() {
-        assertEquals(listOf(430.0, 430.0), RrIngest.newBeats(sample(500, 140, 430.0, 430.0)))
+        assertEquals(listOf(430.0, 430.0), RrIngest.newBeats(listOf(sample(500, 140, 430.0, 430.0))))
     }
 
     /**
-     * (pre-fix) A notification repeating its predecessor is counted again today.
+     * A notification repeating its predecessor carried no new beat.
      *
-     * Written against the batch form because that is the signature the fix does
-     * not change, so this same assertion can be inverted by the fix rather than
-     * rewritten by it.
+     * Inverts the (pre-fix) assertion of the same name. The strap re-sends its
+     * last completed R-R on its own cadence when no beat has arrived, and the
+     * second report is the same beat, not a second one.
      */
     @Test
-    fun `a notification repeating its predecessor is counted again today`() {
+    fun `a notification repeating its predecessor contributes nothing`() {
         assertEquals(
-            listOf(800.0, 800.0),
+            listOf(800.0),
             RrIngest.newBeats(listOf(sample(0, 75, 800.0), sample(500, 75, 800.0))),
         )
     }
 
-    /** (pre-fix) Nothing is dropped today, so the batch total is the reported total. */
+    /** A run of repeats is one beat however long the run is. */
     @Test
-    fun `the batch form keeps every reported interval today`() {
+    fun `a run of three identical notifications is one beat`() {
         val stream =
             listOf(
                 sample(0, 75, 800.0),
@@ -72,7 +80,90 @@ class RrIngestTest {
                 sample(1000, 75, 800.0),
                 sample(1500, 76, 790.0),
             )
-        assertEquals(listOf(800.0, 800.0, 800.0, 790.0), RrIngest.newBeats(stream))
+        assertEquals(listOf(800.0, 790.0), RrIngest.newBeats(stream))
+    }
+
+    /**
+     * A value returning after a different one intervened is a NEW beat.
+     *
+     * Only the IMMEDIATE predecessor is compared. A heart returning to an
+     * interval it held a moment ago is ordinary, and treating equality at any
+     * distance as duplication would delete real beats wholesale.
+     *
+     * Green both before and after the fix, and not dead weight for it: this is
+     * the only test that kills a rule freezing its reference at the first
+     * notification of the stream instead of advancing it.
+     */
+    @Test
+    fun `a value that returns after another intervenes is a new beat`() {
+        val stream =
+            listOf(
+                sample(0, 75, 800.0),
+                sample(500, 76, 790.0),
+                sample(1000, 75, 800.0),
+            )
+        assertEquals(listOf(800.0, 790.0, 800.0), RrIngest.newBeats(stream))
+    }
+
+    /**
+     * Equality is over the WHOLE list, not the first interval.
+     *
+     * Kills a rule comparing only firstOrNull(), which otherwise passes every
+     * test in this repository and is a different rule: it discards a
+     * notification sharing its opening interval with its predecessor while
+     * carrying a genuinely new one after it.
+     */
+    @Test
+    fun `two notifications agreeing only on their first interval are both kept`() {
+        val stream = listOf(sample(0, 80, 800.0, 700.0), sample(500, 82, 800.0, 650.0))
+        assertEquals(listOf(800.0, 700.0, 800.0, 650.0), RrIngest.newBeats(stream))
+    }
+
+    /**
+     * Equality, not containment.
+     *
+     * Kills a rule asking whether the predecessor already CONTAINED everything
+     * this notification carries, which also otherwise passes every test here. A
+     * strap reporting two beats and then one of them again is reporting a beat
+     * it has not reported in that position; containment would drop it.
+     */
+    @Test
+    fun `a notification the predecessor merely contained is still a new beat`() {
+        val stream = listOf(sample(0, 80, 800.0, 700.0), sample(500, 82, 700.0))
+        assertEquals(listOf(800.0, 700.0, 700.0), RrIngest.newBeats(stream))
+    }
+
+    /**
+     * Order inside a notification is part of its identity.
+     *
+     * Kills the remaining family of predicates that differ from the shipped
+     * rule only where no capture reaches: set equality, sorted equality, and
+     * multiset equality all call this pair a duplicate. It is two beats
+     * reported in the opposite order, which is a different notification.
+     */
+    @Test
+    fun `a notification carrying the same intervals reordered is not a repeat`() {
+        val stream = listOf(sample(0, 80, 800.0, 700.0), sample(500, 80, 700.0, 800.0))
+        assertEquals(listOf(800.0, 700.0, 700.0, 800.0), RrIngest.newBeats(stream))
+    }
+
+    /**
+     * A silent notification does not break a repeat run.
+     *
+     * The comparison is against the last notification that CARRIED intervals,
+     * not against the last notification. A notification with the R-R flag clear
+     * says nothing about beats, so letting it reset the comparison would turn
+     * one beat into two whenever the strap went quiet mid-run.
+     */
+    @Test
+    fun `a silent notification does not make the next repeat a new beat`() {
+        val stream =
+            listOf(
+                sample(0, 75, 800.0),
+                sample(500, 75),
+                sample(1000, 75, 800.0),
+            )
+        assertEquals(listOf(800.0), RrIngest.newBeats(stream))
     }
 
     /** A notification carrying nothing contributes nothing, before or after the fix. */
