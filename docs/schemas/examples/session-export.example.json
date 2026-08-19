@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.5",
+  "schemaVersion": "1.6",
   "startedAt": "2026-07-18T17:04:00Z",
   "endedAt": "2026-07-18T18:11:00Z",
   "timeZone": { "id": "America/New_York", "utcOffsetMinutes": -240 },
@@ -44,7 +44,7 @@
             { "ecc_s": 3.7, "bottomPause_s": 0.2, "con_s": 1.1, "topPause_s": 1.4, "meanConVel_mps": 0.46, "peakConVel_mps": 0.78, "meanEccVel_mps": -0.15, "rom_m": 0.59, "peakPower_w": 921.0 },
             { "ecc_s": 3.2, "bottomPause_s": 0.1, "con_s": 1.3, "topPause_s": 0.9, "meanConVel_mps": 0.45, "peakConVel_mps": 0.74, "meanEccVel_mps": -0.17, "rom_m": 0.6, "peakPower_w": 905.6 }
           ],
-          "summary": { "meanConVel_mps": 0.48, "peakConVel_mps": 0.85, "meanEcc_s": 3.74, "meanCon_s": 1.02, "meanRom_m": 0.6 }
+          "summary": { "meanConVel_mps": 0.48, "peakConVel_mps": 0.85, "meanEcc_s": 3.74, "meanCon_s": 1.02, "meanRom_m": 0.6, "romSpread_pct": 4.2 }
         }
       ]
     },
@@ -83,7 +83,7 @@
               "travelRatio": "default"
             }
           },
-          "summary": { "meanConVel_mps": 0.41, "peakConVel_mps": 0.66, "meanEcc_s": 2.8, "meanCon_s": 1.1, "meanRom_m": 0.34 }
+          "summary": { "meanConVel_mps": 0.41, "peakConVel_mps": 0.66, "meanEcc_s": 2.8, "meanCon_s": 1.1, "meanRom_m": 0.34, "romSpread_pct": 11.8 }
         }
       ]
     }
