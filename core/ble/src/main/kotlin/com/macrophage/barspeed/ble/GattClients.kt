@@ -148,7 +148,16 @@ abstract class GattClient(protected val context: Context) {
             override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
                 when (newState) {
                     BluetoothProfile.STATE_CONNECTED -> {
-                        g.requestMtu(247)
+                        try {
+                            g.requestMtu(247)
+                        } catch (e: SecurityException) {
+                            // Same race as connect(): the permission can be revoked
+                            // between the stack delivering this callback and this
+                            // call. Nothing downstream has run yet -- no
+                            // notification is subscribed -- so there is no live
+                            // data path to protect by staying on Connecting.
+                            stateFlow.value = ConnectionState.Failed(PERMISSION_DENIED_REASON)
+                        }
                     }
                     BluetoothProfile.STATE_DISCONNECTED -> {
                         stateFlow.value = ConnectionState.Disconnected
@@ -157,7 +166,14 @@ abstract class GattClient(protected val context: Context) {
             }
 
             override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
-                g.discoverServices()
+                try {
+                    g.discoverServices()
+                } catch (e: SecurityException) {
+                    // Same reasoning as onConnectionStateChange above: no
+                    // notification is subscribed yet, so Failed costs nothing
+                    // beyond what a stuck Connecting would already have cost.
+                    stateFlow.value = ConnectionState.Failed(PERMISSION_DENIED_REASON)
+                }
             }
 
             override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
@@ -170,15 +186,25 @@ abstract class GattClient(protected val context: Context) {
                     stateFlow.value = ConnectionState.Failed("Expected service/characteristic not found")
                     return
                 }
-                g.setCharacteristicNotification(characteristic, true)
-                val descriptor = characteristic.getDescriptor(CCC_DESCRIPTOR)
-                if (descriptor != null) {
-                    if (Build.VERSION.SDK_INT >= 33) {
-                        g.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
-                    } else {
-                        descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                        g.writeDescriptor(descriptor)
+                try {
+                    g.setCharacteristicNotification(characteristic, true)
+                    val descriptor = characteristic.getDescriptor(CCC_DESCRIPTOR)
+                    if (descriptor != null) {
+                        if (Build.VERSION.SDK_INT >= 33) {
+                            g.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+                        } else {
+                            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                            g.writeDescriptor(descriptor)
+                        }
                     }
+                } catch (e: SecurityException) {
+                    // Same race as connect(), one callback later. These three
+                    // calls are the last step before Connected; none of them
+                    // has run, so no notification is subscribed and there is
+                    // nothing live to protect by staying here instead of
+                    // reporting Failed.
+                    stateFlow.value = ConnectionState.Failed(PERMISSION_DENIED_REASON)
+                    return
                 }
                 stateFlow.value = ConnectionState.Connected(deviceName)
                 onReady(g)
@@ -270,16 +296,26 @@ class WitmotionClient(context: Context, private val clock: () -> Long = System::
         val characteristic =
             gatt.getService(serviceUuid)
                 ?.getCharacteristic(UUID.fromString(WitmotionProtocol.WRITE_CHARACTERISTIC_UUID)) ?: return
-        if (Build.VERSION.SDK_INT >= 33) {
-            gatt.writeCharacteristic(
-                characteristic,
-                command,
-                BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE,
-            )
-        } else {
-            characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-            characteristic.value = command
-            gatt.writeCharacteristic(characteristic)
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                gatt.writeCharacteristic(
+                    characteristic,
+                    command,
+                    BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE,
+                )
+            } else {
+                characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                characteristic.value = command
+                gatt.writeCharacteristic(characteristic)
+            }
+        } catch (e: SecurityException) {
+            // Connected already; the notify characteristic is already
+            // subscribed and delivering samples, so demoting the state here
+            // would be the opposite lie -- Failed while data keeps arriving.
+            // A lost configuration command leaves the sensor on whatever rate
+            // it already had; the DSP measures the actual delivered rate
+            // rather than trusting this write (see onReady above), so this
+            // degrades the capture rather than corrupting it.
         }
     }
 
@@ -306,9 +342,17 @@ class HrmClient(context: Context, private val clock: () -> Long = System::curren
     val samples: SharedFlow<HrSample> = samplesFlow
 
     override fun onReady(gatt: BluetoothGatt) {
-        gatt.getService(UUID.fromString(HeartRateProfile.BATTERY_SERVICE_UUID))
-            ?.getCharacteristic(UUID.fromString(HeartRateProfile.BATTERY_LEVEL_CHARACTERISTIC_UUID))
-            ?.let { gatt.readCharacteristic(it) }
+        try {
+            gatt.getService(UUID.fromString(HeartRateProfile.BATTERY_SERVICE_UUID))
+                ?.getCharacteristic(UUID.fromString(HeartRateProfile.BATTERY_LEVEL_CHARACTERISTIC_UUID))
+                ?.let { gatt.readCharacteristic(it) }
+        } catch (e: SecurityException) {
+            // Connected is already set and the measurement characteristic is
+            // already subscribed; only this battery read is lost. batteryPct
+            // stays null, its already-honest default for "unknown" -- this
+            // must not demote a client still receiving heart-rate samples to
+            // Failed.
+        }
     }
 
     override fun onNotification(uuid: UUID, value: ByteArray) {

@@ -28,7 +28,21 @@ class BleScanner {
         val callback =
             object : ScanCallback() {
                 override fun onScanResult(callbackType: Int, result: ScanResult) {
-                    val name = result.device.name ?: result.scanRecord?.deviceName ?: return
+                    // This callback is invoked by the framework outside the
+                    // callbackFlow builder's own coroutine, so no downstream
+                    // .catch and no awaitClose can ever see a throw from here;
+                    // it must be closed locally or not at all. scanRecord's
+                    // local name needs no permission at all (unlike
+                    // device.name, BLUETOOTH_CONNECT-gated from API 31) and is
+                    // tried first for that reason, but many devices omit a
+                    // local name from their advertising payload, so the
+                    // gated fallback is still reached often enough that it
+                    // has to be caught too, not just reordered after.
+                    val name = try {
+                        result.scanRecord?.deviceName ?: result.device.name
+                    } catch (e: SecurityException) {
+                        null
+                    } ?: return
                     trySend(
                         DiscoveredDevice(
                             address = result.device.address,
