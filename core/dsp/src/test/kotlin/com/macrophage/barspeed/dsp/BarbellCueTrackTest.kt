@@ -50,6 +50,16 @@ import kotlin.test.assertTrue
  *
  * See [CueTrack]. Cue times are wall-clock; the DSP reports phase boundaries on
  * a uniform reconstructed clock. The skew between them is pinned here.
+ *
+ * ## These recordings predate the cadence fix
+ *
+ * These sets were paced before issue 106 removed the one-second announcement
+ * beat. The beat is a row of its own, so the intervals that SPAN it change and
+ * the intervals inside a stroke do not: `Down` to `Up` stays 3.004 s and `Up`
+ * to the announcement stays 1.001 s, while the announcement-to-`Down` interval
+ * and the 5.006 s cycle disappear and become 4.005 s of continuous cycling.
+ * Everything here stays valid as a recording of what the metronome did on
+ * 2026-08-17; none of it describes current behaviour.
  */
 class BarbellCueTrackTest {
     private fun load(n: String): List<ImuSample> = ImuCsv.decode(

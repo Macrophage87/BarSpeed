@@ -66,6 +66,13 @@ import kotlin.test.assertEquals
  * axis has no spread in it to separate on -- so no assertion here should be
  * read as attributing the clip to either. See #47 for that analysis and #92 for
  * the modelling gap underneath it.
+ *
+ * ## This recording predates the cadence fix
+ *
+ * The extra beat described above is issue 106, and it is fixed in the commit
+ * series that added this note. The intervals here stay valid as a recording of
+ * what the metronome did on 2026-08-18; a capture made afterwards will not look
+ * like this.
  */
 class LegCurlCueTrackTest {
     private fun res(n: String) = javaClass.getResourceAsStream("/$n")!!.readBytes().decodeToString()
