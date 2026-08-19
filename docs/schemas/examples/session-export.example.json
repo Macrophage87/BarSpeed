@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.6",
+  "schemaVersion": "1.7",
   "startedAt": "2026-07-18T17:04:00Z",
   "endedAt": "2026-07-18T18:11:00Z",
   "timeZone": { "id": "America/New_York", "utcOffsetMinutes": -240 },
@@ -36,7 +36,7 @@
               "travelRatio": "seeded"
             }
           },
-          "hr": { "endOfSetBpm": 148, "avgBpm": 131, "maxBpm": 152 },
+          "hr": { "endOfSetBpm": 148, "avgBpm": 131, "maxBpm": 152, "minBpm": 118 },
           "repMetrics": [
             { "ecc_s": 3.9, "bottomPause_s": 0.2, "con_s": 0.8, "topPause_s": 1.1, "meanConVel_mps": 0.52, "peakConVel_mps": 0.85, "meanEccVel_mps": -0.16, "rom_m": 0.61, "peakPower_w": 980.2 },
             { "ecc_s": 3.8, "bottomPause_s": 0.3, "con_s": 0.9, "topPause_s": 1.0, "meanConVel_mps": 0.5, "peakConVel_mps": 0.83, "meanEccVel_mps": -0.16, "rom_m": 0.6, "peakPower_w": 951.7 },
