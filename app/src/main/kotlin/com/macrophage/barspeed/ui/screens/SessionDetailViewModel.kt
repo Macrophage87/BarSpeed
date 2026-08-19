@@ -11,6 +11,7 @@ import com.macrophage.barspeed.BuildConfig
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.model.WeightUnit
+import com.macrophage.barspeed.model.sessionTimestamp
 import com.macrophage.barspeed.ui.ShareUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,18 +71,42 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
     /**
      * Exports carry the app name and the version that produced them: several of
      * these end up in one Downloads folder or one chat, and how a number should
-     * be read depends on which build wrote it.
+     * be read depends on which build wrote it -- more true than ever with
+     * schema 1.4 through 1.9 landing across two releases.
+     *
+     * Named after the session's own start time, not a database row id --
+     * direct lifter request, since `session12` says nothing off the phone
+     * and sorts a Downloads folder full of these by nothing useful.
+     * [sessionTimestamp] carries the actual reasoning (the zone it renders
+     * in, the null fallback, why seconds); this function only assembles the
+     * three pieces around it.
+     *
+     * Suspend, and nullable, because the session row is looked up fresh
+     * here rather than trusted from the [session] StateFlow's cached
+     * value: the six export buttons on the detail screen are gated on
+     * [exporting], not on session being non-null, so a tap in the brief
+     * window before that flow's first emission must not synthesise a name
+     * from nothing. Null propagates the same way a missing session already
+     * does through [container]'s exportJson/buildZip -- the caller bails
+     * out via `?: return@launch`, exactly as it already does when the
+     * payload itself comes back null.
      */
-    private fun exportName(suffix: String) = "BarSpeed-v${BuildConfig.VERSION_NAME}-session$sessionId-$suffix"
+    private suspend fun exportName(suffix: String): String? {
+        val row = repository.session(sessionId) ?: return null
+        val timestamp = sessionTimestamp(row.startedAtMs, row.zoneId, row.utcOffsetMinutes)
+        return "BarSpeed-v${BuildConfig.VERSION_NAME}-$timestamp-$suffix"
+    }
 
-    private fun jsonName(includeDetail: Boolean) = exportName(if (includeDetail) "detailed.json" else "summary.json")
+    private suspend fun jsonName(includeDetail: Boolean) =
+        exportName(if (includeDetail) "detailed.json" else "summary.json")
 
     fun shareJson(includeDetail: Boolean) {
         viewModelScope.launch {
             _exporting.value = true
             try {
                 val json = container.sessionExporter.exportJson(sessionId, includeDetail) ?: return@launch
-                ShareUtil.shareJson(getApplication(), jsonName(includeDetail), json)
+                val name = jsonName(includeDetail) ?: return@launch
+                ShareUtil.shareJson(getApplication(), name, json)
             } finally {
                 _exporting.value = false
             }
@@ -93,7 +118,8 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
             _exporting.value = true
             try {
                 val zip = container.rawExporter.buildZip(sessionId) ?: return@launch
-                ShareUtil.shareFile(getApplication(), exportName("raw.zip"), zip, "application/zip")
+                val name = exportName("raw.zip") ?: return@launch
+                ShareUtil.shareFile(getApplication(), name, zip, "application/zip")
             } finally {
                 _exporting.value = false
             }
@@ -109,8 +135,9 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
             _exporting.value = true
             try {
                 val json = container.sessionExporter.exportJson(sessionId, includeDetail) ?: return@launch
+                val name = jsonName(includeDetail) ?: return@launch
                 pendingSave = json.toByteArray(Charsets.UTF_8)
-                onReady(jsonName(includeDetail))
+                onReady(name)
             } finally {
                 _exporting.value = false
             }
@@ -122,8 +149,9 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
             _exporting.value = true
             try {
                 val zip = container.rawExporter.buildZip(sessionId) ?: return@launch
+                val name = exportName("raw.zip") ?: return@launch
                 pendingSave = zip
-                onReady(exportName("raw.zip"))
+                onReady(name)
             } finally {
                 _exporting.value = false
             }
