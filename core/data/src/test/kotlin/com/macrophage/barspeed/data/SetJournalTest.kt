@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.nio.file.Files
+import java.util.zip.ZipInputStream
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -373,5 +374,53 @@ class SetJournalTest {
             found.cues,
             "a cue the app spoke was counted as a rep the lifter performed",
         )
+    }
+
+    // ---- getting it off the phone -------------------------------------------
+
+    /**
+     * The zip carries the capture verbatim, because that is what makes it
+     * useful twice: once to the lifter who wants their set, and once to this
+     * repository, where a capture that exposed a defect becomes a regression
+     * fixture with no transformation. Byte equality, not "contains something
+     * plausible".
+     */
+    @Test
+    fun `an interrupted capture zips to its files, byte for byte`() = runTest {
+        val store = store()
+        onDisk(imuText = ImuCsv.encode(imu), cueText = CueCsv.encode(cues))
+        val entries = unzip(store.zip(store.orphans().single()))
+        assertEquals(
+            listOf(SetJournalStore.HEADER_FILE, SetJournal.CUES, SetJournal.IMU).sorted(),
+            entries.keys.sorted(),
+        )
+        assertEquals(ImuCsv.encode(imu), entries.getValue(SetJournal.IMU))
+        assertEquals(CueCsv.encode(cues), entries.getValue(SetJournal.CUES))
+    }
+
+    /**
+     * Some of a capture is worth more than none of it. The whole reason this
+     * file exists is that the process was killed partway, so a stream cut off
+     * mid-line must not be what stops the lifter getting the rest.
+     */
+    @Test
+    fun `a capture cut off mid-line still zips everything it has`() = runTest {
+        val store = store()
+        val ragged = ImuCsv.encode(imu) + "1020,0.03"
+        onDisk(imuText = ragged, cueText = CueCsv.encode(cues))
+        val entries = unzip(store.zip(store.orphans().single()))
+        assertEquals(ragged, entries.getValue(SetJournal.IMU), "the zip repaired or truncated the raw capture")
+        assertEquals(CueCsv.encode(cues), entries.getValue(SetJournal.CUES))
+    }
+
+    private fun unzip(bytes: ByteArray): Map<String, String> {
+        val out = mutableMapOf<String, String>()
+        ZipInputStream(bytes.inputStream()).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                out[entry.name] = zip.readBytes().toString(Charsets.UTF_8)
+            }
+        }
+        return out
     }
 }

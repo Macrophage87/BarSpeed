@@ -7,6 +7,7 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.SessionEntity
 import com.macrophage.barspeed.model.WeightUnit
+import com.macrophage.barspeed.ui.ShareUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -83,6 +84,25 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * timer. Nothing else deletes one: a capture the lifter has not ruled on
      * outlives any number of launches.
      */
+    /**
+     * Send an interrupted capture to the lifter, as the raw files.
+     *
+     * The only route this data has off the phone -- app-private storage is not
+     * browsable -- so without it the capture would be safe and permanently out
+     * of reach of the person whose set it is.
+     *
+     * Deliberately does NOT discard afterwards. Sharing can fail at the share
+     * sheet, silently as far as this code can tell, and a capture deleted on
+     * the assumption that it arrived somewhere is the defect this whole branch
+     * exists to close, re-created one step further along.
+     */
+    fun shareInterrupted(orphan: OrphanedSet) {
+        viewModelScope.launch {
+            val zip = withContext(Dispatchers.IO) { container.setJournals.zip(orphan) }
+            ShareUtil.shareFile(getApplication(), interruptedName(orphan), zip, "application/zip")
+        }
+    }
+
     fun discardInterrupted(orphan: OrphanedSet) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { container.setJournals.discard(orphan) }
@@ -162,3 +182,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         const val DAYS_PER_WEEK = 7L
     }
 }
+
+/** Names the file after the set it holds, so two captures cannot collide. */
+private fun interruptedName(orphan: OrphanedSet): String =
+    "interrupted-${orphan.header.exerciseId}-${orphan.header.startedAtMs}.zip"

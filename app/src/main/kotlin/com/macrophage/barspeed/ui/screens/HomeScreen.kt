@@ -153,7 +153,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
             // history LazyColumn below is unweighted, so anything added here
             // comes out of the history list with no way to scroll it back.
             PermissionBanner()
-            InterruptedSetNotice(interrupted, viewModel::discardInterrupted)
+            InterruptedSetNotice(interrupted, viewModel::shareInterrupted, viewModel::discardInterrupted)
             HeroCard(state) { navController.navigate("record") }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -306,7 +306,11 @@ private fun volumeUnit(unit: WeightUnit): String = when (unit) {
  * it means is that there was nothing to measure.
  */
 @Composable
-private fun InterruptedSetNotice(interrupted: List<OrphanedSet>, onDiscard: (OrphanedSet) -> Unit) {
+private fun InterruptedSetNotice(
+    interrupted: List<OrphanedSet>,
+    onShare: (OrphanedSet) -> Unit,
+    onDiscard: (OrphanedSet) -> Unit,
+) {
     if (interrupted.isEmpty()) return
     val clock = DateTimeFormatter.ofPattern("HH:mm:ss")
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -330,8 +334,13 @@ private fun InterruptedSetNotice(interrupted: List<OrphanedSet>, onDiscard: (Orp
                     Spacer(Modifier.height(6.dp))
                     SectionCaption("Kept on this phone. Nothing deletes it but you")
                     Spacer(Modifier.height(6.dp))
-                    TextButton(onClick = { onDiscard(orphan) }) {
-                        Text("DISCARD THIS CAPTURE", color = BarColors.Red)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { onShare(orphan) }) {
+                            Text("SEND IT TO ME", color = BarColors.Volt)
+                        }
+                        TextButton(onClick = { onDiscard(orphan) }) {
+                            Text("DISCARD", color = BarColors.Red)
+                        }
                     }
                 }
             }

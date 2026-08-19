@@ -12,8 +12,11 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.BufferedWriter
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Locale
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * Who a set was, written before any of it.
@@ -264,6 +267,39 @@ class SetJournalStore(
 
     fun discard(orphan: OrphanedSet) {
         orphan.directory.deleteRecursively()
+    }
+
+    /**
+     * An interrupted capture as a zip the lifter can send themselves.
+     *
+     * The only way this data leaves the phone. App-private storage is not
+     * browsable, so without this the capture is safe and permanently out of
+     * reach -- which is a strange thing to offer somebody whose set it is.
+     *
+     * The files are copied in exactly as they lie, uncompressed and
+     * unconverted. They are already the canonical CSV that
+     * `core/dsp/src/test/resources/field-*.csv` fixtures are written in, so a
+     * capture that exposes a defect converts into a regression fixture with no
+     * transformation at all -- which is this repository's discharge ritual for
+     * a hardware-found bug.
+     *
+     * A stream that will not read is skipped rather than failing the export.
+     * Some of the capture is worth more than none of it, and the whole reason
+     * this file exists is that the process was killed partway.
+     */
+    fun zip(orphan: OrphanedSet): ByteArray {
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zip ->
+            orphan.directory.listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }.forEach { file ->
+                runCatching {
+                    val bytes = file.readBytes()
+                    zip.putNextEntry(ZipEntry(file.name))
+                    zip.write(bytes)
+                    zip.closeEntry()
+                }
+            }
+        }
+        return out.toByteArray()
     }
 
     /**
