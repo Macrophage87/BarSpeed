@@ -6,6 +6,19 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import java.io.File
+
+/**
+ * The schema version this build knows, in one place.
+ *
+ * A top-level constant rather than a literal repeated in the annotation and in
+ * the downgrade check: those two must never disagree, and the way they disagree
+ * is somebody bumping one of them.
+ */
+const val DATABASE_VERSION = 9
+
+/** The database file name, shared with the downgrade check for the same reason. */
+const val DATABASE_NAME = "accelerometer_lifting.db"
 
 @Database(
     entities = [
@@ -15,7 +28,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         RawStreamEntity::class,
         CustomExerciseEntity::class,
     ],
-    version = 9,
+    version = DATABASE_VERSION,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -120,8 +133,42 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
-        fun build(context: Context): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, "accelerometer_lifting.db")
+        /**
+         * Open the database, having first made sure opening it cannot destroy
+         * it. Issue #101.
+         *
+         * BEFORE ROOM IS ASKED FOR ANYTHING, the file on disk is read directly
+         * and, if it is newer than this build, moved aside -- so Room then
+         * finds nothing, creates an empty database, and the destructive
+         * downgrade path is never entered. That is why
+         * fallbackToDestructiveMigrationOnDowngrade is gone from the chain
+         * below: with the rescue in front of it, it was unreachable, and
+         * removing it means a downgrade the rescue MISSES now throws instead of
+         * silently dropping every table. Loud beats quiet when the alternative
+         * is a corpus that cannot be rebuilt.
+         *
+         * If the rescue cannot complete there is nothing further to do and
+         * nothing further is done: the original is untouched, Room meets the
+         * newer file, and it throws. A crash with the data intact beats a clean
+         * start with it gone.
+         *
+         * WHAT THIS RELEASE ACTUALLY MEETS is the uninteresting branch. The
+         * database version has not moved, so a rollback from this build to the
+         * previous one is already safe and the rescue is not what makes it so.
+         * This protects rollbacks TO a build that carries it -- the first
+         * release that moves the version is the one that needs it.
+         *
+         * The migrations are untouched. Only downgrade behaviour changes; a
+         * missing UPGRADE migration still throws exactly as before.
+         */
+        fun build(context: Context): AppDatabase {
+            val databaseFile = context.getDatabasePath(DATABASE_NAME)
+            DatabaseRescue.rescue(
+                databaseFile = databaseFile,
+                rescueRoot = File(context.filesDir, DatabaseRescue.RESCUE_DIR),
+                compiledVersion = DATABASE_VERSION,
+            )
+            return Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
                 .addMigrations(
                     MIGRATION_1_2,
                     MIGRATION_2_3,
@@ -132,7 +179,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                 )
-                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
+        }
     }
 }
