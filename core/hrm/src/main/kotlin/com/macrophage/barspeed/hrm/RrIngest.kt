@@ -66,19 +66,32 @@ import com.macrophage.barspeed.model.HrSample
  * `FieldHrDuplicationTest.lag one is enriched three and a half fold over every
  * other lag` against a parameter-free Laplace prediction, and cross-checked by
  * `.above 120 bpm, where re-sends are near-suppressed, the tie rate matches the
- * law`. ASSUMED: that resting variability is
- * several times this capture's. The benefit at a resting rate follows from the
- * HEART RATE and the residual cost from that assumed SIGMA; they are not the
- * same kind of claim and must not be quoted as though both came from the rate.
- * The benefit dominates across the range of sigma considered, including the
- * pessimistic case where resting variability equals this capture's.
+ * law`. FORMERLY ASSUMED, NOW MEASURED, AND THE ASSUMPTION WAS WRONG: that
+ * resting variability is several times this capture's. Across the two 0.1.40
+ * captures, paired against the set each rest period precedes, the median
+ * rest-to-set ratio is 1.26 and four of twenty rest streams are LESS variable
+ * than their own set. The benefit at a resting rate follows from the HEART
+ * RATE and the residual cost from SIGMA; they are not the same kind of claim
+ * and must not be quoted as though both came from the rate.
  *
- * No WORN capture held here reaches a resting heart rate; the control's range
- * and the absence of any sample below 70 bpm are pinned in
- * `FieldHrTrustDischargeTest.the worn control contains no resting heart rate at
- * all`. The unworn capture does go lower, but it is a strap on a table
- * reporting a detector holding its own last value, so it is not evidence about
- * a resting heart at all. Issue #83.
+ * THE CONCLUSION SURVIVES BECAUSE IT WAS ALREADY STATED AGAINST THE
+ * PESSIMISTIC CASE: the benefit dominates across the range of sigma
+ * considered, INCLUDING where resting variability equals this capture's. The
+ * measurement lands inside that range rather than outside it, so what changes
+ * is the wording and not the finding -- but the wording was a claim, and it
+ * was false. Pinned by `FieldHrRestingBandTest.inter-set rest is not several
+ * times more variable than the set it precedes`.
+ *
+ * No WORN capture held here reaches a RESTING heart rate, which is a different
+ * statement from reaching a slow one. Session 26's range and the absence of
+ * any sample below 70 bpm are pinned in `FieldHrTrustDischargeTest.the worn
+ * control contains no resting heart rate at all`; the two 0.1.40 captures do
+ * go below it, to 67 bpm across 16 of their 8,044 samples, pinned in
+ * `FieldHrRestingBandTest.the captures reach 67 bpm and no lower`. That is
+ * eleven beats below session 26's floor, not the thirty-two that would reach
+ * the figure the unworn strap published. The unworn capture goes lower still,
+ * but it is a strap on a table reporting a detector holding its own last
+ * value, so it is not evidence about a resting heart at all. Issue #83.
  *
  * WHY A RULE FOR THIS CANNOT LIVE IN [Hrv]: two equal values inside ONE
  * notification are two beats the strap queued; two equal values in SUCCESSIVE

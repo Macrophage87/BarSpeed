@@ -56,12 +56,39 @@ data class HrStreamSummary(
  */
 object HrTrust {
     /**
-     * THE DISCRIMINANT IS VARIABILITY, AND THIS IS THE FIRST THING TO KNOW
-     * ABOUT IT. A heart's successive intervals differ from each other; a strap
-     * that has lost contact holds one interval and re-sends it, so its series
-     * has almost none. A SINUS rhythm's sigma does not approach 1 ms -- not
-     * when slow, not when maximal, not when the corpus's hardest set drives it
-     * to 6.58 ms. That is what this rule rests on.
+     * THE DISCRIMINANT IS COVERAGE. WHAT BOUNDS THE FALSE POSITIVES IS
+     * VARIABILITY. Those are two different statements and this paragraph used
+     * to make only the second, in the words of the first.
+     *
+     * What silences a stream is the fraction of its own elapsed time its
+     * de-duplicated beats account for, and nothing else. What makes that safe
+     * for a real wearer is that a genuine stream's shortfall comes from ties,
+     * ties go as q/(sigma*sqrt(2)), and a SINUS rhythm's sigma does not
+     * approach 1 ms -- not when slow, not when maximal, not when the corpus's
+     * hardest set drives it to 6.58 ms. That is the bound, and
+     * [silencingSigmaMs] is where it lives.
+     *
+     * THE SENTENCE THIS REPLACES SAID A STRAP THAT HAS LOST CONTACT "HOLDS ONE
+     * INTERVAL AND RE-SENDS IT, SO ITS SERIES HAS ALMOST NO VARIABILITY", AND
+     * THAT IS FALSE OF THE SERIES THIS FILE MEASURES. It is true of the raw
+     * notification stream. It is not true after [RrIngest.newBeats], which is
+     * the only series anything here takes a sigma over: the unworn set of
+     * session 28 held three values for 24 seconds, every repeat was removed,
+     * and the three that survive -- 1902.3, 1607.4 and 1003.9 ms -- give it a
+     * sigma of 474.96 ms. That is the LARGEST of any stream in the corpus,
+     * worn or not.
+     *
+     * SO VARIABILITY IS NOT A WEAKER DISCRIMINANT HERE. IT IS NOT ONE IN
+     * EITHER DIRECTION. A rule "silence when sigma is below X" needs X above
+     * 474.96 ms to reach the unworn set, and every worn stream sits below
+     * 391.02 ms, so that rule silences the whole corpus. A rule "silence when
+     * sigma is above X" would silence the most variable worn streams first.
+     * The unworn set is at the wrong END of this axis for a floor to reach it,
+     * which is why the rule reads coverage: 0.171 against a 0.35 cut. Pinned
+     * by `FieldHrTrustDischargeTest.the unworn set is the most variable stream
+     * held here, not the least`, which also records that RMSSD over the RAW
+     * notifications is 99.04 ms -- the withdrawn sentence was true of a series
+     * this file does not measure.
      *
      * IT IS NOT TRUE OF ALL HEARTS, and an earlier version of this sentence
      * said "no heart is a metronome", which is a universal asserted over a
@@ -122,14 +149,27 @@ object HrTrust {
      * still falls short -- worn set 03 by 12.8% with no interval under 500 ms
      * anywhere in it.
      *
-     * WHY REST IS THE SAFE END, now derived on the axis that actually governs
-     * it. Both terms shrink as the heart slows: drops need two beats inside one
-     * ~500 ms window, so they need a fast heart and vanish at rest; ties go as
+     * WHY REST IS THE SAFE END, on the axis that actually governs it. Both
+     * terms shrink as the heart slows: drops need two beats inside one ~500 ms
+     * window, so they need a fast heart and vanish at rest; ties go as
      * q/(sigma*sqrt(2)), the density law confirmed independently in issue #81
      * at a level of 0.686 against a parameter-free 0.691, so they shrink as
-     * variability rises, and resting variability is several times working
-     * variability. This is no longer an extrapolation along heart rate from a
-     * predictor range that never contained rest.
+     * variability RISES.
+     *
+     * THIS PARAGRAPH USED TO END "AND RESTING VARIABILITY IS SEVERAL TIMES
+     * WORKING VARIABILITY". That is not what the data shows. Paired against
+     * the set each rest period precedes across the two 0.1.40 captures, the
+     * median rest-to-set ratio is 1.26 and four of the twenty rest streams are
+     * LESS variable than their own set. It was an assumption stated as a
+     * finding, and it is withdrawn rather than reworded.
+     *
+     * What survives it is the part that was load-bearing anyway, and that part
+     * is measured. What the bound is compared with is the FLOOR, not the
+     * median, and the floor does not fall at rest: the least variable rest
+     * stream is 8.23 ms, and the least variable stream of any kind in any
+     * capture held here is 6.58 ms, an in-set stream of session 26. Pinned by
+     * `FieldHrRestingBandTest.the resting captures do not lower the
+     * variability floor`.
      */
     const val MIN_ACCOUNTED_FRACTION = 0.35
 
@@ -194,8 +234,27 @@ object HrTrust {
      * the largest residual any committed capture shows, and it may not be
      * padded far above it either. A one-sided pin here would let the number be
      * made safe by making it meaningless.
+     *
+     * THE MEASUREMENT IS 0.180714, ACROSS ALL 57 WORN STREAMS held here --
+     * session 26's seventeen sets plus the forty streams of sessions 30 and
+     * 31. This constant is 0.181, that figure rounded UP, so it stays above
+     * the data by construction. It was 0.07 while session 26 was the whole
+     * corpus, and 0.0649 is what session 26 actually shows, so seventeen
+     * streams were never a bound on this quantity; they were the worst of
+     * seventeen. The stream that sets
+     * it is the rest before session 30's first set, which is also the shortest
+     * in the corpus at 17 distinct beats and contains a 300 ms interval
+     * followed immediately by a 1,600 ms one.
+     *
+     * THE RESIDUAL IS LARGEST WHERE SIGMA IS LARGEST, which is why carrying a
+     * single worst case is conservative here rather than optimistic. Across
+     * the 57 the correlation between sigma and residual is +0.57, and among
+     * the 36 streams under 15 ms -- the decade the bound is actually evaluated
+     * in -- the worst residual is 0.0778, not 0.181. Carrying the corpus-wide
+     * maximum down to a sigma near 1 ms applies the drop term of the most
+     * variable streams to the least variable ones.
      */
-    const val MAX_SHORTFALL_BELOW_TIE_ONLY = 0.07
+    const val MAX_SHORTFALL_BELOW_TIE_ONLY = 0.181
 
     /**
      * The variability at which a genuine wearer would be silenced.
@@ -255,6 +314,15 @@ object HrTrust {
      * 0.9632 and the one unworn set that still publishes scores 0.17111. The
      * rule costs the worn control nothing and silences the unworn set. Margins
      * 2.45x and 2.05x.
+     *
+     * AND ON THE TWO CAPTURES THE BRANCH WAS HELD FOR: forty more worn streams
+     * at 0.1.40, twenty in-set and twenty rest-before-set, 8,044 samples.
+     * Nothing is withheld. The narrowest is 0.8175, a margin of 2.34x, and it
+     * is a REST stream -- the regime the hold was about. The discharge is
+     * `FieldHrRestingBandTest`, which also states what those captures do not
+     * reach: their slowest sample is 67 bpm against the 46 the unworn strap
+     * published, and only 16 of the 8,044 are below 70. Below 67 bpm this rule
+     * is still argued rather than measured.
      *
      * THE BOUND, on the axis that governs the rule, and it is now arithmetic
      * rather than prose: [silencingSigmaMs]. [tieOnlyFraction] alone puts the
