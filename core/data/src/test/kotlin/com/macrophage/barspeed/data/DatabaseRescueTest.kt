@@ -262,4 +262,58 @@ class DatabaseRescueTest {
         assertTrue(file.isFile, "the database was disturbed by a rescue that could not complete")
         assertEquals(10, DatabaseRescue.storedVersion(file), "the database was altered")
     }
+
+    // ---- issue #111: a failed move must not be reported as a rescue -------
+
+    /**
+     * THE GAP #111'S GATE FOUND. Every `Failed` path above is `mkdirs`
+     * failing; nothing before this test made a `renameTo` call itself fail,
+     * because POSIX `renameTo` overwrites its destination silently -- no
+     * fixture built from real files could provoke it. [move] is the seam
+     * that makes the state producible: reporting `Rescued` when a move
+     * actually failed was killed by no test until this one.
+     */
+    @Test
+    fun `a move that reports failure is reported as Failed, not as Rescued`() {
+        val file = db(10)
+        val outcome = DatabaseRescue.rescue(file, rescueRoot(), 9, move = { _, _ -> false })
+        assertTrue(outcome is RescueOutcome.Failed, "expected Failed, got " + outcome)
+    }
+
+    /**
+     * THE SAFETY-ORDERING PROPERTY THE KDOC ARGUES FOR, DISCHARGED RATHER
+     * THAN TRUSTED BY READING. Sidecars move first and the main file last so
+     * that a crash mid-rescue leaves the main file in place at its newer
+     * version; this simulates exactly that failure -- the wal's move fails
+     * -- and checks the property the ordering exists to guarantee: the main
+     * database file was never touched, still sitting at its original path
+     * with its original bytes.
+     */
+    @Test
+    fun `when a sidecar's move fails, the main file is left in place`() {
+        val file = db(10)
+        val originalBytes = file.readBytes()
+        val wal = File(file.path + "-wal").apply { writeText("wal") }
+        val failWal: (File, File) -> Boolean = { source, dest -> source.name != wal.name && source.renameTo(dest) }
+        val outcome = DatabaseRescue.rescue(file, rescueRoot(), 9, move = failWal)
+        assertTrue(outcome is RescueOutcome.Failed, "expected Failed, got " + outcome)
+        assertTrue(file.isFile, "the main database moved even though a sidecar's move failed")
+        assertEquals(originalBytes.toList(), file.readBytes().toList(), "the main database's bytes changed")
+    }
+
+    /**
+     * The production default is the real [File.renameTo], not a stub left
+     * behind by the seam above -- checked directly rather than inferred from
+     * every other test in this file happening to omit the parameter.
+     */
+    @Test
+    fun `the move parameter defaults to a real file rename`() {
+        val file = db(10)
+        val rescued = assertIsRescued(DatabaseRescue.rescue(file, rescueRoot(), 9))
+        assertTrue(
+            File(rescued, "accelerometer_lifting.db").isFile,
+            "the default move did not actually rename the file",
+        )
+        assertTrue(!file.exists(), "the default move left the original in place")
+    }
 }

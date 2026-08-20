@@ -73,6 +73,14 @@ object DatabaseRescue {
     /** Where rescued databases live, beside the in-flight set journals. */
     const val RESCUE_DIR = "rescued"
 
+    /**
+     * Every rescue directory's name starts with this, followed by the epoch
+     * millisecond it was created at. Public so a reader -- issue #111's
+     * card -- can parse the timestamp back out without a magic string
+     * duplicated between this file and that one.
+     */
+    const val DIR_PREFIX = "db-"
+
     private const val WAL_SUFFIX = "-wal"
     private const val SHM_SUFFIX = "-shm"
 
@@ -142,23 +150,38 @@ object DatabaseRescue {
      * [rescueRoot] is the directory rescued databases are kept in; it is
      * created on demand and only when there is something to put in it.
      *
+     * [move] defaults to [File.renameTo] and production never overrides it --
+     * this parameter exists so a test can make one specific file's move fail
+     * without depending on real filesystem permissions to provoke it. POSIX
+     * renameTo overwrites its destination silently, so no fixture built from
+     * real files could make it return false; the seam is what makes "a move
+     * fails" a state a test can produce at all. Issue #111 found that gap:
+     * before this parameter existed, nothing pinned that a failed move is
+     * reported as [RescueOutcome.Failed] rather than silently taken as
+     * [RescueOutcome.Rescued].
+     *
      * ONE DIRECTORY IS NOT NECESSARILY ONE DATABASE. A rescue interrupted after
      * a sidecar has moved leaves that sidecar in one db-<ms> directory and the
      * main file, moved by the retry on the next launch, in another. Anything
      * reading these back must not assume a directory holds a complete set.
      */
-    fun rescue(databaseFile: File, rescueRoot: File, compiledVersion: Int): RescueOutcome {
+    fun rescue(
+        databaseFile: File,
+        rescueRoot: File,
+        compiledVersion: Int,
+        move: (source: File, dest: File) -> Boolean = File::renameTo,
+    ): RescueOutcome {
         val stored = storedVersion(databaseFile)
         if (DatabaseDowngradePolicy.decide(stored, compiledVersion) == DatabaseOpenAction.OPEN) {
             return RescueOutcome.NotNeeded
         }
         return runCatching {
-            val target = File(rescueRoot, "db-${System.currentTimeMillis()}")
+            val target = File(rescueRoot, "$DIR_PREFIX${System.currentTimeMillis()}")
             if (!target.mkdirs() && !target.isDirectory) {
                 return RescueOutcome.Failed("could not create ${target.path}")
             }
             for (source in moveOrder(databaseFile)) {
-                if (source.isFile && !source.renameTo(File(target, source.name))) {
+                if (source.isFile && !move(source, File(target, source.name))) {
                     return RescueOutcome.Failed("could not move ${source.name}")
                 }
             }

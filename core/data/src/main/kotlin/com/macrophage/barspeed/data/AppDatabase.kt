@@ -148,9 +148,13 @@ abstract class AppDatabase : RoomDatabase() {
          * is a corpus that cannot be rebuilt.
          *
          * If the rescue cannot complete there is nothing further to do and
-         * nothing further is done: the original is untouched, Room meets the
-         * newer file, and it throws. A crash with the data intact beats a clean
-         * start with it gone.
+         * nothing further is done: Room meets the newer main file and throws.
+         * What "nothing further is done" means for what is still where it was
+         * is [RescueOutcome.Failed]'s own KDoc to state, not repeated here --
+         * an earlier version of this exact sentence claimed the original was
+         * untouched, a gate found that false for a mid-move failure, and it
+         * was deleted there rather than reworded. A crash with the data
+         * recoverable beats a clean start with it gone.
          *
          * WHAT THIS RELEASE ACTUALLY MEETS is the uninteresting branch. The
          * database version has not moved, so a rollback from this build to the
