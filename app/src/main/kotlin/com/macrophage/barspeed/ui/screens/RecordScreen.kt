@@ -79,6 +79,7 @@ import com.macrophage.barspeed.ui.components.ProgressRing
 import com.macrophage.barspeed.ui.components.RepBars
 import com.macrophage.barspeed.ui.components.SectionCaption
 import com.macrophage.barspeed.ui.components.SensorDot
+import com.macrophage.barspeed.ui.components.SideArrow
 import com.macrophage.barspeed.ui.components.TargetLineBars
 import com.macrophage.barspeed.ui.components.VerdictChip
 import com.macrophage.barspeed.ui.components.velocityLossColor
@@ -963,7 +964,12 @@ private fun InSetHeader(state: RecordState, slot: PlannedSlot?) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = BarColors.Sub)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            // The same value the word in `parts` carries, drawn as a shape
+            // rather than a word. See [SideArrow].
+            SideArrow(side, Modifier.padding(end = 8.dp))
+            Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = BarColors.Sub)
+        }
         state.hrBpm?.let {
             Text("♥ $it", style = MaterialTheme.typography.bodyMedium, color = BarColors.Red)
         }
@@ -1584,11 +1590,18 @@ private fun RestHeader(state: RecordState) {
                 val name =
                     feedback.exerciseName +
                         (feedback.side?.let { " (${it.replaceFirstChar { c -> c.uppercase() }})" } ?: "")
-                Text(
-                    feedback.actualDurationS?.let { "$name ${it}s @ $loadText" }
-                        ?: "$name ${feedback.effectiveReps} × $loadText",
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // The rest screen can hold two arrows at once -- this one
+                    // and "Up next" -- and they must not read as one signal.
+                    // Colour separates last from next; direction alone
+                    // separates left from right.
+                    SideArrow(feedback.side, Modifier.padding(end = 6.dp), color = BarColors.Text)
+                    Text(
+                        feedback.actualDurationS?.let { "$name ${it}s @ $loadText" }
+                            ?: "$name ${feedback.effectiveReps} × $loadText",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
                 Spacer(Modifier.height(6.dp))
                 FeedbackChips(feedback, state.hrBpm, state.hrvMs)
             }
@@ -1823,11 +1836,16 @@ private fun SlotCard(
                         ?: "bodyweight".takeIf { slot.isTimed },
                     slot.tempo?.let { "tempo $it" },
                 ).joinToString(" · ")
-            Text(
-                "${slot.exercise.displayName} — $core",
-                style = MaterialTheme.typography.titleMedium,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(vertical = 4.dp),
-            )
+            ) {
+                SideArrow(slot.side, Modifier.padding(end = 8.dp))
+                Text(
+                    "${slot.exercise.displayName} — $core",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
             val secondary =
                 listOfNotNull(
                     slot.targetMeanConVelMps?.let { "target ${trim(it)} m/s" },
