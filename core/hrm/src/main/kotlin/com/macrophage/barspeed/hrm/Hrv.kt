@@ -59,7 +59,7 @@ object Hrv {
      * this clause would refuse them as confirmation on grounds that no longer
      * apply, dropping a real re-anchor. Not fixed here -- it would change
      * segmentation for every caller in a commit whose subject is ingest, and
-     * nothing can exercise it: 0 of the 2,184 notifications across all 20
+     * nothing can exercise it: 0 of the 10,228 notifications across all 60
      * committed captures carry more than one interval. It triggers on a strap
      * that batches, which this one has never been observed to do.
      *

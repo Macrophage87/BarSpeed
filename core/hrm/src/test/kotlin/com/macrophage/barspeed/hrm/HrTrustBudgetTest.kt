@@ -161,7 +161,7 @@ class HrTrustBudgetTest {
         fun fractionAt(sigmaMs: Double) = HrTrust.tieOnlyFraction(sigmaMs)
         assertEquals(0.35, fractionAt(1.062), 0.005, "the sigma at which the cut bites")
         assertTrue(fractionAt(6.58) > 0.88, "the hardest worn set in the corpus")
-        assertTrue(fractionAt(50.0) > 0.98, "well above every stream held here")
+        assertTrue(fractionAt(17.7) > 0.96, "the median rest stream of the two 0.1.40 captures")
         assertTrue(
             fractionAt(6.58) > HrTrust.MIN_ACCOUNTED_FRACTION,
             "the corpus minimum stopped clearing the cut",

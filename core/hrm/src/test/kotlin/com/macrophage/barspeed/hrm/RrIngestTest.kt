@@ -16,8 +16,8 @@ import kotlin.test.assertEquals
  * rule does. Writing four of them against the one-notification form was an
  * oversight that made the fix fail to COMPILE rather than fail an assertion.
  *
- * The multi-interval cases are synthetic and have to be: 0 of the 2,184
- * notifications across all 20 committed captures carry more than one interval.
+ * The multi-interval cases are synthetic and have to be: 0 of the 10,228
+ * notifications across all 60 committed captures carry more than one interval.
  * They pin the intended contract and they are the only thing that does -- two
  * semantically different rules otherwise pass every test in this repository.
  */

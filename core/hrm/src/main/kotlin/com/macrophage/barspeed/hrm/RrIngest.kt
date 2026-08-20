@@ -87,8 +87,8 @@ import com.macrophage.barspeed.model.HrSample
  * boundaries already gone. This is a property of the FORMAT and of [HrSample] --
  * `rrIntervalsMs` is a list, and the BLE characteristic defines it as every
  * interval since the last notification. It is NOT something this corpus
- * demonstrates: 0 of the 2,184 notifications across all 20 committed captures
- * carry more than one interval, so the multi-interval case is unexercised by
+ * demonstrates: 0 of the 10,228 notifications across all 60 committed
+ * captures carry more than one interval, so the multi-interval case is unexercised by
  * every capture held here and is a `[Field]` question, not a finding.
  *
  * WHAT ARRIVAL TIME DOES NOT DO, recorded because issue #81 proposes it and it

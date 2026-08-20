@@ -11,7 +11,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * [HrTrust] run against both real captures, before it is wired to anything.
+ * [HrTrust] run against the sessions 26 and 28 captures, before it is wired
+ * to anything, plus two assertions that reach every worn stream held here.
  *
  * The worn control is the point of this file. Two earlier candidate rules for
  * this defect looked correct against the unworn capture and were withdrawn only
@@ -278,7 +279,8 @@ class FieldHrTrustDischargeTest {
     }
 
     /**
-     * THE CONSTANT THAT CARRIES THE DROP TERM, PINNED FROM BOTH SIDES.
+     * THE CONSTANT THAT CARRIES THE DROP TERM, PINNED FROM BOTH SIDES, OVER
+     * EVERY WORN STREAM HELD HERE AND NOT ONLY SESSION 26.
      *
      * [HrTrust.MAX_SHORTFALL_BELOW_TIE_ONLY] is the only figure between
      * [HrTrust.tieOnlyFraction] -- a centre -- and [HrTrust.silencingSigmaMs],
@@ -289,14 +291,28 @@ class FieldHrTrustDischargeTest {
      * So it is bounded above as well as below. It may not sit under the largest
      * residual the committed corpus shows, and it may not be padded more than a
      * hundredth above it.
+     *
+     * The corpus it is measured over widened from 17 streams to 57, and the
+     * residual widened with it: 0.0649 across session 26, 0.1808 once the two
+     * 0.1.40 captures are included. Session 26 alone was not a bound on how far
+     * a real worn stream falls below the closed form; it was the worst of
+     * seventeen.
      */
     @Test
     fun `the closed form's residual is bounded by the constant that carries it`() {
         val residuals =
-            HrFixtures.allWorn().map {
+            HrFixtures.everyWornStream().map {
                 HrTrust.tieOnlyFraction(HrFixtures.sigmaOf(it)) - HrTrust.accountedFraction(it)!!
             }
-        assertEquals(0.0649, residuals.max(), 0.0005, "the worst the closed form does against the corpus")
+        assertEquals(0.1808, residuals.max(), 0.0005, "the worst the closed form does against the corpus")
+        assertEquals(
+            0.0649,
+            HrFixtures.allWorn().maxOf {
+                HrTrust.tieOnlyFraction(HrFixtures.sigmaOf(it)) - HrTrust.accountedFraction(it)!!
+            },
+            0.0005,
+            "and the worst it did against session 26 alone, which is what made the wider figure a surprise",
+        )
         assertTrue(
             HrTrust.MAX_SHORTFALL_BELOW_TIE_ONLY >= residuals.max(),
             "the constant sits below a residual a real stream shows: ${residuals.max()}",
@@ -311,14 +327,85 @@ class FieldHrTrustDischargeTest {
      * THE BOUND AGAINST THE CORPUS THAT HAS TO CLEAR IT, which is the
      * comparison the whole resting argument is. Neither side means anything
      * alone.
+     *
+     * The bound got WORSE when the resting captures arrived, from 1.19 ms to
+     * 1.47 ms, because the drop term it carries is measured and the wider
+     * corpus measured a larger one. The corpus minimum sigma did not move --
+     * 6.58 ms, still session 26's fourteenth set -- so the margin fell from
+     * 5.5x to 4.5x on the bound moving alone.
      */
     @Test
     fun `the bound the resting argument rests on, against the corpus that has to clear it`() {
         val bound = HrTrust.silencingSigmaMs()
-        val lowest = HrFixtures.allWorn().minOf(HrFixtures::sigmaOf)
-        assertEquals(1.19, bound, 0.01, "the variability at which a genuine wearer would be silenced")
-        assertEquals(5.5, lowest / bound, 0.1, "the margin between the bound and the least variable real stream")
+        val lowest = HrFixtures.everyWornStream().minOf(HrFixtures::sigmaOf)
+        assertEquals(6.58, lowest, 0.02, "the least variable stream of any capture held here")
+        assertEquals(1.47, bound, 0.01, "the variability at which a genuine wearer would be silenced")
+        assertEquals(4.5, lowest / bound, 0.1, "the margin between the bound and the least variable real stream")
         assertTrue(lowest > bound, "a real worn stream reached the silencing variability")
+    }
+
+    /**
+     * THE HEADLINE SENTENCE OF THIS RULE WAS FALSE UNDER THE RULE'S OWN
+     * DEFINITION OF VARIABILITY, and this is where that is pinned so it cannot
+     * come back.
+     *
+     * [HrTrust.MIN_ACCOUNTED_FRACTION] opened by saying that a strap which has
+     * lost contact holds one interval and re-sends it, so its series "has
+     * almost none" of a heart's variability. Measured on the DE-DUPLICATED
+     * series -- the only series anything here takes a sigma over -- the unworn
+     * set is the MOST variable stream in this directory: 474.96 ms, against a
+     * worn maximum of 391.01 and a worn minimum of 6.58.
+     *
+     * The de-duplication is the mechanism. The strap held three values for
+     * 24 seconds and [RrIngest.newBeats] removes every repeat, leaving
+     * 1902.3, 1607.4 and 1003.9 ms, whose successive differences are enormous.
+     * "Almost no variability" is true of the RAW notification stream and false
+     * of the series the rule reads.
+     *
+     * Nothing about the rule moves. It silences on the FRACTION, 0.171 against
+     * a 0.35 cut, and the variability argument is about why a GENUINE stream
+     * cannot reach that fraction -- not about how this one does. But the
+     * discriminant is coverage, and a sentence saying it is variability had
+     * survived three rounds unchallenged because no test could reach it.
+     */
+    @Test
+    fun `the unworn set is the most variable stream held here, not the least`() {
+        val unworn = HrFixtures.sigmaOf(HrFixtures.unworn(3))
+        assertEquals(474.96, unworn, 0.05, "the unworn set's de-duplicated variability")
+        assertTrue(
+            unworn > HrFixtures.everyWornStream().maxOf(HrFixtures::sigmaOf),
+            "the unworn set stopped being the most variable stream held here",
+        )
+        // The consequence, and it is stronger than "a weaker discriminant": any
+        // rule of the form "silence when sigma < X" that reaches the unworn set
+        // needs X above 474.96, and every worn stream is below 391.02, so it
+        // silences the entire corpus. Variability cannot separate these two
+        // populations in EITHER direction.
+        assertTrue(
+            HrFixtures.everyWornStream().all { HrFixtures.sigmaOf(it) < unworn },
+            "a variability floor reaching the unworn set would spare some worn stream",
+        )
+        // And why the withdrawn sentence looked true: it is true of the series
+        // the file does not measure. RMSSD over the raw notifications is 99.04
+        // ms, low against a worn corpus of 6.58 to 391.02; the de-duplication
+        // is what turns it into the largest figure in the directory.
+        val raw = HrFixtures.unworn(3).filter(HrTrust::isTrusted).map { it.rrIntervalsMs.single() }
+        val diffs = (1 until raw.size).map { raw[it] - raw[it - 1] }
+        assertEquals(
+            99.04,
+            kotlin.math.sqrt(diffs.sumOf { it * it } / diffs.size),
+            0.05,
+            "the raw notification series, which is the one the withdrawn sentence described",
+        )
+        assertEquals(
+            listOf(1902.3, 1607.4, 1003.9),
+            RrIngest.newBeats(HrFixtures.unworn(3).filter(HrTrust::isTrusted)),
+            "the three values a strap on a table held for 24 seconds",
+        )
+        assertTrue(
+            HrTrust.accountedFraction(HrFixtures.unworn(3))!! < HrTrust.MIN_ACCOUNTED_FRACTION,
+            "and it is still silenced, on coverage rather than on variability",
+        )
     }
 
     /**
