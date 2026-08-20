@@ -1,23 +1,29 @@
 package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.OrphanedSet
+import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.data.SessionEntity
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.ShareUtil
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /** One history row: session summary plus a per-set mean-velocity sparkline. */
@@ -68,8 +74,64 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val interruptedFlow = MutableStateFlow<List<OrphanedSet>>(emptyList())
     val interrupted: StateFlow<List<OrphanedSet>> = interruptedFlow
 
+    /**
+     * Databases `container.rescuedDatabases` found moved aside by a
+     * downgrade. Issue #111: the same shape as [interrupted] and for the
+     * same reason -- a directory scan with no observer behind it, so it is
+     * its own flow rather than another arm of [state].
+     */
+    private val rescuedFlow = MutableStateFlow<List<RescuedDatabase>>(emptyList())
+    val rescued: StateFlow<List<RescuedDatabase>> = rescuedFlow
+
+    /**
+     * Rescued directories with a share or a discard currently in flight,
+     * keyed by [RescuedDatabase.directory] so one busy item does not disable
+     * every card.
+     *
+     * THE FIX FOR THIS ISSUE'S OWN GATE. Nothing gated these two buttons
+     * before this: both were always enabled, both launched on their own
+     * coroutine, and a lens executed the result -- tap SEND, see nothing
+     * happen while the archive streams, tap DISCARD, and the corpus is
+     * deleted mid-stream while the share sheet goes on to offer a valid,
+     * empty zip with no exception, no toast, no log. This is
+     * `SessionDetailViewModel.exporting`'s own reasoning from issue #29 --
+     * "moving the build off Main widened a real race rather than only
+     * fixing one" -- applied to the one place on this screen where the
+     * adjacent button is destructive and the payload is not bounded the way
+     * every one of that screen's six exports is.
+     *
+     * NO DURATION IS QUOTED, and the omission is deliberate. This KDoc used
+     * to carry "12 s at 80 MB, 28 s at 200 MB on a desktop SSD", relayed
+     * from a review into shipped source; an independent re-measurement of
+     * the same code path got 3 to 30 times faster in every configuration
+     * tried, so the figure is retracted rather than replaced. The fix does
+     * not rest on it: any window longer than one frame admits the second
+     * tap, and how long the window actually is on a phone is a field
+     * question nothing here has measured.
+     *
+     * MUTATED WITH `update {}`, NOT `value = value + x`. Read-modify-write
+     * is correct only while every caller is already on the same thread, and
+     * issue #29's own defect was created by moving work off Main. The claim
+     * this repository makes elsewhere (`Exporters.kt`) that
+     * `viewModelScope` is `Dispatchers.Main.immediate` IS verified for the
+     * lifecycle version this module builds against, from the artifact
+     * already in the Gradle cache: `javap -c` on androidx.lifecycle
+     * 2.8.7's `CloseableCoroutineScopeKt.createViewModelScope` shows
+     * `Dispatchers.getMain()` followed by
+     * `MainCoroutineDispatcher.getImmediate()`, and `ViewModelKt`'s
+     * `getViewModelScope` calls that function on-path. Its only fallback
+     * is `EmptyCoroutineContext`, taken where no Main dispatcher exists at
+     * all, which is not a phone. The code still does not depend on it. If it
+     * were a dispatching Main instead, two rapid SEND taps could both pass
+     * the guard below and two concurrent `zipTo` calls would write the same
+     * cache path.
+     */
+    private val busyRescuesFlow = MutableStateFlow<Set<File>>(emptySet())
+    val busyRescues: StateFlow<Set<File>> = busyRescuesFlow
+
     init {
         refreshInterrupted()
+        refreshRescued()
     }
 
     /** Re-scan private storage. Cheap: an empty root is the normal case. */
@@ -80,10 +142,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Throw an interrupted capture away, at the lifter's word and never on a
-     * timer. Nothing else deletes one: a capture the lifter has not ruled on
-     * outlives any number of launches.
+     * Re-scan the rescue directory. Cheap: an empty root is the normal case.
+     *
+     * RETURNS THE JOB so a caller that must not report "done" before the list
+     * on screen reflects the disk can wait for it; [discardRescued] is the one
+     * that must. [refreshInterrupted] above is deliberately left as it is:
+     * [discardInterrupted] has the same un-awaited shape, but it predates this
+     * branch and is not issue #111's to change.
      */
+    fun refreshRescued(): Job = viewModelScope.launch {
+        rescuedFlow.value = withContext(Dispatchers.IO) { container.rescuedDatabases.rescued() }
+    }
+
     /**
      * Send an interrupted capture to the lifter, as the raw files.
      *
@@ -103,10 +173,117 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Throw an interrupted capture away, at the lifter's word and never on a
+     * timer. Nothing else deletes one: a capture the lifter has not ruled on
+     * outlives any number of launches.
+     */
     fun discardInterrupted(orphan: OrphanedSet) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { container.setJournals.discard(orphan) }
             refreshInterrupted()
+        }
+    }
+
+    /**
+     * Send a rescued database off the phone, zipped. Issue #111.
+     *
+     * Streamed through [ShareUtil.shareStreamed] rather than
+     * [ShareUtil.shareFile]: a rescued corpus has no upper bound by design,
+     * unlike everything else this screen shares, and
+     * `container.rescuedDatabases.zipTo` is written to match -- see that
+     * function's own KDoc for the measurement behind why.
+     *
+     * Deliberately does NOT discard afterwards, for the same reason
+     * [shareInterrupted] does not: sharing can fail at the share sheet,
+     * silently as far as this code can tell, and deleting on the assumption
+     * it arrived somewhere would recreate the defect this whole feature
+     * exists to close.
+     *
+     * MARKS [item] BUSY for the whole call, not only the build phase, and
+     * CATCHES A FAILED BUILD rather than letting it surface as a bare crash.
+     * `RescuedDatabaseStore.zipTo` itself deletes its own partial output on
+     * failure and rethrows; this is the boundary where that becomes
+     * something the lifter is actually told about, the same shape
+     * `SessionDetailViewModel.savePendingTo` already uses for its own IO
+     * failure.
+     *
+     * That last reference used to read as a KDoc link and to describe its
+     * target as "two functions down in this same file". Both were wrong:
+     * savePendingTo is declared exactly once, in SessionDetailViewModel, a
+     * different class in a different file, so the link resolved to nothing.
+     * Backticks and a qualified name, the convention `Exporters.kt` already
+     * uses for a cross-class reference.
+     *
+     * CATCHES MORE THAN IOException. The narrower catch left the share
+     * sheet's own startActivity free to crash the app outright -- an
+     * ActivityNotFoundException when no target exists is a RuntimeException,
+     * not an IOException -- from the first screen of a cold launch. A crash
+     * here is not silent data loss; the rescued corpus is untouched by a
+     * failed share, so a Toast is strictly the better outcome.
+     * CancellationException is rethrown rather than swallowed, because
+     * catching it would leave a cancelled coroutine reporting a failed share
+     * instead of unwinding.
+     */
+    fun shareRescued(item: RescuedDatabase) {
+        if (item.directory in busyRescuesFlow.value) return
+        viewModelScope.launch {
+            busyRescuesFlow.update { it + item.directory }
+            try {
+                ShareUtil.shareStreamed(getApplication(), rescuedName(item), "application/zip") { destination ->
+                    container.rescuedDatabases.zipTo(item, destination)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(getApplication(), "Couldn't build the archive -- try again", Toast.LENGTH_SHORT).show()
+            } finally {
+                busyRescuesFlow.update { it - item.directory }
+            }
+        }
+    }
+
+    /**
+     * Throw a rescued database away, at the lifter's word and never on a
+     * timer -- the same rule [discardInterrupted] already follows, and
+     * rescued data has the stronger claim to it: it is what an entire
+     * corpus, not one set, would otherwise depend on nothing else deleting.
+     *
+     * Marks [item] busy for the same reason [shareRescued] does: this is
+     * the other half of the race that finding closed. The confirmation
+     * dialog is `RescuedDatabaseNotice`'s own concern, not this function's
+     * -- by the time this runs, the lifter has already confirmed.
+     *
+     * TELLS THE LIFTER WHEN THE DISCARD DID NOT FULLY HAPPEN. `discard`
+     * reports whether the directory actually went; see its own KDoc for why a
+     * partial removal is not benign -- what survives re-reads as a fragment,
+     * and the card re-titles itself as possibly holding data the live
+     * database is missing, which after a deliberate discard is false. Without
+     * this the lifter would watch a card they had just confirmed change its
+     * own story, with nothing saying a delete had failed. Whether Android
+     * ever produces that outcome is unmeasured, and said so where `discard`
+     * lives rather than here.
+     *
+     * AWAITS THE RESCAN BEFORE RELEASING THE BUSY KEY. [refreshRescued] only
+     * LAUNCHES a scan, so clearing the key first re-enabled both buttons
+     * against a stale list -- a window needing an inhuman second tap, and
+     * nothing is destroyed inside it, but joining closes it for the cost of
+     * one suspension point.
+     */
+    fun discardRescued(item: RescuedDatabase) {
+        if (item.directory in busyRescuesFlow.value) return
+        viewModelScope.launch {
+            busyRescuesFlow.update { it + item.directory }
+            try {
+                val removed = withContext(Dispatchers.IO) { container.rescuedDatabases.discard(item) }
+                refreshRescued().join()
+                if (!removed) {
+                    Toast.makeText(getApplication(), "Couldn't remove all of it -- try again", Toast.LENGTH_SHORT)
+                        .show()
+                }
+            } finally {
+                busyRescuesFlow.update { it - item.directory }
+            }
         }
     }
 
@@ -186,3 +363,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 /** Names the file after the set it holds, so two captures cannot collide. */
 private fun interruptedName(orphan: OrphanedSet): String =
     "interrupted-${orphan.header.exerciseId}-${orphan.header.startedAtMs}.zip"
+
+/** Names the file after the directory it holds, so two rescues cannot collide. */
+private fun rescuedName(item: RescuedDatabase): String = "${item.directory.name}.zip"

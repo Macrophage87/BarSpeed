@@ -5,8 +5,10 @@ import com.macrophage.barspeed.ble.AutoConnectManager
 import com.macrophage.barspeed.ble.BleScanner
 import com.macrophage.barspeed.ble.DeviceRegistry
 import com.macrophage.barspeed.data.AppDatabase
+import com.macrophage.barspeed.data.DatabaseRescue
 import com.macrophage.barspeed.data.PlanRepository
 import com.macrophage.barspeed.data.RawExporter
+import com.macrophage.barspeed.data.RescuedDatabaseStore
 import com.macrophage.barspeed.data.SessionExporter
 import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.data.SetJournalStore
@@ -42,6 +44,17 @@ class AppContainer(app: Application) {
      */
     val setJournals =
         SetJournalStore(File(app.filesDir, "inflight"), CoroutineScope(SupervisorJob() + Dispatchers.IO))
+
+    /**
+     * Where [DatabaseRescue.rescue] leaves a database it moved aside, read
+     * back for issue #111's card. The same directory [AppDatabase.build]
+     * passes as rescueRoot, recomputed from the same public constant rather
+     * than threaded through as a return value -- [DatabaseRescue.rescue]'s
+     * own result is discarded there today, and #111's own gate found why
+     * that discard is not yet safe to build on. This store never reads it;
+     * it reads the filesystem [DatabaseRescue] already left in place.
+     */
+    val rescuedDatabases = RescuedDatabaseStore(File(app.filesDir, DatabaseRescue.RESCUE_DIR))
 
     val deviceRegistry = DeviceRegistry(app)
     val bleScanner = BleScanner()
