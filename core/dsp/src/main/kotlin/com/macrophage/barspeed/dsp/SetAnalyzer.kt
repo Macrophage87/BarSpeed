@@ -143,6 +143,22 @@ object SetAnalyzer {
      * row is "forward". Orient it from what the lift declares instead: the
      * first real movement of the set is the first phase, so if it points the
      * wrong way, flip the axis. Vertical work needs none of this: up is up.
+     *
+     * **THIS IS THE ONLY DIRECTION DECISION IN THE DSP TAKEN FROM MEASURED
+     * DATA.** Every other direction fact — `driveIsPositive`, `startsAtTop`,
+     * `concentricSign`, `concentricRun`, `eccentricRun` — is a pure function of
+     * declared inputs, and `concentricUp` is never inferred (issue 96). So the
+     * fragile-signal class has exactly one member and it is this function.
+     * Searching for a second one has been done; there is not one.
+     *
+     * It is fragile because ANY pre-rep movement decides it: a 3 cm settle
+     * before the first rep inverts the whole set. When that happens the rep
+     * count is unchanged and the published velocities stay positive and
+     * plausible — they simply describe the wrong stroke, and the eccentric and
+     * concentric swap outright. Issue 28, reproduced in
+     * [HorizontalAxisOrientationTest], not fixed there: no committed capture
+     * can reach this code, so any threshold chosen to harden it would be
+     * calibrated against fabricated samples.
      */
     private fun orient(series: VelocitySeries, direction: LiftDirection, config: DspConfig): VelocitySeries {
         if (direction.measuredPlane != MovementPlane.HORIZONTAL) return series
