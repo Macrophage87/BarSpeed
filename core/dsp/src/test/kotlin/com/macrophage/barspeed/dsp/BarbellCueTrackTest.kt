@@ -61,21 +61,28 @@ import kotlin.test.assertTrue
  * Everything here stays valid as a recording of what the metronome did on
  * 2026-08-17; none of it describes current behaviour.
  *
- * ## The head band will stop describing new captures
+ * ## The head band covers these four fixtures and nothing else
  *
  * `the cue track lies inside the capture it annotates` asserts the first cue
  * row lands -60..0 ms from the first IMU sample. That band encodes "the first
  * cue is spoken at set start", which held because the prep said `Ready` and
- * then nothing. Once [LeadInPlan] delivers the launch phrase, the first
- * RECORDED row becomes `Ready` two seconds before the first stroke and roughly
+ * then nothing. Since [LeadInPlan] delivers the launch phrase the first
+ * RECORDED row is `Ready`, two seconds before the first stroke and roughly
  * three seconds AFTER the first sample, because the countdown before it is
  * spoken and not written down.
  *
- * These four fixtures are untouched, so nothing reds today. The next
- * cue-tracked capture committed to the corpus will. Re-derive the band from
- * that capture when it arrives rather than widening this one -- the same
- * treatment issue 106's changes got twice above. Do not weaken the assertion
- * in advance of a measurement.
+ * These four predate that change and are untouched, so nothing reds. Nor would
+ * a new capture: every fixture list here is hardcoded -- [performed] in this
+ * file, `cueTracked` in [CuedRepCoverageTest] -- and nothing enumerates the
+ * resources directory, so a `-cues.csv` dropped into the corpus is read by no
+ * test and reds none. An earlier version of this note said the next capture
+ * would red it. That was wrong.
+ *
+ * Whoever commits a cue-tracked barbell capture recorded after the launch
+ * phrase must, in that same commit: add it to [performed], add it to
+ * `CuedRepCoverageTest.cueTracked`, bump the size and tally assertions there,
+ * and re-derive this band from the new capture. Do not weaken the assertion in
+ * advance of a measurement.
  */
 class BarbellCueTrackTest {
     private fun load(n: String): List<ImuSample> = ImuCsv.decode(

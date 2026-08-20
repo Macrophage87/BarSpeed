@@ -127,12 +127,13 @@ class LeadInPlanTest {
 
     @Test
     fun `the lead-in vocabulary is disjoint from the vocabulary a plan emits`() {
-        // Sibling of CadencePlanTest.`the cue vocabulary a plan can emit is the
-        // one the committed tracks use`, which is the canonical statement of
-        // the stroke set and is not touched here. Both sets share one cue
-        // track, and CueTrack.calledReps counts rows equal to "Down": a
-        // lead-in word colliding with a stroke word would inflate a rep count
-        // in every capture made afterwards.
+        // HAND COPY of the set CadencePlanTest.`the cue vocabulary a plan can
+        // emit is the one the committed tracks use` pins, with no mechanical
+        // link to it. If the plan vocabulary widens, that test reds first and
+        // this list must be corrected in the same commit; nothing detects the
+        // drift. Both sets share one cue track, and CueTrack.calledReps counts
+        // rows equal to "Down": a lead-in word colliding with a stroke word
+        // would inflate a rep count in every capture made afterwards.
         val strokeWords = setOf("Down", "Drive", "Hold", "Return", "Up")
         assertEquals(emptySet(), LeadInPlan.RECORDED intersect strokeWords, "lead-in word that is a stroke call")
         val digits = (1..9).map { it.toString() }.toSet()

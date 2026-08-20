@@ -49,8 +49,9 @@ class GuidedCadenceRunner(
      * one of those consumers.
      *
      * A NULL cue means speak it and write nothing down. The lead-in needs that
-     * third state — see [LeadInPlan], which decides which of its words reach
-     * the record. Nothing passes null yet.
+     * third state — its countdown digits and its `"N seconds"` opener are
+     * spoken and not recorded. [LeadInPlan.RECORDED] decides which lead-in
+     * words reach the record, and nothing else may.
      */
     private val speak: (cue: String?, utterance: String) -> Unit,
     /** Pushes the on-screen phase label + countdown (label, remaining, total). */
@@ -144,9 +145,8 @@ class GuidedCadenceRunner(
      * immediately.
      *
      * The ring is pushed before each sleep and the beat's word is spoken while
-     * that number is on screen, so a spoken countdown digit is the number the
-     * lifter is looking at. Both come from [LeadInPlan.secondsBeforeStart], so
-     * they cannot drift apart.
+     * that number is on screen. Both come from [LeadInPlan.secondsBeforeStart],
+     * so they cannot drift apart.
      */
     private suspend fun playLeadIn(plan: LeadInPlan) {
         val total = plan.prepS.coerceAtLeast(1)

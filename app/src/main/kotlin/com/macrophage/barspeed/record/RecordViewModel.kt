@@ -978,10 +978,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Speak without recording: touches neither [cueBuffer] nor the journal.
      *
-     * The lead-in's countdown digits go here. `LeadInPlan.RECORDED` is the
-     * canonical statement of which lead-in words are written down and why the
-     * digits are not; this function is only the half that obeys it. Nothing
-     * routes here yet -- `LeadInPlan.of` gives every word it speaks a cue.
+     * The lead-in's countdown digits and its `"N seconds"` opener come here.
+     * `LeadInPlan.RECORDED` is the canonical statement of which lead-in words
+     * are written down and why the digits are not; this function is only the
+     * half that obeys it.
      */
     private fun speakOnly(utterance: String) {
         voice?.speak(utterance)

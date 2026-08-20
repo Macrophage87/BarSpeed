@@ -42,35 +42,65 @@ data class LeadInBeat(val spoken: String?, val cue: String?)
  * is what makes the horizontal case right without anyone remembering to write
  * it.
  *
- * ## What today's prep actually is
+ * ## What the prep plays
  *
- * `Ready` at the top, then silence until the first stroke. Measured across the
- * seven committed `-cues.csv` fixtures, `Ready` to the first movement cue is
- * 5.001-5.004 s. That is what [of] currently builds. The launch phrase the
- * owner asked for -- a numeric countdown into "ready, brace" -- is not built
- * yet; do not read the constants below as a description of what is played.
+ * A prep of P seconds is exactly P one-second slots, filled from the END
+ * backwards. `VoiceCounter` speaks with `TextToSpeech.QUEUE_FLUSH`, so every
+ * utterance cancels the one before it and each slot holds exactly one thing to
+ * say. That is measurable in the committed cue tracks: `Down` then `1` at
+ * 1002 ms on `field-bench-rotating-6rep`.
+ *
+ * - The last second says [BRACE], the one before it [READY]. That is
+ *   [PHRASE_S] seconds, and it is fixed to the END of the prep so `Brace`
+ *   means the same thing whether the prep is 2 seconds or 20.
+ * - Earlier slots, back to [COUNT_FROM_S], speak their own number, so the
+ *   digit at T-k is k and agrees with the ring already on screen. `Ready` and
+ *   `Brace` REPLACE what would have been "2" and "1"; they do not follow them.
+ * - Earlier still is silence, except the first slot, which names the prep
+ *   ("20 seconds") when P is at least `COUNT_FROM_S + PHRASE_S`. What is
+ *   measured is the scheduling: one utterance per second, `Down` then `1` at
+ *   1002 ms. That a shorter slot would truncate the words is inferred from
+ *   QUEUE_FLUSH and has not been heard.
+ *
+ * The default prep therefore reads: five, four, three, ready, brace, and then
+ * the stroke call. Degradation is not symmetric: at P = 1 only `Brace`
+ * survives, because the brace-now beat immediately before movement is worth
+ * more than the get-ready beat two seconds out. At P = 0 nothing is spoken.
+ *
+ * Prep LENGTH is unchanged by any of this -- it is still
+ * [GuidedCadence.LEAD_IN_S] seconds and the first stroke lands where it always
+ * did. What moves is `Ready`, from the top of the prep to [PHRASE_S] seconds
+ * before the first stroke. Across the seven committed `-cues.csv` fixtures,
+ * recorded before this change, `Ready` to the first movement cue measures
+ * 5.001-5.004 s; afterwards it is a prescribed [PHRASE_S] s on every prep,
+ * which is the cost noted below.
+ *
+ * No mid-point pings. The screen already counts the prep down visibly, and
+ * whether 14 s of silence at P = 20 feels broken is a question for a gym
+ * session, not for this file.
  *
  * ## What reaches the record
  *
- * Only words in [RECORDED]. That set is the canonical statement of the rule and
- * the reason it is written here rather than at the call site: a later author
- * will want to record the countdown digits too, and should not.
+ * Only words in [RECORDED]: `Ready` and `Brace`. NOT the countdown digits and
+ * NOT the `"N seconds"` opener. That set is the canonical statement of the
+ * rule and the reason it is written here rather than at the call site: a later
+ * author will want to record the countdown digits too, and should not.
  *
- * - Bare digits are already an overloaded cue vocabulary. The metronome's own
- *   tempo counts, the timed-set countdown and the rep counter all emit them,
- *   and `session-export.schema.json` documents `'3'` as an example cue meaning
- *   a tempo count. A fourth producer emitting `5,4,3` immediately before the
+ * - Bare digits are already an overloaded cue vocabulary. Three producers
+ *   emit them: the guided metronome's tempo counts, the unguided metronome's,
+ *   and the timed-set countdown. `session-export.schema.json` documents `'3'`
+ *   as an example cue meaning a tempo count. A fourth producer emitting `5,4,3` immediately before the
  *   first `Down` would put ambiguous digits exactly where a consumer measures
  *   "time from the first cue to the first movement".
  * - The digits carry no boundary the phrase does not. With `Ready` rigidly at
  *   [PHRASE_S] seconds before the first stroke, every digit's time is
  *   derivable from the phrase.
  *
- * **The cost, stated rather than hidden:** once the phrase lands, prep length
- * stops being readable from the cue track. `Ready` to the first movement cue
- * becomes [PHRASE_S] seconds for every prep, so a 20 s strap-up and a 2 s cable
- * set would produce identical cue tracks. Any feature that makes prep length
- * configurable must therefore persist the prescribed prep on the set record.
+ * **The cost, stated rather than hidden:** prep length is no longer readable
+ * from the cue track. `Ready` to the first movement cue is [PHRASE_S] seconds
+ * for every prep, so a 20 s strap-up and a 2 s cable set produce identical cue
+ * tracks. Any feature that makes prep length configurable must therefore
+ * persist the prescribed prep on the set record.
  * Recording a `Prep 20` row was considered and rejected: one character from
  * `Rep 20` in a format humans grep, and it fabricates a row for a second in
  * which nothing was said.
@@ -126,9 +156,20 @@ data class LeadInPlan(val beats: List<LeadInBeat>, val prepS: Int) {
 
         fun of(prepS: Int): LeadInPlan {
             val beats = List(prepS) { index ->
-                // Today's behaviour, transcribed: one word at the top of the
-                // prep, then silence until the first stroke.
-                val spoken = READY.takeIf { index == 0 }
+                val secondsLeft = prepS - index
+                val spoken = when {
+                    // The phrase is fixed to the END of the prep, so a prep
+                    // too short for both keeps the beat nearest the movement.
+                    secondsLeft == PHRASE_S -> READY
+                    secondsLeft < PHRASE_S -> BRACE
+                    // The digit spoken at T-k is k, so it is the number the
+                    // ring is already showing.
+                    secondsLeft <= COUNT_FROM_S -> secondsLeft.toString()
+                    // A long prep names itself, but only with a silent second
+                    // after it to keep QUEUE_FLUSH off the end of the word.
+                    index == 0 && prepS >= COUNT_FROM_S + PHRASE_S -> "$prepS seconds"
+                    else -> null
+                }
                 LeadInBeat(spoken = spoken, cue = spoken?.takeIf { it in RECORDED })
             }
             return LeadInPlan(beats, prepS)
