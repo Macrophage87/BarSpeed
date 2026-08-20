@@ -5,6 +5,7 @@ import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -315,5 +316,65 @@ class DatabaseRescueTest {
             "the default move did not actually rename the file",
         )
         assertTrue(!file.exists(), "the default move left the original in place")
+    }
+
+    // ---- issue #111: what a real rescue reads back as ----------------------
+
+    /*
+     * THE COUPLING NOTHING ELSE PINS. RescuedDatabaseStore describes
+     * directories this class writes, and every fixture in
+     * RescuedDatabaseStoreTest builds one by hand -- so the reader is checked
+     * against directories a test invented, never against one
+     * DatabaseRescue.rescue actually produced.
+     * Drift in the move order, in the mkdirs-before-move step, or in the
+     * db-<ms> name would move only the writing side and leave every one of
+     * those tests green.
+     *
+     * The three below drive rescue() for real, one per RescueCompleteness
+     * state, and read the result back through the store. Nothing here
+     * constructs a directory name: rescue chooses it, and the store has to
+     * parse back what it chose.
+     */
+
+    @Test
+    fun `a real rescue that moves everything reads back as complete`() {
+        val file = db(10)
+        File(file.path + "-wal").writeText("wal")
+        assertIsRescued(DatabaseRescue.rescue(file, rescueRoot(), 9))
+
+        val found = RescuedDatabaseStore(rescueRoot()).rescued().single()
+        assertEquals(RescueCompleteness.COMPLETE, found.completeness)
+        assertEquals(listOf("accelerometer_lifting.db", "accelerometer_lifting.db-wal"), found.files)
+        assertEquals(1_003L, found.totalBytes, "the store did not size what the rescue moved")
+        assertNotNull(found.rescuedAtMs, "the store could not date a directory the rescue itself named")
+    }
+
+    @Test
+    fun `a real rescue whose main file will not move reads back as a fragment`() {
+        val file = db(10)
+        val wal = File(file.path + "-wal").apply { writeText("wal") }
+        val failMain: (File, File) -> Boolean = { source, dest -> source.name != file.name && source.renameTo(dest) }
+        val outcome = DatabaseRescue.rescue(file, rescueRoot(), 9, move = failMain)
+        assertTrue(outcome is RescueOutcome.Failed, "expected Failed, got " + outcome)
+
+        val found = RescuedDatabaseStore(rescueRoot()).rescued().single()
+        assertEquals(RescueCompleteness.FRAGMENT, found.completeness)
+        assertEquals(listOf("accelerometer_lifting.db-wal"), found.files)
+        assertNotNull(found.rescuedAtMs, "the store could not date a directory the rescue itself named")
+        assertTrue(!wal.exists(), "the sidecar the rescue reported moving is still in place")
+    }
+
+    @Test
+    fun `a real rescue that moves nothing reads back as an empty one`() {
+        val file = db(10)
+        val outcome = DatabaseRescue.rescue(file, rescueRoot(), 9, move = { _, _ -> false })
+        assertTrue(outcome is RescueOutcome.Failed, "expected Failed, got " + outcome)
+
+        val found = RescuedDatabaseStore(rescueRoot()).rescued().single()
+        assertEquals(RescueCompleteness.NOTHING, found.completeness)
+        assertEquals(emptyList(), found.files)
+        assertEquals(0L, found.totalBytes)
+        assertNotNull(found.rescuedAtMs, "the store could not date a directory the rescue itself named")
+        assertTrue(file.isFile, "the main database moved even though every move was made to fail")
     }
 }
