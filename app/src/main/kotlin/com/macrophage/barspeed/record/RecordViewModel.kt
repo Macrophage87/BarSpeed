@@ -940,7 +940,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         guidedCadence =
             GuidedCadenceRunner(
                 scope = viewModelScope,
-                speak = ::speakCue,
+                speak = { cue, utterance ->
+                    if (cue == null) speakOnly(utterance) else speakCue(cue, utterance)
+                },
                 update = { label, remaining, total ->
                     stateFlow.value =
                         stateFlow.value.copy(
@@ -970,6 +972,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val cue = VoiceCue(System.currentTimeMillis(), cueText)
         cueBuffer += cue
         journal?.appendCue(cue)
+        voice?.speak(utterance)
+    }
+
+    /**
+     * Speak without recording: touches neither [cueBuffer] nor the journal.
+     *
+     * The lead-in's countdown digits go here. `LeadInPlan.RECORDED` is the
+     * canonical statement of which lead-in words are written down and why the
+     * digits are not; this function is only the half that obeys it. Nothing
+     * routes here yet -- `LeadInPlan.of` gives every word it speaks a cue.
+     */
+    private fun speakOnly(utterance: String) {
         voice?.speak(utterance)
     }
 

@@ -3,11 +3,15 @@ package com.macrophage.barspeed.record
 import com.macrophage.barspeed.dsp.CadenceBeat
 import com.macrophage.barspeed.dsp.CadencePlan
 import com.macrophage.barspeed.dsp.GuidedCadence
+import com.macrophage.barspeed.dsp.LeadInPlan
 import com.macrophage.barspeed.dsp.TempoSchedule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/** On-screen label held for the whole prep, unchanged from before the lead-in had a voice. */
+private const val LEAD_IN_LABEL = "GET READY"
 
 /**
  * Voice-guided cadence. The runner plays the tempo prescription and counts the
@@ -43,8 +47,12 @@ class GuidedCadenceRunner(
      * with the cue. Merging the announcement into the logged cue would rename
      * "Down" to "Down, Rep 1" in every capture made afterwards and break every
      * one of those consumers.
+     *
+     * A NULL cue means speak it and write nothing down. The lead-in needs that
+     * third state — see [LeadInPlan], which decides which of its words reach
+     * the record. Nothing passes null yet.
      */
-    private val speak: (cue: String, utterance: String) -> Unit,
+    private val speak: (cue: String?, utterance: String) -> Unit,
     /** Pushes the on-screen phase label + countdown (label, remaining, total). */
     private val update: (String, Int, Int) -> Unit,
     /** Called each time a full rep cycle completes, with the running count. */
@@ -61,8 +69,7 @@ class GuidedCadenceRunner(
     fun start(schedule: TempoSchedule, plannedReps: Int?) {
         job =
             scope.launch {
-                speak("Ready", "Ready")
-                countdownPhase("GET READY", GuidedCadence.LEAD_IN_S)
+                playLeadIn(LeadInPlan.of(GuidedCadence.LEAD_IN_S))
                 val plan = CadencePlan.of(schedule)
                 var rep = 1
                 var pending: String? = null
@@ -132,16 +139,31 @@ class GuidedCadenceRunner(
         }
     }
 
+    /**
+     * Walk the prep, one beat per second, then return with the first stroke due
+     * immediately.
+     *
+     * The ring is pushed before each sleep and the beat's word is spoken while
+     * that number is on screen, so a spoken countdown digit is the number the
+     * lifter is looking at. Both come from [LeadInPlan.secondsBeforeStart], so
+     * they cannot drift apart.
+     */
+    private suspend fun playLeadIn(plan: LeadInPlan) {
+        val total = plan.prepS.coerceAtLeast(1)
+        update(LEAD_IN_LABEL, plan.prepS, total)
+        for ((index, beat) in plan.beats.withIndex()) {
+            val spoken = beat.spoken
+            if (spoken != null) speak(beat.cue, spoken)
+            delay(1_000)
+            update(LEAD_IN_LABEL, plan.secondsBeforeStart(index) - 1, total)
+        }
+    }
+
     private suspend fun countdownPhase(label: String, seconds: Int) {
         update(label, seconds, seconds.coerceAtLeast(1))
         repeat(seconds) { done ->
             delay(1_000)
             update(label, seconds - done - 1, seconds.coerceAtLeast(1))
         }
-    }
-
-    companion object {
-        /** Retained for callers; the cadence constants live in [GuidedCadence]. */
-        const val GUIDED_LEAD_IN_S = GuidedCadence.LEAD_IN_S
     }
 }
