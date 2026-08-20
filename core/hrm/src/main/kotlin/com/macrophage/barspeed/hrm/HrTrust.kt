@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.hrm
 
 import com.macrophage.barspeed.model.HrSample
+import kotlin.math.sqrt
 
 /**
  * What one set's heart-rate stream is willing to say about that set.
@@ -149,6 +150,71 @@ object HrTrust {
     const val MIN_DISTINCT_BEATS = 3
 
     /**
+     * The grain the strap reports R-R intervals on: 1/1024 s.
+     *
+     * It is why two consecutive beats can land on the same reported value at
+     * all, and so it is the numerator of every tie-rate figure below. Named
+     * here because it was written out as `1000.0 / 1024.0` in three places and
+     * a constant that appears three times is a constant that will disagree with
+     * itself once.
+     */
+    const val RR_QUANTUM_MS = 1000.0 / 1024.0
+
+    /**
+     * The fraction TIE REMOVAL ALONE predicts for a stream of variability
+     * [sigmaMs], and it is a CENTRE rather than a floor.
+     *
+     * Two adjacent intervals that quantise to the same 1/1024 s bucket are
+     * removed by the de-duplication even though both beats happened, and the
+     * density of that coincidence goes as q/(sigma*sqrt(2)) -- the law
+     * confirmed independently in issue #81 at a level of 0.686 against a
+     * parameter-free 0.691. So a stream of variability [sigmaMs] is expected to
+     * account for about this much of its own time.
+     *
+     * It OMITS dropped beats, which is why it is a centre and not a bound. Real
+     * streams scatter on both sides of it; [MAX_SHORTFALL_BELOW_TIE_ONLY] is
+     * how far below it any real worn stream has been measured to fall, and
+     * [silencingSigmaMs] is what the two of them together imply.
+     */
+    fun tieOnlyFraction(sigmaMs: Double): Double = 1.0 - RR_QUANTUM_MS / (sigmaMs * sqrt(2.0))
+
+    /**
+     * How far BELOW [tieOnlyFraction] a real worn stream has been measured to
+     * fall. Measured over a corpus, not derived, and the corpus is named where
+     * it is asserted.
+     *
+     * This is the drop term the closed form omits, carried as a single worst
+     * case rather than modelled. It is NOT part of the rule: nothing in
+     * [tracksAHeart] reads it. It exists so that [silencingSigmaMs] -- the
+     * number the whole resting argument rests on -- is arithmetic a test can
+     * red rather than a sentence in a comment that goes quietly false.
+     *
+     * `FieldHrTrustDischargeTest.the closed form's residual is bounded by the
+     * constant that carries it` pins it from both sides: it may not sit below
+     * the largest residual any committed capture shows, and it may not be
+     * padded far above it either. A one-sided pin here would let the number be
+     * made safe by making it meaningless.
+     */
+    const val MAX_SHORTFALL_BELOW_TIE_ONLY = 0.07
+
+    /**
+     * The variability at which a genuine wearer would be silenced.
+     *
+     * THIS IS THE WHOLE RESTING ARGUMENT, as arithmetic. Set
+     * [tieOnlyFraction] minus [MAX_SHORTFALL_BELOW_TIE_ONLY] equal to
+     * [MIN_ACCOUNTED_FRACTION] and solve for sigma. A stream more variable than
+     * this cannot be silenced by this rule however slow the heart driving it,
+     * because the rule reads variability and not rate.
+     *
+     * Compare it against the lowest sigma any real worn stream reaches, which
+     * is what `FieldHrTrustDischargeTest.the bound the resting argument rests
+     * on, against the corpus that has to clear it` does. The comparison is the
+     * claim; this function is only one side of it.
+     */
+    fun silencingSigmaMs(): Double =
+        RR_QUANTUM_MS / ((1.0 - MIN_ACCOUNTED_FRACTION - MAX_SHORTFALL_BELOW_TIE_ONLY) * sqrt(2.0))
+
+    /**
      * How much of a stream's elapsed time its own reported beats account for,
      * or null when the stream cannot say.
      *
@@ -190,16 +256,22 @@ object HrTrust {
      * rule costs the worn control nothing and silences the unworn set. Margins
      * 2.45x and 2.05x.
      *
-     * THE BOUND, on the axis that governs the rule, stated as the centre
-     * estimate it is rather than as a requirement. The closed form
-     * 1 - q/(sigma*sqrt(2)) puts the cut at sigma 1.06 ms, but it is a centre
-     * with a measured residual of about 0.07 against the corpus and five of the
-     * seventeen worn sets score ABOVE it -- the drop term it omits is real.
-     * Carrying that term, the honest bound is sigma at or below about 1.38 ms.
-     * The lowest sigma of any worn set is 6.58 ms, on the hardest set in it, so
-     * the margin is 4.8x rather than the 6.2x the closed form alone suggests.
-     * Still a bound on a quantity that can be measured, in place of an
-     * extrapolation along a predictor whose range never included rest.
+     * THE BOUND, on the axis that governs the rule, and it is now arithmetic
+     * rather than prose: [silencingSigmaMs]. [tieOnlyFraction] alone puts the
+     * cut at sigma 1.06 ms, but it is a centre and not a floor -- five of the
+     * seventeen worn sets of session 26 score ABOVE it, so the drop term it
+     * omits is real. Carrying that term through
+     * [MAX_SHORTFALL_BELOW_TIE_ONLY] gives the honest bound, and the lowest
+     * sigma any real worn stream reaches is what it has to be compared with.
+     *
+     * A PRIOR VERSION OF THIS PARAGRAPH PUT THE HONEST BOUND AT 1.38 ms AND
+     * THE MARGIN AT 4.8x, AND BOTH WERE WRONG. 1.38 ms is what you get by
+     * carrying 0.15 -- the padded band a test happened to assert -- through the
+     * arithmetic, not by carrying the 0.07 residual the same sentence named.
+     * The two numbers sat one line apart and did not agree. That is the reason
+     * this is a function now: a derivation written as a sentence can carry a
+     * figure that no longer follows from the figure beside it, and nothing
+     * notices.
      *
      * A stream that cannot produce a budget is NOT silenced. Issue #82 -- a
      * strap streaming bpm with no R-R at all -- is deliberately not covered:

@@ -149,23 +149,60 @@ class HrTrustBudgetTest {
 
     /**
      * THE BOUND, as arithmetic rather than as prose. Silencing needs the tie
-     * rate q/(sigma*sqrt(2)) to reach 0.65, so sigma at or below 1.06 ms. The
-     * lowest sigma of any worn set in the corpus is 6.58 ms.
+     * rate q/(sigma*sqrt(2)) to reach 0.65, so sigma at or below 1.06 ms on the
+     * closed form alone. The lowest sigma of any worn set in the corpus is
+     * 6.58 ms.
      *
      * This is the claim the whole resting argument now rests on, so it is a
      * test rather than a sentence: a sigma of 1 ms is a metronome, not a heart.
      */
     @Test
     fun `silencing requires a variability no heart has`() {
-        val q = 1000.0 / 1024.0
-        fun fractionAt(sigmaMs: Double) = 1.0 - q / (sigmaMs * kotlin.math.sqrt(2.0))
+        fun fractionAt(sigmaMs: Double) = HrTrust.tieOnlyFraction(sigmaMs)
         assertEquals(0.35, fractionAt(1.062), 0.005, "the sigma at which the cut bites")
         assertTrue(fractionAt(6.58) > 0.88, "the hardest worn set in the corpus")
-        assertTrue(fractionAt(50.0) > 0.98, "a typical resting variability")
+        assertTrue(fractionAt(50.0) > 0.98, "well above every stream held here")
         assertTrue(
             fractionAt(6.58) > HrTrust.MIN_ACCOUNTED_FRACTION,
             "the corpus minimum stopped clearing the cut",
         )
+    }
+
+    /**
+     * THE SEAM ITSELF: [HrTrust.silencingSigmaMs] is a derivation, not a digit,
+     * and this is what makes it one. Move either input and the bound moves the
+     * way the algebra says it does.
+     *
+     * The check that would otherwise be missing is the round trip. A bound
+     * asserted only against a hardcoded expectation cannot tell a correct
+     * derivation from a coincidence; feeding it back through
+     * [HrTrust.tieOnlyFraction] can.
+     */
+    @Test
+    fun `the bound is the sigma at which the cut and the drop term meet`() {
+        val bound = HrTrust.silencingSigmaMs()
+        assertEquals(
+            HrTrust.MIN_ACCOUNTED_FRACTION,
+            HrTrust.tieOnlyFraction(bound) - HrTrust.MAX_SHORTFALL_BELOW_TIE_ONLY,
+            1e-9,
+            "the bound is not where the cut and the carried drop term meet",
+        )
+        assertTrue(
+            bound > HrTrust.RR_QUANTUM_MS / ((1.0 - HrTrust.MIN_ACCOUNTED_FRACTION) * kotlin.math.sqrt(2.0)),
+            "carrying a drop term must make the bound WORSE than the closed form alone, not better",
+        )
+        assertTrue(bound < 2.0, "the bound left the metronome end entirely: $bound")
+    }
+
+    /**
+     * The quantum is the strap's, not ours. 1/1024 s is what the Bluetooth
+     * Heart Rate Measurement characteristic specifies R-R intervals in, and
+     * every tie-rate figure in this branch divides by it.
+     */
+    @Test
+    fun `the reported interval quantum is one over ten twenty four of a second`() {
+        assertEquals(1000.0 / 1024.0, HrTrust.RR_QUANTUM_MS, 1e-12)
+        assertEquals(0.9765625, HrTrust.RR_QUANTUM_MS, 1e-12)
     }
 
     @Test

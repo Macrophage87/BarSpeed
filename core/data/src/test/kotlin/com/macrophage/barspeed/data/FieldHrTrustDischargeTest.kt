@@ -174,17 +174,15 @@ class FieldHrTrustDischargeTest {
      */
     @Test
     fun `tie removal predicts the mean shortfall and not the ordering`() {
-        val q = 1000.0 / 1024.0
         val observed = mutableListOf<Double>()
         val predicted = mutableListOf<Double>()
         HrFixtures.allWorn().forEach { set ->
             val trusted = set.filter(HrTrust::isTrusted)
             val beats = RrIngest.newBeats(trusted)
-            val diffs = (1 until beats.size).map { beats[it] - beats[it - 1] }
-            val sigma = kotlin.math.sqrt(diffs.sumOf { it * it } / diffs.size)
+            val tieRate = HrTrust.RR_QUANTUM_MS / (HrFixtures.sigmaOf(set) * kotlin.math.sqrt(2.0))
             val span = (trusted.last().timestampMs - trusted.first().timestampMs) + beats.first()
             observed += 1.0 - beats.sum() / span
-            predicted += (trusted.size - 1) * (q / (sigma * kotlin.math.sqrt(2.0))) * beats.average() / span
+            predicted += (trusted.size - 1) * tieRate * beats.average() / span
         }
         assertEquals(0.0880, observed.average(), 0.001, "mean observed shortfall")
         assertEquals(0.0811, predicted.average(), 0.001, "mean predicted by tie removal alone")
@@ -261,29 +259,66 @@ class FieldHrTrustDischargeTest {
      */
     @Test
     fun `every worn set clears both the variability floor and the cut`() {
-        val q = 1000.0 / 1024.0
         HrFixtures.allWorn().forEachIndexed { index, set ->
-            val beats = RrIngest.newBeats(set.filter(HrTrust::isTrusted))
-            val diffs = (1 until beats.size).map { beats[it] - beats[it - 1] }
-            val sigma = kotlin.math.sqrt(diffs.sumOf { it * it } / diffs.size)
+            val sigma = HrFixtures.sigmaOf(set)
             val fraction = HrTrust.accountedFraction(set)!!
             assertTrue(sigma > 5.0, "set ${index + 1} sigma $sigma is approaching the metronome end")
             assertTrue(fraction >= HrTrust.MIN_ACCOUNTED_FRACTION, "set ${index + 1} would be silenced")
             assertTrue(
-                fraction > 1.0 - q / (sigma * kotlin.math.sqrt(2.0)) - 0.15,
+                fraction > HrTrust.tieOnlyFraction(sigma) - HrTrust.MAX_SHORTFALL_BELOW_TIE_ONLY,
                 "set ${index + 1} falls further short than its own variability explains",
             )
         }
         assertEquals(
             6.58,
-            HrFixtures.allWorn().minOf { set ->
-                val beats = RrIngest.newBeats(set.filter(HrTrust::isTrusted))
-                val diffs = (1 until beats.size).map { beats[it] - beats[it - 1] }
-                kotlin.math.sqrt(diffs.sumOf { it * it } / diffs.size)
-            },
+            HrFixtures.allWorn().minOf(HrFixtures::sigmaOf),
             0.02,
             "the lowest variability any worn set reaches",
         )
+    }
+
+    /**
+     * THE CONSTANT THAT CARRIES THE DROP TERM, PINNED FROM BOTH SIDES.
+     *
+     * [HrTrust.MAX_SHORTFALL_BELOW_TIE_ONLY] is the only figure between
+     * [HrTrust.tieOnlyFraction] -- a centre -- and [HrTrust.silencingSigmaMs],
+     * which is the number the resting argument rests on. A one-sided assertion
+     * would let it be made safe by being made meaningless: set it to 0.60 and
+     * every stream clears it, the bound goes to infinity and nothing reds.
+     *
+     * So it is bounded above as well as below. It may not sit under the largest
+     * residual the committed corpus shows, and it may not be padded more than a
+     * hundredth above it.
+     */
+    @Test
+    fun `the closed form's residual is bounded by the constant that carries it`() {
+        val residuals =
+            HrFixtures.allWorn().map {
+                HrTrust.tieOnlyFraction(HrFixtures.sigmaOf(it)) - HrTrust.accountedFraction(it)!!
+            }
+        assertEquals(0.0649, residuals.max(), 0.0005, "the worst the closed form does against the corpus")
+        assertTrue(
+            HrTrust.MAX_SHORTFALL_BELOW_TIE_ONLY >= residuals.max(),
+            "the constant sits below a residual a real stream shows: ${residuals.max()}",
+        )
+        assertTrue(
+            HrTrust.MAX_SHORTFALL_BELOW_TIE_ONLY <= residuals.max() + 0.01,
+            "the constant is padded past the data it is meant to carry",
+        )
+    }
+
+    /**
+     * THE BOUND AGAINST THE CORPUS THAT HAS TO CLEAR IT, which is the
+     * comparison the whole resting argument is. Neither side means anything
+     * alone.
+     */
+    @Test
+    fun `the bound the resting argument rests on, against the corpus that has to clear it`() {
+        val bound = HrTrust.silencingSigmaMs()
+        val lowest = HrFixtures.allWorn().minOf(HrFixtures::sigmaOf)
+        assertEquals(1.19, bound, 0.01, "the variability at which a genuine wearer would be silenced")
+        assertEquals(5.5, lowest / bound, 0.1, "the margin between the bound and the least variable real stream")
+        assertTrue(lowest > bound, "a real worn stream reached the silencing variability")
     }
 
     /**
