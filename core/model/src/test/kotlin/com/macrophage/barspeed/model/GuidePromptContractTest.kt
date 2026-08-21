@@ -45,7 +45,7 @@ class GuidePromptContractTest {
         listOf(
             "exercise", "notes", "start", "concentric", "sensorInverted",
             "sensorOnStack", "travelRatio", "plane", "bodyweight", "implementCount",
-            "optional", "sets",
+            "optional", "prep_s", "sets",
         ).forEach(::assertDocuments)
     }
 

@@ -171,7 +171,8 @@ class PlanDecodeCharacterizationTest {
         assertEquals(
             setOf(
                 "exercise", "notes", "start", "concentric", "sensorInverted", "sensorOnStack",
-                "travelRatio", "plane", "bodyweight", "implementCount", "optional", "kind", "sets",
+                "travelRatio", "plane", "bodyweight", "implementCount", "optional",
+                "kind", "prep_s", "sets",
             ),
             PlanExerciseDef.serializer().descriptor.elementNames.toSet(),
         )

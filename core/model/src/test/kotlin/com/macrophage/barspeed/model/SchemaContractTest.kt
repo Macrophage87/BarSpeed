@@ -144,10 +144,11 @@ class SchemaContractTest {
     fun `every declared plan key is documented in the schema`() {
         val plan = schema("plan.schema.json")
         val exerciseKeys = plan["\$defs"]!!.jsonObject["exercise"]!!.jsonObject["properties"]!!.jsonObject.keys
-        // Wire names. On [PlanExerciseDef] they happen to equal the Kotlin
-        // property names; on [PlanSetDef] they do not — @SerialName renames six
-        // of its ten — so read this as the wire contract, and do not assume the
-        // two coincide anywhere else.
+        // Wire names. They used to equal the Kotlin property names on
+        // [PlanExerciseDef] and no longer do: prep_s is that type's first
+        // @SerialName, alongside the six of [PlanSetDef]'s ten that were already
+        // renamed. Read this as the wire contract and assume nothing about the
+        // Kotlin spelling of any of it.
         //
         // Kept as a literal rather than derived from the serializer descriptor
         // on purpose. A descriptor-derived assertion follows a @SerialName
@@ -157,7 +158,8 @@ class SchemaContractTest {
         val declared =
             setOf(
                 "exercise", "notes", "start", "concentric", "sensorInverted", "sensorOnStack",
-                "travelRatio", "plane", "bodyweight", "implementCount", "optional", "kind", "sets",
+                "travelRatio", "plane", "bodyweight", "implementCount", "optional",
+                "kind", "prep_s", "sets",
             )
         assertEquals(declared, exerciseKeys, "PlanExerciseDef and the schema disagree on exercise keys")
     }
