@@ -7,6 +7,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -182,6 +183,51 @@ class SchemaContractTest {
             1,
             implementCount["minimum"]!!.jsonPrimitive.int,
             "the published implement floor drifted from the one PlanFile.validate enforces",
+        )
+    }
+
+    /**
+     * The prep pair is declared in the published export schema, and both keys
+     * carry a description.
+     *
+     * `$defs.set` is `additionalProperties: false`, so an undeclared key does
+     * not merely go unmentioned -- it makes every export carrying it INVALID
+     * against the contract its own consumer was pointed at.
+     *
+     * A description each, because the omission has a number on it. `rest_s` is
+     * the one planned field in this document with neither a `planned` prefix nor
+     * a description, and a reader takes it for an observation; that is issue
+     * #76, which this pair is deliberately shaped to avoid and does not fix.
+     */
+    @Test
+    fun `the published export declares both prep keys, each described`() {
+        val set = schema("session-export.schema.json")["\$defs"]!!.jsonObject["set"]!!
+            .jsonObject["properties"]!!.jsonObject
+        listOf("plannedPrep_s", "prep_s").forEach { key ->
+            val property = assertNotNull(set[key], "the published export schema does not declare $key")
+            val description = property.jsonObject["description"]?.jsonPrimitive?.content
+            assertTrue(
+                description?.isNotBlank() == true,
+                "$key is declared with no description, which is the shape of issue #76",
+            )
+        }
+    }
+
+    /**
+     * The published example carries the prep pair.
+     *
+     * `ci.yml` validates this example against the schema with ajv, and that is
+     * the schema half's only automated coverage. An example carrying none of the
+     * new contract passes a schema that declares it and a schema that does not
+     * -- so the keys could be wrong in every detail while the step stayed green.
+     */
+    @Test
+    fun `the published export example carries the prep pair`() {
+        val sets = schema("examples/session-export.example.json")["exercises"]!!
+            .jsonArray.flatMap { it.jsonObject["sets"]!!.jsonArray }
+        assertTrue(
+            sets.any { "plannedPrep_s" in it.jsonObject && "prep_s" in it.jsonObject },
+            "no set in the published example carries the prep pair, so ajv never validates it",
         )
     }
 

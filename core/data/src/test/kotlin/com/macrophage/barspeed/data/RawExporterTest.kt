@@ -386,6 +386,39 @@ class RawExporterTest {
      * this document. So an exact key set is the whole of its published shape,
      * and adding to it is a deliberate act rather than a side effect.
      */
+    /**
+     * The manifest names the prep beside the set it describes.
+     *
+     * The archive has to stand on its own -- an analysis that opens only the
+     * CSVs never sees session.json -- and the cue track can no longer answer
+     * this: `LeadInPlan` fixes the launch phrase to the END of the prep, so
+     * `Ready` sits a prescribed `PHRASE_S` seconds before the first movement
+     * cue whether the prep was 2 seconds or 20. Without this key the seconds
+     * the lifter spent getting set are unrecoverable from the zip.
+     *
+     * Both halves, and unequal, so a descriptor that wrote one of them twice
+     * cannot pass.
+     */
+    @Test
+    fun `the manifest names the prep prescribed and the prep played`() = runTest {
+        val manifest = meta(listOf(row(id = 5L).copy(plannedPrepS = 5, prepS = 20)), emptyMap())
+        assertEquals(5.0, manifest.set(0).num("plannedPrep_s"), "the manifest lost the prescribed prep")
+        assertEquals(20.0, manifest.set(0).num("prep_s"), "the manifest lost the prep that was played")
+    }
+
+    /**
+     * A set that played no lead-in gets neither key. The manifest expresses
+     * every other unknown by omission and `num` already drops a null; what is
+     * pinned is that nothing substitutes a 0, which here would read as a real,
+     * silent prep rather than as no prep at all.
+     */
+    @Test
+    fun `a set that played no lead-in gets no prep keys in the manifest`() = runTest {
+        val set = meta(listOf(row(id = 5L)), emptyMap()).set(0)
+        assertTrue("plannedPrep_s" !in set, "a set with no lead-in published a planned prep")
+        assertTrue("prep_s" !in set, "a set with no lead-in published a prep")
+    }
+
     @Test
     fun `the manifest states exactly the top-level keys it states today`() = runTest {
         val manifest = meta(listOf(row(id = 5L)), emptyMap())
