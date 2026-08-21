@@ -7,13 +7,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * What `velocityLoss_pct` is today, on rep lists small enough to check by hand.
- *
- * These are characterization pins, not a statement of what the figure ought to
- * be: they record the behaviour a change is about to alter so that the
- * alteration shows up in the diff of this file, not only in the diff of the
- * code. Two of them are marked `(pre-fix)` in the repository's usual sense --
- * they are expected to be inverted, not preserved.
+ * When `velocityLoss_pct` is published and when it is withheld, on rep lists
+ * small enough to check by hand and on the committed captures that reach the
+ * withheld case, with a control beside them that does not.
  *
  * Only `meanConVelMps` matters to this figure. Every other field on
  * [RepAnalysis] is filled with a fixed, obviously-synthetic value so that a
@@ -24,7 +20,7 @@ class VelocityLossTest {
         ImuCsv.decode(javaClass.getResourceAsStream("/$name")!!.readBytes().decodeToString())
 
     /**
-     * The geometry the three committed leg-curl captures are analysed with
+     * The geometry the four committed leg-curl captures are analysed with
      * everywhere else in this module -- concentric first, drive DOWN, sensor
      * inverted on the weight stack. `loadKg` is left null: it feeds power and
      * nothing else, and no figure asserted here depends on it.
@@ -128,7 +124,7 @@ class VelocityLossTest {
      * Four committed captures of the same exercise, tempo and mount, three of
      * which publish a green 0.0 today.
      *
-     * Measured at f58ce2570b829d58bba70af7c30facfdb0867c53 by driving these
+     * Measured at df17bcb44957e5d84913a2d511b04bf62ef1c8ed by driving these
      * fixtures through [SetAnalyzer.analyze]: `-b` resolves 13 detections for
      * the 12 reps performed and its last carries 1.517 m/s against 0.311 for
      * the best of the others; `-c` resolves 11 and its last carries 0.648
