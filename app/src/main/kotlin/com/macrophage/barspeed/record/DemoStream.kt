@@ -22,6 +22,19 @@ fun CoroutineScope.launchDemoStream(
     onSample: (ImuSample) -> Unit,
 ): Job = launch(Dispatchers.Default) {
     delay(DEMO_LEAD_IN_MS)
+    // downS and upS are read POSITIONALLY here and that is correct, which is
+    // worth saying because #127 changed three other sites that were not.
+    // SyntheticSets.RepSpec.eccS is the phase it generates with a NEGATIVE
+    // sign -- the down stroke -- whatever the lift's drive direction is.
+    // Resolving the eccentric here would invert it on a leg curl.
+    //
+    // Which stroke comes FIRST is a separate matter and is NOT correct:
+    // `eccentricFirst` in RecordViewModel.startDemoStream is passed
+    // `startsWith == ECCENTRIC`, a phase fact, where SyntheticSets.generate
+    // uses the flag to choose which SIGN goes first. `ExerciseDef.startsAtTop`
+    // is the property that answers the question actually being asked. Left as
+    // a remainder rather than folded in: it is demo-only and the wiring is in
+    // this module, where no test can reach it.
     val spec =
         SyntheticSets.RepSpec(
             eccS = tempo?.downS?.coerceAtLeast(MIN_DEMO_ECC_S) ?: DEFAULT_DEMO_ECC_S,

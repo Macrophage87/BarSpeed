@@ -466,6 +466,20 @@ data class RecordState(
     val currentSlot: PlannedSlot? get() = queue.getOrNull(queueIndex)
     val nextSlot: PlannedSlot? get() = queue.getOrNull(queueIndex + 1)
 
+    /**
+     * The exercise the set being set up or recorded runs against.
+     *
+     * On the state rather than in [RecordViewModel] because the live readout
+     * needs it too: the in-set tempo ring resolves which digit it is charging a
+     * phase against, and it has to resolve that against the SAME lift
+     * [RecordViewModel.beginSet] handed the tracker. Two statements of this
+     * rule is one more than can be kept in agreement.
+     */
+    val currentExercise: ExerciseDef
+        get() = currentSlot?.exercise
+            ?: ExerciseDef.seedById(selectedExerciseId)
+            ?: ExerciseDef(selectedExerciseId, selectedExerciseId)
+
     /** Index of the first not-yet-done slot: during rating/rest the current one is already complete. */
     val upcomingIndex: Int
         get() = if (stage == Stage.RESTING) queueIndex + 1 else queueIndex
@@ -821,7 +835,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     /** Begin recording the current set. */
     fun beginSet() {
         val s = stateFlow.value
-        val exercise = currentExercise(s)
+        val exercise = s.currentExercise
         val tracker = StreamingSetTracker.forLift(exercise.liftDirection())
         this.tracker = tracker
         imuBuffer.clear()
@@ -1090,7 +1104,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         demoJob?.cancel()
         guidedCadence?.cancel()
         val s = stateFlow.value
-        val exercise = currentExercise(s)
+        val exercise = s.currentExercise
         val slot = s.currentSlot
         val isTimed = s.currentIsTimed
         val addedKg =
@@ -1466,10 +1480,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun abandonSetup() {
         stateFlow.value = stateFlow.value.copy(stage = Stage.SETUP, queue = emptyList(), queueIndex = 0)
     }
-
-    private fun currentExercise(s: RecordState): ExerciseDef = s.currentSlot?.exercise
-        ?: ExerciseDef.seedById(s.selectedExerciseId)
-        ?: ExerciseDef(s.selectedExerciseId, s.selectedExerciseId)
 
     /** Demo/replay mode (spec 5): synthesizes a realistic set through the full pipeline. */
     private fun startDemoStream(s: RecordState, exercise: ExerciseDef) {

@@ -37,7 +37,6 @@ import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
-import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
@@ -207,9 +206,15 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
                 SetChips(record, a)
                 if (a.reps.isNotEmpty()) {
                     SetVelocityBars(record, a)
-                    record.tempo?.let { Tempo.parseOrNull(it) }?.let { tempo ->
-                        SetTempoChart(a, tempo.downS)
-                    }
+                    // The prescription this set's eccentric was GRADED
+                    // against, not a second reading of record.tempo's digits:
+                    // digit 1 is the eccentric only while the drive moves up.
+                    // record.geometryJson would answer that for rows that have
+                    // it, but re-resolving could print a target the compliance
+                    // chip beside it was not scored on, and it is null on every
+                    // row recorded before geometry was captured. Absent means
+                    // no target line, not a zero one. #56.
+                    a.tempoCompliance?.eccentricPrescribedS?.let { SetTempoChart(a, it) }
                     powerSummary(a)?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                     }

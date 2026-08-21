@@ -47,7 +47,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.dsp.CoachingRules
+import com.macrophage.barspeed.dsp.PhaseTempoTarget
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.model.BlePermissionStep
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.ExerciseKind
@@ -981,7 +983,14 @@ private fun TempoRing(state: RecordState, slot: PlannedSlot?) {
     val tempoText = if (state.adHoc) state.tempoInput.ifBlank { null } else slot?.tempo
     val tempo = tempoText?.let { Tempo.parseOrNull(it) }
     val phase = state.live.phase
-    val targetS = tempo?.let { phaseTargetS(it, phase) }
+    // Which digit a phase is charged against is a property of the (tempo, lift)
+    // PAIR, and it is resolved in :core:dsp against the same direction beginSet
+    // handed the tracker. `tempo` is null in every state that reaches here --
+    // InSetStage routes a set with a tempo to the guided branch first, and
+    // beginSet derives guidedSet from this same expression -- so this line
+    // changes nothing on screen. It is here so the decision has one home
+    // rather than three. #127.
+    val targetS = tempo?.let { PhaseTempoTarget.secondsFor(it, state.currentExercise.liftDirection(), phase) }
     val elapsed = state.live.currentPhaseElapsedS
     val moving = phase == Phase.ECCENTRIC || phase == Phase.CONCENTRIC
 
@@ -1033,14 +1042,6 @@ private fun TempoRing(state: RecordState, slot: PlannedSlot?) {
             }
         }
     }
-}
-
-private fun phaseTargetS(tempo: Tempo, phase: Phase): Double? = when (phase) {
-    Phase.ECCENTRIC -> tempo.downS
-    Phase.CONCENTRIC -> tempo.upS
-    Phase.BOTTOM_PAUSE -> tempo.bottomPauseS
-    Phase.TOP_PAUSE -> tempo.topPauseS
-    Phase.IDLE -> null
 }
 
 @Composable
@@ -1698,12 +1699,17 @@ private fun RepQualityCard(feedback: SetFeedback) {
         return
     }
     if (analysis.reps.isEmpty()) return
-    val tempo = feedback.tempo?.let { Tempo.parseOrNull(it) }
+    // The prescription this set's eccentric was GRADED against, read off the
+    // analysis rather than resolved from the digits a second time, so the chart
+    // cannot state a target the compliance chip beside it was not scored on.
+    // Null means the set carried no prescription or its eccentric stroke was
+    // explosive, and neither has a target line to draw -- #56.
+    val targetEccS = analysis.tempoCompliance?.eccentricPrescribedS
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
             when {
                 feedback.explosive -> PeakVelocityChart(analysis)
-                tempo != null -> EccTempoChart(analysis, tempo.downS)
+                targetEccS != null -> EccTempoChart(analysis, targetEccS)
                 else -> ConVelocityChart(analysis)
             }
         }
