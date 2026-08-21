@@ -34,6 +34,11 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     plannedLoadKg = set.resolvedLoadKg,
                     tempo = set.tempo,
                     side = set.side,
+                    // Read from the exercise block, so two blocks of the same
+                    // exercise in one session carry independent counts and
+                    // nothing can leak between them. Display only: loadKg
+                    // above is untouched by it.
+                    implementCount = exerciseDef.implementCount,
                     exerciseNotes = listOfNotNull(exerciseDef.notes, set.note)
                         .takeIf { it.isNotEmpty() }?.joinToString(" · "),
                     targetMeanConVelMps = set.targetMeanConcentricVelocityMps,

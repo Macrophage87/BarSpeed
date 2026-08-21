@@ -70,6 +70,12 @@ data class PlannedSlot(
     val tempo: String?,
     /** Unilateral sets: "left" or "right". */
     val side: String? = null,
+    /**
+     * How many identical objects this exercise block is held with, as the plan
+     * declared it. DISPLAY ONLY: [loadKg] and [plannedLoadKg] are the TOTAL
+     * across all of them, and nothing divides either. See [ImplementLoad].
+     */
+    val implementCount: Int? = null,
     /** Coach/LLM comment on this exercise from the plan, shown with the set. */
     val exerciseNotes: String? = null,
     val targetMeanConVelMps: Double? = null,
@@ -93,6 +99,16 @@ data class PlannedSlot(
 data class SetFeedback(
     val exerciseName: String,
     val loadKg: Double,
+    /**
+     * The ADDED load of the same set, which on body-weight work is a different
+     * number from [loadKg]: that one is [SetLoadPolicy.totalKg], the lifter's
+     * own mass included. Carried separately because it is the only one of the
+     * two that may be divided across implements -- halving [loadKg] would
+     * print "2 x 50 kg" for a 20 kg weighted dip at 80 kg body weight.
+     */
+    val addedKg: Double,
+    /** The plan's declared implement count for the set just finished, if any. */
+    val implementCount: Int?,
     val analysis: SetAnalysis,
     val plannedReps: Int?,
     val tempo: String?,
@@ -310,6 +326,11 @@ private fun restingState(
         SetFeedback(
             exerciseName = p.exercise.displayName,
             loadKg = p.loadKg,
+            // Both frozen with the rest of the write. The count comes off the
+            // slot rather than off live state, which has already moved on by
+            // the time the rest screen draws.
+            addedKg = p.addedKg,
+            implementCount = p.slot?.implementCount,
             analysis = analysis,
             plannedReps = p.plannedReps,
             tempo = p.tempoText,

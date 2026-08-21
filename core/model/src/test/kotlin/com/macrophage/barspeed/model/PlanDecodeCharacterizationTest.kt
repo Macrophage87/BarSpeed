@@ -152,10 +152,16 @@ class PlanDecodeCharacterizationTest {
             setOf("name", "notes", "exercises"),
             PlanSessionDef.serializer().descriptor.elementNames.toSet(),
         )
+        // This literal is the third independent statement of the exercise key
+        // set, after SchemaContractTest's and the published schema's. It moves
+        // in the SAME commit as the property, and cannot be red-before-green
+        // for a structural reason worth naming: the descriptor it is compared
+        // against is derived from the data class, so the key does not exist to
+        // be asserted until the commit that adds it.
         assertEquals(
             setOf(
                 "exercise", "notes", "start", "concentric", "sensorInverted", "sensorOnStack",
-                "travelRatio", "plane", "bodyweight", "optional", "kind", "sets",
+                "travelRatio", "plane", "bodyweight", "implementCount", "optional", "kind", "sets",
             ),
             PlanExerciseDef.serializer().descriptor.elementNames.toSet(),
         )

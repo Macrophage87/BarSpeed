@@ -204,6 +204,25 @@ data class PlanExerciseDef(
      * (band or machine). Total load is body weight plus that.
      */
     val bodyweight: Boolean = false,
+    /**
+     * How many IDENTICAL objects are held at once — 2 for a pair of dumbbells
+     * or a two-handled carry, 1 (or omitted) for a barbell, a machine, a
+     * goblet squat, a single-arm row, or one dumbbell held on a weighted dip.
+     *
+     * DISPLAY ONLY. [PlanSetDef.loadKg] and [PlanSetDef.loadLb] are always the
+     * TOTAL across everything held, with this key and without it, and
+     * [PlanSetDef.resolvedLoadKg] does not read this — see [ImplementLoad].
+     *
+     * Omit it when the objects are NOT identically loaded; the app then shows
+     * the total alone rather than inventing a split. That is why this is
+     * nullable: absent means "no split to show" and is a different fact from
+     * a declared 1.
+     *
+     * Never derived from [PlanSetDef.side] and never guessed from the exercise
+     * id. A rear-foot-elevated split squat holding two dumbbells is unilateral
+     * with two objects; a suitcase carry is unilateral with one.
+     */
+    val implementCount: Int? = null,
     /** Accessory work that may be dropped when a session runs long. */
     val optional: Boolean = false,
     /**
