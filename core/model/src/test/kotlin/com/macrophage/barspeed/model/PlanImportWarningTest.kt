@@ -267,4 +267,56 @@ class PlanImportWarningTest {
             result.warnings,
         )
     }
+
+    /**
+     * The import gate is the last surface before the lifter is holding the
+     * weight, and this is the only warning here about a LOAD rather than about
+     * a direction or a kind. It states BOTH figures in the plan's own unit,
+     * because the mistake it exists to catch is a number that is right for one
+     * hand and half of what was lifted: `"load_lb": 40` with
+     * `"implementCount": 2` on a set really done at two 40s records 40, and
+     * nothing in the app afterwards can tell that from a real 40 lb set.
+     *
+     * Quoted in the plan's own unit deliberately. The question being put back
+     * to the plan's author is about what they wrote, and the app renders in
+     * whichever unit the lifter has selected -- a warning that guessed at the
+     * screen would be a claim about something it cannot see.
+     */
+    @Test
+    fun `declaring a pair states both figures in the plan's own unit`() {
+        val result = parse(
+            """{"exercise":"dumbbell_bench_press","implementCount":2,"sets":[{"reps":10,"load_lb":80}]}""",
+        )
+
+        assertEquals(emptyList(), result.errors, "a declared pair is not a reason to refuse the plan")
+        val warning = result.warnings.single()
+        assertTrue(warning.contains("80 lb"), warning)
+        assertTrue(warning.contains("2 × 40 lb"), warning)
+        assertTrue(warning.contains("TOTAL"), warning)
+
+        val kg = parse(
+            """{"exercise":"dumbbell_bench_press","implementCount":2,"sets":[{"reps":10,"load_kg":30}]}""",
+        ).warnings.single()
+        assertTrue(kg.contains("30 kg"), kg)
+        assertTrue(kg.contains("2 × 15 kg"), kg)
+    }
+
+    /**
+     * Which limb a set trains and how many objects are held are two separate
+     * facts, and neither implies the other: a rear-foot-elevated split squat
+     * is unilateral with two dumbbells, a suitcase carry is unilateral with
+     * one. Deriving the count from the limb key would halve every split squat,
+     * lunge and step-up in a plan, so nothing may warn about the pairing.
+     */
+    @Test
+    fun `a unilateral set may still declare two implements`() {
+        val result = parse(
+            """{"exercise":"rear_foot_elevated_split_squat","implementCount":2,"sets":[
+               {"reps":8,"load_lb":80,"side":"left"},{"reps":8,"load_lb":80,"side":"right"}]}""",
+        )
+
+        assertEquals(emptyList(), result.errors)
+        assertEquals(2, assertNotNull(result.plan).sessions[0].exercises[0].implementCount)
+        assertEquals(1, result.warnings.size, "expected only the pair note: ${result.warnings}")
+    }
 }

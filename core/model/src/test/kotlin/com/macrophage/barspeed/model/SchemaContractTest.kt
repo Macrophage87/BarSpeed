@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.model
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -155,9 +156,33 @@ class SchemaContractTest {
         val declared =
             setOf(
                 "exercise", "notes", "start", "concentric", "sensorInverted", "sensorOnStack",
-                "travelRatio", "plane", "bodyweight", "optional", "kind", "sets",
+                "travelRatio", "plane", "bodyweight", "implementCount", "optional", "kind", "sets",
             )
         assertEquals(declared, exerciseKeys, "PlanExerciseDef and the schema disagree on exercise keys")
+    }
+
+    /**
+     * The floor the published schema advertises and the floor
+     * [PlanFile.validate] enforces are the same floor.
+     *
+     * Modelled on `a set's load has no floor, so bodyweight assistance can be
+     * declared negative`, and it guards the same failure shape from the other
+     * direction: a bound in one document that the other contradicts. A count
+     * below one reaches a division, so the two must agree -- a schema that
+     * accepted 0 would publish a document the app refuses, and one that
+     * refused 1 would forbid the default.
+     */
+    @Test
+    fun `the schema's implement floor is the one the app validates`() {
+        val exercise = schema("plan.schema.json")["\$defs"]!!.jsonObject["exercise"]!!
+            .jsonObject["properties"]!!.jsonObject
+        val implementCount = exercise["implementCount"]!!.jsonObject
+        assertEquals("integer", implementCount["type"]!!.jsonPrimitive.content, "implementCount is not an integer")
+        assertEquals(
+            1,
+            implementCount["minimum"]!!.jsonPrimitive.int,
+            "the published implement floor drifted from the one PlanFile.validate enforces",
+        )
     }
 
     @Test

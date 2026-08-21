@@ -44,7 +44,8 @@ class GuidePromptContractTest {
     fun `the plan prompt documents every declared exercise key`() {
         listOf(
             "exercise", "notes", "start", "concentric", "sensorInverted",
-            "sensorOnStack", "travelRatio", "plane", "bodyweight", "optional", "sets",
+            "sensorOnStack", "travelRatio", "plane", "bodyweight", "implementCount",
+            "optional", "sets",
         ).forEach(::assertDocuments)
     }
 

@@ -119,24 +119,34 @@ class PlanDecodeCharacterizationTest {
 
     @Test
     fun `an unsupported schemaVersion is unreachable behind the unknown-key failure`() {
-        val v15 = documentWithUnknownKeys.replace("\"1.3\"", "\"1.5\"")
-        val failure = assertFailsWith<Exception> { strict.decodeFromString(PlanFile.serializer(), v15) }
+        // 9.9 rather than "one version up", which is what this held until the
+        // implement-count change: a fixture pinned one bump ahead has to be
+        // shuffled on every bump, and 1.5 became a real version in the commit
+        // after this one. 9.9 is the shape PlanValidationTest already uses and
+        // it survives every bump this repo will ever make.
+        val v99 = documentWithUnknownKeys.replace("\"1.3\"", "\"9.9\"")
+        val failure = assertFailsWith<Exception> { strict.decodeFromString(PlanFile.serializer(), v99) }
 
         // Same message as the 1.3 document: the version is never looked at.
         assertContains(failure.message.orEmpty(), "Encountered an unknown key 'tempoBias'")
 
-        // Decoded leniently, the version check does run - and rejects 1.5.
-        val errors = lenient.decodeFromString(PlanFile.serializer(), v15).validate()
+        // Decoded leniently, the version check does run - and rejects 9.9. The
+        // supported list is spelled out rather than read from the constant:
+        // built from SUPPORTED_SCHEMA_VERSIONS it would be an assertion that
+        // cannot fail, and this is the only place in the test suite where the
+        // whole published list is written down.
+        val errors = lenient.decodeFromString(PlanFile.serializer(), v99).validate()
         assertEquals(
-            listOf("Unsupported schemaVersion '1.5' (expected one of 1.0, 1.1, 1.2, 1.3, 1.4)"),
+            listOf("Unsupported schemaVersion '9.9' (expected one of 1.0, 1.1, 1.2, 1.3, 1.4, 1.5)"),
             errors,
         )
 
-        // 1.4 is the version this change introduces, and it validates clean.
-        // This assertion was written against 1.4 as the REJECTED version one
-        // commit ago; the flip is the behaviour change, not an oversight.
-        val v14 = documentWithUnknownKeys.replace("\"1.3\"", "\"1.4\"")
-        assertEquals(emptyList(), lenient.decodeFromString(PlanFile.serializer(), v14).validate())
+        // The version the app's own prompt asks for validates clean. Read from
+        // the constant, so this half cannot drift a version behind it; what
+        // the constant IS is pinned by SchemaContractTest against both the
+        // published schema and the prompt.
+        val current = documentWithUnknownKeys.replace("\"1.3\"", "\"${PlanFile.SCHEMA_VERSION}\"")
+        assertEquals(emptyList(), lenient.decodeFromString(PlanFile.serializer(), current).validate())
     }
 
     @OptIn(ExperimentalSerializationApi::class)

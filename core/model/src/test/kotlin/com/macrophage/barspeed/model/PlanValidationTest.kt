@@ -210,4 +210,46 @@ class PlanValidationTest {
         assertEquals(true, file.sessions[0].exercises[1].optional)
         assertEquals("closer to the plate, higher ROM", file.sessions[0].exercises[1].sets[0].note)
     }
+
+    private fun withImplementCount(declaration: String) = json.decodeFromString(
+        PlanFile.serializer(),
+        validPlan.replace("\"exercise\": \"back_squat\",", "\"exercise\": \"back_squat\", $declaration"),
+    )
+
+    /**
+     * A count below one would reach a division. [ImplementLoad.count] coerces
+     * it so nothing can render garbage into a line a lifter acts on, but the
+     * plan is still REFUSED rather than silently corrected: a 0 does not say
+     * what the writer meant, and reading it as 1 would put a figure on screen
+     * that nobody declared.
+     */
+    @Test
+    fun `an implement count below one is an error, not a warning`() {
+        listOf(0, -1).forEach { n ->
+            val errors = withImplementCount("\"implementCount\": $n,").validate()
+            assertTrue(
+                errors.any { it.contains("sessions[0].exercises[0].implementCount") },
+                "implementCount $n was accepted: $errors",
+            )
+        }
+        listOf(1, 2, 8).forEach { n ->
+            val errors = withImplementCount("\"implementCount\": $n,").validate()
+            assertTrue(errors.isEmpty(), "implementCount $n was refused: $errors")
+        }
+    }
+
+    /**
+     * A weighted step-up or a walking lunge holding a dumbbell in each hand is
+     * body-weight work with two implements. A rule forbidding that pairing was
+     * considered and rejected: it makes a real and common movement unwritable,
+     * and it is the kind of regression that arrives dressed as a safety
+     * improvement. This pin exists to refuse it.
+     */
+    @Test
+    fun `a bodyweight exercise may declare two implements`() {
+        val plan = withImplementCount("\"bodyweight\": true, \"implementCount\": 2,")
+        assertTrue(plan.validate().isEmpty(), plan.validate().joinToString())
+        assertEquals(2, plan.sessions[0].exercises[0].implementCount)
+        assertEquals(true, plan.sessions[0].exercises[0].bodyweight)
+    }
 }
