@@ -7,6 +7,7 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -379,7 +380,17 @@ class FieldDataRegressionTest {
         assertEquals(13, analysis.reps.size, "segmented reps; the lifter performed 12")
         assertEquals(1, analysis.reps.count { it.romM > 1.2 }, "reps claiming over 1.2 m of ROM")
         assertEquals<Double?>(1.275, analysis.reps.last().romM, "ROM of the extra rep, metres")
-        assertEquals<Double?>(0.0, analysis.velocityLossPct, "velocity loss reported to the lifter")
+        // The 13th detection -- 1.275 m of travel on a pallof press, so not a
+        // rep -- is also the FASTEST thing in the set: 0.428 m/s against 0.400
+        // for the best of the other twelve. Velocity loss is best rep to LAST
+        // rep, so best and last were the same detection and the figure came out
+        // at exactly 0.0: a green "-0% vel" chip on the set whose fastest
+        // measured movement was an artefact. The reassuring value and the
+        // artefact are one event, which is why the figure is withheld rather
+        // than corrected. This fixture carries no cue track at all, so nothing
+        // keyed on the voice guide could ever reach it.
+        assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(analysis.reps))
+        assertNull(analysis.velocityLossPct, "velocity loss reported to the lifter")
     }
 
     @Test
