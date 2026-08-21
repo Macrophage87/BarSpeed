@@ -47,6 +47,62 @@ class SchemaContractTest {
     }
 
     /**
+     * [PlanFile.SCHEMA_VERSION] is the version the app ASKS FOR rather than
+     * one it writes. No production code reads it; its only consumer in the
+     * repository is `GuidePromptContractTest`, which pins it into
+     * `GuideScreen.kt`'s PLAN_PROMPT -- the text the COPY PLAN PROMPT button
+     * puts on the lifter's clipboard. So a version the app advertises but will
+     * not accept means every plan written by following the app's own
+     * instructions is refused at the import gate.
+     *
+     * Found by mutation testing, as `the published example declares the
+     * version the exporter writes` was: raising SCHEMA_VERSION to 1.5 and
+     * moving the prompt's prose and skeleton to 1.5, while leaving
+     * SUPPORTED_SCHEMA_VERSIONS and the published schema at 1.4, left the
+     * whole suite green.
+     *
+     * Both halves are asserted because they refuse the plan at different
+     * moments: a version absent from the published enum is rejected by a
+     * generator validating against the contract it was pointed at, and one
+     * absent from SUPPORTED_SCHEMA_VERSIONS is rejected by [PlanFile.validate]
+     * after the file reaches the app.
+     */
+    @Test
+    fun `plan schema allows the version the plan prompt asks for`() {
+        val props = schema("plan.schema.json")["properties"]!!.jsonObject
+        val versions = enumOf(props["schemaVersion"]!!.jsonObject)
+        assertTrue(
+            PlanFile.SCHEMA_VERSION in versions,
+            "the prompt asks for ${PlanFile.SCHEMA_VERSION}, which the published plan schema rejects",
+        )
+        assertTrue(
+            PlanFile.SCHEMA_VERSION in PlanFile.SUPPORTED_SCHEMA_VERSIONS,
+            "the prompt asks for ${PlanFile.SCHEMA_VERSION}, which PlanFile.validate() rejects",
+        )
+    }
+
+    /**
+     * The published example is the document a plan writer is pointed at, and
+     * it declares a version. One advertising a version the prompt no longer
+     * asks for teaches the reader a contract the app has moved off.
+     *
+     * Found by mutation testing: reverting the example to "1.1" left the suite
+     * green. Nothing else reads the example's version.
+     * `ShippedPlanExampleTest` decodes the example and asserts
+     * [PlanFile.validate] returns no errors, but that passes for ANY still
+     * supported version, so an example left a bump behind cannot fail it.
+     */
+    @Test
+    fun `the published plan example declares the version the prompt asks for`() {
+        val example = schema("examples/plan.example.json")
+        assertEquals(
+            PlanFile.SCHEMA_VERSION,
+            example["schemaVersion"]!!.jsonPrimitive.content,
+            "the published plan example and PlanFile.SCHEMA_VERSION disagree",
+        )
+    }
+
+    /**
      * The exercise-level `bodyweight` description states, in so many words,
      * that the set's own load "may be NEGATIVE for band or machine
      * assistance" — and [PlanFile.validate] already accepts a negative
