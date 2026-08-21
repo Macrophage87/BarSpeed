@@ -56,6 +56,7 @@ import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
 import com.macrophage.barspeed.model.ExitPrompt
+import com.macrophage.barspeed.model.ImplementLoad
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlateMath
 import com.macrophage.barspeed.model.RecordExitPolicy
@@ -490,9 +491,10 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         OutlinedTextField(
             value = state.loadInput,
             onValueChange = viewModel::updateLoadInput,
-            label = { Text("Load (${state.weightUnit.suffix})") },
+            label = { Text(loadFieldLabel(slot, state.weightUnit)) },
             modifier = Modifier.fillMaxWidth(),
         )
+        PerImplementEcho(state, slot)
     } else {
         AdHocForm(state, viewModel)
     }
@@ -574,6 +576,44 @@ private fun MoveSensorCard(exerciseName: String) {
         )
     }
     Spacer(Modifier.height(8.dp))
+}
+
+/**
+ * "Total load (lb)" once an exercise declares more than one implement, so the
+ * box says what it takes before anything is typed into it.
+ *
+ * The box goes on taking the TOTAL at every site, unchanged. That is the whole
+ * reason this feature performs no multiplication anywhere: if the field's
+ * meaning flipped to per-implement, every read and every re-seed of
+ * `loadInput` would carry a divide-or-multiply obligation forever, in the one
+ * module with no test source set.
+ */
+private fun loadFieldLabel(slot: PlannedSlot?, unit: WeightUnit): String =
+    if (ImplementLoad.count(slot?.implementCount) > 1) "Total load (${unit.suffix})" else "Load (${unit.suffix})"
+
+/**
+ * "= 2 × 45 lb each" under the load box, recomputed on every keystroke.
+ *
+ * DERIVED and not typeable, so no per-implement figure can reach
+ * `statedLoadKg`: this reads the box, it is not a second box. It exists so the
+ * arithmetic the lifter is doing in their head is visible BEFORE the set
+ * rather than discoverable afterwards in an export.
+ *
+ * A plain Text rather than the field's `supportingText` slot, which is used
+ * nowhere else in this app -- a rendering that ships tonight should not depend
+ * on an API this codebase has never exercised.
+ */
+@Composable
+private fun PerImplementEcho(state: RecordState, slot: PlannedSlot?) {
+    val typedAddedKg = state.weightUnit.parseToKg(state.loadInput)
+    val split = ImplementLoad.decomposition(typedAddedKg, slot?.implementCount, state.weightUnit)
+    if (split != null) {
+        Text(
+            "= $split each",
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+    }
 }
 
 @Composable
@@ -959,8 +999,14 @@ private fun InSetHeader(state: RecordState, slot: PlannedSlot?) {
             exerciseName,
             side?.replaceFirstChar { it.uppercase() },
             slot?.let { "Set ${it.setIndexInExercise + 1}/${it.setsInExercise}" },
-            loadKg.takeIf { it > 0 }?.let { state.weightUnit.format(it) }
-                ?: "bodyweight".takeIf { state.currentIsTimed },
+            // The canonical total keeps its position and the split follows it
+            // in brackets, never instead of it. `loadKg` above is
+            // SetLoadPolicy.resolve's answer, which is the ADDED load -- the
+            // one figure here that may be divided.
+            loadKg.takeIf { it > 0 }?.let { added ->
+                val split = ImplementLoad.decomposition(added, slot?.implementCount, state.weightUnit)
+                state.weightUnit.format(added) + (split?.let { " ($it)" } ?: "")
+            } ?: "bodyweight".takeIf { state.currentIsTimed },
         )
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1263,7 +1309,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
             OutlinedTextField(
                 value = state.loadInput,
                 onValueChange = viewModel::updateLoadInput,
-                label = { Text("Load (${state.weightUnit.suffix})") },
+                label = { Text(loadFieldLabel(next, state.weightUnit)) },
                 modifier = Modifier.weight(1f),
             )
             if (next.isTimed) {
@@ -1282,6 +1328,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
                 )
             }
         }
+        PerImplementEcho(state, next)
         Spacer(Modifier.height(12.dp))
         StartNextSetButton(state, viewModel)
     } else if (state.adHoc) {
@@ -1589,6 +1636,13 @@ private fun RestHeader(state: RecordState) {
             state.lastFeedback?.let { feedback ->
                 val loadText =
                     feedback.loadKg.takeIf { it > 0 }?.let { state.weightUnit.format(it) } ?: "BW"
+                // addedKg, NEVER loadKg. feedback.loadKg is
+                // SetLoadPolicy.totalKg -- the lifter's own mass included on
+                // body-weight work -- so halving it would read "2 x 50 kg" for
+                // a 20 kg weighted dip at 80 kg body weight. The total on
+                // screen stays loadKg; only the split comes off addedKg.
+                val split =
+                    ImplementLoad.decomposition(feedback.addedKg, feedback.implementCount, state.weightUnit)
                 val name =
                     feedback.exerciseName +
                         (feedback.side?.let { " (${it.replaceFirstChar { c -> c.uppercase() }})" } ?: "")
@@ -1599,7 +1653,14 @@ private fun RestHeader(state: RecordState) {
                     // separates left from right.
                     SideArrow(feedback.side, Modifier.padding(end = 6.dp), color = BarColors.Text)
                     Text(
+                        // "8 × 2 × 40 lb" would put two different meanings on
+                        // one glyph, so the rep joiner becomes "reps @" when
+                        // and only when a split renders. That is the shape the
+                        // timed branch directly above already uses, rather
+                        // than a new punctuation invented for this case; with
+                        // no split the line is byte-identical to before.
                         feedback.actualDurationS?.let { "$name ${it}s @ $loadText" }
+                            ?: split?.let { "$name ${feedback.effectiveReps} reps @ $loadText ($it)" }
                             ?: "$name ${feedback.effectiveReps} × $loadText",
                         style = MaterialTheme.typography.titleMedium,
                     )
@@ -1883,13 +1944,29 @@ private fun SlotCard(
             // arise before -- a barbell slot the plan gave no load for now
             // draws a line once the lifter states one -- which is wanted:
             // there was nothing to compute from before, and there is now.
-            if (slot.exercise.usesBarbell) {
-                (plateLoadKgOverride ?: slot.loadKg)?.takeIf { it > 0 }?.let { loadKg ->
-                    plateLine(loadKg, unit)?.let {
-                        Spacer(Modifier.height(4.dp))
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Blue)
-                    }
+            //
+            // "Pick up" REPLACES the plate line rather than sitting beside it,
+            // and a DECLARED count beats an INFERRED bar, which is the
+            // precedence used everywhere else here. You cannot load plates per
+            // side onto two dumbbells, and usesBarbell is a guess from the
+            // exercise id while the count is not guessed at all.
+            //
+            // Both lines read the same load, which is the ADDED load: the
+            // slot's own number, or what the lifter has stated in its place.
+            // Never a body-weight-inclusive total -- see ImplementLoad.
+            val instructionKg = (plateLoadKgOverride ?: slot.loadKg)?.takeIf { it > 0 }
+            val instruction =
+                if (ImplementLoad.count(slot.implementCount) > 1) {
+                    ImplementLoad.decomposition(instructionKg, slot.implementCount, unit)
+                        ?.let { "Pick up: $it" }
+                } else if (slot.exercise.usesBarbell) {
+                    instructionKg?.let { plateLine(it, unit) }
+                } else {
+                    null
                 }
+            instruction?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Blue)
             }
         }
     }

@@ -190,6 +190,20 @@ private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
                 Spacer(Modifier.height(2.dp))
                 Text("“$it”", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
             }
+            // Stated ONCE, on the header, because the count is declared on the
+            // exercise and not on a set. This screen is the approval gate --
+            // the cheapest place a wrong count is caught, before any lifting
+            // rather than afterwards in an export. The per-set loads below
+            // stay the TOTAL, which is what they have always been and what is
+            // recorded.
+            exercise.implementCount?.takeIf { it > 1 }?.let { n ->
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Held $n at a time — each load below is the TOTAL across all $n.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BarColors.Blue,
+                )
+            }
 
             val common = commonPrescriptions(exercise.sets)
             if (common.isNotEmpty()) {

@@ -9,9 +9,11 @@ package com.macrophage.barspeed.model
  * everything held, before this file existed and after it. Nothing here
  * multiplies a load, and nothing here returns a number that is stored,
  * exported or summed: [decomposition] returns a string, its only callers are
- * screens, and [PlanSetDef.resolvedLoadKg] takes no implement count. That is
- * the whole safety case and it is mechanical rather than a promise — a count
- * cannot corrupt a measurement it is not in scope to reach.
+ * screens, and [PlanSetDef.resolvedLoadKg] takes no implement count. Every
+ * division by an implement count in this feature terminates in a String and
+ * reaches nothing that is stored, exported or summed. That is the whole
+ * safety case and it is mechanical rather than a promise — a count cannot
+ * corrupt a measurement it is not in scope to reach.
  *
  * Every load here is the ADDED load — the number a plan writes as `load_kg`,
  * which may be negative on assisted body-weight work. It is NEVER the
@@ -57,12 +59,12 @@ object ImplementLoad {
     /**
      * The added load on each object, in kilograms.
      *
-     * The only division this feature performs, and it happens in KILOGRAMS,
-     * upstream of the single conversion inside [WeightUnit.format]. Two
-     * consequences worth not "improving": halving a double is exact, so
-     * dividing here loses nothing; and dividing before the conversion makes
-     * the answer the same figure whichever unit the lifter displays, so a
-     * pound-authored plan read in kilograms agrees with itself.
+     * This division happens in KILOGRAMS, upstream of the conversion at the
+     * display boundary inside [WeightUnit.format]. Two consequences worth
+     * not "improving": halving a double is exact, so dividing here loses
+     * nothing; and dividing before the conversion makes the answer the same
+     * figure whichever unit the lifter displays, so a pound-authored plan
+     * read in kilograms agrees with itself.
      *
      * No `:app` call site takes this today — [decomposition] is what the
      * screens use. It is public because it is the kilogram-level statement of
@@ -87,14 +89,8 @@ object ImplementLoad {
      */
     fun decomposition(totalAddedKg: Double?, declared: Int?, unit: WeightUnit): String? {
         val n = count(declared)
+        if (n < 2) return null
         val total = totalAddedKg?.takeIf { it > 0 } ?: return null
-        // INCOMPLETE AT THIS COMMIT, on purpose. The count is read and the
-        // total is rendered whole: neither the "nothing to split" guard nor
-        // the division exists yet, and both land in the commit that greens the
-        // differentials written against them. This shape exists so those
-        // differentials COMPILE -- a test that does not compile is a broken
-        // build, not a red test. Nothing calls this function here, so it is a
-        // no-op wherever you look for it.
-        return "$n × ${unit.format(total)}"
+        return "$n × ${unit.format(perImplementAddedKg(total, declared))}"
     }
 }

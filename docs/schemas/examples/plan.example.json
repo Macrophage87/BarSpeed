@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.4",
+  "schemaVersion": "1.5",
   "planName": "Hypertrophy Block W3",
   "notes": "Week 3 of 4. Keep eccentrics honest.",
   "sessions": [
@@ -133,6 +133,44 @@
               "tempo": "30X0",
               "targetMeanConcentricVelocity_mps": 0.4,
               "rest_s": 180
+            }
+          ]
+        },
+        {
+          "exercise": "dumbbell_bench_press",
+          "implementCount": 2,
+          "notes": "A pair. load_lb is the TOTAL across both - 80 is two 40s, not 80 in each hand.",
+          "sets": [
+            {
+              "reps": 10,
+              "load_lb": 80,
+              "tempo": "3010",
+              "rest_s": 90
+            },
+            {
+              "reps": 10,
+              "load_lb": 80,
+              "tempo": "3010",
+              "rest_s": 90
+            }
+          ]
+        },
+        {
+          "exercise": "single_arm_dumbbell_row",
+          "implementCount": 1,
+          "notes": "One object held, one side at a time. Which side is a different fact from how many are held, so both are declared and neither is taken from the other.",
+          "sets": [
+            {
+              "reps": 10,
+              "load_lb": 45,
+              "side": "right",
+              "rest_s": 60
+            },
+            {
+              "reps": 10,
+              "load_lb": 45,
+              "side": "left",
+              "rest_s": 60
             }
           ]
         },

@@ -33,6 +33,14 @@ data class PlanFile(
                 exercise.travelRatio?.let {
                     if (it <= 0.0) errors += "sessions[$si].exercises[$ei].travelRatio must be positive"
                 }
+                // Refused rather than silently corrected. [ImplementLoad.count]
+                // coerces a 0 so nothing can divide by it, but a 0 does not say
+                // what the plan's author meant, and reading it as 1 would put a
+                // figure on screen that nobody declared. No maximum: a bound
+                // contradicting the prose beside it is worse than none.
+                exercise.implementCount?.let {
+                    if (it < 1) errors += "sessions[$si].exercises[$ei].implementCount must be at least 1"
+                }
                 if (exercise.plane != null && exercise.plane !in VALID_PLANES) {
                     errors += "sessions[$si].exercises[$ei].plane must be \"vertical\" or \"horizontal\""
                 }
@@ -66,10 +74,45 @@ data class PlanFile(
      * plan. Overriding a built-in comes first: that is the app being told to
      * ignore something it ships with, and this is the only sign it happened.
      */
-    fun warnings(): List<String> = eachExercise(::startVsSeed) +
+    fun warnings(): List<String> = eachExercise(::pairVsLoad) +
+        eachExercise(::startVsSeed) +
         eachExercise(::kindVsSeed) +
         eachExercise(::kindVsShape) +
         eachExercise(::kindVsInference)
+
+    /**
+     * A declared pair, stated back with BOTH figures in the plan's own unit.
+     *
+     * First in the list because it is the only warning here about a LOAD. The
+     * others describe how a set will be measured and are recoverable from the
+     * persisted capture afterwards; this one is the last surface before a
+     * number is recorded that cannot be reconstructed from anything. The
+     * mistake it exists to catch is a figure that is right for one hand and
+     * half of what was lifted: `"load_lb": 40` with `"implementCount": 2` on a
+     * set really done at two 40s records 40, and nothing in the app can tell
+     * that afterwards from a real 40 lb set.
+     *
+     * Quoted in the plan's own unit and its own figure. The question being put
+     * back to the author is about what they wrote; the app renders in whatever
+     * unit the lifter has selected, so a warning naming a converted figure
+     * would be a claim about a screen it cannot see.
+     *
+     * Silent when no set declares a positive load. There is then no number to
+     * have got backwards, and a warning with nothing in it is how a warning
+     * decays into noise.
+     */
+    private fun pairVsLoad(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        val n = exercise.implementCount ?: return null
+        if (n < 2) return null
+        val set = exercise.sets.firstOrNull { (it.loadLb ?: it.loadKg ?: 0.0) > 0 } ?: return null
+        val unit = if (set.loadLb != null) "lb" else "kg"
+        val total = set.loadLb ?: set.loadKg ?: return null
+        val whole = "${plainNumber(total)} $unit"
+        return "sessions[$si].exercises[$ei]: ${exercise.exercise} declares " +
+            "\"implementCount\": $n, so this plan's $whole means $n × ${plainNumber(total / n)} $unit " +
+            "in hand, not $whole in each. load_kg/load_lb is always the TOTAL across everything " +
+            "held — if $whole was what was on one of them, write the total of all $n here instead."
+    }
 
     private fun eachExercise(warn: (Int, Int, PlanExerciseDef) -> String?): List<String> = sessions
         .flatMapIndexed { si, session ->
@@ -123,8 +166,8 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.4"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4")
+        const val SCHEMA_VERSION = "1.5"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5")
         val VALID_SIDES = setOf("left", "right")
 
         /** "top"/"bottom" name the start position; "down"/"up" the first movement. */
@@ -141,6 +184,15 @@ data class PlanFile(
         val VALID_KINDS = setOf("dynamic", "hold", "carry", "explosive")
     }
 }
+
+/**
+ * A figure quoted back to a plan's author the way they wrote it, without the
+ * trailing ".0" a Double prints. Local to this file because it exists only for
+ * [PlanFile.warnings]: WeightUnit.format is the app's renderer and converts,
+ * which is exactly what a message about the plan's own text must not do.
+ */
+private fun plainNumber(value: Double): String =
+    if (value == Math.floor(value)) value.toLong().toString() else value.toString()
 
 @Serializable
 data class PlanSessionDef(
