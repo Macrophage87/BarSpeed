@@ -57,6 +57,7 @@ import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
 import com.macrophage.barspeed.model.ExitPrompt
 import com.macrophage.barspeed.model.ImplementLoad
+import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlateMath
 import com.macrophage.barspeed.model.RecordExitPolicy
@@ -498,6 +499,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     } else {
         AdHocForm(state, viewModel)
     }
+    PrepAdjuster(state, viewModel)
     Spacer(Modifier.height(12.dp))
     // The bar sensor is record-only for standard lifts: the lifter (or the
     // voice guide) counts; explosive lifts stay sensor-counted.
@@ -520,6 +522,78 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         AudioCueChip(state, viewModel)
     }
     SessionCloseControls(state, viewModel)
+}
+
+/**
+ * How much of a step one tap of the prep control is worth.
+ *
+ * Five, not one. The two cases this control exists for are a strap-up (5 -> 20)
+ * and a machine that is ready instantly (5 -> 0), three taps and one tap away;
+ * at single seconds the strap case is fifteen taps taken out of a rest period,
+ * with chalk on the lifter's hands.
+ */
+private const val PREP_STEP_S = 5
+
+/**
+ * The prep before the next guided set, and the taps that change it.
+ *
+ * Shown only when the set coming up will actually run the voice guide -- a
+ * control that changed nothing would be worse than no control. The predicate is
+ * [LeadInPolicy.playsPrep], reached through `state.upcomingPlaysPrep`, which is
+ * the same rule `beginSet` decides guidedness with and the same one the import
+ * gate warns an inert `prep_s` against.
+ *
+ * Rendered on READY and again on the rest screen because READY is drawn at most
+ * once per session: `startNextSet` writes READY and calls `beginSet` in the same
+ * frame, so from set two onwards the rest screen is the only place the lifter
+ * can change anything.
+ *
+ * The adjustment is stored against the exercise, so it holds for the rest of
+ * that exercise's sets and for the same exercise next week. What the plan asked
+ * for is named beside it whenever the two differ, because the difference is
+ * published in the export and the next plan is meant to be authored from it --
+ * the lifter should be able to see what they are departing from.
+ */
+@Composable
+private fun PrepAdjuster(state: RecordState, viewModel: RecordViewModel) {
+    if (!state.upcomingPlaysPrep) return
+    val slot = state.upcomingSlot
+    val prepS = state.prepSecondsFor(slot)
+    val plannedS = state.plannedPrepSecondsFor(slot)
+    Spacer(Modifier.height(8.dp))
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                "Prep ${prepS}s",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                if (prepS == plannedS) {
+                    "Time to get set before the first rep is called"
+                } else {
+                    "Plan says ${plannedS}s - your change is recorded in the export"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = BarColors.Sub,
+            )
+        }
+        OutlinedButton(
+            onClick = { viewModel.adjustPrep(-PREP_STEP_S) },
+            enabled = prepS > LeadInPolicy.MIN_S,
+        ) {
+            Text("-${PREP_STEP_S}s")
+        }
+        OutlinedButton(
+            onClick = { viewModel.adjustPrep(PREP_STEP_S) },
+            enabled = prepS < LeadInPolicy.MAX_S,
+        ) {
+            Text("+${PREP_STEP_S}s")
+        }
+    }
 }
 
 /** Equipment busy? Offer the session's other remaining exercises out of order. */
@@ -1329,10 +1403,12 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
             }
         }
         PerImplementEcho(state, next)
+        PrepAdjuster(state, viewModel)
         Spacer(Modifier.height(12.dp))
         StartNextSetButton(state, viewModel)
     } else if (state.adHoc) {
         AdHocForm(state, viewModel)
+        PrepAdjuster(state, viewModel)
         Spacer(Modifier.height(12.dp))
         StartNextSetButton(state, viewModel)
     } else {

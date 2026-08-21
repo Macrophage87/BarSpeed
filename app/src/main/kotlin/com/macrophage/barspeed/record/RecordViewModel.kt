@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
+import com.macrophage.barspeed.SettingsStore
 import com.macrophage.barspeed.VoiceCounter
 import com.macrophage.barspeed.data.CompletedSet
 import com.macrophage.barspeed.data.SessionRepository
@@ -40,6 +41,7 @@ import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -82,6 +84,12 @@ data class PlannedSlot(
     val targetMeanConVelMps: Double? = null,
     val velocityLossStopPct: Double? = null,
     val restS: Int? = null,
+    /**
+     * Prep the plan declared for this exercise, in seconds; null when it
+     * declared none. Resolved against the lifter's adjustment and the default by
+     * [LeadInPolicy], never read raw.
+     */
+    val prepS: Int? = null,
     val isExerciseChange: Boolean = false,
 ) {
     /**
@@ -196,6 +204,36 @@ private data class PendingSetWrite(
  * zone read at export time would be the zone the phone is in then, which is a
  * different fact wearing the same name.
  */
+/**
+ * Apply one tap of the prep control: work out which exercise it changes and what
+ * the new value is, clamped, then write it.
+ *
+ * A free function taking what it needs, for the reason [openSession] gives --
+ * detekt measures [RecordViewModel] as at its size limit, and this addition took
+ * it over. The behaviour is unchanged by the move.
+ *
+ * Written to the settings store and read back through its flow rather than
+ * copied onto the state here. One source of truth: a state field written
+ * alongside the store is a second copy that survives exactly until the next
+ * emission disagrees with it.
+ *
+ * On [appScope] rather than the ViewModel's own scope, the same reason
+ * `rateLastSet` gives -- the rest screen is where this is tapped, and the pop
+ * that leaves it cancels anything still running on the ViewModel's scope. The
+ * clamp is applied here as well as in the store, so a tap at either end of the
+ * range moves nothing rather than storing a value the store then corrects.
+ */
+private fun applyPrepAdjustment(s: RecordState, deltaS: Int, appScope: CoroutineScope, settings: SettingsStore) {
+    val slot = s.upcomingSlot
+    val exerciseId = s.prepExerciseId(slot)
+    val seconds = LeadInPolicy.clamp(s.prepSecondsFor(slot) + deltaS)
+    appScope.launch { settings.setPrepS(exerciseId, seconds) }
+}
+
+/** Mirror the stored prep adjustments onto the state; free for the same reason. */
+private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: MutableStateFlow<RecordState>) =
+    launch { settings.prepOverrides.collect { state.value = state.value.copy(prepOverrides = it) } }
+
 private suspend fun openSession(repository: SessionRepository, p: PendingSetWrite): Long {
     return repository.startSession(
         planName = p.planName,
@@ -487,6 +525,12 @@ data class RecordState(
     val weightUnit: WeightUnit = WeightUnit.KG,
     /** Lifter body weight, the base load for pull-ups and dips; null until set. */
     val bodyWeightKg: Double? = null,
+    /**
+     * The lifter's prep adjustments, exercise id to seconds. Empty until the
+     * settings flow first emits, which is why nothing here reads it directly --
+     * [prepSecondsFor] falls back through the plan's declaration to the default.
+     */
+    val prepOverrides: Map<String, Int> = emptyMap(),
 ) {
     val currentSlot: PlannedSlot? get() = queue.getOrNull(queueIndex)
     val nextSlot: PlannedSlot? get() = queue.getOrNull(queueIndex + 1)
@@ -508,6 +552,43 @@ data class RecordState(
     /** Index of the first not-yet-done slot: during rating/rest the current one is already complete. */
     val upcomingIndex: Int
         get() = if (stage == Stage.RESTING) queueIndex + 1 else queueIndex
+
+    /** The slot the next START will run: the current one, or the next during rest. */
+    val upcomingSlot: PlannedSlot? get() = queue.getOrNull(upcomingIndex)
+
+    /** Which exercise's prep a control on screen is editing. */
+    fun prepExerciseId(slot: PlannedSlot?): String = slot?.exercise?.id ?: currentExercise.id
+
+    /**
+     * The prep a set of [slot] will play: the lifter's stored adjustment, else
+     * the plan's declaration, else the default.
+     *
+     * A function taking the slot rather than a property, because the screen and
+     * [RecordViewModel.beginSet] ask about different slots -- the next one during
+     * rest, the current one at START. The RULE is stated once, in
+     * [LeadInPolicy.resolve]; only the subject differs.
+     */
+    fun prepSecondsFor(slot: PlannedSlot?): Int = LeadInPolicy.resolve(slot?.prepS, prepOverrides[prepExerciseId(slot)])
+
+    /** What the plan prescribed for [slot]: its declaration, or the default. */
+    fun plannedPrepSecondsFor(slot: PlannedSlot?): Int = LeadInPolicy.planned(slot?.prepS)
+
+    /**
+     * True when the set coming up will run the voice guide, and therefore a
+     * prep. [LeadInPolicy.playsPrep], asked of the upcoming slot rather than the
+     * current one, so the control on the rest screen is about the set it sits
+     * above.
+     */
+    val upcomingPlaysPrep: Boolean
+        get() {
+            val slot = upcomingSlot
+            val tempo = if (adHoc) tempoInput.ifBlank { null } else slot?.tempo
+            return LeadInPolicy.playsPrep(
+                hasTempo = tempo?.let { Tempo.parseOrNull(it) } != null,
+                isTimed = slot?.isTimed ?: currentIsTimed,
+                kind = (slot?.exercise ?: currentExercise).kind,
+            )
+        }
 
     /** Other exercises with sets still to do — offered when equipment is busy. */
     val exerciseChoices: List<ExerciseChoice>
@@ -760,6 +841,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 stateFlow.value = stateFlow.value.copy(bodyWeightKg = kg)
             }
         }
+        viewModelScope.mirrorPrepOverrides(container.settings, stateFlow)
         viewModelScope.launch {
             container.settings.audioCues.collect { enabled ->
                 stateFlow.value = stateFlow.value.copy(audioCues = enabled)
@@ -908,12 +990,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // The same predicate the import gate warns an inert prep_s against and
         // the same one the screen offers the prep control on. Stated once, in a
         // module with tests, because three statements of it would be three rules.
-        val guidedSet =
-            LeadInPolicy.playsPrep(
-                hasTempo = guidedTempo != null,
-                isTimed = s.currentIsTimed,
-                kind = exercise.kind,
-            )
+        val guidedSet = LeadInPolicy.playsPrep(guidedTempo != null, s.currentIsTimed, exercise.kind)
         if (guidedSet) manualSet = true
         // The prep, decided once here and used twice: handed to the runner
         // below, and frozen onto the set record at endSet. One expression,
@@ -925,8 +1002,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // no prep, and writing 0 for it would be absence rendered as a value:
         // 0 is a real prep, the one where nothing is spoken before the first
         // stroke call.
-        val prepS = LeadInPolicy.DEFAULT_S
-        plannedPrepSForSet = prepS.takeIf { guidedSet }
+        //
+        // The PLANNED half is what the plan prescribed, which is its declaration
+        // or the default -- not what was played. The two differ exactly when the
+        // lifter adjusted the prep, and the export publishes both so that
+        // difference is the record of the adjustment.
+        val prepS = s.prepSecondsFor(s.currentSlot)
+        plannedPrepSForSet = s.plannedPrepSecondsFor(s.currentSlot).takeIf { guidedSet }
         prepSForSet = prepS.takeIf { guidedSet }
         setStartedAtMs = System.currentTimeMillis()
         if (sessionStartedAtMs == 0L) sessionStartedAtMs = setStartedAtMs
@@ -987,11 +1069,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 guidedFinished = false,
             )
         if (guidedSet && guidedTempo != null) {
-            startGuidedCadence(
-                TempoSchedule.of(guidedTempo, exercise.liftDirection()),
-                plannedRepsForSet,
-                prepS,
-            )
+            startGuidedCadence(TempoSchedule.of(guidedTempo, exercise.liftDirection()), plannedRepsForSet, prepS)
         }
     }
 
@@ -1454,6 +1532,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 stateFlow.value.copy(lastSetRpe = rpe, lastSetFailed = effectiveFailed, lastSetWarmup = warmup)
         }
     }
+
+    /** One tap of the prep control; the work is in the free [applyPrepAdjustment]. */
+    fun adjustPrep(deltaS: Int) = applyPrepAdjustment(stateFlow.value, deltaS, container.appScope, container.settings)
 
     /** Advance to the next planned set, applying any in-rest load/rep edits. */
     fun startNextSet() {

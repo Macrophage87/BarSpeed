@@ -35,6 +35,7 @@
         },
         {
           "exercise": "romanian_deadlift",
+          "prep_s": 20,
           "sets": [
             {
               "reps": 8,

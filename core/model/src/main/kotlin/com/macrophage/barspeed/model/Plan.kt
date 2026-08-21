@@ -47,6 +47,12 @@ data class PlanFile(
                 if (exercise.kind != null && exercise.kind !in VALID_KINDS) {
                     errors += "sessions[$si].exercises[$ei].kind must be one of ${VALID_KINDS.joinToString()}"
                 }
+                exercise.prepS?.let {
+                    if (it < LeadInPolicy.MIN_S || it > LeadInPolicy.MAX_S) {
+                        errors += "sessions[$si].exercises[$ei].prep_s must be between " +
+                            "${LeadInPolicy.MIN_S} and ${LeadInPolicy.MAX_S} seconds"
+                    }
+                }
                 if (exercise.sets.isEmpty()) errors += "sessions[$si].exercises[$ei] must contain at least one set"
                 exercise.sets.forEachIndexed { xi, set ->
                     // On bodyweight work the load is what was ADDED, and a band or
@@ -78,7 +84,9 @@ data class PlanFile(
         eachExercise(::startVsSeed) +
         eachExercise(::kindVsSeed) +
         eachExercise(::kindVsShape) +
-        eachExercise(::kindVsInference)
+        eachExercise(::kindVsInference) +
+        eachExercise(::prepVsGuide) +
+        eachExercise(::prepVsPhrase)
 
     /**
      * A declared pair, stated back with BOTH figures in the plan's own unit.
@@ -153,6 +161,50 @@ data class PlanFile(
         return "sessions[$si].exercises[$ei]: this plan declares \"kind\": \"${exercise.kind}\" " +
             "but prescribes $prescribed - the set is measured $measured either way. " +
             "Kind sets the movement type, not the timing."
+    }
+
+    /**
+     * A prep declared on an exercise no set of which runs the voice guide.
+     *
+     * Nothing is lost and nothing is wrong, but the plan's author asked for
+     * something and nothing happens, and the import gate is the only place that
+     * can tell them. Not hypothetical: in the published `plan.example.json`,
+     * `farmers_walk`, `plank`, `suitcase_carry`, `hanging_leg_raise` and
+     * `band_assisted_pull_up` all carry no tempo, and a cable machine -- the
+     * example that motivated a declarable prep -- is among the likeliest to be
+     * given one and no tempo.
+     */
+    private fun prepVsGuide(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        if (exercise.prepS == null || exercise.playsAnyPrep) return null
+        return "sessions[$si].exercises[$ei]: \"prep_s\" is declared on ${exercise.exercise}, " +
+            "but no set of it runs the voice guide - a set needs a tempo, and must be neither " +
+            "timed nor an explosive lift - so no prep is played and the declaration has no effect."
+    }
+
+    /**
+     * A prep too short to fit the launch phrase, naming what gets dropped.
+     *
+     * A warning rather than an error: a two-second cable set is exactly what a
+     * declarable prep was asked for, and a lifter who wants no countdown should
+     * be able to have none. What the plan's author may not know is that below
+     * the phrase length the countdown is not what goes -- the phrase is fixed to
+     * the END of the prep, so at 1 second `Ready` is dropped and only `Brace`
+     * survives.
+     *
+     * Silent on an inert declaration: how short a prep that never plays would
+     * have been is not a fact about anything, and two complaints about one
+     * mistake bury the one that matters.
+     */
+    private fun prepVsPhrase(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        val prep = exercise.prepS ?: return null
+        if (!exercise.playsAnyPrep || prep >= LeadInPolicy.MIN_USEFUL_S) return null
+        if (prep == 0) {
+            return "sessions[$si].exercises[$ei]: \"prep_s\": 0 means nothing at all is spoken " +
+                "before the first movement call."
+        }
+        return "sessions[$si].exercises[$ei]: \"prep_s\": $prep is shorter than the launch " +
+            "phrase - only \"Brace\" is spoken, and the \"Ready\" beat two seconds before the " +
+            "first movement is dropped."
     }
 
     private fun kindVsInference(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
@@ -289,8 +341,41 @@ data class PlanExerciseDef(
      * voice guide runs a tempo, and whether plate math applies.
      */
     val kind: String? = null,
+    /**
+     * Seconds of prep before each set of this exercise: the pause between the
+     * lifter starting the set and the voice guide calling the first movement,
+     * during which the app counts down and says `Ready` then `Brace`.
+     *
+     * What the plan's author is estimating is the time the LIFTER'S HANDS ARE
+     * UNAVAILABLE -- straps, chalk, a hook grip, a belt, lying down on a machine
+     * -- not the walk to the rack or the loading of plates, which happen before
+     * the set is started at all. A Romanian deadlift with straps is not ready
+     * five seconds after START; a cable machine is ready in two.
+     *
+     * `Int?` and never `Int = 0`: omitted and zero are different states.
+     * Omitted means the app's default; zero means this machine is ready
+     * instantly and nothing should be spoken. Omitted is resolved by
+     * [LeadInPolicy], which is also where the bounds and the precedence live.
+     *
+     * Only applies to sets that run the voice guide -- a set needs a tempo and
+     * must be neither timed nor an explosive lift. Declared anywhere else it is
+     * inert, and [PlanFile.warnings] says so at the import gate.
+     *
+     * The lifter can change it in the app, and the change is reported back in
+     * the session export as `prep_s` beside `plannedPrep_s`. A plan being
+     * authored from an export should take what was played rather than re-guess.
+     */
+    @SerialName("prep_s") val prepS: Int? = null,
     val sets: List<PlanSetDef>,
 ) {
+    /**
+     * True when at least one set of this exercise runs the voice guide, and so
+     * plays a prep. The predicate is [LeadInPolicy.playsPrep], stated once for
+     * the import gate, the record flow and the screen alike.
+     */
+    val playsAnyPrep: Boolean
+        get() = sets.any { LeadInPolicy.playsPrep(it.tempo != null, it.isTimed, effectiveKind) }
+
     /** True when the drive goes up; plans may pin it, otherwise inferred from the id. */
     val concentricUp: Boolean
         get() = when (concentric) {

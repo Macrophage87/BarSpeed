@@ -103,6 +103,12 @@
           "exclusiveMinimum": 0,
           "description": "Lifter-side travel per unit of sensor travel, for pulleys that are not 1:1. A 2:1 cable moves the handle twice as far as the stack, so 2. Default 1."
         },
+        "prep_s": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120,
+          "description": "Seconds of prep before each set of this exercise: the pause between my starting the set and the voice guide calling the first movement, during which the app counts down and says 'Ready' then 'Brace'. Estimate THE TIME MY HANDS ARE UNAVAILABLE -- fastening straps, chalking, setting a hook grip, cinching a belt, lying down on a machine -- not the walk to the rack or loading plates, which happen before I start the set. A Romanian deadlift with straps is not ready five seconds after I tap START; a cable machine is ready in two. ONLY APPLIES TO SETS CARRYING A tempo: a set with no tempo runs no voice guide, so a prep declared on one does nothing and the app says so at the import gate. Omitted means 5. I can change it in the app, and the change comes back in the session export as prep_s beside plannedPrep_s -- author the next plan from that rather than guessing again."
+        },
         "optional": {
           "type": "boolean",
           "description": "Accessory work that may be dropped when the session runs long. Surfaced in the app so the decision is planned rather than improvised."

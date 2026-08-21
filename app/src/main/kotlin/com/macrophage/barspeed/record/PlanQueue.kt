@@ -44,6 +44,7 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     targetMeanConVelMps = set.targetMeanConcentricVelocityMps,
                     velocityLossStopPct = set.velocityLossStopPct,
                     restS = set.restS,
+                    prepS = exerciseDef.prepS,
                     isExerciseChange = setIdx == 0 && exerciseIdx > 0,
                 )
         }
