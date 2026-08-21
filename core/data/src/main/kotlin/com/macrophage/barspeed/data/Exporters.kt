@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.VelocityEstimator
+import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.hrm.HrTrust
 import com.macrophage.barspeed.model.ExerciseExport
 import com.macrophage.barspeed.model.GeometryExport
@@ -149,6 +150,16 @@ class SessionExporter(
     ): SetExport {
         val analysis = sessionRepository.decodeAnalysis(record)
         val reps = analysis?.reps.orEmpty()
+        // Re-asked of the stored REPS, never read from the stored scalar.
+        // analysis.velocityLossPct is frozen into analysisJson when the set is
+        // recorded, so every set already on disk carries a figure computed
+        // under whatever rule was in force then -- including the 0.0 this
+        // withholds. Reading that column would leave the whole history
+        // republishing it on every export. The judgement is a pure function of
+        // the rep list the row already holds, which is what makes it
+        // answerable here at all; the hr block below re-asks its own question
+        // of the stored raw stream for the same reason (issue #83, schema 1.9).
+        val velocityLoss = VelocityLoss.of(reps)
         // Cues are still fetched here even when RawExporter already fetched
         // this same set's streams for the zip entries -- named, not fixed:
         // RawExporter's own inflate is for the raw CSV text, this one for
@@ -211,7 +222,8 @@ class SessionExporter(
                     actualEccConRatio = it.actualEccConRatio,
                 )
             },
-            velocityLossPct = analysis?.velocityLossPct,
+            velocityLossPct = velocityLoss.pctOrNull,
+            velocityLossBasis = velocityLoss.basis.takeIf { reps.isNotEmpty() },
             // minBpm in this list is load-bearing, not defensive padding: it is
             // computed fresh, below, from this set's raw stream, while the
             // other three are read off columns frozen at record time. Those two

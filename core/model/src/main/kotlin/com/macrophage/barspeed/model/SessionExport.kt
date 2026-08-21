@@ -138,9 +138,12 @@ data class SetExport(
      * Which case [velocityLossPct] is in, drawn from
      * [SessionExport.VALID_VELOCITY_LOSS_BASES].
      *
-     * Declared ahead of the exporter that writes it, so the tests pinning that
-     * exporter's behaviour can be committed and shown failing before the
-     * behaviour exists. Nothing writes this key yet.
+     * Present whenever the sensor resolved any reps, including -- especially
+     * -- when [velocityLossPct] itself is absent, so that a reader can tell a
+     * figure that was WITHHELD from one an older app version simply never
+     * wrote. Absent when no reps were resolved at all, the same condition
+     * under which [repMetricsComplete] is absent: there is no rep list for it
+     * to be a statement about.
      */
     val velocityLossBasis: String? = null,
     val hr: HrSetSummary? = null,

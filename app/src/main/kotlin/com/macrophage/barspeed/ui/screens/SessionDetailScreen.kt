@@ -35,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.WeightUnit
@@ -278,15 +279,23 @@ private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis) {
                 if (ok) ChipTone.OK else ChipTone.WARN,
             )
         }
-        analysis.velocityLossPct?.let { loss ->
-            VerdictChip(
-                "−${trimNum(loss)}% vel",
-                when {
-                    loss >= (record.velocityLossStopPct ?: VEL_LOSS_BAD_PCT) -> ChipTone.BAD
-                    loss >= VEL_LOSS_WARN_PCT -> ChipTone.WARN
-                    else -> ChipTone.OK
-                },
-            )
+        // Asked of the STORED reps, not of the stored velocityLossPct. History
+        // renders analyses frozen when each set was recorded, so re-asking here
+        // is what makes this rule reach sets recorded before it existed --
+        // which is all of them -- and keeps this chip agreeing with what the
+        // export publishes for the same set.
+        when (val loss = VelocityLoss.of(analysis.reps)) {
+            is VelocityLoss.Measured ->
+                VerdictChip(
+                    "−${trimNum(loss.pct)}% vel",
+                    when {
+                        loss.pct >= (record.velocityLossStopPct ?: VEL_LOSS_BAD_PCT) -> ChipTone.BAD
+                        loss.pct >= VEL_LOSS_WARN_PCT -> ChipTone.WARN
+                        else -> ChipTone.OK
+                    },
+                )
+            VelocityLoss.TerminalRepIsFastest -> VerdictChip("Vel loss n/a", ChipTone.NEUTRAL)
+            VelocityLoss.NotEnoughReps, VelocityLoss.NoReference -> Unit
         }
         record.hrAvgBpm?.let { VerdictChip("♥ $it", ChipTone.NEUTRAL) }
     }

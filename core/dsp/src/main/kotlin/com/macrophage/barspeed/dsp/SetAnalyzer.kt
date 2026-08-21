@@ -124,6 +124,11 @@ data class SetTargets(
 data class SetAnalysis(
     val reps: List<RepAnalysis>,
     val sampleRateHz: Double,
+    /**
+     * Best rep to LAST rep, percent. Null whenever there is no such figure:
+     * fewer than two reps, no positive drive velocity, or a last rep that is
+     * the fastest of the set. [VelocityLoss] is what names which of the three.
+     */
     val velocityLossPct: Double?,
     val tempoCompliance: TempoComplianceResult?,
     /** Rule-based coaching notes; empty means "on target". */

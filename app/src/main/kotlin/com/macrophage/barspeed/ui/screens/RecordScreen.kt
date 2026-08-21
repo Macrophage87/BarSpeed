@@ -49,6 +49,7 @@ import androidx.navigation.NavController
 import com.macrophage.barspeed.dsp.CoachingRules
 import com.macrophage.barspeed.dsp.PhaseTempoTarget
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.model.BlePermissionStep
 import com.macrophage.barspeed.model.ConnectionState
@@ -1668,15 +1669,25 @@ private fun FeedbackChips(feedback: SetFeedback, hrBpm: Int?, hrvMs: Int? = null
                 if (ok) ChipTone.OK else ChipTone.WARN,
             )
         }
-        analysis.velocityLossPct?.let { loss ->
-            VerdictChip(
-                "−${trim(loss)}% vel",
-                when {
-                    loss >= DEFAULT_VELOCITY_LOSS_STOP_PCT -> ChipTone.BAD
-                    loss >= VEL_LOSS_OK_PCT -> ChipTone.WARN
-                    else -> ChipTone.OK
-                },
-            )
+        // Asked of the reps rather than read off analysis.velocityLossPct, so
+        // this chip and the exported velocityLoss_pct are answered by one
+        // function and cannot drift apart.
+        when (val loss = VelocityLoss.of(analysis.reps)) {
+            is VelocityLoss.Measured ->
+                VerdictChip(
+                    "−${trim(loss.pct)}% vel",
+                    when {
+                        loss.pct >= DEFAULT_VELOCITY_LOSS_STOP_PCT -> ChipTone.BAD
+                        loss.pct >= VEL_LOSS_OK_PCT -> ChipTone.WARN
+                        else -> ChipTone.OK
+                    },
+                )
+            // Drawn, not dropped. A chip that simply vanishes is
+            // indistinguishable from a set with fewer than two reps, and this
+            // is a set the sensor DID resolve reps for: the lifter is being
+            // told the figure is unavailable, not that nothing was measured.
+            VelocityLoss.TerminalRepIsFastest -> VerdictChip("Vel loss n/a", ChipTone.NEUTRAL)
+            VelocityLoss.NotEnoughReps, VelocityLoss.NoReference -> Unit
         }
         hrBpm?.let { VerdictChip("♥ $it", ChipTone.NEUTRAL) }
         hrvMs?.let { VerdictChip("HRV ${it}ms", ChipTone.NEUTRAL) }
@@ -1791,7 +1802,7 @@ private fun ConVelocityChart(analysis: SetAnalysis) {
     )
     Spacer(Modifier.height(6.dp))
     PowerLine(analysis)
-    analysis.velocityLossPct?.let {
+    VelocityLoss.of(analysis.reps).pctOrNull?.let {
         Text(
             "Velocity loss ${trim(it)}% across the set.",
             style = MaterialTheme.typography.bodySmall,

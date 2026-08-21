@@ -13,9 +13,12 @@ package com.macrophage.barspeed.dsp
  * "the lifter held velocity" from "the last thing resolved was the fastest
  * thing in the set" from "there were not two reps to compare".
  *
- * [of] currently reproduces [SetAnalyzer.velocityLossPct] exactly, including
- * the degenerate case. Naming the cases is the whole of this commit; deciding
- * differently about them is not.
+ * A set in [TerminalRepIsFastest] publishes no `velocityLoss_pct` at all.
+ * That withholds the figure on a genuinely flat set too, and the trade is
+ * deliberate: best-to-last with last == best is the degenerate case of the
+ * definition and carries no information about fatigue in either direction,
+ * while `velocityLossBasis` still tells a reader the last rep was the fastest
+ * of the set.
  */
 sealed interface VelocityLoss {
     /** Best rep to last rep, percent, rounded as the export publishes it. */
@@ -29,8 +32,12 @@ sealed interface VelocityLoss {
 
     /**
      * The last rep resolved is the fastest of the set, so best-to-last is
-     * exactly zero by construction. Declared here, and not yet returned by
-     * [of].
+     * exactly zero by construction.
+     *
+     * This is also the signature of a spurious final detection -- the sensor
+     * set down, or the lifter getting off the machine, moving faster than any
+     * rep. Nothing in the rep list tells that apart from a set held flat to the
+     * end, which is why both are withheld rather than one being corrected.
      */
     data object TerminalRepIsFastest : VelocityLoss
 
@@ -65,7 +72,16 @@ sealed interface VelocityLoss {
             val best = reps.maxOf { it.meanConVelMps }
             if (best <= 0) return NoReference
             val last = reps.last().meanConVelMps
-            return Measured(round1(((best - last) / best * 100.0).coerceAtLeast(0.0)))
+            // `>=` against the MAXIMUM, not "is the maximum at the last index".
+            // maxByOrNull returns the FIRST maximum, so an index comparison
+            // answers "not the fastest" on a tie -- and a tie is precisely the
+            // case this branch exists for.
+            if (last >= best) return TerminalRepIsFastest
+            // No coerceAtLeast, and none is reachable: `best` is a maximum over
+            // a list containing `last`, so best - last is never negative, and
+            // the branch above has already taken the equality case. What
+            // remains is strictly positive.
+            return Measured(round1((best - last) / best * 100.0))
         }
 
         private fun round1(x: Double) = Math.round(x * 10.0) / 10.0
