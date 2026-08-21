@@ -218,8 +218,8 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.5"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5")
+        const val SCHEMA_VERSION = "1.6"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6")
         val VALID_SIDES = setOf("left", "right")
 
         /** "top"/"bottom" name the start position; "down"/"up" the first movement. */

@@ -42,7 +42,7 @@ can be pasted straight back into the app via Plans → Import → Paste.
 >
 > IMPORTANT: Reply with a single JSON document conforming EXACTLY to the schema at
 > the end. No prose before or after the JSON. Use the same exercise ids that appear
-> in my data. schemaVersion must be "1.5". Timed sets (planks, carries) use
+> in my data. schemaVersion must be "1.6". Timed sets (planks, carries) use
 > `duration_s` instead of `reps`; bodyweight sets omit the load entirely.
 >
 > Current plan:
