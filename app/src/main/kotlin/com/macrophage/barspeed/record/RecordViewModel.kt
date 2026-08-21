@@ -10,7 +10,6 @@ import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.data.SetJournal
 import com.macrophage.barspeed.data.SetJournalHeader
 import com.macrophage.barspeed.data.SetJournalStore
-import com.macrophage.barspeed.dsp.GuidedCadence
 import com.macrophage.barspeed.dsp.LiveSetState
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
@@ -25,6 +24,7 @@ import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.RecordedTimeZone
@@ -905,7 +905,15 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // (concentric is the metric) stay sensor-counted.
         val guidedTempo =
             (if (s.adHoc) s.tempoInput.ifBlank { null } else s.currentSlot?.tempo)?.let { Tempo.parseOrNull(it) }
-        val guidedSet = !s.currentIsTimed && exercise.kind != ExerciseKind.EXPLOSIVE && guidedTempo != null
+        // The same predicate the import gate warns an inert prep_s against and
+        // the same one the screen offers the prep control on. Stated once, in a
+        // module with tests, because three statements of it would be three rules.
+        val guidedSet =
+            LeadInPolicy.playsPrep(
+                hasTempo = guidedTempo != null,
+                isTimed = s.currentIsTimed,
+                kind = exercise.kind,
+            )
         if (guidedSet) manualSet = true
         // The prep, decided once here and used twice: handed to the runner
         // below, and frozen onto the set record at endSet. One expression,
@@ -917,7 +925,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // no prep, and writing 0 for it would be absence rendered as a value:
         // 0 is a real prep, the one where nothing is spoken before the first
         // stroke call.
-        val prepS = GuidedCadence.LEAD_IN_S
+        val prepS = LeadInPolicy.DEFAULT_S
         plannedPrepSForSet = prepS.takeIf { guidedSet }
         prepSForSet = prepS.takeIf { guidedSet }
         setStartedAtMs = System.currentTimeMillis()

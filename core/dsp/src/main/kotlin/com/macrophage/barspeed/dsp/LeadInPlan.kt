@@ -67,13 +67,11 @@ data class LeadInBeat(val spoken: String?, val cue: String?)
  * survives, because the brace-now beat immediately before movement is worth
  * more than the get-ready beat two seconds out. At P = 0 nothing is spoken.
  *
- * Prep LENGTH is unchanged by any of this -- it is still
- * [GuidedCadence.LEAD_IN_S] seconds and the first stroke lands where it always
- * did. What moves is `Ready`, from the top of the prep to [PHRASE_S] seconds
- * before the first stroke. Across the seven committed `-cues.csv` fixtures,
- * recorded before this change, `Ready` to the first movement cue measures
- * 5.001-5.004 s; afterwards it is a prescribed [PHRASE_S] s on every prep,
- * which is the cost noted below.
+ * What the launch phrase moved is `Ready`, from the top of the prep to
+ * [PHRASE_S] seconds before the first stroke. Across the seven committed
+ * `-cues.csv` fixtures, all recorded before the phrase landed, `Ready` to the
+ * first movement cue measures 5.001-5.004 s; afterwards it is a prescribed
+ * [PHRASE_S] s on every prep, which is the cost noted below.
  *
  * No mid-point pings. The screen already counts the prep down visibly, and
  * whether 14 s of silence at P = 20 feels broken is a question for a gym
@@ -99,20 +97,26 @@ data class LeadInBeat(val spoken: String?, val cue: String?)
  * **The cost, stated rather than hidden:** prep length is no longer readable
  * from the cue track. `Ready` to the first movement cue is [PHRASE_S] seconds
  * for every prep, so a 20 s strap-up and a 2 s cable set produce identical cue
- * tracks. Any feature that makes prep length configurable must therefore
- * persist the prescribed prep on the set record.
+ * tracks. What makes that survivable is that the prep is persisted on the set
+ * record instead -- `SetRecordEntity.plannedPrepS` and `prepS` in `:core:data`,
+ * published as `plannedPrep_s` and `prep_s`.
  * Recording a `Prep 20` row was considered and rejected: one character from
  * `Rep 20` in a format humans grep, and it fabricates a row for a second in
  * which nothing was said.
  *
- * ## Bounds, for whoever makes prep length configurable
+ * ## Bounds
  *
- * Not implemented here and not validated here. Integer seconds; default
- * [GuidedCadence.LEAD_IN_S] when omitted; a warning below 2 naming what is
- * dropped; no ceiling is needed for correctness, though a warning above ~120 s
- * would catch a typo. A negative prep is not representable: [of] throws out of
- * `List(prepS)`, measured as `IllegalArgumentException: Illegal Capacity: -1`,
- * which is not a message anyone should see -- reject it before it gets here.
+ * Still not decided here and not validated here. They are
+ * [com.macrophage.barspeed.model.LeadInPolicy] in `:core:model`, which this
+ * module can see and which cannot see back: integer seconds, a default when the
+ * plan declares nothing, a floor of 0, a typo ceiling, and a warning below the
+ * length of the launch phrase.
+ *
+ * The one fact about them this file owns is why the floor exists at all. [of]
+ * builds its beats with `List(prepS)`, so a negative throws
+ * `IllegalArgumentException: Illegal Capacity: -1` -- measured, not inferred --
+ * which is not a message anyone should see, and which would land inside `:app`
+ * in the middle of starting a set.
  */
 data class LeadInPlan(val beats: List<LeadInBeat>, val prepS: Int) {
     /** Seconds between the start of the beat at [index] and the first stroke. */
@@ -135,6 +139,12 @@ data class LeadInPlan(val beats: List<LeadInBeat>, val prepS: Int) {
          * ones worth counting. The launch phrase silently grows to three
          * seconds, a two-second prep stops saying `Ready` at all, and nothing
          * about counting out loud has anything to do with either.
+         *
+         * There is now a fourth 2, `LeadInPolicy.MIN_USEFUL_S` in `:core:model`,
+         * which is the prep the import gate warns below. That one is a
+         * consequence of this one and has to move with it; `:core:model` cannot
+         * see this module, so the agreement is checked from here, in
+         * `LeadInPlanTest`.
          */
         const val PHRASE_S = 2
 

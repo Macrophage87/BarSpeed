@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.LeadInPolicy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -24,6 +25,38 @@ import kotlin.test.assertTrue
  * green, which is the whole failure the constant's own KDoc warns about.
  */
 class LeadInPlanTest {
+    /**
+     * The prep the import gate warns below is the length of the launch phrase,
+     * checked from the module that can see both constants.
+     *
+     * `LeadInPolicy.MIN_USEFUL_S` lives in `:core:model` and is 2 because the
+     * phrase occupies [LeadInPlan.PHRASE_S] seconds. They are separate constants
+     * on purpose -- `:core:model` cannot see this module at all, and PHRASE_S's
+     * own KDoc records what aliasing two equal constants costs. Separate
+     * constants still have to agree about the REASON, and this is the only place
+     * that can say so: raise PHRASE_S to 3 and the import gate goes on warning
+     * at 2, so a plan declaring a prep of 2 would be told the phrase fits when
+     * it no longer does. The same two-hop arrangement `VelocityLossTest` uses
+     * for the velocity-loss vocabulary.
+     *
+     * Asserted through the BEATS rather than by comparing the two numbers, so
+     * what is pinned is the claim the warning makes and not an equality that
+     * could be kept true while the claim went false.
+     */
+    @Test
+    fun `the prep the import gate warns below is the length of the launch phrase`() {
+        assertEquals(
+            listOf(LeadInPlan.READY, LeadInPlan.BRACE),
+            spoken(LeadInPolicy.MIN_USEFUL_S),
+            "at the import gate's threshold the whole launch phrase should still fit",
+        )
+        assertEquals(
+            listOf(LeadInPlan.BRACE),
+            spoken(LeadInPolicy.MIN_USEFUL_S - 1),
+            "one second below it, Ready is what gets dropped",
+        )
+    }
+
     private fun spoken(prepS: Int) = LeadInPlan.of(prepS).beats.map { it.spoken }
 
     private fun recorded(prepS: Int) = LeadInPlan.of(prepS).beats.mapNotNull { it.cue }

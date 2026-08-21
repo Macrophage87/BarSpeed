@@ -140,10 +140,16 @@ data class CadencePlan(
     }
 }
 
-/** Constants the guided metronome and its plan share. */
+/**
+ * Constants the guided metronome and its plan share.
+ *
+ * The prep before a guided set used to be a `LEAD_IN_S` here, read by the runner
+ * itself. It is [com.macrophage.barspeed.model.LeadInPolicy.DEFAULT_S] now, and
+ * only a DEFAULT: the prep is a per-exercise decision the caller makes and
+ * records on the set, so a constant read here could disagree with what the
+ * record says was played.
+ */
 object GuidedCadence {
-    const val LEAD_IN_S = 5
-
     /** Strokes at least this long get counted out loud second by second. */
     const val COUNT_ALOUD_FROM_S = 2
 }
