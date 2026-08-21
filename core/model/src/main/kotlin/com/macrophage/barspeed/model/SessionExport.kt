@@ -66,8 +66,14 @@ data class SessionExport(
          * instant altogether. The key is absent on sessions recorded before the
          * app captured it.
          */
-        const val SCHEMA_VERSION = "1.9"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9")
+        const val SCHEMA_VERSION = "1.10"
+
+        /**
+         * `"1.10"` is not the number 1.1 -- a reader that parses this field as
+         * a float collides 1.10 with 1.1, which is a different contract.
+         */
+        val SUPPORTED_SCHEMA_VERSIONS =
+            setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "1.10")
 
         /**
          * Which phase a rep opened with, lowercased [StartPhase] names. 1:1

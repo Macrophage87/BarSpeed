@@ -201,6 +201,28 @@ class SchemaContractTest {
     }
 
     /**
+     * The vocabulary `velocityLossBasis` is published in, pinned in both
+     * directions the way the geometry vocabularies are.
+     *
+     * The names are produced by `VelocityLoss` in `:core:dsp`, which this
+     * module cannot see. `VelocityLossTest` pins that side against
+     * [SessionExport.VALID_VELOCITY_LOSS_BASES]; this pins the same constant
+     * against the published schema. Neither hop on its own would catch a
+     * rename -- one would leave the schema declaring a value nothing emits,
+     * the other a value the schema rejects.
+     */
+    @Test
+    fun `the published velocity-loss bases are exactly the ones the exporter declares`() {
+        val set = schema("session-export.schema.json")["\$defs"]!!.jsonObject["set"]!!
+            .jsonObject["properties"]!!.jsonObject
+        assertEquals(
+            SessionExport.VALID_VELOCITY_LOSS_BASES,
+            enumOf(set["velocityLossBasis"]!!.jsonObject),
+            "velocityLossBasis values drifted",
+        )
+    }
+
+    /**
      * The session export requires exactly three keys of a reader, and no more.
      *
      * Every version of this contract so far has claimed to be additive -- 1.2's
