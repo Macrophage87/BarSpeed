@@ -79,7 +79,29 @@ data class TempoComplianceResult(
      * stay distinguishable from one.
      */
     val actualEccConRatio: Double? = null,
-)
+) {
+    /**
+     * Seconds the ECCENTRIC of this set was graded against.
+     *
+     * [phases] is built from [TempoSchedule], so this is that resolution frozen
+     * at analysis time rather than a second reading of the digits. A screen
+     * showing a set that has already been recorded should read it here rather
+     * than resolve the prescription again: the history screen has no geometry
+     * of its own to resolve it with, and a screen that re-derived the answer
+     * could print a target line the compliance ratio beside it was not graded
+     * against.
+     *
+     * Null when the eccentric stroke is explosive. That is a real state and not
+     * a zero -- a stroke with no prescribed duration has no target line to draw.
+     */
+    val eccentricPrescribedS: Double?
+        get() = phases.firstOrNull { it.phase == PHASE_ECCENTRIC }?.prescribedS
+
+    companion object {
+        /** The phase name [SetAnalyzer.complianceFor] writes, and the export publishes, for the eccentric. */
+        const val PHASE_ECCENTRIC = "eccentric"
+    }
+}
 
 /** Targets carried over from the active plan for this set, if any. */
 @Serializable
@@ -283,7 +305,7 @@ object SetAnalyzer {
 
         val defs =
             listOf(
-                PhaseDef("eccentric", schedule.eccentricS, scored = true) { it.eccS },
+                PhaseDef(TempoComplianceResult.PHASE_ECCENTRIC, schedule.eccentricS, scored = true) { it.eccS },
                 PhaseDef("bottomPause", tempo.bottomPauseS, scored = false) { it.bottomPauseS },
                 PhaseDef("concentric", schedule.concentricS, scored = true) { it.conS },
                 PhaseDef("topPause", tempo.topPauseS, scored = false) { it.topPauseS },
