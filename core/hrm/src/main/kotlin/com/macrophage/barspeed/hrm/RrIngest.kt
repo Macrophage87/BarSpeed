@@ -61,8 +61,9 @@ import com.macrophage.barspeed.model.HrSample
  * `FieldHrDuplicationTest.what the rule costs rises steeply with heart rate`,
  * with its grouping convention and its estimator named there.
  *
- * The claim for the resting end is an EXTRAPOLATION resting on two things,
- * only one of which is measured. Measured: the density law's level, pinned by
+ * The claim for the resting end rests on two things, and when it was written
+ * only one of them was measured. Both are now, and the second came out
+ * against it. Measured all along: the density law's level, pinned by
  * `FieldHrDuplicationTest.lag one is enriched three and a half fold over every
  * other lag` against a parameter-free Laplace prediction, and cross-checked by
  * `.above 120 bpm, where re-sends are near-suppressed, the tie rate matches the

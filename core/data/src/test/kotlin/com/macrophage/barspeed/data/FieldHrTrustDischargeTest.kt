@@ -20,11 +20,14 @@ import kotlin.test.assertTrue
  * sets. The discharge is executable here rather than quoted in a commit message
  * so that it is re-run on every push instead of being true once.
  *
- * The bound on what this can show is asserted below rather than left to a
- * reader: the worn control has NO sample under 70 bpm, so it is silent about a
- * resting athlete. It can demonstrate that a rule costs nothing on a working
- * lifter. It cannot demonstrate that a rule is safe at rest, and one earlier
- * rule was accepted on exactly that confusion.
+ * The bound on what the WORN CONTROL can show is asserted below rather than
+ * left to a reader: session 26 has NO sample under 70 bpm, so it is silent
+ * about a resting athlete. It can demonstrate that a rule costs nothing on a
+ * working lifter. It cannot demonstrate that a rule is safe at rest, and one
+ * earlier rule was accepted on exactly that confusion. Two assertions here do
+ * reach every worn stream in this directory, including the captures that go
+ * below 70 bpm, but they read SIGMA and the residual from them; what those
+ * captures show about heart RATE is asserted in [FieldHrRestingBandTest].
  */
 class FieldHrTrustDischargeTest {
     /** [SessionRepository.recordSet]'s summary as it stands before this change. */

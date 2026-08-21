@@ -90,14 +90,15 @@ object HrTrust {
      * notifications is 99.04 ms -- the withdrawn sentence was true of a series
      * this file does not measure.
      *
-     * IT IS NOT TRUE OF ALL HEARTS, and an earlier version of this sentence
-     * said "no heart is a metronome", which is a universal asserted over a
-     * corpus of one subject. A fixed-rate PACED ventricular rhythm has
-     * crystal-controlled interval jitter well under a millisecond, and a chest
-     * strap detects the R wave whatever drives it. Simulation puts the point at
-     * which half of such streams are silenced near sigma 0.5 ms; a paced rhythm
-     * sits below it. So this rule would withhold the published block for a
-     * paced user, on every set, silently and permanently.
+     * THE SIGMA BOUND IS NOT TRUE OF ALL HEARTS -- the claim three paragraphs
+     * up, that a sinus rhythm's sigma does not approach 1 ms. An earlier
+     * version of it said "no heart is a metronome", which is a universal
+     * asserted over a corpus of one subject. A fixed-rate PACED ventricular
+     * rhythm has crystal-controlled interval jitter well under a millisecond,
+     * and a chest strap detects the R wave whatever drives it. Simulation puts
+     * the point at which half of such streams are silenced near sigma 0.5 ms;
+     * a paced rhythm sits below it. So this rule would withhold the published
+     * block for a paced user, on every set, silently and permanently.
      *
      * The raw capture keeps every sample either way, so nothing is destroyed --
      * but that is the recovery, not a defence. It is a known limitation of the
@@ -149,19 +150,20 @@ object HrTrust {
      * still falls short -- worn set 03 by 12.8% with no interval under 500 ms
      * anywhere in it.
      *
-     * WHY REST IS THE SAFE END, on the axis that actually governs it. Both
-     * terms shrink as the heart slows: drops need two beats inside one ~500 ms
-     * window, so they need a fast heart and vanish at rest; ties go as
-     * q/(sigma*sqrt(2)), the density law confirmed independently in issue #81
-     * at a level of 0.686 against a parameter-free 0.691, so they shrink as
-     * variability RISES.
+     * WHAT REST DOES TO THE TWO TERMS, AND THEY DO NOT MOVE TOGETHER. Drops
+     * need two beats inside one ~500 ms window, so they need a fast heart and
+     * vanish at rest. Ties go as q/(sigma*sqrt(2)) -- the density law
+     * confirmed independently in issue #81 at a level of 0.686 against a
+     * parameter-free 0.691 -- so they shrink as VARIABILITY rises, which is a
+     * different quantity from heart rate and is not carried by it.
      *
-     * THIS PARAGRAPH USED TO END "AND RESTING VARIABILITY IS SEVERAL TIMES
-     * WORKING VARIABILITY". That is not what the data shows. Paired against
-     * the set each rest period precedes across the two 0.1.40 captures, the
-     * median rest-to-set ratio is 1.26 and four of the twenty rest streams are
-     * LESS variable than their own set. It was an assumption stated as a
-     * finding, and it is withdrawn rather than reworded.
+     * THE PARAGRAPH ABOVE USED TO CLOSE ON "AND RESTING VARIABILITY IS SEVERAL
+     * TIMES WORKING VARIABILITY", WHICH IS WHAT LET IT OPEN BY SAYING BOTH
+     * TERMS SHRINK AS THE HEART SLOWS. That is not what the data shows. Paired
+     * against the set each rest period precedes across the two 0.1.40
+     * captures, the median rest-to-set ratio is 1.26 and four of the twenty
+     * rest streams are LESS variable than their own set. It was an assumption
+     * stated as a finding, and it is withdrawn rather than reworded.
      *
      * What survives it is the part that was load-bearing anyway, and that part
      * is measured. What the bound is compared with is the FLOOR, not the
