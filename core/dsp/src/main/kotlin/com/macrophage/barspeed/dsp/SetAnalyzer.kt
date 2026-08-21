@@ -124,7 +124,6 @@ data class SetTargets(
 data class SetAnalysis(
     val reps: List<RepAnalysis>,
     val sampleRateHz: Double,
-    /** Velocity loss of the slowest rep vs the best rep, percent (VBT fatigue metric). */
     val velocityLossPct: Double?,
     val tempoCompliance: TempoComplianceResult?,
     /** Rule-based coaching notes; empty means "on target". */
@@ -273,13 +272,7 @@ object SetAnalyzer {
      * report any single fumbled rep mid-set as the set's fatigue, which inverts
      * the metric against perceived effort.
      */
-    fun velocityLossPct(reps: List<RepAnalysis>): Double? {
-        if (reps.size < 2) return null
-        val best = reps.maxOf { it.meanConVelMps }
-        val last = reps.last().meanConVelMps
-        if (best <= 0) return null
-        return round1(((best - last) / best * 100.0).coerceAtLeast(0.0))
-    }
+    fun velocityLossPct(reps: List<RepAnalysis>): Double? = VelocityLoss.of(reps).pctOrNull
 
     /**
      * Tempo compliance over the two MOVEMENT phases only.

@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.SessionExport
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -79,5 +80,33 @@ class VelocityLossTest {
     fun `a set with no positive drive velocity has no reference to divide by`() {
         assertNull(SetAnalyzer.velocityLossPct(reps(0.0, 0.0)))
         assertNull(SetAnalyzer.velocityLossPct(reps(-0.10, -0.20)))
+    }
+
+    /**
+     * The case names [VelocityLoss] can emit are exactly the ones the session
+     * export publishes as its vocabulary.
+     *
+     * Asserted from `:core:dsp` because this is the only side that can see both
+     * constants -- `:core:model` cannot see `:core:dsp`. Adding a case to
+     * [VelocityLoss] is caught by the compiler rather than by the list below,
+     * since `basis` is an exhaustive `when`; what this pins is that the
+     * STRINGS on the two sides agree, which nothing else checks.
+     */
+    @Test
+    fun `the published basis vocabulary is exactly the cases this type has`() {
+        val cases =
+            listOf(
+                VelocityLoss.Measured(0.0),
+                VelocityLoss.NotEnoughReps,
+                VelocityLoss.NoReference,
+                VelocityLoss.TerminalRepIsFastest,
+            )
+        val names = cases.map { it.basis }
+        assertEquals(cases.size, names.toSet().size, "two cases share a basis name: $names")
+        assertEquals(
+            SessionExport.VALID_VELOCITY_LOSS_BASES,
+            names.toSet(),
+            "VelocityLoss and SessionExport.VALID_VELOCITY_LOSS_BASES disagree",
+        )
     }
 }

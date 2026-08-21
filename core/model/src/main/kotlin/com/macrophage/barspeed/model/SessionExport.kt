@@ -78,6 +78,20 @@ data class SessionExport(
 
         /** How a geometry value was arrived at, lowercased [GeometrySource] names. */
         val VALID_GEOMETRY_SOURCES = setOf("declared", "seeded", "inferred", "default")
+
+        /**
+         * Why a set does or does not carry `velocityLoss_pct`, the values
+         * [SetExport.velocityLossBasis] is drawn from.
+         *
+         * The names are owned by `VelocityLoss` in `:core:dsp`, which this
+         * module cannot see -- the dependency runs the other way. They are
+         * mirrored here so the published schema has a Kotlin constant to be
+         * pinned against, the same arrangement [VALID_STARTS_WITH] uses.
+         * `VelocityLossTest` asserts the two lists are equal, from the side
+         * that can see both.
+         */
+        val VALID_VELOCITY_LOSS_BASES =
+            setOf("measured", "notEnoughReps", "noReference", "terminalRepIsFastest")
     }
 }
 
@@ -120,6 +134,15 @@ data class SetExport(
     val tempoPrescribed: String? = null,
     val tempoCompliance: TempoComplianceExport? = null,
     @SerialName("velocityLoss_pct") val velocityLossPct: Double? = null,
+    /**
+     * Which case [velocityLossPct] is in, drawn from
+     * [SessionExport.VALID_VELOCITY_LOSS_BASES].
+     *
+     * Declared ahead of the exporter that writes it, so the tests pinning that
+     * exporter's behaviour can be committed and shown failing before the
+     * behaviour exists. Nothing writes this key yet.
+     */
+    val velocityLossBasis: String? = null,
     val hr: HrSetSummary? = null,
     /** Per-rep detail; included only when the user enables detailed export. */
     val repMetrics: List<RepMetricsExport>? = null,
