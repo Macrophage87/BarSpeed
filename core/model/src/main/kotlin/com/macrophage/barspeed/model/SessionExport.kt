@@ -74,12 +74,11 @@ data class SessionExport(
          * contract came to have four statements that disagree. The drift is real
          * and is named rather than fixed here.
          *
-         * 1.11 -- a set may carry `plannedPrep_s` and `prep_s`, the prep the
-         * plan prescribed before it and the prep that was actually played.
-         * Purely additive: no key from 1.10 changed type or stopped being
-         * written, so a 1.10 reader works unchanged against a 1.11 export. Both
-         * keys are absent on a set that played no lead-in, and on every set
-         * recorded before this version.
+         * 1.11 -- a set may carry `plannedPrep_s` and `prep_s`. Purely
+         * additive: no key from 1.10 changed type or stopped being written, so
+         * a 1.10 reader works unchanged against a 1.11 export. Both keys are
+         * absent on a set that ran no voice guide, and on every set recorded
+         * before this version.
          */
         const val SCHEMA_VERSION = "1.11"
 
@@ -155,15 +154,12 @@ data class SetExport(
     /** True for warm-up sets (no RPE recorded). Omitted when false. */
     val warmup: Boolean = false,
     /**
-     * The prep the plan prescribed before this set, and the prep actually
-     * played, in whole seconds.
+     * The prep prescribed before this set, and the prep handed to the voice
+     * guide, in whole seconds.
      *
-     * A planned/actual pair on the convention this type already uses for
-     * [plannedLoadKg]/[loadKg], [plannedReps]/[reps] and
-     * [plannedDurationS]/[durationS]. The two differ exactly when the lifter
-     * adjusted the prep in the app, so their DIFFERENCE is the record of that
-     * adjustment -- which is what lets the next plan be authored from this
-     * document instead of re-guessed.
+     * The two differ exactly when the lifter adjusted the prep in the app, so
+     * their DIFFERENCE is the record of that adjustment -- which is what lets
+     * the next plan be authored from this document instead of re-guessed.
      *
      * [plannedPrepS] is present whenever a lead-in ran, including when the plan
      * declared nothing: the app's default is still what was prescribed, and a
@@ -172,8 +168,7 @@ data class SetExport(
      *
      * [restS] beside them is the one planned value in this type carrying neither
      * a `planned` prefix nor a description, so a reader takes a prescription for
-     * an observation. That is issue #76. This pair is shaped to avoid it and
-     * does not fix it.
+     * an observation. That is issue #76.
      *
      * Both absent when no lead-in was played -- an unguided set has no prep --
      * and both absent on every set recorded before 1.11. 0 is a value, not an

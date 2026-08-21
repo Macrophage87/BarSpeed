@@ -95,14 +95,13 @@ data class SetRecordEntity(
     val velocityLossStopPct: Double? = null,
     val plannedRestS: Int? = null,
     /**
-     * The prep the plan prescribed before this set, and the prep that was
-     * actually played, in whole seconds.
+     * The prep prescribed before this set, and the prep handed to the voice
+     * guide, in whole seconds.
      *
-     * A planned/actual pair on the terms [plannedDurationS] / [actualDurationS]
-     * already use, and for the reason issue #76 names: a prescription published
-     * under a bare name reads as an observation. The two differ exactly when the
-     * lifter adjusted the prep, so their difference is the only record that the
-     * adjustment happened.
+     * [plannedPrepS] carries its prefix for the reason issue #76 names: a
+     * prescription published under a bare name reads as an observation. The two
+     * differ exactly when the lifter adjusted the prep, so their difference is
+     * the only record that the adjustment happened.
      *
      * Both null when no lead-in was played at all. A set with no voice guide has
      * no prep, and 0 there would be absence rendered as a value -- 0 is a real

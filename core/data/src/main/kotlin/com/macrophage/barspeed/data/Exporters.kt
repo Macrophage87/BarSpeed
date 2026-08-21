@@ -515,7 +515,7 @@ class RawExporter(
         flag("repsManual", record.repsManual)
         str("tempoPrescribed", record.tempo)
         // The prep, both halves. [num] drops a null, which is right -- a set
-        // that played no lead-in has no prep -- and writes a real 0, which is
+        // that ran no voice guide has no prep -- and writes a real 0, which is
         // also right: 0 is the prep in which nothing is spoken before the first
         // stroke call, not the absence of one.
         //

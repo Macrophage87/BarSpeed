@@ -709,8 +709,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var pendingWrite: PendingSetWrite? = null
 
     /**
-     * The prep prescribed for the set in progress, and the prep actually played
-     * before it. Both null when no lead-in ran.
+     * The prep prescribed for the set in progress, and the prep handed to the
+     * voice guide. Both null when no lead-in ran.
      *
      * Held here for the same reason `plannedRepsForSet` is: the value is decided
      * at [beginSet], when the set's guided-ness is known, and is needed at

@@ -151,8 +151,8 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
-         * v10: the prep prescribed before a set and the prep actually played,
-         * as two columns on set_records.
+         * v10: the prep prescribed before a set and the prep handed to the
+         * voice guide, as two columns on set_records.
          *
          * Nullable with no default, so existing rows are untouched and read
          * back as "not captured" -- the same shape and the same refusal
@@ -160,8 +160,8 @@ abstract class AppDatabase : RoomDatabase() {
          * old constant was considered and refused: it would be right for every
          * guided set already recorded and wrong for every unguided one, and the
          * row cannot say which it was. `tempo` is the prescription, not evidence
-         * that a voice guide ran against it -- a tempo set recorded in demo mode
-         * or as an explosive lift plays no lead-in at all.
+         * that a voice guide ran against it -- a tempo set recorded as an
+         * explosive lift plays no lead-in at all.
          *
          * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2] and
          * [MIGRATION_8_9] already do. Nothing in this repository can execute
