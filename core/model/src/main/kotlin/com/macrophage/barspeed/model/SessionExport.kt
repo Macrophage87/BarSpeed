@@ -65,15 +65,33 @@ data class SessionExport(
          * would silently start treating a local time as UTC and lose the
          * instant altogether. The key is absent on sessions recorded before the
          * app captured it.
+         *
+         * 1.4 through 1.10 are documented in the `schemaVersion` description of
+         * `docs/schemas/session-export.schema.json`, which is the published
+         * contract, and are deliberately not repeated here -- this KDoc stopped
+         * being kept up at 1.3, and backfilling seven entries from memory into a
+         * second statement of a contract that already has one is how the plan
+         * contract came to have four statements that disagree. The drift is real
+         * and is named rather than fixed here.
+         *
+         * 1.11 -- a set may carry `plannedPrep_s` and `prep_s`, the prep the
+         * plan prescribed before it and the prep that was actually played.
+         * Purely additive: no key from 1.10 changed type or stopped being
+         * written, so a 1.10 reader works unchanged against a 1.11 export. Both
+         * keys are absent on a set that played no lead-in, and on every set
+         * recorded before this version.
          */
-        const val SCHEMA_VERSION = "1.10"
+        const val SCHEMA_VERSION = "1.11"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
          * a float collides 1.10 with 1.1, which is a different contract.
          */
         val SUPPORTED_SCHEMA_VERSIONS =
-            setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "1.10")
+            setOf(
+                "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
+                "1.6", "1.7", "1.8", "1.9", "1.10", "1.11",
+            )
 
         /**
          * Which phase a rep opened with, lowercased [StartPhase] names. 1:1
@@ -136,6 +154,35 @@ data class SetExport(
     val failed: Boolean = false,
     /** True for warm-up sets (no RPE recorded). Omitted when false. */
     val warmup: Boolean = false,
+    /**
+     * The prep the plan prescribed before this set, and the prep actually
+     * played, in whole seconds.
+     *
+     * A planned/actual pair on the convention this type already uses for
+     * [plannedLoadKg]/[loadKg], [plannedReps]/[reps] and
+     * [plannedDurationS]/[durationS]. The two differ exactly when the lifter
+     * adjusted the prep in the app, so their DIFFERENCE is the record of that
+     * adjustment -- which is what lets the next plan be authored from this
+     * document instead of re-guessed.
+     *
+     * [plannedPrepS] is present whenever a lead-in ran, including when the plan
+     * declared nothing: the app's default is still what was prescribed, and a
+     * reader that saw only [prepS] could not tell an adjustment from a
+     * declaration without knowing the app's constant.
+     *
+     * [restS] beside them is the one planned value in this type carrying neither
+     * a `planned` prefix nor a description, so a reader takes a prescription for
+     * an observation. That is issue #76. This pair is shaped to avoid it and
+     * does not fix it.
+     *
+     * Both absent when no lead-in was played -- an unguided set has no prep --
+     * and both absent on every set recorded before 1.11. 0 is a value, not an
+     * absence: it is the prep in which nothing is spoken before the first stroke
+     * call, and the default here is null precisely so that 0 survives
+     * `encodeDefaults = false`.
+     */
+    @SerialName("plannedPrep_s") val plannedPrepS: Int? = null,
+    @SerialName("prep_s") val prepS: Int? = null,
     @SerialName("rest_s") val restS: Int? = null,
     val tempoPrescribed: String? = null,
     val tempoCompliance: TempoComplianceExport? = null,

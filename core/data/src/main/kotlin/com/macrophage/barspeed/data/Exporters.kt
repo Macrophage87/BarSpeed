@@ -208,6 +208,8 @@ class SessionExporter(
             rpe = record.rpe,
             failed = record.failed,
             warmup = record.warmup,
+            plannedPrepS = record.plannedPrepS,
+            prepS = record.prepS,
             restS = record.plannedRestS,
             tempoPrescribed = record.tempo,
             tempoCompliance =
@@ -512,6 +514,18 @@ class RawExporter(
         flag("warmup", record.warmup)
         flag("repsManual", record.repsManual)
         str("tempoPrescribed", record.tempo)
+        // The prep, both halves. [num] drops a null, which is right -- a set
+        // that played no lead-in has no prep -- and writes a real 0, which is
+        // also right: 0 is the prep in which nothing is spoken before the first
+        // stroke call, not the absence of one.
+        //
+        // Here as well as in session.json because the archive has to stand on
+        // its own, and because the cue track can no longer answer it: LeadInPlan
+        // fixes the launch phrase to the END of the prep, so Ready sits a
+        // prescribed PHRASE_S seconds before the first movement cue whether the
+        // prep was 2 seconds or 20.
+        num("plannedPrep_s", record.plannedPrepS)
+        num("prep_s", record.prepS)
         // Which way the lift moved and how the sensor was mounted.
         //
         // This manifest is the only thing a reader who opens the CSVs alone
