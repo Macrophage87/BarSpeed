@@ -224,6 +224,8 @@ class SessionRepositoryRecordSetTest {
         targetMeanConVelMps = 0.6,
         velocityLossStopPct = 20.0,
         plannedRestS = 180,
+        plannedPrepS = 5,
+        prepS = 20,
         startedAtMs = 1_000L,
         endedAtMs = 2_000L,
         analysis = analysis,
@@ -263,6 +265,62 @@ class SessionRepositoryRecordSetTest {
         assertEquals(180, row.plannedRestS)
         assertEquals(1_000L, row.startedAtMs)
         assertEquals(2_000L, row.endedAtMs)
+    }
+
+    /**
+     * The prep is a planned/actual pair and both halves reach the row.
+     *
+     * The fixture declares 5 and plays 20, which is the only combination that
+     * can catch a mapping that crossed the two: equal values pass whichever way
+     * round they are wired, and that is how a "planned" column ends up holding
+     * what was played. The pair exists so an adjustment is visible at all --
+     * once the prep is adjustable, their difference is the only record that the
+     * lifter changed it.
+     */
+    @Test
+    fun `the set row carries the prep prescribed and the prep played, unswapped`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet())
+        val row = dao.sets.single()
+        assertEquals(5, row.plannedPrepS)
+        assertEquals(20, row.prepS)
+    }
+
+    /**
+     * A set with no voice guide played no lead-in, and the row says so by
+     * holding nothing.
+     *
+     * Zero is not available as the way to say it. Zero is a real prep -- the one
+     * where nothing is spoken before the first stroke call -- so a row holding 0
+     * would claim a measurement that was never taken, and a reader averaging
+     * prep across a session would count sets that never had one.
+     */
+    @Test
+    fun `a set that played no lead-in stores neither prep, never a zero`() = runTest {
+        val dao = FakeSessionDao()
+        val unguided = completedSet().copy(plannedPrepS = null, prepS = null)
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = unguided)
+        val row = dao.sets.single()
+        assertNull(row.plannedPrepS)
+        assertNull(row.prepS)
+    }
+
+    /**
+     * A prep of zero is stored as zero, on the same terms a manual count of zero
+     * is. It is the shortest prep the lead-in can express, not the absence of
+     * one, and the two are distinguished above by null.
+     */
+    @Test
+    fun `a prep of zero is stored as zero, not folded into absence`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).recordSet(
+            sessionId = 1L,
+            orderIdx = 0,
+            set = completedSet().copy(plannedPrepS = 0, prepS = 0),
+        )
+        val row = dao.sets.single()
+        assertEquals(0, row.plannedPrepS)
+        assertEquals(0, row.prepS)
     }
 
     @Test

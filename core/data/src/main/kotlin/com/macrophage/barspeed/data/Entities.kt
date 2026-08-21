@@ -94,6 +94,29 @@ data class SetRecordEntity(
     val targetMeanConVelMps: Double? = null,
     val velocityLossStopPct: Double? = null,
     val plannedRestS: Int? = null,
+    /**
+     * The prep the plan prescribed before this set, and the prep that was
+     * actually played, in whole seconds.
+     *
+     * A planned/actual pair on the terms [plannedDurationS] / [actualDurationS]
+     * already use, and for the reason issue #76 names: a prescription published
+     * under a bare name reads as an observation. The two differ exactly when the
+     * lifter adjusted the prep, so their difference is the only record that the
+     * adjustment happened.
+     *
+     * Both null when no lead-in was played at all. A set with no voice guide has
+     * no prep, and 0 there would be absence rendered as a value -- 0 is a real
+     * prep, the one where nothing is spoken before the first stroke call.
+     *
+     * Both are also null on every row written before these columns existed,
+     * which reads the same way and is permanent: the prep a past set ran with is
+     * not in the analysis blob and not in any raw stream, so unlike a figure the
+     * DSP derives it cannot be recomputed. What separates the two cases for a
+     * reader is the export's own schemaVersion; a version below the one that
+     * introduced these keys never wrote them for any set.
+     */
+    val plannedPrepS: Int? = null,
+    val prepS: Int? = null,
     val startedAtMs: Long,
     val endedAtMs: Long,
     /** kotlinx-serialized [com.macrophage.barspeed.dsp.SetAnalysis]. */

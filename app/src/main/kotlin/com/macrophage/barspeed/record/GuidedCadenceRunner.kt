@@ -67,10 +67,20 @@ class GuidedCadenceRunner(
 ) {
     private var job: Job? = null
 
-    fun start(schedule: TempoSchedule, plannedReps: Int?) {
+    /**
+     * [prepS] is the prep in whole seconds, decided by the caller rather than
+     * read from a constant here.
+     *
+     * An argument because the value has to be RECORDED as well as played, and
+     * the recorder is the caller. A constant read here and a second statement
+     * of the same constant at the write site are two facts that can disagree,
+     * and the way they disagree is one of them changing -- at which point every
+     * capture claims a prep the lifter never heard.
+     */
+    fun start(schedule: TempoSchedule, plannedReps: Int?, prepS: Int) {
         job =
             scope.launch {
-                playLeadIn(LeadInPlan.of(GuidedCadence.LEAD_IN_S))
+                playLeadIn(LeadInPlan.of(prepS))
                 val plan = CadencePlan.of(schedule)
                 var rep = 1
                 var pending: String? = null

@@ -14,8 +14,25 @@ import java.io.File
  * A top-level constant rather than a literal repeated in the annotation and in
  * the downgrade check: those two must never disagree, and the way they disagree
  * is somebody bumping one of them.
+ *
+ * MOVING THIS NUMBER IS ALSO A UI EVENT -- issue #118, which is not closed by
+ * this comment. [DatabaseRescue] fires only when the file on disk is NEWER than
+ * this constant, and the rescue shipped in v0.1.40 with the constant at 9. So
+ * no stock install could produce a `rescued/` directory, and the rescued-database
+ * card -- three tiers, their titles, the discard dialog and the share path --
+ * had never been reachable outside a test. Ten is the first value above the one
+ * the rescue shipped at, so it is the first that can make that card appear.
+ *
+ * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 10 writes the
+ * file, then a build carrying 9 opens it. A forward install runs
+ * [MIGRATION_9_10] and never enters the rescue at all, so an ordinary upgrade
+ * sees none of it.
+ *
+ * The version has moved before -- eight times, shipped in v0.1.5, v0.1.10,
+ * v0.1.13, v0.1.15, v0.1.16, v0.1.20 and twice in v0.1.38. What is new is not
+ * the bump; it is that a bump now has a downgrade path with a screen attached.
  */
-const val DATABASE_VERSION = 9
+const val DATABASE_VERSION = 10
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -134,6 +151,34 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
+         * v10: the prep prescribed before a set and the prep actually played,
+         * as two columns on set_records.
+         *
+         * Nullable with no default, so existing rows are untouched and read
+         * back as "not captured" -- the same shape and the same refusal
+         * [MIGRATION_7_8] and [MIGRATION_8_9] wrote down. A backfill of the
+         * old constant was considered and refused: it would be right for every
+         * guided set already recorded and wrong for every unguided one, and the
+         * row cannot say which it was. `tempo` is the prescription, not evidence
+         * that a voice guide ran against it -- a tempo set recorded in demo mode
+         * or as an explosive lift plays no lead-in at all.
+         *
+         * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2] and
+         * [MIGRATION_8_9] already do. Nothing in this repository can execute
+         * either of them: there are no migration tests, no committed schema
+         * baseline for any version, and no instrumented tests at all, so the
+         * first time this runs is on the lifter's phone against their real
+         * history. The SQL was read against the entity diff by hand.
+         */
+        private val MIGRATION_9_10 =
+            object : Migration(9, 10) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN plannedPrepS INTEGER")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN prepS INTEGER")
+                }
+            }
+
+        /**
          * Open the database, having first made sure opening it cannot destroy
          * it. Issue #101.
          *
@@ -156,11 +201,10 @@ abstract class AppDatabase : RoomDatabase() {
          * was deleted there rather than reworded. A crash with the data
          * recoverable beats a clean start with it gone.
          *
-         * WHAT THIS RELEASE ACTUALLY MEETS is the uninteresting branch. The
-         * database version has not moved, so a rollback from this build to the
-         * previous one is already safe and the rescue is not what makes it so.
-         * This protects rollbacks TO a build that carries it -- the first
-         * release that moves the version is the one that needs it.
+         * WHAT THIS RELEASE MEETS is the branch that was theoretical until now.
+         * [DATABASE_VERSION] moves to 10 here, so a rollback from this build to
+         * any build carrying 9 is the first rollback the rescue can act on. What
+         * that exposes on screen is stated at the constant, with issue #118.
          *
          * The migrations are untouched. Only downgrade behaviour changes; a
          * missing UPGRADE migration still throws exactly as before.
@@ -182,6 +226,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_6_7,
                     MIGRATION_7_8,
                     MIGRATION_8_9,
+                    MIGRATION_9_10,
                 )
                 .build()
         }

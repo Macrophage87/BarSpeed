@@ -31,6 +31,18 @@ data class CompletedSet(
     val targetMeanConVelMps: Double?,
     val velocityLossStopPct: Double?,
     val plannedRestS: Int?,
+    /**
+     * The prep the plan prescribed before this set, and the prep the caller
+     * actually handed the voice guide, in whole seconds.
+     *
+     * Both null when no lead-in was played -- see [SetRecordEntity.plannedPrepS],
+     * which is the pair these two become. They have no default, deliberately:
+     * a defaulted parameter is one a call site can silently stop passing, and
+     * the value that was PLAYED exists only at recording time. Null is a
+     * legitimate value here and has to be written out.
+     */
+    val plannedPrepS: Int?,
+    val prepS: Int?,
     val startedAtMs: Long,
     val endedAtMs: Long,
     val analysis: SetAnalysis,
@@ -202,6 +214,8 @@ class SessionRepository(
                 targetMeanConVelMps = set.targetMeanConVelMps,
                 velocityLossStopPct = set.velocityLossStopPct,
                 plannedRestS = set.plannedRestS,
+                plannedPrepS = set.plannedPrepS,
+                prepS = set.prepS,
                 startedAtMs = set.startedAtMs,
                 endedAtMs = set.endedAtMs,
                 analysisJson = json.encodeToString(SetAnalysis.serializer(), set.analysis),

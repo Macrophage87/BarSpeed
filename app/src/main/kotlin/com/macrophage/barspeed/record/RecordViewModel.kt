@@ -10,6 +10,7 @@ import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.data.SetJournal
 import com.macrophage.barspeed.data.SetJournalHeader
 import com.macrophage.barspeed.data.SetJournalStore
+import com.macrophage.barspeed.dsp.GuidedCadence
 import com.macrophage.barspeed.dsp.LiveSetState
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
@@ -154,6 +155,9 @@ private data class PendingSetWrite(
     val tempoText: String?,
     val plannedDurationS: Int?,
     val actualDurationS: Int?,
+    /** The prep prescribed and the prep played, frozen with everything else. */
+    val plannedPrepS: Int?,
+    val prepS: Int?,
     val startedAtMs: Long,
     val endedAtMs: Long,
     val orderIdx: Int,
@@ -624,6 +628,17 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var pendingWrite: PendingSetWrite? = null
 
     /**
+     * The prep prescribed for the set in progress, and the prep actually played
+     * before it. Both null when no lead-in ran.
+     *
+     * Held here for the same reason `plannedRepsForSet` is: the value is decided
+     * at [beginSet], when the set's guided-ness is known, and is needed at
+     * [endSet], which is a different call with different state in front of it.
+     */
+    private var plannedPrepSForSet: Int? = null
+    private var prepSForSet: Int? = null
+
+    /**
      * The row id the set-end write already obtained, or null if it has not got
      * that far. A retry that ignored this would insert the set a second time,
      * under the same orderIdx, with its own copy of the gzipped stream, and
@@ -892,6 +907,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             (if (s.adHoc) s.tempoInput.ifBlank { null } else s.currentSlot?.tempo)?.let { Tempo.parseOrNull(it) }
         val guidedSet = !s.currentIsTimed && exercise.kind != ExerciseKind.EXPLOSIVE && guidedTempo != null
         if (guidedSet) manualSet = true
+        // The prep, decided once here and used twice: handed to the runner
+        // below, and frozen onto the set record at endSet. One expression,
+        // because a constant read by the player and a second statement of it at
+        // the write site are two facts that can disagree -- and the way they
+        // disagree leaves every capture claiming a prep nobody heard.
+        //
+        // Recorded only when a lead-in is actually played. An unguided set has
+        // no prep, and writing 0 for it would be absence rendered as a value:
+        // 0 is a real prep, the one where nothing is spoken before the first
+        // stroke call.
+        val prepS = GuidedCadence.LEAD_IN_S
+        plannedPrepSForSet = prepS.takeIf { guidedSet }
+        prepSForSet = prepS.takeIf { guidedSet }
         setStartedAtMs = System.currentTimeMillis()
         if (sessionStartedAtMs == 0L) sessionStartedAtMs = setStartedAtMs
         // Opened before the collectors below start, so no sample can arrive
@@ -951,7 +979,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 guidedFinished = false,
             )
         if (guidedSet && guidedTempo != null) {
-            startGuidedCadence(TempoSchedule.of(guidedTempo, exercise.liftDirection()), plannedRepsForSet)
+            startGuidedCadence(
+                TempoSchedule.of(guidedTempo, exercise.liftDirection()),
+                plannedRepsForSet,
+                prepS,
+            )
         }
     }
 
@@ -970,7 +1002,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** See [GuidedCadenceRunner]; the runner speaks and counts, the VM just mirrors state. */
-    private fun startGuidedCadence(schedule: TempoSchedule, plannedReps: Int?) {
+    private fun startGuidedCadence(schedule: TempoSchedule, plannedReps: Int?, prepS: Int) {
         if (voice == null) voice = VoiceCounter(getApplication())
         guidedCadence =
             GuidedCadenceRunner(
@@ -991,7 +1023,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     stateFlow.value = stateFlow.value.copy(manualReps = rep)
                 },
                 onFinished = { stateFlow.value = stateFlow.value.copy(guidedFinished = true) },
-            ).also { it.start(schedule, plannedReps) }
+            ).also { it.start(schedule, plannedReps, prepS) }
     }
 
     /**
@@ -1174,6 +1206,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 tempoText = tempoText,
                 plannedDurationS = plannedDurationS,
                 actualDurationS = actualDurationS,
+                plannedPrepS = plannedPrepSForSet,
+                prepS = prepSForSet,
                 startedAtMs = setStartedAtMs,
                 endedAtMs = System.currentTimeMillis(),
                 orderIdx = s.setsCompleted,
@@ -1348,6 +1382,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     targetMeanConVelMps = p.slot?.targetMeanConVelMps,
                     velocityLossStopPct = p.slot?.velocityLossStopPct,
                     plannedRestS = p.slot?.restS,
+                    plannedPrepS = p.plannedPrepS,
+                    prepS = p.prepS,
                     startedAtMs = p.startedAtMs,
                     endedAtMs = p.endedAtMs,
                     analysis = analysis,

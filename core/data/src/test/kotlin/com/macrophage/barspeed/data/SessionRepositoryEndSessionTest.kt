@@ -160,6 +160,8 @@ class SessionRepositoryEndSessionTest {
         targetMeanConVelMps = null,
         velocityLossStopPct = null,
         plannedRestS = null,
+        plannedPrepS = null,
+        prepS = null,
         startedAtMs = 1_000L,
         endedAtMs = 2_000L,
         analysis =
