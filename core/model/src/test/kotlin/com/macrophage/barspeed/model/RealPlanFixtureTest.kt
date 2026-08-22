@@ -36,4 +36,29 @@ class RealPlanFixtureTest {
         // Non-seed exercise ids are allowed; the app creates custom exercises on import.
         assertTrue(session.exercises.any { ExerciseDef.seedById(it.exercise) == null })
     }
+
+    /**
+     * Characterization: this is the actual plan behind the wrong-stroke
+     * leg-press session issue #131 describes, and as this test was written
+     * `plan.warnings()` has nothing to say about any of its five non-seed
+     * exercises omitting "start" -- the app silently guessed on every one of
+     * them, on the exact class of plan that produced the harm.
+     */
+    @Test
+    fun `today, omitting start on a non-seed exercise is silent`() {
+        val text =
+            checkNotNull(javaClass.getResourceAsStream("/real-plan-lower-body.json")) {
+                "fixture missing"
+            }.bufferedReader().readText()
+        val plan = Json { ignoreUnknownKeys = true }.decodeFromString(PlanFile.serializer(), text)
+
+        assertTrue(
+            plan.sessions.single().exercises.count { ExerciseDef.seedById(it.exercise) == null } == 5,
+            "expected five non-seed exercises in this fixture",
+        )
+        assertTrue(
+            plan.warnings().none { "start" in it },
+            "expected no warning to mention start yet: ${plan.warnings()}",
+        )
+    }
 }
