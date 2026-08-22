@@ -169,6 +169,77 @@ class PlanValidationTest {
         assertTrue(planWith("bench_press", """, "start": "sideways"""").validate().any { it.contains("start") })
     }
 
+    /**
+     * The omission warning fires only where the guess is both real and
+     * consumed: real because a built-in id already has a genuine
+     * declaration in [ExerciseDef.SEED], not a guess; consumed because a
+     * timed set is graded by the clock and never reaches segmentation, so
+     * the direction it never uses is never worth flagging.
+     */
+    @Test
+    fun `an undeclared start warns on a non-seed exercise with an untimed set, and nowhere else`() {
+        // single_leg_press is not in ExerciseDef.SEED, and planWith's set
+        // prescribes reps, so this is the case the leg-press session hit.
+        val guessed = planWith("single_leg_press", "")
+        assertTrue(
+            guessed.warnings().any { it.contains("single_leg_press") && it.contains("does not declare \"start\"") },
+            "expected an undeclared-start warning: ${guessed.warnings()}",
+        )
+
+        // back_squat IS seeded, so an omission there is a real value, not a guess.
+        assertTrue(
+            planWith("back_squat", "").warnings().none { "does not declare \"start\"" in it },
+            "a seeded exercise's omitted start must not warn",
+        )
+
+        // A declared start silences the omission warning outright, even one
+        // that disagrees with the seed — that disagreement is startVsSeed's
+        // warning, a different one, and back_squat is seeded so it still fires.
+        val declared = planWith("back_squat", """, "start": "bottom"""")
+        assertTrue(
+            declared.warnings().none { "does not declare \"start\"" in it },
+            "start was written down, so nothing was omitted: ${declared.warnings()}",
+        )
+        assertTrue(declared.warnings().any { it.contains("normally starts at the top") })
+
+        // An invalid value was WRITTEN, not omitted — validate() rejects it
+        // and the omission warning must not pile on.
+        val invalid = planWith("single_leg_press", """, "start": "sideways"""")
+        assertTrue(invalid.validate().any { it.contains("start") })
+        assertTrue(
+            invalid.warnings().none { "does not declare \"start\"" in it },
+            "an invalid value is an error, not also an omission warning: ${invalid.warnings()}",
+        )
+
+        // A non-seed exercise whose only set is timed never reaches
+        // segmentation, so the never-consumed guess does not warn.
+        val timed = json.decodeFromString(
+            PlanFile.serializer(),
+            """
+            {"schemaVersion": "1.3", "planName": "t", "sessions": [{"name": "s",
+              "exercises": [{"exercise": "custom_carry", "sets": [{"duration_s": 30, "load_kg": 20}]}]}]}
+            """.trimIndent(),
+        )
+        assertTrue(
+            timed.warnings().none { "does not declare \"start\"" in it },
+            "a timed set is graded by the clock, not segmentation: ${timed.warnings()}",
+        )
+
+        // ...but one untimed set among several timed ones still reaches it.
+        val mixed = json.decodeFromString(
+            PlanFile.serializer(),
+            """
+            {"schemaVersion": "1.3", "planName": "t", "sessions": [{"name": "s",
+              "exercises": [{"exercise": "custom_carry", "sets": [
+                {"duration_s": 30, "load_kg": 20}, {"reps": 8, "load_kg": 20}]}]}]}
+            """.trimIndent(),
+        )
+        assertTrue(
+            mixed.warnings().any { "does not declare \"start\"" in it },
+            "one untimed set is enough to reach segmentation: ${mixed.warnings()}",
+        )
+    }
+
     @Test
     fun `concentric direction is independent of where the lift starts`() {
         // A seated leg curl starts at the top (legs extended) and its DRIVE goes

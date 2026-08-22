@@ -80,6 +80,32 @@ class ShippedPlanExampleTest {
         )
     }
 
+    /**
+     * Companion to the prep pin above, for the omission warning PlanFile
+     * gained afterwards: `hanging_leg_raise`, `dumbbell_bench_press`,
+     * `single_arm_dumbbell_row` and `band_assisted_pull_up` are none of them
+     * built in, and every one of them prescribes reps rather than
+     * duration_s, so an omitted "start" on any of them would reach
+     * segmentation and draw the warning. All four declare it.
+     */
+    @Test
+    fun `the shipped example declares start on its non-seed exercises, and the gate is quiet about it`() {
+        val plan = shippedExample()
+        val nonSeed = plan.sessions.flatMap { it.exercises }.filter { ExerciseDef.seedById(it.exercise) == null }
+
+        assertTrue(nonSeed.isNotEmpty(), "expected at least one non-seed exercise in the shipped example")
+        nonSeed.forEach { exercise ->
+            assertTrue(
+                exercise.start != null,
+                "${exercise.exercise} is not built in and declares no start - it will draw the omission warning",
+            )
+        }
+        assertTrue(
+            plan.warnings().none { "does not declare \"start\"" in it },
+            "the shipped example warns about its own start: ${plan.warnings()}",
+        )
+    }
+
     @Test
     fun `the published schema permits a set with no load and says to omit both`() {
         val schema =

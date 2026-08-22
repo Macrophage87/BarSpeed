@@ -102,6 +102,7 @@
         {
           "exercise": "hanging_leg_raise",
           "kind": "dynamic",
+          "start": "bottom",
           "notes": "Declared: the id contains \"hang\", so without this the app would track it as an isometric hold and never count a rep.",
           "sets": [
             {
@@ -141,6 +142,7 @@
         {
           "exercise": "dumbbell_bench_press",
           "implementCount": 2,
+          "start": "top",
           "notes": "A pair. load_lb is the TOTAL across both - 80 is two 40s, not 80 in each hand.",
           "sets": [
             {
@@ -160,6 +162,7 @@
         {
           "exercise": "single_arm_dumbbell_row",
           "implementCount": 1,
+          "start": "bottom",
           "notes": "One object held, one side at a time. Which side is a different fact from how many are held, so both are declared and neither is taken from the other.",
           "sets": [
             {
@@ -179,6 +182,7 @@
         {
           "exercise": "band_assisted_pull_up",
           "bodyweight": true,
+          "start": "bottom",
           "notes": "Band assist; negative load_kg is the band's help subtracted from body weight, not an added plate.",
           "sets": [
             {

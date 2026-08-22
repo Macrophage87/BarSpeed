@@ -114,7 +114,9 @@ class PlanDecodeCharacterizationTest {
         assertNull(set.loadKg, "loadKg is not load_kg")
         assertNull(set.resolvedLoadKg, "the set resolves to no load at all")
         assertEquals(emptyList(), plan.validate(), "validate() imposes no load requirement")
-        assertEquals(emptyList(), plan.warnings(), "warnings() only speaks about a declared start")
+        // back_squat is seeded, so an omitted "start" is a real value taken
+        // from ExerciseDef.SEED, not a guess -- nothing here is worth flagging.
+        assertEquals(emptyList(), plan.warnings(), "warnings() has nothing to say about a seeded exercise")
     }
 
     @Test

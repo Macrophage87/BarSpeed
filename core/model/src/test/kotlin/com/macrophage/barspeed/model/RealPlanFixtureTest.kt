@@ -38,27 +38,42 @@ class RealPlanFixtureTest {
     }
 
     /**
-     * Characterization: this is the actual plan behind the wrong-stroke
-     * leg-press session issue #131 describes, and as this test was written
-     * `plan.warnings()` has nothing to say about any of its five non-seed
-     * exercises omitting "start" -- the app silently guessed on every one of
-     * them, on the exact class of plan that produced the harm.
+     * This is the actual plan behind the wrong-stroke leg-press session
+     * issue #131 describes: five of its seven exercises are ids the app
+     * does not ship (rear_foot_elevated_split_squat, cossack_squat,
+     * seated_leg_curl, calf_raise, leg_extension), none of them declares
+     * "start", and every one of their sets prescribes reps rather than
+     * duration_s, so every one reaches segmentation on a guessed direction.
+     * back_squat and romanian_deadlift are seeded, so their own omission is
+     * a real declaration, not a guess, and neither should warn.
      */
     @Test
-    fun `today, omitting start on a non-seed exercise is silent`() {
+    fun `omitting start on a non-seed exercise now warns, once per exercise`() {
         val text =
             checkNotNull(javaClass.getResourceAsStream("/real-plan-lower-body.json")) {
                 "fixture missing"
             }.bufferedReader().readText()
         val plan = Json { ignoreUnknownKeys = true }.decodeFromString(PlanFile.serializer(), text)
-
+        val nonSeedIds = listOf(
+            "rear_foot_elevated_split_squat",
+            "cossack_squat",
+            "seated_leg_curl",
+            "calf_raise",
+            "leg_extension",
+        )
         assertTrue(
             plan.sessions.single().exercises.count { ExerciseDef.seedById(it.exercise) == null } == 5,
             "expected five non-seed exercises in this fixture",
         )
+
+        val startWarnings = plan.warnings().filter { "does not declare \"start\"" in it }
+        assertEquals(5, startWarnings.size, startWarnings.joinToString("\n"))
+        nonSeedIds.forEach { id ->
+            assertTrue(startWarnings.any { id in it }, "expected a start warning naming $id: $startWarnings")
+        }
         assertTrue(
-            plan.warnings().none { "start" in it },
-            "expected no warning to mention start yet: ${plan.warnings()}",
+            startWarnings.none { "back_squat" in it || "romanian_deadlift" in it },
+            "the two seeded lifts have a real start from ExerciseDef.SEED, not a guess: $startWarnings",
         )
     }
 }
