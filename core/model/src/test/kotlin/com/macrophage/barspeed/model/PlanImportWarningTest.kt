@@ -166,8 +166,9 @@ class PlanImportWarningTest {
     /** pallof_hold names no built-in and prescribes reps, so it also draws the new undeclared-start warning. */
     private fun undeclaredStart(id: String) = "sessions[0].exercises[0]: $id does not declare \"start\", and " +
         "is not one of the app's built-in exercises, so the app is guessing which end of the range it " +
-        "begins at from the id alone - the guess decides the voice guide's first call and which direction " +
-        "opens a rep. Declare \"start\": \"top\" or \"bottom\" to replace it."
+        "begins at from the id alone - the guess decides which direction opens a rep and, on a set " +
+        "carrying a tempo, the voice guide's first call. Declare \"start\": \"top\" or \"bottom\" " +
+        "to replace it."
 
     @Test
     fun `a declared kind that contradicts the set's shape does not silence either`() {

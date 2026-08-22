@@ -85,8 +85,9 @@ class PlanImplementCountTest {
                     "a set has - it belongs on an exercise. It was ignored.",
                 "sessions[0].exercises[0]: dumbbell_bench_press does not declare \"start\", and is not " +
                     "one of the app's built-in exercises, so the app is guessing which end of the range " +
-                    "it begins at from the id alone - the guess decides the voice guide's first call and " +
-                    "which direction opens a rep. Declare \"start\": \"top\" or \"bottom\" to replace it.",
+                    "it begins at from the id alone - the guess decides which direction opens a rep and, " +
+                    "on a set carrying a tempo, the voice guide's first call. Declare \"start\": \"top\" " +
+                    "or \"bottom\" to replace it.",
             ),
             result.warnings,
         )

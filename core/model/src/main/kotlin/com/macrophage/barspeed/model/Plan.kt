@@ -73,14 +73,20 @@ data class PlanFile(
      * but it is worth saying out loud when a plan pins something that
      * contradicts how the built-in lift is normally performed, because a
      * mis-declared direction inverts the voice guide's whole cadence and a
-     * mis-declared kind changes which numbers the set is judged on.
+     * mis-declared kind changes which numbers the set is judged on. It is
+     * worth saying just as loudly when the plan made no decision at all: the
+     * app is then guessing the same direction, and nothing at the gate said so.
      *
-     * Grouped by what the declaration disagrees WITH, not by where it appears,
-     * because the three prompt different questions back to whoever wrote the
-     * plan. Overriding a built-in comes first: that is the app being told to
-     * ignore something it ships with, and this is the only sign it happened.
+     * Grouped by what each warning is really about, not by where it appears in
+     * the plan, because each group prompts a different question back to
+     * whoever wrote it. An undeclared start comes first among the direction
+     * and kind warnings, because it is the one case here where the plan made
+     * no decision for the app to follow at all. Overriding a built-in comes
+     * next: that is the app being told to ignore something it ships with, and
+     * this is the only sign it happened.
      */
     fun warnings(): List<String> = eachExercise(::pairVsLoad) +
+        eachExercise(::startUndeclared) +
         eachExercise(::startVsSeed) +
         eachExercise(::kindVsSeed) +
         eachExercise(::kindVsShape) +
@@ -126,6 +132,41 @@ data class PlanFile(
         .flatMapIndexed { si, session ->
             session.exercises.mapIndexedNotNull { ei, exercise -> warn(si, ei, exercise) }
         }
+
+    /**
+     * `start` left undeclared on an exercise the app does not ship, so which
+     * end of the range each rep opens from is guessed off the id rather than
+     * known — the guess that turned five sets of a real leg-press session
+     * backwards, with nothing at the import gate to say it was a guess.
+     *
+     * Fires only where the guess is both real and consumed. Real: a built-in
+     * id already carries a genuine value from [ExerciseDef.SEED], so nothing
+     * is being guessed there — that is why this checks [ExerciseDef.seedById]
+     * rather than reading [PlanExerciseDef.startsAtTop], which would report a
+     * guess even for a seeded id. Consumed: `RepSegmenter` (`:core:dsp`) reads
+     * the resolved direction to open every rep on every set that is not
+     * timed, tempo or no tempo, but `RecordViewModel.runSetWrite` skips
+     * segmentation outright for a timed set and grades it on the clock
+     * instead — so a direction no timed set ever reaches is not worth
+     * flagging, and an exercise warns only when at least one of its sets is
+     * not timed.
+     *
+     * Checks [PlanExerciseDef.start] directly rather than
+     * [PlanExerciseDef.startPhaseOverride], which also reads null for an
+     * unrecognised value such as `"sideways"`. That case wrote something and
+     * got it wrong — `validate()` already reports it as an error — and must
+     * not also be reported here as nothing having been written at all.
+     */
+    private fun startUndeclared(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        if (exercise.start != null) return null
+        if (ExerciseDef.seedById(exercise.exercise) != null) return null
+        if (exercise.sets.all { it.isTimed }) return null
+        return "sessions[$si].exercises[$ei]: ${exercise.exercise} does not declare \"start\", and is " +
+            "not one of the app's built-in exercises, so the app is guessing which end of the range it " +
+            "begins at from the id alone - the guess decides which direction opens a rep and, on a set " +
+            "carrying a tempo, the voice guide's first call. Declare \"start\": \"top\" or \"bottom\" " +
+            "to replace it."
+    }
 
     private fun startVsSeed(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
         val seed = ExerciseDef.seedById(exercise.exercise) ?: return null
