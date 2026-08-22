@@ -41,7 +41,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,6 +73,8 @@ import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.Tempo
+import com.macrophage.barspeed.model.TempoAdjustPolicy
+import com.macrophage.barspeed.model.TempoDigit
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.record.PlannedSlot
 import com.macrophage.barspeed.record.RecordState
@@ -544,14 +548,17 @@ private const val PREP_STEP_S = 5
  * [LeadInPolicy.playsPrep], reached through `state.upcomingPlaysPrep`. It is the
  * same function the import gate warns an inert `prep_s` against.
  *
- * It is asked here of the slot AS DECLARED, and `beginSet` is not:
- * `restingState` seeds `tempoInput` from the next slot's tempo, falling back to
- * the set just finished, and `advancedState` bakes that into the next slot, so
- * an exercise declaring no tempo that follows one that does inherits it, runs
- * guided with a prep, and gets no control here. Reachable on the plan this repo
- * publishes -- Upper A runs dumbbell_bench_press (3010) into
- * single_arm_dumbbell_row, which declares none. A known gap, not closed on this
- * branch: changing either operand is an untested `:app` behaviour change.
+ * It is asked here of the slot AS DECLARED, and `beginSet` asks it of the slot
+ * the lifter is about to run. Those two used to disagree: `restingState` seeded
+ * `tempoInput` from the set just finished whenever the coming one declared no
+ * tempo, and `advancedState` baked that in, so an exercise declaring none that
+ * followed one that does ran guided with a prep and got no control here.
+ * Reachable on the plan this repo publishes -- Upper A runs
+ * dumbbell_bench_press (3010) into single_arm_dumbbell_row, which declares
+ * none. Closed by #148: nothing now displaces the declaration except a tempo
+ * the lifter set on the wheels for THIS block, and the wheels can neither clear
+ * a tempo nor add one, so the adjustment cannot move
+ * [LeadInPolicy.playsPrep]'s answer either way.
  *
  * Rendered on READY and again on the rest screen because READY is drawn at most
  * once per session: `startNextSet` writes READY and calls `beginSet` in the same
@@ -601,6 +608,143 @@ private fun PrepAdjuster(state: RecordState, viewModel: RecordViewModel) {
             enabled = prepS < LeadInPolicy.MAX_S,
         ) {
             Text("+${PREP_STEP_S}s")
+        }
+    }
+}
+
+/** One value's height in a tempo wheel, and how much of the wheel is on screen. */
+private const val WHEEL_ITEM_DP = 40
+
+private const val WHEEL_DP = 96
+
+/**
+ * The tempo of the next set, as four separated wheels.
+ *
+ * DUMB. Every decision here is [TempoAdjustPolicy]'s: which word and which
+ * phase each digit is for this lift, which values its wheel offers, whether
+ * this tempo can be shown on wheels at all, and what one turn produces. This
+ * renders the answer and reports a digit change. `:app` has no test that can
+ * run a composable, so nothing that decides anything may live in this file.
+ *
+ * Shown only when the coming set already has a tempo four single-character
+ * wheels can show. It cannot CLEAR one and cannot ADD one: the ask was to
+ * adjust a tempo, and either of those moves the set across
+ * [LeadInPolicy.prepCase]'s boundary, taking the prep, the voice pacing, the
+ * guide's rep count and the compliance verdict with it. A set that declares no
+ * tempo, or one written with a fraction or a two-character component, gets no
+ * control rather than a rewritten one.
+ *
+ * **A tap selects; scrolling does not.** The wheel's scroll offset is never
+ * read back, so a lifter who flicks the page and catches a wheel spins it and
+ * changes nothing. That is deliberate: the alternative -- a snap-to-centre
+ * wheel whose resting position IS the value -- would let a stray drag rewrite
+ * the prescription of the set they are about to do.
+ *
+ * The plan's own declaration is named beside the total whenever the two differ,
+ * as [PrepAdjuster] names it for the prep.
+ *
+ * Not drawn on READY, so the first set of a session cannot be adjusted -- the
+ * same gap the load field had before READY got one of its own. Reaching it
+ * needs `beginSet`, `endSet`, the in-set ring and `upcomingPlaysPrep` to read
+ * the stated tempo as well as the slot's, which is four more reads in the
+ * module with no tests, for a case the ask did not name. Every other set of a
+ * session is reachable, because the rest screen is drawn before each of them.
+ */
+@Composable
+private fun TempoAdjuster(state: RecordState, viewModel: RecordViewModel) {
+    val slot = state.upcomingSlot ?: return
+    val tempo = state.statedTempo ?: slot.tempo
+    val values = TempoAdjustPolicy.wheelValues(tempo) ?: return
+    val planned = slot.plannedTempo
+    Spacer(Modifier.height(10.dp))
+    Text(
+        "Tempo ${values.joinToString("")}",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+    )
+    // NOT "your change is recorded in the export", which is what PrepAdjuster
+    // says one control down and is FALSE here. That line is true of the prep
+    // and of the load because both publish a planned/actual pair -- prep_s
+    // beside plannedPrep_s, load_kg beside plannedLoad_kg -- so a reader can
+    // see the deviation afterwards. Tempo has no such pair: session.json
+    // carries one field, tempoPrescribed, and it holds what RAN, so an
+    // adjusted set is indistinguishable from one the plan prescribed that way.
+    // #151. What is said instead is what the lifter can act on: how far this
+    // change reaches.
+    Text(
+        when {
+            planned == null || tempo == planned -> "Seconds per phase for the coming set"
+            else -> "Plan says $planned - the rest of this exercise runs $tempo unless the plan changes it"
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = BarColors.Sub,
+    )
+    Spacer(Modifier.height(6.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        TempoAdjustPolicy.digits(slot.exercise.concentricUp, slot.exercise.horizontal)
+            .forEachIndexed { index, digit ->
+                TempoWheel(digit, values[index], Modifier.weight(1f)) { picked ->
+                    viewModel.adjustTempoDigit(digit.position, picked)
+                }
+            }
+    }
+}
+
+/** One digit's wheel: its word, what it is for this lift, and the values it takes. */
+@Composable
+private fun TempoWheel(digit: TempoDigit, selected: String, modifier: Modifier, onPick: (String) -> Unit) {
+    val scroll = rememberScrollState()
+    val itemPx = with(LocalDensity.current) { WHEEL_ITEM_DP.dp.roundToPx() }
+    val windowPx = with(LocalDensity.current) { WHEEL_DP.dp.roundToPx() }
+    // Bring the current value into view when the control appears and after each
+    // tap. Never the other way round: see TempoAdjuster on why a scroll offset
+    // is not a selection.
+    LaunchedEffect(selected) {
+        scroll.scrollTo(digit.choices.indexOf(selected) * itemPx - (windowPx - itemPx) / 2)
+    }
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            digit.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = BarColors.Sub,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+        // Fixed so the four wheels line up whatever their captions wrap to; the
+        // value is two lines of labelSmall rather than one, because "after the
+        // eccentric" does not fit one line of a quarter-width column. 30 dp
+        // was the first guess and is under the 32 sp two lines occupy at
+        // fontScale 1.0, so it clips before a lifter has changed anything.
+        Text(
+            digit.caption,
+            Modifier.height(36.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = BarColors.Ghost,
+            textAlign = TextAlign.Center,
+        )
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .height(WHEEL_DP.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(BarColors.Track)
+                .verticalScroll(scroll),
+        ) {
+            digit.choices.forEach { value ->
+                val picked = value == selected
+                Text(
+                    value,
+                    Modifier
+                        .fillMaxWidth()
+                        .height(WHEEL_ITEM_DP.dp)
+                        .clickable { onPick(value) }
+                        .padding(top = 8.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (picked) BarColors.Volt else BarColors.Sub,
+                    fontWeight = if (picked) FontWeight.Bold else FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
@@ -1476,6 +1620,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
             }
         }
         PerImplementEcho(state, next)
+        TempoAdjuster(state, viewModel)
         PrepAdjuster(state, viewModel)
         Spacer(Modifier.height(12.dp))
         StartNextSetButton(state, viewModel)

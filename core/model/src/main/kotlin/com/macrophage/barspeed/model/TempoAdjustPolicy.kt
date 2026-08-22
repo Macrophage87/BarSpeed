@@ -113,34 +113,45 @@ object TempoAdjustPolicy {
     /**
      * What each digit is, for a lift with this drive direction and plane.
      *
-     * NAIVE, and knowingly so: this reads the notation the classic way, digit 1
-     * the eccentric and digit 3 the concentric. That is right for a bench press
-     * and right for every horizontal machine, and it is wrong for a lift whose
-     * drive goes DOWN -- a triceps pushdown, a lat pulldown, a leg curl -- where
-     * digit 1 is the drive and moves down. `TempoSchedule.of` reads those
-     * positionally, and the app was corrected once for exactly this mistake in
-     * v0.1.41.
+     * The digits are in NOTATION order and stay there. Which stroke is
+     * performed first is [ExerciseDef.startsWith]'s business and is not a
+     * parameter here: a lifter reading a tempo off a plan reads digit 1 first
+     * whichever end of the movement their rep opens at.
      *
-     * Written in this shape so the differential is a body change rather than a
-     * new function: #148 c2 reds it on a pushdown, c3 derives it from the
-     * direction.
+     * Both halves of the reading are `TempoSchedule.of`'s and are stated the
+     * same way. Vertical work is POSITIONAL -- digit 1 is the down stroke -- so
+     * on a lift whose drive goes down, digit 1 is the drive: a triceps
+     * pushdown, a lat pulldown, a leg curl. Horizontal work is read by PHASE,
+     * digit 1 the eccentric, because a seated row has no up or down for a
+     * positional reading to attach to.
+     *
+     * Getting this from the position alone is v0.1.41's defect, and it would
+     * caption the wheel over a pushdown's drive "eccentric" -- a lifter
+     * lengthening the wrong half of the rep.
      */
-    fun digits(concentricUp: Boolean, horizontal: Boolean): List<TempoDigit> = listOf(
-        TempoDigit(
-            position = DOWN_STROKE,
-            label = strokeLabel(horizontal, isConcentric = false, movesUp = !concentricUp),
-            caption = ECCENTRIC,
-            choices = choices(DOWN_STROKE),
-        ),
-        TempoDigit(BOTTOM_PAUSE, PAUSE, after(ECCENTRIC), choices(BOTTOM_PAUSE)),
-        TempoDigit(
-            position = UP_STROKE,
-            label = strokeLabel(horizontal, isConcentric = true, movesUp = concentricUp),
-            caption = CONCENTRIC,
-            choices = choices(UP_STROKE),
-        ),
-        TempoDigit(TOP_PAUSE, PAUSE, after(CONCENTRIC), choices(TOP_PAUSE)),
-    )
+    fun digits(concentricUp: Boolean, horizontal: Boolean): List<TempoDigit> {
+        val digit1IsConcentric = if (horizontal) false else !concentricUp
+        val downStroke =
+            TempoDigit(
+                position = DOWN_STROKE,
+                label = strokeLabel(horizontal, isConcentric = digit1IsConcentric, movesUp = false),
+                caption = phase(digit1IsConcentric),
+                choices = choices(DOWN_STROKE),
+            )
+        val upStroke =
+            TempoDigit(
+                position = UP_STROKE,
+                label = strokeLabel(horizontal, isConcentric = !digit1IsConcentric, movesUp = true),
+                caption = phase(!digit1IsConcentric),
+                choices = choices(UP_STROKE),
+            )
+        return listOf(
+            downStroke,
+            TempoDigit(BOTTOM_PAUSE, PAUSE, after(downStroke.caption), choices(BOTTOM_PAUSE)),
+            upStroke,
+            TempoDigit(TOP_PAUSE, PAUSE, after(upStroke.caption), choices(TOP_PAUSE)),
+        )
+    }
 
     /**
      * The four wheel values [tempoText] shows, or null when it is not something
@@ -194,56 +205,64 @@ object TempoAdjustPolicy {
     /**
      * The tempo to offer for the set coming up, or null to offer none.
      *
-     * TODAY'S RULE, defect included, stated where a test can reach it.
-     * `restingState` seeds its tempo field `nextSlot?.tempo ?: p.tempoText` and
-     * `advancedState` bakes that into the upcoming slot, so an exercise
-     * declaring NO tempo inherits the one the previous set ran. It is then
-     * paced by the voice, counted by the guide instead of by the lifter, given
-     * a prep it never declared, and it permanently records a tempo nobody
-     * prescribed.
+     * [hasPlannedNext] separates two facts that must not share an answer,
+     * exactly as [SetLoadPolicy.seedAddedKg] separates them for load. "The next
+     * planned set declares no tempo" is a DECLARATION and is offered none:
+     * declaring nothing is a declaration. "There is no next planned set at all"
+     * is the ad-hoc case, where the tempo field is the only declaration there
+     * is and carrying it forward is what the lifter typed it for.
      *
-     * [hasPlannedNext] is ignored here, and it is the operand that fixes it. It
-     * separates two facts that must not share an answer, exactly as
-     * [SetLoadPolicy.seedAddedKg] separates them for load: "the next planned set
-     * declares no tempo" is a declaration and must offer none, while "there is
-     * no next planned set at all" is the ad-hoc case, where the last tempo is
-     * the only thing to go on and carrying it forward is what the lifter typed
-     * it for. #148 c2 reds this; c3 stops conflating them.
-     *
-     * detekt is right that the parameter is unused and is being told so rather
-     * than turned off: `config/detekt/detekt.yml` is untouched and the
-     * suppression is one function wide. It is here so the differential later on
-     * this branch is a body change against a real assertion, rather than a
-     * signature change that would stop the red commit compiling at all.
+     * Conflating them is what leaked one exercise's tempo into the next.
+     * `restingState` seeded `nextSlot?.tempo ?: p.tempoText` and
+     * `advancedState` baked that into the upcoming slot, so an exercise
+     * declaring NO tempo inherited the one the previous set ran: it was paced
+     * by the voice, counted by the guide instead of by the lifter, given a prep
+     * its author never declared, and it recorded that tempo as its own
+     * prescription for good. Reachable on the plan this repo publishes.
      */
-    @Suppress("UnusedParameter")
     fun seedTempo(hasPlannedNext: Boolean, nextDeclaredTempo: String?, lastRanTempo: String?): String? =
-        nextDeclaredTempo ?: lastRanTempo
+        if (hasPlannedNext) nextDeclaredTempo else lastRanTempo
 
     /**
      * The tempo the lifter ADJUSTED that still stands for the set coming up, or
      * null when that set is offered whatever its own slot declares.
      *
-     * Null in every case today, and null is today's answer rather than a
-     * placeholder: no control anywhere states a tempo, so there is nothing that
-     * could stand. #148 c3 gives this its body, and that body is
-     * [SetLoadPolicy.standingStatedAddedKg]'s -- the same four boundaries, for
-     * the same reasons, on a different quantity.
+     * The same expression as [SetLoadPolicy.standingStatedAddedKg], with the
+     * same four boundaries and for the same reasons; read that function for the
+     * long form. A lifter who slows the eccentric on set 1 of an exercise did
+     * not mean it for set 1 alone, any more than one who moved up in weight
+     * did, and the alternative re-offers the plan's tempo on every later set
+     * and paces the lifter against it.
      *
-     * detekt is right about both the body and the parameters, and is being told
-     * so rather than turned off, exactly as [SetLoadPolicy.standingStatedAddedKg]
-     * was at the same point in #124: the config file is untouched and the
-     * suppression is one function wide. Lifting the seam here, one commit ahead
-     * of the change, is what lets the differential be shown red against a real
-     * assertion.
+     * [adjustedTempo] is what the lifter set on the wheels as it stood when the
+     * set that just finished was written, null when they set nothing.
+     *
+     * [sameExerciseBlock] bounds the carry, and is
+     * [SetLoadPolicy.sameExerciseBlock]'s answer passed in rather than a second
+     * statement of what a block is.
+     *
+     * [lastDeclaredTempo] and [nextDeclaredTempo] are the two slots' frozen
+     * `plannedTempo`, never their live `tempo`, which carries the adjustment
+     * itself once [carriedIntoNextSet] has baked it in -- comparing those would
+     * compare a value against itself. A plan declaring a DIFFERENT tempo for
+     * the next set is prescribing a change and it is that tempo the lifter is
+     * offered: without it the fix becomes the same defect facing the other way,
+     * and an adjustment made to the opener of a block written 3010/4010 would
+     * flatten the prescribed contrast.
+     *
+     * A null on one side only is not that case and is not claimed to be: the
+     * plan declared a tempo for one of the two sets and not the other. Null
+     * compares unequal to a string, so the carry drops there too -- the safe
+     * direction, and stated as what it is. Null on BOTH sides compares equal,
+     * but is unreachable rather than a carry: a set that declares no tempo gets
+     * no wheels at all, so nothing can have been adjusted for it.
      */
-    @Suppress("FunctionOnlyReturningConstant", "UnusedParameter")
     fun standingAdjustedTempo(
         adjustedTempo: String?,
         sameExerciseBlock: Boolean,
         lastDeclaredTempo: String?,
         nextDeclaredTempo: String?,
-    ): String? = null
+    ): String? = adjustedTempo?.takeIf { sameExerciseBlock && lastDeclaredTempo == nextDeclaredTempo }
 
     /**
      * The tempo the upcoming planned slot carries once the lifter taps through
@@ -265,6 +284,8 @@ object TempoAdjustPolicy {
     private const val CONCENTRIC = "concentric"
 
     private const val PAUSE = "PAUSE"
+
+    private fun phase(isConcentric: Boolean): String = if (isConcentric) CONCENTRIC else ECCENTRIC
 
     private fun after(phase: String): String = "after the $phase"
 

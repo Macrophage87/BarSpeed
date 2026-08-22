@@ -75,6 +75,22 @@ data class PlannedSlot(
     val loadKg: Double?,
     val plannedLoadKg: Double?,
     val tempo: String?,
+    /**
+     * The tempo the PLAN declared for this set, frozen and never written back
+     * to, the way [plannedLoadKg] is for load.
+     *
+     * [tempo] carries the lifter's adjustment once `advancedState` has baked it
+     * in; this does not, which is what lets
+     * [TempoAdjustPolicy.standingAdjustedTempo] tell "the plan prescribes a
+     * tempo change for the next set" from "the lifter changed the tempo and it
+     * is still standing". Comparing two `tempo` fields would compare a value
+     * against itself.
+     *
+     * Null on a slot the plan declared no tempo for, and on a slot built before
+     * this field existed -- nothing persists a PlannedSlot, so the second case
+     * lives only inside one running session.
+     */
+    val plannedTempo: String? = null,
     /** Unilateral sets: "left" or "right". */
     val side: String? = null,
     /**
@@ -322,6 +338,10 @@ private fun jumpedState(s: RecordState, done: List<PlannedSlot>, fixed: List<Pla
         // Refresh the editable inputs so they describe the new upcoming set.
         loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
         statedLoadKg = null,
+        // Cleared for [RecordState.statedLoadKg]'s reason, one field over: a
+        // tempo set on the wheels for the exercise the lifter was about to do
+        // is not a statement about the one they switched to.
+        statedTempo = null,
         repsInput = upcoming.reps?.toString() ?: s.repsInput,
         durationInput = upcoming.durationS?.toString() ?: s.durationInput,
         tempoInput = upcoming.tempo ?: "",
@@ -348,6 +368,10 @@ private fun jumpedState(s: RecordState, done: List<PlannedSlot>, fixed: List<Pla
  * here -- at the exercise boundary it does not, nor where the plan declares a
  * different load for the set coming up, and in both cases the field is
  * re-seeded from the plan exactly as it always was. #124.
+ *
+ * [RecordState.statedTempo] is re-decided by the same rule on the same
+ * boundaries, so a tempo the lifter set on the wheels holds for the rest of the
+ * block and no further. #148.
  */
 private fun restingState(
     s: RecordState,
@@ -357,6 +381,16 @@ private fun restingState(
     restS: Int,
 ): RecordState {
     val nextSlot = s.nextSlot
+    // Where the block ends. Hoisted to a local because the load and the tempo
+    // are bounded by the SAME block -- asking twice would be two statements of
+    // one rule, and the way they diverge is one of the two carrying past a
+    // boundary the other stops at.
+    val sameBlock =
+        SetLoadPolicy.sameExerciseBlock(
+            lastExerciseId = p.slot?.exercise?.id,
+            nextExerciseId = nextSlot?.exercise?.id,
+            nextSetIndexInExercise = nextSlot?.setIndexInExercise,
+        )
     // What the lifter said about the load, and whether it still applies to the
     // set coming up. The decision is SetLoadPolicy's; this hands it the two
     // slots' FROZEN declarations -- never their loadKg, which the bake below
@@ -364,14 +398,20 @@ private fun restingState(
     val standingKg =
         SetLoadPolicy.standingStatedAddedKg(
             statedAddedKg = s.statedLoadKg,
-            sameExerciseBlock =
-            SetLoadPolicy.sameExerciseBlock(
-                lastExerciseId = p.slot?.exercise?.id,
-                nextExerciseId = nextSlot?.exercise?.id,
-                nextSetIndexInExercise = nextSlot?.setIndexInExercise,
-            ),
+            sameExerciseBlock = sameBlock,
             lastDeclaredAddedKg = p.slot?.plannedLoadKg,
             nextDeclaredAddedKg = nextSlot?.plannedLoadKg,
+        )
+    // The same question about the tempo, decided by the same four boundaries.
+    // plannedTempo on both sides, never tempo: the bake has already written the
+    // adjustment into the slot's own tempo, so comparing those would compare a
+    // value against itself and the carry would never stop.
+    val standingTempo =
+        TempoAdjustPolicy.standingAdjustedTempo(
+            adjustedTempo = s.statedTempo,
+            sameExerciseBlock = sameBlock,
+            lastDeclaredTempo = p.slot?.plannedTempo,
+            nextDeclaredTempo = nextSlot?.plannedTempo,
         )
     val seedKg =
         SetLoadPolicy.seedAddedKg(
@@ -419,11 +459,12 @@ private fun restingState(
         statedLoadKg = standingKg,
         repsInput = (nextSlot?.reps ?: p.plannedReps ?: 5).toString(),
         durationInput = (nextSlot?.durationS ?: p.plannedDurationS)?.toString() ?: s.durationInput,
-        // Behaviour-identical to the expression this replaces. The RULE is
-        // TempoAdjustPolicy's now, in a module with tests; today it still
-        // answers `next ?: last`, and it is that fallback -- an exercise
-        // declaring no tempo inheriting the previous one's -- that the fix
-        // later on this branch removes.
+        statedTempo = standingTempo,
+        // The AD-HOC field. On a plan session nothing draws or reads it -- the
+        // wheels read statedTempo above, falling back to the slot's own
+        // declaration -- and seedTempo no longer hands it the last tempo that
+        // ran when a planned set is coming up, which is the inheritance this
+        // change removes.
         tempoInput =
         TempoAdjustPolicy.seedTempo(
             hasPlannedNext = nextSlot != null,
@@ -431,6 +472,29 @@ private fun restingState(
             lastRanTempo = p.tempoText,
         ) ?: "",
     )
+}
+
+/**
+ * The state one turn of a tempo wheel leaves behind. Free function for
+ * [openSession]'s reason.
+ *
+ * The wheel that was turned is read from [RecordState.statedTempo] falling back
+ * to the upcoming slot's own declaration -- the same expression the control
+ * draws itself from, so what is on screen and what is written back cannot
+ * disagree about which tempo is being edited.
+ *
+ * A turn that would not spell a tempo returns the state UNCHANGED rather than
+ * clamping to something near it. [TempoAdjustPolicy.withDigit] is what decides,
+ * and it refuses anything the control could not have drawn, so this cannot
+ * write a prescription the metronome will not play or the exporter will not
+ * recognise. In practice the control only offers values that pass; a refusal
+ * here means the slot's tempo was not one four wheels can show, and the control
+ * is not drawn for those at all.
+ */
+private fun tempoAdjustedState(s: RecordState, position: Int, value: String): RecordState {
+    val editing = s.statedTempo ?: s.upcomingSlot?.tempo
+    val turned = TempoAdjustPolicy.withDigit(editing, position, value) ?: return s
+    return s.copy(statedTempo = turned)
 }
 
 /**
@@ -450,6 +514,9 @@ private fun adHocSessionState(s: RecordState): RecordState =
  * The state tapping through to the next planned set leaves behind, with any
  * in-rest edits applied. Free function for [openSession]'s reason.
  *
+ * [RecordState.statedTempo] travels with [RecordState.statedLoadKg] through
+ * both branches and for the same reasons, one field over.
+ *
  * [RecordState.statedLoadKg] is cleared in the ad-hoc branch, which never reads
  * it, and SURVIVES the plan branch. The bake below consumes it into the slot,
  * and it is also the statement [restingState] puts back to
@@ -462,7 +529,7 @@ private fun adHocSessionState(s: RecordState): RecordState =
  */
 private fun advancedState(s: RecordState): RecordState {
     val next = s.nextSlot
-    if (s.adHoc || next == null) return s.copy(stage = Stage.READY, statedLoadKg = null)
+    if (s.adHoc || next == null) return s.copy(stage = Stage.READY, statedLoadKg = null, statedTempo = null)
     val edited =
         next.copy(
             loadKg =
@@ -472,15 +539,20 @@ private fun advancedState(s: RecordState): RecordState {
             ),
             reps = if (next.isTimed) next.reps else s.repsInput.toIntOrNull() ?: next.reps,
             durationS = if (next.isTimed) s.durationInput.toIntOrNull() ?: next.durationS else next.durationS,
-            // Behaviour-identical to the expression this replaces, and it names
-            // what that expression was doing: the tempo TEXT FIELD, which the
-            // plan branch of the rest screen does not draw, is treated as an
-            // adjustment that displaces the plan's declaration. The argument
-            // becomes a fact the lifter can actually state later on this branch.
+            // statedTempo, not tempoInput. The text field is the ad-hoc
+            // control and reading it here is how one exercise's tempo reached
+            // the next: restingState seeded it from the set just finished
+            // whenever the coming one declared none. What displaces the plan's
+            // declaration now is a tempo the lifter actually set on the wheels
+            // for THIS block, and nothing else.
+            //
+            // plannedTempo is deliberately not in this copy: it stays frozen at
+            // the plan's declaration so restingState can tell a prescribed
+            // tempo change from a standing adjustment one set later.
             tempo =
             TempoAdjustPolicy.carriedIntoNextSet(
                 declaredTempo = next.tempo,
-                adjustedTempo = s.tempoInput.ifBlank { null },
+                adjustedTempo = s.statedTempo,
             ),
         )
     val queue = s.queue.toMutableList()
@@ -517,7 +589,28 @@ data class RecordState(
     val durationInput: String = "60",
     /** Ad-hoc unilateral side: null (bilateral), "left", or "right". */
     val sideInput: String? = null,
+    /**
+     * The AD-HOC tempo text field. A plan session neither draws it nor reads
+     * it: its control is the digit wheels, and what they produce is
+     * [statedTempo].
+     */
     val tempoInput: String = "",
+    /**
+     * The tempo the lifter has set on the wheels for the set now being set up,
+     * and null when they have set none.
+     *
+     * The tempo analogue of [statedLoadKg] and separate from [tempoInput] for
+     * the reason given there: this has no default that means anything, is
+     * written only by a turn of a wheel or by
+     * [TempoAdjustPolicy.standingAdjustedTempo] ruling that an earlier turn
+     * still applies, and cannot outlive the block it was made in. Seeding a
+     * text field does not set it.
+     *
+     * It cannot hold a tempo the app will not run. Every value that reaches it
+     * comes from [TempoAdjustPolicy.withDigit], which refuses anything four
+     * wheels could not have drawn, and there is no wheel value that clears it.
+     */
+    val statedTempo: String? = null,
     val live: LiveSetState = LiveSetState(),
     /** Sensorless rep set: the lifter taps to count reps. */
     val manualSet: Boolean = false,
@@ -1019,6 +1112,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateTempoInput(text: String) {
         stateFlow.value = stateFlow.value.copy(tempoInput = text)
+    }
+
+    /** One turn of a tempo wheel between sets; every decision is [tempoAdjustedState]'s. */
+    fun adjustTempoDigit(position: Int, value: String) {
+        stateFlow.value = tempoAdjustedState(stateFlow.value, position, value)
     }
 
     /** Begin recording the current set. */

@@ -33,6 +33,13 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     loadKg = set.resolvedLoadKg,
                     plannedLoadKg = set.resolvedLoadKg,
                     tempo = set.tempo,
+                    // The same declaration twice, and one of the two is frozen.
+                    // `tempo` carries the lifter's between-sets adjustment once
+                    // `advancedState` bakes it in; `plannedTempo` never does, so
+                    // a plan that prescribes a tempo CHANGE mid-exercise stays
+                    // distinguishable from a lifter who changed it. Mirrors
+                    // loadKg / plannedLoadKg above.
+                    plannedTempo = set.tempo,
                     side = set.side,
                     // Read from the exercise block, so two blocks of the same
                     // exercise in one session carry independent counts and
