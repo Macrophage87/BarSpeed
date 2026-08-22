@@ -18,7 +18,7 @@ import java.util.zip.ZipOutputStream
  * worth offering -- and made all four in a module with no test source set.
  * That was measured, not assumed: this issue's own gate permuted those
  * branches in :app and the whole suite stayed green. Computed here, the split
- * is pinned by [RescuedDatabaseStoreTest] on every push, and :app is left
+ * is pinned by `RescuedDatabaseStoreTest` on every push, and :app is left
  * with a `when` over a value it does not compute.
  *
  * [COMPLETE] IS NOT A COMPLETENESS GUARANTEE, and its name is the trap this

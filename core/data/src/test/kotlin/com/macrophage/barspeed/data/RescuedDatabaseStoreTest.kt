@@ -280,7 +280,7 @@ class RescuedDatabaseStoreTest {
 
     /**
      * A second rescue is untouched by discarding the first -- two directories
-     * in [store.rescued] must not become one operation.
+     * in `store.rescued()` must not become one operation.
      */
     @Test
     fun `discarding one rescue leaves the other`() {

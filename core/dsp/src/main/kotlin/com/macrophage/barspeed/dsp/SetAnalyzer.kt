@@ -234,7 +234,7 @@ object SetAnalyzer {
      * count is unchanged and the published velocities stay positive and
      * plausible — they simply describe the wrong stroke, and the eccentric and
      * concentric swap outright. Issue 28, reproduced in
-     * [HorizontalAxisOrientationTest], not fixed there: no committed capture
+     * `HorizontalAxisOrientationTest`, not fixed there: no committed capture
      * can reach this code, so any threshold chosen to harden it would be
      * calibrated against fabricated samples.
      */
