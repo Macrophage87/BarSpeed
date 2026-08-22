@@ -54,11 +54,61 @@ class CadencePlanTest {
         sensorOnStack = true,
     )
 
+    /**
+     * The (tempo, lift) pairs this file reasons about, each with a name that
+     * reads in a failure message.
+     *
+     * One list rather than a list per test, because the tests below PARTITION
+     * it: every pair either carries the spoken rep call or does not. A pair
+     * cannot quietly stop being covered by one assertion without the other
+     * gaining it, which is the only mechanical protection this repo has
+     * against a pin being narrowed instead of a defect being fixed.
+     */
+    private val corpus: List<Triple<String, String, LiftDirection>> = listOf(
+        Triple("bench 3010", "3010", benchPress),
+        Triple("bench 2011", "2011", benchPress),
+        Triple("bench 2010", "2010", benchPress),
+        Triple("bench 1010", "1010", benchPress),
+        Triple("bench 1110", "1110", benchPress),
+        Triple("leg curl 1030", "1030", legCurl),
+        Triple("leg curl 1020", "1020", legCurl),
+        Triple("leg press 2010", "2010", legPress),
+        Triple("leg press 3010", "3010", legPress),
+        Triple("leg press 2011", "2011", legPress),
+        Triple("leg press 1010", "1010", legPress),
+        Triple("face pull 2011", "2011", facePull),
+        Triple("lat pulldown ecc-first 3010", "3010", latPulldownEccFirst),
+        Triple("chest press ecc-first 3010", "3010", chestPressEccFirst),
+    )
+
     private fun schedule(t: String, d: LiftDirection) = TempoSchedule.of(Tempo.parse(t), d)
 
     private fun plan(tempo: String, direction: LiftDirection) = CadencePlan.of(schedule(tempo, direction))
 
     private fun shape(p: CadencePlan) = p.beats.map { it.label to it.seconds }
+
+    /** Corpus names, split by whether the plan speaks a rep call at all. */
+    private fun named(carries: Boolean) =
+        corpus.filter { (_, t, d) -> (plan(t, d).announceOnBeat != null) == carries }.map { it.first }
+
+    /**
+     * The beats a prescription asks for, built from [TempoSchedule] alone:
+     * first stroke, the pause after it when the prescription has one, second
+     * stroke, the closing pause when the prescription has one.
+     *
+     * Restated here rather than read back off [CadencePlan] -- an oracle that
+     * asks the thing it is checking checks nothing. What it pins is the SHAPE
+     * of the schedule against the prescription. It repeats CadencePlan's
+     * whole-second rules, so it does NOT pin those; `a zero-second stroke is
+     * played as one second` and `a fractional prescription cannot be delivered
+     * in whole seconds` pin them separately.
+     */
+    private fun prescribedBeats(s: TempoSchedule): List<Pair<String, Int>> = buildList {
+        add(s.first.label to (s.first.seconds ?: 1.0).toInt().coerceAtLeast(1))
+        if (s.pauseAfterFirstS.toInt() > 0) add(CadencePlan.HOLD to s.pauseAfterFirstS.toInt())
+        add(s.second.label to (s.second.seconds ?: 1.0).toInt().coerceAtLeast(1))
+        if (s.pauseAfterSecondS.toInt() > 0) add(CadencePlan.BREATHE to s.pauseAfterSecondS.toInt())
+    }
 
     @Test
     fun `the beats of the four tempo-and-lift pairs the sessions used`() {
@@ -147,19 +197,94 @@ class CadencePlanTest {
     }
 
     @Test
-    fun `when no stroke can spare a count the announcement is not spoken`() {
-        // These pairs all open on a one-second stroke, so nothing can carry the
-        // call. The rep NUMBER stays on screen, driven by onRepCounted, so it
-        // is the metronome's own count and not the sensor's. The "Last rep"
-        // warning has no on-screen equivalent at all and is simply lost on
-        // these pairs -- the screen shows "rep 7 of 8" and nothing marks the
-        // last one.
-        listOf("2010" to legPress, "1030" to legCurl, "2011" to facePull).forEach { (tempo, direction) ->
+    fun `which pairs run a whole set with no spoken count`() {
+        // Issue 147, stated as a list. A pair lands here when the prescription
+        // leaves no closing pause to say the call in AND the stroke the next
+        // rep opens on is one second, with no count to give up. The rep NUMBER
+        // stays on screen, driven by onRepCounted, so it is the metronome's own
+        // count and not the sensor's. The "Last rep" warning has no on-screen
+        // equivalent at all and is simply lost -- the screen reads "rep 7 of 8"
+        // and nothing marks the last one.
+        //
+        // Two of these are recorded rather than reasoned about, both captured
+        // after issue 106 and neither carrying a Rep row:
+        // `field-legcurl-1030-10rep-cues.csv` is leg curl 1030, and
+        // `field-reardeltfly-s32-set06-cues.csv` is 2011 on a vertical
+        // concentric-first drive-up machine, which resolves exactly as
+        // [legPress] does -- its track reads Up, Hold, Down, 1 and repeats.
+        //
+        // Which pairs these are belongs to (TEMPO, LIFT) and never to a tempo
+        // string: 2010 is here on a leg press and not on a bench press, from
+        // the same four digits.
+        assertEquals(
+            listOf(
+                "bench 1010",
+                "bench 1110",
+                "leg curl 1030",
+                "leg curl 1020",
+                "leg press 2010",
+                "leg press 3010",
+                "leg press 2011",
+                "leg press 1010",
+                "face pull 2011",
+                "lat pulldown ecc-first 3010",
+            ),
+            named(carries = false),
+            "pairs that run a whole set with no spoken rep count",
+        )
+        assertEquals(
+            listOf("bench 3010", "bench 2011", "bench 2010", "chest press ecc-first 3010"),
+            named(carries = true),
+            "pairs that speak it",
+        )
+        // Silence is total, not partial: nothing is half-said, and no stroke
+        // gives up a count for a call that never comes.
+        val silent = named(carries = false)
+        corpus.filter { it.first in silent }.forEach { (name, tempo, direction) ->
             val p = plan(tempo, direction)
-            assertEquals(null, p.announceOnBeat, "$tempo cannot carry the announcement")
-            assertEquals(false, p.announceMerged, "$tempo")
-            assertTrue(p.beats.none { it.suppressFirstCount }, "$tempo gives up no count")
+            assertEquals(false, p.announceMerged, name)
+            assertTrue(p.beats.none { it.suppressFirstCount }, "$name gives up no count")
         }
+    }
+
+    @Test
+    fun `deciding where the rep call goes moves no beat, on any tempo any lift prescribes`() {
+        // THE INVARIANT THE REP CALL MAY NOT BREAK, and the one this suite
+        // could not previously state. Two shipped releases moved these beats: a
+        // flat allowance for everything after the first stroke (+3.0 s per
+        // rep), then a one-second floor under the closing pause (issue 106,
+        // +1.00 s per rep, measured on 31 of 31 captured sets). Both were found
+        // by outside audit rather than here.
+        //
+        // deliveredCycleS checks only the TOTAL, so a second moved out of one
+        // beat and into another passes it. This compares the whole beat list
+        // against the prescription for every whole-second tempo with strokes in
+        // 0..4 and pauses in 0..2, plus the explosive and fractional forms, on
+        // all six lifts -- so a beat added, dropped, lengthened or shortened
+        // anywhere reds, whatever the announcement decides to ride.
+        val whole = (0..4).flatMap { d1 ->
+            (0..2).flatMap { d2 ->
+                (0..4).flatMap { d3 ->
+                    (0..2).map { d4 -> "$d1$d2$d3$d4" }
+                }
+            }
+        }
+        val notations = whole + listOf("30X0", "20X1", "10X0", "3-0-1.5-0", "1-0-2.5-1")
+        val lifts = listOf(benchPress, legCurl, facePull, legPress, latPulldownEccFirst, chestPressEccFirst)
+        var checked = 0
+        notations.forEach { n ->
+            lifts.forEach { lift ->
+                val s = schedule(n, lift)
+                val drive = if (lift.concentricUp) "up" else "down"
+                assertEquals(
+                    prescribedBeats(s),
+                    CadencePlan.of(s).beats.map { it.label to it.seconds },
+                    "$n on ${lift.plane}/${lift.startsWith}/drive-$drive",
+                )
+                checked++
+            }
+        }
+        assertEquals(230 * 6, checked, "(tempo, lift) pairs checked")
     }
 
     @Test
