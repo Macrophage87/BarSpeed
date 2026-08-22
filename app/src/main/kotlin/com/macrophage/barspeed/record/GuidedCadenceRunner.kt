@@ -17,6 +17,10 @@ private const val LEAD_IN_LABEL = "GET READY"
  * Voice-guided cadence. The runner plays the tempo prescription and counts the
  * reps; the lifter just follows the voice.
  *
+ * Two entry points. [start] plays the prep and then the cadence. [startPrep]
+ * plays the prep and hands control back, for a hold or a carry, which has one
+ * movement lasting the whole set and so no cadence to follow.
+ *
  * What it plays comes from [CadencePlan], which is pure and lives in
  * `:core:dsp` where a test can reach it. This class is the player: it walks the
  * beats, sleeps a second at a time, pushes the label and countdown, and speaks.
@@ -109,6 +113,43 @@ class GuidedCadenceRunner(
             }
     }
 
+    /**
+     * Play the prep, speak the word the set opens on, and hand control back.
+     *
+     * For a set with no cadence to run into. [startWord] is `Hold` or `Carry`,
+     * chosen by `LeadInPolicy.timedStartWord` in `:core:model` and not here --
+     * the same division that keeps [TempoSchedule] the one thing that names a
+     * stroke. It is RECORDED as well as spoken whenever the prep speaks, the way
+     * [CadencePlan]'s beat 0 records the first stroke call, so the instant the
+     * set began is readable from the cue track against the raw stream on the
+     * same clock. With [speaks] false nothing reaches the cue track and that
+     * instant is not recoverable from it.
+     *
+     * `Hold` is also what a tempo's isometric pause is called. The two are told
+     * apart by the set they sit on: `endSet` writes no tempo on a timed set, so
+     * a set carrying this cue and no `tempoPrescribed` is a hold beginning.
+     *
+     * [onStarted] runs immediately after that word, and is the instant the
+     * set's own clock starts. It is called from inside this coroutine, after
+     * the last beat's sleep, rather than launched beside the prep: a sequence
+     * point rather than an ordering between two coroutines, which is the shape
+     * of the dispatcher race this repository has already fixed once.
+     *
+     * [speaks] false runs the same seconds and pushes the same ring, saying
+     * nothing and writing nothing to the cue track. The clock still starts when
+     * the prep ends, so no figure the set records changes; what is lost is the
+     * cue-track row marking the instant the set began. Who decides it is
+     * `LeadInPolicy.speaks`, not this class.
+     */
+    fun startPrep(prepS: Int, startWord: String, speaks: Boolean, onStarted: () -> Unit) {
+        job =
+            scope.launch {
+                playLeadIn(LeadInPlan.of(prepS), speaks)
+                if (speaks) speak(startWord, startWord)
+                onStarted()
+            }
+    }
+
     fun cancel() {
         job?.cancel()
         job = null
@@ -158,12 +199,12 @@ class GuidedCadenceRunner(
      * that number is on screen. Both come from [LeadInPlan.secondsBeforeStart],
      * so they cannot drift apart.
      */
-    private suspend fun playLeadIn(plan: LeadInPlan) {
+    private suspend fun playLeadIn(plan: LeadInPlan, speaks: Boolean = true) {
         val total = plan.prepS.coerceAtLeast(1)
         update(LEAD_IN_LABEL, plan.prepS, total)
         for ((index, beat) in plan.beats.withIndex()) {
             val spoken = beat.spoken
-            if (spoken != null) speak(beat.cue, spoken)
+            if (spoken != null && speaks) speak(beat.cue, spoken)
             delay(1_000)
             update(LEAD_IN_LABEL, plan.secondsBeforeStart(index) - 1, total)
         }

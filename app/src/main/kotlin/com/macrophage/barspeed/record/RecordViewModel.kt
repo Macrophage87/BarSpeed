@@ -166,7 +166,7 @@ private data class PendingSetWrite(
     val tempoText: String?,
     val plannedDurationS: Int?,
     val actualDurationS: Int?,
-    /** The prep prescribed and the prep handed to the voice guide, frozen too. */
+    /** The prep prescribed and the prep that played, frozen too. */
     val plannedPrepS: Int?,
     val prepS: Int?,
     val startedAtMs: Long,
@@ -481,6 +481,16 @@ data class RecordState(
     val guidedLabel: String = "",
     val guidedCountdown: Int = 0,
     val guidedPhaseTotal: Int = 1,
+    /**
+     * True while the prep before a hold or a carry is playing.
+     *
+     * The set is recording and its clock has not started: [setElapsedS] is 0
+     * and stays there until the prep ends. A different question from
+     * [guidedSet], which says whether a CADENCE follows the prep; a hold has
+     * none.
+     */
+    val timedPrepRunning: Boolean = false,
+
     /** True once the voice guide has called the prescription all the way through. */
     val guidedFinished: Boolean = false,
     val setElapsedS: Int = 0,
@@ -577,10 +587,10 @@ data class RecordState(
     fun plannedPrepSecondsFor(slot: PlannedSlot?): Int = LeadInPolicy.planned(slot?.prepS)
 
     /**
-     * True when the set coming up will run the voice guide, and therefore a
-     * prep. [LeadInPolicy.playsPrep], asked of the upcoming slot rather than the
-     * current one, so the control on the rest screen is about the set it sits
-     * above.
+     * True when the set coming up will play a prep -- a tempo'd lift, or a hold
+     * or a carry. [LeadInPolicy.playsPrep], asked of the upcoming slot rather
+     * than the current one, so the control on the rest screen is about the set
+     * it sits above.
      */
     val upcomingPlaysPrep: Boolean
         get() {
@@ -724,8 +734,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var pendingWrite: PendingSetWrite? = null
 
     /**
-     * The prep prescribed for the set in progress, and the prep handed to the
-     * voice guide. Both null on a set that ran no voice guide.
+     * The prep prescribed for the set in progress, and the prep that played.
+     * Both null on a set that played none.
      *
      * Held here for the same reason `plannedRepsForSet` is: the value is decided
      * at [beginSet], when the set's guided-ness is known, and is needed at
@@ -1010,16 +1020,21 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // read from the case rather than restated, so it cannot drift from it.
         val guidedSet = prepCase == PrepCase.CUED
         if (guidedSet) manualSet = true
+        // The word the prep of a hold or a carry ends on, at the instant the
+        // set's clock starts. Non-null on every TIMED prep and on nothing else:
+        // LeadInPolicy pairs the case with the word, so this is one decision
+        // read twice rather than two decisions that can disagree.
+        val timedStartWord = LeadInPolicy.timedStartWord(exercise.kind).takeIf { prepCase == PrepCase.TIMED }
         // The prep, decided once here and used twice: handed to the runner
         // below, and frozen onto the set record at endSet. One expression,
         // because a constant read by the player and a second statement of it at
         // the write site are two facts that can disagree -- and the way they
         // disagree leaves every capture claiming a prep nobody heard.
         //
-        // Recorded only when the set ran a voice guide. An unguided set has
+        // Recorded only when the set played a prep. A set that played none has
         // no prep, and writing 0 for it would be absence rendered as a value:
-        // 0 is a real prep, the one where nothing is spoken before the first
-        // stroke call.
+        // 0 is a real prep, the one where nothing is spoken before the set
+        // begins.
         //
         // The PLANNED half is what the plan prescribed, which is its declaration
         // or the default -- not what was played. Whenever the two differ the
@@ -1056,7 +1071,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     stateFlow.value = stateFlow.value.copy(hrBpm = hr.bpm)
                 }
             }
-        startSetTimer(timedTargetS)
+        // A timed prep starts the clock itself, when it ends. Every other set
+        // is measured from here, exactly as before.
+        if (timedStartWord == null) startSetTimer(timedTargetS)
         stateFlow.value =
             s.copy(
                 stage = Stage.IN_SET,
@@ -1068,8 +1085,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 guidedLabel = "",
                 guidedCountdown = 0,
                 guidedFinished = false,
+                timedPrepRunning = timedStartWord != null,
             )
-        if (guidedSet && guidedTempo != null) {
+        if (timedStartWord != null) {
+            val speaks = LeadInPolicy.speaks(prepCase, s.audioCues)
+            startTimedPrep(prepS, timedStartWord, speaks) { startSetTimer(timedTargetS) }
+        } else if (guidedSet && guidedTempo != null) {
             startGuidedCadence(TempoSchedule.of(guidedTempo, exercise.liftDirection()), plannedRepsForSet, prepS)
         }
     }
@@ -1104,6 +1125,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun startSetTimer(timedTargetS: Int?) {
         clockStartedAtMs = System.currentTimeMillis()
+        stateFlow.value = stateFlow.value.copy(timedPrepRunning = false)
         tickJob =
             viewModelScope.launch {
                 var seconds = 0
@@ -1111,7 +1133,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     delay(1_000)
                     seconds++
                     stateFlow.value = stateFlow.value.copy(setElapsedS = seconds)
-                    if (timedTargetS != null && stateFlow.value.audioCues) {
+                    if (timedTargetS != null && LeadInPolicy.speaks(prepCaseForSet, stateFlow.value.audioCues)) {
                         TimedSetVoice.cueFor(timedTargetS - seconds)?.let { speakCue(it) }
                     }
                 }
@@ -1154,6 +1176,27 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     /** See [GuidedCadenceRunner]; the runner speaks and counts, the VM just mirrors state. */
     private fun startGuidedCadence(schedule: TempoSchedule, plannedReps: Int?, prepS: Int) {
         guidedCadence = newVoiceRunner().also { it.start(schedule, plannedReps, prepS) }
+    }
+
+    /**
+     * Play the prep before a hold or a carry, and start the set's clock when it
+     * ends rather than when the lifter tapped START.
+     *
+     * [onStarted] is [startSetTimer], handed through the runner instead of
+     * being called here. Called here, a 45 s hang with a 10 s prep would record
+     * 55 s: `duration_s` and `plannedDuration_s` would agree with each other,
+     * `startedAt` is not a per-set key in `session.json`, and the auto-fail rule
+     * compares that same inflated figure against the prescription. The witness
+     * in the gym is audible -- `TimedSetVoice` counts against the same figure,
+     * so "15 seconds" would arrive with 25 seconds of holding left to go; see
+     * [SetClockPolicy] for the silent one at the desk.
+     *
+     * [speaks] false plays the same seconds in silence. The clock still starts
+     * at the end of them, so the toggle changes what the lifter hears and what
+     * reaches the cue track, and no figure the set records.
+     */
+    private fun startTimedPrep(prepS: Int, startWord: String, speaks: Boolean, onStarted: () -> Unit) {
+        guidedCadence = newVoiceRunner().also { it.startPrep(prepS, startWord, speaks, onStarted) }
     }
 
     /**

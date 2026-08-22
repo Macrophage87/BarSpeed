@@ -164,21 +164,25 @@ data class PlanFile(
     }
 
     /**
-     * A prep declared on an exercise no set of which runs the voice guide.
+     * A prep declared on an exercise no set of which plays one.
      *
      * Nothing is lost and nothing is wrong, but the plan's author asked for
      * something and nothing happens, and the import gate is the only place that
      * can tell them. Not hypothetical: in the published `plan.example.json`,
-     * `farmers_walk`, `plank`, `suitcase_carry`, `hanging_leg_raise` and
-     * `band_assisted_pull_up` all carry no tempo, and a cable machine -- the
-     * example that motivated a declarable prep -- is among the likeliest to be
-     * given one and no tempo.
+     * `hanging_leg_raise` and `band_assisted_pull_up` are both rep-based with no
+     * tempo, and a cable machine -- the example that motivated a declarable prep
+     * -- is among the likeliest to be given one and no tempo.
+     *
+     * The holds and carries in that same example used to be listed here and are
+     * not any more: a timed set of a hold or a carry plays a prep, so a
+     * declaration on one is live.
      */
     private fun prepVsGuide(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
         if (exercise.prepS == null || exercise.playsAnyPrep) return null
         return "sessions[$si].exercises[$ei]: \"prep_s\" is declared on ${exercise.exercise}, " +
-            "but no set of it runs the voice guide - a set needs a tempo, and must be neither " +
-            "timed nor an explosive lift - so no prep is played and the declaration has no effect."
+            "but no set of it plays a prep - a prep plays before a set carrying a tempo unless " +
+            "the lift is explosive, and before a timed hold or carry - so no prep is played and " +
+            "the declaration has no effect."
     }
 
     /**
@@ -189,7 +193,8 @@ data class PlanFile(
      * be able to have none. What the plan's author may not know is that below
      * the phrase length the countdown is not what goes -- the phrase is fixed to
      * the END of the prep, so at 1 second `Ready` is dropped and only `Brace`
-     * survives.
+     * survives. Reachable on a hold since preps reached them, which is why the
+     * warning names the set beginning rather than a first movement call.
      *
      * Silent on an inert declaration: how short a prep that never plays would
      * have been is not a fact about anything, and two complaints about one
@@ -200,11 +205,11 @@ data class PlanFile(
         if (!exercise.playsAnyPrep || prep >= LeadInPolicy.MIN_USEFUL_S) return null
         if (prep == 0) {
             return "sessions[$si].exercises[$ei]: \"prep_s\": 0 means nothing at all is spoken " +
-                "before the first movement call."
+                "before the set begins."
         }
         return "sessions[$si].exercises[$ei]: \"prep_s\": $prep is shorter than the launch " +
-            "phrase - only \"Brace\" is spoken, and the \"Ready\" beat two seconds before the " +
-            "first movement is dropped."
+            "phrase - the prep says only \"Brace\", and the \"Ready\" beat two seconds before " +
+            "the set begins is dropped."
     }
 
     private fun kindVsInference(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
@@ -218,8 +223,8 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.6"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6")
+        const val SCHEMA_VERSION = "1.7"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7")
         val VALID_SIDES = setOf("left", "right")
 
         /** "top"/"bottom" name the start position; "down"/"up" the first movement. */
@@ -343,7 +348,7 @@ data class PlanExerciseDef(
     val kind: String? = null,
     /**
      * Seconds of prep before each set of this exercise: the pause between the
-     * lifter starting the set and the voice guide calling the first movement.
+     * lifter starting the set and the set actually beginning.
      *
      * What the plan's author is estimating is the time the LIFTER'S HANDS ARE
      * UNAVAILABLE -- straps, chalk, a hook grip, a belt, lying down on a machine
@@ -356,9 +361,10 @@ data class PlanExerciseDef(
      * instantly and nothing should be spoken. Omitted is resolved by
      * [LeadInPolicy], which is also where the bounds and the precedence live.
      *
-     * Only applies to sets that run the voice guide -- a set needs a tempo and
-     * must be neither timed nor an explosive lift. Declared anywhere else it is
-     * inert, and [PlanFile.warnings] says so at the import gate.
+     * Applies to a set carrying a tempo, where the prep runs into the first
+     * movement call, and to a timed set of a hold or a carry, where it runs into
+     * the word that starts the clock. Declared anywhere else it is inert, and
+     * [PlanFile.warnings] says so at the import gate.
      *
      * The lifter can change it in the app, and the change is reported back in
      * the session export as `prep_s` beside `plannedPrep_s`. A plan being
@@ -368,9 +374,9 @@ data class PlanExerciseDef(
     val sets: List<PlanSetDef>,
 ) {
     /**
-     * True when at least one set of this exercise runs the voice guide, and so
-     * plays a prep. The predicate is [LeadInPolicy.playsPrep], stated once for
-     * the import gate, the record flow and the screen alike.
+     * True when at least one set of this exercise plays a prep. The predicate is
+     * [LeadInPolicy.playsPrep], stated once for the import gate, the record flow
+     * and the screen alike.
      */
     val playsAnyPrep: Boolean
         get() = sets.any { LeadInPolicy.playsPrep(it.tempo != null, it.isTimed, effectiveKind) }

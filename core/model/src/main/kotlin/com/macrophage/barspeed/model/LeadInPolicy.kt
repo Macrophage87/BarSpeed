@@ -8,8 +8,9 @@ package com.macrophage.barspeed.model
  *
  * ## What a prep is
  *
- * The seconds between the lifter starting a set and the voice guide calling the
- * first movement. `LeadInPlan` in `:core:dsp` lays those seconds out beat by
+ * The seconds between the lifter starting a set and the set beginning -- the
+ * first movement call on a tempo'd lift, the word that starts the clock on a
+ * hold or a carry. `LeadInPlan` in `:core:dsp` lays those seconds out beat by
  * beat, and this decides how many of them there are.
  *
  * The two live in different modules on purpose. The beat layout is DSP; the
@@ -73,7 +74,7 @@ object LeadInPolicy {
     const val DEFAULT_S = 5
 
     /**
-     * No prep at all is legal: nothing is spoken before the first movement call.
+     * No prep at all is legal: nothing is spoken before the set begins.
      * Refusing it would mean deciding for a lifter who wants a machine set to
      * start the instant they tap.
      */
@@ -89,7 +90,7 @@ object LeadInPolicy {
     /**
      * Below this the launch phrase is clipped: at 1 only `Brace` is spoken and
      * the `Ready` beat two seconds out is dropped; at 0 nothing is spoken before
-     * the first movement call.
+     * the set begins.
      *
      * This equals `LeadInPlan.PHRASE_S` in `:core:dsp` -- the length of the
      * launch phrase -- and is deliberately NOT written as it, which this module
@@ -173,8 +174,11 @@ object LeadInPolicy {
      * operator precedence.
      */
     fun prepCase(hasTempo: Boolean, isTimed: Boolean, kind: ExerciseKind): PrepCase = when {
-        // A timed set runs a stopwatch, not a cadence.
-        isTimed -> PrepCase.NONE
+        // A timed set runs a stopwatch rather than a cadence, and gets a prep
+        // where the movement has a name to open on. Pairing the two here rather
+        // than testing the kind twice is what makes a prep that ends in silence
+        // unreachable.
+        isTimed -> if (timedStartWord(kind) != null) PrepCase.TIMED else PrepCase.NONE
         // An explosive lift is judged on peak velocity and is deliberately given
         // no tempo to follow.
         hasTempo && kind != ExerciseKind.EXPLOSIVE -> PrepCase.CUED
@@ -193,20 +197,19 @@ object LeadInPolicy {
     /**
      * Whether a set of this shape speaks, given the lifter's audio-cues setting.
      *
-     * The setting is consulted in four places in `:app` -- the countdown during
-     * a timed set, the rep milestones, the per-second phase counting and the
-     * rest countdown -- and in none of the paths a voice guide runs through.
-     * `GuidedCadenceRunner` never mentions it, and neither do the `speakCue` and
-     * `speakOnly` pair it is wired to. So whatever a prep or a cadence emits is
-     * spoken whatever the toggle says.
+     * A tempo'd set's voice IS the feature: prescribing a tempo is asking to be
+     * paced, so its prep and its stroke calls speak whatever the toggle says. A
+     * timed set's voice is an aid, and the toggle declines it -- with cues off a
+     * hold is silent end to end, prep included.
      *
      * Stated here rather than left implicit in which call sites happen to read
-     * the flag, because "who ignores the toggle" is a rule and four call sites
-     * are not.
+     * the flag. Two readers in `:app` ask it, one for the prep and one for the
+     * countdown during the set, and a rule spread across two call sites is two
+     * rules.
      */
     fun speaks(case: PrepCase, audioCues: Boolean): Boolean = when (case) {
-        PrepCase.CUED, PrepCase.TIMED -> true
-        PrepCase.NONE -> audioCues
+        PrepCase.CUED -> true
+        PrepCase.NONE, PrepCase.TIMED -> audioCues
     }
 }
 

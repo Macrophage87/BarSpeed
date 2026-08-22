@@ -77,8 +77,8 @@ data class SessionExport(
          * 1.11 -- a set may carry `plannedPrep_s` and `prep_s`. Purely
          * additive: no key from 1.10 changed type or stopped being written, so
          * a 1.10 reader works unchanged against a 1.11 export. Both keys are
-         * absent on a set that ran no voice guide, and on every set recorded
-         * before this version.
+         * absent on a set that played no prep, and on every set recorded before
+         * this version.
          */
         const val SCHEMA_VERSION = "1.11"
 
@@ -154,28 +154,28 @@ data class SetExport(
     /** True for warm-up sets (no RPE recorded). Omitted when false. */
     val warmup: Boolean = false,
     /**
-     * The prep prescribed before this set, and the prep handed to the voice
-     * guide, in whole seconds.
+     * The prep prescribed before this set, and the prep that played, in whole
+     * seconds.
      *
      * Whenever the two differ, the lifter adjusted the prep in the app; they
      * are equal both when no adjustment exists and when the adjustment happens
      * to equal what the plan prescribed. The difference is what lets the next
      * plan be authored from this document instead of re-guessed.
      *
-     * [plannedPrepS] is present whenever the set ran a voice guide, including
-     * declared nothing: the app's default is still what was prescribed, and a
-     * reader that saw only [prepS] could not tell an adjustment from a
-     * declaration without knowing the app's constant.
+     * [plannedPrepS] is present whenever the set played a prep, including where
+     * the plan declared nothing: the app's default is still what was
+     * prescribed, and a reader that saw only [prepS] could not tell an
+     * adjustment from a declaration without knowing the app's constant.
      *
      * [restS] beside them is the one planned value in this type whose name does
      * not say it is planned, so a reader takes a prescription for an
      * observation. That is issue #76.
      *
-     * Both absent on a set that ran no voice guide -- such a set has no prep --
-     * and both absent on every set recorded before 1.11. 0 is a value, not an
-     * absence: it is the prep in which nothing is spoken before the first stroke
-     * call, and the default here is null precisely so that 0 survives
-     * `encodeDefaults = false`.
+     * Both absent on a set that played no prep -- such a set has none -- and
+     * both absent on every set recorded before 1.11, and on every hold and
+     * carry recorded before a prep reached them. 0 is a value, not an absence: it is
+     * the prep in which nothing is spoken before the set begins, and the default
+     * here is null precisely so that 0 survives `encodeDefaults = false`.
      */
     @SerialName("plannedPrep_s") val plannedPrepS: Int? = null,
     @SerialName("prep_s") val prepS: Int? = null,

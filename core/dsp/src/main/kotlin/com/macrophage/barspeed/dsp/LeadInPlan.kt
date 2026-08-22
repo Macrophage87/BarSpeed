@@ -42,6 +42,11 @@ data class LeadInBeat(val spoken: String?, val cue: String?)
  * is what makes the horizontal case right without anyone remembering to write
  * it.
  *
+ * The same holds on a timed set, which has no [TempoSchedule] to ask: the word
+ * is `Hold` or `Carry`, and `LeadInPolicy.timedStartWord` in `:core:model`
+ * picks it. Two components own the opening word, one per case, and neither of
+ * them is this one.
+ *
  * ## What the prep plays
  *
  * A prep of P seconds is exactly P one-second slots, filled from the END
@@ -63,7 +68,7 @@ data class LeadInBeat(val spoken: String?, val cue: String?)
  *   QUEUE_FLUSH and has not been heard.
  *
  * The default prep therefore reads: five, four, three, ready, brace, and then
- * the stroke call. Degradation is not symmetric: at P = 1 only `Brace`
+ * the word the set opens on. Degradation is not symmetric: at P = 1 only `Brace`
  * survives, because the brace-now beat immediately before movement is worth
  * more than the get-ready beat two seconds out. At P = 0 nothing is spoken.
  *

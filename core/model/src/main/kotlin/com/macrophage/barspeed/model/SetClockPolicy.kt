@@ -11,12 +11,16 @@ package com.macrophage.barspeed.model
  * and only the second one is the hold.
  *
  * Measured from the tap, a 45 s hang with a 10 s prep records 55 s. Nothing in
- * the published set object separates the two: `duration_s` and
- * `plannedDuration_s` agree with each other either way, and `startedAt` is not
- * a per-set key at all. What DOES give it away is audible -- `TimedSetVoice`
- * counts against the same figure, so `"15 seconds"` would arrive with 25
- * seconds of holding still to go. A bug with a witness is worth more than a
- * silent one, and this one has exactly one.
+ * `session.json` separates the two: `duration_s` and `plannedDuration_s` agree
+ * with each other either way, and `startedAt` is not a key in that document's
+ * set object. The raw archive is where it shows: its per-set `meta.json`
+ * carries `startedAt_ms`, `endedAt_ms` and `prep_s` beside `duration_s`, and
+ * `endSet` reads the clock once for both `duration_s` and `endedAt`, so a
+ * tap-started hold satisfies `duration_s == floor((endedAt_ms -
+ * startedAt_ms) / 1000)` exactly where a correct one falls short of it by
+ * about `prep_s`. The other witness is audible: `TimedSetVoice` counts against
+ * the same figure, so `"15 seconds"` would arrive with 25 seconds of holding
+ * still to go.
  *
  * The same figure decides whether the set counts as met: `setTargetMet` on the
  * in-set screen and the auto-fail rule at `endSet` both compare it against

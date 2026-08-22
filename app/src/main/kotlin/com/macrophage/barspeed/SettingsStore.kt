@@ -32,7 +32,15 @@ class SettingsStore(private val context: Context) {
     val bodyWeightKg: Flow<Double?> =
         context.settingsDataStore.data.map { prefs -> prefs[bodyWeightKgKey]?.takeIf { it > 0 } }
 
-    /** Voice counting during sets (tempo count-up) and rest countdown. On by default. */
+    /**
+     * Everything the app says that the lifter did not prescribe: the tempo
+     * count-up, the rep announcements, a hold or a carry's whole voice -- its
+     * prep included -- and the rest countdown. On by default.
+     *
+     * It does NOT silence a voice-guided cadence or the prep before one.
+     * Prescribing a tempo is asking to be paced; see `LeadInPolicy.speaks`,
+     * which is where that split is decided.
+     */
     val audioCues: Flow<Boolean> =
         context.settingsDataStore.data.map { prefs -> prefs[audioCuesKey] ?: true }
 

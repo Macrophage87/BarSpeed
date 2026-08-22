@@ -537,8 +537,8 @@ private const val PREP_STEP_S = 5
 /**
  * The prep before the next guided set, and the taps that change it.
  *
- * Shown only when the set coming up will actually run the voice guide -- a
- * control that changed nothing would be worse than no control. The predicate is
+ * Shown only when the set coming up will actually play a prep -- a control that
+ * changed nothing would be worse than no control. The predicate is
  * [LeadInPolicy.playsPrep], reached through `state.upcomingPlaysPrep`. It is the
  * same function the import gate warns an inert `prep_s` against.
  *
@@ -580,7 +580,7 @@ private fun PrepAdjuster(state: RecordState, viewModel: RecordViewModel) {
             )
             Text(
                 when {
-                    prepS == plannedS -> "Time to get set before the first rep is called"
+                    prepS == plannedS -> "Time to get set before the set begins"
                     slot != null -> "Plan says ${plannedS}s - your change is recorded in the export"
                     else -> "Default is ${plannedS}s - your change is recorded in the export"
                 },
@@ -1005,55 +1005,96 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
 /** In-set display for holds and carries: big countdown ring, no velocity metrics. */
 @Composable
 private fun TimedSetStage(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot?) {
-    val targetS = state.currentTimedTargetS
-    val elapsed = state.setElapsedS
+    val carry = slot?.exercise?.kind == ExerciseKind.CARRY
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         InSetHeader(state, slot)
         Spacer(Modifier.height(10.dp))
-        val remaining = targetS?.let { it - elapsed }
-        val ringColor = if (remaining != null && remaining < 0) BarColors.Amber else BarColors.Volt
-        ProgressRing(
-            progress = targetS?.let { (elapsed / it.toFloat()) } ?: 0f,
-            color = ringColor,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    if (slot?.exercise?.kind == ExerciseKind.CARRY) "CARRY" else "HOLD",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = BarColors.Sub,
-                    letterSpacing = 2.sp,
-                )
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        (remaining?.coerceAtLeast(0) ?: elapsed).toString(),
-                        style = MaterialTheme.typography.displayLarge,
-                    )
-                    Text(
-                        "s",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = BarColors.Sub,
-                        modifier = Modifier.padding(bottom = 10.dp),
-                    )
-                }
-                Text(
-                    when {
-                        targetS == null -> "elapsed"
-                        remaining != null && remaining < 0 -> "target ${targetS}s — bonus time!"
-                        else -> "of ${targetS}s target"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = BarColors.Sub,
-                )
-            }
-        }
+        if (state.timedPrepRunning) TimedPrepRing(state, carry) else TimedClockRing(state, carry)
         Spacer(Modifier.height(14.dp))
         Text(
-            "Elapsed ${formatMmSs(elapsed)}",
+            "Elapsed ${formatMmSs(state.setElapsedS)}",
             style = MaterialTheme.typography.titleMedium,
             color = BarColors.Sub,
         )
         Spacer(Modifier.height(24.dp))
         EndSetControl(state, viewModel)
+    }
+}
+
+/**
+ * The prep before a hold or a carry: the seconds left before the clock starts,
+ * on the ring whether or not the prep is spoken.
+ *
+ * A ring of its own rather than a branch inside the one after it, because the
+ * two count opposite things -- this one down to the start, that one up from it
+ * -- and one expression drawing both is how a set that has not begun ends up
+ * looking like one that has.
+ *
+ * The numbers come from the same three state fields the guided cadence pushes:
+ * they carry whatever a running voice guide is saying, and a prep before a hold
+ * is one.
+ */
+@Composable
+private fun TimedPrepRing(state: RecordState, carry: Boolean) {
+    val total = state.guidedPhaseTotal.coerceAtLeast(1)
+    ProgressRing(progress = 1f - state.guidedCountdown / total.toFloat(), color = BarColors.Sub) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "GET READY",
+                style = MaterialTheme.typography.labelMedium,
+                color = BarColors.Sub,
+                letterSpacing = 2.sp,
+            )
+            Text("${state.guidedCountdown}", style = MaterialTheme.typography.displayLarge)
+            Text(
+                if (carry) "until the carry starts" else "until the hold starts",
+                style = MaterialTheme.typography.bodySmall,
+                color = BarColors.Sub,
+            )
+        }
+    }
+}
+
+/** The hold itself, counting down to the target and then past it. */
+@Composable
+private fun TimedClockRing(state: RecordState, carry: Boolean) {
+    val targetS = state.currentTimedTargetS
+    val elapsed = state.setElapsedS
+    val remaining = targetS?.let { it - elapsed }
+    val ringColor = if (remaining != null && remaining < 0) BarColors.Amber else BarColors.Volt
+    ProgressRing(
+        progress = targetS?.let { (elapsed / it.toFloat()) } ?: 0f,
+        color = ringColor,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                if (carry) "CARRY" else "HOLD",
+                style = MaterialTheme.typography.labelMedium,
+                color = BarColors.Sub,
+                letterSpacing = 2.sp,
+            )
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    (remaining?.coerceAtLeast(0) ?: elapsed).toString(),
+                    style = MaterialTheme.typography.displayLarge,
+                )
+                Text(
+                    "s",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = BarColors.Sub,
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
+            }
+            Text(
+                when {
+                    targetS == null -> "elapsed"
+                    remaining != null && remaining < 0 -> "target ${targetS}s — bonus time!"
+                    else -> "of ${targetS}s target"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = BarColors.Sub,
+            )
+        }
     }
 }
 
