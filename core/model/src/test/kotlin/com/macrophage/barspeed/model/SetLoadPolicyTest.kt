@@ -2,7 +2,9 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * The load rules the record flow applies.
@@ -557,6 +559,158 @@ class SetLoadPolicyTest {
                 statedAddedKg = null,
             ),
             "set 13 silently reverts to the plan",
+        )
+    }
+
+    /**
+     * The span a stated load is allowed to hold for: consecutive sets of one
+     * exercise block. Set 2 of a block follows set 1 of the same block.
+     */
+    @Test
+    fun `sameExerciseBlock holds from one set of a block to the next`() {
+        assertTrue(
+            SetLoadPolicy.sameExerciseBlock(
+                lastExerciseId = "seated_leg_curl",
+                nextExerciseId = "seated_leg_curl",
+                nextSetIndexInExercise = 1,
+            ),
+        )
+    }
+
+    @Test
+    fun `sameExerciseBlock ends at the next exercise`() {
+        assertFalse(
+            SetLoadPolicy.sameExerciseBlock(
+                lastExerciseId = "seated_leg_curl",
+                nextExerciseId = "lateral_raise",
+                nextSetIndexInExercise = 0,
+            ),
+        )
+    }
+
+    /**
+     * A session may run one movement in two blocks -- three heavy sets, then
+     * three back-off sets written as a separate exercise entry. The second
+     * block is a fresh prescription, so a statement made in the first does not
+     * reach it, and the exercise id alone cannot tell the two apart. This is
+     * the case `isExerciseChange` answers differently depending on whether the
+     * queue was flattened or reordered.
+     */
+    @Test
+    fun `sameExerciseBlock ends at a second block of the same exercise`() {
+        assertFalse(
+            SetLoadPolicy.sameExerciseBlock(
+                lastExerciseId = "back_squat",
+                nextExerciseId = "back_squat",
+                nextSetIndexInExercise = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun `sameExerciseBlock is false at the end of the queue`() {
+        assertFalse(
+            SetLoadPolicy.sameExerciseBlock(
+                lastExerciseId = "back_squat",
+                nextExerciseId = null,
+                nextSetIndexInExercise = null,
+            ),
+        )
+    }
+
+    /**
+     * An ad-hoc set belongs to no block, so nothing carries out of one. Guards
+     * the null-id branch against being written as an equality test alone, which
+     * would make two ad-hoc sets in a row "the same block".
+     */
+    @Test
+    fun `sameExerciseBlock is false when the set just finished was ad-hoc`() {
+        assertFalse(
+            SetLoadPolicy.sameExerciseBlock(
+                lastExerciseId = null,
+                nextExerciseId = null,
+                nextSetIndexInExercise = 1,
+            ),
+        )
+        assertFalse(
+            SetLoadPolicy.sameExerciseBlock(
+                lastExerciseId = null,
+                nextExerciseId = "back_squat",
+                nextSetIndexInExercise = 1,
+            ),
+        )
+    }
+
+    /**
+     * #124 as it behaves today, at the seam the record flow now runs through.
+     * The lifter stated 105 for a set of a block whose remaining sets all
+     * declare 90, and the statement is discarded anyway. Replaced by its
+     * inversion later on this branch.
+     */
+    @Test
+    fun `standingStatedAddedKg discards a statement inside one block (pre-fix)`() {
+        val declared = 90 / WeightUnit.LB_PER_KG
+        assertNull(
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 105 / WeightUnit.LB_PER_KG,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = declared,
+                nextDeclaredAddedKg = declared,
+            ),
+        )
+    }
+
+    /**
+     * The exercise boundary. Whatever the lifter said about the movement they
+     * have just finished says nothing about the next one, which is offered its
+     * own plan. Green before the fix on this branch and green after it.
+     */
+    @Test
+    fun `standingStatedAddedKg drops a statement at the exercise boundary`() {
+        assertNull(
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 105 / WeightUnit.LB_PER_KG,
+                sameExerciseBlock = false,
+                lastDeclaredAddedKg = 90 / WeightUnit.LB_PER_KG,
+                nextDeclaredAddedKg = 90 / WeightUnit.LB_PER_KG,
+            ),
+        )
+    }
+
+    /**
+     * A block written 60/80/100 is prescribing a change at every set. A lifter
+     * who opens at 65 instead of 60 has corrected the opener, not declared 65
+     * the working weight, and the second set is still offered 80. Green before
+     * the fix on this branch and green after it -- this is the boundary that
+     * keeps the carry from becoming the same silent substitution in the other
+     * direction.
+     */
+    @Test
+    fun `standingStatedAddedKg yields to a plan that prescribes a different load next`() {
+        assertNull(
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 65.0,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = 60.0,
+                nextDeclaredAddedKg = 80.0,
+            ),
+        )
+    }
+
+    /**
+     * Nothing stated is nothing to carry, and the plan stands untouched. Green
+     * before the fix on this branch and green after it.
+     */
+    @Test
+    fun `standingStatedAddedKg has nothing to carry when the lifter said nothing`() {
+        val declared = 90 / WeightUnit.LB_PER_KG
+        assertNull(
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = null,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = declared,
+                nextDeclaredAddedKg = declared,
+            ),
         )
     }
 }

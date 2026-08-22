@@ -341,10 +341,12 @@ private fun jumpedState(s: RecordState, done: List<PlannedSlot>, fixed: List<Pla
  * same slot when the lifter taps through, so what is seeded below is read back
  * as a declaration one set later.
  *
- * [RecordState.statedLoadKg] is cleared because the set being set up has just
- * changed: a load typed for the set that has now been written is not a
- * statement about the next one, and the field is re-seeded from the plan in the
- * same breath.
+ * [RecordState.statedLoadKg] is re-decided rather than cleared. What the lifter
+ * said about the load holds for the rest of the exercise block, and
+ * [SetLoadPolicy.standingStatedAddedKg] is what says whether it still holds
+ * here. That function answers null in every case today, so this clears the
+ * statement and re-seeds the field from the plan exactly as it always has --
+ * the seam is put in place before the rule it decides changes. #124.
  */
 private fun restingState(
     s: RecordState,
@@ -354,6 +356,22 @@ private fun restingState(
     restS: Int,
 ): RecordState {
     val nextSlot = s.nextSlot
+    // What the lifter said about the load, and whether it still applies to the
+    // set coming up. The decision is SetLoadPolicy's; this hands it the two
+    // slots' FROZEN declarations -- never their loadKg, which the bake below
+    // has already written a statement into -- and where the block ends.
+    val standingKg =
+        SetLoadPolicy.standingStatedAddedKg(
+            statedAddedKg = s.statedLoadKg,
+            sameExerciseBlock =
+            SetLoadPolicy.sameExerciseBlock(
+                lastExerciseId = p.slot?.exercise?.id,
+                nextExerciseId = nextSlot?.exercise?.id,
+                nextSetIndexInExercise = nextSlot?.setIndexInExercise,
+            ),
+            lastDeclaredAddedKg = p.slot?.plannedLoadKg,
+            nextDeclaredAddedKg = nextSlot?.plannedLoadKg,
+        )
     val seedKg =
         SetLoadPolicy.seedAddedKg(
             hasPlannedNext = nextSlot != null,
@@ -392,9 +410,12 @@ private fun restingState(
         // Set from the frozen index rather than incremented, so a retry cannot
         // count the same set twice.
         setsCompleted = p.orderIdx + 1,
-        // Pre-fill next-set inputs so in-rest edits start from plan values.
-        loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
-        statedLoadKg = null,
+        // Pre-fill next-set inputs so in-rest edits start from plan values --
+        // except the load, where a statement that still stands is shown ahead
+        // of the plan's number, so the box and what the set would record cannot
+        // disagree.
+        loadInput = (standingKg ?: seedKg)?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
+        statedLoadKg = standingKg,
         repsInput = (nextSlot?.reps ?: p.plannedReps ?: 5).toString(),
         durationInput = (nextSlot?.durationS ?: p.plannedDurationS)?.toString() ?: s.durationInput,
         tempoInput = nextSlot?.tempo ?: p.tempoText ?: "",
@@ -418,11 +439,15 @@ private fun adHocSessionState(s: RecordState): RecordState =
  * The state tapping through to the next planned set leaves behind, with any
  * in-rest edits applied. Free function for [openSession]'s reason.
  *
- * [RecordState.statedLoadKg] is cleared in BOTH branches. The plan branch
- * consumes it into the slot and must not leave it to be read again one set
- * later; the ad-hoc branch never reads it, and clearing it there keeps "the set
- * being set up changed" and "statedLoadKg is null" one rule rather than a rule
- * with an exception.
+ * [RecordState.statedLoadKg] is cleared in the ad-hoc branch, which never reads
+ * it, and SURVIVES the plan branch. The bake below consumes it into the slot,
+ * and it is also the statement [restingState] puts back to
+ * [SetLoadPolicy.standingStatedAddedKg] once the set that slot carries has been
+ * written -- clearing it here would end a carry after one set from the other
+ * side of the same rule. Between here and there nothing reads it that the bake
+ * has not already given the same number to: [SetLoadPolicy.resolve] prefers it
+ * over a declaration that now equals it, and the plate line prefers it over a
+ * `loadKg` that now equals it.
  */
 private fun advancedState(s: RecordState): RecordState {
     val next = s.nextSlot
@@ -440,7 +465,7 @@ private fun advancedState(s: RecordState): RecordState {
         )
     val queue = s.queue.toMutableList()
     queue[s.queueIndex + 1] = edited
-    return s.copy(queue = queue, queueIndex = s.queueIndex + 1, stage = Stage.READY, statedLoadKg = null)
+    return s.copy(queue = queue, queueIndex = s.queueIndex + 1, stage = Stage.READY)
 }
 
 data class RecordState(
@@ -455,16 +480,17 @@ data class RecordState(
     val selectedExerciseId: String = ExerciseDef.SEED.first().id,
     val loadInput: String = "60",
     /**
-     * The added load the lifter typed for the set now being set up, in kg, and
-     * null when they have typed nothing for it.
+     * The added load the lifter has stated for the set now being set up, in kg,
+     * and null when they have stated nothing for it.
      *
      * A different fact from [loadInput], which is one string reused across
      * every set of a session and holds a value from an earlier set until
-     * something re-seeds it. This has no default that means anything, is
-     * written only by [RecordViewModel.updateLoadInput] -- a keystroke -- and
-     * is cleared by every path that changes which set is being set up. Seeding
-     * the text does NOT set it, and that separation is what makes a forgotten
-     * clear cost a stale string on screen rather than a stale recorded load.
+     * something re-seeds it. This has no default that means anything and is
+     * written only by [RecordViewModel.updateLoadInput] -- a keystroke -- or by
+     * [SetLoadPolicy.standingStatedAddedKg] ruling on a rest transition that an
+     * earlier keystroke still applies. Seeding the text does NOT set it, and
+     * that separation is what makes a forgotten clear cost a stale string on
+     * screen rather than a stale recorded load.
      */
     val statedLoadKg: Double? = null,
     val repsInput: String = "5",

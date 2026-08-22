@@ -4,10 +4,12 @@ package com.macrophage.barspeed.model
  * Pure decisions about which load a set is recorded and pre-filled against.
  *
  * These live here rather than beside their callers in `:app` because no plain
- * JVM test can reach them where they were written. `:app` has no test source
- * set today, and adding one would not be enough by itself: both callers sit
- * inside an `AndroidViewModel` and a `@Composable`, so reaching them in place
- * would need Robolectric on the CI path. Nothing in this file touches Android,
+ * JVM test can reach them where they were written. `:app` DOES have a test
+ * source set as of `ed274bd`, which falsifies the sentence that stood here --
+ * it said `:app` had none -- but not the conclusion: the callers sit inside an
+ * `AndroidViewModel`, a `@Composable`, and file-private functions in
+ * `RecordViewModel.kt` that no test in another file can name, so reaching them
+ * in place would still need Robolectric on the CI path. Nothing in this file touches Android,
  * Room or a sensor. Callers pass what the plan declared and what the lifter
  * typed, and get a number back.
  *
@@ -32,13 +34,14 @@ object SetLoadPolicy {
      * [statedAddedKg] rather than this parameter is what carries a number the
      * lifter gave for a planned set.
      *
-     * [statedAddedKg] is the added load the lifter typed FOR THE SET BEING SET
-     * UP, and null when they have typed nothing for it. It is a different fact
-     * from [typedAddedKg], which is one string reused across every set of a
-     * session: this one has no default that means anything, is written only by
-     * a keystroke, and is cleared by every path that changes which set is being
-     * set up. That is what lets a plan set honour a load the lifter gave while
-     * still refusing to read a value left behind by an earlier set.
+     * [statedAddedKg] is the added load the lifter has stated FOR THE SET BEING
+     * SET UP, and null when they have stated nothing for it. It is a different
+     * fact from [typedAddedKg], which is one string reused across every set of
+     * a session: this one has no default that means anything, is written only
+     * by a keystroke, and is re-decided by [standingStatedAddedKg] on every
+     * rest transition, so it cannot outlive the span that function allows it.
+     * That is what lets a plan set honour a load the lifter gave while still
+     * refusing to read a value left behind by an earlier exercise.
      *
      * A 0 returned here is a real measurement of the added load, not a stand-in
      * for an unknown one, so it is a number rather than a null. Nothing
@@ -94,6 +97,105 @@ object SetLoadPolicy {
      * field is no longer in the path at all.
      */
     fun carriedIntoNextSet(declaredAddedKg: Double?, statedAddedKg: Double?): Double? = statedAddedKg ?: declaredAddedKg
+
+    /**
+     * Whether the set just finished and the set coming up belong to the same
+     * BLOCK of one exercise -- the span a load the lifter states is allowed to
+     * hold for.
+     *
+     * A block, not an exercise. `flattenPlan` walks a session's exercises in
+     * order and emits one slot per set of each, and nothing stops the same
+     * movement appearing in two of them; the second block is a fresh
+     * prescription rather than a continuation of the first.
+     * [nextSetIndexInExercise] is 0 on exactly the first set of a block, which
+     * separates the two cases without needing a block identity that no slot
+     * carries.
+     *
+     * `isExerciseChange` is deliberately not what this reads. That flag is
+     * computed as `setIdx == 0 && exerciseIdx > 0` where the queue is
+     * flattened and as `prevId != slot.exercise.id` where it is reordered by
+     * the switch-exercise route, so on a session running one movement in two
+     * consecutive blocks the two disagree about it.
+     *
+     * A null on either id, or on the index, means there is no such pair: the
+     * queue ran out, or the set just finished was ad-hoc and belongs to no
+     * block at all. Nothing carries across that.
+     */
+    fun sameExerciseBlock(lastExerciseId: String?, nextExerciseId: String?, nextSetIndexInExercise: Int?): Boolean =
+        lastExerciseId != null &&
+            lastExerciseId == nextExerciseId &&
+            nextSetIndexInExercise != null &&
+            nextSetIndexInExercise > 0
+
+    /**
+     * The added load the lifter STATED that still stands for the set coming up,
+     * or null when that set is offered whatever its own slot declares.
+     *
+     * THIS FUNCTION RETURNS null UNCONDITIONALLY, WHICH IS TODAY'S RULE. A load
+     * typed for one set reaches that set and no further: the rest transition
+     * clears the statement and re-seeds the load field from the plan, so a
+     * lifter who moves up in weight and does not retype it on every subsequent
+     * set has the prescription recorded against reps done at another load, with
+     * nothing on screen marking the change. That is #124, and this is the seam
+     * it will be fixed at -- written here first, with the record flow already
+     * routed through it, so that the fix is one expression in a module with
+     * tests rather than a new branch in an untested view model.
+     *
+     * [statedAddedKg] is the statement as it stood when the set that just
+     * finished was written: what the lifter typed for it, null when they typed
+     * nothing. Zero is a statement rather than an absence, the same way it is
+     * in [resolve] -- a lifter who stripped the bar has said something -- so
+     * this parameter is tested against null and never for truthiness.
+     *
+     * [sameExerciseBlock] bounds the carry; see that function for what a block
+     * is.
+     *
+     * [lastDeclaredAddedKg] and [nextDeclaredAddedKg] are the two slots'
+     * `plannedLoadKg`, frozen at what the plan declared and never written back
+     * to. NOT their `loadKg`, which carries the statement itself once
+     * [carriedIntoNextSet] has baked it in -- comparing those two would compare
+     * a number against itself. A plan that declares a DIFFERENT load for the
+     * next set is prescribing a change, and it is that number the lifter is
+     * offered: a warm-up corrected upward must not become the working set's
+     * load, and a block written 60/80/100 must still climb after its opener is
+     * adjusted. One keystroke still displaces it, exactly as before.
+     *
+     * A null on one side only is not that case and is not claimed to be: the
+     * plan declared no load for one of the two sets rather than a different
+     * one. Null compares unequal to a number, so the carry drops there too --
+     * the right direction, and stated as what it is rather than as a
+     * prescription. Null on BOTH sides compares equal, which is the loadless
+     * block carrying an added load the lifter supplied.
+     *
+     * The two declarations are compared with `==` on Double, which is exact
+     * here rather than approximate: both are `PlanSetDef.resolvedLoadKg`
+     * applied to the plan's own text, so two slots declaring the same load in
+     * the same unit hold the same bits, and nothing arithmetic happens to
+     * either on the way in. In the SAME UNIT: `resolvedLoadKg` is `loadKg ?:
+     * loadLb?.let { it / LB_PER_KG }`, so one slot written `load_lb: 90` and
+     * the next written `load_kg: 40.8233133` are the same weight and compare
+     * unequal. The carry drops there, which is the safe direction and not the
+     * intended one.
+     *
+     * A carried load does not touch `plannedLoad_kg`. The plan's prescription
+     * is stored beside the load actually recorded for every set, so a carry is
+     * visible afterwards as a deviation on each set it reached.
+     */
+    // Both suppressions describe the CONSTANT BODY BELOW and go away with it in
+    // the commit that changes the rule. The decision this function names is a
+    // literal `statedLoadKg = null` in `:app` today, where no test can reach
+    // it; lifting it here one commit ahead of the change is what lets the
+    // differential be shown red against a real assertion rather than against a
+    // test source set that will not compile. detekt is right about the body and
+    // is being told so, not turned off: `config/detekt/detekt.yml` is untouched
+    // and every other function in this module is still judged by both rules.
+    @Suppress("FunctionOnlyReturningConstant", "UnusedParameter")
+    fun standingStatedAddedKg(
+        statedAddedKg: Double?,
+        sameExerciseBlock: Boolean,
+        lastDeclaredAddedKg: Double?,
+        nextDeclaredAddedKg: Double?,
+    ): Double? = null
 
     /**
      * The load actually borne by a lifter's body on a body-weight movement:
