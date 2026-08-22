@@ -3,6 +3,7 @@ package com.macrophage.barspeed.dsp
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
+import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -133,26 +134,56 @@ data class SetAnalysis(
     val tempoCompliance: TempoComplianceResult?,
     /** Rule-based coaching notes; empty means "on target". */
     val verdicts: List<String>,
+    /**
+     * Detections whose drive began after the set's own end cue, or null when
+     * nothing on the record said when the set ended. See [SetEnd].
+     *
+     * Null and 0 are different facts and must stay distinguishable: 0 means a
+     * cue bounded this set and nothing came after it, null means no cue did.
+     * A reader of a stored analysis cannot recover the difference from
+     * anything else the row carries.
+     */
+    val detectionsAfterSetEndCue: Int? = null,
 )
 
 /** Full batch analysis of one recorded set. */
 object SetAnalyzer {
+    /**
+     * [cues] is the set's own voice-cue track, which says when the app stopped
+     * prescribing. Empty for a set that was not guided, and for every caller
+     * that has no track to offer; [SetEnd] is where what that means is written
+     * down.
+     */
     fun analyze(
         samples: List<ImuSample>,
         direction: LiftDirection = LiftDirection(),
         loadKg: Double? = null,
         targets: SetTargets = SetTargets(),
         config: DspConfig = DspConfig(),
+        cues: List<VoiceCue> = emptyList(),
     ): SetAnalysis {
         val raw = VelocityEstimator.estimate(samples, config, direction.measuredPlane)
         val series = orient(raw, direction, config).mappedToLifter(direction.sensorToLifter)
         val spans = RepSegmenter.segment(series, direction, config)
+        // The sample's OWN arrival stamp, not a time off the reconstructed
+        // clock the series runs on: the series is built index-parallel to the
+        // sample list, so this is exact, and comparing it against a cue costs
+        // none of the skew CueTrack.MAX_SKEW_MS measures.
+        val driveStartMs = spans.map { samples[it.conStartIdx].timestampMs }
+        val setEnd = SetEnd.of(cues)
         val reps = spans.mapIndexed { idx, span -> repMetrics(idx, span, series, direction, loadKg, config) }
         val velocityLoss = velocityLossPct(reps)
         val tempoCompliance =
             targets.tempo?.let { complianceFor(it, targets.toleranceS, reps, direction) }
         val verdicts = CoachingRules.verdicts(reps, velocityLoss, tempoCompliance, targets)
-        return SetAnalysis(reps, series.sampleRateHz, velocityLoss, tempoCompliance, verdicts)
+        return SetAnalysis(
+            reps,
+            series.sampleRateHz,
+            velocityLoss,
+            tempoCompliance,
+            verdicts,
+            setEnd.detectionsAfter(driveStartMs),
+        )
     }
 
     fun analyze(

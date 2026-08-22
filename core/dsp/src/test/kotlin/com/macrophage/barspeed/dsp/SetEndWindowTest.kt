@@ -1,8 +1,11 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.StartPhase
+import com.macrophage.barspeed.model.VoiceCue
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Session 32, set 6: what the analyzer makes of the stream that keeps
@@ -54,6 +57,9 @@ class SetEndWindowTest {
     private fun load(name: String) =
         ImuCsv.decode(javaClass.getResourceAsStream("/$name")!!.readBytes().decodeToString())
 
+    /** The capture's own cue track, in the form the recorder hands to the analyzer. */
+    private fun track(name: String) = CueTrack.read(name).map { VoiceCue(it.timestampMs, it.label) }
+
     private val fixture = "field-reardeltfly-s32-set06"
 
     /** Set 6's exported geometry block, read off the session's own export. */
@@ -90,6 +96,136 @@ class SetEndWindowTest {
         PublishedRep(null, 5.23, 0.368, 0.622, 1.930, 58.9),
         PublishedRep(null, 5.07, 0.134, 0.306, 0.679, 27.8),
     )
+
+    // ------------------------------------------------------------------
+    // The rule itself. See SetEnd for what each of these decisions costs.
+    // ------------------------------------------------------------------
+
+    /**
+     * An unguided set: nothing said when it ended, so nothing is bounded, and
+     * the analysis says that rather than saying zero.
+     *
+     * Null and 0 are the two states this has to keep apart. Reporting 0 here
+     * would state that a boundary was applied and excluded nothing, which is
+     * the "absence rendered as a value" failure -- and on a set with no cue
+     * track the tail is exactly as long and exactly as full of handling as it
+     * is on a guided one.
+     */
+    @Test
+    fun `a set with nothing saying when it ended is not bounded and says so`() {
+        assertEquals(SetEnd.NotCued, SetEnd.of(emptyList()))
+        assertNull(SetEnd.NotCued.detectionsAfter(listOf(1L, 2L, 3L)), "detections after an absent boundary")
+        assertTrue(SetEnd.NotCued.startedWithinSet(Long.MAX_VALUE), "no boundary excludes nothing")
+    }
+
+    /** A drive beginning on the cue's own millisecond was begun no later than the call. */
+    @Test
+    fun `the boundary includes the instant the cue was stamped`() {
+        val end = SetEnd.Cued(1_000L)
+        assertTrue(end.startedWithinSet(999L), "a drive begun before the cue")
+        assertTrue(end.startedWithinSet(1_000L), "a drive begun on the cue")
+        assertEquals(false, end.startedWithinSet(1_001L), "a drive begun after the cue")
+        assertEquals(2, end.detectionsAfter(listOf(999L, 1_000L, 1_001L, 5_000L)), "detections after the cue")
+    }
+
+    /**
+     * The FIRST `Done`, not the last.
+     *
+     * Two sources can speak it -- the guided runner when it has called the
+     * prescription through, and the rep counter when it reaches the planned
+     * count -- and on every capture held here exactly one does. Taking the
+     * first makes the rule total without resting on that, and a second `Done`
+     * cannot un-tell the lifter the set is over.
+     */
+    @Test
+    fun `the first Done bounds the set, not a later one`() {
+        val spoken = listOf(
+            VoiceCue(1_000L, "Up"),
+            VoiceCue(2_000L, "Done"),
+            VoiceCue(3_000L, "Done"),
+        )
+        assertEquals(SetEnd.Cued(2_000L), SetEnd.of(spoken))
+    }
+
+    /** Every other cue calls a stroke or counts one; none of them ends the set. */
+    @Test
+    fun `a cue track that never says Done leaves the set unbounded`() {
+        val spoken = listOf(
+            VoiceCue(1_000L, "Ready"),
+            VoiceCue(2_000L, "Up"),
+            VoiceCue(3_000L, "Hold"),
+            VoiceCue(4_000L, "Down"),
+            VoiceCue(5_000L, "1"),
+            VoiceCue(6_000L, "Time"),
+        )
+        assertEquals(SetEnd.NotCued, SetEnd.of(spoken))
+    }
+
+    /**
+     * Set 6 through the analyzer, with and without its own cue track.
+     *
+     * The count is what the rule found, reported whether or not anything is
+     * done with it.
+     */
+    @Test
+    fun `set 6 counts the one detection that began after its Done cue`() {
+        val samples = load("$fixture.csv")
+        assertEquals(
+            1,
+            SetAnalyzer.analyze(samples, rearDeltFly, loadKg = loadKg, cues = track(fixture))
+                .detectionsAfterSetEndCue,
+            "detections beginning after Done",
+        )
+        assertNull(
+            SetAnalyzer.analyze(samples, rearDeltFly, loadKg = loadKg).detectionsAfterSetEndCue,
+            "same capture with no cue track",
+        )
+    }
+
+    /**
+     * Every committed capture that carries a cue track, and how many of its
+     * detections begin after the set was called over.
+     *
+     * Five of the nine carry none: the four session-26 barbell captures and one
+     * of the four leg curls are untouched by this rule, which is what makes the
+     * other four evidence rather than a coincidence of one recording. The
+     * affected four are not a random sample either -- three of them are the
+     * captures [VelocityLossTest] documents as publishing no velocity loss
+     * because their last detection was the fastest of the set, one of which
+     * (`field-legcurl-1030-10rep`, session 31 set 11) is issue #126's own set.
+     * That case's KDoc says nothing in the rep list can tell a spurious final
+     * detection from a set held flat; the cue track is the thing outside the
+     * rep list that can.
+     */
+    @Test
+    fun `four of the nine cued captures carry a detection that began after Done`() {
+        val legCurl = LiftDirection(
+            startsWith = StartPhase.CONCENTRIC,
+            concentricUp = false,
+            sensorInverted = true,
+            plane = MovementPlane.VERTICAL,
+            sensorOnStack = true,
+        )
+        val barbell = LiftDirection(startsWith = StartPhase.ECCENTRIC)
+        val corpus = listOf(
+            Triple("field-legcurl-1030-12rep", legCurl, 0),
+            Triple("field-legcurl-1030-12rep-b", legCurl, 1),
+            Triple("field-legcurl-1030-12rep-c", legCurl, 2),
+            Triple("field-legcurl-1030-10rep", legCurl, 1),
+            Triple("field-ohp-rotating-8rep", barbell, 0),
+            Triple("field-ohp-rotating-8rep-b", barbell, 0),
+            Triple("field-bench-rotating-6rep", barbell, 0),
+            Triple("field-bench-rotating-6rep-ok", barbell, 0),
+            Triple(fixture, rearDeltFly, 1),
+        )
+        corpus.forEach { (name, direction, expected) ->
+            assertEquals(
+                expected,
+                SetAnalyzer.analyze(load("$name.csv"), direction, cues = track(name)).detectionsAfterSetEndCue,
+                "$name detections beginning after Done",
+            )
+        }
+    }
 
     /**
      * The fixture reproduces the shipped export, rep for rep.
