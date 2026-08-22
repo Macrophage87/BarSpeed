@@ -365,10 +365,20 @@ class CadencePlanTest {
         // on its eccentric. Both are representable -- start phase and plane are
         // independent fields -- and both take a branch of TempoSchedule that
         // none of the captured sessions reaches. Both lose a second here.
+        //
+        // The pulldown is one of the seven pairs issue 147 moves, and this
+        // assertion is the near neighbour of the two the differential commit
+        // before this one changed: same defect, same fix, a different test.
+        // Its opener is one second and its second stroke is three, so the call
+        // goes there instead of nowhere. `the merge threshold is two seconds`
+        // and `a one-second opener sends the rep call to the second stroke`
+        // both pin the rule; this one only stops asserting the old outcome.
         val pulldown = plan("3010", latPulldownEccFirst)
         assertEquals(listOf("UP" to 1, "DOWN" to 3), shape(pulldown), "drive-down, ecc-first")
         assertEquals(4, pulldown.deliveredCycleS)
-        assertEquals(null, pulldown.announceOnBeat, "opens on a one-second stroke")
+        assertEquals(1, pulldown.announceOnBeat, "one-second opener, so the second stroke takes the call")
+        assertEquals(true, pulldown.announceMerged)
+        assertEquals(true, pulldown.beats[1].suppressFirstCount, "and gives up its first count for it")
 
         val chestPress = plan("3010", chestPressEccFirst)
         assertEquals(listOf("RETURN" to 3, "DRIVE" to 1), shape(chestPress), "horizontal, ecc-first")
