@@ -3,6 +3,8 @@ package com.macrophage.barspeed.model
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -159,6 +161,123 @@ class LeadInPolicyTest {
         assertFalse(LeadInPolicy.playsPrep(hasTempo = false, isTimed = true, kind = ExerciseKind.CARRY))
     }
 
+    // ---- which KIND of prep, and the word it ends on -------------------------
+
+    /**
+     * The whole truth table, one row per shape of set a plan or the ad-hoc path
+     * can produce. Sixteen rows rather than a handful of examples, because the
+     * rows that go wrong are the ones nobody thought to write out: a tempo on a
+     * timed set, which `PlanFile.validate` refuses but the device path has no
+     * validator for, and a rep-based set of an exercise whose kind is a hold.
+     *
+     * Expectations are literals. Deriving one from another call to
+     * [LeadInPolicy.prepCase] would be a check that cannot fail.
+     */
+    @Test
+    fun `every shape of set gets the prep its shape calls for`() {
+        val expected: Map<Triple<Boolean, Boolean, ExerciseKind>, PrepCase> =
+            mapOf(
+                // A rep-based lift: a tempo is what makes a start instant worth
+                // announcing, and the cadence is what the prep runs into.
+                Triple(false, false, ExerciseKind.DYNAMIC) to PrepCase.NONE,
+                Triple(true, false, ExerciseKind.DYNAMIC) to PrepCase.CUED,
+                Triple(false, true, ExerciseKind.DYNAMIC) to PrepCase.NONE,
+                Triple(true, true, ExerciseKind.DYNAMIC) to PrepCase.NONE,
+                // A hold. Its rep-based row is not a mistake in this table:
+                // `kind` says what the movement IS and the SET says how it is
+                // measured, so a tempo'd rep set of a hold exercise is cued like
+                // any other. `PlanFile.warnings` complains about the pairing
+                // separately.
+                Triple(false, false, ExerciseKind.HOLD) to PrepCase.NONE,
+                Triple(true, false, ExerciseKind.HOLD) to PrepCase.CUED,
+                Triple(false, true, ExerciseKind.HOLD) to PrepCase.NONE,
+                Triple(true, true, ExerciseKind.HOLD) to PrepCase.NONE,
+                // A carry, which reaches every case the same way a hold does.
+                Triple(false, false, ExerciseKind.CARRY) to PrepCase.NONE,
+                Triple(true, false, ExerciseKind.CARRY) to PrepCase.CUED,
+                Triple(false, true, ExerciseKind.CARRY) to PrepCase.NONE,
+                Triple(true, true, ExerciseKind.CARRY) to PrepCase.NONE,
+                // An explosive lift, in every shape: judged on peak velocity
+                // with deliberately no cadence to open on.
+                Triple(false, false, ExerciseKind.EXPLOSIVE) to PrepCase.NONE,
+                Triple(true, false, ExerciseKind.EXPLOSIVE) to PrepCase.NONE,
+                Triple(false, true, ExerciseKind.EXPLOSIVE) to PrepCase.NONE,
+                Triple(true, true, ExerciseKind.EXPLOSIVE) to PrepCase.NONE,
+            )
+
+        expected.forEach { (shape, case) ->
+            val (hasTempo, isTimed, kind) = shape
+            assertEquals(
+                case,
+                LeadInPolicy.prepCase(hasTempo, isTimed, kind),
+                "hasTempo=$hasTempo isTimed=$isTimed kind=$kind",
+            )
+        }
+    }
+
+    /**
+     * [LeadInPolicy.playsPrep] is the yes/no half of the same rule and cannot
+     * disagree with it. Checked over the same sixteen shapes rather than
+     * asserted in prose, because two statements of one rule is how the import
+     * gate ends up warning about a prep that plays.
+     */
+    @Test
+    fun `playsPrep answers the same question as prepCase`() {
+        ExerciseKind.entries.forEach { kind ->
+            listOf(false, true).forEach { hasTempo ->
+                listOf(false, true).forEach { isTimed ->
+                    assertEquals(
+                        LeadInPolicy.prepCase(hasTempo, isTimed, kind) != PrepCase.NONE,
+                        LeadInPolicy.playsPrep(hasTempo, isTimed, kind),
+                        "hasTempo=$hasTempo isTimed=$isTimed kind=$kind",
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * The word a timed set's prep ends on, which is the movement's own name.
+     * `Down` and `Up` name what a dynamic set is about to do; `Hold` and `Carry`
+     * do the same job for a set that has one movement lasting the whole of it.
+     *
+     * A rep-based lift and an explosive lift have no such word, and that is the
+     * fact `prepCase` leans on: it can only answer [PrepCase.TIMED] where this
+     * answers something, so no prep can end in silence.
+     */
+    @Test
+    fun `a timed set opens on the name of the movement`() {
+        assertEquals("Hold", LeadInPolicy.timedStartWord(ExerciseKind.HOLD))
+        assertEquals("Carry", LeadInPolicy.timedStartWord(ExerciseKind.CARRY))
+        assertNull(LeadInPolicy.timedStartWord(ExerciseKind.DYNAMIC))
+        assertNull(LeadInPolicy.timedStartWord(ExerciseKind.EXPLOSIVE))
+    }
+
+    /**
+     * The invariant that pairing buys: nothing can reach [PrepCase.TIMED]
+     * without a word to end on.
+     *
+     * Weak on its own and said so: it is satisfied by a table with no TIMED row
+     * in it at all. What makes it worth keeping is the row count beside it --
+     * `every shape of set gets the prep its shape calls for` states which shapes
+     * are TIMED, and this states that each of them can be spoken.
+     */
+    @Test
+    fun `no shape of set plays a prep with no word to end it on`() {
+        ExerciseKind.entries.forEach { kind ->
+            listOf(false, true).forEach { hasTempo ->
+                listOf(false, true).forEach { isTimed ->
+                    if (LeadInPolicy.prepCase(hasTempo, isTimed, kind) == PrepCase.TIMED) {
+                        assertNotNull(
+                            LeadInPolicy.timedStartWord(kind),
+                            "hasTempo=$hasTempo isTimed=$isTimed kind=$kind plays a prep that ends in silence",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     // ---- the relationship between two constants that are both 2 -------------
 
     /**
@@ -180,5 +299,30 @@ class LeadInPolicyTest {
     @Test
     fun `the useful minimum is two seconds`() {
         assertEquals(2, LeadInPolicy.MIN_USEFUL_S)
+    }
+
+    // ---- what the audio-cues setting silences -------------------------------
+
+    /**
+     * CHARACTERIZATION: what the audio-cues setting does to each shape of set at
+     * this commit, so that changing it shows as a changed assertion rather than
+     * as a silent widening.
+     *
+     * The setting gates the countdown during a timed set, the rep milestones,
+     * the per-second phase counting and the rest countdown. It gates nothing a
+     * voice guide emits: `GuidedCadenceRunner` never mentions it, and neither
+     * does the `speakCue`/`speakOnly` pair it is wired to.
+     *
+     * The TIMED rows are the branch's own behaviour rather than the app's
+     * before it, because no set reaches [PrepCase.TIMED] at this commit.
+     */
+    @Test
+    fun `the audio-cues setting silences nothing a voice guide is playing`() {
+        assertTrue(LeadInPolicy.speaks(PrepCase.CUED, audioCues = true))
+        assertTrue(LeadInPolicy.speaks(PrepCase.CUED, audioCues = false))
+        assertTrue(LeadInPolicy.speaks(PrepCase.TIMED, audioCues = true))
+        assertTrue(LeadInPolicy.speaks(PrepCase.TIMED, audioCues = false))
+        assertTrue(LeadInPolicy.speaks(PrepCase.NONE, audioCues = true))
+        assertFalse(LeadInPolicy.speaks(PrepCase.NONE, audioCues = false))
     }
 }

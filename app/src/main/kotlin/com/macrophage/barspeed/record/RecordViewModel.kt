@@ -17,6 +17,7 @@ import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.SetTargets
 import com.macrophage.barspeed.dsp.StreamingSetTracker
 import com.macrophage.barspeed.dsp.TempoSchedule
+import com.macrophage.barspeed.dsp.TimedSetVoice
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.hrm.Hrv
 import com.macrophage.barspeed.hrm.RrIngest
@@ -28,10 +29,12 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
+import com.macrophage.barspeed.model.PrepCase
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SessionCloseState
+import com.macrophage.barspeed.model.SetClockPolicy
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetWriteState
@@ -681,6 +684,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var guidedCadence: GuidedCadenceRunner? = null
     private var setStartedAtMs = 0L
 
+    /**
+     * When the set's own clock started, or null while it has not started.
+     *
+     * Distinct from [setStartedAtMs], which is when RECORDING started and is the
+     * set journal's t0. Which of the two a figure is measured from is
+     * [SetClockPolicy]'s decision, not this file's.
+     */
+    private var clockStartedAtMs: Long? = null
+
+    /** Which prep the set in progress played; frozen at [beginSet] for [endSet]. */
+    private var prepCaseForSet: PrepCase = PrepCase.NONE
+
     /** When this session began, for grouping a session's captures on disk. */
     private var sessionStartedAtMs = 0L
 
@@ -987,10 +1002,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // (concentric is the metric) stay sensor-counted.
         val guidedTempo =
             (if (s.adHoc) s.tempoInput.ifBlank { null } else s.currentSlot?.tempo)?.let { Tempo.parseOrNull(it) }
-        // The same predicate the import gate warns an inert prep_s against and
-        // the same one the screen offers the prep control on. Stated once, in a
+        // The same rule the import gate warns an inert prep_s against and the
+        // same one the screen offers the prep control on. Stated once, in a
         // module with tests, because three statements of it would be three rules.
-        val guidedSet = LeadInPolicy.playsPrep(guidedTempo != null, s.currentIsTimed, exercise.kind)
+        val prepCase = LeadInPolicy.prepCase(guidedTempo != null, s.currentIsTimed, exercise.kind)
+        // A cadence runner runs on exactly the sets whose prep runs into one,
+        // read from the case rather than restated, so it cannot drift from it.
+        val guidedSet = prepCase == PrepCase.CUED
         if (guidedSet) manualSet = true
         // The prep, decided once here and used twice: handed to the runner
         // below, and frozen onto the set record at endSet. One expression,
@@ -1008,8 +1026,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // lifter adjusted the prep; they are equal both when no adjustment
         // exists and when it happens to equal what the plan prescribed.
         val prepS = s.prepSecondsFor(s.currentSlot)
-        plannedPrepSForSet = s.plannedPrepSecondsFor(s.currentSlot).takeIf { guidedSet }
-        prepSForSet = prepS.takeIf { guidedSet }
+        plannedPrepSForSet = s.plannedPrepSecondsFor(s.currentSlot).takeIf { prepCase != PrepCase.NONE }
+        prepSForSet = prepS.takeIf { prepCase != PrepCase.NONE }
+        prepCaseForSet = prepCase
+        clockStartedAtMs = null
         setStartedAtMs = System.currentTimeMillis()
         if (sessionStartedAtMs == 0L) sessionStartedAtMs = setStartedAtMs
         // Opened before the collectors below start, so no sample can arrive
@@ -1036,26 +1056,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     stateFlow.value = stateFlow.value.copy(hrBpm = hr.bpm)
                 }
             }
-        tickJob =
-            viewModelScope.launch {
-                var seconds = 0
-                while (true) {
-                    delay(1_000)
-                    seconds++
-                    stateFlow.value = stateFlow.value.copy(setElapsedS = seconds)
-                    if (timedTargetS != null && stateFlow.value.audioCues) {
-                        // Long holds/carries: milestone every 15 s remaining
-                        // ("45 seconds"), then each second from 10 down.
-                        val remaining = timedTargetS - seconds
-                        when {
-                            remaining == 0 -> speakCue("Time")
-                            remaining in 1..TIMED_FINAL_COUNTDOWN_FROM_S -> speakCue(remaining.toString())
-                            remaining > 0 && remaining % TIMED_MILESTONE_EVERY_S == 0 ->
-                                speakCue("$remaining seconds")
-                        }
-                    }
-                }
-            }
+        startSetTimer(timedTargetS)
         stateFlow.value =
             s.copy(
                 stage = Stage.IN_SET,
@@ -1087,29 +1088,72 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Start the set's own clock: the seconds on screen, and what a timed set
+     * says as its target approaches.
+     *
+     * A function rather than four lines inside [beginSet] because WHEN it runs
+     * is a decision. The instant it runs is the instant the set is measured
+     * from -- [endSet] reads [clockStartedAtMs] and nothing else -- so a caller
+     * that runs it too early folds whatever came before into the set's figure.
+     *
+     * What is said comes from [TimedSetVoice] in `:core:dsp`, where every case
+     * of it is a literal in a test. This walks the seconds and hands each cue to
+     * [speakCue], which writes it to the cue track as the tempo calls are
+     * written.
+     */
+    private fun startSetTimer(timedTargetS: Int?) {
+        clockStartedAtMs = System.currentTimeMillis()
+        tickJob =
+            viewModelScope.launch {
+                var seconds = 0
+                while (true) {
+                    delay(1_000)
+                    seconds++
+                    stateFlow.value = stateFlow.value.copy(setElapsedS = seconds)
+                    if (timedTargetS != null && stateFlow.value.audioCues) {
+                        TimedSetVoice.cueFor(timedTargetS - seconds)?.let { speakCue(it) }
+                    }
+                }
+            }
+    }
+
+    /**
+     * A [GuidedCadenceRunner] wired to this view model's voice, journal and
+     * state.
+     *
+     * One construction site rather than one per thing a runner can be asked to
+     * play. The `speak` split is load-bearing and easy to get subtly wrong: the
+     * FIRST argument is the cue that goes on the record, the second is what is
+     * spoken, and a NULL cue means speak it and write nothing down. A second
+     * copy of that line is a second chance to record a countdown digit that
+     * `LeadInPlan.RECORDED` says must not be recorded.
+     *
+     * [RecordState.guidedLabel], [RecordState.guidedCountdown] and
+     * [RecordState.guidedPhaseTotal] carry whatever a running voice guide is
+     * saying. `guidedSet` is a different question -- whether a CADENCE follows
+     * the prep -- and is answered in [beginSet].
+     */
+    private fun newVoiceRunner(): GuidedCadenceRunner {
+        if (voice == null) voice = VoiceCounter(getApplication())
+        return GuidedCadenceRunner(
+            scope = viewModelScope,
+            speak = { cue, utterance -> if (cue == null) speakOnly(utterance) else speakCue(cue, utterance) },
+            update = { label, remaining, total ->
+                stateFlow.value =
+                    stateFlow.value.copy(guidedLabel = label, guidedCountdown = remaining, guidedPhaseTotal = total)
+            },
+            onRepCounted = { rep ->
+                journal?.appendRepMark(System.currentTimeMillis())
+                stateFlow.value = stateFlow.value.copy(manualReps = rep)
+            },
+            onFinished = { stateFlow.value = stateFlow.value.copy(guidedFinished = true) },
+        )
+    }
+
     /** See [GuidedCadenceRunner]; the runner speaks and counts, the VM just mirrors state. */
     private fun startGuidedCadence(schedule: TempoSchedule, plannedReps: Int?, prepS: Int) {
-        if (voice == null) voice = VoiceCounter(getApplication())
-        guidedCadence =
-            GuidedCadenceRunner(
-                scope = viewModelScope,
-                speak = { cue, utterance ->
-                    if (cue == null) speakOnly(utterance) else speakCue(cue, utterance)
-                },
-                update = { label, remaining, total ->
-                    stateFlow.value =
-                        stateFlow.value.copy(
-                            guidedLabel = label,
-                            guidedCountdown = remaining,
-                            guidedPhaseTotal = total,
-                        )
-                },
-                onRepCounted = { rep ->
-                    journal?.appendRepMark(System.currentTimeMillis())
-                    stateFlow.value = stateFlow.value.copy(manualReps = rep)
-                },
-                onFinished = { stateFlow.value = stateFlow.value.copy(guidedFinished = true) },
-            ).also { it.start(schedule, plannedReps, prepS) }
+        guidedCadence = newVoiceRunner().also { it.start(schedule, plannedReps, prepS) }
     }
 
     /**
@@ -1264,8 +1308,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val plannedReps = if (s.adHoc) s.repsInput.toIntOrNull() else slot?.reps
         val side = if (s.adHoc) s.sideInput else slot?.side
         val plannedDurationS = if (isTimed) s.currentTimedTargetS else null
+        // Measured from the instant the set's CLOCK started, which is not the
+        // instant recording started once a prep sits in front of a hold. The
+        // rule is SetClockPolicy's, in a module with tests; this hands it both
+        // instants and the case that decides between them. One reading of the
+        // clock, shared with the row's own endedAt, so the two cannot disagree.
+        val endedAtMs = System.currentTimeMillis()
         val actualDurationS =
-            if (isTimed) ((System.currentTimeMillis() - setStartedAtMs) / 1000L).toInt() else null
+            if (isTimed) {
+                SetClockPolicy.heldSeconds(prepCaseForSet, setStartedAtMs, clockStartedAtMs, endedAtMs)
+            } else {
+                null
+            }
         val tempoText =
             when {
                 isTimed -> null
@@ -1295,7 +1349,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 plannedPrepS = plannedPrepSForSet,
                 prepS = prepSForSet,
                 startedAtMs = setStartedAtMs,
-                endedAtMs = System.currentTimeMillis(),
+                endedAtMs = endedAtMs,
                 orderIdx = s.setsCompleted,
                 samples = imuBuffer.toList(),
                 hrSamples = hrBuffer.toList(),
@@ -1720,8 +1774,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         const val DEFAULT_REST_S = 150
         const val REST_COUNTDOWN_FROM_S = 3
-        const val TIMED_FINAL_COUNTDOWN_FROM_S = 10
-        const val TIMED_MILESTONE_EVERY_S = 15
 
         /** Reps synthesized for a demo set when nothing planned one. */
         const val DEMO_REPS = 5

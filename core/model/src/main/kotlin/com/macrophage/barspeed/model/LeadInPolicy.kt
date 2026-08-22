@@ -1,8 +1,10 @@
 package com.macrophage.barspeed.model
 
 /**
- * How long the prep before a guided set is, who gets to say, and where the
- * bounds are enforced.
+ * Which sets get a prep before them, how long it is, who gets to say, and where
+ * the bounds are enforced.
+ *
+ * @see PrepCase for the shapes of set a prep can precede.
  *
  * ## What a prep is
  *
@@ -124,18 +126,114 @@ object LeadInPolicy {
     fun resolve(declaredS: Int?, adjustedS: Int?): Int = clamp(adjustedS ?: declaredS ?: DEFAULT_S)
 
     /**
-     * Whether a set of this shape runs the voice guide, and therefore a prep.
+     * The word a TIMED set's prep ends on, or null for a kind whose timed sets
+     * get no prep.
      *
-     * One statement of the rule with three readers: the record flow deciding
-     * whether a set is guided at all, the import gate warning that a declared
-     * prep is inert, and the screen deciding whether to offer the adjuster.
-     * Written out three times it would be three rules, and the way they diverge
-     * is a plan warned about a prep that does play, or a control that changes
-     * nothing.
+     * ## Who owns the opening word, case by case
      *
-     * A timed set runs a stopwatch, not a cadence. An explosive lift is judged on
-     * peak velocity and is deliberately given no tempo to follow.
+     * `LeadInPlan` in `:core:dsp` lays out the prep and deliberately does not
+     * pick the word the set opens on -- that is the property which makes a
+     * seated row open on `Drive` and a chest press on `Return` without anyone
+     * remembering to write it. It stays true here. Two other components own the
+     * word, one per case:
+     *
+     * - [PrepCase.CUED]: `TempoSchedule`, resolved from the plane, the drive
+     *   direction and the start phase, and spoken by `CadencePlan`'s beat 0.
+     * - [PrepCase.TIMED]: this function, from the kind alone. There is no
+     *   `TempoSchedule` on a timed set to ask.
+     *
+     * Exhaustive over [ExerciseKind] on purpose: a kind added later cannot
+     * compile without someone deciding what its timed sets say.
+     */
+    fun timedStartWord(kind: ExerciseKind): String? = when (kind) {
+        ExerciseKind.HOLD -> "Hold"
+        ExerciseKind.CARRY -> "Carry"
+        // A timed set of a rep-based lift has no movement to name, and an
+        // explosive lift is judged on peak velocity with deliberately no cadence
+        // to open.
+        ExerciseKind.DYNAMIC, ExerciseKind.EXPLOSIVE -> null
+    }
+
+    /**
+     * Which kind of prep, if any, a set of this shape gets.
+     *
+     * One statement of the rule with four readers: the record flow deciding
+     * whether a set is guided at all AND what follows its prep, the import gate
+     * warning that a declared prep is inert, and the screen deciding whether to
+     * offer the adjuster. Written out four times it would be four rules, and the
+     * way they diverge is a plan warned about a prep that does play, or a
+     * control that changes nothing.
+     *
+     * [isTimed] is asked first and answered on its own. It is not a modifier on
+     * the tempo question: it says how the set is MEASURED, and a set measured on
+     * the clock never plays a `TempoSchedule` whether or not a tempo string
+     * reached it. `PlanFile.validate` refuses that pair, but the device path has
+     * no validator -- an ad-hoc set carries whatever `tempoInput` holds -- so
+     * the combination is reachable and is decided here rather than left to
+     * operator precedence.
+     */
+    fun prepCase(hasTempo: Boolean, isTimed: Boolean, kind: ExerciseKind): PrepCase = when {
+        // A timed set runs a stopwatch, not a cadence.
+        isTimed -> PrepCase.NONE
+        // An explosive lift is judged on peak velocity and is deliberately given
+        // no tempo to follow.
+        hasTempo && kind != ExerciseKind.EXPLOSIVE -> PrepCase.CUED
+        else -> PrepCase.NONE
+    }
+
+    /**
+     * Whether a set of this shape plays a prep at all.
+     *
+     * The yes/no half of [prepCase], for the two readers that need nothing
+     * finer: the import gate and the prep adjuster on the rest screen.
      */
     fun playsPrep(hasTempo: Boolean, isTimed: Boolean, kind: ExerciseKind): Boolean =
-        hasTempo && !isTimed && kind != ExerciseKind.EXPLOSIVE
+        prepCase(hasTempo, isTimed, kind) != PrepCase.NONE
+
+    /**
+     * Whether a set of this shape speaks, given the lifter's audio-cues setting.
+     *
+     * The setting is consulted in four places in `:app` -- the countdown during
+     * a timed set, the rep milestones, the per-second phase counting and the
+     * rest countdown -- and in none of the paths a voice guide runs through.
+     * `GuidedCadenceRunner` never mentions it, and neither do the `speakCue` and
+     * `speakOnly` pair it is wired to. So whatever a prep or a cadence emits is
+     * spoken whatever the toggle says.
+     *
+     * Stated here rather than left implicit in which call sites happen to read
+     * the flag, because "who ignores the toggle" is a rule and four call sites
+     * are not.
+     */
+    fun speaks(case: PrepCase, audioCues: Boolean): Boolean = when (case) {
+        PrepCase.CUED, PrepCase.TIMED -> true
+        PrepCase.NONE -> audioCues
+    }
+}
+
+/**
+ * The kinds of set a prep can precede, and what the prep runs into.
+ *
+ * A prep exists to give the lifter the seconds between tapping START and the
+ * instant the set actually begins. What makes that instant announceable differs
+ * by case, and so does what happens at it, which is why this is three states
+ * rather than a boolean.
+ */
+enum class PrepCase {
+    /**
+     * No prep. The set begins the moment it is started.
+     */
+    NONE,
+
+    /**
+     * A tempo'd set of a rep-based lift. The prep runs into the cadence, and the
+     * word it ends on is the first stroke call, which `TempoSchedule` picks.
+     */
+    CUED,
+
+    /**
+     * A hold or a carry. There is no cadence to run into: the prep ends on the
+     * word [LeadInPolicy.timedStartWord] picks, and the set's own clock starts
+     * there rather than at the tap -- see [SetClockPolicy].
+     */
+    TIMED,
 }
