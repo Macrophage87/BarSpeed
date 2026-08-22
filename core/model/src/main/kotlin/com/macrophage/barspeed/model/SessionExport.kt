@@ -79,8 +79,23 @@ data class SessionExport(
          * a 1.10 reader works unchanged against a 1.11 export. Both keys are
          * absent on a set that played no prep, and on every set recorded before
          * this version.
+         *
+         * 1.12 -- a set's figures cover only the detections whose drive began
+         * at or before the set's own `Done` cue. NOT purely additive: no key
+         * changes type or stops being written, but `repMetrics`,
+         * `velocityLoss_pct`, `velocityLossBasis`, `repMetricsComplete`,
+         * `reps` on a sensor-counted set and every field of `summary` are
+         * computed over a different population of reps. It does not apply
+         * retroactively: the exporter re-derives these from the STORED rep
+         * list, and a stored rep carries durations, velocities, a range and an
+         * ordinal index -- an index into the rep list, not into the samples --
+         * but no instant, so an already-recorded row cannot be placed against
+         * its own cue track without re-running segmentation over its stored
+         * raw IMU stream, which the exporter does not do. The published
+         * schema's `schemaVersion` description carries the argument and the
+         * measured sizes; this is the warning, not a second copy of it.
          */
-        const val SCHEMA_VERSION = "1.11"
+        const val SCHEMA_VERSION = "1.12"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -89,7 +104,7 @@ data class SessionExport(
         val SUPPORTED_SCHEMA_VERSIONS =
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
-                "1.6", "1.7", "1.8", "1.9", "1.10", "1.11",
+                "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12",
             )
 
         /**

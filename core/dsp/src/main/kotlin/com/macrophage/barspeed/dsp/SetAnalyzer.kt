@@ -171,7 +171,27 @@ object SetAnalyzer {
         // none of the skew CueTrack.MAX_SKEW_MS measures.
         val driveStartMs = spans.map { samples[it.conStartIdx].timestampMs }
         val setEnd = SetEnd.of(cues)
-        val reps = spans.mapIndexed { idx, span -> repMetrics(idx, span, series, direction, loadKg, config) }
+        // Bounded HERE, before any figure is derived from the list: velocity
+        // loss, tempo compliance, the verdicts and everything the export
+        // recomputes later all read this one list, so a rule applied at any of
+        // those would have to be applied at all of them.
+        //
+        // Segmentation runs over the WHOLE stream and is not re-run on a
+        // truncated one. Cutting the samples at the cue instead rebuilds the
+        // time base from what is left, which moves reps that were never in
+        // question. Measured on session 31's 13 sets, which are not committed
+        // here: 9 of the 13 moved and one set of four reps was reduced to
+        // none. Issue #125 records that as the reason this is not a
+        // truncation.
+        //
+        // Spans arrive in drive order, so this removes a suffix and no
+        // retained rep is renumbered. The pause figures below were measured by
+        // the segmenter against every span it found, so a kept rep's end pause
+        // still ends where the excluded movement began -- which is what
+        // happened: the pause did end when the sensor moved again, whatever
+        // that movement was.
+        val within = spans.filterIndexed { idx, _ -> setEnd.startedWithinSet(driveStartMs[idx]) }
+        val reps = within.mapIndexed { idx, span -> repMetrics(idx, span, series, direction, loadKg, config) }
         val velocityLoss = velocityLossPct(reps)
         val tempoCompliance =
             targets.tempo?.let { complianceFor(it, targets.toleranceS, reps, direction) }
@@ -186,6 +206,7 @@ object SetAnalyzer {
         )
     }
 
+    /** Takes no cue track, so a set analysed through this is never bounded -- see [SetEnd]. */
     fun analyze(
         samples: List<ImuSample>,
         startsWith: StartPhase,
