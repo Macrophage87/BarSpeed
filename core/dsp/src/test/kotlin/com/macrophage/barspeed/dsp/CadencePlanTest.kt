@@ -466,4 +466,24 @@ class CadencePlanTest {
         assertEquals(null, s.second.seconds, "X has no prescribed seconds")
         assertEquals(listOf("DOWN" to 3, "UP" to 1), shape(CadencePlan.of(s)))
     }
+
+    /**
+     * Both stroke digits at zero, which is the degenerate end of the coercion
+     * the two pins above cover one digit at a time.
+     *
+     * Premise pin for #148, which needs a floor for a control that BUILDS a
+     * tempo out of digits rather than reading one a plan wrote. The floor is
+     * measured here rather than chosen: `0000` is played as a two-second
+     * cycle against a prescription of none, it carries no spoken rep count
+     * because neither stroke has a second to give up, and the compliance
+     * scorer still grades the lifter against the zeros.
+     */
+    @Test
+    fun `both stroke digits at zero are played as a second each, and the rep call has nowhere to go`() {
+        val s = schedule("0000", benchPress)
+        assertEquals(0.0, s.prescribedCycleS, "a prescription in which nothing moves for any time")
+        assertEquals(listOf("DOWN" to 1, "UP" to 1), shape(CadencePlan.of(s)))
+        assertEquals(2, CadencePlan.of(s).deliveredCycleS, "two seconds over, from the coercion alone")
+        assertEquals(null, CadencePlan.of(s).announceOnBeat, "and neither stroke can carry the rep call")
+    }
 }

@@ -133,4 +133,60 @@ class ShippedPlanExampleTest {
             )
         }
     }
+
+    /**
+     * The other adjacency in the shipped example, and the one #148 is about:
+     * a paced rep exercise runs straight into two that declare no tempo at
+     * all.
+     *
+     * Premise only. This asserts what the published plan says and nothing
+     * about what the record flow does with it; the consequence is the pin
+     * below.
+     */
+    @Test
+    fun `the shipped example runs a paced exercise straight into two that declare no tempo`() {
+        val plan = shippedExample()
+        val upperA = plan.sessions.first { it.name == "Upper A" }
+        val ids = upperA.exercises.map { it.exercise }
+
+        assertEquals(ids.indexOf("dumbbell_bench_press") + 1, ids.indexOf("single_arm_dumbbell_row"))
+        assertEquals(ids.indexOf("single_arm_dumbbell_row") + 1, ids.indexOf("band_assisted_pull_up"))
+
+        val paced = upperA.exercises.first { it.exercise == "dumbbell_bench_press" }
+        assertEquals(listOf("3010", "3010"), paced.sets.map { it.tempo })
+
+        listOf("single_arm_dumbbell_row", "band_assisted_pull_up").forEach { id ->
+            val exercise = upperA.exercises.first { it.exercise == id }
+            assertTrue(exercise.sets.isNotEmpty(), "$id declares no sets")
+            exercise.sets.forEachIndexed { i, set ->
+                assertNull(set.tempo, "$id set ${i + 1} declares a tempo")
+                assertFalse(set.isTimed, "$id set ${i + 1} is timed, so no cadence could reach it anyway")
+            }
+        }
+        assertTrue(plan.validate().isEmpty(), "expected clean validation: ${plan.validate()}")
+    }
+
+    /**
+     * What a tempo reaching the row would turn on: the whole prep-and-cadence
+     * branch, on an exercise whose author declared no tempo.
+     *
+     * [LeadInPolicy.prepCase] is asked here rather than restated, because it
+     * is the same function `RecordViewModel.beginSet` reads to decide whether
+     * a set is guided at all. A row that acquires a tempo string is paced by
+     * the voice, counted by the guide instead of by the lifter, given a prep
+     * it never declared, and graded for compliance against it.
+     */
+    @Test
+    fun `a tempo reaching the row would turn on a prep and a cadence it never declared`() {
+        val plan = shippedExample()
+        val row =
+            plan.sessions.first { it.name == "Upper A" }
+                .exercises.first { it.exercise == "single_arm_dumbbell_row" }
+
+        assertFalse(row.playsAnyPrep, "the row declares nothing that would play a prep")
+        row.sets.forEach { set ->
+            assertEquals(PrepCase.NONE, LeadInPolicy.prepCase(false, set.isTimed, row.effectiveKind))
+            assertEquals(PrepCase.CUED, LeadInPolicy.prepCase(true, set.isTimed, row.effectiveKind))
+        }
+    }
 }
