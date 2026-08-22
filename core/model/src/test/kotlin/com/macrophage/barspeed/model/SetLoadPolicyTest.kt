@@ -626,6 +626,33 @@ class SetLoadPolicyTest {
     }
 
     /**
+     * The switch-exercise route. `jumpToExercise` pulls another exercise's
+     * remaining sets forward without renumbering them, so the set coming up
+     * after a switch is routinely set 2 or set 3 of its own block: a non-zero
+     * index behind a different exercise id. Without the id in the question a
+     * statement made on the exercise being left would follow the lifter onto
+     * the one they switched to, which is the shape of the leak `a loadless
+     * exercise switched to mid-plan does not inherit the last load` already
+     * guards on the seeding side.
+     *
+     * Added because a mutation survived. With the id equality deleted from
+     * [SetLoadPolicy.sameExerciseBlock] and every other term intact, all 42
+     * tests in this file passed: the three neighbouring boundary cases each
+     * happen to pass index 0, so the index term alone was killing them and the
+     * id term was pinned by nothing.
+     */
+    @Test
+    fun `sameExerciseBlock is false after switching to another exercise mid-block`() {
+        assertFalse(
+            SetLoadPolicy.sameExerciseBlock(
+                lastExerciseId = "seated_leg_curl",
+                nextExerciseId = "lateral_raise",
+                nextSetIndexInExercise = 2,
+            ),
+        )
+    }
+
+    /**
      * A session may run one movement in two blocks -- three heavy sets, then
      * three back-off sets written as a separate exercise entry. The second
      * block is a fresh prescription, so a statement made in the first does not
