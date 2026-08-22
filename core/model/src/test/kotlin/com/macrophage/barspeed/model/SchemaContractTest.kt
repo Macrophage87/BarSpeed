@@ -7,6 +7,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -137,6 +138,33 @@ class SchemaContractTest {
             ExerciseKind.entries.map { it.name.lowercase() }.toSet(),
             PlanFile.VALID_KINDS,
             "VALID_KINDS and ExerciseKind disagree",
+        )
+    }
+
+    /**
+     * The published `prep_s` description no longer says the key applies only to
+     * sets carrying a tempo.
+     *
+     * That sentence was true when it was written and this change makes it
+     * false, and the published schema is the document a plan-writing model is
+     * pointed at -- a commit body is read once, a description is read every
+     * week. What this pins is narrow and said so: it cannot check that the
+     * description is RIGHT, only that the one claim this change falsified is
+     * gone and that the case it was wrong about is named.
+     */
+    @Test
+    fun `the published prep_s description does not tie the key to a tempo`() {
+        val exercise = schema("plan.schema.json")["\$defs"]!!.jsonObject["exercise"]!!.jsonObject
+        val description =
+            exercise["properties"]!!.jsonObject["prep_s"]!!.jsonObject["description"]!!.jsonPrimitive.content
+
+        assertFalse(
+            "ONLY APPLIES TO SETS CARRYING A tempo" in description,
+            "the published prep_s description still restricts the key to tempo'd sets: $description",
+        )
+        assertTrue(
+            "a hold or a carry" in description,
+            "the published prep_s description never names the timed case: $description",
         )
     }
 

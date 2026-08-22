@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.model
 
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -68,6 +69,28 @@ class GuidePromptContractTest {
         // before this one, and a key the prompt never mentions is a key no
         // generated plan will carry, so declaring it would stay theoretical.
         assertDocuments("kind")
+    }
+
+    /**
+     * The prompt is the only statement of the contract anything actually sends
+     * anywhere, so a claim left standing here outlives the same claim corrected
+     * in the schema. It told the model a prep applies only to sets with a
+     * tempo, which this change makes false.
+     *
+     * Narrow, and said so: this cannot check the prompt is right, only that the
+     * sentence this change falsified is gone and the case it was wrong about is
+     * named.
+     */
+    @Test
+    fun `the plan prompt does not tell the model a prep needs a tempo`() {
+        assertFalse(
+            "ONLY APPLIES TO SETS WITH A tempo" in prompt,
+            "the plan prompt still tells the model a prep needs a tempo",
+        )
+        assertTrue(
+            "a hold or a carry" in prompt,
+            "the plan prompt never tells the model a prep applies to a hold or a carry",
+        )
     }
 
     @Test

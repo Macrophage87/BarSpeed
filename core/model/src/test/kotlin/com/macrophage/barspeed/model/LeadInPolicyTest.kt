@@ -134,31 +134,35 @@ class LeadInPolicyTest {
     }
 
     /**
-     * A timed set runs a stopwatch rather than a cadence, and an explosive lift
-     * is judged on peak velocity with no tempo to follow. Both are named here
-     * because both are ways a set can carry a tempo string and still never hear
-     * a lead-in -- which is what makes a `prep_s` declared on them inert.
+     * A set measured on the clock whose exercise is a rep-based lift has no
+     * movement to name, and an explosive lift is judged on peak velocity with
+     * no tempo to follow. Both are named here because both are ways a set can
+     * carry a tempo string and still never hear a lead-in -- which is what
+     * makes a `prep_s` declared on them inert.
      */
     @Test
-    fun `a timed set and an explosive lift play no prep even carrying a tempo`() {
+    fun `a timed rep-based lift and an explosive lift play no prep even carrying a tempo`() {
         assertFalse(LeadInPolicy.playsPrep(hasTempo = true, isTimed = true, kind = ExerciseKind.DYNAMIC))
         assertFalse(LeadInPolicy.playsPrep(hasTempo = true, isTimed = false, kind = ExerciseKind.EXPLOSIVE))
     }
 
     /**
-     * CHARACTERIZATION: what a hold and a carry do at this commit, so that
-     * changing it shows as a changed assertion rather than as a silent
-     * widening.
+     * A hold and a carry play a prep, which is the whole of this change stated
+     * as one assertion.
      *
-     * A hold is excluded twice over. `PlanSetDef.validate` refuses a tempo on a
-     * timed set, so `hasTempo` is false; and `isTimed` is true. The lifter taps
-     * START holding the phone, and the stopwatch is running before they reach
-     * the bar.
+     * They reach it by a different route from a tempo'd lift and cannot reach
+     * it by the same one: `PlanSetDef.validate` refuses a tempo on a timed set,
+     * so `hasTempo` is false on every hold a plan can express. What makes their
+     * start instant worth announcing is that the set is measured on the clock,
+     * and the clock starts when the prep ends.
+     *
+     * The lifter's own words for what this is for: five to ten seconds to put
+     * the phone down and get into position before the hang starts.
      */
     @Test
-    fun `a hold and a carry play no prep`() {
-        assertFalse(LeadInPolicy.playsPrep(hasTempo = false, isTimed = true, kind = ExerciseKind.HOLD))
-        assertFalse(LeadInPolicy.playsPrep(hasTempo = false, isTimed = true, kind = ExerciseKind.CARRY))
+    fun `a hold and a carry play a prep`() {
+        assertTrue(LeadInPolicy.playsPrep(hasTempo = false, isTimed = true, kind = ExerciseKind.HOLD))
+        assertTrue(LeadInPolicy.playsPrep(hasTempo = false, isTimed = true, kind = ExerciseKind.CARRY))
     }
 
     // ---- which KIND of prep, and the word it ends on -------------------------
@@ -188,15 +192,22 @@ class LeadInPolicyTest {
                 // measured, so a tempo'd rep set of a hold exercise is cued like
                 // any other. `PlanFile.warnings` complains about the pairing
                 // separately.
+                //
+                // The last row is the pairing no validator has seen: a tempo on
+                // a timed set. `PlanFile.validate` refuses it, but the device
+                // path carries whatever was typed into the tempo box, so it is
+                // reachable ad hoc. It is TIMED rather than CUED because a set
+                // measured on the clock never plays a TempoSchedule, so the
+                // tempo has nothing to open.
                 Triple(false, false, ExerciseKind.HOLD) to PrepCase.NONE,
                 Triple(true, false, ExerciseKind.HOLD) to PrepCase.CUED,
-                Triple(false, true, ExerciseKind.HOLD) to PrepCase.NONE,
-                Triple(true, true, ExerciseKind.HOLD) to PrepCase.NONE,
+                Triple(false, true, ExerciseKind.HOLD) to PrepCase.TIMED,
+                Triple(true, true, ExerciseKind.HOLD) to PrepCase.TIMED,
                 // A carry, which reaches every case the same way a hold does.
                 Triple(false, false, ExerciseKind.CARRY) to PrepCase.NONE,
                 Triple(true, false, ExerciseKind.CARRY) to PrepCase.CUED,
-                Triple(false, true, ExerciseKind.CARRY) to PrepCase.NONE,
-                Triple(true, true, ExerciseKind.CARRY) to PrepCase.NONE,
+                Triple(false, true, ExerciseKind.CARRY) to PrepCase.TIMED,
+                Triple(true, true, ExerciseKind.CARRY) to PrepCase.TIMED,
                 // An explosive lift, in every shape: judged on peak velocity
                 // with deliberately no cadence to open on.
                 Triple(false, false, ExerciseKind.EXPLOSIVE) to PrepCase.NONE,
@@ -304,24 +315,20 @@ class LeadInPolicyTest {
     // ---- what the audio-cues setting silences -------------------------------
 
     /**
-     * CHARACTERIZATION: what the audio-cues setting does to each shape of set at
-     * this commit, so that changing it shows as a changed assertion rather than
-     * as a silent widening.
+     * The toggle silences a hold end to end, and does not silence a tempo'd
+     * lift. The owner chose the split.
      *
-     * The setting gates the countdown during a timed set, the rep milestones,
-     * the per-second phase counting and the rest countdown. It gates nothing a
-     * voice guide emits: `GuidedCadenceRunner` never mentions it, and neither
-     * does the `speakCue`/`speakOnly` pair it is wired to.
-     *
-     * The TIMED rows are the branch's own behaviour rather than the app's
-     * before it, because no set reaches [PrepCase.TIMED] at this commit.
+     * A tempo'd set's voice is the feature: prescribing a tempo IS asking to be
+     * paced, so the prep and the stroke calls speak whatever the toggle says. A
+     * hold's voice is an aid, and the toggle declines it -- with cues off a hold
+     * says nothing at all, prep included.
      */
     @Test
-    fun `the audio-cues setting silences nothing a voice guide is playing`() {
+    fun `the toggle silences a timed set end to end and never a cued one`() {
         assertTrue(LeadInPolicy.speaks(PrepCase.CUED, audioCues = true))
         assertTrue(LeadInPolicy.speaks(PrepCase.CUED, audioCues = false))
         assertTrue(LeadInPolicy.speaks(PrepCase.TIMED, audioCues = true))
-        assertTrue(LeadInPolicy.speaks(PrepCase.TIMED, audioCues = false))
+        assertFalse(LeadInPolicy.speaks(PrepCase.TIMED, audioCues = false))
         assertTrue(LeadInPolicy.speaks(PrepCase.NONE, audioCues = true))
         assertFalse(LeadInPolicy.speaks(PrepCase.NONE, audioCues = false))
     }

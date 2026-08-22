@@ -101,22 +101,25 @@ class PlanPrepDeclarationTest {
     /**
      * A prep declared on an exercise no set of which runs the voice guide.
      *
-     * Not hypothetical: in the published `plan.example.json`, `farmers_walk`,
-     * `plank`, `suitcase_carry`, `hanging_leg_raise` and `band_assisted_pull_up`
-     * all carry no tempo, and a cable machine -- the case that motivated this
-     * feature -- is the likeliest one to be given a prep and no tempo. The plan's
-     * author asked for something and nothing happens; the gate is the only place
-     * that can say so.
+     * Not hypothetical: in the published `plan.example.json`,
+     * `band_assisted_pull_up` and `hanging_leg_raise` are rep-based and carry
+     * no tempo, and a cable machine -- the case that motivated this feature --
+     * is the likeliest one to be given a prep and no tempo. The plan's author
+     * asked for something and nothing happens; the gate is the only place that
+     * can say so.
+     *
+     * The exercise here used to be `plank`, which is no longer an example of
+     * anything: a hold runs a prep. What is left is the case the warning is
+     * actually for, a set with reps and no tempo.
      */
     @Test
     fun `a prep declared where nothing runs the voice guide is warned about as inert`() {
-        val result = parse("""{"exercise":"plank","prep_s":10,"sets":[{"duration_s":45}]}""")
+        val result = parse("""{"exercise":"band_assisted_pull_up","prep_s":10,"sets":[{"reps":8}]}""")
 
         assertEquals(emptyList(), result.errors, "an inert declaration is not a reason to refuse the plan")
         assertTrue(
             result.warnings.any {
-                it.startsWith("$path: \"prep_s\" is declared on plank") &&
-                    "no set of it runs the voice guide" in it &&
+                it.startsWith("$path: \"prep_s\" is declared on band_assisted_pull_up") &&
                     "no prep is played" in it
             },
             "no inert-declaration warning: ${result.warnings}",
@@ -124,36 +127,93 @@ class PlanPrepDeclarationTest {
     }
 
     /**
-     * CHARACTERIZATION: the same for a carry, written down at this commit so
-     * that changing it shows as a changed assertion rather than as a silent
-     * widening. A carry reaches the inert case exactly as a hold does -- the
-     * validator refuses a tempo on a timed set, so there is none to carry.
+     * A prep declared on a hold or a carry is not inert, and the gate must stop
+     * saying it is.
+     *
+     * This is the half of the change a plan author sees. Before it, a plan that
+     * asked for ten seconds before a dead hang was told at the import gate that
+     * the declaration had no effect -- which was true, and is what the lifter
+     * asked to be changed.
      */
     @Test
-    fun `a prep declared on a carry is warned about as inert`() {
-        val result = parse("""{"exercise":"farmers_walk","prep_s":10,"sets":[{"duration_s":40}]}""")
+    fun `a prep declared on a hold or a carry is not reported as inert`() {
+        listOf(
+            """{"exercise":"plank","prep_s":10,"sets":[{"duration_s":45}]}""",
+            """{"exercise":"farmers_walk","prep_s":10,"sets":[{"duration_s":40}]}""",
+        ).forEach { exercise ->
+            val result = parse(exercise)
 
-        assertEquals(emptyList(), result.errors, "an inert declaration is not a reason to refuse the plan")
-        assertTrue(
-            result.warnings.any { it.startsWith("$path: \"prep_s\" is declared on farmers_walk") },
-            "no inert-declaration warning for a carry: ${result.warnings}",
+            assertEquals(emptyList(), result.errors, "a declared prep is not a reason to refuse the plan")
+            // No prep warning AT ALL rather than the absence of one phrase.
+            // The inert warning's wording changes in the same commit that makes
+            // this pass, so matching on it would leave a check that cannot
+            // fail: the phrase would be gone either way.
+            assertFalse(
+                result.warnings.any { "prep_s" in it },
+                "a timed set was warned about its prep: ${result.warnings}",
+            )
+        }
+    }
+
+    /**
+     * The inert warning explains itself, and its explanation stops being true.
+     *
+     * It told the plan author that a set "needs a tempo, and must be neither
+     * timed nor an explosive lift". Half of that is now wrong, and it is the
+     * half a plan author reads to decide where a prep is worth declaring.
+     */
+    @Test
+    fun `the inert warning no longer says a prep needs a tempo`() {
+        val result = parse("""{"exercise":"band_assisted_pull_up","prep_s":10,"sets":[{"reps":8}]}""")
+        val warning = result.warnings.single { "prep_s" in it }
+
+        assertFalse("a set needs a tempo" in warning, "the inert warning still says a prep needs a tempo: $warning")
+        assertTrue("timed hold or carry" in warning, "the inert warning never names the timed case: $warning")
+    }
+
+    /**
+     * And the warning that DOES apply to a hold now applies to it: a prep too
+     * short for the launch phrase drops `Ready` on a hold exactly as on a
+     * tempo'd lift, because both walk the same `LeadInPlan`.
+     *
+     * Whole sentence, not a prefix. The prefix is true either way; the TAIL is
+     * the claim, and the tail this warning carried named a first movement that
+     * a hold does not have. A prefix match on a string whose tail is the claim
+     * green-lights the half that is wrong.
+     */
+    @Test
+    fun `a short prep on a hold is warned about for what it drops`() {
+        val result = parse("""{"exercise":"plank","prep_s":1,"sets":[{"duration_s":45}]}""")
+
+        assertEquals(emptyList(), result.errors, "a short prep is legal")
+        assertEquals(
+            listOf(
+                "$path: \"prep_s\": 1 is shorter than the launch phrase - the prep says only " +
+                    "\"Brace\", and the \"Ready\" beat two seconds before the set begins is dropped.",
+            ),
+            result.warnings.filter { "prep_s" in it },
         )
     }
 
     /**
      * An explosive lift carrying a tempo is the same case arriving a different
      * way, and the one a reader is least likely to predict: the set has a tempo,
-     * so the declaration looks live, and the voice guide still never runs.
+     * so the declaration looks live, and no prep is played.
+     *
+     * The second assertion is the one with teeth. `PlanSetDef.validate` refuses
+     * a tempo only alongside `duration_s`, so this document is legal and is what
+     * a pasted plan actually meets. A warning whose explanation stops at "a prep
+     * plays before a set carrying a tempo" contradicts itself on it, and
+     * asserting only the prefix cannot see that.
      */
     @Test
     fun `a prep on an explosive lift is inert even though the set carries a tempo`() {
         val result =
             parse("""{"exercise":"power_clean","kind":"explosive","prep_s":10,"sets":[{"reps":3,"tempo":"3010"}]}""")
+        val warning = result.warnings.single { "prep_s" in it }
 
-        assertTrue(
-            result.warnings.any { "\"prep_s\" is declared on power_clean" in it },
-            "no inert-declaration warning for an explosive lift: ${result.warnings}",
-        )
+        assertTrue("\"prep_s\" is declared on power_clean" in warning, "no inert warning: $warning")
+        assertTrue("explosive" in warning, "the inert warning never names the explosive case: $warning")
     }
 
     /**
@@ -180,16 +240,20 @@ class PlanPrepDeclarationTest {
 
     /**
      * A prep of zero, where the difference is worth a sentence of its own: not a
-     * clipped phrase but no speech at all before the first movement call.
+     * clipped phrase but no speech at all before the set begins.
+     *
+     * Whole sentence, not a prefix, for the reason the hold's short-prep
+     * warning is: the tail is the claim, and this warning is reachable on a
+     * hold now, which has no first movement for it to name.
      */
     @Test
     fun `a prep of zero is warned about as speaking nothing at all`() {
         val result = parse("""{"exercise":"cable_row","prep_s":0,"sets":[{"reps":10,"tempo":"2010"}]}""")
 
         assertEquals(emptyList(), result.errors, "a prep of zero is legal")
-        assertTrue(
-            result.warnings.any { it.startsWith("$path: \"prep_s\": 0 means nothing at all is spoken") },
-            "no silent-prep warning: ${result.warnings}",
+        assertEquals(
+            listOf("$path: \"prep_s\": 0 means nothing at all is spoken before the set begins."),
+            result.warnings.filter { "prep_s" in it },
         )
     }
 
@@ -201,14 +265,14 @@ class PlanPrepDeclarationTest {
      */
     @Test
     fun `an inert declaration is not also warned about for being short`() {
-        val result = parse("""{"exercise":"plank","prep_s":1,"sets":[{"duration_s":45}]}""")
+        val result = parse("""{"exercise":"band_assisted_pull_up","prep_s":1,"sets":[{"reps":8}]}""")
 
         assertEquals(
             1,
             result.warnings.count { "prep_s" in it },
             "expected exactly one prep warning: ${result.warnings}",
         )
-        assertTrue(result.warnings.single { "prep_s" in it }.contains("no set of it runs the voice guide"))
+        assertTrue(result.warnings.single { "prep_s" in it }.contains("the declaration has no effect"))
     }
 
     // ---- the control ---------------------------------------------------------

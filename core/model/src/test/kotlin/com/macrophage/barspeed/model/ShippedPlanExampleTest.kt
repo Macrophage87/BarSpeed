@@ -56,6 +56,30 @@ class ShippedPlanExampleTest {
         assertTrue(plan.validate().isEmpty(), "expected clean validation: ${plan.validate()}")
     }
 
+    /**
+     * The shipped example exercises a prep on a hold, and the import gate is
+     * quiet about it.
+     *
+     * Two things at once, and both are the point. A capability nothing
+     * exercises is one an LLM writing a plan from this document will never use,
+     * and `plank` is the case the widening was asked for. The warning check is
+     * the same fact from the gate's side: before this change the example could
+     * not have carried it without the app calling it inert.
+     */
+    @Test
+    fun `the shipped example declares a prep on a hold, and the gate is quiet about it`() {
+        val plan = shippedExample()
+        val hold = plan.sessions.flatMap { it.exercises }.first { it.exercise == "plank" }
+
+        assertEquals(10, hold.prepS, "the shipped example declares no prep on its hold")
+        assertTrue(hold.sets.all { it.isTimed }, "the plank's sets are timed")
+        assertTrue(hold.sets.all { it.tempo == null }, "a timed set cannot carry a tempo")
+        assertTrue(
+            plan.warnings().none { "prep_s" in it },
+            "the shipped example warns about its own prep: ${plan.warnings()}",
+        )
+    }
+
     @Test
     fun `the published schema permits a set with no load and says to omit both`() {
         val schema =
