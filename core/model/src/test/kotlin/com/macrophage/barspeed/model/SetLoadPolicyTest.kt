@@ -9,12 +9,14 @@ import kotlin.test.assertTrue
 /**
  * The load rules the record flow applies.
  *
- * Three `(pre-fix)` characterization pins have been through this file, all
+ * Five `(pre-fix)` characterization pins have been through this file, all
  * now replaced by their inversions, named in the commit bodies that made
  * each replacement true: `resolve reads the typed field for a loadless plan
  * set (pre-fix)`, `seedAddedKg carries the last load forward for a loadless
- * next slot (pre-fix)`, and `recordedPlannedLoadKg passes the plan's added
- * declaration through unconverted (pre-fix)` (#25).
+ * next slot (pre-fix)`, `recordedPlannedLoadKg passes the plan's added
+ * declaration through unconverted (pre-fix)` (#25), `a stated load reaches
+ * only the set it was typed for (pre-fix)` and `standingStatedAddedKg
+ * discards a statement inside one block (pre-fix)` (#124).
  */
 class SetLoadPolicyTest {
     @Test
@@ -491,22 +493,24 @@ class SetLoadPolicyTest {
     }
 
     /**
-     * #124 as it behaves today, walked through the three functions the record
-     * flow calls and in the order it calls them: [resolve] when a set is
-     * written, [seedAddedKg] on the rest transition that follows it, and
-     * [carriedIntoNextSet] when the lifter taps through to the next set.
+     * #124. Session 31's three seated leg curls, all declared 90 lb, walked
+     * through the four functions the record flow calls and in the order it
+     * calls them: [SetLoadPolicy.resolve] when a set is written,
+     * [SetLoadPolicy.standingStatedAddedKg] on the rest transition that
+     * follows, and [SetLoadPolicy.carriedIntoNextSet] when the lifter taps
+     * through to the next set.
      *
-     * Session 31's three seated leg curls, all declared 90 lb. The lifter
-     * states 105 for the middle one and says nothing further. That set records
-     * 105. The next one is offered its own declaration and records 90, against
-     * reps the lifter did at 105.
+     * The lifter states 105 for the middle set and says nothing further. The
+     * export shows what happens next: set 12 recorded 47.63 kg, set 13 recorded
+     * 40.82 against reps the lifter did at 105, and `plannedLoad_kg` reads
+     * 40.82 on all three. Set 13 must record 105.
      *
-     * The null passed as `statedAddedKg` on the last two hops is not a
-     * simplification: `restingState` writes `statedLoadKg = null` on every rest
-     * transition, so null is what those calls actually receive.
+     * Replaces the pre-fix pin of the same walk. It is the same call sequence
+     * with one value changed -- what the rest transition after set 12 leaves in
+     * `statedLoadKg` -- and that value is the whole defect.
      */
     @Test
-    fun `a stated load reaches only the set it was typed for (pre-fix)`() {
+    fun `a stated load carries to the rest of the exercise`() {
         val declared = 90 / WeightUnit.LB_PER_KG
         val stated = 105 / WeightUnit.LB_PER_KG
 
@@ -521,44 +525,77 @@ class SetLoadPolicyTest {
             "set 11 records the plan's declaration",
         )
 
-        // Rest after set 11. The lifter types 105, and tapping through bakes it
-        // into the slot set 12 is recorded against.
+        // Rest after set 11. Nothing has been stated yet, so there is nothing
+        // to stand and the field is seeded from set 12's declaration.
+        assertNull(
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = null,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = declared,
+                nextDeclaredAddedKg = declared,
+            ),
+        )
+        // The lifter types 105 during that rest; tapping through bakes it into
+        // the slot set 12 is recorded against.
         val slot12 =
             SetLoadPolicy.carriedIntoNextSet(declaredAddedKg = declared, statedAddedKg = stated)
-        assertEquals(stated, slot12)
         assertEquals(
             stated,
             SetLoadPolicy.resolve(
                 adHoc = false,
                 plannedAddedKg = slot12,
                 typedAddedKg = null,
-                statedAddedKg = null,
+                statedAddedKg = stated,
             ),
             "set 12 records the stated load",
         )
 
-        // Rest after set 12. The statement is gone, so the field is re-seeded
-        // from set 13's own declaration and the slot carries that declaration.
-        assertEquals(
-            declared,
-            SetLoadPolicy.seedAddedKg(
-                hasPlannedNext = true,
+        // Rest after set 12. Set 13 is the same block and its declaration is
+        // unchanged, so the statement still stands and is what the rest screen
+        // offers.
+        val standing =
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = stated,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
-                lastAddedKg = stated,
-            ),
-            "the rest screen offers 90 again",
-        )
+            )
+        assertEquals(stated, standing, "the statement still stands for set 13")
+
         val slot13 =
-            SetLoadPolicy.carriedIntoNextSet(declaredAddedKg = declared, statedAddedKg = null)
+            SetLoadPolicy.carriedIntoNextSet(declaredAddedKg = declared, statedAddedKg = standing)
         assertEquals(
-            declared,
+            stated,
             SetLoadPolicy.resolve(
                 adHoc = false,
                 plannedAddedKg = slot13,
                 typedAddedKg = null,
-                statedAddedKg = null,
+                statedAddedKg = standing,
             ),
-            "set 13 silently reverts to the plan",
+            "set 13 records what was lifted",
+        )
+        // The plan's own prescription is untouched, on the same scale the
+        // recorded load is paired against, so the deviation stays visible on
+        // every set the carry reached.
+        assertEquals(
+            declared,
+            SetLoadPolicy.recordedPlannedLoadKg(
+                bodyweight = false,
+                bodyWeightKg = null,
+                plannedAddedKg = declared,
+            ),
+            "plannedLoad_kg still reads 90",
+        )
+
+        // Rest after set 13, the last of the block. The next exercise is
+        // offered its own plan.
+        assertNull(
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = stated,
+                sameExerciseBlock = false,
+                lastDeclaredAddedKg = declared,
+                nextDeclaredAddedKg = 0.0,
+            ),
         )
     }
 
@@ -642,20 +679,79 @@ class SetLoadPolicyTest {
     }
 
     /**
-     * #124 as it behaves today, at the seam the record flow now runs through.
-     * The lifter stated 105 for a set of a block whose remaining sets all
-     * declare 90, and the statement is discarded anyway. Replaced by its
-     * inversion later on this branch.
+     * The statement holds for the remaining sets of the block it was made in.
+     * Replaces the pre-fix pin that demanded it be discarded here.
      */
     @Test
-    fun `standingStatedAddedKg discards a statement inside one block (pre-fix)`() {
+    fun `standingStatedAddedKg carries a statement inside one block`() {
         val declared = 90 / WeightUnit.LB_PER_KG
-        assertNull(
+        val stated = 105 / WeightUnit.LB_PER_KG
+        assertEquals(
+            stated,
             SetLoadPolicy.standingStatedAddedKg(
-                statedAddedKg = 105 / WeightUnit.LB_PER_KG,
+                statedAddedKg = stated,
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
+            ),
+        )
+    }
+
+    /**
+     * The carry is direction-agnostic. Working up is what the reported case
+     * did, but a lifter who fails a set and drops the weight has said the same
+     * kind of thing, and a revert would put them back under a load they had
+     * just failed while recording the next set as compliance.
+     */
+    @Test
+    fun `a stated load that goes down carries the same as one that goes up`() {
+        val declared = 20 / WeightUnit.LB_PER_KG
+        val stated = 10 / WeightUnit.LB_PER_KG
+        assertEquals(
+            stated,
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = stated,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = declared,
+                nextDeclaredAddedKg = declared,
+            ),
+        )
+    }
+
+    /**
+     * Zero is a statement, exactly as it is in [SetLoadPolicy.resolve]. A
+     * lifter who stripped the bar has said the added load was nothing, and that
+     * has to survive the rest transition the same way any other number does --
+     * written as a truthiness test on the stated value it would not.
+     */
+    @Test
+    fun `a stated load of zero carries like any other statement`() {
+        assertEquals(
+            0.0,
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 0.0,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = 100.0,
+                nextDeclaredAddedKg = 100.0,
+            ),
+        )
+    }
+
+    /**
+     * Assisted work states negative added load. A lifter who needed more band
+     * than the plan asked for needs that to hold for the rest of the exercise,
+     * and the sign has to survive the carry the same way it survives
+     * [SetLoadPolicy.resolve] and [SetLoadPolicy.totalKg].
+     */
+    @Test
+    fun `a negative stated load carries for assisted work`() {
+        assertEquals(
+            -30.0,
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = -30.0,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = -20.0,
+                nextDeclaredAddedKg = -20.0,
             ),
         )
     }
