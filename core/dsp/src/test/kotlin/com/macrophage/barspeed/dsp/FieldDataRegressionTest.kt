@@ -3,6 +3,7 @@ package com.macrophage.barspeed.dsp
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
+import com.macrophage.barspeed.model.VoiceCue
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -835,5 +836,259 @@ class FieldDataRegressionTest {
         // check itself rather than an argument about one.
         assertEquals(8.3030422, preZuptDisplacementM(series), 1e-6, "pre-ZUPT displacement, metres")
         assertEquals(0.3513516, abs(preZuptVelocity(series).last()), 1e-6, "pre-ZUPT final speed, m/s")
+    }
+
+    // ------------------------------------------------------------------
+    // Lower-body corpus. Sessions 30 and 31, app 0.1.40, WitMotion
+    // WT901BLECL, recorded back to back on 2026-08-20.
+    // ------------------------------------------------------------------
+
+    /**
+     * The 24 fixtures above this section carry no leg press and no Romanian
+     * deadlift at any sample rate, and back squat only at the factory 10 Hz
+     * default (`field-backsquat-10hz*`) -- every ~99 Hz fixture is upper-body
+     * free-weight or cable work. So every DSP change up to this point has
+     * been gated against a corpus that structurally excludes the lower-body
+     * sessions progression is read from: green there was evidence about cable
+     * rows and overhead presses, not squats or presses with the legs. The
+     * four fixtures below close that gap. They pin CURRENT behaviour only --
+     * no source under `core/dsp/src/main` changed to add them.
+     *
+     * ## Provenance
+     *
+     * `field-30` and `field-31` are two raw session exports from the same
+     * training day (epochs 09:19 and 09:48 UTC-4), copied byte for byte out
+     * of a durable, read-only field-capture archive; nothing was re-encoded,
+     * resampled or trimmed. `repsManual` is true on every set cited here, so
+     * the "performed" figure named beside each pin is a hand count, not an
+     * inference.
+     *
+     * Selection was measured, not guessed. For leg press and single-leg
+     * press, the set chosen from each session is the one with the lowest
+     * ratio of `repMetrics.size` (what the app's own analyzer resolved,
+     * published in `session.json`) to `reps` (the hand count) of every set of
+     * that exercise in its session: leg press 2/8 (25%) beats 4/6, 1/5, 5/6
+     * and 7/8; single-leg press 2/8 (25%) beats 4/8, 3/8 and 3/8. For back
+     * squat, the session has three near-identical 99 Hz sets (95 lb, tempo
+     * 4011, RPE 6); the one committed here is one of the two that
+     * under-resolve by one rep -- the third segments 6 for 6 and would add no
+     * evidence about the gap this section exists to fill. For Romanian
+     * deadlift, the session's three sets read 8/10, 11/10 and 10/10; the one
+     * committed is the 11/10 set, chosen because it is the only one the app's
+     * own export OVER-counted, which is the same defect class #125 fixed on
+     * the rear-delt-fly fixture above, now shown on a second exercise and a
+     * second session.
+     *
+     * Geometry -- `startsWith`, `concentric`, `plane`, `sensorOnStack`,
+     * `sensorInverted`, `travelRatio` -- is copied verbatim from each set's
+     * own entry in its session's `meta.json`, cross-checked against
+     * `session.json`'s per-set `geometry` block (schema 1.8), which agrees.
+     * That schema marks the source of every one of these fields `inferred` or
+     * `default` rather than plan-declared, so unlike the rear-delt-fly
+     * fixture above this is NOT evidence of a plan's own geometry
+     * declaration -- it is the geometry value the app actually used to record
+     * and export the set. All four collapse to `LiftDirection(startsWith =
+     * X)` with every other field at its class default (`concentricUp` true,
+     * `sensorInverted` false, `travelRatio` 1.0, `plane` VERTICAL,
+     * `sensorOnStack` false), stated here so a reader does not have to
+     * cross-reference `meta.json` to see that. `loadKg` is each set's own
+     * `load_kg`, carried at the full float precision the app stores it at.
+     *
+     * The check that this geometry is right: every rep these fixtures
+     * resolve reproduces app 0.1.40's own published `repMetrics` -- ROM, mean
+     * concentric velocity, bottom pause -- to the last digit. That is
+     * asserted directly in the tests below, not merely claimed here.
+     *
+     * All four sets carry a `Done` cue -- none is a failed set, so issue
+     * #141 (failed guided sets never speak `Done`) has no evidence for or
+     * against it in this corpus, recorded here so nobody assumes otherwise.
+     * `*_hrm.csv` and `*_rest_before_hrm.csv` exist beside these captures in
+     * the source archive and were not copied: nothing in `:core:dsp` reads
+     * heart rate, matching every other fixture already committed here.
+     *
+     * ## What each fixture is filed under, and why
+     *
+     * Back squat rolls 89.8 deg through the stroke -- past the 31-52 deg band
+     * issue #72 measured bar-mounted sets losing reps at -- and resolves 5 of
+     * 6. Filed under #72 directly: same mechanism, a larger rotation.
+     *
+     * Leg press and single-leg press roll only 0.6 and 0.7 deg -- inside the
+     * 0.2-0.7 deg range #72's own table measured for its STACK-MOUNTED sets,
+     * the ones that OVER-count. These are not stack-mounted (a leg-press sled
+     * does not let the sensor rotate either way), and they UNDER-count at 2
+     * of 8 -- breaking the correlation between roll and the direction of
+     * error that #72's own table shows. They are filed under #72 because the
+     * behaviour -- `repMetrics.size` far under the hand count, a batch
+     * segmenter figure -- is exactly #72's title and scope; the roll-based
+     * mechanism #72's own filing measured plainly does not explain them, and
+     * that is stated rather than folded silently into #72's story.
+     *
+     * The bilateral leg press set's second (and last) resolved rep carries a
+     * 14.27 s `bottomPauseS` against a 2010 prescription's 0 s pause -- inside
+     * the range issue #93 measured for exactly this field on exactly this
+     * exercise (mean 1.34 s, max 22.73 s). It is very likely one of #93's own
+     * examples; that has not been independently re-derived here, so it is
+     * stated as a match, not an identity. The single-leg press's two resolved
+     * reps carry no such pause (0.04 s, 0.05 s) -- so the two sets share an
+     * undercount and a rough magnitude and do NOT visibly share a mechanism,
+     * which would be easy to misread from "same tempo, same count" alone.
+     *
+     * The bilateral leg press set's last resolved rep is also its FASTEST, so
+     * today's `SetAnalyzer` withholds velocity loss (`TerminalRepIsFastest`)
+     * rather than publish the degenerate 0% a naive best-to-last would
+     * compute -- the same class already pinned for the pallof press above,
+     * reached here from a leg press instead of a cable machine. App 0.1.40
+     * published `velocityLoss_pct` 0.0 for this exact set in the field; that
+     * is the reading this repo's `VelocityLoss` type exists to withhold, and
+     * it is not reproduced in a test here because nothing in this repo
+     * recomputes what an old app build did.
+     *
+     * The Romanian deadlift's ten KEPT reps (once its own `Done` cue bounds
+     * the set) reproduce the app's own figures exactly and are NOT evidence
+     * for #72 -- the batch segmenter is not the defect on this fixture. Only
+     * the eleventh, post-`Done` detection is, and #125 already fixes it in
+     * current code; the companion test below calls the analyzer with no cue
+     * track to show what 0.1.40 actually published before that fix existed:
+     * an 11-rep count and a 64.1% velocity loss, both reproduced exactly.
+     */
+    private fun track(name: String) = CueTrack.read(name).map { VoiceCue(it.timestampMs, it.label) }
+
+    @Test
+    fun `the corpus's first 99 Hz back squat resolves 5 of the 6 reps performed (issue 72)`() {
+        val samples = load("field-backsquat-99hz-6rep.csv")
+        val direction = LiftDirection(startsWith = StartPhase.ECCENTRIC)
+        val analysis = SetAnalyzer.analyze(
+            samples,
+            direction,
+            loadKg = 43.091275150953365,
+            cues = track("field-backsquat-99hz-6rep"),
+        )
+        assertEquals(
+            6,
+            CueTrack.calledReps("field-backsquat-99hz-6rep"),
+            "metronome Down-cues, corroborating meta.json's hand count of 6",
+        )
+        assertEquals<Double>(99.3937495805463, analysis.sampleRateHz, "measured rate, against this set's own meta.json")
+        assertEquals(5, analysis.reps.size, "segmented reps; the lifter performed 6")
+        assertEquals(0, analysis.detectionsAfterSetEndCue, "detections after Done")
+        assertEquals<Double?>(28.5, analysis.velocityLossPct, "velocity loss reported to the lifter")
+        // Every figure app 0.1.40 published for the five reps it also found,
+        // reproduced here -- the check that the geometry given in the class
+        // KDoc above is the geometry this set was actually recorded with.
+        assertMeasured(listOf(0.606, 0.599, 0.562, 0.561, 0.458), analysis.reps.map { it.romM }, "ROM, metres")
+        assertMeasured(
+            listOf(0.498, 0.458, 0.385, 0.396, 0.356),
+            analysis.reps.map { it.meanConVelMps },
+            "mean concentric velocity, m/s",
+        )
+    }
+
+    @Test
+    fun `bilateral leg press resolves 2 of the 8 reps performed, the sharpest undercount in the corpus (issue 72)`() {
+        val samples = load("field-legpress-2010-8rep.csv")
+        val direction = LiftDirection(startsWith = StartPhase.ECCENTRIC)
+        val analysis = SetAnalyzer.analyze(
+            samples,
+            direction,
+            loadKg = 24.94758035055195,
+            cues = track("field-legpress-2010-8rep"),
+        )
+        assertEquals(
+            8,
+            CueTrack.calledReps("field-legpress-2010-8rep"),
+            "metronome Down-cues, corroborating meta.json's hand count of 8",
+        )
+        assertEquals(2, analysis.reps.size, "segmented reps; the lifter performed 8")
+        assertEquals(0, analysis.detectionsAfterSetEndCue, "detections after Done")
+        // The two reps this DOES find are measured correctly: both reproduce
+        // app 0.1.40's own published repMetrics.
+        assertMeasured(listOf(0.176, 0.563), analysis.reps.map { it.romM }, "ROM, metres")
+        assertMeasured(
+            listOf(0.243, 0.419),
+            analysis.reps.map { it.meanConVelMps },
+            "mean concentric velocity, m/s",
+        )
+        // Rep 2's bottom pause -- see the class KDoc for why issue #93 is
+        // named beside it.
+        assertEquals(14.27, analysis.reps[1].bottomPauseS, 1e-3, "rep 2's bottom pause, seconds -- issue 93")
+        // The last of the two resolved reps is also the faster of the two, so
+        // today's SetAnalyzer withholds velocity loss instead of publishing
+        // the degenerate 0% app 0.1.40 actually reported for this set in the
+        // field -- see the class KDoc.
+        assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(analysis.reps))
+        assertNull(analysis.velocityLossPct, "velocity loss reported to the lifter")
+    }
+
+    @Test
+    fun `single-leg press resolves 2 of the 8 reps performed, on the right leg (issue 72)`() {
+        val samples = load("field-legpress-single-2010-8rep.csv")
+        val direction = LiftDirection(startsWith = StartPhase.CONCENTRIC)
+        val analysis = SetAnalyzer.analyze(
+            samples,
+            direction,
+            loadKg = 52.163122551154075,
+            cues = track("field-legpress-single-2010-8rep"),
+        )
+        assertEquals(
+            8,
+            CueTrack.calledReps("field-legpress-single-2010-8rep"),
+            "metronome Down-cues, corroborating meta.json's hand count of 8",
+        )
+        assertEquals(2, analysis.reps.size, "segmented reps; the lifter performed 8")
+        assertEquals(0, analysis.detectionsAfterSetEndCue, "detections after Done")
+        assertMeasured(listOf(0.256, 0.103), analysis.reps.map { it.romM }, "ROM, metres")
+        // Contrast with the bilateral leg press above: no bottom pause
+        // anywhere near issue #93's range, despite the same tempo and the
+        // same 2-of-8 count -- see the class KDoc.
+        assertMeasured(listOf(0.04, 0.05), analysis.reps.map { it.bottomPauseS }, "bottom pause, seconds")
+        assertEquals<Double?>(5.2, analysis.velocityLossPct, "velocity loss reported to the lifter")
+    }
+
+    @Test
+    fun `Romanian deadlift resolves all 10 reps performed once the tail after Done is bounded out (issue 125)`() {
+        val samples = load("field-rdl-3010-10rep.csv")
+        val direction = LiftDirection(startsWith = StartPhase.ECCENTRIC)
+        val analysis = SetAnalyzer.analyze(
+            samples,
+            direction,
+            loadKg = 43.091275150953365,
+            cues = track("field-rdl-3010-10rep"),
+        )
+        assertEquals(
+            10,
+            CueTrack.calledReps("field-rdl-3010-10rep"),
+            "metronome Down-cues, corroborating meta.json's hand count of 10",
+        )
+        assertEquals(10, analysis.reps.size, "segmented reps kept once the post-Done tail is bounded out")
+        assertEquals(1, analysis.detectionsAfterSetEndCue, "detections dropped")
+        assertEquals<Double?>(40.9, analysis.velocityLossPct, "velocity loss reported to the lifter, tail excluded")
+        // The ten KEPT reps reproduce app 0.1.40's own published repMetrics
+        // for its first ten entries -- confirming the Done bound is the ONLY
+        // difference it makes here, not a reshuffling of the ten real reps.
+        assertMeasured(
+            listOf(1.29, 0.558, 0.401, 0.411, 0.4, 0.402, 0.423, 0.411, 0.344, 0.276),
+            analysis.reps.map { it.romM },
+            "ROM, metres",
+        )
+    }
+
+    @Test
+    fun `the same Romanian deadlift over-counts to 11 and reads 64 percent loss without the Done bound (issue 125)`() {
+        // What app 0.1.40 actually published in the field for this set:
+        // repMetrics.size 11 and velocityLoss_pct 64.1, both reproduced here
+        // by calling the analyzer with no cues argument -- which defaults to
+        // an empty list, the same as the class's own two-argument overload
+        // documented as "never bounded". The eleventh, spurious detection is
+        // the SLOWEST of the eleven, so it drags best-to-last down to the
+        // largest reading in the set -- a 64.1% loss on a 6-RPE set the
+        // lifter rated with plenty left, computed over a rep that begins
+        // after the metronome had already said the set was over.
+        val samples = load("field-rdl-3010-10rep.csv")
+        val direction = LiftDirection(startsWith = StartPhase.ECCENTRIC)
+        val analysis = SetAnalyzer.analyze(samples, direction, loadKg = 43.091275150953365)
+        assertEquals(11, analysis.reps.size, "segmented reps with no cue track to bound the set")
+        assertEquals(VelocityLoss.Measured(64.1), VelocityLoss.of(analysis.reps))
+        assertEquals<Double?>(64.1, analysis.velocityLossPct, "velocity loss, as app 0.1.40 published it")
+        assertEquals(0.194, analysis.reps.last().meanConVelMps, 1e-3, "the spurious 11th rep's own drive speed")
     }
 }
