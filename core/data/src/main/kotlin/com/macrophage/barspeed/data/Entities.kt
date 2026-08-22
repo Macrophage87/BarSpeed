@@ -84,9 +84,13 @@ data class SetRecordEntity(
     val plannedDurationS: Int? = null,
     /** Unilateral sets: "left" or "right". */
     val side: String? = null,
-    /** Lifter-reported RPE (6–10), entered on the rest screen. */
+    /** Lifter-reported RPE (6–10), logged when the set ends; correctable afterward on the rest screen. */
     val rpe: Int? = null,
-    /** True when the lifter marked the set as failed. */
+    /**
+     * True when the set is marked failed: the lifter tapped it as failed, the
+     * set fell short of its planned reps or duration and the app derived a
+     * failure, or both. The derived case needs no lifter input at all.
+     */
     val failed: Boolean = false,
     /** True for warm-up sets — kept out of the RPE scale so effort data stays clean. */
     val warmup: Boolean = false,

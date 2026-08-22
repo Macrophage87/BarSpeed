@@ -1660,29 +1660,37 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
     }
 }
 
-/** Rest-screen reminder of what was logged for the finished set (incl. auto-fail on early stop). */
+/**
+ * Rest-screen reminder of the effort recorded for the finished set.
+ *
+ * When an RPE or warm-up tile was tapped, its own label is shown, with
+ * "short of target" appended if the set also fell short by rep count or
+ * duration -- both are real, distinct facts and neither replaces the other.
+ *
+ * When neither was tapped, this state cannot say why: [RecordState.lastSetRpe]
+ * is null and [RecordState.lastSetWarmup] is false whether the lifter tapped
+ * the grid's own "Failed the set" tile (rpe null, warmup false) or never saw
+ * the grid at all -- [EndSetEarlyButton] ends the set with no rating whenever
+ * the target was not met, landing on exactly the same state. Naming a tap
+ * that may not have happened is the defect issue #139 found, so this shows
+ * only the one fact both cases share: the set is marked failed.
+ */
 @Composable
 private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
     val feedback = state.lastFeedback ?: return
     if (state.lastSetRpe == null && !state.lastSetFailed && !state.lastSetWarmup) return
     val options =
         rpeOptions(timed = feedback.actualDurationS != null, explosive = feedback.explosive)
-    // Show what the lifter tapped, and mark the failure alongside it rather than
-    // replacing it — a set can be both "very hard" and short of its target.
     val tapped =
         options.firstOrNull {
-            when {
-                state.lastSetWarmup -> it.warmup
-                state.lastSetRpe != null -> !it.warmup && !it.failed && it.rpe == state.lastSetRpe
-                else -> it.failed
-            }
+            if (state.lastSetWarmup) it.warmup else !it.warmup && !it.failed && it.rpe == state.lastSetRpe
         }?.description
     val text =
         when {
-            tapped == null -> null
-            state.lastSetFailed && state.lastSetRpe == null && !state.lastSetWarmup -> tapped
-            state.lastSetFailed -> "$tapped · short of target"
-            else -> tapped
+            tapped != null && state.lastSetFailed -> "$tapped · short of target"
+            tapped != null -> tapped
+            state.lastSetFailed -> "Failed"
+            else -> null
         }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         SectionCaption(

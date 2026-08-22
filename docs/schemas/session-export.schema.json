@@ -307,11 +307,11 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 10,
-          "description": "Lifter-reported RPE, entered on the rest screen."
+          "description": "Lifter-reported RPE, logged when the set ends; correctable afterward on the rest screen."
         },
         "failed": {
           "type": "boolean",
-          "description": "True when the lifter marked the set as failed."
+          "description": "True when the set is marked failed: the lifter tapped it as failed, the set fell short of its planned reps or duration and the app derived a failure, or both. The derived case needs no lifter input at all."
         },
         "warmup": {
           "type": "boolean",

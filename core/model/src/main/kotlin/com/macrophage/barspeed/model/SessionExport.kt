@@ -149,7 +149,12 @@ data class SetExport(
     val side: String? = null,
     /** Lifter-reported RPE (6–10). */
     val rpe: Int? = null,
-    /** True when the lifter marked the set as failed. Omitted when false. */
+    /**
+     * True when the set is marked failed: the lifter tapped it as failed, the
+     * set fell short of its planned reps or duration and the app derived a
+     * failure, or both. The derived case needs no lifter input at all.
+     * Omitted when false.
+     */
     val failed: Boolean = false,
     /** True for warm-up sets (no RPE recorded). Omitted when false. */
     val warmup: Boolean = false,
