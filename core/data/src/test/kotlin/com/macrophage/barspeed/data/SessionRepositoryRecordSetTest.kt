@@ -274,8 +274,7 @@ class SessionRepositoryRecordSetTest {
      * can catch a mapping that crossed the two: equal values pass whichever way
      * round they are wired, and that is how a "planned" column ends up holding
      * what was played. The pair exists so an adjustment is visible at all --
-     * once the prep is adjustable, their difference is the only record that the
-     * lifter changed it.
+     * whenever they differ, the lifter adjusted the prep.
      */
     @Test
     fun `the set row carries the prep prescribed and the prep played, unswapped`() = runTest {

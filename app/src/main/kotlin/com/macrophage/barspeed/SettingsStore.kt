@@ -87,7 +87,7 @@ class SettingsStore(private val context: Context) {
     private companion object {
         /**
          * `weight_unit`, `audio_cues` and `body_weight_kg` are the other keys in
-         * this store and none of them begins with it.
+         * this store and none of them begins with [PREP_KEY_PREFIX].
          */
         const val PREP_KEY_PREFIX = "prep_s_"
     }

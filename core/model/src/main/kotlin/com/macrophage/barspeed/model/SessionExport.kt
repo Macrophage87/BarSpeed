@@ -162,7 +162,7 @@ data class SetExport(
      * to equal what the plan prescribed. The difference is what lets the next
      * plan be authored from this document instead of re-guessed.
      *
-     * [plannedPrepS] is present whenever a lead-in ran, including when the plan
+     * [plannedPrepS] is present whenever the set ran a voice guide, including
      * declared nothing: the app's default is still what was prescribed, and a
      * reader that saw only [prepS] could not tell an adjustment from a
      * declaration without knowing the app's constant.

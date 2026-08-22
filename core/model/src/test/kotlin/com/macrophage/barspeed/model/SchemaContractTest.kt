@@ -196,10 +196,9 @@ class SchemaContractTest {
      * not merely go unmentioned -- it makes every export carrying it INVALID
      * against the contract its own consumer was pointed at.
      *
-     * A description each, because the omission has a number on it. `rest_s` is
-     * the one planned field in this document with neither a `planned` prefix nor
-     * a description, and a reader takes it for an observation; that is issue
-     * #76.
+     * A description each. `rest_s` is the one planned field in this document
+     * whose name does not say it is planned, and a reader takes it for an
+     * observation; that is issue #76.
      */
     @Test
     fun `the published export declares both prep keys, each described`() {

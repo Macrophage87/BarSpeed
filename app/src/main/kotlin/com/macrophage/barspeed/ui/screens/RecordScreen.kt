@@ -539,16 +539,17 @@ private const val PREP_STEP_S = 5
  *
  * Shown only when the set coming up will actually run the voice guide -- a
  * control that changed nothing would be worse than no control. The predicate is
- * [LeadInPolicy.playsPrep], reached through `state.upcomingPlaysPrep`, which is
- * the function the import gate warns an inert `prep_s` against.
+ * [LeadInPolicy.playsPrep], reached through `state.upcomingPlaysPrep`. It is the
+ * same function the import gate warns an inert `prep_s` against.
  *
- * It is asked here of the slot AS DECLARED, and `beginSet` is not: `restingState`
- * seeds `tempoInput` from the set just finished and `advancedState` bakes that
- * into the next slot, so an exercise declaring no tempo that follows one that
- * does inherits it, runs guided with a prep, and gets no control here. Reachable
- * on the plan this repo publishes -- Upper A runs dumbbell_bench_press (3010)
- * into single_arm_dumbbell_row, which declares none. A known gap, not closed on
- * this branch: changing either operand is an untested `:app` behaviour change.
+ * It is asked here of the slot AS DECLARED, and `beginSet` is not:
+ * `restingState` seeds `tempoInput` from the next slot's tempo, falling back to
+ * the set just finished, and `advancedState` bakes that into the next slot, so
+ * an exercise declaring no tempo that follows one that does inherits it, runs
+ * guided with a prep, and gets no control here. Reachable on the plan this repo
+ * publishes -- Upper A runs dumbbell_bench_press (3010) into
+ * single_arm_dumbbell_row, which declares none. A known gap, not closed on this
+ * branch: changing either operand is an untested `:app` behaviour change.
  *
  * Rendered on READY and again on the rest screen because READY is drawn at most
  * once per session: `startNextSet` writes READY and calls `beginSet` in the same
@@ -558,9 +559,7 @@ private const val PREP_STEP_S = 5
  * The adjustment is stored against the exercise, so it holds for the rest of
  * that exercise's sets and for the same exercise next week. What it is being
  * changed from is named beside it whenever the two differ -- the plan's
- * declaration on a planned set, the app's default on an ad-hoc one, which has no
- * plan to ask -- because the difference is published in the export and the next
- * plan is meant to be authored from it.
+ * declaration where it made one, the app's default otherwise.
  */
 @Composable
 private fun PrepAdjuster(state: RecordState, viewModel: RecordViewModel) {

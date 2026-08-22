@@ -998,7 +998,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // the write site are two facts that can disagree -- and the way they
         // disagree leaves every capture claiming a prep nobody heard.
         //
-        // Recorded only when a lead-in is actually played. An unguided set has
+        // Recorded only when the set ran a voice guide. An unguided set has
         // no prep, and writing 0 for it would be absence rendered as a value:
         // 0 is a real prep, the one where nothing is spoken before the first
         // stroke call.

@@ -35,11 +35,11 @@ package com.macrophage.barspeed.model
  * correction forward, so a plan-wins rule would discard the lifter's fix every
  * Monday.
  *
- * A device-local value that silently wins would normally be invisible to the one
- * reader who could repair the plan. It is not invisible here: both values are
- * published, `plannedPrep_s` beside `prep_s`, and their difference is the record
- * that the lifter adjusted it. The correction survives the week AND the plan
- * converges on reality instead of drifting from it.
+ * A device-local value that silently wins would normally be invisible to the
+ * one reader who could repair the plan. Both values are published,
+ * `plannedPrep_s` beside `prep_s`, and whenever they differ the lifter adjusted
+ * it. The correction survives the week AND the plan converges on reality
+ * instead of drifting from it.
  *
  * ## Three tiers of bound, none redundant
  *
