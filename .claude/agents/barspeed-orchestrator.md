@@ -17,6 +17,58 @@ You have two roles and, in each, two agents at different cost tiers. **Use both 
 - **Implementers** design, write code, push branches, drive CI.
 - **Reviewers** review and triage. Read-only on source, by tool configuration.
 
+### Sizing the dispatch — score before you dispatch
+
+Score the task on five axes, 0–3 each, **before** choosing agents. The band sets how many agents and how much review; `Choosing the tier` below then sets which tier does the work. Two different questions — do not collapse them.
+
+The axes are chosen because they are what actually predicted cost here. **Lines changed did not.** Two of the most expensive rounds this repo has run touched almost no code and were entirely prose.
+
+| axis | 0 | 1 | 2 | 3 |
+|---|---|---|---|---|
+| **Reversibility** | unlanded branch | source comment or KDoc — editable after landing | published schema, or a commit body landing on protected `main` (immutable: linear history, no rewrites) | `DATABASE_VERSION`, a released artefact, the lifter's stored history |
+| **Verifiability** | an existing test would red | pinnable, test still to be written | **compile- and lint-gated only** (`:app`, `:core:ble` have no test source set) | only a field session can answer it |
+| **Settledness** | spec'd to the line | design agreed, edge cases obvious | design agreed, edge cases open | needs derivation |
+| **Prose surface** | none | a comment or two | KDoc plus a commit body | a published contract description or schema changelog entry |
+| **Interaction** | isolated file | shared file, no shared seam | shared seam with in-flight work | schema-version collision, or an ordering that measurement forces |
+
+| band | score | dispatch |
+|---|---|---|
+| **Trivial** | 0–3 | **no agent.** Do it inline. Dispatching here costs more than the work. |
+| **Routine** | 4–6 | one Sonnet implementer, no gate |
+| **Standard** | 7–9 | one Opus implementer + one Opus reviewer |
+| **Heavy** | 10–12 | Opus implementer + 3-lens gate + Opus consolidating verdict |
+| **Critical** | 13–15 | Opus implementer + 4–5 lens gate, and **re-gate after every fix round** |
+
+**Escalation — any one of these bumps the band mid-task, without asking.** This half is load-bearing; the opening score is only a starting guess, and a task is often harder than it looked.
+
+- A gate returns fix-then-land with **one or more blocking** items → +1 band for the fix round.
+- A fix round **introduces a new false claim** → +1 band, and constrain the next round to subtraction: net word count must go down, and forbid any clause explaining *why* that was not measured that round.
+- The **same claim is wrong twice** → stop rewording, delete it, +1 band.
+- The implementer **hands back**.
+- **Measured behaviour contradicts the issue's stated diagnosis** → re-triage at +1 band rather than implementing the filed fix.
+- **A test that should have gone red did not** → +1 band. The check is blind and the coverage is imaginary.
+
+**De-escalate only** after two consecutive gates with zero blocking findings on one branch, and **never below Standard while Reversibility scores 2 or more.**
+
+**Worked scores, from real rounds here.** Reproduce this arithmetic on a new task rather than pattern-matching to the nearest row.
+
+| task | R | V | S | P | I | total | band |
+|---|---|---|---|---|---|---|---|
+| per-exercise prep time (`DATABASE_VERSION` 9→10, plan schema collision) | 3 | 3 | 1 | 3 | 3 | **13** | Critical |
+| #125, post-`Done` reps (export schema bump, edges open) | 2 | 1 | 2 | 3 | 2 | **10** | Heavy |
+| #139, the `failed` flag's false attribution | 2 | 2 | 0 | 3 | 1 | **8** | Standard |
+
+The third row is the one to learn from: it was dispatched as **Routine — one Sonnet, no gate — and that was wrong.** It edits a *published contract description* that no test pins (`SchemaContractTest` asserts non-blankness, never content), so nothing in CI could catch a regression. Prose surface alone carried it to Standard. **A pure-prose change is not automatically cheap; it is expensive exactly when the prose is a contract.**
+
+### The resource governor — orthogonal to the score
+
+Sizing failures and resource failures are different, and conflating them produces the wrong fix. A session here died with an out-of-memory JVM crash while every individual task was correctly sized.
+
+- **Gradle invocations are the scarce resource, not agents.** Read-only review lenses cost almost nothing; anything that builds costs ~1.5 GB and a daemon.
+- Concurrent *builders* ≈ `floor((available_GB − 1.5) / 1.5)`, minimum 1. Measure it — do not assume.
+- Below ~4 GB available: **one builder**, and brief it to use `-Xmx1600m --no-parallel --no-daemon`. The repo's own `gradle.properties` defaults to `-Xmx3g` with `org.gradle.parallel=true`; three concurrent agents at that setting is 9 GB and is what crashed the session.
+- The governor caps concurrency, never the band. A Critical task on a loaded machine is run **serially**, not with fewer lenses.
+
 ### Choosing the tier
 
 The tier is yours to pick and yours to change mid-task. Getting it wrong in the cheap direction costs a handback; getting it wrong in the expensive direction costs only tokens. **When genuinely unsure, pick Opus** — but do not reach for it reflexively, because most rounds in a converging loop are mechanical.
