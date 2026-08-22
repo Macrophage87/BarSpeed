@@ -227,6 +227,98 @@ class SetEndWindowTest {
         }
     }
 
+    // ------------------------------------------------------------------
+    // What the rule changes about the figures the lifter reads.
+    // ------------------------------------------------------------------
+
+    /**
+     * The correction this fixture was committed for: 82.6% to 52.1%.
+     *
+     * The set keeps its first four detections and loses the fifth, and the
+     * fourth is the straddling one -- drive begun 1.829 s before the cue and
+     * ended 3.389 s after it. Keeping it is the decision [SetEnd] argues for,
+     * and this is where it shows: bounding on the drive's END instead would
+     * leave three reps and read 14.8%.
+     *
+     * 52.1% is what the rule yields, and it is NOT a claim that 52.1% is the
+     * set's honest fatigue. The lifter rated the set RPE 7 -- about three reps
+     * left -- which agrees with neither figure, and the reps that remain still
+     * include two carrying more than 1.8 m of range on a rear delt fly. What is
+     * fixed here is that the figure is computed over movements the lifter was
+     * still being told to make; what is not fixed is whether those movements
+     * were segmented correctly, which is #72, #87 and #94.
+     */
+    @Test
+    fun `set 6's velocity loss drops thirty points once the tail is out of the set`() {
+        val analysis =
+            SetAnalyzer.analyze(load("$fixture.csv"), rearDeltFly, loadKg = loadKg, cues = track(fixture))
+        assertEquals(4, analysis.reps.size, "detections kept; the lifter performed 12 reps")
+        assertEquals(1, analysis.detectionsAfterSetEndCue, "detections dropped")
+        assertEquals(
+            published.dropLast(1).map { it.meanConVelMps },
+            analysis.reps.map { it.meanConVelMps },
+            "the kept drives, in the export's own figures",
+        )
+        assertEquals(52.1, analysis.velocityLossPct, "velocity loss over the reps of the set")
+    }
+
+    /**
+     * Every committed capture with a cue track, before and after.
+     *
+     * Five are untouched, which is what says the rule is not simply deleting
+     * the last rep of every set. On the four that move, two land exactly on the
+     * count the lifter performed -- 12 for `-b`, 10 for `-10rep` -- and the peak
+     * drive velocity of three of them stops being the sensor being handled:
+     * 1.673 to 0.737 m/s, 1.707 to 0.768, 1.261 to 0.910. That is the same
+     * defect reaching `summary.peakConVel_mps` instead of `velocityLoss_pct`,
+     * and it is why the rule is applied to the rep list rather than to the
+     * velocity-loss calculation.
+     *
+     * Three of the four stop reading [VelocityLoss.TerminalRepIsFastest] and
+     * start reading [VelocityLoss.Measured]. That is not a reinterpretation of
+     * the basis vocabulary, which is unchanged: those sets were withheld because
+     * nothing in the REP LIST could tell a spurious final detection from a set
+     * held flat, and the cue track answers exactly that question from outside
+     * the rep list. Set 6 goes the other way and stays `Measured` throughout --
+     * its wrong figure was never withheld from the lifter at all.
+     */
+    @Test
+    fun `the cue track changes four of the nine cued captures and leaves five alone`() {
+        val legCurl = LiftDirection(
+            startsWith = StartPhase.CONCENTRIC,
+            concentricUp = false,
+            sensorInverted = true,
+            plane = MovementPlane.VERTICAL,
+            sensorOnStack = true,
+        )
+        val barbell = LiftDirection(startsWith = StartPhase.ECCENTRIC)
+        data class Case(
+            val name: String,
+            val direction: LiftDirection,
+            val reps: Int,
+            val loss: VelocityLoss,
+            val peakConVelMps: Double,
+        )
+
+        val corpus = listOf(
+            Case("field-legcurl-1030-12rep", legCurl, 12, VelocityLoss.Measured(36.5), 0.577),
+            Case("field-legcurl-1030-12rep-b", legCurl, 12, VelocityLoss.Measured(34.7), 0.737),
+            Case("field-legcurl-1030-12rep-c", legCurl, 9, VelocityLoss.Measured(69.1), 0.768),
+            Case("field-legcurl-1030-10rep", legCurl, 10, VelocityLoss.Measured(22.5), 0.910),
+            Case("field-ohp-rotating-8rep", barbell, 3, VelocityLoss.Measured(30.7), 1.062),
+            Case("field-ohp-rotating-8rep-b", barbell, 4, VelocityLoss.Measured(35.9), 1.119),
+            Case("field-bench-rotating-6rep", barbell, 2, VelocityLoss.Measured(7.0), 0.600),
+            Case("field-bench-rotating-6rep-ok", barbell, 6, VelocityLoss.Measured(58.3), 0.676),
+            Case(fixture, rearDeltFly, 4, VelocityLoss.Measured(52.1), 2.085),
+        )
+        corpus.forEach { case ->
+            val reps = SetAnalyzer.analyze(load("${case.name}.csv"), case.direction, cues = track(case.name)).reps
+            assertEquals(case.reps, reps.size, "${case.name} detections kept")
+            assertEquals(case.loss, VelocityLoss.of(reps), "${case.name} velocity loss")
+            assertEquals(case.peakConVelMps, reps.maxOf { it.peakConVelMps }, "${case.name} peak drive velocity")
+        }
+    }
+
     /**
      * The fixture reproduces the shipped export, rep for rep.
      *
