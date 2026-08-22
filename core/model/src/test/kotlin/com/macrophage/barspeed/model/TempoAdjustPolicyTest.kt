@@ -8,9 +8,12 @@ import kotlin.test.assertNull
 /**
  * [TempoAdjustPolicy], the decision half of the between-sets tempo picker.
  *
- * Three of the pins below state TODAY'S behaviour rather than the wanted one,
- * and each says so in its own name. They are replaced by their inversions later
- * on this branch, the way #124's characterization pin was.
+ * Three of these are the DIFFERENTIALS of #148, replacing the three
+ * characterization pins that stood in their place at
+ * 96111a7495bb7a945b4d0d94ba3daf383c38f711: a drive-down lift's labels, the
+ * tempo offered to a set that declares none, and whether an adjustment stands
+ * past the set it was made on. Each names what it inverted. They red against
+ * that parent, which is the point of them.
  *
  * The lift shapes are named for what they are and not for a machine: what the
  * policy is asked is a pair of booleans, and it is the pair that reaches
@@ -53,23 +56,28 @@ class TempoAdjustPolicyTest {
     }
 
     /**
-     * TODAY'S ANSWER, and it is wrong. A pushdown drives DOWN, so digit 1 is
-     * the down stroke and it is the concentric -- which is what
-     * `TempoSchedule.of` already does with the same lift. Naming the digits by
-     * phase-then-direction instead gets both words and both captions backwards,
-     * and a lifter scrolling the wheel captioned "eccentric" would be
-     * lengthening their drive.
+     * A pushdown, a lat pulldown and a leg curl all drive DOWN. Digit 1 is
+     * still the down stroke -- `TempoSchedule.of` reads it that way and the
+     * guide calls it "DOWN" -- and on these lifts that stroke is the drive, so
+     * the wheel saying DOWN is captioned concentric and it is digit 3 that is
+     * the eccentric.
      *
-     * Replaced by its inversion later on this branch.
+     * Naming the digits by phase-then-direction instead gets both words and
+     * both captions backwards, which is v0.1.41's defect in a new place: a
+     * lifter scrolling the wheel captioned "eccentric" would be lengthening
+     * their drive.
+     *
+     * Inverts the pin that stood here at
+     * 96111a7495bb7a945b4d0d94ba3daf383c38f711.
      */
     @Test
-    fun `today a drive-down lift is labelled backwards, both words and both captions`() {
+    fun `a drive-down lift keeps the digits where they are and moves the phases`() {
         assertEquals(
             listOf(
-                "UP/eccentric",
-                "PAUSE/after the eccentric",
                 "DOWN/concentric",
                 "PAUSE/after the concentric",
+                "UP/eccentric",
+                "PAUSE/after the eccentric",
             ),
             labelled(pushdown()),
         )
@@ -172,19 +180,21 @@ class TempoAdjustPolicyTest {
     }
 
     /**
-     * TODAY'S ANSWER, and it is the defect #148 folds in. The shipped example's
-     * Upper A runs dumbbell_bench_press at 3010 straight into
-     * single_arm_dumbbell_row, which declares no tempo at all. The row is
-     * offered 3010, is paced by the voice against it, is counted by the guide
-     * rather than by the lifter, is given a prep its author never declared, and
-     * records 3010 as its prescription for good.
+     * A planned set that declares no tempo is offered none.
      *
-     * Replaced by its inversion later on this branch.
+     * The shipped example's Upper A runs dumbbell_bench_press at 3010 straight
+     * into single_arm_dumbbell_row, which declares no tempo at all. Offered
+     * 3010, the row is paced by the voice against it, counted by the guide
+     * rather than by the lifter, given a prep its author never declared, and
+     * records 3010 as its prescription for good. Declaring nothing is a
+     * declaration.
+     *
+     * Inverts the pin that stood here at
+     * 96111a7495bb7a945b4d0d94ba3daf383c38f711.
      */
     @Test
-    fun `today a planned set declaring no tempo is offered the one the last set ran`() {
-        assertEquals(
-            "3010",
+    fun `a planned set declaring no tempo is offered none, not the one the last set ran`() {
+        assertNull(
             TempoAdjustPolicy.seedTempo(hasPlannedNext = true, nextDeclaredTempo = null, lastRanTempo = "3010"),
         )
     }
@@ -205,21 +215,100 @@ class TempoAdjustPolicyTest {
     }
 
     /**
-     * TODAY'S ANSWER. Nothing carries, because nothing can state a tempo: the
-     * plan branch of the rest screen draws a load box and a reps box, and the
-     * free-text tempo field is in the ad-hoc form alone.
+     * An adjustment holds for the rest of the block it was made in.
      *
-     * Replaced by its inversion later on this branch.
+     * The lifter who slows the eccentric on set 1 of an exercise did not mean
+     * it for set 1 alone, any more than a lifter who moves up in weight means
+     * it for one set -- which is #124, decided the same way for load. Without
+     * this, every set after the first is re-offered the plan's tempo and paced
+     * against it, and the export records compliance with a prescription the
+     * lifter deliberately left.
+     *
+     * Inverts the pin that stood here at
+     * 96111a7495bb7a945b4d0d94ba3daf383c38f711.
      */
     @Test
-    fun `today an adjusted tempo never stands, because nothing can state one`() {
-        assertNull(
+    fun `an adjusted tempo stands for the rest of the block it was set in`() {
+        assertEquals(
+            "4010",
             TempoAdjustPolicy.standingAdjustedTempo(
                 adjustedTempo = "4010",
                 sameExerciseBlock = true,
                 lastDeclaredTempo = "3010",
                 nextDeclaredTempo = "3010",
             ),
+        )
+    }
+
+    /**
+     * The three boundaries the carry stops at, all of them
+     * [SetLoadPolicy.standingStatedAddedKg]'s and none of them restated here.
+     *
+     * [SetLoadPolicy.sameExerciseBlock] is what decides the first two -- the
+     * next exercise, and a second block of the same movement -- and it is
+     * pinned in `SetLoadPolicyTest` rather than a second time here; this takes
+     * its answer as a parameter, which is the whole reason it is one.
+     *
+     * The third is the plan prescribing a CHANGE. A block written 3010 / 4010
+     * is asking for a different tempo on its second set, and it is that tempo
+     * the lifter is offered. Without it the fix becomes the same defect facing
+     * the other way: an adjustment made to the opener would flatten a
+     * prescribed progression.
+     */
+    @Test
+    fun `an adjusted tempo stops at the block boundary and at a prescribed change`() {
+        assertNull(
+            TempoAdjustPolicy.standingAdjustedTempo("4010", false, "3010", "3010"),
+            "a new exercise, or a second block of the same one, is offered its own plan",
+        )
+        assertNull(
+            TempoAdjustPolicy.standingAdjustedTempo("4010", true, "3010", "4010"),
+            "the plan prescribes a change for the next set, and it wins",
+        )
+        assertNull(
+            TempoAdjustPolicy.standingAdjustedTempo(null, true, "3010", "3010"),
+            "nothing was adjusted, so nothing stands",
+        )
+        assertNull(
+            TempoAdjustPolicy.standingAdjustedTempo("4010", true, "3010", null),
+            "the plan declared a tempo for one of the two sets and not the other",
+        )
+    }
+
+    /**
+     * The walk through the shipped example's Upper A, in the order the record
+     * flow takes it.
+     *
+     * dumbbell_bench_press declares 3010 on both its sets. The lifter slows the
+     * eccentric to 4010 on set 1; set 2 runs 4010 without being retyped. The
+     * next exercise is single_arm_dumbbell_row, a different movement declaring
+     * no tempo at all: nothing said about the bench reaches it, and it is
+     * offered no tempo, so it runs unpaced as its author wrote it.
+     */
+    @Test
+    fun `the walk through Upper A carries an adjustment to set 2 and stops it at the row`() {
+        val withinTheBlock =
+            TempoAdjustPolicy.standingAdjustedTempo(
+                adjustedTempo = "4010",
+                sameExerciseBlock = true,
+                lastDeclaredTempo = "3010",
+                nextDeclaredTempo = "3010",
+            )
+        assertEquals("4010", withinTheBlock, "set 2 of the bench press keeps what the lifter set")
+        assertEquals("4010", TempoAdjustPolicy.carriedIntoNextSet("3010", withinTheBlock))
+
+        val acrossTheBoundary =
+            TempoAdjustPolicy.standingAdjustedTempo(
+                adjustedTempo = "4010",
+                sameExerciseBlock = false,
+                lastDeclaredTempo = "3010",
+                nextDeclaredTempo = null,
+            )
+        assertNull(acrossTheBoundary, "nothing the lifter said about the bench reaches the row")
+        assertNull(TempoAdjustPolicy.carriedIntoNextSet(null, acrossTheBoundary))
+        assertNull(
+            TempoAdjustPolicy.seedTempo(hasPlannedNext = true, nextDeclaredTempo = null, lastRanTempo = "4010"),
+            "and the row is offered no tempo at all, which is what it declares",
         )
     }
 
