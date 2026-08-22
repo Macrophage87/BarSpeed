@@ -107,9 +107,10 @@ private val SECTIONS =
                 "lifts: it measures velocity and power while the reps are counted by you (tap) or " +
                 "by the voice guide on tempo sets — a miscounted phase switch can't corrupt the " +
                 "count. Explosive lifts stay sensor-counted. " +
-                "Right when a set ends, tap how hard it felt (warm-up and failed included); a set " +
-                "stopped short of its target is logged as failed automatically. Rest follows, then " +
-                "'Start next set'.",
+                "Right when a set ends, tap how hard it felt — on every set, whether or not it hit " +
+                "its target, warm-up always among the choices. A set that met its target also gets " +
+                "a 'failed the set' tile; one stopped short does not, because it is logged as " +
+                "failed automatically. Rest follows, then 'Start next set'.",
         ),
         GuideSection(
             "Voice",

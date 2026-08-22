@@ -24,12 +24,29 @@ enum class SetEndControl {
  *
  * Here rather than in `:app` for the reason [RestControlPolicy] is here: `:app`
  * has no test that can reach a composable, so a gate written inside one is a
- * gate nothing can measure. This one has already shipped wrong once.
+ * gate nothing can measure. This one shipped wrong and stayed wrong for every
+ * session the app has recorded.
  *
- * Characterized, not yet changed. This is what `EndSetControl` in RecordScreen
- * has always done -- the effort grid once the set met its target, END SET EARLY
- * before that -- lifted out unaltered so the change to it can be seen as a
- * change to one expression rather than read out of a 1,700-line screen.
+ * The effort grid is offered either way, and that is issue #137. Gating it on
+ * the target left the RPE record holding only the sets that hit their target,
+ * so every failed set was absent from it by construction -- and the set the
+ * lifter stopped is where the fatigue information is. The record read easier
+ * the harder the session got.
+ *
+ * What the target decides is the way OUT beside the grid, never whether rating
+ * is possible:
+ *
+ *  - A set that met its target may tap the failure itself. Nothing derived says
+ *    that set fell short, so the lifter's word is the only thing that can.
+ *  - A set that came up short gets END SET EARLY instead, ending it with no
+ *    rating at all. The shortfall is derived at the write either way, so the
+ *    tile would add one thing only: a TAPPED failure, which no later rep
+ *    correction can clear. A miscounted rep total lands on exactly this path.
+ *
+ * Neither case nags. Both leave one tap that ends the set storing no RPE,
+ * because a lifter walking away mid-set has to be able to leave, and because
+ * absence has to stay a state the record can hold: an unrated set is not a
+ * zero.
  */
 object SetEndControlPolicy {
     /**
@@ -42,6 +59,6 @@ object SetEndControlPolicy {
     fun controls(targetMet: Boolean): Set<SetEndControl> = if (targetMet) {
         setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE)
     } else {
-        setOf(SetEndControl.END_UNRATED)
+        setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED)
     }
 }

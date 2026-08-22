@@ -1257,10 +1257,14 @@ private fun phaseLabel(phase: Phase): String = when (phase) {
 /**
  * The set-end control, which changes with what the set has actually delivered.
  *
- * Until the set has met its target the only way out is to stop early, and that
- * is a failed set — offering "solid, had more in me" three reps into a five-rep
- * set would let an abandoned set be logged as a good one. Once the target is
- * met the effort grid takes over and rating IS ending.
+ * The effort grid is drawn either way, with END SET EARLY under it on a set
+ * that came up short. Rating an abandoned set does not log it as a good one:
+ * the shortfall is derived at the write from the rep or second count and lands
+ * as `failed` whether or not a tile was tapped, so "solid, had more in me"
+ * three reps into a five-rep set now records an effort AND a failure, which is
+ * the pair a reader of the export needs and could not get. Which controls
+ * belong to which case is [SetEndControlPolicy]'s decision, in a module with
+ * tests; this draws what it is told.
  *
  * Once the set HAS ended, neither of those is the control any more, and the
  * write's state decides what is. This is the single place all five in-set
@@ -1324,13 +1328,20 @@ private fun UnsavedSetNotice(viewModel: RecordViewModel) {
 }
 
 /**
- * Deliberately ends the set with NO rating attached. The set still lands as a
- * failure — this button only appears when the set is short of its target, which
- * is exactly what [RecordViewModel.endSet] auto-fails on — but it lands as a
- * DERIVED failure rather than a tapped one. Tapping the verdict would make it
- * stick: a lifter who did all five reps but only tapped "+1 REP" three times
- * gets this button as their only exit, and a tapped failure is one that
- * correcting the rep count afterwards can never clear.
+ * Ends the set with NO rating attached. It is the SKIP beside the effort grid
+ * rather than the only way out: a lifter walking away mid-set must not be made
+ * to rate the set before it will end, so absence stays one tap away.
+ *
+ * It does not tap the failure, and the grid above it withholds the "failed the
+ * set" tile for the same reason. A shortfall is DERIVED at the write, so it can
+ * be re-derived -- correcting a miscounted rep total on the rest screen clears
+ * it. A TAPPED failure is one no later REP CORRECTION can clear: `correctReps`
+ * re-derives the derived half and leaves the tapped half standing. Re-rating
+ * the set does overwrite it, so it is not permanent -- it is out of reach of
+ * the one repair that fits the mistake. A lifter who did all five reps but only
+ * tapped "+1 REP" three times reaches exactly this control, and a tapped
+ * verdict here would defeat correcting the count, which is what they would
+ * actually go and do.
  */
 @Composable
 private fun EndSetEarlyButton(viewModel: RecordViewModel) {
@@ -1341,13 +1352,18 @@ private fun EndSetEarlyButton(viewModel: RecordViewModel) {
         Text("END SET EARLY", style = MaterialTheme.typography.titleLarge, color = BarColors.Red)
     }
     Spacer(Modifier.height(6.dp))
-    SectionCaption("Stopping short logs a failed set · finish it to rate the effort")
+    SectionCaption("Ends the set with no rating · a set that came up short logs as failed")
 }
 
 /**
- * The effort grid IS the end-set control once the set is complete. Tapping how
- * the set felt ends the set and logs the rating in one action, while the set is
- * still fresh — there is no separate page between lifting and resting.
+ * The effort grid IS the end-set control. Tapping how the set felt ends the set
+ * and logs the rating in one action, while the set is still fresh -- there is no
+ * separate page between lifting and resting.
+ *
+ * [failedTile] draws the lifter's own "failed the set" verdict. It is false on a
+ * set that came up short, where the failure is already derived: the tile would
+ * store a TAPPED one, which no later rep correction can clear, and it would sit
+ * on the path a miscounted rep total arrives on.
  */
 @Composable
 private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failedTile: Boolean) {
@@ -1678,11 +1694,16 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
  *
  * When neither was tapped, this state cannot say why: [RecordState.lastSetRpe]
  * is null and [RecordState.lastSetWarmup] is false whether the lifter tapped
- * the grid's own "Failed the set" tile (rpe null, warmup false) or never saw
- * the grid at all -- [EndSetEarlyButton] ends the set with no rating whenever
- * the target was not met, landing on exactly the same state. Naming a tap
- * that may not have happened is the defect issue #139 found, so this shows
- * only the one fact both cases share: the set is marked failed.
+ * the grid's own "Failed the set" tile (rpe null, warmup false) or was offered
+ * the grid and declined it -- [EndSetEarlyButton] is the skip beside the grid
+ * on a set that came up short, and ends it with no rating, landing on exactly
+ * the same state. Naming a tap that may not have happened is the defect issue
+ * #139 found, so this shows only the one fact every such case shares: the set
+ * is marked failed.
+ *
+ * Issue #137 makes the declined case the common one and the tapped-tile case
+ * rarer, because the failed tile is no longer drawn on a short set at all. This
+ * line gets more conservative, not less.
  */
 @Composable
 private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
