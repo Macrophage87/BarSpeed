@@ -44,20 +44,105 @@ data class CadenceBeat(
  * measurable in the committed cue tracks: `Down` 594039, `1` 595041, `2`
  * 596043, `Up` 597043.
  *
- * Three places it can go:
+ * Three places it can go, tried in this order, and one it cannot:
  *
  * 1. **A closing pause the prescription already provides**, when it is at least
  *    a second. Free, and preferred.
- * 2. **Merged into the next stroke's opening call** -- "Down, rep three" -- with
- *    that stroke's FIRST count suppressed so the window is two seconds instead
- *    of one. Costs one tempo count and no time. Possible only when the stroke
- *    has a count to give up, which is exactly [MERGE_MIN_STROKE_S].
- * 3. **Not spoken.** The rep number stays on screen, driven by `onRepCounted`,
+ * 2. **Merged into the next rep's FIRST stroke call** -- "Down, rep three" --
+ *    with that stroke's FIRST count suppressed so the window is two seconds
+ *    instead of one. Costs one tempo count and no time. Possible only when the
+ *    stroke has a count to give up, which is exactly [MERGE_MIN_STROKE_S].
+ * 3. **Merged into the next rep's SECOND stroke call**, on identical terms,
+ *    when the first stroke is too short to carry it. A pauseless tempo that
+ *    opens on a one second stroke keeps all its room in the other one: a leg
+ *    curl's `1030` pulls for a second and lowers for three, a leg press's
+ *    `2010` drives for a second and lowers for two. Those sets ran with no
+ *    spoken count at all, which is issue 147 and a complaint from the gym.
+ * 4. **Not spoken.** The rep number stays on screen, driven by `onRepCounted`,
  *    and that on-screen number is the metronome's own count rather than the
  *    sensor's.
  *
- * The behaviour before issue 106 was a fourth option: insert a one-second beat
+ * The behaviour before issue 106 was a fifth option: insert a one-second beat
  * the prescription did not ask for.
+ *
+ * ## No home moves a beat
+ *
+ * All four cases only decide what is SAID on seconds the prescription already
+ * asked for. None lengthens a stroke, a pause or a cycle. That is the
+ * obligation two shipped releases broke -- a flat allowance for everything
+ * after the first stroke, then the one-second floor of issue 106, +1.00 s per
+ * rep on 31 of 31 captured sets -- and `CadencePlanTest` pins it against the
+ * prescription for 1,380 (tempo, lift) pairs rather than against the cycle
+ * total, which a second moved from one beat into another leaves unchanged.
+ *
+ * ## What case 3 costs
+ *
+ * A place in the rep, and one tempo count. The call lands one stroke into the
+ * rep instead of at its start: a second late on a `1030` leg curl, two on a
+ * `2011` with an isometric pause between the strokes. It still rides a movement
+ * word the lifter is listening for, and the number it carries counts FINISHED
+ * reps and instructs no movement, so arriving late cannot be mistaken for a cue
+ * to move. Whether a count that lands mid-rep is followable at gym speed is a
+ * question for a session and not for this file.
+ *
+ * `"Last rep"` travels the same channel and arrives after the final rep has
+ * begun. On these pairs it was not spoken at all before, so this is an
+ * improvement bounded by that lateness, not a regression.
+ *
+ * ## What stays uncarryable, and what was rejected
+ *
+ * A tempo whose BOTH strokes are one second with no closing pause -- `1010`,
+ * `1110` -- has a word in every second of its cycle and keeps case 4. Four
+ * ways of forcing a call into it were considered and rejected:
+ *
+ * - **Speak a bare digit** rather than `"Rep 3"`, on the theory that a shorter
+ *   utterance survives a shorter window. Bare digits are already the most
+ *   overloaded string in the cue vocabulary: the guided metronome's tempo
+ *   counts, the unguided metronome's and the timed-set countdown all emit
+ *   them, and `session-export.schema.json` gives `'3'` as an example cue
+ *   meaning a tempo count. That objection binds case 1 only, where the
+ *   announcement IS the cue row: a merged call on cases 2 or 3 writes no row
+ *   at all, so a bare digit there would be spoken and never recorded -- the
+ *   state [LeadInPlan.RECORDED] puts the lead-in digits in, not the one it
+ *   refuses. What rejects it on the merged path is the audio: `"Up, three"`
+ *   sits one second from the same stroke's own tempo count `"2"`, so the
+ *   lifter hears digits meaning two different things inside one stroke.
+ *   Whether the shorter utterance would in fact survive the window is
+ *   unmeasured either way.
+ * - **Let it clip**, accepting a call cut off mid-word. A count you cannot
+ *   trust is worse than no count, which is why case 4 exists at all.
+ * - **Replace a mid-stroke tempo count with the call** instead of merging it
+ *   into the stroke's opening word. [CadenceBeat] cannot express "say this at
+ *   second k", so it would put a timing decision back inside
+ *   `GuidedCadenceRunner` in `:app`, whose test source set is one file deep --
+ *   the shape of issue 106. It would also write a `Rep N` row into the middle
+ *   of a stroke, where cue-track consumers measure phase boundaries.
+ * - **Suppress the NEXT beat's label** rather than a tempo count, widening the
+ *   window at the rep boundary so the call can land on time. This is the dual
+ *   of case 3 and the one a later author will reach for, because it fixes the
+ *   lateness case 3 accepts. It is the dangerous one. The utterance it deletes
+ *   is a MOVEMENT INSTRUCTION, and on a leg press it is specifically the
+ *   `Down` row, which is the row `CueTrack.calledReps` counts a rep as. Every
+ *   capture made afterwards would report one called rep for a set of ten, in
+ *   the persisted record, with nothing to reprocess: the rows were never
+ *   written. Which label goes is lift-dependent -- on a leg curl it is `Up`
+ *   and the count survives -- so the damage is silent AND intermittent, which
+ *   is worse than a count that is merely late.
+ *
+ * A mid-rep isometric pause of [MERGE_MIN_STROKE_S] seconds or more could carry
+ * a call the way case 3 does. No prescription in the corpus has one, and a home
+ * nothing exercises is a home nothing checks, so it is named here and not
+ * built.
+ *
+ * ## Cases 2 and 3 write nothing to the cue track
+ *
+ * A merged call rides the UTTERANCE; the CUE written down stays the bare stroke
+ * word. `GuidedCadenceRunner.play` speaks `(cue, "$cue, $announcement")`, so a
+ * set paced on case 2 or case 3 records `Down`, never `Down, Rep 3`, and no
+ * `Rep N` row appears. Only case 1 writes one, a closing pause having no word
+ * of its own. What case 3 does change in a future cue track is a REMOVED row:
+ * the second stroke's first tempo count, given up from rep 2 onwards, exactly
+ * as case 2 already gives up the first stroke's.
  */
 data class CadencePlan(
     val beats: List<CadenceBeat>,
@@ -73,7 +158,12 @@ data class CadencePlan(
 
     companion object {
         /**
-         * Shortest opening stroke that can carry a merged announcement.
+         * Shortest stroke that can carry a merged announcement, either stroke.
+         *
+         * One threshold for cases 2 and 3 and not two, because the argument
+         * below is about how LONG the stroke is and never about where in the
+         * rep it sits. A two-second stroke leaves two seconds whether the next
+         * rep opens on it or the current rep ends on it.
          *
          * The quantity that matters is the WINDOW the merged utterance gets
          * before anything else speaks and QUEUE_FLUSH cuts it off. A merged
@@ -111,22 +201,33 @@ data class CadencePlan(
             beats += stroke(schedule.first.label, firstS)
             if (firstPause > 0) beats += CadenceBeat(HOLD, firstPause, "Hold", isStroke = false)
             beats += stroke(schedule.second.label, secondS)
-            val repCompleteAfter = beats.lastIndex
+            // The second stroke is the last beat of the rep itself. One index
+            // because it is one beat: the rep is complete after it, and it is
+            // the last stroke that can be given the call.
+            val secondStroke = beats.lastIndex
             if (closing > 0) beats += CadenceBeat(BREATHE, closing, null, isStroke = false)
 
             // The rep call rides a closing pause when the prescription provides
             // one long enough to say it in.
             if (closing >= ANNOUNCE_BEAT_S) {
-                return CadencePlan(beats, repCompleteAfter, beats.lastIndex, announceMerged = false)
+                return CadencePlan(beats, secondStroke, beats.lastIndex, announceMerged = false)
             }
             // Otherwise it opens the next rep's first stroke, which gives up its
             // first count to make room. Only a stroke that HAS a count can.
             if (firstS >= MERGE_MIN_STROKE_S) {
                 beats[0] = beats[0].copy(suppressFirstCount = true)
-                return CadencePlan(beats, repCompleteAfter, announceOnBeat = 0, announceMerged = true)
+                return CadencePlan(beats, secondStroke, announceOnBeat = 0, announceMerged = true)
             }
-            // Nowhere left to put it. The screen still carries the rep number.
-            return CadencePlan(beats, repCompleteAfter, announceOnBeat = null, announceMerged = false)
+            // A one-second opener has no count to give up, so the call goes to
+            // the other stroke on the same terms: a stroke later in the rep,
+            // and not one second longer. Issue 147.
+            if (secondS >= MERGE_MIN_STROKE_S) {
+                beats[secondStroke] = beats[secondStroke].copy(suppressFirstCount = true)
+                return CadencePlan(beats, secondStroke, announceOnBeat = secondStroke, announceMerged = true)
+            }
+            // Every second of the cycle already has a word in it. The screen
+            // still carries the rep number.
+            return CadencePlan(beats, secondStroke, announceOnBeat = null, announceMerged = false)
         }
 
         private fun stroke(label: String, seconds: Int) = CadenceBeat(
