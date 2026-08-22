@@ -487,4 +487,76 @@ class SetLoadPolicyTest {
             SetLoadPolicy.recordedPlannedLoadKg(bodyweight = true, bodyWeightKg = 80.0, plannedAddedKg = null),
         )
     }
+
+    /**
+     * #124 as it behaves today, walked through the three functions the record
+     * flow calls and in the order it calls them: [resolve] when a set is
+     * written, [seedAddedKg] on the rest transition that follows it, and
+     * [carriedIntoNextSet] when the lifter taps through to the next set.
+     *
+     * Session 31's three seated leg curls, all declared 90 lb. The lifter
+     * states 105 for the middle one and says nothing further. That set records
+     * 105. The next one is offered its own declaration and records 90, against
+     * reps the lifter did at 105.
+     *
+     * The null passed as `statedAddedKg` on the last two hops is not a
+     * simplification: `restingState` writes `statedLoadKg = null` on every rest
+     * transition, so null is what those calls actually receive.
+     */
+    @Test
+    fun `a stated load reaches only the set it was typed for (pre-fix)`() {
+        val declared = 90 / WeightUnit.LB_PER_KG
+        val stated = 105 / WeightUnit.LB_PER_KG
+
+        assertEquals(
+            declared,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = declared,
+                typedAddedKg = null,
+                statedAddedKg = null,
+            ),
+            "set 11 records the plan's declaration",
+        )
+
+        // Rest after set 11. The lifter types 105, and tapping through bakes it
+        // into the slot set 12 is recorded against.
+        val slot12 =
+            SetLoadPolicy.carriedIntoNextSet(declaredAddedKg = declared, statedAddedKg = stated)
+        assertEquals(stated, slot12)
+        assertEquals(
+            stated,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = slot12,
+                typedAddedKg = null,
+                statedAddedKg = null,
+            ),
+            "set 12 records the stated load",
+        )
+
+        // Rest after set 12. The statement is gone, so the field is re-seeded
+        // from set 13's own declaration and the slot carries that declaration.
+        assertEquals(
+            declared,
+            SetLoadPolicy.seedAddedKg(
+                hasPlannedNext = true,
+                nextDeclaredAddedKg = declared,
+                lastAddedKg = stated,
+            ),
+            "the rest screen offers 90 again",
+        )
+        val slot13 =
+            SetLoadPolicy.carriedIntoNextSet(declaredAddedKg = declared, statedAddedKg = null)
+        assertEquals(
+            declared,
+            SetLoadPolicy.resolve(
+                adHoc = false,
+                plannedAddedKg = slot13,
+                typedAddedKg = null,
+                statedAddedKg = null,
+            ),
+            "set 13 silently reverts to the plan",
+        )
+    }
 }
