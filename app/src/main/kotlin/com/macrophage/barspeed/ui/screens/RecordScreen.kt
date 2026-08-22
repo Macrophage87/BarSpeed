@@ -65,6 +65,8 @@ import com.macrophage.barspeed.model.RestControl
 import com.macrophage.barspeed.model.RestControlPolicy
 import com.macrophage.barspeed.model.SensorAdvice
 import com.macrophage.barspeed.model.SensorAdvicePolicy
+import com.macrophage.barspeed.model.SetEndControl
+import com.macrophage.barspeed.model.SetEndControlPolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.Stage
@@ -1270,8 +1272,13 @@ private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
     when (state.setWrite) {
         SetWriteState.IN_FLIGHT -> SavingSetNotice()
         SetWriteState.FAILED -> UnsavedSetNotice(viewModel)
-        SetWriteState.NONE ->
-            if (state.setTargetMet) EndSetRpeGrid(state, viewModel) else EndSetEarlyButton(viewModel)
+        SetWriteState.NONE -> {
+            val controls = SetEndControlPolicy.controls(state.setTargetMet)
+            if (SetEndControl.EFFORT_GRID in controls) {
+                EndSetRpeGrid(state, viewModel, failedTile = SetEndControl.FAILED_TILE in controls)
+            }
+            if (SetEndControl.END_UNRATED in controls) EndSetEarlyButton(viewModel)
+        }
     }
 }
 
@@ -1343,8 +1350,10 @@ private fun EndSetEarlyButton(viewModel: RecordViewModel) {
  * still fresh — there is no separate page between lifting and resting.
  */
 @Composable
-private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel) {
-    val options = rpeOptions(timed = state.currentIsTimed, explosive = currentKind(state) == ExerciseKind.EXPLOSIVE)
+private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failedTile: Boolean) {
+    val options =
+        rpeOptions(timed = state.currentIsTimed, explosive = currentKind(state) == ExerciseKind.EXPLOSIVE)
+            .filter { failedTile || !it.failed }
     SectionCaption("Tap how that set felt to end it")
     Spacer(Modifier.height(6.dp))
     options.chunked(2).forEach { row ->
