@@ -143,6 +143,22 @@ class LeadInPolicyTest {
         assertFalse(LeadInPolicy.playsPrep(hasTempo = true, isTimed = false, kind = ExerciseKind.EXPLOSIVE))
     }
 
+    /**
+     * CHARACTERIZATION: what a hold and a carry do at this commit, so that
+     * changing it shows as a changed assertion rather than as a silent
+     * widening.
+     *
+     * A hold is excluded twice over. `PlanSetDef.validate` refuses a tempo on a
+     * timed set, so `hasTempo` is false; and `isTimed` is true. The lifter taps
+     * START holding the phone, and the stopwatch is running before they reach
+     * the bar.
+     */
+    @Test
+    fun `a hold and a carry play no prep`() {
+        assertFalse(LeadInPolicy.playsPrep(hasTempo = false, isTimed = true, kind = ExerciseKind.HOLD))
+        assertFalse(LeadInPolicy.playsPrep(hasTempo = false, isTimed = true, kind = ExerciseKind.CARRY))
+    }
+
     // ---- the relationship between two constants that are both 2 -------------
 
     /**

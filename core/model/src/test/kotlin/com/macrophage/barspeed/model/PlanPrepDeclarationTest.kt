@@ -124,6 +124,23 @@ class PlanPrepDeclarationTest {
     }
 
     /**
+     * CHARACTERIZATION: the same for a carry, written down at this commit so
+     * that changing it shows as a changed assertion rather than as a silent
+     * widening. A carry reaches the inert case exactly as a hold does -- the
+     * validator refuses a tempo on a timed set, so there is none to carry.
+     */
+    @Test
+    fun `a prep declared on a carry is warned about as inert`() {
+        val result = parse("""{"exercise":"farmers_walk","prep_s":10,"sets":[{"duration_s":40}]}""")
+
+        assertEquals(emptyList(), result.errors, "an inert declaration is not a reason to refuse the plan")
+        assertTrue(
+            result.warnings.any { it.startsWith("$path: \"prep_s\" is declared on farmers_walk") },
+            "no inert-declaration warning for a carry: ${result.warnings}",
+        )
+    }
+
+    /**
      * An explosive lift carrying a tempo is the same case arriving a different
      * way, and the one a reader is least likely to predict: the set has a tempo,
      * so the declaration looks live, and the voice guide still never runs.
