@@ -76,10 +76,17 @@ class PlanImplementCountTest {
               {"exercise":"dumbbell_bench_press","sets":[{"reps":10,"implementCount":2}]}]}]}
             """.trimIndent(),
         )
+        // dumbbell_bench_press is not built in and this set prescribes reps,
+        // so the undeclared-start warning fires alongside the wrong-level one.
+        // keys.lost is prepended ahead of plan.warnings() in PlanImport.parse.
         assertEquals(
             listOf(
                 "sessions[0].exercises[0].sets[0]: \"implementCount\" is a plan key, but not one " +
                     "a set has - it belongs on an exercise. It was ignored.",
+                "sessions[0].exercises[0]: dumbbell_bench_press does not declare \"start\", and is not " +
+                    "one of the app's built-in exercises, so the app is guessing which end of the range " +
+                    "it begins at from the id alone - the guess decides the voice guide's first call and " +
+                    "which direction opens a rep. Declare \"start\": \"top\" or \"bottom\" to replace it.",
             ),
             result.warnings,
         )

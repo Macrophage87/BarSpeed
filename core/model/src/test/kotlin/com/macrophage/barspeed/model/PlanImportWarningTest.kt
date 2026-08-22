@@ -163,6 +163,12 @@ class PlanImportWarningTest {
         )
     }
 
+    /** pallof_hold names no built-in and prescribes reps, so it also draws the new undeclared-start warning. */
+    private fun undeclaredStart(id: String) = "sessions[0].exercises[0]: $id does not declare \"start\", and " +
+        "is not one of the app's built-in exercises, so the app is guessing which end of the range it " +
+        "begins at from the id alone - the guess decides the voice guide's first call and which direction " +
+        "opens a rep. Declare \"start\": \"top\" or \"bottom\" to replace it."
+
     @Test
     fun `a declared kind that contradicts the set's shape does not silence either`() {
         // The declaration still wins, and the set is still measured on what it
@@ -172,6 +178,7 @@ class PlanImportWarningTest {
 
         assertEquals(
             listOf(
+                undeclaredStart("pallof_hold"),
                 "sessions[0].exercises[0]: this plan declares \"kind\": \"hold\" but prescribes reps - " +
                     "the set is measured on reps either way. Kind sets the movement type, not the timing.",
             ),
@@ -190,6 +197,7 @@ class PlanImportWarningTest {
 
         assertEquals(
             listOf(
+                undeclaredStart("pallof_hold"),
                 "sessions[0].exercises[0]: this plan declares \"kind\": \"dynamic\" for " +
                     "pallof_hold; the app would have guessed hold from the id. The plan wins.",
             ),
@@ -210,13 +218,17 @@ class PlanImportWarningTest {
         val shape = result.warnings.map {
             when {
                 "is not a plan key" in it || "not one a set has" in it -> "lost"
+                "does not declare \"start\"" in it -> "undeclared"
                 "built in as" in it -> "seed"
                 "but prescribes" in it -> "shape"
                 "would have guessed" in it -> "guess"
                 else -> "extra"
             }
         }
-        assertEquals(listOf("lost", "seed", "shape", "guess", "extra"), shape)
+        // pallof_hold and wall_sit are both non-seed with a reps-only set, so
+        // both draw "undeclared" ahead of the seed/shape/guess band their
+        // other declarations already drew.
+        assertEquals(listOf("lost", "undeclared", "undeclared", "seed", "shape", "guess", "extra"), shape)
     }
 
     @Test
@@ -289,14 +301,21 @@ class PlanImportWarningTest {
         )
 
         assertEquals(emptyList(), result.errors, "a declared pair is not a reason to refuse the plan")
-        val warning = result.warnings.single()
+        // dumbbell_bench_press is not built in, so this also draws the
+        // undeclared-start warning; pairVsLoad is first in warnings()' list.
+        assertEquals(
+            2,
+            result.warnings.size,
+            "expected the pair note and the undeclared-start note: ${result.warnings}",
+        )
+        val warning = result.warnings.first()
         assertTrue(warning.contains("80 lb"), warning)
         assertTrue(warning.contains("2 × 40 lb"), warning)
         assertTrue(warning.contains("TOTAL"), warning)
 
         val kg = parse(
             """{"exercise":"dumbbell_bench_press","implementCount":2,"sets":[{"reps":10,"load_kg":30}]}""",
-        ).warnings.single()
+        ).warnings.first()
         assertTrue(kg.contains("30 kg"), kg)
         assertTrue(kg.contains("2 × 15 kg"), kg)
     }
@@ -317,6 +336,12 @@ class PlanImportWarningTest {
 
         assertEquals(emptyList(), result.errors)
         assertEquals(2, assertNotNull(result.plan).sessions[0].exercises[0].implementCount)
-        assertEquals(1, result.warnings.size, "expected only the pair note: ${result.warnings}")
+        // rear_foot_elevated_split_squat is not built in, so this also draws
+        // the undeclared-start warning alongside the pair note.
+        assertEquals(
+            2,
+            result.warnings.size,
+            "expected the pair note and the undeclared-start note: ${result.warnings}",
+        )
     }
 }
