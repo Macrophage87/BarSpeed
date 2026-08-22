@@ -99,20 +99,20 @@ data class SetRecordEntity(
      * guide, in whole seconds.
      *
      * [plannedPrepS] carries its prefix for the reason issue #76 names: a
-     * prescription published under a bare name reads as an observation. The two
-     * differ exactly when the lifter adjusted the prep, so their difference is
-     * the only record that the adjustment happened.
+     * prescription published under a bare name reads as an observation. Whenever
+     * the two differ, the lifter adjusted the prep; they are equal both when no
+     * adjustment exists and when the adjustment happens to equal what the plan
+     * prescribed.
      *
-     * Both null when no lead-in was played at all. A set with no voice guide has
-     * no prep, and 0 there would be absence rendered as a value -- 0 is a real
+     * Both null on a set that ran no voice guide. Such a set has no prep, and 0
+     * there would be absence rendered as a value -- 0 is a real
      * prep, the one where nothing is spoken before the first stroke call.
      *
-     * Both are also null on every row written before these columns existed,
-     * which reads the same way and is permanent: the prep a past set ran with is
-     * not in the analysis blob and not in any raw stream, so unlike a figure the
-     * DSP derives it cannot be recomputed. What separates the two cases for a
-     * reader is the export's own schemaVersion; a version below the one that
-     * introduced these keys never wrote them for any set.
+     * Both are also null on every row written before v10. The prep such a set
+     * ran was the app's then-fixed 5 s wherever its cue stream shows a lead-in
+     * ran, so it is recoverable only where that stream survives -- which is why
+     * a prep that can now vary is stored rather than inferred. Nothing in the
+     * export distinguishes a legacy row from a genuinely unguided one.
      */
     val plannedPrepS: Int? = null,
     val prepS: Int? = null,

@@ -540,8 +540,15 @@ private const val PREP_STEP_S = 5
  * Shown only when the set coming up will actually run the voice guide -- a
  * control that changed nothing would be worse than no control. The predicate is
  * [LeadInPolicy.playsPrep], reached through `state.upcomingPlaysPrep`, which is
- * the same rule `beginSet` decides guidedness with and the same one the import
- * gate warns an inert `prep_s` against.
+ * the function the import gate warns an inert `prep_s` against.
+ *
+ * It is asked here of the slot AS DECLARED, and `beginSet` is not: `restingState`
+ * seeds `tempoInput` from the set just finished and `advancedState` bakes that
+ * into the next slot, so an exercise declaring no tempo that follows one that
+ * does inherits it, runs guided with a prep, and gets no control here. Reachable
+ * on the plan this repo publishes -- Upper A runs dumbbell_bench_press (3010)
+ * into single_arm_dumbbell_row, which declares none. A known gap, not closed on
+ * this branch: changing either operand is an untested `:app` behaviour change.
  *
  * Rendered on READY and again on the rest screen because READY is drawn at most
  * once per session: `startNextSet` writes READY and calls `beginSet` in the same
@@ -549,10 +556,11 @@ private const val PREP_STEP_S = 5
  * can change anything.
  *
  * The adjustment is stored against the exercise, so it holds for the rest of
- * that exercise's sets and for the same exercise next week. What the plan asked
- * for is named beside it whenever the two differ, because the difference is
- * published in the export and the next plan is meant to be authored from it --
- * the lifter should be able to see what they are departing from.
+ * that exercise's sets and for the same exercise next week. What it is being
+ * changed from is named beside it whenever the two differ -- the plan's
+ * declaration on a planned set, the app's default on an ad-hoc one, which has no
+ * plan to ask -- because the difference is published in the export and the next
+ * plan is meant to be authored from it.
  */
 @Composable
 private fun PrepAdjuster(state: RecordState, viewModel: RecordViewModel) {
@@ -572,10 +580,10 @@ private fun PrepAdjuster(state: RecordState, viewModel: RecordViewModel) {
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                if (prepS == plannedS) {
-                    "Time to get set before the first rep is called"
-                } else {
-                    "Plan says ${plannedS}s - your change is recorded in the export"
+                when {
+                    prepS == plannedS -> "Time to get set before the first rep is called"
+                    slot != null -> "Plan says ${plannedS}s - your change is recorded in the export"
+                    else -> "Default is ${plannedS}s - your change is recorded in the export"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = BarColors.Sub,

@@ -343,8 +343,7 @@ data class PlanExerciseDef(
     val kind: String? = null,
     /**
      * Seconds of prep before each set of this exercise: the pause between the
-     * lifter starting the set and the voice guide calling the first movement,
-     * during which the app counts down and says `Ready` then `Brace`.
+     * lifter starting the set and the voice guide calling the first movement.
      *
      * What the plan's author is estimating is the time the LIFTER'S HANDS ARE
      * UNAVAILABLE -- straps, chalk, a hook grip, a belt, lying down on a machine

@@ -27,8 +27,8 @@ import kotlin.test.assertTrue
  * That matters now rather than later. Once the prep is declarable, the seconds
  * between READY and the first movement cue are `LeadInPlan.PHRASE_S` on every
  * prep, so a 20 s strap-up and a 2 s cable set produce identical cue tracks;
- * `LeadInPlan`'s own KDoc says so, and names the consequence: prep length is no
- * longer readable from anything else in the artifact. If it is not on the set
+ * `LeadInPlan`'s own KDoc says so, and names the consequence: from this version
+ * on, prep length is not readable from the cue track. If it is not on the set
  * record and in the export, it is nowhere.
  *
  * The fixture declares 5 and plays 20 throughout. Equal values pass whichever

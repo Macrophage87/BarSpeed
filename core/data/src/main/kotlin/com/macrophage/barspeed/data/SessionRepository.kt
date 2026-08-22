@@ -35,7 +35,7 @@ data class CompletedSet(
      * The prep prescribed before this set, and the prep the caller handed the
      * voice guide, in whole seconds.
      *
-     * Both null when no lead-in was played -- see [SetRecordEntity.plannedPrepS],
+     * Both null on a set that ran no voice guide -- see [SetRecordEntity.plannedPrepS],
      * which is the pair these two become. They have no default, deliberately:
      * a defaulted parameter is one a call site can silently stop passing, and
      * the RESOLVED prep exists only at recording time. Null is a legitimate

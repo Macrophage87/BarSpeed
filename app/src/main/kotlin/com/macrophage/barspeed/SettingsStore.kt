@@ -86,7 +86,6 @@ class SettingsStore(private val context: Context) {
 
     private companion object {
         /**
-         * Exercise ids are snake_case, so this prefix cannot collide with one:
          * `weight_unit`, `audio_cues` and `body_weight_kg` are the other keys in
          * this store and none of them begins with it.
          */

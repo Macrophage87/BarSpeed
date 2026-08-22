@@ -8,8 +8,7 @@ package com.macrophage.barspeed.model
  *
  * The seconds between the lifter starting a set and the voice guide calling the
  * first movement. `LeadInPlan` in `:core:dsp` lays those seconds out beat by
- * beat -- a spoken countdown, then `Ready`, then `Brace` -- and this decides how
- * many of them there are.
+ * beat, and this decides how many of them there are.
  *
  * The two live in different modules on purpose. The beat layout is DSP; the
  * precedence is a plan question, and [PlanFile.validate] is here and cannot see

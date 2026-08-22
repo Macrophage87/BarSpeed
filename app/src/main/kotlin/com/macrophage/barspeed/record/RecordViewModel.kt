@@ -163,7 +163,7 @@ private data class PendingSetWrite(
     val tempoText: String?,
     val plannedDurationS: Int?,
     val actualDurationS: Int?,
-    /** The prep prescribed and the prep played, frozen with everything else. */
+    /** The prep prescribed and the prep handed to the voice guide, frozen too. */
     val plannedPrepS: Int?,
     val prepS: Int?,
     val startedAtMs: Long,
@@ -204,6 +204,15 @@ private data class PendingSetWrite(
  * zone read at export time would be the zone the phone is in then, which is a
  * different fact wearing the same name.
  */
+private suspend fun openSession(repository: SessionRepository, p: PendingSetWrite): Long {
+    return repository.startSession(
+        planName = p.planName,
+        planSessionName = p.planSessionName,
+        startedAtMs = p.startedAtMs,
+        timeZone = RecordedTimeZone.resolve(ZoneId.systemDefault().id, p.startedAtMs),
+    )
+}
+
 /**
  * Apply one tap of the prep control: work out which exercise it changes and what
  * the new value is, clamped, then write it.
@@ -233,15 +242,6 @@ private fun applyPrepAdjustment(s: RecordState, deltaS: Int, appScope: Coroutine
 /** Mirror the stored prep adjustments onto the state; free for the same reason. */
 private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: MutableStateFlow<RecordState>) =
     launch { settings.prepOverrides.collect { state.value = state.value.copy(prepOverrides = it) } }
-
-private suspend fun openSession(repository: SessionRepository, p: PendingSetWrite): Long {
-    return repository.startSession(
-        planName = p.planName,
-        planSessionName = p.planSessionName,
-        startedAtMs = p.startedAtMs,
-        timeZone = RecordedTimeZone.resolve(ZoneId.systemDefault().id, p.startedAtMs),
-    )
-}
 
 /**
  * Open the durable capture for a set that is about to begin.
@@ -710,7 +710,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * The prep prescribed for the set in progress, and the prep handed to the
-     * voice guide. Both null when no lead-in ran.
+     * voice guide. Both null on a set that ran no voice guide.
      *
      * Held here for the same reason `plannedRepsForSet` is: the value is decided
      * at [beginSet], when the set's guided-ness is known, and is needed at
@@ -1004,9 +1004,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // stroke call.
         //
         // The PLANNED half is what the plan prescribed, which is its declaration
-        // or the default -- not what was played. The two differ exactly when the
-        // lifter adjusted the prep, and the export publishes both so that
-        // difference is the record of the adjustment.
+        // or the default -- not what was played. Whenever the two differ the
+        // lifter adjusted the prep; they are equal both when no adjustment
+        // exists and when it happens to equal what the plan prescribed.
         val prepS = s.prepSecondsFor(s.currentSlot)
         plannedPrepSForSet = s.plannedPrepSecondsFor(s.currentSlot).takeIf { guidedSet }
         prepSForSet = prepS.takeIf { guidedSet }

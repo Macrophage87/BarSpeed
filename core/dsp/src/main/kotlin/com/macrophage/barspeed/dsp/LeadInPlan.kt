@@ -68,7 +68,7 @@ data class LeadInBeat(val spoken: String?, val cue: String?)
  * more than the get-ready beat two seconds out. At P = 0 nothing is spoken.
  *
  * What the launch phrase moved is `Ready`, from the top of the prep to
- * [PHRASE_S] seconds before the first stroke. Across the seven committed
+ * [PHRASE_S] seconds before the first stroke. Across the eight committed
  * `-cues.csv` fixtures, all recorded before the phrase landed, `Ready` to the
  * first movement cue measures 5.001-5.004 s; afterwards it is a prescribed
  * [PHRASE_S] s on every prep, which is the cost noted below.

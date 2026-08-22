@@ -206,8 +206,8 @@ abstract class AppDatabase : RoomDatabase() {
          * any build carrying 9 is the first rollback the rescue can act on. What
          * that exposes on screen is stated at the constant, with issue #118.
          *
-         * The migrations are untouched. Only downgrade behaviour changes; a
-         * missing UPGRADE migration still throws exactly as before.
+         * The EXISTING migrations are untouched, and a missing UPGRADE
+         * migration still throws exactly as before.
          */
         fun build(context: Context): AppDatabase {
             val databaseFile = context.getDatabasePath(DATABASE_NAME)

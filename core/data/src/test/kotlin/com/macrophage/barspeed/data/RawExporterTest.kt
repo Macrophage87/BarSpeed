@@ -386,6 +386,24 @@ class RawExporterTest {
      * this document. So an exact key set is the whole of its published shape,
      * and adding to it is a deliberate act rather than a side effect.
      */
+    @Test
+    fun `the manifest states exactly the top-level keys it states today`() = runTest {
+        val manifest = meta(listOf(row(id = 5L)), emptyMap())
+        assertEquals(
+            setOf(
+                "epoch",
+                "appVersion",
+                "sensorModel",
+                "analysisFile",
+                "csvHeaderImu",
+                "csvHeaderHrm",
+                "csvHeaderCues",
+                "sets",
+            ),
+            manifest.keys,
+        )
+    }
+
     /**
      * The manifest names the prep beside the set it describes.
      *
@@ -417,24 +435,6 @@ class RawExporterTest {
         val set = meta(listOf(row(id = 5L)), emptyMap()).set(0)
         assertTrue("plannedPrep_s" !in set, "a set with no lead-in published a planned prep")
         assertTrue("prep_s" !in set, "a set with no lead-in published a prep")
-    }
-
-    @Test
-    fun `the manifest states exactly the top-level keys it states today`() = runTest {
-        val manifest = meta(listOf(row(id = 5L)), emptyMap())
-        assertEquals(
-            setOf(
-                "epoch",
-                "appVersion",
-                "sensorModel",
-                "analysisFile",
-                "csvHeaderImu",
-                "csvHeaderHrm",
-                "csvHeaderCues",
-                "sets",
-            ),
-            manifest.keys,
-        )
     }
 
     /**

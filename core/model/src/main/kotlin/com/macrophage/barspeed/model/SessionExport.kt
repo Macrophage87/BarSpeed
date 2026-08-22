@@ -157,20 +157,21 @@ data class SetExport(
      * The prep prescribed before this set, and the prep handed to the voice
      * guide, in whole seconds.
      *
-     * The two differ exactly when the lifter adjusted the prep in the app, so
-     * their DIFFERENCE is the record of that adjustment -- which is what lets
-     * the next plan be authored from this document instead of re-guessed.
+     * Whenever the two differ, the lifter adjusted the prep in the app; they
+     * are equal both when no adjustment exists and when the adjustment happens
+     * to equal what the plan prescribed. The difference is what lets the next
+     * plan be authored from this document instead of re-guessed.
      *
      * [plannedPrepS] is present whenever a lead-in ran, including when the plan
      * declared nothing: the app's default is still what was prescribed, and a
      * reader that saw only [prepS] could not tell an adjustment from a
      * declaration without knowing the app's constant.
      *
-     * [restS] beside them is the one planned value in this type carrying neither
-     * a `planned` prefix nor a description, so a reader takes a prescription for
-     * an observation. That is issue #76.
+     * [restS] beside them is the one planned value in this type whose name does
+     * not say it is planned, so a reader takes a prescription for an
+     * observation. That is issue #76.
      *
-     * Both absent when no lead-in was played -- an unguided set has no prep --
+     * Both absent on a set that ran no voice guide -- such a set has no prep --
      * and both absent on every set recorded before 1.11. 0 is a value, not an
      * absence: it is the prep in which nothing is spoken before the first stroke
      * call, and the default here is null precisely so that 0 survives

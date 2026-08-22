@@ -137,11 +137,11 @@
         },
         "plannedPrep_s": {
           "type": "integer",
-          "description": "The prep the PLAN prescribed before this set, in whole seconds. This is the exercise's declared prep_s where the plan declared one and the app's default where it did not -- present either way, because a reader holding prep_s alone cannot tell an adjustment from a declaration. Absent when the set ran no voice guide."
+          "description": "The prep the PLAN prescribed before this set, in whole seconds. This is the exercise's declared prep_s where the plan declared one, and the app's default where it did not or where the set was recorded without a plan at all -- present either way, because a reader holding prep_s alone cannot tell an adjustment from a declaration. Absent when the set ran no voice guide."
         },
         "prep_s": {
           "type": "integer",
-          "description": "The prep handed to the voice guide before this set, in whole seconds. It differs from plannedPrep_s exactly when the lifter adjusted the prep for this exercise in the app, and that difference is the only record the adjustment happened -- a plan authored from this export should take prep_s rather than re-guess. 0 is a value, not an absence: it is the prep in which nothing is spoken before the first movement call. Absent when the set ran no voice guide."
+          "description": "The prep handed to the voice guide before this set, in whole seconds. Whenever it differs from plannedPrep_s, the lifter adjusted the prep for this exercise in the app; they are equal both when no adjustment exists and when the adjustment happens to equal what the plan prescribed. A plan authored from this export should take prep_s rather than re-guess. 0 is a value, not an absence: it is the prep in which nothing is spoken before the first movement call. Absent when the set ran no voice guide."
         },
         "rest_s": {
           "type": "integer"

@@ -156,8 +156,8 @@ class LeadInPolicyTest {
      * would leave the import gate warning about the wrong number, and this test
      * would still pass. That check needs a module that can see both constants,
      * and this one cannot see `:core:dsp` at all -- it is
-     * `LeadInPlanTest.the clipping threshold the import gate warns at is the
-     * length of the launch phrase`, in `:core:dsp`, which is where the arrow
+     * `LeadInPlanTest.the prep the import gate warns below is the length of the
+     * launch phrase`, in `:core:dsp`, which is where the arrow
      * runs the right way. The same two-hop arrangement `VALID_VELOCITY_LOSS_BASES`
      * uses.
      */
