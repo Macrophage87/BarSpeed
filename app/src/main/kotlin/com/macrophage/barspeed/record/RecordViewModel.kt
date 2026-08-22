@@ -41,6 +41,7 @@ import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
+import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.CancellationException
@@ -418,7 +419,17 @@ private fun restingState(
         statedLoadKg = standingKg,
         repsInput = (nextSlot?.reps ?: p.plannedReps ?: 5).toString(),
         durationInput = (nextSlot?.durationS ?: p.plannedDurationS)?.toString() ?: s.durationInput,
-        tempoInput = nextSlot?.tempo ?: p.tempoText ?: "",
+        // Behaviour-identical to the expression this replaces. The RULE is
+        // TempoAdjustPolicy's now, in a module with tests; today it still
+        // answers `next ?: last`, and it is that fallback -- an exercise
+        // declaring no tempo inheriting the previous one's -- that the fix
+        // later on this branch removes.
+        tempoInput =
+        TempoAdjustPolicy.seedTempo(
+            hasPlannedNext = nextSlot != null,
+            nextDeclaredTempo = nextSlot?.tempo,
+            lastRanTempo = p.tempoText,
+        ) ?: "",
     )
 }
 
@@ -461,7 +472,16 @@ private fun advancedState(s: RecordState): RecordState {
             ),
             reps = if (next.isTimed) next.reps else s.repsInput.toIntOrNull() ?: next.reps,
             durationS = if (next.isTimed) s.durationInput.toIntOrNull() ?: next.durationS else next.durationS,
-            tempo = s.tempoInput.ifBlank { null } ?: next.tempo,
+            // Behaviour-identical to the expression this replaces, and it names
+            // what that expression was doing: the tempo TEXT FIELD, which the
+            // plan branch of the rest screen does not draw, is treated as an
+            // adjustment that displaces the plan's declaration. The argument
+            // becomes a fact the lifter can actually state later on this branch.
+            tempo =
+            TempoAdjustPolicy.carriedIntoNextSet(
+                declaredTempo = next.tempo,
+                adjustedTempo = s.tempoInput.ifBlank { null },
+            ),
         )
     val queue = s.queue.toMutableList()
     queue[s.queueIndex + 1] = edited
