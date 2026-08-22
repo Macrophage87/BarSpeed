@@ -198,42 +198,48 @@ class CadencePlanTest {
 
     @Test
     fun `which pairs run a whole set with no spoken count`() {
-        // Issue 147, stated as a list. A pair lands here when the prescription
-        // leaves no closing pause to say the call in AND the stroke the next
-        // rep opens on is one second, with no count to give up. The rep NUMBER
-        // stays on screen, driven by onRepCounted, so it is the metronome's own
-        // count and not the sensor's. The "Last rep" warning has no on-screen
-        // equivalent at all and is simply lost -- the screen reads "rep 7 of 8"
-        // and nothing marks the last one.
+        // Issue 147, stated as a partition. A pair keeps its silence only when
+        // NEITHER stroke has a count to give up and the prescription leaves no
+        // closing pause -- both strokes one second, so every second of the
+        // cycle already has a word in it.
         //
-        // Two of these are recorded rather than reasoned about, both captured
-        // after issue 106 and neither carrying a Rep row:
+        // The seven pairs that move out of the silent list are the complaint.
+        // Two of them are recorded rather than reasoned about, both captured
+        // after issue 106 and neither carrying a rep call:
         // `field-legcurl-1030-10rep-cues.csv` is leg curl 1030, and
         // `field-reardeltfly-s32-set06-cues.csv` is 2011 on a vertical
         // concentric-first drive-up machine, which resolves exactly as
         // [legPress] does -- its track reads Up, Hold, Down, 1 and repeats.
+        // Those files are recordings and do not change; a set paced on this
+        // version of the plan will not look like them.
         //
         // Which pairs these are belongs to (TEMPO, LIFT) and never to a tempo
-        // string: 2010 is here on a leg press and not on a bench press, from
-        // the same four digits.
+        // string: 2010 was silent on a leg press and never on a bench press,
+        // from the same four digits.
+        //
+        // What stays true of the three that remain: the rep NUMBER is on
+        // screen, driven by onRepCounted, so it is the metronome's own count
+        // and not the sensor's, and the "Last rep" warning has no on-screen
+        // equivalent at all and is simply lost.
+        assertEquals(
+            listOf("bench 1010", "bench 1110", "leg press 1010"),
+            named(carries = false),
+            "pairs that run a whole set with no spoken rep count",
+        )
         assertEquals(
             listOf(
-                "bench 1010",
-                "bench 1110",
+                "bench 3010",
+                "bench 2011",
+                "bench 2010",
                 "leg curl 1030",
                 "leg curl 1020",
                 "leg press 2010",
                 "leg press 3010",
                 "leg press 2011",
-                "leg press 1010",
                 "face pull 2011",
                 "lat pulldown ecc-first 3010",
+                "chest press ecc-first 3010",
             ),
-            named(carries = false),
-            "pairs that run a whole set with no spoken rep count",
-        )
-        assertEquals(
-            listOf("bench 3010", "bench 2011", "bench 2010", "chest press ecc-first 3010"),
             named(carries = true),
             "pairs that speak it",
         )
@@ -244,6 +250,42 @@ class CadencePlanTest {
             val p = plan(tempo, direction)
             assertEquals(false, p.announceMerged, name)
             assertTrue(p.beats.none { it.suppressFirstCount }, "$name gives up no count")
+        }
+    }
+
+    @Test
+    fun `a one-second opener sends the rep call to the second stroke`() {
+        // Issue 147, and the fix for the list above. No closing pause to say
+        // the call in and a one-second opening stroke with no count to give up,
+        // so it goes to the OTHER stroke on the same terms the first would have
+        // had: merged into that stroke's own word, that stroke's first count
+        // given up to widen the window, and not one second added anywhere.
+        //
+        // The beat index is the second stroke's, which is also the beat the rep
+        // completes after. It is 2 rather than 1 whenever the prescription puts
+        // an isometric pause between the strokes, so it is asserted per pair
+        // rather than as a constant.
+        listOf(
+            Triple("leg curl 1030", 1, 3),
+            Triple("leg curl 1020", 1, 2),
+            Triple("leg press 2010", 1, 2),
+            Triple("leg press 3010", 1, 3),
+            Triple("leg press 2011", 2, 2),
+            Triple("face pull 2011", 2, 2),
+            Triple("lat pulldown ecc-first 3010", 1, 3),
+        ).forEach { (name, beat, seconds) ->
+            val (_, tempo, direction) = corpus.first { it.first == name }
+            val p = plan(tempo, direction)
+            assertEquals(beat, p.announceOnBeat, "$name: the second stroke carries the call")
+            assertEquals(p.repCompleteAfterBeat, p.announceOnBeat, "$name: which is the rep-completion beat")
+            assertEquals(true, p.announceMerged, "$name: merged into that stroke's own word")
+            assertEquals(true, p.beats[beat].isStroke, "$name: and it is a stroke, not a pause")
+            assertEquals(seconds, p.beats[beat].seconds, "$name: seconds of the stroke that carries it")
+            assertEquals(
+                listOf(beat),
+                p.beats.indices.filter { p.beats[it].suppressFirstCount },
+                "$name: exactly that stroke gives up its first count, and only it",
+            )
         }
     }
 
@@ -346,6 +388,16 @@ class CadencePlanTest {
         assertEquals(0, p.announceOnBeat, "which is enough to carry the call")
         assertEquals(true, p.announceMerged)
         assertEquals(true, p.beats[0].suppressFirstCount)
+        // The same threshold on the same terms for the second stroke. Leg press
+        // 2010 is the same four digits resolved the other way round, so the
+        // two-second stroke is the one the rep ends on rather than opens with.
+        val q = plan("2010", legPress)
+        assertEquals(listOf("UP" to 1, "DOWN" to 2), shape(q), "closes on exactly two seconds")
+        assertEquals(1, q.announceOnBeat, "which is equally enough")
+        assertEquals(true, q.beats[1].suppressFirstCount)
+        // And one second is not enough at either end of the rep. Raise the
+        // threshold to 3 and both pins above red; lower it to 1 and this reds.
+        assertEquals(null, plan("1010", legPress).announceOnBeat, "neither stroke has a count to give up")
     }
 
     @Test
