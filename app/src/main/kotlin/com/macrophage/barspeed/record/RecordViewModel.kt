@@ -344,9 +344,9 @@ private fun jumpedState(s: RecordState, done: List<PlannedSlot>, fixed: List<Pla
  * [RecordState.statedLoadKg] is re-decided rather than cleared. What the lifter
  * said about the load holds for the rest of the exercise block, and
  * [SetLoadPolicy.standingStatedAddedKg] is what says whether it still holds
- * here. That function answers null in every case today, so this clears the
- * statement and re-seeds the field from the plan exactly as it always has --
- * the seam is put in place before the rule it decides changes. #124.
+ * here -- at the exercise boundary it does not, nor where the plan declares a
+ * different load for the set coming up, and in both cases the field is
+ * re-seeded from the plan exactly as it always was. #124.
  */
 private fun restingState(
     s: RecordState,

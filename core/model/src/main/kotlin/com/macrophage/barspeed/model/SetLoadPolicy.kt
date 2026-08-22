@@ -131,15 +131,11 @@ object SetLoadPolicy {
      * The added load the lifter STATED that still stands for the set coming up,
      * or null when that set is offered whatever its own slot declares.
      *
-     * THIS FUNCTION RETURNS null UNCONDITIONALLY, WHICH IS TODAY'S RULE. A load
-     * typed for one set reaches that set and no further: the rest transition
-     * clears the statement and re-seeds the load field from the plan, so a
-     * lifter who moves up in weight and does not retype it on every subsequent
-     * set has the prescription recorded against reps done at another load, with
-     * nothing on screen marking the change. That is #124, and this is the seam
-     * it will be fixed at -- written here first, with the record flow already
-     * routed through it, so that the fix is one expression in a module with
-     * tests rather than a new branch in an untested view model.
+     * A load typed for one set used to reach that set and no further: the rest
+     * transition cleared the statement and re-seeded the load field from the
+     * plan, so a lifter who moved up in weight and did not retype it on every
+     * subsequent set had the prescription recorded against reps done at another
+     * load, with nothing on screen marking the change. #124.
      *
      * [statedAddedKg] is the statement as it stood when the set that just
      * finished was written: what the lifter typed for it, null when they typed
@@ -181,21 +177,12 @@ object SetLoadPolicy {
      * is stored beside the load actually recorded for every set, so a carry is
      * visible afterwards as a deviation on each set it reached.
      */
-    // Both suppressions describe the CONSTANT BODY BELOW and go away with it in
-    // the commit that changes the rule. The decision this function names is a
-    // literal `statedLoadKg = null` in `:app` today, where no test can reach
-    // it; lifting it here one commit ahead of the change is what lets the
-    // differential be shown red against a real assertion rather than against a
-    // test source set that will not compile. detekt is right about the body and
-    // is being told so, not turned off: `config/detekt/detekt.yml` is untouched
-    // and every other function in this module is still judged by both rules.
-    @Suppress("FunctionOnlyReturningConstant", "UnusedParameter")
     fun standingStatedAddedKg(
         statedAddedKg: Double?,
         sameExerciseBlock: Boolean,
         lastDeclaredAddedKg: Double?,
         nextDeclaredAddedKg: Double?,
-    ): Double? = null
+    ): Double? = statedAddedKg?.takeIf { sameExerciseBlock && lastDeclaredAddedKg == nextDeclaredAddedKg }
 
     /**
      * The load actually borne by a lifter's body on a body-weight movement:

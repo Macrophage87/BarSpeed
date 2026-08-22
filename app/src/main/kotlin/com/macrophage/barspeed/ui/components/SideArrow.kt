@@ -33,7 +33,10 @@ private const val SHAFT_HEIGHT_FRACTION = 0.34f
  * recorded even if something measured it, and nothing here does. This draws
  * that same prescribed value as a shape. It knows no more than the word
  * beside it, and no reading of it can say which limb moved. Recording a
- * deviation is issue #124.
+ * deviation is issue #144, which owns the side planned/actual pair and the
+ * control that would let a lifter state one. It was #124 until that issue
+ * turned out to be about the LOAD reverting and nothing else; #124's fix
+ * carries a stated load across an exercise and leaves side exactly as it is.
  *
  * The word stays. The export, the review screen and every screen-reader path
  * read the text, and this draws nothing any of them can read: the arrow is
