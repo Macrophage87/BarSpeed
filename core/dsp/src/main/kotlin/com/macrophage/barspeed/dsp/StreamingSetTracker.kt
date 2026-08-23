@@ -111,6 +111,9 @@ class StreamingSetTracker(
     /** Ecc-first lifts: a concentric only counts after a qualified eccentric (kills walkout/re-rack bumps). */
     private var eccentricPending = false
 
+    /** Latched false by [noteRunaway]; published as [LiveSetState.countTrusted]. */
+    private var countTrusted = true
+
     var state: LiveSetState = LiveSetState()
         private set
 
@@ -142,6 +145,7 @@ class StreamingSetTracker(
                 currentPhaseElapsedS = if (runType == 0 && repCount == 0) 0.0 else timeS - runStartS,
                 repMeanVelocities = repVelocities.toList(),
                 repPeakVelocities = repPeaks.toList(),
+                countTrusted = countTrusted,
             )
         return state
     }
@@ -219,6 +223,7 @@ class StreamingSetTracker(
                 runSampleCount++
                 runVelocityMax = maxOf(runVelocityMax, v * driveSign)
                 runDisplacement += abs(v) * frameIntervalS
+                noteRunaway()
             }
             return
         }
@@ -240,6 +245,27 @@ class StreamingSetTracker(
         runSampleCount = 1
         runVelocityMax = v * driveSign
         runDisplacement = abs(v) * frameIntervalS
+        noteRunaway()
+    }
+
+    /**
+     * The run in progress has carried past [DspConfig.maxRunDisplacementM] —
+     * the same bound the qualification gate above uses to throw the run away.
+     *
+     * Tested WHILE the run accumulates rather than when it ends, because a
+     * runaway run may not end. On `field-reardeltfly-s32-set06` one run carries
+     * 127 m across 51 s; waiting for it to close would withhold the fact for
+     * most of the set, and the point of the flag is to be true of the count
+     * while the lifter is still reading it. The two readings agree on every
+     * committed capture — [LiveIntegratorRunawayTest] pins that they do — so
+     * nothing here rests on the difference.
+     *
+     * Never cleared. A run that has travelled that far did so because the
+     * integrator has no zero, and nothing downstream re-establishes one within
+     * the set.
+     */
+    private fun noteRunaway() {
+        if (runDisplacement > config.maxRunDisplacementM) countTrusted = false
     }
 
     private fun onQualifiedRun(direction: Int) {
