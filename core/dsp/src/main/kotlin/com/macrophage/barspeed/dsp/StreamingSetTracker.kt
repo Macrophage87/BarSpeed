@@ -15,6 +15,21 @@ data class LiveSetState(
     val repMeanVelocities: List<Double> = emptyList(),
     /** Peak concentric velocity of each completed rep — the metric for explosive lifts. */
     val repPeakVelocities: List<Double> = emptyList(),
+    /**
+     * False once a movement run has carried further than any real phase of
+     * this lift can — the integrator has lost its zero, and [repCount] from
+     * that point on is a number the tracker cannot stand behind. Latched for
+     * the set and never cleared.
+     *
+     * [repCount] is an `Int` and cannot say "I have lost track", so a stale
+     * low count reads exactly like a correct low count. That is the repo's
+     * *absence rendered as a value* class, and this is the same separation
+     * `RepAnalysis.eccS` already makes by being nullable.
+     *
+     * NOTHING READS THIS. No rep count, no screen and no spoken cue behaves
+     * differently because of it; it is a capability, not a fix.
+     */
+    val countTrusted: Boolean = true,
 )
 
 /**
