@@ -252,10 +252,11 @@ class StreamingSetTracker(
         /**
          * Build a tracker for a declared lift.
          *
-         * The call site in `:app` has an `ExerciseDef` in hand and `:app` has no
-         * test source set, so anything decided there cannot be asserted. This
-         * factory is where the mapping from a declared lift to tracker
-         * parameters lives, in a module a test can reach.
+         * The call site in `:app` has an `ExerciseDef` in hand. `:app` does
+         * have a test source set now -- `PlanQueueTest` -- but nothing in it
+         * constructs a tracker, so a decision made at that call site is still
+         * asserted nowhere. This factory is where the mapping from a declared
+         * lift to tracker parameters lives, in a module a test can reach.
          */
         fun forLift(direction: LiftDirection, config: DspConfig = DspConfig()): StreamingSetTracker =
             StreamingSetTracker(

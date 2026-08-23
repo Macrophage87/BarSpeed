@@ -13,16 +13,25 @@ import kotlin.test.assertEquals
  *
  * NOTHING IS FIXED HERE. Characterization pins for the change that follows.
  *
+ * ## The corpus is twenty-one captures, and was fifteen
+ *
+ * Six captures committed since issue 86 landed are included here. Every figure
+ * in this file is over all twenty-one, and figures quoted against the earlier
+ * fifteen -- seven reps removed, 63 in family, 213 batch runs -- are that
+ * corpus and not this one.
+ *
  * ## The constant has never been calibrated anywhere
  *
  * `maxRunDisplacementM` is 2.0 m and has exactly one consumer, `RepSegmentation`,
- * where across the 213 batch movement runs in this corpus it has NEVER demoted
- * anything -- the largest batch run is 1.982 m. Reusing it in the live path
- * therefore meant importing a number with no evidence behind it.
+ * where across the 293 batch movement runs in this corpus it has NEVER demoted
+ * anything -- the largest batch run is 1.982 m, and the eighty runs the six new
+ * captures added did not raise it. Reusing it in the live path therefore meant
+ * importing a number with no evidence behind it.
  *
  * Two measurements pinned below bracket it:
  *
- *  - the artefacts it catches on the live path span 2.128 m to 20.376 m;
+ *  - the least extreme artefact it catches on the live path sits at 3.34x its
+ *    own set's batch median rep ROM, and the largest carries 127.405 m;
  *  - the largest live rep displacement that is IN FAMILY with its own set is
  *    1.675 m, on field-ohp-rotating-8rep-b.
  *
@@ -75,6 +84,16 @@ class LiveCapCalibrationTest {
         sensorOnStack = true,
     )
 
+    /** Session 32 set 6's exported geometry block, as [SetEndWindowTest] reads it. */
+    private val rearDeltFly = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = true,
+        sensorInverted = false,
+        travelRatio = 1.0,
+        plane = MovementPlane.VERTICAL,
+        sensorOnStack = false,
+    )
+
     private fun ecc() = LiftDirection(startsWith = StartPhase.ECCENTRIC)
 
     private fun con() = LiftDirection(startsWith = StartPhase.CONCENTRIC)
@@ -95,6 +114,15 @@ class LiveCapCalibrationTest {
         Triple("field-legcurl-1030-12rep.csv", legCurl, 12),
         Triple("field-legcurl-1030-12rep-b.csv", legCurl, 12),
         Triple("field-legcurl-1030-12rep-c.csv", legCurl, 12),
+        // The six committed since issue 94 was scoped, in the geometry the
+        // batch pins in FieldDataRegressionTest and SetEndWindowTest were taken
+        // with.
+        Triple("field-backsquat-99hz-6rep.csv", ecc(), 6),
+        Triple("field-rdl-3010-10rep.csv", ecc(), 10),
+        Triple("field-legpress-2010-8rep.csv", ecc(), 8),
+        Triple("field-legpress-single-2010-8rep.csv", con(), 8),
+        Triple("field-legcurl-1030-10rep.csv", legCurl, 10),
+        Triple("field-reardeltfly-s32-set06.csv", rearDeltFly, 12),
     )
 
     private data class LiveRun(val displacementM: Double, val durationS: Double, val type: Int)
@@ -172,7 +200,7 @@ class LiveCapCalibrationTest {
     }
 
     @Test
-    fun `the bound removes nine counted reps and every one is far outside its own set (pre-fix)`() {
+    fun `every counted rep the bound removes is far outside its own set (pre-fix)`() {
         val c = DspConfig()
         var removed = 0
         var removedOutOfFamily = 0
@@ -191,12 +219,14 @@ class LiveCapCalibrationTest {
                 largestRemovedM = maxOf(largestRemovedM, it.displacementM)
             }
         }
-        assertEquals(7, removed, "counted reps the bound removes")
-        // Every one, not most. The smallest is 3.3x its own set median, which no
-        // reference error of at most 1.65x can explain away.
-        assertEquals(7, removedOutOfFamily, "of those, how many are out of family with their own set")
-        assertEquals(3.3, smallestRemovedRatio, 0.05, "the least extreme removal, as a multiple of its set median")
-        assertEquals(20.376, largestRemovedM, 5e-3, "the largest removal, metres")
+        assertEquals(11, removed, "counted reps the bound removes")
+        // Every one, not most. The least extreme is 3.34x its own set median,
+        // which no reference error of at most 1.65x can explain away.
+        assertEquals(11, removedOutOfFamily, "of those, how many are out of family with their own set")
+        assertEquals(3.338, smallestRemovedRatio, 5e-3, "the least extreme removal, as a multiple of its set median")
+        // On field-reardeltfly-s32-set06. The largest across the earlier
+        // fifteen captures was 20.376 m.
+        assertEquals(127.405, largestRemovedM, 5e-3, "the largest removal, metres")
     }
 
     @Test
@@ -212,8 +242,8 @@ class LiveCapCalibrationTest {
             inFamilyToday += countedReps(runs, d, c, 0).count { !outOfFamily(it, ref) }
             inFamilyCapped += countedReps(runs, d, c, 1).count { !outOfFamily(it, ref) }
         }
-        assertEquals(63, inFamilyToday, "in-family counted reps today")
-        assertEquals(63, inFamilyCapped, "in-family counted reps with the bound applied")
+        assertEquals(85, inFamilyToday, "in-family counted reps today")
+        assertEquals(85, inFamilyCapped, "in-family counted reps with the bound applied")
     }
 
     @Test
@@ -239,7 +269,7 @@ class LiveCapCalibrationTest {
         // The second floor, and the binding one: anything below this starts
         // demoting BATCH runs, because the constant is shared and the batch path
         // is the trusted one. 2.0 m clears it by 18 mm.
-        assertEquals(213, batchRuns, "batch movement runs across the corpus")
+        assertEquals(293, batchRuns, "batch movement runs across the corpus")
         assertEquals(1.982, largestBatchRun, 5e-3, "largest batch run displacement, metres")
         assertEquals(2.0, c.maxRunDisplacementM, "the value, barely above both floors")
     }
@@ -252,19 +282,27 @@ class LiveCapCalibrationTest {
         // is that an over-cap eccentric cannot then take the following
         // concentric down with it.
         //
-        // THIS CORPUS CANNOT SEPARATE THEM. The only over-cap DOWN run anywhere
-        // in it is on field-legcurl-1030-12rep-c, which is concentric-first,
-        // where a down run arms nothing. So both choices give identical counts
-        // on all fifteen captures and the argument for the choice is structural
-        // rather than measured: a run that travelled far enough to be rejected
-        // is not a trustworthy phase boundary either, so letting it arm the
-        // next rep would propagate a boundary this bound has just thrown out.
+        // THIS CORPUS STILL CANNOT SEPARATE THEM, and it is no longer for the
+        // reason it was. On the earlier fifteen captures the only over-cap DOWN
+        // run anywhere was on field-legcurl-1030-12rep-c, which is
+        // concentric-first, where a down run arms nothing -- so the two modes
+        // agreed trivially. On twenty-one there are six, and FOUR of them are on
+        // eccentric-first captures, where a down run does arm. The claim that
+        // they are "all on concentric-first captures" is false and is withdrawn.
+        // The two modes agree anyway, which is a stronger result than the one it
+        // replaces: it now holds where the mechanism could have shown itself.
+        //
+        // The argument for the shipped choice is still structural rather than
+        // measured: a run that travelled far enough to be rejected is not a
+        // trustworthy phase boundary either, so letting it arm the next rep
+        // would propagate a boundary this bound has just thrown out.
         //
         // An earlier report of this said the arming variant deletes a legitimate
         // rep and that it "fires once". That is WRONG and is corrected here: the
-        // suppression event fires once, on a capture where it costs nothing.
+        // suppression event fires on captures where it costs nothing.
         val c = DspConfig()
         var overCapDownRuns = 0
+        var overCapDownOnEccentricFirst = 0
         corpus.forEach { (file, d, _) ->
             val runs = liveRuns(load(file), d, c)
             assertEquals(
@@ -272,10 +310,17 @@ class LiveCapCalibrationTest {
                 countedReps(runs, d, c, 2).size,
                 "$file: suppressing the rep against suppressing the arming",
             )
-            overCapDownRuns += runs.count {
+            val down = runs.count {
                 qualifies(it, c) && it.displacementM > c.maxRunDisplacementM && it.type == -1
             }
+            overCapDownRuns += down
+            if (d.startsWith == StartPhase.ECCENTRIC) overCapDownOnEccentricFirst += down
         }
-        assertEquals(1, overCapDownRuns, "over-cap DOWN runs in the corpus, all on concentric-first captures")
+        assertEquals(6, overCapDownRuns, "over-cap DOWN runs in the corpus")
+        assertEquals(
+            4,
+            overCapDownOnEccentricFirst,
+            "of those, ones on eccentric-first captures, where a down run arms the next rep",
+        )
     }
 }

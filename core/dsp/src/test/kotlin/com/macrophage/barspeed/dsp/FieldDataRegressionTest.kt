@@ -667,7 +667,16 @@ class FieldDataRegressionTest {
             if (base in cueTracked) {
                 assertEquals(performed, CueTrack.calledReps(base), "${fs.file}: hand count against the metronome")
             }
-            val tracker = StreamingSetTracker(fs.startsWith)
+            // Built through forLift, the factory the app uses, not through the
+            // raw constructor. No value in the map moves: all seven of these
+            // captures are analysed above with a defaulted LiftDirection, whose
+            // sensorToLifter is 1.0 and whose driveIsPositive is true, which is
+            // exactly what the raw constructor's defaults were. The reason to
+            // change it anyway is that the raw path is the one that goes wrong
+            // silently -- the next fixture added here with real cable or
+            // drive-down geometry would be tracked with the wrong sign and
+            // nothing would say so.
+            val tracker = StreamingSetTracker.forLift(LiftDirection(startsWith = fs.startsWith))
             var last = LiveSetState()
             load(fs.file).forEach { last = tracker.feed(it) }
             assertEquals(live, last.repCount, "${fs.file}: live reps; the lifter performed $performed")

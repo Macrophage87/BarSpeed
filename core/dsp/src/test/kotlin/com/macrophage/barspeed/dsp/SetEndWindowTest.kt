@@ -186,19 +186,29 @@ class SetEndWindowTest {
      * Every committed capture that carries a cue track, and how many of its
      * detections begin after the set was called over.
      *
-     * Five of the nine carry none: the four session-26 barbell captures and one
-     * of the four leg curls are untouched by this rule, which is what makes the
-     * other four evidence rather than a coincidence of one recording. The
-     * affected four are not a random sample either -- three of them are the
-     * captures [VelocityLossTest] documents as publishing no velocity loss
-     * because their last detection was the fastest of the set, one of which
+     * All thirteen, enumerated, not nine. The list stood at nine while four
+     * cue-tracked captures were committed beside it, and the KDoc claim to
+     * cover "every committed capture that carries a cue track" stayed green
+     * throughout because nothing checked the enumeration against the corpus --
+     * [CuedRepCoverageTest] `the coverage limit` now does that against the
+     * resource directory.
+     *
+     * Eight of the thirteen carry none: the four barbell captures of session
+     * 2026-08-17, one of the four leg curls, the back squat and both leg
+     * presses are untouched by this rule, which is what makes the other five
+     * evidence rather than a coincidence of one recording. The affected five
+     * are not a random sample either -- three of them are the captures
+     * [VelocityLossTest] documents as publishing no velocity loss because their
+     * last detection was the fastest of the set, one of which
      * (`field-legcurl-1030-10rep`, session 31 set 11) is issue #126's own set.
      * That case's KDoc says nothing in the rep list can tell a spurious final
      * detection from a set held flat; the cue track is the thing outside the
-     * rep list that can.
+     * rep list that can. The fifth is the Romanian deadlift, whose single
+     * post-`Done` detection is the one issue #125 is named for in
+     * [FieldDataRegressionTest].
      */
     @Test
-    fun `four of the nine cued captures carry a detection that began after Done`() {
+    fun `five of the thirteen cued captures carry a detection that began after Done`() {
         val legCurl = LiftDirection(
             startsWith = StartPhase.CONCENTRIC,
             concentricUp = false,
@@ -207,6 +217,7 @@ class SetEndWindowTest {
             sensorOnStack = true,
         )
         val barbell = LiftDirection(startsWith = StartPhase.ECCENTRIC)
+        val concentricFirst = LiftDirection(startsWith = StartPhase.CONCENTRIC)
         val corpus = listOf(
             Triple("field-legcurl-1030-12rep", legCurl, 0),
             Triple("field-legcurl-1030-12rep-b", legCurl, 1),
@@ -216,15 +227,27 @@ class SetEndWindowTest {
             Triple("field-ohp-rotating-8rep-b", barbell, 0),
             Triple("field-bench-rotating-6rep", barbell, 0),
             Triple("field-bench-rotating-6rep-ok", barbell, 0),
+            // The four cue-tracked captures the list did not cover, in the
+            // geometry FieldDataRegressionTest analyses each of them with.
+            Triple("field-backsquat-99hz-6rep", barbell, 0),
+            Triple("field-rdl-3010-10rep", barbell, 1),
+            Triple("field-legpress-2010-8rep", barbell, 0),
+            Triple("field-legpress-single-2010-8rep", concentricFirst, 0),
             Triple(fixture, rearDeltFly, 1),
         )
-        corpus.forEach { (name, direction, expected) ->
-            assertEquals(
-                expected,
-                SetAnalyzer.analyze(load("$name.csv"), direction, cues = track(name)).detectionsAfterSetEndCue,
-                "$name detections beginning after Done",
-            )
-        }
+        assertEquals(13, corpus.size, "cue-tracked captures covered here")
+        // Compared as one map rather than one assertion per row: a per-row loop
+        // stops at the first mismatch, so a change that moved several captures
+        // would be reported as moving one, and the rows after it would never be
+        // evaluated at all.
+        assertEquals(
+            corpus.associate { (name, _, expected) -> name to expected },
+            corpus.associate { (name, direction, _) ->
+                name to SetAnalyzer.analyze(load("$name.csv"), direction, cues = track(name)).detectionsAfterSetEndCue
+            },
+            "detections beginning after Done, per capture",
+        )
+        assertEquals(5, corpus.count { it.third > 0 }, "captures carrying at least one post-Done detection")
     }
 
     // ------------------------------------------------------------------

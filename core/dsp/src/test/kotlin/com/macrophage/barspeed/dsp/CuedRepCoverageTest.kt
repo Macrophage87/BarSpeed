@@ -2,6 +2,7 @@ package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
+import java.io.File
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -9,28 +10,26 @@ import kotlin.test.assertTrue
 
 /**
  * Every rep the live counter reports, checked against the rep the metronome
- * called for it. The first per-rep ground truth this repository has had on
- * eccentric-first barbell work.
+ * called for it. Per-rep ground truth on eccentric-first barbell work, on
+ * lower-body barbell and machine work, and on accessory work.
  *
- * ## Why this exists instead of an in-family metric
+ * ## What the corpus says today
  *
- * The plan was a metric separating real counted reps from artefact counted reps
- * by displacement, judged against a reference. It is not built, because there
- * is nothing left to separate: of 37 counted reps across the seven cue-tracked
- * captures, ALL 37 fall inside a rep the metronome called. Issue 86 removed
- * most of the artefact population it was designed for -- seven reps built from
- * runs of 3.3x to 27x their set median -- and a bound fitted to the one
- * survivor would be fitted to noise.
+ * Thirteen of the twenty-one committed captures carry a cue track. Across them
+ * the metronome called 118 reps; 62 produce a counted rep and 56 produce none.
+ * Two counted reps land outside every cued window. All four figures are pinned
+ * below.
  *
  * ## What this does NOT say
  *
- * It does not say the counter no longer invents reps. Seven of fifteen captures
- * carry a cue track and eight do not, and the previously identified survivors
- * are in the second group -- field-ohp-100hz-bursty keeps three runs at 1.553,
- * 1.604 and 1.892 m against a 0.766 m median, all UNPINNED figures quoted in
- * [LiveCapCalibrationTest]. Nothing here disproves them. The claim is bounded to
- * where truth exists and the boundary is pinned below, so 43-of-44 cannot be
- * read as a corpus-wide property.
+ * It does not say the counter no longer invents reps. Eight captures carry no
+ * cue track, and previously identified survivors are in that group --
+ * field-ohp-100hz-bursty keeps runs of 1.553, 1.604 and 1.892 m against a
+ * 0.766 m median, all UNPINNED figures quoted in [LiveCapCalibrationTest].
+ * Nothing here disproves them. The boundary between the two groups is pinned
+ * in `the coverage limit`, against the resource directory rather than against
+ * a hand-kept number, so the figures above cannot be read as corpus-wide and
+ * cannot silently become stale when a fixture is added.
  *
  * ## A cue is an instruction, not a measurement
  *
@@ -44,13 +43,25 @@ import kotlin.test.assertTrue
  *
  * ## The width comes from each track, never from a constant
  *
- * These fixtures were paced with the announcement beat issue 106 removed, so
- * their cycle is 5.006 s where a capture taken today is 4.005 s. A hard-coded
- * width would mis-window the first new capture; the median gap between
- * consecutive `Down` cues is taken from the track being read.
+ * The thirteen tracks carry eight distinct cycle widths from 3.003 s to
+ * 6.008 s, pinned in `window width is read from the track, not from a
+ * constant`. The four barbell captures and the three 12-rep leg curls were
+ * paced before issue 106 removed the announcement beat, so their 4 s
+ * prescription measures 5.006 s where the same prescription recorded after it
+ * measures 4.005 s. A hard-coded width would mis-window most of the corpus.
  */
 class CuedRepCoverageTest {
     private data class CountedRep(val displacementM: Double, val endMs: Long)
+
+    /** The four training classes the corpus covers, so a total can be read per class. */
+    private enum class TrainingClass { BARBELL_UPPER, BARBELL_LOWER, MACHINE_LOWER, ACCESSORY }
+
+    private data class Cued(
+        val fixture: String,
+        val direction: LiftDirection,
+        val performed: Int,
+        val trainingClass: TrainingClass,
+    )
 
     private fun load(n: String): List<ImuSample> = ImuCsv.decode(
         javaClass.getResourceAsStream("/$n.csv")!!.readBytes().decodeToString(),
@@ -64,17 +75,35 @@ class CuedRepCoverageTest {
         sensorOnStack = true,
     )
 
+    /** Session 32 set 6's exported geometry block, as [SetEndWindowTest] reads it. */
+    private val rearDeltFly = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = true,
+        sensorInverted = false,
+        travelRatio = 1.0,
+        plane = MovementPlane.VERTICAL,
+        sensorOnStack = false,
+    )
+
     private val eccFirst = LiftDirection(startsWith = StartPhase.ECCENTRIC)
 
-    /** The seven captures carrying a cue track, with the count the lifter performed. */
+    private val conFirst = LiftDirection(startsWith = StartPhase.CONCENTRIC)
+
+    /** The thirteen captures carrying a cue track, with the count the lifter performed. */
     private val cueTracked = listOf(
-        Triple("field-ohp-rotating-8rep", eccFirst, 8),
-        Triple("field-ohp-rotating-8rep-b", eccFirst, 8),
-        Triple("field-bench-rotating-6rep-ok", eccFirst, 6),
-        Triple("field-bench-rotating-6rep", eccFirst, 6),
-        Triple("field-legcurl-1030-12rep", legCurl, 12),
-        Triple("field-legcurl-1030-12rep-b", legCurl, 12),
-        Triple("field-legcurl-1030-12rep-c", legCurl, 12),
+        Cued("field-ohp-rotating-8rep", eccFirst, 8, TrainingClass.BARBELL_UPPER),
+        Cued("field-ohp-rotating-8rep-b", eccFirst, 8, TrainingClass.BARBELL_UPPER),
+        Cued("field-bench-rotating-6rep-ok", eccFirst, 6, TrainingClass.BARBELL_UPPER),
+        Cued("field-bench-rotating-6rep", eccFirst, 6, TrainingClass.BARBELL_UPPER),
+        Cued("field-backsquat-99hz-6rep", eccFirst, 6, TrainingClass.BARBELL_LOWER),
+        Cued("field-rdl-3010-10rep", eccFirst, 10, TrainingClass.BARBELL_LOWER),
+        Cued("field-legpress-2010-8rep", eccFirst, 8, TrainingClass.MACHINE_LOWER),
+        Cued("field-legpress-single-2010-8rep", conFirst, 8, TrainingClass.MACHINE_LOWER),
+        Cued("field-legcurl-1030-12rep", legCurl, 12, TrainingClass.ACCESSORY),
+        Cued("field-legcurl-1030-12rep-b", legCurl, 12, TrainingClass.ACCESSORY),
+        Cued("field-legcurl-1030-12rep-c", legCurl, 12, TrainingClass.ACCESSORY),
+        Cued("field-legcurl-1030-10rep", legCurl, 10, TrainingClass.ACCESSORY),
+        Cued("field-reardeltfly-s32-set06", rearDeltFly, 12, TrainingClass.ACCESSORY),
     )
 
     /** The eight that do not, which is where the surviving artefacts live. */
@@ -202,35 +231,60 @@ class CuedRepCoverageTest {
             counted += reps.size
             called += reps.size - uncalled(fixture, d, c, tol).size
         }
-        assertEquals(37, counted, "counted reps across the seven cue-tracked captures")
-        assertEquals(37, called, "of those, reps landing inside a cued rep window")
+        assertEquals(64, counted, "counted reps across the thirteen cue-tracked captures")
+        assertEquals(62, called, "of those, reps landing inside a cued rep window")
     }
 
     @Test
-    fun `no counted rep is one nobody called`() {
-        // There is no artefact population left where truth exists. Every rep
-        // the counter reports lands inside a rep the metronome called.
-        //
-        // There used to be exactly one -- 0.125 m over 1.08 s on
-        // field-legcurl-1030-12rep-c, arriving after the last window closed --
-        // and issue 102 removed it along with the other reps that were being
-        // taken off the return stroke. It is recorded here because a count of
-        // zero says nothing about what it replaced.
+    fun `the two counted reps nobody called both land after the last cued window`() {
+        // There was no artefact population left where truth existed when the
+        // corpus was seven captures; on thirteen there are two, and both are
+        // the same shape. field-rdl-3010-10rep completes a 0.278 m rep 3.83 s
+        // after its last window closes and field-legpress-single-2010-8rep a
+        // 0.189 m rep 2.047 s after its own. Neither is an interior miss: they
+        // are in the tail that keeps recording past the metronome's last call,
+        // which is the population [SetEndWindowTest] bounds out of the BATCH
+        // analysis. The live tracker has no such bound and this is what that
+        // costs, measured.
         val c = DspConfig()
         val tol = CueTrack.WINDOW_TOLERANCE_MS.toLong()
         val strays = cueTracked.flatMap { (fixture, d, _) ->
             uncalled(fixture, d, c, tol).map { fixture to it }
         }
-        assertEquals(0, strays.size, "counted reps outside every cued window")
+        assertEquals(2, strays.size, "counted reps outside every cued window")
+        assertEquals(
+            listOf("field-legpress-single-2010-8rep", "field-rdl-3010-10rep"),
+            strays.map { it.first }.sorted(),
+            "the captures they are on",
+        )
+        strays.forEach { (fixture, rep) ->
+            val lastWindowEnd = windows(fixture).last().second
+            assertTrue(
+                rep.endMs >= lastWindowEnd,
+                "$fixture: the stray completes after the last cued window closed",
+            )
+        }
     }
 
     @Test
-    fun `the coverage limit - seven captures have truth and eight do not`() {
-        // Without this the figures above read as corpus-wide. They are not:
-        // every artefact identified before this fixture existed lives in the
-        // second list, field-ohp-100hz-bursty most of all.
-        assertEquals(7, cueTracked.size, "captures with a cue track")
-        assertEquals(8, notCueTracked.size, "captures without one")
+    fun `the coverage limit - every committed capture is in exactly one of the two lists`() {
+        // Without this the figures above read as corpus-wide. They are not.
+        // Asserted against the resource directory rather than against two
+        // hand-kept list lengths, because the hand-kept version could not
+        // detect the thing that actually happened: six captures were added and
+        // named in neither list, and every assertion stayed green while the
+        // file's headline claim went false.
+        val dir = File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile
+        val onDisk = dir.list()!!
+            .filter { it.startsWith("field-") && it.endsWith(".csv") && !it.endsWith("-cues.csv") }
+            .map { it.removeSuffix(".csv") }
+            .sorted()
+        assertTrue(onDisk.size >= 21, "captures found on the classpath: ${onDisk.size}")
+        assertEquals(
+            onDisk,
+            (cueTracked.map { it.fixture } + notCueTracked).sorted(),
+            "every capture in the resource directory must be named in exactly one list",
+        )
         cueTracked.forEach { (fixture, _, _) ->
             assertTrue(
                 javaClass.getResourceAsStream("/$fixture-cues.csv") != null,
@@ -242,21 +296,21 @@ class CuedRepCoverageTest {
                 javaClass.getResourceAsStream("/$fixture-cues.csv") == null,
                 "$fixture must NOT carry a cue track",
             )
-            assertTrue(
-                javaClass.getResourceAsStream("/$fixture.csv") != null,
-                "$fixture must still be a capture in the corpus",
-            )
         }
+        assertEquals(13, cueTracked.size, "captures with a cue track")
+        assertEquals(8, notCueTracked.size, "captures without one")
         assertTrue("field-ohp-100hz-bursty" in notCueTracked, "the survivors' capture has no truth")
     }
 
     @Test
     fun `every rep the batch reference rejects is one the metronome called`() {
         // Why no metric is built on that reference, measured rather than
-        // suspected: it rejects six counted reps and the metronome called all
-        // six of them. "Out of family" is LiveCapCalibrationTest's own rule --
+        // suspected: it rejects eleven counted reps and the metronome called
+        // all eleven. "Out of family" is LiveCapCalibrationTest's own rule --
         // more than twice, or less than a third of, the set's BATCH median rep
-        // ROM -- applied to the captures where the metronome says what happened.
+        // ROM -- applied to the captures where the metronome says what
+        // happened. The two reps nobody called are both IN family, so the
+        // reference does not separate them either.
         val c = DspConfig()
         val tol = CueTrack.WINDOW_TOLERANCE_MS.toLong()
         var outOfFamily = 0
@@ -281,20 +335,23 @@ class CuedRepCoverageTest {
                 }
             }
         }
-        assertEquals(6, outOfFamily, "counted reps the batch reference rejects")
-        assertEquals(6, outOfFamilyCalled, "of those, reps the metronome actually called")
-        assertEquals(31, inFamily, "counted reps the batch reference accepts")
-        assertEquals(31, inFamilyCalled, "of those, reps the metronome actually called")
+        assertEquals(11, outOfFamily, "counted reps the batch reference rejects")
+        assertEquals(11, outOfFamilyCalled, "of those, reps the metronome actually called")
+        assertEquals(53, inFamily, "counted reps the batch reference accepts")
+        assertEquals(51, inFamilyCalled, "of those, reps the metronome actually called")
     }
 
     @Test
     fun `the out-of-family survivors reconcile with the corpus totals`() {
         // Ties this file to the corpus figures pinned in `the corpus totals,
         // corrected against the ones issue 94 was filed with (pre-fix)` and in
-        // `the bound destroys no rep that is in family with its own set`: 81
-        // counted, 61 in family, so 20 rejected. Fifteen of those twenty are
-        // here and fourteen of the fifteen were called; the remaining five are
-        // on captures with no truth and are neither confirmed nor disproved.
+        // `the bound destroys no in-family rep`. Both of those count the same
+        // population this file does: 101 reps the shipped tracker reports over
+        // all twenty-one captures, of which 85 are in family with their own
+        // set. Sixty-four of the 101 and 53 of the 85 are here, so 37 counted
+        // reps and 32 in-family ones are on captures with no truth, and five
+        // out-of-family reps are neither confirmed nor disproved by any cue
+        // track.
         val c = DspConfig()
         var counted = 0
         var inFamily = 0
@@ -309,8 +366,8 @@ class CuedRepCoverageTest {
                 if (!out) inFamily++
             }
         }
-        val corpusCounted = 74
-        val corpusInFamily = 63
+        val corpusCounted = 101
+        val corpusInFamily = 85
         assertEquals(37, corpusCounted - counted, "counted reps on captures with no cue track")
         assertEquals(32, corpusInFamily - inFamily, "of those, in family by the batch reference")
         assertEquals(
@@ -322,28 +379,50 @@ class CuedRepCoverageTest {
 
     @Test
     fun `half the reps the lifter performed produce no count at all`() {
-        // Issue 94 as a per-rep fact rather than a per-set total, and on
-        // eccentric-first barbell work for the first time.
+        // Issue 94 as a per-rep fact rather than a per-set total, across every
+        // training class the corpus covers. The rate is 47%, and it is worse on
+        // the wider corpus than on the seven captures this started with (42%),
+        // not better.
         val c = DspConfig()
         val tol = CueTrack.WINDOW_TOLERANCE_MS.toLong()
         var cued = 0
         var empty = 0
-        var barbellCued = 0
-        var barbellEmpty = 0
-        cueTracked.forEach { (fixture, d, performed) ->
-            val h = hits(fixture, d, c, tol)
-            assertEquals(performed, h.size, "$fixture: cued reps against the count performed")
+        val cuedByClass = mutableMapOf<TrainingClass, Int>()
+        val emptyByClass = mutableMapOf<TrainingClass, Int>()
+        cueTracked.forEach { row ->
+            val h = hits(row.fixture, row.direction, c, tol)
+            assertEquals(row.performed, h.size, "${row.fixture}: cued reps against the count performed")
             cued += h.size
             empty += h.count { it == 0 }
-            if (d !== legCurl) {
-                barbellCued += h.size
-                barbellEmpty += h.count { it == 0 }
-            }
+            val k = row.trainingClass
+            cuedByClass[k] = (cuedByClass[k] ?: 0) + h.size
+            emptyByClass[k] = (emptyByClass[k] ?: 0) + h.count { it == 0 }
         }
-        assertEquals(64, cued, "cued reps across the seven")
-        assertEquals(27, empty, "cued reps that produced no counted rep")
-        assertEquals(28, barbellCued, "cued reps on the four barbell captures")
-        assertEquals(14, barbellEmpty, "of those, exactly half produced nothing")
+        assertEquals(118, cued, "cued reps across the thirteen")
+        assertEquals(56, empty, "cued reps that produced no counted rep")
+        // Per class, because the owner's calibration order is barbell first and
+        // accessory last, and the loss is not distributed the way that order
+        // would suggest.
+        assertEquals(
+            mapOf(
+                TrainingClass.BARBELL_UPPER to 28,
+                TrainingClass.BARBELL_LOWER to 16,
+                TrainingClass.MACHINE_LOWER to 16,
+                TrainingClass.ACCESSORY to 58,
+            ),
+            cuedByClass,
+            "cued reps per training class",
+        )
+        assertEquals(
+            mapOf(
+                TrainingClass.BARBELL_UPPER to 14,
+                TrainingClass.BARBELL_LOWER to 6,
+                TrainingClass.MACHINE_LOWER to 9,
+                TrainingClass.ACCESSORY to 27,
+            ),
+            emptyByClass,
+            "of those, the ones that produced nothing",
+        )
     }
 
     @Test
@@ -353,25 +432,42 @@ class CuedRepCoverageTest {
         // because the tracker could not be told which way the drive moves. It
         // can now, and the seven are gone. Kept as a regression guard, and as
         // the record that the differential was real when it was measured.
+        //
+        // Split on LiftDirection.driveIsPositive rather than on which
+        // LiftDirection instance a row happens to hold: that is the property
+        // issue 102 was about, and an identity test silently reclassified every
+        // capture added since.
         val c = DspConfig()
         val tol = CueTrack.WINDOW_TOLERANCE_MS.toLong()
-        var legCurlDoubled = 0
-        var barbellDoubled = 0
+        var driveDownCued = 0
+        var driveDownDoubled = 0
+        var driveUpCued = 0
+        var driveUpDoubled = 0
         cueTracked.forEach { (fixture, d, _) ->
-            val doubled = hits(fixture, d, c, tol).count { it > 1 }
-            if (d === legCurl) legCurlDoubled += doubled else barbellDoubled += doubled
+            val h = hits(fixture, d, c, tol)
+            if (d.driveIsPositive) {
+                driveUpCued += h.size
+                driveUpDoubled += h.count { it > 1 }
+            } else {
+                driveDownCued += h.size
+                driveDownDoubled += h.count { it > 1 }
+            }
         }
-        assertEquals(0, legCurlDoubled, "cued reps counted twice, since issue 102")
-        assertEquals(0, barbellDoubled, "and none at all on drive-up lifts")
+        assertEquals(46, driveDownCued, "cued reps on drive-down lifts")
+        assertEquals(72, driveUpCued, "cued reps on drive-up lifts")
+        assertEquals(0, driveDownDoubled, "cued reps counted twice on drive-down lifts, since issue 102")
+        assertEquals(0, driveUpDoubled, "and none at all on drive-up lifts")
     }
 
     @Test
     fun `the verdict does not depend on the window tolerance`() {
-        // Invariant from zero to 300 ms, so the cross-clock skew is not what
-        // produces the answer. 600 ms is excluded by arithmetic rather than by
-        // result: windows are one cycle apart, so widening both edges by 600
-        // makes neighbours overlap by 1200 ms and a rep near a boundary can be
-        // claimed by either. That is a reason not to go there, not a finding.
+        // Invariant from zero to 150 ms, so the cross-clock skew is not what
+        // produces the answer. Beyond that it is not invariant, and the reason
+        // is arithmetic rather than a finding: windows are contiguous by
+        // construction -- one cycle wide, starting one cycle apart -- so any
+        // positive tolerance lets neighbours overlap, and a rep in the overlap
+        // is taken by the earlier window while the later one starves. The count
+        // of MATCHED reps never moves; only their attribution does.
         val c = DspConfig()
         fun tally(tolMs: Long): Triple<Int, Int, Int> {
             var called = 0
@@ -386,44 +482,28 @@ class CuedRepCoverageTest {
             return Triple(called, empty, doubled)
         }
         // The shipped tolerance and zero agree exactly.
-        assertEquals(Triple(37, 27, 0), tally(0L), "at 0 ms")
-        assertEquals(Triple(37, 27, 0), tally(CueTrack.WINDOW_TOLERANCE_MS.toLong()), "at 150 ms")
-        // 300 ms does NOT agree, and the earlier claim that it did was measured
-        // on a tracker configuration the app stopped producing at issue 102.
-        // One rep now sits close enough to a boundary that the earlier window
-        // claims it, so one window doubles and its neighbour starves. The same
-        // count of matched reps, attributed differently.
-        assertEquals(Triple(37, 28, 1), tally(300L), "at 300 ms one rep is re-attributed")
-        // Why 600 ms is excluded, measured rather than argued. Windows are
-        // contiguous by construction -- one cycle wide, starting one cycle
-        // apart -- so any positive tolerance lets neighbours overlap, and a rep
-        // in the overlap is taken by the earlier window while the later one
-        // starves. No rep moves at the shipped 150 ms; one moves at 300 ms.
-        var called600 = 0
-        var empty600 = 0
-        var doubled600 = 0
-        cueTracked.forEach { (fixture, d, _) ->
-            val h = hits(fixture, d, c, 600L)
-            called600 += h.sum()
-            empty600 += h.count { it == 0 }
-            doubled600 += h.count { it > 1 }
-        }
-        assertEquals(37, called600, "the same reps are still matched at 600 ms")
-        assertEquals(27, empty600, "and the 300 ms re-attribution happens to undo itself")
-        assertEquals(0, doubled600, "so 600 ms agrees with 150 by coincidence, not by being better")
+        assertEquals(Triple(62, 56, 0), tally(0L), "at 0 ms")
+        assertEquals(Triple(62, 56, 0), tally(CueTrack.WINDOW_TOLERANCE_MS.toLong()), "at 150 ms")
+        // Two reps are re-attributed at 300 ms and one of those two goes back
+        // at 600, which is why neither is a better tolerance than the shipped
+        // one -- they are noisier, not stricter.
+        assertEquals(Triple(62, 58, 2), tally(300L), "at 300 ms two reps are re-attributed")
+        assertEquals(Triple(62, 57, 1), tally(600L), "at 600 ms one of the two goes back")
     }
 
     @Test
     fun `window width is read from the track, not from a constant`() {
-        // These fixtures were paced before issue 106 removed the announcement
-        // beat, so their cycle is a second longer than a capture taken now. A
-        // constant would mis-window the first new capture.
+        // The session-26 fixtures were paced before issue 106 removed the
+        // announcement beat, so their cycle is a second longer than the same
+        // prescription recorded after it. A constant would mis-window most of
+        // the corpus, and this pins by how much.
         val barbell = windows("field-bench-rotating-6rep").let { it[1].first - it[0].first }
         val curl = windows("field-legcurl-1030-12rep").let { it[1].first - it[0].first }
         assertEquals(5_006L, barbell, "bench 3010 cycle as recorded, ms")
         assertEquals(5_006L, curl, "leg curl 1030 cycle as recorded, ms")
-        // Both prescribe a 4.000 s cycle. Reading these tracks with a width
-        // taken from a capture paced after issue 106 would be a second short.
-        assertTrue(barbell > 4_500 && curl > 4_500, "both carry the announcement beat")
+        val widths = cueTracked.map { (fixture, _, _) -> windows(fixture).first().let { it.second - it.first } }
+        assertEquals(3_003L, widths.min(), "narrowest window in the corpus, ms -- a 2010 leg press")
+        assertEquals(6_008L, widths.max(), "widest, ms -- a 4011 back squat")
+        assertEquals(8, widths.toSortedSet().size, "distinct widths across the thirteen tracks")
     }
 }
