@@ -85,7 +85,7 @@ Use these names; the implementer uses the same ones.
 - **`Build, lint, test` is a four-way contract**: `ci.yml:14`, both `scripts/protect-branch.*`, and the live required context on `main`. Any diff touching the job name is blocking unless all four move together — nothing verifies the coupling, and neither script is invoked by any workflow.
 - **There is no test-name pin file.** Do not invent one. Require the manual substitute: totals before and after, every test added, renamed or removed named in the commit body.
 - **Demand mutation numbers for every new pin**, run and not asserted, and **demand the red before the green** where the module has tests.
-- **Room has no schema baseline** — `version = 7`, six hand-written migrations, zero migration tests, only `7.json` emitted and untracked. Treat any entity or DAO change as unrecoverable-data risk.
+- **Room's schema baseline is tracked, but only from version 10** — `version = 10`, nine hand-written migrations, zero migration tests, `core/data/schemas/com.macrophage.barspeed.data.AppDatabase/10.json` committed at `7db7046` as the baseline for a future `MigrationTestHelper` (any untracked sibling under that directory is a build leftover, per `.claude/skills/land/SKILL.md:36`). Treat any entity or DAO change as unrecoverable-data risk.
 - **No internal model or vendor identifiers in anything pushed**, and do not assume CI enforces it — nothing in `ci.yml` scans commit messages.
 - Commit bodies become **permanent** on a linear-history repo that lands by fast-forward. A false claim in one is unfixable after landing. Hold them to the same standard as code.
 
