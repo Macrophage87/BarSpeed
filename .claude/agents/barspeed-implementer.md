@@ -34,6 +34,7 @@ Interpret these strictly. Work here is tracked by GitHub issues — address by n
 The branch namespace, the force-push grant and its three exclusions, the `main` protection contract, the `Build, lint, test` four-way coupling, release dispatch, and the commit-body and trailer bar are stated once in `.claude/facts/live-state.md` §1, §2, §7 and §8. Read them there. What binds *you*, at the point you act:
 
 - **All work happens on a single `claude/<slug>` branch.** Never push to any other ref — `main` included — without explicit permission. Start or reset with `git fetch origin main && git checkout -B claude/<slug> origin/main`. Landed history is finished history; never stack on it.
+- **Never `git add` a directory, `-A` or `.`** — name every file path explicitly, every time. Issue #97 records six sweeps of an untracked directory, one of which reached a remote branch at 1,212 insertions on an eight-line change (`.claude/skills/land/SKILL.md:33-36`). This fires mid-work, not at landing.
 - **Landing is a gate action** requiring all three of an explicit instruction, a stated Accept, and a green `Build, lint, test` check-run on that exact SHA — never two of the three. Say plainly which one is missing.
 - **The commit body is the record.** Issues can be edited or relabelled after the fact; a landed commit body cannot, and with no PR bodies it is the only durable artifact of why a change is believed correct. Anything not written there did not happen. Name the differentials, the review round, the retractions, and the issue number when one exists.
 
@@ -78,6 +79,8 @@ Use these names; the reviewer uses the same ones. **The incident each was learne
 
 - **A green local run is necessary and never sufficient, and `-PjvmOnly` covers four of seven modules.** For any change to a `:core:model` or `:core:dsp` public symbol, compile the Android modules locally *and* grep the symbol through `app/` and `core/{ble,data}/` — the compiler reaches every consumer, while grep only enumerates call sites you then have to reason about. e199119 renamed `Tempo.eccentricS`/`concentricS` and left six unresolved references in `app/`, fixed 18 minutes later by 7f0ded2. Note *which* CI step caught it: `Unit tests (all modules)`, because `./gradlew test` compiles `:app`; `Assemble debug APK` never ran.
 - **Run `ktlintCheck detekt` unrestricted before every push.** It is CI's first step, over all seven modules, and `-PjvmOnly` excludes exactly the three most likely to red it. A red run reporting a formatting error tells you nothing about tests, lint or the APK.
+- **Never kill any java process.** Gradle daemons and a running emulator are shared with other work on this machine and are not yours to stop. `./gradlew --stop` when a daemon genuinely must go; nothing broader, and never a process sweep.
+- **Pin the device before any `adb` command**: confirm `adb devices` shows exactly one device and that it is the emulator, then `export ANDROID_SERIAL=emulator-5554` (or pass `-s emulator-5554` every time), so nothing can reach a phone on USB.
 
 ## Working style
 

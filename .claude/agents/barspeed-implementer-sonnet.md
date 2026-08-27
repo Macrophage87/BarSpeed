@@ -58,6 +58,7 @@ The branch namespace, the force-push grant and its three exclusions, the `main` 
 
 - All work happens on a **single `claude/<slug>` branch**. Never push to any other ref — `main` included. A branch outside that namespace gets **no push CI at all, silently** — you will push, see no run, and conclude it passed.
 - Start or reset with `git fetch origin main && git checkout -B claude/<slug> origin/main`. Work **lands** by fast-forward and is never merged. Never stack on landed history.
+- **Never `git add` a directory, `-A` or `.`** — name every file path explicitly, every time. Issue #97 records six sweeps of an untracked directory, one of which reached a remote branch at 1,212 insertions on an eight-line change (`.claude/skills/land/SKILL.md:33-36`). This fires mid-work, not at landing.
 - **Landing is a gate action** requiring an explicit instruction, a stated Accept, and a green `Build, lint, test` on that exact SHA — and it is not yours. Say which condition is missing and stop.
 - **`Build, lint, test` is a rename-forbidden string.** Renaming the CI job silently disables the only automated gate this repo has, and nothing checks the coupling.
 - **The commit body is the record.** Issues can be edited after the fact; a landed commit body cannot. With no PR bodies, it is the only durable artifact of why a change is believed correct. Imperative, sentence case, no conventional-commit prefix, subject ≤72 chars, no trailing period, body wrapped at 72 columns explaining the **failure mode**, its mechanism, and its consequence to the lifter — not the files touched. No emoji.
@@ -108,6 +109,8 @@ The reviewer uses these names; so do you. **The incident each was learned from i
 - With `JAVA_HOME` unset or pointing at jdk-25, **every** task fails with a message whose entire body is the string `25.0.3`. It is not the network and not the SDK — Kotlin dies compiling the build *script*. **Fix the JDK; do not "fix" build files you never reached.**
 - **Green where nothing ran.** A command exiting 0 is not verification. A `test` task reported `UP-TO-DATE` or `FROM-CACHE` **has not run** — use `--rerun-tasks` whenever a number matters, and read the task list, not just `BUILD SUCCESSFUL`. `-PjvmOnly` is a *presence* check, so `-PjvmOnly=false` still excludes the three Android modules.
 - **Run `ktlintCheck detekt` unrestricted, never under `-PjvmOnly`.** It is CI's first step, over all seven modules, and a formatting error hides every downstream result. detekt is `maxIssues: 0` with no baseline. All ktlint config lives in `.editorconfig`.
+- **Never kill any java process.** Gradle daemons and a running emulator are shared with other work on this machine and are not yours to stop. `./gradlew --stop` when a daemon genuinely must go; nothing broader, and never a process sweep.
+- **Pin the device before any `adb` command**: confirm `adb devices` shows exactly one device and that it is the emulator, then `export ANDROID_SERIAL=emulator-5554` (or pass `-s emulator-5554` every time), so nothing can reach a phone on USB.
 - Two Gradle builds against the same clone corrupt the Kotlin incremental cache. That is a collision, not a code defect: `./gradlew --stop`, delete the affected `build/` dirs, retry.
 - **Use Git Bash when an exit code matters.** PowerShell mangles native exit codes when the output is piped through a truncating cmdlet.
 

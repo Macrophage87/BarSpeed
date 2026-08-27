@@ -203,6 +203,12 @@ What is yours alone, because only you see it:
 - `core/data/schemas/com.macrophage.barspeed.data.AppDatabase/10.json` is tracked — the deliberate migration-test baseline landed at `7db7046` — so building `:core:data` at the current `DATABASE_VERSION` reproduces it rather than leaving it untracked; only a version bump writes a NEW file, which belongs in the same commit as the entity change that produced it (`.claude/skills/land/SKILL.md:33-36`). Room sits at `version = 10` with nine hand-written migrations, a committed baseline for version 10 only, and zero migration tests of any kind, so **no test in this repo can verify Android, BLE or Room behaviour** and a brief that treats a green suite as covering any of the three is a brief you wrote wrong.
 - **PROMPT.md is a historical seed prompt, not a description of the code** (`.claude/facts/live-state.md` §13). It is the most authoritative-looking document an agent you dispatch will find, and there is no CLAUDE.md or AGENTS.md to displace it — so say so in the brief when a task's diagnosis leans on it.
 
+Three hazards bind every agent you dispatch and you as well. They fire mid-work rather than at a ritual boundary, so put them in the brief; a skill loaded at landing time arrives after the damage.
+
+- **Never `git add` a directory, `-A` or `.`** — name every file path explicitly, every time. Issue #97 records six sweeps of an untracked directory, one of which reached a remote branch at 1,212 insertions on an eight-line change (`.claude/skills/land/SKILL.md:33-36`).
+- **Never kill any java process.** Gradle daemons and a running emulator are shared with other work on this machine and are not yours, or a lens's, to stop. `./gradlew --stop` when a daemon genuinely must go; nothing broader, and never a process sweep.
+- **Pin the device before any `adb` command**: confirm `adb devices` shows exactly one device and that it is the emulator, then `export ANDROID_SERIAL=emulator-5554` (or pass `-s emulator-5554` every time), so nothing can reach a phone on USB.
+
 ---
 
 ## Landing
