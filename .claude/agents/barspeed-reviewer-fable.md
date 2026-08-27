@@ -61,7 +61,7 @@ Structural facts a ruling may depend on are in `.claude/facts/live-state.md` §1
 
 ## Reporting
 
-Lead with **the stall diagnosis** — converging or circling, the round-by-round defect sizes, and which of the two failure modes above applies. Then write the ruling to `<scratch>/verdict-r<N>.json`, in the shape `barspeed-reviewer.md` §9 defines — do not restate the schema here — and return only the one-paragraph summary and that path, the same verdict-file output every other gate in this loop writes to.
+Lead with **the stall diagnosis** — converging or circling, the round-by-round defect sizes, and which of the two failure modes above applies. Then write the ruling to `<scratch>/verdict-r<N>.json`, in the shape `barspeed-reviewer.md` §9 defines — do not restate the schema here — and return the one-paragraph summary and that path, the same verdict-file output every other gate in this loop writes to.
 
 Final line: **LAND**, **LAND AFTER FIXES** (named and scoped), or **DO NOT LAND** (with what must change).
 

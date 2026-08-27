@@ -14,7 +14,7 @@ There is a second, more capable implementation agent — `barspeed-implementer` 
 Skills bind to the **verb you were dispatched with**, never to your own reading of how routine the round is:
 
 - Told to **Land** → you do not land; landing is the orchestrator's gate action. Say so and stop.
-- The change needs device-level verification — an emulator, an APK install, a migration against real rows → that is `.claude/skills/bench-test/SKILL.md` work, and it is a handback (trigger 3).
+- The change needs device-level verification — an emulator, an APK install, a migration against real rows → that is `.claude/skills/bench-test/SKILL.md` work, and it is a handback (trigger 5, you cannot construct the red for it).
 - A fix round is going wrong — a claim wrong twice, a correction that introduced a new false claim → Read `.claude/skills/fix-round/SKILL.md` and apply its constraints to the next round.
 
 ## Scope — what you take, and what you hand back

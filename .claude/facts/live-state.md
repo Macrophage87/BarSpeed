@@ -268,6 +268,8 @@ mutation killed, and that mapping is the whole content of a mutation table.
   `!providers.gradleProperty("jvmOnly").isPresent` and never reads the value, so `-PjvmOnly=false`
   still excludes the three Android modules — trying to turn the flag off gets you the opposite of
   what you intended.
+- **Require the full 40-character SHA on any `gh run list --commit`.** A short SHA returns `[]`,
+  which reads identically to "no CI ran."
 - **A `--tests` filter fails in the opposite direction**, which is worth knowing so you do not
   misread it as a broken build: one matching nothing **fails** with
   `No tests found for given includes: […](--tests filter)`, exit 1, and a valid class filter
@@ -283,9 +285,10 @@ inherits none of them. `echo` all three first and export any that are empty rath
 concluding a toolchain is absent.
 
 `C:\Program Files\Eclipse Adoptium\` holds `jdk-17.0.20.8-hotspot`, `jdk-21.0.12.8-hotspot` and
-`jdk-25.0.3.9-hotspot`. The SDK is at `%LOCALAPPDATA%\Android\Sdk` with `platforms`,
-`build-tools`, `platform-tools`, `emulator`, `system-images` and accepted `licenses`. Treat those
-as where to look first, not as a guarantee — the machine changes underneath this file.
+`jdk-25.0.3.9-hotspot`. The SDK is at `%LOCALAPPDATA%\Android\Sdk` with `platforms/android-35`,
+`build-tools/{34.0.0,35.0.0}`, `platform-tools`, `emulator`, `system-images` and accepted
+`licenses`. Treat those as where to look first, not as a guarantee — the machine changes
+underneath this file.
 
 **Two toolchains are required and neither can be downloaded.** `:core:{model,dsp,hrm,witmotion}`
 declare `jvmToolchain(21)`; `:app`, `:core:ble` and `:core:data` declare `jvmToolchain(17)`. There
@@ -325,9 +328,10 @@ Android modules local lint historically never reached.
   missing. Do not conflate the two blockers.
 - A JDK switch can leave daemons from the previous JVM alive and corrupt the Kotlin incremental
   caches. `w: Detected multiple Kotlin daemon sessions` appears during Android compiles, and a
-  `:core:model:compileKotlin` failure quoting a missing `constants.tab` was observed once after
-  such a switch. `./gradlew --stop`, delete the affected `build/` directories — build output
-  only, never a tracked file — and retry.
+  `:core:model:compileKotlin` failure reading *"Failed to create MD5 hash for file
+  …constants.tab as it does not exist"* was observed once after such a switch, not reproducibly.
+  `./gradlew --stop`, delete the affected `build/` directories — build output only, never a
+  tracked file — and retry.
 - Two Gradle builds against one clone corrupt the same cache; the signature is
   `Could not delete '…\build\kotlin\compileKotlin\cacheable\caches-jvm'` followed by
   `Using fallback strategy: Compile without Kotlin daemon`. That is a collision, not a code
@@ -550,8 +554,9 @@ defect:
 
 **The discharge is a fixture.** A hardware-found bug is not fixed until it is pinned: the session's
 raw capture becomes a `core/dsp/src/test/resources/field-*.csv` plus a case in
-`FieldDataRegressionTest.kt`, in the SAME commit as the fix — as d4aa6ed, a50ddee and 2f15e04 each
-did.
+`FieldDataRegressionTest.kt`, in the SAME commit as the fix — as d4aa6ed (stream rate, measured
+ROM), a50ddee (bursty arrival timestamps, continuous cycling with no quiet window) and 2f15e04
+(overlapping counters, concentric-first phase) each did.
 
 Work is tracked by GitHub issues; §16's field-selected `gh issue list` form is the live list (147
 issues at the time of writing, with real labels: `P0`–`P6`, `audit`, `crash`,

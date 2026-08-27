@@ -44,7 +44,8 @@ name it. Run every step; none is decorative.
 Read the prose that changed since the last gate verdict: amended commit bodies, new KDoc,
 changed captions and schema descriptions. The dominant defect class in this repository is a
 false claim shipped in prose, and four consecutive fix rounds once introduced a fresh false
-claim each inside their own correction paragraphs (#111). For every deletion, check the surviving
+claim each inside their own correction paragraphs (the four rounds ran on #111's branch,
+claude/rescued-database-card). For every deletion, check the surviving
 sentence parses and holds alone; for every quoted residue of a refuted claim, confirm it sits
 inside a retraction, not a standing claim (`grep` the claim, not the line). A residue grep that
 returns hits is not a failure by itself — read them; retractions legitimately quote what they
