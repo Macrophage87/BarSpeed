@@ -51,7 +51,7 @@ Its mandate is two questions, answered in the prior verdict's own numbering: did
 
 Continuing the same reviewer instance into the next round is permitted **only as the diff-holding role** — the one that needs the previous round's text in its own context. `.claude/skills/fix-round/SKILL.md` constraints 4 and 6, re-reading the surviving paragraph and diffing bodies round-over-round to catch a deletion that took a correction with it, cannot be checked from the new tree alone.
 
-**The verdict on any round that touched prose goes to a fresh lens.** Prose is this repository's recurring defect class — the four-consecutive-gate streak that the fix-round skill opens with, every round of it prose-only — and a continued reviewer re-gating the wording it supplied is reviewing its own sentences. **An author of a substitution never re-gates it**: `required_fix` is the reviewer's wording, and the moment the fix round uses it verbatim it is the reviewer's claim in the tree.
+**The verdict on any round that touched prose goes to a fresh lens.** Prose is this repository's recurring defect class — the four-consecutive-gate streak that the fix-round skill opens with, where the code converged while each round's own explanatory prose carried that round's next false claim — and a continued reviewer re-gating the wording it supplied is reviewing its own sentences. **An author of a substitution never re-gates it**: `required_fix` is the reviewer's wording, and the moment the fix round uses it verbatim it is the reviewer's claim in the tree.
 
 Fresh-on-code-changed is the wrong guard here. The record says fresh-on-prose.
 

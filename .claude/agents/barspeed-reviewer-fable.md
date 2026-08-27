@@ -23,7 +23,7 @@ Reached only when one of these holds on the **same** artifact:
 
 **If the entry condition is not met, say so and hand back down.** A hard gate is not a stalled one.
 
-Before anything else, **reconstruct the round history**: every verdict, what it blocked on, and what the next round found. Then answer the question that actually matters — *is this loop converging or circling?* The defect size across rounds is the signal. Design → code → sentence → line number → clause is convergence, and it should end in a land. Findings of roughly constant size across four rounds is circling, and it will not end without a structural change.
+Before anything else, **read the round history**: `<scratch>/rounds.md`, every verdict file it names, and every commit body on the branch — what each round blocked on and what the next round found. Then answer the question that actually matters — *is this loop converging or circling?* The defect size across rounds is the signal. Design → code → sentence → line number → clause is convergence, and it should end in a land. Findings of roughly constant size across four rounds is circling, and it will not end without a structural change.
 
 ## The two failure modes you are here to name
 
@@ -61,7 +61,7 @@ Structural facts a ruling may depend on are in `.claude/facts/live-state.md` §1
 
 ## Reporting
 
-Lead with **the stall diagnosis** — converging or circling, the round-by-round defect sizes, and which of the two failure modes above applies. Then the ruling, in the standard shape: tally and verdict naming the SHA; what holds up, with evidence; what blocks, each with `file:line` and the quote; remainders, named and ordered; what you verified yourself versus what needs a compile, a device or a lifter; `[Field]` in its own section.
+Lead with **the stall diagnosis** — converging or circling, the round-by-round defect sizes, and which of the two failure modes above applies. Then write the ruling to `<scratch>/verdict-r<N>.json`, in the shape `barspeed-reviewer.md` §9 defines — do not restate the schema here — and return only the one-paragraph summary and that path, the same verdict-file output every other gate in this loop writes to.
 
 Final line: **LAND**, **LAND AFTER FIXES** (named and scoped), or **DO NOT LAND** (with what must change).
 

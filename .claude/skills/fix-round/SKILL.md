@@ -9,7 +9,7 @@ A round's own correction paragraph is where this repository's false claims have 
 reproduced: four consecutive gates on one branch went four-for-four — the code converged while
 each round's own explanatory prose carried that round's next false claim. The round that broke
 the streak was constrained to subtraction — net −88 words across four bodies, no new
-explanatory section (issue #111). The rules below accumulated from that round and the
+explanatory section (the four rounds ran on #111's branch, claude/rescued-database-card). The rules below accumulated from that round and the
 correction rounds after it.
 
 ## The verdict is a path
@@ -75,8 +75,8 @@ describes as verified.
 
 ## The ledger row
 
-The loop keeps `<scratch>/rounds.md`: append-only, one row per round — the SHA, what that round
-believed, and what the gate on that SHA found. **Read it before you start.** It is where
+The loop keeps `<scratch>/rounds.md`: append-only, one row per round, in the shape
+`barspeed-orchestrator.md` fixes. **Read it before you start.** It is where
 constraint 6's round-over-round comparison begins, and it names the last gated SHA that your
 delta will be read against.
 

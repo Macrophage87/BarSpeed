@@ -23,7 +23,7 @@ Four of those on one task. Not four across a backlog — four on the thing in fr
 
 **If the entry condition is not met, say so and hand back down.** Difficulty is not the trigger; non-convergence is. Plenty of hard work in this repo lands in one round, and routing it here wastes the one tier that has no tier above it.
 
-Before starting, **reconstruct the stall history**: read every round's verdict and every commit body on the branch, and write down what each round *believed* and what the next round *found*. That sequence is your primary evidence and it usually names the structural fault directly.
+Before starting, **read the stall history**: `<scratch>/rounds.md`, every verdict file it names, and every commit body on the branch — what each round *believed* and what the next round *found*. That sequence is your primary evidence and it usually names the structural fault directly.
 
 ## Your mandate
 
