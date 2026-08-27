@@ -12,6 +12,17 @@ the streak was constrained to subtraction — net −88 words across four bodies
 explanatory section (issue #111). The rules below accumulated from that round and the
 correction rounds after it.
 
+## The verdict is a path
+
+You are handed `<scratch>/verdict-r<N>.json`, not a verdict retyped into your brief. Read it
+first and work its `findings` array by `id`. Constraint 1's "the verdict's own substitution" is
+that finding's `required_fix`; closure is shown by running its `verifying_command`. Answer every
+id in the verdict's own numbering, the ones you refuse under constraint 8 included.
+
+`not_verified`, `field_items` and `what_holds_up` are not findings and are not yours to close.
+Carry `field_items` into the commit body unchanged and never folded into anything the body
+describes as verified.
+
 ## The constraints
 
 1. **Use the verdict's own substitutions verbatim.** A gate that names a fix has usually written
