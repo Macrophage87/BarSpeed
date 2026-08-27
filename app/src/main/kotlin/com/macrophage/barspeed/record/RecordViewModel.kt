@@ -349,6 +349,35 @@ private fun jumpedState(s: RecordState, done: List<PlannedSlot>, fixed: List<Pla
 }
 
 /**
+ * The state a rest-screen effort correction leaves behind.
+ *
+ * Free function for the reason [restingState] and [advancedState] are: it is a
+ * pure `copy` over a state and some arguments, and `RecordViewModel` is at
+ * detekt's `LargeClass` limit -- one more multi-line copy inside the class
+ * pushes it over, which is not a reason to write the correction in fewer
+ * fields.
+ *
+ * [tappedFailed] is what the lifter just said and [effectiveFailed] is the OR
+ * `SetRatingTracker` returned. Both are stored, because the correction grid has
+ * to attribute the verdict and the OR cannot say whose it was. #140.
+ */
+private fun ratedState(
+    s: RecordState,
+    rpe: Int?,
+    tappedFailed: Boolean,
+    effectiveFailed: Boolean,
+    warmup: Boolean,
+): RecordState = s.copy(
+    lastSetRpe = rpe,
+    lastSetFailed = effectiveFailed,
+    // SetRatingTracker overwrites its own tapped flag on every correction,
+    // so this mirrors it exactly: a correction away from the failed tile
+    // withdraws the tap and leaves the derived shortfall standing.
+    lastSetTappedFailed = tappedFailed,
+    lastSetWarmup = warmup,
+)
+
+/**
  * The rest-screen state the set just written leaves behind. Free function for
  * [openSession]'s reason.
  *
@@ -446,6 +475,10 @@ private fun restingState(
         ),
         lastSetRpe = p.rating?.rpe,
         lastSetFailed = failed,
+        // The rating frozen with the write is the only tap there has been at
+        // this point; [failed] above already carries the derived shortfall
+        // OR-ed in, and that OR is what this field exists to see past.
+        lastSetTappedFailed = p.rating?.failed == true,
         lastSetWarmup = p.rating?.warmup ?: false,
         restRemainingS = restS,
         // Set from the frozen index rather than incremented, so a retry cannot
@@ -641,7 +674,20 @@ data class RecordState(
     val restTotalS: Int = 0,
     /** RPE the lifter picked for the just-finished set (rest screen), if any. */
     val lastSetRpe: Int? = null,
+    /**
+     * The effective failed verdict: what the lifter tapped OR the shortfall
+     * derived from the count, exactly as it was stored with the set row.
+     */
     val lastSetFailed: Boolean = false,
+    /**
+     * The lifter's own failure tap, kept apart from [lastSetFailed] so the rest
+     * screen can tell a verdict the lifter gave from one the app derived.
+     *
+     * `SetRatingTracker` holds both facts and ORs them privately, so without
+     * this field the two are indistinguishable downstream by construction, and
+     * a screen that has to attribute one of them cannot. #140.
+     */
+    val lastSetTappedFailed: Boolean = false,
     val lastSetWarmup: Boolean = false,
     val audioCues: Boolean = true,
     val imuConnected: Boolean = false,
@@ -1404,6 +1450,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 stateFlow.value.copy(
                     lastFeedback = stateFlow.value.lastFeedback?.copy(repsOverride = reps),
                     lastSetFailed = failed,
+                    // lastSetTappedFailed is deliberately NOT written here.
+                    // correctReps re-derives only the shortfall; the lifter's
+                    // own tap is untouched by a rep correction, so carrying it
+                    // unchanged is what keeps the two facts two facts.
                 )
         }
     }
@@ -1776,8 +1826,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // the correction on the way out.
         container.appScope.launch(Dispatchers.Main.immediate) {
             val effectiveFailed = ratings.rate(rpe, failed, warmup) ?: return@launch
-            stateFlow.value =
-                stateFlow.value.copy(lastSetRpe = rpe, lastSetFailed = effectiveFailed, lastSetWarmup = warmup)
+            stateFlow.value = ratedState(stateFlow.value, rpe, failed, effectiveFailed, warmup)
         }
     }
 

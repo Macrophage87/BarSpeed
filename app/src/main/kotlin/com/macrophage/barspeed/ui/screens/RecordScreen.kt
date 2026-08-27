@@ -55,6 +55,7 @@ import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.model.BlePermissionStep
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.EffortCorrectionPolicy
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
 import com.macrophage.barspeed.model.ExitPrompt
@@ -1794,7 +1795,14 @@ private fun rpeColor(rpe: Int): Color = when {
     else -> BarColors.Amber
 }
 
-/** Correction grid on the rest screen, for a mistapped effort rating. */
+/**
+ * Correction grid on the rest screen, for a mistapped effort rating.
+ *
+ * What is pre-lit is [EffortCorrectionPolicy]'s decision, not this file's. The
+ * rule is a decision about attribution -- whose verdict a lit tile claims to be
+ * -- and it lives in `:core:model` where a test runs on it every push; `:app`
+ * has one test file and none of it reaches a Compose screen.
+ */
 @Composable
 private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked: () -> Unit) {
     val feedback = state.lastFeedback
@@ -1802,6 +1810,18 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
         rpeOptions(
             timed = feedback?.actualDurationS != null,
             explosive = feedback?.explosive == true,
+        )
+    // lastSetFailed is the OR of both facts, so the derived one is recovered by
+    // subtracting the tap. Where BOTH are true this hands the policy false for
+    // derivedFailed, which is a value the policy cannot act on differently: its
+    // only use of the argument is `derivedFailed && !tappedFailed`, false in
+    // that case either way.
+    val selection =
+        EffortCorrectionPolicy.selection(
+            rpe = state.lastSetRpe,
+            warmup = state.lastSetWarmup,
+            tappedFailed = state.lastSetTappedFailed,
+            derivedFailed = state.lastSetFailed && !state.lastSetTappedFailed,
         )
     SectionCaption("Change the effort logged for that set")
     Spacer(Modifier.height(6.dp))
@@ -1811,14 +1831,14 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         ) {
             row.forEach { option ->
-                // A set can now carry BOTH an effort rating and the auto-fail
-                // flag, so these have to be a precedence chain rather than three
-                // independent predicates — otherwise two tiles light up at once.
+                // One tile per fact, and EffortSelection guarantees at most one
+                // fact is set -- otherwise two tiles light up at once and say
+                // two contradictory things about one set.
                 val selected =
                     when {
-                        state.lastSetWarmup -> option.warmup
-                        state.lastSetFailed -> option.failed
-                        else -> !option.warmup && !option.failed && option.rpe == state.lastSetRpe
+                        option.warmup -> selection.warmup
+                        option.failed -> selection.failed
+                        else -> selection.rpe != null && option.rpe == selection.rpe
                     }
                 RpeTile(option, selected, modifier = Modifier.weight(1f)) {
                     viewModel.rateLastSet(option.rpe, failed = option.failed, warmup = option.warmup)
