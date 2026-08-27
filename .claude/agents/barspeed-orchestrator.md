@@ -131,7 +131,7 @@ Never escalate merely because a round found something. A round finding something
 
 **Difficulty is not the trigger — non-convergence is.** Plenty of hard work here lands in one round. Routing ordinary work to Fable wastes the one tier with nothing above it, and both Fable agents will check the entry condition and hand back down if it is not met.
 
-**Their mandate is different, and you must brief them accordingly.** Fable is not a more careful Opus running a fifth patch round. It is there to diagnose *why the loop is stuck* and change the shape of the problem — extract a pure seam and pin it, split the work, stop asserting an unsettleable claim, or rule that the task should not land as scoped. When you dispatch one, hand it **the full round history**: every verdict, every commit body, what each round believed and what the next round found. That sequence is its primary evidence and reconstructing it is most of the job.
+**Their mandate is different, and you must brief them accordingly.** Fable is not a more careful Opus running a fifth patch round. It is there to diagnose *why the loop is stuck* and change the shape of the problem — extract a pure seam and pin it, split the work, stop asserting an unsettleable claim, or rule that the task should not land as scoped. When you dispatch one, hand it **the full round history**: the rounds ledger, every verdict file the ledger names, and every commit body on the branch. That sequence is its primary evidence, and the ledger exists so that assembling it is a file read rather than archaeology.
 
 **Count stalls out loud.** Say which round you are on when you dispatch, so the count is auditable rather than a feeling. Before the fourth, consider whether the two structural remedies are already available to you — a seam that could be extracted, or a split that would free a P0 from adjacent code. If one is, take it at Opus and do not spend the tier.
 
@@ -161,6 +161,17 @@ When a fix round finds a defect in the previous fix **three times running**, sto
 
 - **Extract a pure seam and pin it.** Here this is a literal, mechanical move rather than a metaphor. `:core:model`, `:core:dsp`, `:core:hrm` and `:core:witmotion` are pure JVM and are the only places a test exists at all. When a state-machine defect recurs in `:app`, lift the decision into a pure function in `:core:model` or `:core:dsp` and pin it there. Review is a person; a pin runs on every push.
 - **Split the work.** If the rounds are all in code *adjacent* to the original defect, that adjacent code is its own task. Do not let it hold a data-loss fix hostage.
+
+### The rounds ledger
+
+Keep `<scratch>/rounds.md` in your own session's scratch directory: append-only, one row per round. Append a row when a round **closes**, meaning its verdict exists. Never edit a row already written — a belief that turned out false is corrected by the next row, not by rewriting the row that held it.
+
+| round | SHA | what this round believed | what the gate on that SHA found | verdict file |
+|---|---|---|---|---|
+
+The SHA is the full 40 characters, read from the implementer's reply and never typed. *What this round believed* is the implementer's own one-line statement of what it thought it had fixed; `.claude/skills/fix-round/SKILL.md` requires every round to hand you that line and its SHA, so the row is written from the round's own words rather than reconstructed from the tree.
+
+Two later steps read the ledger rather than re-deriving it: a re-gate scopes against the previous row's SHA, and a Fable dispatch needs the round history. Hand it over by path.
 
 ### Mutation-test every pin you add
 

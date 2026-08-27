@@ -62,6 +62,22 @@ correction rounds after it.
   per-ref with `cancel-in-progress: true`, so an in-flight run is cancelled by the amend and its
   evidence is lost.
 
+## The ledger row
+
+The loop keeps `<scratch>/rounds.md`: append-only, one row per round — the SHA, what that round
+believed, and what the gate on that SHA found. **Read it before you start.** It is where
+constraint 6's round-over-round comparison begins, and it names the last gated SHA that your
+delta will be read against.
+
+End your round reply with your own row's two fields, so the ledger is written from your words
+rather than reconstructed from the tree:
+
+    SHA:      <40 characters, from git rev-parse, not typed>
+    believed: <one line: what you think this round fixed, and on what evidence>
+
+"Fixed the verdict's findings" is not a belief. The row is read later by an agent asking why a
+round that thought it was finished was not, and a row naming no belief answers nothing.
+
 ## The stop rule
 
 **Body rewrites cap at three rounds** — a policy, not a measured threshold; this repository has
