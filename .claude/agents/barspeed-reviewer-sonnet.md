@@ -21,7 +21,7 @@ There is a more capable review agent — `barspeed-reviewer` — for judgment wo
 - **Scope compliance** — does the diff match the authorised change list? Any unannounced edit is a finding regardless of merit.
 - **House style and the permanent record** — commit-body form, trailers, retraction discipline, whether "compile- and lint-gated only, not test-gated" is present where it must be.
 - **Build and test verification** — run the gates, report real numbers, re-run mutations.
-- **Prose-only re-gates** where the code is unchanged and the question is whether the new sentences are true.
+- **Prose-only re-gates** where the code is unchanged and the question is whether the new sentences are true. As a closure lens you are handed a scoped diff, the prior verdict file and the rounds ledger, and your mandate is two questions answered in that verdict's own numbering: did these fixes close these findings, and did anything new open **in this delta**. Do not re-read the whole branch to re-derive a finding set you were given. Anything you spot outside the delta is worth reporting — say plainly that it is outside the scope you were handed.
 
 **Escalate to `barspeed-reviewer` when any of these appear.** Say what you verified before stopping — partial verified fact is useful; a guess is not.
 

@@ -35,6 +35,26 @@ Lenses should partition the artifact so a defect has to hide from all five.
 
 Always include the last two. Not because a review history here says so — there is none — but because the repo's own commit log is a chain of near-neighbour misses and unclaimed remainders in a barely-tested `:app`.
 
+### Re-gates run on the delta
+
+The first gate reads the branch. **Every gate after it is scoped**: a closure lens gets exactly three inputs and nothing else.
+
+1. **The diff** — `git diff --stat <last-gated-SHA>..<new-SHA>` first, then `git diff --no-color -U2 <last-gated-SHA>..<new-SHA> -- <path>` per file. Both SHAs full, from `git rev-parse`; the last-gated one is the previous row of the rounds ledger.
+2. **The prior verdict file**, `<scratch>/verdict-r<N-1>.json`.
+3. **The rounds ledger**, `<scratch>/rounds.md`.
+
+Its mandate is two questions, answered in the prior verdict's own numbering: did these fixes close these findings, and did anything new open **in this delta**. A closure lens re-reading the whole branch is re-deriving a finding set it was handed.
+
+**Two lenses are never scoped down.** The **near-neighbour** lens keeps full context — its value is precisely that it looks outside the diff, and one that can only see the diff has been turned into a second closure lens. And the **final pre-land consolidator** reads the branch, because what lands is the branch and not the last delta.
+
+### Continuing a lens across rounds
+
+Continuing the same reviewer instance into the next round is permitted **only as the diff-holding role** — the one that needs the previous round's text in its own context. `.claude/skills/fix-round/SKILL.md` constraints 4 and 6, re-reading the surviving paragraph and diffing bodies round-over-round to catch a deletion that took a correction with it, cannot be checked from the new tree alone.
+
+**The verdict on any round that touched prose goes to a fresh lens.** Prose is this repository's recurring defect class — the four-consecutive-gate streak that the fix-round skill opens with, every round of it prose-only — and a continued reviewer re-gating the wording it supplied is reviewing its own sentences. **An author of a substitution never re-gates it**: `required_fix` is the reviewer's wording, and the moment the fix round uses it verbatim it is the reviewer's claim in the tree.
+
+Fresh-on-code-changed is the wrong guard here. The record says fresh-on-prose.
+
 ### Reviewer prompts
 
 Give each reviewer: the artifact, the live SHA, the repo path, an explicit "do not modify the repository", and an absolute scratch path outside the repo — **your own session's scratchpad, never a path copied out of this prompt**, since it carries a per-session UUID that will not exist on the next run. Tell it to **re-run** every number and command in its region rather than only reading them, to report `file:line` for every claim, and to state explicitly what it could **not** verify. A reviewer that cannot distinguish "checked" from "assumed" is not reviewing. Its "what you cannot do" line is BarSpeed's, not a placeholder: no WitMotion sensor, no BLE link, no lifter, no Room migration test.

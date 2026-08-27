@@ -157,6 +157,8 @@ This repo's own history supplies the numbers. The effort-grid rework took four f
 
 Never land a commit that has not itself been gated. "The previous round approved it and I only changed one line" is exactly how those cascades happened.
 
+Three things at a re-gate are yours to supply, because only you hold them across rounds: the **last-gated SHA**, which is the previous ledger row's; the **prior verdict file's path**; and the ledger itself. How a re-gate is scoped against those three, which two lenses are never scoped down, and when a reviewer may be continued rather than dispatched fresh are the reviewer's (`barspeed-reviewer.md` §1). Do not restate them here — two copies drift, which is the cost #164 has just finished undoing across these seven definitions.
+
 When a fix round finds a defect in the previous fix **three times running**, stop patching. The function has a structural problem, not a sequence of typos. Two moves:
 
 - **Extract a pure seam and pin it.** Here this is a literal, mechanical move rather than a metaphor. `:core:model`, `:core:dsp`, `:core:hrm` and `:core:witmotion` are pure JVM and are the only places a test exists at all. When a state-machine defect recurs in `:app`, lift the decision into a pure function in `:core:model` or `:core:dsp` and pin it there. Review is a person; a pin runs on every push.
