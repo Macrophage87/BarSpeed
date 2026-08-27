@@ -3,7 +3,8 @@
 The volatile facts every BarSpeed agent needs and none of them should carry its own copy of.
 Seven agent definitions used to restate this material in seven paraphrases; they drifted, and
 the drift shipped false claims about Room's schema baseline into six files at once (#162).
-This file is the single copy. A definition points here; it does not summarise here.
+This file is the single copy. A definition points here rather than summarising here, except
+for the one-line class names carved out at §15 — a definition keeps those inline.
 
 **Every entry names how it was measured.** A fact without a SHA, a command or an API call is a
 claim about a state that may no longer exist. Where an entry is known stale it says so rather
@@ -69,8 +70,9 @@ rebased without asking each round. The boundary does not widen by inference:
 
 - `claude/**` yes; `main` never; anything already fast-forwarded into `main` never.
 - **Deletion is not covered** by the grant. Never delete a branch without being told to.
-- Matching the namespace does not make a branch yours. 59 `claude/**` branches exist on the
-  remote (`git ls-remote --heads origin | wc -l`), and at least one is still live in-flight work:
+- Matching the namespace does not make a branch yours. 57 `claude/**` branches exist on the
+  remote (`git ls-remote --heads origin | grep -c 'refs/heads/claude/'`), and at least one is
+  still live in-flight work:
   `claude/strength-training-android-app-11lidw` at `c3c9c521c99515b912ce57914dfb1afc3c1e8b22`,
   confirmed unlanded by `git merge-base --is-ancestor c3c9c52 origin/main` failing. Run that
   check before treating any `claude/**` branch as stale.
@@ -260,6 +262,9 @@ Android modules local lint historically never reached.
   `Could not delete '…\build\kotlin\compileKotlin\cacheable\caches-jvm'` followed by
   `Using fallback strategy: Compile without Kotlin daemon`. That is a collision, not a code
   defect. Serialise, or `git clone` into scratch.
+- **Never kill any java process.** Gradle daemons and a running emulator are shared with other
+  work on this machine and are not yours to stop. `./gradlew --stop` when a daemon genuinely
+  must go; nothing broader, and never a process sweep.
 - **PowerShell mangles native exit codes.** Unpiped, and even with `2>&1`, it reports a failing
   build's `1` faithfully; piping `gradlew.bat` through a truncating cmdlet
   (`| Select-Object -First N`) breaks the pipe and turns that `1` into `$LASTEXITCODE = -1`,
@@ -288,9 +293,14 @@ The tag is created by the action at publish time, and at least once it did not l
 that was built: `v0.1.5` **and** `v0.1.6` both resolve to
 `56448cb9613fe81fab346bd128c4571c157149ab` (`git rev-list -n1`), whose `versionName` is **0.1.6**
 — so v0.1.5 names a commit that was never built as 0.1.5. That is one collision among 44 `v*`
-tags (`git tag -l 'v*' | wc -l`); the mechanism is unconfirmed and later tags landed correctly. `release.yml` has **no concurrency group**, so do not push to `main`
-while a release run is in flight, and after every release verify `git rev-list -n1 vX.Y.Z` is the
-SHA you intended.
+tags (`git tag -l 'v*' | wc -l`); later tags landed correctly. The mechanism is readable in
+`.github/workflows/release.yml:59` — the release step passes `tag_name` with no
+`target_commitish`, so GitHub creates the tag from `main`'s HEAD at the moment that step runs,
+the end of the build, not the dispatch — and `.claude/skills/release-cut/SKILL.md` derives the
+freeze rule from it. What remains unverified is narrower: no one has read the v0.1.5 run's log,
+so the specific incident's causation is inferred from the mechanism, not confirmed against it.
+`release.yml` has **no concurrency group**, so do not push to `main` while a release run is in
+flight, and after every release verify `git rev-list -n1 vX.Y.Z` is the SHA you intended.
 
 > When cutting a release → Read `.claude/skills/release-cut/SKILL.md`.
 
@@ -331,8 +341,12 @@ self-corrected once — do not regress it. (Earlier definitions stated this as "
 written; the numerator still holds, the denominator has moved.)
 
 **Never `git add` a directory, `-A` or `.`** — name every file path explicitly. Issue #97 records
-six sweeps of the untracked Room schema directory, one of which reached a remote branch at 1,212
+six sweeps of `core/data/schemas`, then untracked, one of which reached a remote branch at 1,212
 insertions on an eight-line change (`.claude/skills/land/SKILL.md:33-36`).
+`core/data/schemas/com.macrophage.barspeed.data.AppDatabase/10.json` is **tracked now**
+(confirmed by `git ls-tree -r --name-only HEAD -- core/data/schemas`); only a `DATABASE_VERSION`
+bump writes an untracked sibling `<N>.json`, and that new file must ship in the same commit as
+the migration, never swept in separately.
 
 ## 9. Red-before-green, and where it is not available
 

@@ -166,7 +166,7 @@ When a fix round finds a defect in the previous fix **three times running**, sto
 
 A test that cannot fail is worse than no test, because it reads as coverage. For each new case, break the thing it guards, run the suite, and report the numbers actually observed. If it does not red, the test is decoration.
 
-**Never state a test total bare — name the parent SHA and the command every time**, and require the same of every agent you dispatch. The rule, CI's command, the current totals, why this entry has already been wrong twice in two different ways, and the absence of any test-name pin file: `.claude/facts/live-state.md` §4. Do not restate a number here; a number written into a definition is a number nobody re-measures.
+**Never state a test total bare — name the parent SHA and the command every time**, and require the same of every agent you dispatch. The rule, CI's command, the last-recorded total marked stale, why this entry has already been wrong twice in two different ways, and the absence of any test-name pin file: `.claude/facts/live-state.md` §4. Do not restate a number here; a number written into a definition is a number nobody re-measures.
 
 ---
 
