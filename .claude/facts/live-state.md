@@ -20,14 +20,17 @@ disclaimer on it.
 
 ## 1. Branch protection and the landing contract
 
-Live source, never this sentence: `gh api repos/Macrophage87/BarSpeed/branches/main/protection`.
-At the time of writing it returns:
+Live source, never this sentence — field-selected, per §16's rule:
 
 ```
-contexts: ["Build, lint, test"]   strict: true
-enforce_admins: true              required_linear_history: true
-required_pull_request_reviews: absent
-allow_force_pushes: false         allow_deletions: false
+gh api repos/Macrophage87/BarSpeed/branches/main/protection --jq \
+  '{contexts: .required_status_checks.contexts, strict: .required_status_checks.strict, enforce_admins: .enforce_admins.enabled, linear: .required_linear_history.enabled, reviews: .required_pull_request_reviews, force_push: .allow_force_pushes.enabled, deletions: .allow_deletions.enabled}'
+```
+
+Verified live at `gh version 2.96.0`, at the time of writing it returns:
+
+```
+{"contexts":["Build, lint, test"],"deletions":false,"enforce_admins":true,"force_push":false,"linear":true,"reviews":null,"strict":true}
 ```
 
 `enforce_admins` and `required_linear_history` were both **false** when the first agent
@@ -186,8 +189,9 @@ left to check against. Three things travel together:
 
 - `--console=plain` — Gradle's default rich console redraws lines in place, which is not a stable
   string to grep, diff or quote; plain mode is one line per event.
-- the executed-task count read from the non-`-q` task lines (count `> Task :…` lines and subtract
-  any suffixed `UP-TO-DATE`, `FROM-CACHE` or `NO-SOURCE`), reported in the form already landed —
+- the executed-task count read from the non-`-q` task lines (count `> Task :…` lines carrying no
+  suffix — not `UP-TO-DATE`, `FROM-CACHE`, `NO-SOURCE` or `SKIPPED`), reported in the form already
+  landed —
   *"1120 executions, 0 failures, all 141 tasks executed rather than restored"*
   (`16c2e7401d65a9ad8660639a21f5873edee792a1`).
 - the tests/failures/errors/skipped tuple parsed from the JUnit XML under
@@ -549,8 +553,8 @@ raw capture becomes a `core/dsp/src/test/resources/field-*.csv` plus a case in
 `FieldDataRegressionTest.kt`, in the SAME commit as the fix — as d4aa6ed, a50ddee and 2f15e04 each
 did.
 
-Work is tracked by GitHub issues; `gh issue list --repo Macrophage87/BarSpeed --state all` is the
-live list (147 issues at the time of writing, with real labels: `P0`–`P6`, `audit`, `crash`,
+Work is tracked by GitHub issues; §16's field-selected `gh issue list` form is the live list (147
+issues at the time of writing, with real labels: `P0`–`P6`, `audit`, `crash`,
 `data-loss`, `wrong-data`, `export`, `performance`, `concurrency`, `ble`, `schema`, `Field`). An
 issue body pins its `file:line` claims to the SHA it was audited against — re-verify against
 current `origin/main` before acting, and do not assume an issue is right: #22's prescribed
@@ -710,19 +714,21 @@ documentation drifts" rule.
 **Search exclusions: count first, read only where there are hits.** `!**/build/**`, `!.gradle/**`
 and `!**/.git/**` — generated Kotlin, R classes and Room's schema-export JSON under a module's
 `build/` are indistinguishable from source to a site-counting grep, and inflate a hit count with
-nothing a diff needs to touch. Two forms, re-run live against this checkout for the token
-`DatabaseRescue` (chosen because it does not appear in this file, so documenting the count here
-cannot inflate the count it documents — an earlier draft of this entry used a token that appeared
-in this very paragraph and went stale the moment the paragraph was written):
+nothing a diff needs to touch. Two forms, measured for the token `DatabaseRescue` at
+`c1dd4c4b78ad950264c389e70c247b9c80bcb34e`. This paragraph is itself among the matches — it
+names the token more than once — so a live re-run on your own checkout is not expected to
+reproduce the pinned figures below; treat them as a record of that one SHA, and re-run rather
+than trust them:
 
 ```
 rg -c "PATTERN" --hidden --glob '!**/build/**' --glob '!.gradle/**' --glob '!**/.git/**'
 ```
 
 **`--hidden` is not optional and is the sharper finding here.** Plain `rg` skips dot-directories
-by default, and `.claude/` — the exact tree these command pins live in — is one. Confirmed live:
-`rg -c "DatabaseRescue" --glob '!**/build/**' …` (no `--hidden`) finds 9 files and silently omits
-`.claude/skills/bench-test/SKILL.md`'s one match; adding `--hidden` finds all 10 files, 64
+by default, and `.claude/` — the exact tree these command pins live in — is one. Measured at
+`c1dd4c4b78ad950264c389e70c247b9c80bcb34e`: `rg -c "DatabaseRescue" --glob '!**/build/**' …` (no
+`--hidden`) finds 9 files and silently omits two dot-directory files, `.claude/skills/bench-test/SKILL.md`
+and this file (`.claude/facts/live-state.md`); adding `--hidden` finds all 11 files, 66
 occurrences total, matching the `Grep` tool's count exactly. The `Grep` tool searches hidden
 directories by default with no flag to opt out, so a raw `rg` count run without `--hidden` reads
 as agreement with the `Grep` tool while actually excluding every `.claude/**`, `.github/**` and

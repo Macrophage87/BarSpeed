@@ -50,10 +50,9 @@ evidence against the one you skipped attaching:
 1. **Old-version rows recorded** (step 1 of the two-way test) — the baseline the whole test is
    checked against; without it attached, "old sessions listed" in step 2 has nothing to compare
    to.
-2. **Post-upgrade history listing** (step 2) — the FAIL states here are "crash" (obviously
-   different) and "old sessions visible as if nothing happened", which by construction renders
-   identically to PASS unless the row-for-row content is actually attached and read, not glanced
-   at.
+2. **Post-upgrade history listing** (step 2) — the FAIL states are step 4's list below; "old
+   sessions visible as if nothing happened" renders identically to PASS unless the row-for-row
+   content is actually attached and read, not glanced at.
 3. **Post-downgrade rescue card** (step 4) — the FAIL state "old sessions visible as if nothing
    happened" recurs here for the same reason: a rescue that silently no-ops looks like a normal
    history screen.
