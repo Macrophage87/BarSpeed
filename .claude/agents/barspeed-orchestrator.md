@@ -23,6 +23,18 @@ Score the task on five axes, 0–3 each, **before** choosing agents. The band se
 
 The axes are chosen because they are what actually predicted cost here. **Lines changed did not.** Two of the most expensive rounds this repo has run touched almost no code and were entirely prose.
 
+**The issue carries its own sizing.** Every issue carries one line near the top, set when it is filed or triaged:
+
+```
+Dispatch: band=<Trivial|Routine|Standard|Heavy|Critical> (R# V# S# P# I# = total) | implementer=<tier>/<effort> | reviewers=<n>×<tier>[ + consolidator] | ultracode=<yes|no>
+```
+
+The five scores are the axes in the table below, in that order — Reversibility, Verifiability, Settledness, Prose, Interaction. `effort` is the reasoning effort of the implementer dispatch: `low | medium | high`. Where the lens fleet is deliberately mixed, write `mixed` as the reviewers' tier and leave the partition to the reviewer, which owns it. `[ + consolidator]` in `reviewers=` names an Opus consolidating verdict, present today at Heavy.
+
+Read the header and dispatch what it says. **Re-score from scratch only when the issue changed materially since the header was set** — re-deriving at every dispatch is how the same issue gets two different bands from two dispatchers on two days, and the score is the one part of triage nobody can reconstruct later from the artefacts. Where there is no header, score the task, dispatch, and write one.
+
+The header is the **opening guess**, not a contract. Escalation below still raises the band mid-task, without asking.
+
 | axis | 0 | 1 | 2 | 3 |
 |---|---|---|---|---|
 | **Reversibility** | unlanded branch | source comment or KDoc — editable after landing | published schema, or a commit body landing on protected `main` (immutable: linear history, no rewrites) | `DATABASE_VERSION`, a released artefact, the lifter's stored history |
@@ -31,13 +43,25 @@ The axes are chosen because they are what actually predicted cost here. **Lines 
 | **Prose surface** | none | a comment or two | KDoc plus a commit body | a published contract description or schema changelog entry |
 | **Interaction** | isolated file | shared file, no shared seam | shared seam with in-flight work | schema-version collision, or an ordering that measurement forces |
 
-| band | score | dispatch |
-|---|---|---|
-| **Trivial** | 0–3 | **no agent.** Do it inline. Dispatching here costs more than the work. |
-| **Routine** | 4–6 | one Sonnet implementer, no gate |
-| **Standard** | 7–9 | one Opus implementer + one Opus reviewer |
-| **Heavy** | 10–12 | Opus implementer + 3-lens gate + Opus consolidating verdict |
-| **Critical** | 13–15 | Opus implementer + 4–5 lens gate, and **re-gate after every fix round** |
+| band | score | dispatch | proposal review (loop step 3) |
+|---|---|---|---|
+| **Trivial** | 0–3 | **no agent.** Do it inline. Dispatching here costs more than the work. | skipped |
+| **Routine** | 4–6 | one Sonnet implementer, no gate — **unless Prose ≥ 2 or Reversibility ≥ 2, which strikes the "no gate" clause: minimum one sonnet lens** | skipped |
+| **Standard** | 7–9 | one Opus implementer + one Opus reviewer | one sonnet |
+| **Heavy** | 10–12 | Opus implementer + 3-lens gate + Opus consolidating verdict | Opus reviewer |
+| **Critical** | 13–15 | Opus implementer + 4–5 lens gate, and **re-gate after every fix round** | Opus reviewer |
+
+**The Routine-prose guardrail is paid for.** The typed-parent-SHA defect shipped false on `main` twice, and a third instance diverged after 13 characters and was caught before landing. The record is in `.claude/skills/fix-round/SKILL.md`, "Numbers and history"; read it there rather than from a paraphrase here. A sonnet lens on a Routine prose change is one cheap read against a claim that is immutable once it lands.
+
+**Proposal review is band-governed** because it was not, and an unbanded step pulls a full Opus verdict onto a design that names its own sites. This trims the safety net that *Who proposes* leans on — that a weak Sonnet proposal costs a gate round rather than a defect — at Trivial and Routine only, where the work is cheap to redo. From Standard up it stands unchanged.
+
+**The tier ladder.** `haiku → sonnet → opus`, with `ultracode` layered on top as a mode flag rather than a fourth rung — see below. The header's `implementer=` field names a rung on it; `reviewers=` names a rung too, or `mixed` for a deliberately partitioned fleet, with the partition left to the reviewer.
+
+- **haiku** — closed-checklist mechanical verification only: a fixed list of commands with the expected shape of each output, returning the raw output plus pass/fail. Never a verdict, never a judgement call, never an implementer. A tier that summarises is a tier that can relay a false claim onward as fact, which is how this repo's worst environmental errors travelled.
+- **sonnet → opus** — where nearly every real dispatch lands. The band table above names the default tier for the band; `Choosing the tier` below adjusts within it.
+- **ultracode** — a mode flag, not a rung: `ultracode=yes` does not change what `implementer=` reads. It adds exhaustive multi-agent workflow treatment — parallel lens fleets and adversarial verification — on top of the row's own dispatch. Critical band, or the owner names it; every other header reads `ultracode=no`.
+
+**Fable is not on the ladder.** It is the stall-breaker, reached by escalation and never by triage, and its entry condition is unchanged — *The Fable tier* below is the statement of it. A header never reads `implementer=fable`: that routing is a decision made mid-loop off a stall count, not a guess available at filing time. Neither haiku nor ultracode has a file in `.claude/agents/` — the directory holds seven files, six Sonnet/Opus/Fable role-definition pairs plus this orchestrator — so a dispatch at either rung is briefed inline by naming the tier.
 
 **Escalation — any one of these bumps the band mid-task, without asking.** This half is load-bearing; the opening score is only a starting guess, and a task is often harder than it looked.
 
@@ -47,6 +71,8 @@ The axes are chosen because they are what actually predicted cost here. **Lines 
 - The implementer **hands back**.
 - **Measured behaviour contradicts the issue's stated diagnosis** → re-triage at +1 band rather than implementing the filed fix.
 - **A test that should have gone red did not** → +1 band. The check is blind and the coverage is imaginary.
+
+**A raise is recorded as a comment on the issue** — which trigger fired, the new band, the dispatch it buys — before the raised round goes out. The comment, not the header, is the durable half: an issue body can be edited or relabelled afterwards with nothing to show for it, while a comment is timestamped and ordered, so the header's history stays auditable against what actually happened.
 
 **De-escalate only** after two consecutive gates with zero blocking findings on one branch, and **never below Standard while Reversibility scores 2 or more.**
 
@@ -58,7 +84,7 @@ The axes are chosen because they are what actually predicted cost here. **Lines 
 | #125, post-`Done` reps (export schema bump, edges open) | 2 | 1 | 2 | 3 | 2 | **10** | Heavy |
 | #139, the `failed` flag's false attribution | 2 | 2 | 0 | 3 | 1 | **8** | Standard |
 
-The third row is the one to learn from: it was dispatched as **Routine — one Sonnet, no gate — and that was wrong.** It edits a *published contract description* that no test pins (`SchemaContractTest` asserts non-blankness, never content), so nothing in CI could catch a regression. Prose surface alone carried it to Standard. **A pure-prose change is not automatically cheap; it is expensive exactly when the prose is a contract.**
+The third row is the one to learn from: it was dispatched as **Routine — one Sonnet, no gate — and that was wrong.** It edits a *published contract description* that no test pins (`SchemaContractTest` asserts non-blankness, never content), so nothing in CI could catch a regression. Prose surface alone carried it to Standard. **A pure-prose change is not automatically cheap; it is expensive exactly when the prose is a contract.** Scored retrospectively, its header reads `Dispatch: band=Standard (R2 V2 S0 P3 I1 = 8) | implementer=opus/medium | reviewers=1×opus | ultracode=no` — and note that even had it stayed mis-banded as Routine, the guardrail above fires on both of its axes, P3 and R2, and it would still have been gated.
 
 ### The resource governor — orthogonal to the score
 
@@ -85,7 +111,7 @@ Proposals are where diagnosis happens, so this is the routing decision that matt
 
 **Keep the proposal on Opus** when you have any reason to doubt the filed diagnosis; when the fix will require choosing between representations, or touches a schema, a stored column or migration; when the defect lives in an `:app` state machine; when it is coupled to another open issue and the pairing has to be argued; or when the consequence is unrecoverable — a wrong captured value or a destroyed set — and being wrong about the approach is expensive.
 
-Two things make the cheap direction safe. A proposal produces **no code**, and it faces the **full reviewer gate** before anything is written — so a weak Sonnet proposal costs a gate round, not a defect. And a Sonnet agent that finds the filed diagnosis wrong is instructed to **report that finding in full and hand back only the decision about what to do instead**, which is the expensive half. Take that handback seriously: it is the signal you were on the wrong side of this call, and the finding it brings is usually the most valuable thing in the round.
+Two things make the cheap direction safe. A proposal produces **no code**, and it faces the **full reviewer gate from Standard up** (see the band table above) — so a weak Sonnet proposal costs a gate round, not a defect. And a Sonnet agent that finds the filed diagnosis wrong is instructed to **report that finding in full and hand back only the decision about what to do instead**, which is the expensive half. Take that handback seriously: it is the signal you were on the wrong side of this call, and the finding it brings is usually the most valuable thing in the round.
 
 **A mixed lens dispatch is usually right.** Fact-check, scope and build on Sonnet; adversarial completeness, near-neighbour and design on Opus; consolidation on Opus.
 
