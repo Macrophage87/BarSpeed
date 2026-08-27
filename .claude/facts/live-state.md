@@ -687,15 +687,18 @@ line numbers it does keep to the SHA at the top.
 ## 16. Command hygiene — gh field selection and search exclusions
 
 Shape output at the command, not by summarising a wall of it afterward. Two more pins beyond the
-gradle rule in §4 and the CI poll in §3, both re-verified live against `f2fde86…` and #166.
+gradle rule in §4 and the CI poll in §3, from #166.
 
 **`gh`, field-selected always.** Select fields explicitly rather than reading the plain-text
 default:
 
 ```
-gh issue list --repo Macrophage87/BarSpeed --state all --limit 60 --json number,title,state
+gh issue list --repo Macrophage87/BarSpeed --state all --limit 300 --json number,title,state
 gh issue view N --repo Macrophage87/BarSpeed --json title,body
 ```
+
+If the returned count equals the limit, the list is truncated — raise the limit; 148 issues
+exist as of this commit's SHA.
 
 Verified live at `gh version 2.96.0`: the first returns a JSON array of `{number,state,title}`
 objects, most recent first (`167`, `166`, `165`, …). **A retraction, caught by running the
