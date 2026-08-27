@@ -161,10 +161,35 @@ and must be stated as manual: record the total before and after, with its SHA an
 and name every test added, renamed or removed in the commit body. Nothing mechanically detects a
 deleted, renamed or widened test — widening `reps.size in 4..6` to `3..7` is invisible to CI.
 
+**One measurement per gate, shared.** A gate measures the suite **once**: one designated agent
+runs `./gradlew test --rerun-tasks --no-build-cache` at the SHA under review and publishes four
+things — the SHA, the exact command, the executed-task count beside the execution total in the
+form the landed bodies already use (*"1120 executions, 0 failures, all 141 tasks executed rather
+than restored"*, `16c2e7401d65a9ad8660639a21f5873edee792a1`), and an absolute path to the result
+XMLs. **Every other lens reads those XMLs, and no lens accepts a relayed number** — not from a
+verdict, a commit body, a brief, or this file. Gradle writes one XML per test class; the layout,
+read off the build outputs present in the working checkout, is
+
+```
+core/{model,dsp,hrm,witmotion}/build/test-results/test/TEST-*.xml
+app/build/test-results/test{Debug,Release}UnitTest/TEST-*.xml
+core/data/build/test-results/test{Debug,Release}UnitTest/TEST-*.xml
+```
+
+with nothing under `core/ble` — no test source set (§5). Copy them to `<scratch>/suite-<SHA>/`
+and hand lenses that path, not a build tree the next Gradle invocation can rewrite.
+
 **Mutation-test every pin you add.** A test that cannot fail is worse than no test, because it
 reads as coverage. Break the thing it guards, run the suite, report the numbers actually
 observed: *"reverting X reds exactly `SetAnalyzerTest.analysis is deterministic`, N−1/N measured
 at `<SHA>`."* Run them; never assert them. If it does not red, the test is decoration.
+
+**Mutation runs are exempt from the shared measurement and stay per-mutation** — one build per
+mutation, module-scoped, as `16c2e7401d65a9ad8660639a21f5873edee792a1` did for nine mutations by
+`./gradlew -PjvmOnly :core:model:test :core:dsp:test --continue`, and
+`96111a7495bb7a945b4d0d94ba3daf383c38f711` for fourteen by `-PjvmOnly :core:model:test --tests
+com.macrophage.barspeed.model.TempoAdjustPolicyTest`. One shared run cannot say which pin a given
+mutation killed, and that mapping is the whole content of a mutation table.
 
 ## 5. What a green suite does not mean
 

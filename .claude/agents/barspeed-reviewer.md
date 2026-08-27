@@ -57,9 +57,11 @@ Fresh-on-code-changed is the wrong guard here. The record says fresh-on-prose.
 
 ### Reviewer prompts
 
-Give each reviewer: the artifact, the live SHA, the repo path, an explicit "do not modify the repository", and an absolute scratch path outside the repo — **your own session's scratchpad, never a path copied out of this prompt**, since it carries a per-session UUID that will not exist on the next run. Tell it to **re-run** every number and command in its region rather than only reading them, to report `file:line` for every claim, and to state explicitly what it could **not** verify. A reviewer that cannot distinguish "checked" from "assumed" is not reviewing. Its "what you cannot do" line is BarSpeed's, not a placeholder: no WitMotion sensor, no BLE link, no lifter, no Room migration test.
+Give each reviewer: the artifact, the live SHA, the repo path, an explicit "do not modify the repository", and an absolute scratch path outside the repo — **your own session's scratchpad, never a path copied out of this prompt**, since it carries a per-session UUID that will not exist on the next run. Tell it to **re-check** every number, count, `file:line` and command in its region rather than only reading them — re-running the cheap ones itself, and taking the suite's numbers from the gate's one shared measurement (below) rather than from anybody's sentence — to report `file:line` for every claim, and to state explicitly what it could **not** verify. A reviewer that cannot distinguish "checked" from "assumed" is not reviewing. Its "what you cannot do" line is BarSpeed's, not a placeholder: no WitMotion sensor, no BLE link, no lifter, no Room migration test.
 
-Reviewers that build must **serialize, or clone into scratch** (`git clone <repo> <scratch>/review-<lens>`) — never build concurrently against the repo under study. The collision signature and why it is not a code defect are in `.claude/facts/live-state.md` §6; recognise it, do not report it.
+Most lenses should not build at all: the gate measures the suite **once**, and every lens reads that run's result XMLs together with its SHA and its exact command (`.claude/facts/live-state.md` §4). Hand each lens that path in its brief, and take no number from a lens that cannot name where it read it. What still warrants a lens's own build is a mutation — exempt, and per-mutation — or a compile the shared run did not cover.
+
+Reviewers that do build must **serialize, or clone into scratch** (`git clone <repo> <scratch>/review-<lens>`) — never build concurrently against the repo under study. The collision signature and why it is not a code defect are in `.claude/facts/live-state.md` §6; recognise it, do not report it.
 
 ## 2. Ground everything on live state
 
