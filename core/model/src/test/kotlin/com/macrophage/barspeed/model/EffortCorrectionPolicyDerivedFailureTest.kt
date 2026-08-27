@@ -62,6 +62,19 @@ class EffortCorrectionPolicyDerivedFailureTest {
     }
 
     @Test
+    fun `a rating standing beside an old failure tap is the later statement`() {
+        // Tapping the failed tile stores rpe null, so a set carrying both has
+        // been re-rated since the tap. Unreachable through today's screen --
+        // SetRatingTracker.rate overwrites its tapped flag, so the two never
+        // coexist in RecordState -- but the rule is total, and which of the two
+        // wins is a decision, not an accident. It is pinned here because
+        // nothing else in the suite distinguishes the ordering.
+        val s = EffortCorrectionPolicy.selection(rpe = 9, warmup = false, tappedFailed = true, derivedFailed = false)
+        assertEquals(9, s.rpe)
+        assertFalse(s.failed)
+    }
+
+    @Test
     fun `no two tiles are ever pre-lit at once`() {
         // The invariant the inline precedence chain existed to hold, now over
         // the whole input space rather than the three cases it was written for:
