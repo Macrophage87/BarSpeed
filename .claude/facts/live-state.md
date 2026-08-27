@@ -175,6 +175,9 @@ at `<SHA>`."* Run them; never assert them. If it does not red, the test is decor
   Kotlin source files is test-gated, so a green `./gradlew test` **compiled** `:app` and
   asserted almost nothing about it. Compiled is not tested.
 - **There is no `androidTest` directory anywhere in the tree.**
+- **`./gradlew test` compiles both `:app:compileDebugKotlin` and `:app:compileReleaseKotlin`**, and
+  the release variant additionally runs `isMinifyEnabled = true` with `proguard-rules.pro`
+  (`app/build.gradle.kts:41-42`) — so a change that compiles debug can still fail release.
 - **`:core:data` has a real test source set** — 17 files under
   `core/data/src/test/kotlin/com/macrophage/barspeed/data/`, run twice per push
   (`testDebugUnitTest` and `testReleaseUnitTest`). But its `SessionRepository*` classes take a
@@ -263,13 +266,6 @@ Android modules local lint historically never reached.
   surfaced as 255 — a wrong number, though still non-zero. `-Last N` reports 1 correctly. Use Git
   Bash when an exit code must be trustworthy.
 
-**Gradle invocations are the scarce resource, not agents.** Read-only review lenses cost almost
-nothing; anything that builds costs ~1.5 GB and a daemon. A session here died with an
-out-of-memory JVM crash while every individual task was correctly sized — `gradle.properties`
-defaults to `-Xmx3g` with `org.gradle.parallel=true`, and three concurrent builders at that
-setting is 9 GB. Below ~4 GB available: one builder, briefed to use
-`-Xmx1600m --no-parallel --no-daemon`.
-
 > When running the emulator, installing an APK or verifying a migration on a device →
 > Read `.claude/skills/bench-test/SKILL.md`. It carries the AVD name, the RAM-poor launch flags,
 > the `ANDROID_SERIAL` pin and the two-way migration test.
@@ -289,9 +285,10 @@ the workflow's own comment, *"environments whose git proxy blocks tag pushes can
 release directly; the tag is then created by the release action itself."*
 
 The tag is created by the action at publish time, and at least once it did not land on the SHA
-that was built: `git rev-list -n1 v0.1.5` resolves to `56448cb9613fe81fab346bd128c4571c157149ab`,
-whose `versionName` is **0.1.6**. That is 1 of 44 `v*` tags (`git tag -l 'v*' | wc -l`); the
-mechanism is unconfirmed. `release.yml` has **no concurrency group**, so do not push to `main`
+that was built: `v0.1.5` **and** `v0.1.6` both resolve to
+`56448cb9613fe81fab346bd128c4571c157149ab` (`git rev-list -n1`), whose `versionName` is **0.1.6**
+— so v0.1.5 names a commit that was never built as 0.1.5. That is one collision among 44 `v*`
+tags (`git tag -l 'v*' | wc -l`); the mechanism is unconfirmed and later tags landed correctly. `release.yml` has **no concurrency group**, so do not push to `main`
 while a release run is in flight, and after every release verify `git rev-list -n1 vX.Y.Z` is the
 SHA you intended.
 
