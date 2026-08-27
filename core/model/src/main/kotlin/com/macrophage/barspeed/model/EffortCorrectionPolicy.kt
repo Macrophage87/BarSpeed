@@ -37,6 +37,14 @@ data class EffortSelection(
  * from the rep or second count. `SetRatingTracker` deliberately keeps them
  * apart and ORs them on the way to the database, so that correcting a
  * miscounted rep total re-derives one without erasing the other.
+ *
+ * A lit tile is a quotation. It says "this is what you told the app", which is
+ * why only a fact the lifter supplied may light one, and why a shortfall the
+ * app worked out for itself gets a sentence instead. Correcting the effort
+ * cannot un-fail a set that ended short -- `SetRatingTracker.rate` ORs the
+ * derived flag back in on every correction -- so the grid has to say that in
+ * words rather than by pre-lighting a verdict as though it were an answer
+ * already given.
  */
 object EffortCorrectionPolicy {
     /**
@@ -45,13 +53,16 @@ object EffortCorrectionPolicy {
      * @param tappedFailed the lifter tapped a failure tile in their own words.
      * @param derivedFailed the set was recorded short of its target.
      */
-    fun selection(rpe: Int?, warmup: Boolean, tappedFailed: Boolean, derivedFailed: Boolean): EffortSelection {
-        val anyFailed = tappedFailed || derivedFailed
-        return EffortSelection(
+    fun selection(rpe: Int?, warmup: Boolean, tappedFailed: Boolean, derivedFailed: Boolean): EffortSelection =
+        EffortSelection(
             warmup = warmup,
-            failed = !warmup && anyFailed,
-            rpe = if (!warmup && !anyFailed) rpe else null,
+            // Only the lifter's own word lights this tile, and only where no
+            // rating stands beside it: tapping the failed tile stores rpe null,
+            // so a set carrying both has been re-rated since and the rating is
+            // the later statement. derivedFailed is absent from this line on
+            // purpose -- that is the whole of issue #140.
+            failed = !warmup && tappedFailed && rpe == null,
+            rpe = if (!warmup && !(tappedFailed && rpe == null)) rpe else null,
             derivedShortfall = derivedFailed && !tappedFailed,
         )
-    }
 }

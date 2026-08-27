@@ -1824,6 +1824,18 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
             derivedFailed = state.lastSetFailed && !state.lastSetTappedFailed,
         )
     SectionCaption("Change the effort logged for that set")
+    if (selection.derivedShortfall) {
+        // Without this the grid can pre-light nothing at all, which reads as
+        // the app having lost the rating. It is true of the code beneath it:
+        // SetRatingTracker.rate ORs the derived flag back in on every
+        // correction, so no tap here can clear the shortfall.
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "This set is already recorded as short of target. Rating it does not change that.",
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+    }
     Spacer(Modifier.height(6.dp))
     options.chunked(2).forEach { row ->
         Row(
@@ -1857,14 +1869,14 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
  * "short of target" appended if the set also fell short by rep count or
  * duration -- both are real, distinct facts and neither replaces the other.
  *
- * When neither was tapped, this state cannot say why: [RecordState.lastSetRpe]
- * is null and [RecordState.lastSetWarmup] is false whether the lifter tapped
- * the grid's own "Failed the set" tile (rpe null, warmup false) or was offered
- * the grid and declined it -- [EndSetEarlyButton] is the skip beside the grid
- * on a set that came up short, and ends it with no rating, landing on exactly
- * the same state. Naming a tap that may not have happened is the defect issue
- * #139 found, so this shows only the one fact every such case shares: the set
- * is marked failed.
+ * When neither was tapped, [RecordState.lastSetRpe] is null and
+ * [RecordState.lastSetWarmup] is false whether the lifter tapped the grid's
+ * own "Failed the set" tile or was offered the grid and declined it --
+ * [EndSetEarlyButton] is the skip beside the grid on a set that came up
+ * short, and ends it with no rating, landing on exactly the same two flags.
+ * [RecordState.lastSetTappedFailed] now tells a tapped failure from a
+ * derived one. This line still prints the shared word "Failed" for both,
+ * by #139's deliberate choice, not because the state is incapable.
  *
  * Issue #137 makes the declined case the common one and the tapped-tile case
  * rarer, because the failed tile is no longer drawn on a short set at all. This
