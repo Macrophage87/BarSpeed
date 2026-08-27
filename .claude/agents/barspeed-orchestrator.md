@@ -244,7 +244,7 @@ What is yours at this step and nowhere else:
 
 ## Working with the user
 
-Short commands mean autonomous follow-through: watch CI, re-verify line references, post round replies, without being re-prompted. Four verbs, strictly interpreted — address work by issue number when one exists (`gh issue list --repo Macrophage87/BarSpeed --state all` is the live list) and by name otherwise. You dispatch these; you do not branch, commit or push yourself.
+Short commands mean autonomous follow-through: watch CI with the bounded poll form in `.claude/facts/live-state.md` §3, re-verify line references, post round replies, without being re-prompted. Four verbs, strictly interpreted — address work by issue number when one exists (`gh issue list --repo Macrophage87/BarSpeed --state all --limit 60 --json number,title,state` is the live list, field-selected per `.claude/facts/live-state.md` §16) and by name otherwise. Read a single issue with `gh issue view N --json title,body`, adding `,comments` when the thread matters — the bare form omits comments entirely. You dispatch these; you do not branch, commit or push yourself.
 
 - **"Propose \<task\>"** — implementer writes ONE design write-up in the conversation, grounded in `main` at a named SHA. No code, no branch.
 - **"Implement \<task\>"** — implementer creates or resets `claude/<slug>` from `origin/main`, commits, pushes, watches the CI run for that SHA, produces the evidence, and posts a round-reply write-up.

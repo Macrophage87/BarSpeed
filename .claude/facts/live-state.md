@@ -117,6 +117,24 @@ case. Say which case you are in and report exactly what the API returned, `event
 Where two runs genuinely are the same workflow twice, phrase it honestly: *"two runs of the same
 workflow on the same runner pool for one SHA: a flake check, not independent evidence."*
 
+**Waiting for a run to finish is one bounded poll, never a sequence of model turns each spent
+re-reading one status field.** The shape:
+
+```
+until [ "$(gh run list --repo Macrophage87/BarSpeed --commit <FULL-40-CHAR-SHA> --workflow ci.yml \
+  --json status --jq '[.[].status] | map(select(. == "in_progress" or . == "queued")) | length')" \
+  = "0" ]; do sleep 20; done
+```
+
+Verified against `f2fde863b24b2dbcce8dd7820eb71e97e83d3977`: both rows for that SHA (`main`'s
+push and the branch that landed it) are `completed`, so the `jq` filter counts zero in-progress or
+queued rows and the loop exits on its first check rather than looping — the same command that
+blocks on a live run also returns immediately on a finished one, which is what makes it safe to
+call before you know which case you are in. One call, one number, one branch — never a bare
+`gh run list` re-read on each turn to see whether the enum changed. The emulator boot wait in
+`.claude/skills/bench-test/SKILL.md` is the same shape with a different predicate: `adb
+wait-for-device`, then poll `adb shell getprop sys.boot_completed` until it prints `1`.
+
 **Step order.** CI steps run sequentially with no `continue-on-error`, and **ktlint + detekt runs
 first**, unrestricted across all seven modules, before any test. The first failure hides
 everything downstream: a red run reporting only a formatting error tells you nothing about
@@ -160,6 +178,29 @@ The history of this entry, kept because it names two distinct ways to be wrong:
 and must be stated as manual: record the total before and after, with its SHA and its command,
 and name every test added, renamed or removed in the commit body. Nothing mechanically detects a
 deleted, renamed or widened test — widening `reps.size in 4..6` to `3..7` is invisible to CI.
+
+**Never `-q` alone for the executed-task count, and pin the console mode.** `-q` suppresses the
+`> Task :module:task` execution lines, which are the only place "executed" and "restored from
+cache" are distinguishable — a `-q` run cannot fail an executed-count check because nothing is
+left to check against. Three things travel together:
+
+- `--console=plain` — Gradle's default rich console redraws lines in place, which is not a stable
+  string to grep, diff or quote; plain mode is one line per event.
+- the executed-task count read from the non-`-q` task lines (count `> Task :…` lines and subtract
+  any suffixed `UP-TO-DATE`, `FROM-CACHE` or `NO-SOURCE`), reported in the form already landed —
+  *"1120 executions, 0 failures, all 141 tasks executed rather than restored"*
+  (`16c2e7401d65a9ad8660639a21f5873edee792a1`).
+- the tests/failures/errors/skipped tuple parsed from the JUnit XML under
+  `*/build/test-results/**/TEST-*.xml`, never eyeballed off the console tail. Gradle's fixed
+  format is a `<testsuite>` root carrying all four counts as attributes — confirmed by reading a
+  leftover `app/build/test-results/testDebugUnitTest/TEST-com.macrophage.barspeed.record.
+  PlanQueueTest.xml` in the primary checkout (`<testsuite name="…PlanQueueTest" tests="5"
+  skipped="0" failures="0" errors="0" …>`); the file is from a stale build dated 2026-08-22, so
+  its counts are not evidence for any particular SHA, but the emitted schema is Gradle's own
+  JUnit-XML writer and does not vary with the SHA that produced it.
+
+Tail the console log only on failure — a green multi-module log is thousands of tokens carrying
+zero findings once the XML tuple and the task count both check out.
 
 **One measurement per gate, shared.** A gate measures the suite **once**: one designated agent
 runs `./gradlew test --rerun-tasks --no-build-cache` at the SHA under review and publishes four
@@ -638,3 +679,55 @@ canonical copy.
 earlier", ":84 here" have each been false at the SHA asserting them. **Name the thing; never count
 to it.** That is why this file names symbols and files in preference to line numbers, and pins the
 line numbers it does keep to the SHA at the top.
+
+## 16. Command hygiene — gh field selection and search exclusions
+
+Shape output at the command, not by summarising a wall of it afterward. Two more pins beyond the
+gradle rule in §4 and the CI poll in §3, both re-verified live against `f2fde86…` and #166.
+
+**`gh`, field-selected always.** Select fields explicitly rather than reading the plain-text
+default:
+
+```
+gh issue list --repo Macrophage87/BarSpeed --state all --limit 60 --json number,title,state
+gh issue view N --repo Macrophage87/BarSpeed --json title,body
+```
+
+Verified live at `gh version 2.96.0`: the first returns a JSON array of `{number,state,title}`
+objects, most recent first (`167`, `166`, `165`, …). **A retraction, caught by running the
+alternative before writing it down rather than trusting #166's own wording**: the issue's body
+says the bare `gh issue view N` form "prints the entire comment thread" — false, checked live on
+#165 (one comment). Bare `gh issue view` prints a metadata table (mostly empty fields — labels,
+assignees, projects, sub-issues, …) plus the body; its `comments:` line is a bare count, and the
+thread itself is withheld unless `-c`/`--comments` is passed, which then prints comments ONLY,
+not the body. So neither the bare form nor `--comments` gives you title+body+comments in one
+call — `--json title,body,comments`, stated explicitly, is the only form that does, and it is
+also the only form immune to the metadata table's wasted lines. The protection check already has
+its field-selected form in §1 (`gh api …/protection --jq '{enforce_admins:…, linear:…,
+contexts:…}'`); this entry does not repeat it, only cross-references it, per §15's "duplicate
+documentation drifts" rule.
+
+**Search exclusions: count first, read only where there are hits.** `!**/build/**`, `!.gradle/**`
+and `!**/.git/**` — generated Kotlin, R classes and Room's schema-export JSON under a module's
+`build/` are indistinguishable from source to a site-counting grep, and inflate a hit count with
+nothing a diff needs to touch. Two forms, re-run live against this checkout for the token
+`DatabaseRescue` (chosen because it does not appear in this file, so documenting the count here
+cannot inflate the count it documents — an earlier draft of this entry used a token that appeared
+in this very paragraph and went stale the moment the paragraph was written):
+
+```
+rg -c "PATTERN" --hidden --glob '!**/build/**' --glob '!.gradle/**' --glob '!**/.git/**'
+```
+
+**`--hidden` is not optional and is the sharper finding here.** Plain `rg` skips dot-directories
+by default, and `.claude/` — the exact tree these command pins live in — is one. Confirmed live:
+`rg -c "DatabaseRescue" --glob '!**/build/**' …` (no `--hidden`) finds 9 files and silently omits
+`.claude/skills/bench-test/SKILL.md`'s one match; adding `--hidden` finds all 10 files, 64
+occurrences total, matching the `Grep` tool's count exactly. The `Grep` tool searches hidden
+directories by default with no flag to opt out, so a raw `rg` count run without `--hidden` reads
+as agreement with the `Grep` tool while actually excluding every `.claude/**`, `.github/**` and
+dotfile site — invisible unless the two forms are cross-checked, which is exactly what this entry
+did. The `Grep` tool takes one `glob` string, not repeated flags, so the equivalent exclusion
+there is a single brace group: `glob: "!{**/build/**,.gradle/**,**/.git/**}"`,
+`output_mode: "count"`. Two-step protocol: run the count form first; only re-run in `content`
+mode, and only for the files the count form flagged, when a hit needs reading.

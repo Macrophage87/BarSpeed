@@ -37,6 +37,33 @@ everything below: `adb devices` must show exactly one device and it must be the 
 `export ANDROID_SERIAL=emulator-5554` (or pass `-s emulator-5554` on every command) so no
 invocation can reach a phone on USB.
 
+## Capture/attach split
+
+Screencap at **every** step — `adb exec-out screencap -p > stepN-desc.png` is cheap and local,
+so there is no reason to skip one. Attaching a PNG into the model's own context is not cheap, so
+attach only at decision points: a state you are about to act on, or one you are about to report
+as a finding. Four full-screen attachments are non-negotiable, every run, whether or not the
+screen "looks unchanged" from the previous step — because two of the three FAIL states of the
+migration two-way test below look exactly like a normal screen, and "it looked fine" is not
+evidence against the one you skipped attaching:
+
+1. **Old-version rows recorded** (step 1 of the two-way test) — the baseline the whole test is
+   checked against; without it attached, "old sessions listed" in step 2 has nothing to compare
+   to.
+2. **Post-upgrade history listing** (step 2) — the FAIL states here are "crash" (obviously
+   different) and "old sessions visible as if nothing happened", which by construction renders
+   identically to PASS unless the row-for-row content is actually attached and read, not glanced
+   at.
+3. **Post-downgrade rescue card** (step 4) — the FAIL state "old sessions visible as if nothing
+   happened" recurs here for the same reason: a rescue that silently no-ops looks like a normal
+   history screen.
+4. **The opened discard dialog, before it is cancelled** (step 4) — the only evidence the dialog
+   existed and named what it would discard, since the action itself must never be confirmed.
+
+Layout checks (`font_scale`, `wm size`) also stay full-screen, never cropped — clipping is a
+whole-screen property; a crop that avoids the clipped edge is the one framing that cannot show
+the defect being checked for.
+
 ## Techniques, each proven
 
 - **Navigate by screenshot, never by blind taps**: `adb exec-out screencap -p > step.png`,
@@ -55,8 +82,24 @@ invocation can reach a phone on USB.
   rather than migrating it — most likely `DatabaseRescue` moved the old file aside, or this was
   not an upgrade at all. Either way it is a finding; note that no destructive fallback is in the
   chain, so a missing migration throws rather than silently recreating.
-- **Logcat around the moment**: `adb logcat -c` before, `adb logcat -d` after, grep
-  `Migration|SQLiteException|Fatal`. Save the full dump beside the screenshots.
+- **Logcat around the moment, bounded — never bare `logcat -d`**: `adb logcat -c` before, then
+  `adb logcat -d -t 300` with either a filterspec (`adb logcat -d -t 300 ActivityManager:I *:S`)
+  or `--pid` (`adb logcat -d -t 300 --pid="$(adb shell pidof <process>)"`) scoping the buffer
+  before it reaches you, piped to `grep -E "Migration|SQLiteException|Fatal"` for the moment
+  under test. Bare `adb logcat -d` on a freshly booted emulator returns the whole buffer —
+  measured at 17,459 lines against 327 for the same buffer read with `-t 300` — almost none of it
+  from the app under test; `-c` clears the buffer at the moment it runs, but every system process
+  keeps writing to it in the seconds between that clear and the `-d` read, so the buffer is noisy
+  again by the time you capture it. Save the bounded dump beside the screenshots, not the
+  unbounded one.
+- **Version/install text twin**: `adb shell dumpsys package <pkg>` is thousands of lines; grep it
+  to the four lines that answer "which build is this and when did it land" —
+  `grep -E "versionCode|versionName|firstInstallTime|lastUpdateTime"`. Verified live against
+  `com.android.settings` on `barspeed-api35`: `versionCode=35 minSdk=35 targetSdk=35` on one
+  line, `versionName=15` on the next, then `lastUpdateTime` and `firstInstallTime` as timestamps
+  — four lines, not the dump. Never re-paste a log region already quoted earlier this session;
+  cite the earlier quote by its step name instead — the buffer has not changed since you read it,
+  and a second paste doubles the tokens for zero new information.
 - **First-run prompts**: deny BLE/notifications — no sensor is needed; ad-hoc sets with manual
   `+1 REP` and typed tempos write real database rows. The voice guide's cue scheduling is
   reachable without a sensor, but `-no-audio` plus a possibly-absent TTS engine means
@@ -96,6 +139,6 @@ other work and are not yours to stop.
 
 ## Evidence
 
-Screenshots and logcat dumps go to the session scratchpad, listed by filename in the report, and
-the decisive ones are sent to the owner. A bench claim without its screenshot is a report, not
-evidence.
+Screenshots and logcat dumps go to the session scratchpad, listed by filename in the report; the
+four mandatory attachments plus any other decision-point capture go to the owner. A bench claim
+without its screenshot is a report, not evidence.
