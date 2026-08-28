@@ -157,7 +157,7 @@ class PlanDecodeCharacterizationTest {
         // The keys an unknown-key check would have to know about, taken from the
         // serializers rather than retyped, so a @SerialName rename moves them.
         assertEquals(
-            setOf("schemaVersion", "planName", "notes", "sessions"),
+            setOf("schemaVersion", "planName", "notes", "bodyweight_kg", "bodyweight_lb", "sessions"),
             PlanFile.serializer().descriptor.elementNames.toSet(),
         )
         assertEquals(

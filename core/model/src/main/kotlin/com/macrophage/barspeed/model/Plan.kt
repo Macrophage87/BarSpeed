@@ -9,6 +9,26 @@ data class PlanFile(
     val schemaVersion: String,
     val planName: String,
     val notes: String? = null,
+    /**
+     * The lifter's body weight in kilograms, as it stood when the plan was
+     * written, issue #161. Declared on the PLAN and not on a session: a plan is
+     * authored in one sitting at one body weight, and the app stores exactly
+     * one figure, so a per-session key would raise a question about which one
+     * wins that has no honest answer.
+     *
+     * Nullable, and null is not a lesser value than absent -- they are the same
+     * statement, which is why this is a nullable field rather than a
+     * default-carrying one: the decoder cannot tell them apart, so nothing
+     * downstream can start treating them differently. Both mean "not known",
+     * and neither writes anything.
+     *
+     * Applied by [PlanBodyWeightPolicy], which is where the acceptance rule and
+     * the conversion live. What it is applied TO is a DataStore preference in
+     * `:app`, not a database column, so nothing here touches Room.
+     */
+    @SerialName("bodyweight_kg") val bodyweightKg: Double? = null,
+    /** The same figure in pounds; converted to kilograms by [PlanBodyWeightPolicy]. */
+    @SerialName("bodyweight_lb") val bodyweightLb: Double? = null,
     val sessions: List<PlanSessionDef>,
 ) {
     fun validate(): List<String> {
@@ -18,6 +38,19 @@ data class PlanFile(
                 "(expected one of ${SUPPORTED_SCHEMA_VERSIONS.joinToString()})"
         }
         if (planName.isBlank()) errors += "planName must not be blank"
+        // Refused rather than resolved, both of them, for the reason the load
+        // pair is refused: whichever way a contradiction were silently settled,
+        // the figure it settled on would become the base load of every
+        // bodyweight set until someone noticed, and no recording afterwards
+        // says what the lifter actually weighed. A zero is the same mistake
+        // wearing absence's clothes -- the plan HAS a way to say "not known",
+        // and it is the key not being there.
+        if (bodyweightKg != null && bodyweightLb != null) {
+            errors += "bodyweight_kg and bodyweight_lb must not both be declared - " +
+                "give the weight once, in one unit"
+        }
+        bodyweightKg?.let { if (it <= 0) errors += nonPositiveBodyweight("bodyweight_kg") }
+        bodyweightLb?.let { if (it <= 0) errors += nonPositiveBodyweight("bodyweight_lb") }
         if (sessions.isEmpty()) errors += "Plan must contain at least one session"
         sessions.forEachIndexed { si, session ->
             if (session.name.isBlank()) errors += "sessions[$si].name must not be blank"
@@ -378,6 +411,14 @@ data class PlanFile(
  * [PlanFile.warnings]: WeightUnit.format is the app's renderer and converts,
  * which is exactly what a message about the plan's own text must not do.
  */
+/**
+ * Named for both bodyweight keys, so the two messages cannot drift apart. It
+ * says what to write instead, because the alternative to a refused zero is not
+ * a different number -- it is the key not being there.
+ */
+private fun nonPositiveBodyweight(key: String): String =
+    "$key must be positive - omit it, or write null, when the weight is not known"
+
 private fun plainNumber(value: Double): String =
     if (value == Math.floor(value)) value.toLong().toString() else value.toString()
 

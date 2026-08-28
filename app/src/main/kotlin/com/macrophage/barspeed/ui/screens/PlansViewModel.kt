@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.PlanImportResult
+import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,8 +22,44 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
     val plans = repository.allPlans.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val importResult = MutableStateFlow<PlanImportResult?>(null)
 
+    /**
+     * The lifter's display unit, for the one line at the gate that quotes a
+     * body weight back to them. A figure in a unit they do not weigh themselves
+     * in is a figure they cannot check.
+     */
+    val weightUnit =
+        container.settings.weightUnit
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WeightUnit.KG)
+
     fun import(text: String) {
-        viewModelScope.launch { importResult.value = repository.importPlan(text) }
+        viewModelScope.launch { stage(text) }
+    }
+
+    /**
+     * Validate, stage, and apply anything the document declares about the
+     * lifter rather than about the training — today that is the body weight
+     * alone (issue #161).
+     *
+     * ONE write site, called by both import paths, because there are two ways
+     * into this screen and a rule applied on one of them is a rule that holds
+     * until the lifter picks a file instead of pasting.
+     *
+     * The write happens when the plan is ACCEPTED, not when it is approved. The
+     * owner's rule is recency between two sources of one fact, and discarding a
+     * plan does not make the coach's statement of the lifter's weight untrue;
+     * the gate's line says the change already happened and survives a discard,
+     * so nothing here is silent.
+     *
+     * A refused document writes nothing at all: `importPlan` returns Invalid
+     * before any summary exists, so a plan carrying a bodyweight AND a
+     * contradiction leaves the stored figure alone.
+     */
+    private suspend fun stage(text: String) {
+        val result = repository.importPlan(text)
+        (result as? PlanImportResult.Staged)?.summary?.bodyWeightKg?.let {
+            container.settings.setBodyWeightKg(it)
+        }
+        importResult.value = result
     }
 
     /** File-based import: read the picked document's text, then validate as usual. */
@@ -36,12 +73,11 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }.getOrNull()
                 }
-            importResult.value =
-                if (text.isNullOrBlank()) {
-                    PlanImportResult.Invalid(listOf("Could not read the selected file."))
-                } else {
-                    repository.importPlan(text)
-                }
+            if (text.isNullOrBlank()) {
+                importResult.value = PlanImportResult.Invalid(listOf("Could not read the selected file."))
+            } else {
+                stage(text)
+            }
         }
     }
 

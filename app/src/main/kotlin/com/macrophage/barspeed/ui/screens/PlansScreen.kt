@@ -39,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.data.PlanEntity
 import com.macrophage.barspeed.data.PlanImportResult
+import com.macrophage.barspeed.model.PlanBodyWeightPolicy
 import com.macrophage.barspeed.ui.BarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,6 +47,7 @@ import com.macrophage.barspeed.ui.BarColors
 fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewModel()) {
     val plans by viewModel.plans.collectAsState()
     val importResult by viewModel.importResult.collectAsState()
+    val weightUnit by viewModel.weightUnit.collectAsState()
     var showImportDialog by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
     val context = LocalContext.current
@@ -135,6 +137,19 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                                 "Droppable if short on time: ${summary.optionalExercises.joinToString(", ")}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = BarColors.Blue,
+                            )
+                        }
+                        // Above the warnings and in its own colour: this is not
+                        // a complaint about the document, it is the one thing
+                        // the import changed OUTSIDE the plan, and the lifter
+                        // should read the number rather than discover it in a
+                        // recorded load next week.
+                        summary.bodyWeightKg?.let {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                PlanBodyWeightPolicy.appliedLine(it, weightUnit),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = BarColors.Volt,
                             )
                         }
                         summary.warnings.take(WARNINGS_SHOWN).forEach {

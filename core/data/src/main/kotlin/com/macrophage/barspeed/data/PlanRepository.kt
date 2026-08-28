@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.data
 
+import com.macrophage.barspeed.model.PlanBodyWeightPolicy
 import com.macrophage.barspeed.model.PlanFile
 import com.macrophage.barspeed.model.PlanImport
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +16,14 @@ data class PlanImportSummary(
     val warnings: List<String> = emptyList(),
     /** Exercises the plan marks droppable when the session runs long. */
     val optionalExercises: List<String> = emptyList(),
+    /**
+     * The body weight this import applies, in kilograms, or null when the plan
+     * declared none — issue #161. Decided by `PlanBodyWeightPolicy`; carried on
+     * the summary rather than written here because the store it lands in is a
+     * DataStore preference owned by `:app`, and this module has no reach into
+     * it.
+     */
+    val bodyWeightKg: Double? = null,
 )
 
 sealed interface PlanImportResult {
@@ -86,5 +95,6 @@ class PlanRepository(
         warnings = warnings,
         optionalExercises =
         plan.sessions.flatMap { s -> s.exercises.filter { it.optional }.map { it.exercise } }.distinct(),
+        bodyWeightKg = PlanBodyWeightPolicy.acceptedKg(plan),
     )
 }
