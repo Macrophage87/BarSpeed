@@ -99,8 +99,20 @@ data class PlannedSlot(
      * across all of them, and nothing divides either. See [ImplementLoad].
      */
     val implementCount: Int? = null,
-    /** Coach/LLM comment on this exercise from the plan, shown with the set. */
+    /**
+     * The part of the plan's coaching cue shown with the set without the lifter
+     * touching the phone: the exercise's `description` (or its older `notes`
+     * when it declares no description), plus this set's own `note`. Built by
+     * `PlanNoteDisplay.forSet`, which is where the precedence is pinned.
+     */
     val exerciseNotes: String? = null,
+    /**
+     * The rest of that cue — the exercise's `additional_notes`, and its `notes`
+     * when a `description` displaced them. Drawn only once the lifter expands
+     * the note, so nothing that decides how the set is performed is in here.
+     * Null when the plan wrote nothing beyond the visible line.
+     */
+    val exerciseNotesBehindTap: String? = null,
     val targetMeanConVelMps: Double? = null,
     val velocityLossStopPct: Double? = null,
     val restS: Int? = null,

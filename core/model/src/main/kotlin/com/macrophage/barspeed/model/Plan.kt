@@ -24,6 +24,21 @@ data class PlanFile(
             if (session.exercises.isEmpty()) errors += "sessions[$si] must contain at least one exercise"
             session.exercises.forEachIndexed { ei, exercise ->
                 if (exercise.exercise.isBlank()) errors += "sessions[$si].exercises[$ei].exercise must not be blank"
+                // Tier two of three on the one length limit in this contract.
+                // The published schema states maxLength for whatever wrote the
+                // document; this names the path for a document that reached the
+                // app anyway; and the rest screen caps lines whatever either of
+                // them let through. An error rather than a warning because the
+                // cap is the mechanism -- a cue that keeps growing takes back
+                // the screen the split exists to clear -- and it can refuse no
+                // plan written before schema 1.8, the key not having existed.
+                exercise.description?.let {
+                    if (it.length > DESCRIPTION_MAX_CHARS) {
+                        errors += "sessions[$si].exercises[$ei].description is ${it.length} characters, " +
+                            "over the $DESCRIPTION_MAX_CHARS-character limit - move the rest into " +
+                            "\"additional_notes\", which has no limit"
+                    }
+                }
                 if (exercise.start != null && exercise.start !in VALID_STARTS) {
                     errors += "sessions[$si].exercises[$ei].start must be one of ${VALID_STARTS.joinToString()}"
                 }
@@ -84,6 +99,11 @@ data class PlanFile(
      * no decision for the app to follow at all. Overriding a built-in comes
      * next: that is the app being told to ignore something it ships with, and
      * this is the only sign it happened.
+     *
+     * The two coaching-text warnings come last, because nothing is lost in
+     * either: every word the plan wrote is still reachable on screen. What they
+     * report is narrower — which part of it the lifter reads without tapping,
+     * a choice the app made on the author's behalf.
      */
     fun warnings(): List<String> = eachExercise(::pairVsLoad) +
         eachExercise(::startUndeclared) +
@@ -92,7 +112,9 @@ data class PlanFile(
         eachExercise(::kindVsShape) +
         eachExercise(::kindVsInference) +
         eachExercise(::prepVsGuide) +
-        eachExercise(::prepVsPhrase)
+        eachExercise(::prepVsPhrase) +
+        eachExercise(::cueSplit) +
+        eachExercise(::cueBehindTapOnly)
 
     /**
      * A declared pair, stated back with BOTH figures in the plan's own unit.
@@ -253,6 +275,39 @@ data class PlanFile(
             "the set begins is dropped."
     }
 
+    /**
+     * Both coaching keys on one exercise, saying which of them the lifter reads
+     * without touching the phone.
+     *
+     * Nothing is dropped — [PlanNoteDisplay.forSet] puts `notes` behind the
+     * expand tap rather than discarding it — so this is a warning. What the
+     * author cannot otherwise know is that the app picked between the two on
+     * their behalf, and picked the newer key.
+     */
+    private fun cueSplit(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        if (exercise.description.isNullOrBlank() || exercise.notes.isNullOrBlank()) return null
+        return "sessions[$si].exercises[$ei]: ${exercise.exercise} declares both \"description\" and " +
+            "\"notes\" - \"description\" is what shows between sets and \"notes\" moves behind the expand " +
+            "tap. Neither is dropped, but only one of them is read at a glance."
+    }
+
+    /**
+     * An exercise whose entire cue is behind the expand tap.
+     *
+     * Legal, and left alone on screen: promoting `additional_notes` to the
+     * visible line would put the paragraph back exactly where this split took
+     * it from. But an author who wrote only that key almost certainly did not
+     * mean the lifter to see nothing between sets, and the import gate is the
+     * one surface that can ask before the plan is used.
+     */
+    private fun cueBehindTapOnly(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        if (exercise.additionalNotes.isNullOrBlank()) return null
+        if (!exercise.description.isNullOrBlank() || !exercise.notes.isNullOrBlank()) return null
+        return "sessions[$si].exercises[$ei]: \"additional_notes\" is declared on ${exercise.exercise} with " +
+            "no \"description\" and no \"notes\", so nothing this exercise declares shows until the lifter " +
+            "expands it. Put the line that decides how the set is performed in \"description\"."
+    }
+
     private fun kindVsInference(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
         val declared = exercise.kindOverride ?: return null
         if (ExerciseDef.seedById(exercise.exercise) != null) return null
@@ -264,8 +319,8 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.7"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7")
+        const val SCHEMA_VERSION = "1.8"
+        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8")
         val VALID_SIDES = setOf("left", "right")
 
         /** "top"/"bottom" name the start position; "down"/"up" the first movement. */
@@ -294,10 +349,12 @@ data class PlanFile(
          * lines. 4 × 55 = 220. What is NOT claimed is that 220 characters
          * renders as four lines on any particular phone at any particular font
          * scale — it does not at fontScale 2.0, which is why the display caps
-         * lines as well and why the cap is the third tier rather than the only
-         * one.
+         * lines as well and why that cap is the third tier rather than this
+         * being the only one.
          *
-         * Declared in this commit and enforced by nothing yet.
+         * Enforced by [validate] and published as `maxLength` on
+         * `description` in `docs/schemas/plan.schema.json`; the two are pinned
+         * equal by `SchemaContractTest`.
          */
         const val DESCRIPTION_MAX_CHARS = 220
     }
@@ -334,9 +391,9 @@ data class PlanExerciseDef(
      * phone, capped at [PlanFile.DESCRIPTION_MAX_CHARS] characters so it cannot
      * take the screen the rest of the rest screen needs.
      *
-     * Declared in this commit and read by nothing yet:
-     * [PlanNoteDisplay.forSet] accepts it and ignores it, and no length is
-     * enforced. Both move in the commit that implements the split.
+     * Wins the visible line over [notes] when both are declared, and the
+     * import gate says so. Over-length is an error naming the path, not a
+     * truncation: the app never cuts a coach's sentence in half to fit.
      */
     val description: String? = null,
     /**
@@ -344,7 +401,10 @@ data class PlanExerciseDef(
      * detail, the setup ritual. Reachable only by expanding the note, so
      * nothing that decides how the next set is performed belongs here.
      *
-     * Declared in this commit and read by nothing yet.
+     * No length limit — it is where the overflow goes, and capping it is how
+     * text starts getting deleted to fit. Declared on its own, with no
+     * [description] and no [notes], it stays behind the tap and the import gate
+     * warns rather than the app overruling the author on screen.
      */
     @SerialName("additional_notes") val additionalNotes: String? = null,
     /**

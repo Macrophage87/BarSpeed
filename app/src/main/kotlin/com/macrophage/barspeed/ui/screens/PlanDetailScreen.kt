@@ -39,6 +39,7 @@ import com.macrophage.barspeed.data.PlanEntity
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.PlanExerciseDef
+import com.macrophage.barspeed.model.PlanNoteDisplay
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PlanSetDef
 import com.macrophage.barspeed.model.WeightUnit
@@ -186,7 +187,23 @@ private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
                     color = BarColors.Sub,
                 )
             }
-            exercise.notes?.let {
+            // Everything the plan wrote, in full and behind no tap. This is the
+            // approval gate -- the one screen whose job is to show the lifter
+            // what they are about to accept -- and hiding a paragraph here
+            // would hide it at the only moment it can still be questioned. The
+            // split matters on the rest screen and is drawn there.
+            //
+            // Ordered by the same function that orders it there, rather than by
+            // a second copy of the precedence that could drift from it: what
+            // shows without a tap, then what would have been behind one.
+            val cue =
+                PlanNoteDisplay.forSet(
+                    description = exercise.description,
+                    additionalNotes = exercise.additionalNotes,
+                    notes = exercise.notes,
+                    setNote = null,
+                )
+            listOfNotNull(cue.visible, cue.behindTap).forEach {
                 Spacer(Modifier.height(2.dp))
                 Text("“$it”", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
             }

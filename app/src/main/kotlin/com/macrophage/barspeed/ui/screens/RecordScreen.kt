@@ -84,6 +84,7 @@ import com.macrophage.barspeed.record.SetFeedback
 import com.macrophage.barspeed.record.SetRating
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
+import com.macrophage.barspeed.ui.components.ExpandableNote
 import com.macrophage.barspeed.ui.components.LocalBlePermissionUi
 import com.macrophage.barspeed.ui.components.PermissionBanner
 import com.macrophage.barspeed.ui.components.PermissionBannerBody
@@ -2272,9 +2273,14 @@ private fun SlotCard(
             if (secondary.isNotEmpty()) {
                 Text(secondary.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
             }
-            slot.exerciseNotes?.let { notes ->
+            // The cue the plan wrote, split by whether the lifter has to touch
+            // the phone to read it. The split itself is decided in :core:model
+            // (PlanNoteDisplay); this draws what it decided, and draws a
+            // labelled control rather than an ellipsis whenever anything is
+            // hidden. Nothing auto-expands.
+            if (slot.exerciseNotes != null || slot.exerciseNotesBehindTap != null) {
                 Spacer(Modifier.height(4.dp))
-                Text("“$notes”", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
+                ExpandableNote(slot.exerciseNotes, slot.exerciseNotesBehindTap, BarColors.Amber)
             }
             // The plate line is an INSTRUCTION, not a description: the title
             // above keeps stating what the plan asked for, but telling the

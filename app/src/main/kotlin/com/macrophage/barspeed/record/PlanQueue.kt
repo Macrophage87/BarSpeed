@@ -59,6 +59,7 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     // above is untouched by it.
                     implementCount = exerciseDef.implementCount,
                     exerciseNotes = note.visible,
+                    exerciseNotesBehindTap = note.behindTap,
                     targetMeanConVelMps = set.targetMeanConcentricVelocityMps,
                     velocityLossStopPct = set.velocityLossStopPct,
                     restS = set.restS,
