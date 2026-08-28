@@ -23,7 +23,45 @@ import kotlin.test.assertNull
 class CadenceVoiceTest {
     private val benchPress = LiftDirection(startsWith = StartPhase.ECCENTRIC, concentricUp = true)
 
+    private val legCurl = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = false,
+        sensorInverted = true,
+        sensorOnStack = true,
+    )
+
+    private val legPress = LiftDirection(startsWith = StartPhase.CONCENTRIC, concentricUp = true)
+
+    private val facePull = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = true,
+        plane = MovementPlane.HORIZONTAL,
+        sensorOnStack = true,
+    )
+
+    /**
+     * (tempo, lift, planned reps) covering all four homes for the rep call:
+     * a closing pause, the next rep's first stroke, the rep's own last stroke,
+     * and no home at all.
+     */
+    private val corpus = listOf(
+        Triple("2011", benchPress, 5),
+        Triple("3010", benchPress, 10),
+        Triple("2010", benchPress, 8),
+        Triple("1030", legCurl, 12),
+        Triple("1020", legCurl, 12),
+        Triple("2010", legPress, 8),
+        Triple("3010", legPress, 8),
+        Triple("2011", legPress, 12),
+        Triple("2011", facePull, 12),
+        Triple("1010", legPress, 6),
+        Triple("1110", benchPress, 6),
+    )
+
     private fun plan(tempo: String) = CadencePlan.of(TempoSchedule.of(Tempo.parse(tempo), benchPress))
+
+    private fun plan(tempo: String, direction: LiftDirection) =
+        CadencePlan.of(TempoSchedule.of(Tempo.parse(tempo), direction))
 
     @Test
     fun `a stroke says its own word and writes that word down`() {
@@ -104,6 +142,69 @@ class CadenceVoiceTest {
             3 * plan("3010").deliveredCycleS,
             CadenceVoice.script(plan("3010"), plannedReps = 3).last().atSecond,
             "the set ends when the prescription says, and Done costs no second of its own",
+        )
+    }
+
+    @Test
+    fun `every word the guide speaks is a word the cue track carries`() {
+        // Issue 176, as the general rule. An utterance is one or two words --
+        // the stroke call, and the rep announcement merged into it -- and both
+        // were said out loud. The cue track is presented in
+        // session-export.schema.json as what the app said, so a word spoken and
+        // not written makes it a record of something else.
+        corpus.forEach { (tempo, direction, reps) ->
+            CadenceVoice.script(plan(tempo, direction), reps).forEach { call ->
+                assertEquals(
+                    call.utterance.split(", "),
+                    call.recorded,
+                    "$tempo on ${direction.plane}/${direction.startsWith}: \"${call.utterance}\" at ${call.atSecond}s",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `a set records exactly the rep calls its schedule decided on`() {
+        // The pin issue 176 asks for by name: the recorded count matches the
+        // number of calls the schedule made. Stated as the calls themselves and
+        // in order, because a count alone passes when the right number of wrong
+        // words is written.
+        //
+        // It reads announcementAfter for the expected side, which is the
+        // decision, against the script's rows, which are the delivery. A plan
+        // that decides to say nothing is covered too: 1010 and 1110 have no
+        // home for a call, and must therefore record none.
+        corpus.forEach { (tempo, direction, reps) ->
+            val p = plan(tempo, direction)
+            val decided = (1 until reps).mapNotNull { p.announcementAfter(it, reps) }
+            val recorded = CadenceVoice.script(p, reps)
+                .flatMap { it.recorded }
+                .filter { it == CadencePlan.LAST_REP || it.startsWith(CadencePlan.REP_CALL_PREFIX) }
+            assertEquals(
+                decided,
+                recorded,
+                "$tempo on ${direction.plane}/${direction.startsWith}: calls decided, against calls written down",
+            )
+        }
+    }
+
+    @Test
+    fun `a merged call writes down the call as well as the stroke it rode`() {
+        // Both homes that merge, so that fixing one and leaving the other is
+        // not available. The stroke word keeps its own row unchanged and
+        // unrenamed -- CueTrack.calledReps counts those rows, and every
+        // committed fixture matches them exactly.
+        val nextRepsOpener = plan("3010", benchPress).beats[0]
+        assertEquals(
+            SpokenCall("Down, Rep 3", listOf("Down", "Rep 3")),
+            CadenceVoice.beatCall(nextRepsOpener, "Rep 3"),
+            "case 2, merged into the next rep's opening stroke",
+        )
+        val ownLastStroke = plan("2010", legPress).let { it.beats[it.announceOnBeat!!] }
+        assertEquals(
+            SpokenCall("Down, Last rep", listOf("Down", CadencePlan.LAST_REP)),
+            CadenceVoice.beatCall(ownLastStroke, CadencePlan.LAST_REP),
+            "case 3, merged into the rep's own last stroke",
         )
     }
 

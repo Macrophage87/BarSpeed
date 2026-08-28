@@ -126,6 +126,23 @@ class MergedCallCueTrackTest {
         return i == inner.size
     }
 
+    /** The elements of [outer] left over once [inner] has been matched into it. */
+    private fun <T> surplus(inner: List<T>, outer: List<T>): List<T> {
+        var i = 0
+        return outer.filter { e ->
+            if (i < inner.size && inner[i] == e) {
+                i++
+                false
+            } else {
+                true
+            }
+        }
+    }
+
+    /** The cue rows the plan says a set of [reps] reps writes, as (second, row). */
+    private fun scriptRows(p: CadencePlan, reps: Int): List<Pair<Int, String>> =
+        CadenceVoice.script(p, reps).flatMap { call -> call.recorded.map { call.atSecond to it } }
+
     @Test
     fun `the tempo string does not say which plan case a set was paced on`() {
         // The whole of the correction above, as an assertion. Same four digits,
@@ -236,7 +253,7 @@ class MergedCallCueTrackTest {
             Triple(set13, plan("1120", pushdown), 12),
         ).forEach { (fixture, p, reps) ->
             val recorded = cadenceRows(fixture)
-            val script = CadenceVoice.script(p, reps).flatMap { call -> call.recorded.map { call.atSecond to it } }
+            val script = scriptRows(p, reps)
             assertTrue(
                 isSubsequence(recorded, script),
                 "$fixture: the recording is not accounted for by the plan.\nrecorded: $recorded\nscript:   $script",
@@ -249,6 +266,52 @@ class MergedCallCueTrackTest {
                 "$fixture: and its Done lands where the prescription says it does",
             )
         }
+    }
+
+    @Test
+    fun `the rows the fix adds to set 1 are the nine calls it spoke and never wrote`() {
+        // Issue 176 against a real track rather than a constructed plan: the
+        // ten-rep incline press said a rep call at the start of every rep after
+        // the first, and its cue track names none of them. These are the
+        // instants, on the cadence clock, that the archive is missing.
+        //
+        // Set 1 is eccentric-first, so its whole set of calls is unaffected by
+        // issue 173 and can be asserted here in full.
+        val recorded = cadenceRows(set01)
+        assertEquals(
+            listOf(
+                4 to "Rep 1",
+                8 to "Rep 2",
+                12 to "Rep 3",
+                16 to "Rep 4",
+                20 to "Rep 5",
+                24 to "Rep 6",
+                28 to "Rep 7",
+                32 to "Rep 8",
+                36 to "Last rep",
+            ),
+            surplus(recorded, scriptRows(plan("3010", inclinePress), 10)),
+            "the calls set 1 spoke and did not write down",
+        )
+    }
+
+    @Test
+    fun `the rows the fix adds to set 13 ride the stroke word that silenced a count`() {
+        // The same on the 1120 pushdown, whose call rides the LAST stroke of
+        // the rep it announces. Restricted to the reps before the final one:
+        // what the final rep's call should be is issue 173's question, asserted
+        // with it, and this assertion must not answer it in passing.
+        //
+        // Each added row lands two seconds into a four-second rep, which is the
+        // "Up" the track does record -- and one second before the slot the
+        // track leaves silent, which is the count given up to make room.
+        val recorded = cadenceRows(set13)
+        val finalRepStarts = 11 * plan("1120", pushdown).deliveredCycleS
+        assertEquals(
+            (1..10).map { (it * 4 + 2) to "Rep $it" },
+            surplus(recorded, scriptRows(plan("1120", pushdown), 12)).filter { it.first < finalRepStarts },
+            "the calls set 13 spoke and did not write down, before its last rep",
+        )
     }
 
     @Test
