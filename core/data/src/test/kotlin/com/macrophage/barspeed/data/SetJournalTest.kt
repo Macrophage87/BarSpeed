@@ -376,6 +376,28 @@ class SetJournalTest {
         )
     }
 
+    /**
+     * The bytes of `reps.csv`, exactly: a header line, then one epoch-ms
+     * instant per line and nothing else.
+     *
+     * The round trip above goes through this file's own reader, so the two
+     * halves could drift together and stay green. This pins the ON-DISK form,
+     * which is the half a reader outside this class sees -- the capture is
+     * shared as a zip of these files verbatim, and it is also the form the
+     * canonical stream codecs have to agree with if this column is ever to
+     * mean the same thing in a journal and in an export.
+     */
+    @Test
+    fun `the journal's rep marks are one epoch-ms instant per line under a header`() = runTest {
+        val store = store()
+        val journal = requireNotNull(store.open(header()))
+        journal.appendRepMark(1_100L)
+        journal.appendRepMark(1_900L)
+        journal.close()
+        val text = File(store.orphans().single().directory, SetJournal.REPS).readText()
+        assertEquals("timestamp_ms\n1100\n1900\n", text, "the on-disk rep-mark format moved")
+    }
+
     // ---- getting it off the phone -------------------------------------------
 
     /**
