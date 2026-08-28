@@ -419,6 +419,13 @@ private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: M
  * taps START. What the count decides is whether the set CAPTURES from it,
  * which `beginSet` answers from the roster for its own slot.
  *
+ * For a lifter with two labelled units that makes three concurrent GATT links
+ * the steady state of EVERY set, including one recorded at count 1, and the
+ * second client still unlocks, sets 100 Hz and subscribes. Whether that costs
+ * the analysed stream is unmeasured -- field item F1b -- and if it does, the
+ * link has to be kept warm only when some exercise is armed for two rather
+ * than whenever two units are labelled.
+ *
  * The transform returns a [SensorSettings] and the state is read and written
  * in one statement inside `collect`, as `mirrorPrepOverrides` and all three
  * collectors of [mirrorLinkStates] do. Reading `state.value` in the transform
