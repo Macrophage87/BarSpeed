@@ -94,8 +94,21 @@ data class SessionExport(
          * raw IMU stream, which the exporter does not do. The published
          * schema's `schemaVersion` description carries the argument and the
          * measured sizes; this is the warning, not a second copy of it.
+         *
+         * 1.13 -- `duration_s` on a timed set is the figure the set was
+         * RECORDED with rather than the seconds its clock measured: the
+         * prescription on a set that reached its target, the measurement on
+         * one the lifter stopped, the stated figure on one corrected on the
+         * rest screen. NOT purely additive: no key changes type or stops
+         * being written, but the value changes for the majority case. It is
+         * not retroactive -- the exporter reads the stored `actualDurationS`
+         * column rather than re-deriving it, so a set recorded before this
+         * version publishes exactly what it published before. The published
+         * schema's `schemaVersion` description carries what a 1.12 reader may
+         * assume and a 1.13 reader may not; this is the warning, not a second
+         * copy of it.
          */
-        const val SCHEMA_VERSION = "1.12"
+        const val SCHEMA_VERSION = "1.13"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -104,7 +117,7 @@ data class SessionExport(
         val SUPPORTED_SCHEMA_VERSIONS =
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
-                "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12",
+                "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13",
             )
 
         /**
@@ -166,9 +179,9 @@ data class SetExport(
      * corrected afterwards on the rest screen publishes the corrected
      * seconds. The three are not distinguishable from each other here --
      * [repsManual] has no counterpart for duration -- so a reader comparing
-     * holds across the version this shipped in is comparing figures whose
-     * upper end moved: before it, every timed set carried the walk back to
-     * the phone inside it.
+     * holds across 1.12 and 1.13 is comparing figures whose upper end moved:
+     * under 1.12 every timed set carried the walk back to the phone inside
+     * it.
      */
     @SerialName("duration_s") val durationS: Int? = null,
     @SerialName("plannedDuration_s") val plannedDurationS: Int? = null,
