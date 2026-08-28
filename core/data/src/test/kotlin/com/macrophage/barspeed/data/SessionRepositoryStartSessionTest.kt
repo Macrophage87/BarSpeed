@@ -63,6 +63,8 @@ class SessionRepositoryStartSessionTest {
 
         override suspend fun overrideReps(setId: Long, reps: Int) = Unit
 
+        override suspend fun overrideDuration(setId: Long, seconds: Int) = Unit
+
         override suspend fun sessionsInRange(fromMs: Long, toMs: Long): List<SessionEntity> = emptyList()
 
         override suspend fun deleteSession(id: Long) = Unit

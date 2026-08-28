@@ -290,6 +290,25 @@ class SessionRepository(
     /** Lifter correction of a miscounted (or uncounted) set's reps. */
     suspend fun overrideReps(setId: Long, reps: Int) = sessionDao.overrideReps(setId, reps)
 
+    /**
+     * Lifter correction of a hold or carry's recorded seconds, from the rest
+     * screen.
+     *
+     * The counterpart of [overrideReps] for the sets that have no reps. Its
+     * one caller is the post-set addition #168 puts on the rest screen: a
+     * timed set now ends when its clock reaches the prescription, so a hold
+     * the lifter genuinely carried on past it is stated here afterwards
+     * rather than mid-set, where the owner would never see it.
+     *
+     * Unlike [overrideReps] this sets no "corrected by the lifter" flag,
+     * because `set_records` has no column for one on the duration -- reps have
+     * `repsManual`, seconds have nothing. Adding one is a migration and is
+     * deliberately not folded in here; the consequence, named rather than
+     * hidden, is that the export cannot distinguish a corrected hold from a
+     * measured one.
+     */
+    suspend fun overrideDuration(setId: Long, seconds: Int) = sessionDao.overrideDuration(setId, seconds)
+
     suspend fun deleteSession(id: Long) = sessionDao.deleteSession(id)
 
     fun decodeAnalysis(entity: SetRecordEntity): SetAnalysis? = try {

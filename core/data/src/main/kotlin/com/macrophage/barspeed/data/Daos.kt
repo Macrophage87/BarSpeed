@@ -98,6 +98,12 @@ interface SessionDao {
     @Query("UPDATE set_records SET actualReps = :reps, repsManual = 1 WHERE id = :setId")
     suspend fun overrideReps(setId: Long, reps: Int)
 
+    // No "corrected" flag beside it: reps have repsManual, seconds have no such
+    // column, and adding one is a migration this change does not make. A new
+    // @Query changes no table, so DATABASE_VERSION does not move for this.
+    @Query("UPDATE set_records SET actualDurationS = :seconds WHERE id = :setId")
+    suspend fun overrideDuration(setId: Long, seconds: Int)
+
     @Query("SELECT * FROM sessions WHERE startedAtMs >= :fromMs AND startedAtMs <= :toMs ORDER BY startedAtMs")
     suspend fun sessionsInRange(fromMs: Long, toMs: Long): List<SessionEntity>
 

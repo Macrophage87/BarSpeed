@@ -65,4 +65,40 @@ object EffortCorrectionPolicy {
             rpe = if (!warmup && !(tappedFailed && rpe == null)) rpe else null,
             derivedShortfall = derivedFailed && !tappedFailed,
         )
+
+    /**
+     * What the rest screen's effort line reads for the set just stored.
+     *
+     * [ratedDescription] is the gym-facing wording of whichever tile the
+     * lifter's own rating lit, or null when the set carries no rating at all.
+     * [failed] is the effective verdict, the lifter's tap OR-ed with the
+     * derived shortfall, which is what the line is coloured by.
+     *
+     * SEAM ONLY at this commit: the unrated case returns the empty string,
+     * which stands for what the screen does today -- draw no line and, with
+     * it, no way into the correction grid. #168 makes that case reachable on
+     * every timed set, because an auto-ended hold is ended by the clock and
+     * not by a tap on the effort grid, so it arrives at rest with no rating
+     * and nothing on screen to give it one. The differential is in the commit
+     * after this.
+     */
+    fun lineText(ratedDescription: String?, failed: Boolean): String = when {
+        ratedDescription != null && failed -> "$ratedDescription · short of target"
+        ratedDescription != null -> ratedDescription
+        failed -> FAILED
+        else -> ""
+    }
+
+    /** The line's wording for a set carrying only the derived shortfall. */
+    const val FAILED = "Failed"
+
+    /**
+     * The line's wording for a set that carries no effort statement of any
+     * kind.
+     *
+     * A named absence rather than a blank: an unrated set is not an RPE of
+     * zero and is not a warm-up, and the line has to say which it is or the
+     * lifter reads the gap as the app having lost the rating.
+     */
+    const val NOT_RATED = "Not rated"
 }

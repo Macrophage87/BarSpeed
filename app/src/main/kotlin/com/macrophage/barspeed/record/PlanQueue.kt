@@ -4,9 +4,22 @@ import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.model.PlanNoteDisplay
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.SetGeometryPolicy
+import com.macrophage.barspeed.model.TimedSetEndPolicy
 
-/** Fraction of a timed target that still counts as having made the hold. */
-const val TIMED_CLOSE_ENOUGH_FRACTION = 0.9
+/**
+ * Fraction of a timed target that still counts as having made the hold.
+ *
+ * Declared FROM [TimedSetEndPolicy.CLOSE_ENOUGH_FRACTION] rather than beside
+ * it, so there is one number in the app and not two that agree today. It stays
+ * a `const val` deliberately: `:app`'s unit tests run on a JDK 17 launcher and
+ * `:core:model` compiles to class-file version 65, so a `:app` test that caused
+ * `TimedSetEndPolicy` to be LOADED would die with `UnsupportedClassVersionError`
+ * before asserting anything -- the trap `PlanQueueTest`'s own KDoc documents.
+ * A const initialised from another const is inlined into this file's constant
+ * pool at compile time and loads nothing at runtime, so [timedVerdicts] and its
+ * five tests are unaffected.
+ */
+const val TIMED_CLOSE_ENOUGH_FRACTION = TimedSetEndPolicy.CLOSE_ENOUGH_FRACTION
 
 /** Flatten a plan session into the ordered queue of sets the record flow walks. */
 suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<PlannedSlot> {

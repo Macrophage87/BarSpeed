@@ -119,6 +119,13 @@ class SessionRepositoryRecordSetTest {
             calls += "overrideReps"
         }
 
+        var durationOverrides = mutableListOf<Pair<Long, Int>>()
+
+        override suspend fun overrideDuration(setId: Long, seconds: Int) {
+            calls += "overrideDuration"
+            durationOverrides += setId to seconds
+        }
+
         override suspend fun sessionsInRange(fromMs: Long, toMs: Long): List<SessionEntity> = emptyList()
 
         override suspend fun deleteSession(id: Long) {
@@ -237,6 +244,35 @@ class SessionRepositoryRecordSetTest {
     )
 
     private fun repo(dao: SessionDao, exercises: ExerciseDao = FakeExerciseDao()) = SessionRepository(dao, exercises)
+
+    // ---- the post-set corrections -------------------------------------------
+
+    /**
+     * The rest screen's duration correction reaches the DAO with the set it
+     * names and the seconds it was given, and issues nothing else.
+     *
+     * #168's seam. A hold now ends when its clock reaches the prescription, so
+     * the rare genuine overage is stated afterwards on the rest screen -- the
+     * surface every other post-set correction already lives on -- and this is
+     * the write it turns into. Pinned at the seam, before a caller exists, so
+     * the caller is wired to something already measured.
+     *
+     * Reds if the passthrough starts inventing an id or a figure, and reds if
+     * it grows a second statement: a correction that also re-wrote the rating
+     * would erase the lifter's own tap, which is the mistake
+     * `SetRatingTracker` keeps two separate fields to avoid.
+     *
+     * Nothing here executes Room or SQLite; the DAO is an interface and this
+     * fake stands in for it. What the UPDATE did to the row is not tested by
+     * anything in this repository.
+     */
+    @Test
+    fun `a duration correction reaches the dao with the set and the seconds it names`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).overrideDuration(setId = 31L, seconds = 47)
+        assertEquals(listOf(31L to 47), dao.durationOverrides)
+        assertEquals(listOf("overrideDuration"), dao.calls)
+    }
 
     // ---- the row -----------------------------------------------------------
 
