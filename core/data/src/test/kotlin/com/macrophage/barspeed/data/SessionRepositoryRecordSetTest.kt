@@ -217,6 +217,7 @@ class SessionRepositoryRecordSetTest {
         voiceCues: List<VoiceCue> = cues,
         geometry: ResolvedGeometry? = null,
         restHrSamples: List<HrSample> = emptyList(),
+        repMarks: List<Long> = emptyList(),
     ) = CompletedSet(
         exerciseId = "back_squat",
         exerciseName = "Back Squat",
@@ -241,6 +242,7 @@ class SessionRepositoryRecordSetTest {
         hrSamples = hrSamples,
         restHrSamples = restHrSamples,
         voiceCues = voiceCues,
+        repMarks = repMarks,
     )
 
     private fun repo(dao: SessionDao, exercises: ExerciseDao = FakeExerciseDao()) = SessionRepository(dao, exercises)
@@ -774,6 +776,91 @@ class SessionRepositoryRecordSetTest {
             listOf(RawStreamEntity.KIND_IMU, RawStreamEntity.KIND_HRM, RawStreamEntity.KIND_CUES),
             dao.streams.map { it.kind },
         )
+    }
+
+    /**
+     * The instants the lifter counted become a fifth stream on the row, in
+     * the same transactional insert as the rest (#158).
+     *
+     * Last in the order, after the cue track, because the order is the order
+     * the manifest lists files in and a reader of the zip sees them that way:
+     * the set's own capture, then the window before it, then what the app
+     * said, then what was counted. The two clocks at the end sit beside each
+     * other on purpose -- a cue is what the app SAID, on a schedule, and a
+     * mark is what was COUNTED, and reading one for the other is the whole
+     * reason they are not one file.
+     *
+     * The stored bytes are asserted, not just the kind. A stream stored in
+     * some other format is a stream nothing downstream can read, and the
+     * exporter is a separate class that will not fail for it.
+     */
+    @Test
+    fun `the instants a rep was counted at are written as a fifth stream`() = runTest {
+        val dao = FakeSessionDao()
+        val marks = listOf(1_100L, 4_350L, 8_020L)
+        val rest = listOf(HrSample(500L, 64, listOf(937.5)))
+        repo(dao).recordSet(
+            sessionId = 1L,
+            orderIdx = 0,
+            set = completedSet(restHrSamples = rest, repMarks = marks),
+        )
+        assertEquals(
+            listOf(
+                RawStreamEntity.KIND_IMU,
+                RawStreamEntity.KIND_HRM,
+                RawStreamEntity.KIND_REST_BEFORE_HRM,
+                RawStreamEntity.KIND_CUES,
+                RawStreamEntity.KIND_REPS,
+            ),
+            dao.streams.map { it.kind },
+        )
+        val stream = dao.streams.single { it.kind == RawStreamEntity.KIND_REPS }
+        assertEquals(marks, RepMarkCsv.decode(Gzip.decompress(stream.csvGzip)))
+    }
+
+    /**
+     * A set that counted nothing out loud writes no rep stream at all.
+     *
+     * Absence, not an empty file, for the reason every other stream here uses
+     * it: an empty document is a claim that the app counted and counted
+     * nothing, which is false on the ordinary sensor-counted set, where
+     * nothing counts out loud in the first place.
+     */
+    @Test
+    fun `a set with no rep marks writes no rep stream`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(repMarks = emptyList()))
+        assertEquals(
+            listOf(RawStreamEntity.KIND_IMU, RawStreamEntity.KIND_HRM, RawStreamEntity.KIND_CUES),
+            dao.streams.map { it.kind },
+        )
+    }
+
+    /**
+     * The marks are stored for a set the sensor never saw.
+     *
+     * The straight-rep, sensorless case #158 exists for: no IMU capture, no
+     * cue track, and the taps are the only record of the set's shape. A write
+     * path that hung the rep stream off the presence of another one would
+     * drop exactly the case that needs it.
+     */
+    @Test
+    fun `rep marks are stored even when the set captured nothing else`() = runTest {
+        val dao = FakeSessionDao()
+        val marks = listOf(1_100L, 4_350L)
+        repo(dao).recordSet(
+            sessionId = 1L,
+            orderIdx = 0,
+            set =
+            completedSet(
+                imuSamples = emptyList(),
+                hrSamples = emptyList(),
+                voiceCues = emptyList(),
+                repMarks = marks,
+            ),
+        )
+        assertEquals(listOf(RawStreamEntity.KIND_REPS), dao.streams.map { it.kind })
+        assertEquals(marks, RepMarkCsv.decode(Gzip.decompress(dao.streams.single().csvGzip)))
     }
 
     /**

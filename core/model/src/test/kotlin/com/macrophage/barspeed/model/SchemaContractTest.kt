@@ -326,6 +326,82 @@ class SchemaContractTest {
         )
     }
 
+    /**
+     * `repMarks` is declared, typed as instants, and described (#158).
+     *
+     * `$defs.set` is `additionalProperties: false`, so a key the exporter
+     * writes and the schema does not declare makes every export carrying it
+     * INVALID against the contract its own reader was pointed at -- the key
+     * would not merely go unmentioned. The item type is asserted because the
+     * marks are epoch milliseconds and a schema declaring them as strings, or
+     * as objects the way `voiceCues` is, would send a reader looking for a
+     * field that is not there.
+     */
+    @Test
+    fun `the published export declares repMarks as an array of instants, described`() {
+        val set = schema("session-export.schema.json")["\$defs"]!!.jsonObject["set"]!!
+            .jsonObject["properties"]!!.jsonObject
+        val marks = assertNotNull(set["repMarks"], "the published export schema does not declare repMarks")
+            .jsonObject
+        assertEquals("array", marks["type"]!!.jsonPrimitive.content, "repMarks is not published as an array")
+        assertEquals(
+            "integer",
+            marks["items"]!!.jsonObject["type"]!!.jsonPrimitive.content,
+            "a rep mark is not published as a whole number of milliseconds",
+        )
+        assertTrue(
+            marks["description"]?.jsonPrimitive?.content?.isNotBlank() == true,
+            "repMarks is declared with no description, which is the shape of issue #76",
+        )
+    }
+
+    /**
+     * The 1.13 version-log entry names both of its halves.
+     *
+     * 1.13 was minted for `duration_s`'s changed meaning and is unreleased, so
+     * `repMarks` extends it rather than minting 1.14 -- which leaves one entry
+     * carrying two changes of different kinds, and a reader who is told only
+     * about the additive half would take the whole version as safe to ignore.
+     * Narrow, and said so: this cannot check the entry is RIGHT, only that the
+     * additive half is not silently absent from the one place a consumer looks
+     * for it.
+     */
+    @Test
+    fun `the 1_13 version log names the rep marks as well as the duration change`() {
+        val description =
+            schema("session-export.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
+                .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "repMarks" in description,
+            "the version log never mentions repMarks, so 1.13 publishes a key it does not explain",
+        )
+        assertTrue(
+            "duration_s" in description,
+            "the version log lost the duration_s half of 1.13",
+        )
+    }
+
+    /**
+     * The published example carries a set's rep marks.
+     *
+     * `ci.yml` validates this example against the schema with ajv, and that is
+     * the schema half's only automated coverage. An example carrying none of
+     * the new key passes a schema that declares it and a schema that does not,
+     * so the declaration could be wrong in every detail while the step stayed
+     * green -- the same reasoning as the prep-pair example above.
+     */
+    @Test
+    fun `the published export example carries a set's rep marks`() {
+        val sets = schema("examples/session-export.example.json")["exercises"]!!
+            .jsonArray.flatMap { it.jsonObject["sets"]!!.jsonArray }
+        val marks =
+            assertNotNull(
+                sets.firstNotNullOfOrNull { it.jsonObject["repMarks"] },
+                "no set in the published example carries repMarks, so ajv never validates it",
+            )
+        assertTrue(marks.jsonArray.isNotEmpty(), "the example's repMarks array is empty, which nothing emits")
+    }
+
     @Test
     fun `session export schema allows the version the exporter writes`() {
         val export = schema("session-export.schema.json")

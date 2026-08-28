@@ -202,6 +202,13 @@ class RawExporterTest {
         csvGzip = Gzip.compress(HrCsv.encode(listOf(HrSample(1_000L, 120, listOf(500.0))))),
     )
 
+    private fun repStream(setId: Long, marks: List<Long>) = RawStreamEntity(
+        id = 6L,
+        setId = setId,
+        kind = RawStreamEntity.KIND_REPS,
+        csvGzip = Gzip.compress(RepMarkCsv.encode(marks)),
+    )
+
     private fun restStream(setId: Long, samples: List<HrSample>) = RawStreamEntity(
         id = 4L,
         setId = setId,
@@ -400,10 +407,66 @@ class RawExporterTest {
                 "csvHeaderImu",
                 "csvHeaderHrm",
                 "csvHeaderCues",
+                "csvHeaderReps",
                 "sets",
             ),
             manifest.keys,
         )
+    }
+
+    /**
+     * The rep-mark capture reaches the archive, and the manifest says how to
+     * read it (#158).
+     *
+     * The zip half needs no exporter change -- every stream is named
+     * `set%02d_<exercise>_<kind>.csv` and the loop writes all of them -- but
+     * the manifest publishes a header per format, and a file whose column
+     * layout is stated nowhere is a file a reader has to guess at. The three
+     * existing `csvHeader*` keys are the whole of that statement; a fourth
+     * format arriving without one is the near neighbour this test exists to
+     * catch.
+     *
+     * The instants are asserted through the archive's own bytes, so what is
+     * checked is what a coach opening the zip gets rather than what the
+     * repository held.
+     */
+    @Test
+    fun `a stored rep-mark capture appears in the zip and is described by the manifest`() = runTest {
+        val marks = listOf(1_100L, 4_350L, 8_020L)
+        val entries =
+            zipOf(listOf(row(id = 5L)), mapOf(5L to listOf(repStream(5L, marks))))
+        assertEquals(
+            setOf("set01_plank_reps.csv", "meta.json", "session.json"),
+            entries.keys,
+        )
+        assertEquals(marks, RepMarkCsv.decode(entries.getValue("set01_plank_reps.csv")))
+        val manifest = Json.parseToJsonElement(entries.getValue("meta.json")).jsonObject
+        assertEquals(RepMarkCsv.HEADER, manifest.text("csvHeaderReps"))
+        assertEquals(
+            listOf("set01_plank_reps.csv"),
+            manifest.set(0).getValue("files").jsonArray.map { it.jsonPrimitive.content },
+        )
+    }
+
+    /**
+     * The archive's `session.json` carries the marks too, so the zip answers
+     * the question both ways.
+     *
+     * `session.json` is built with `includeRepDetail = true`, so the detailed
+     * gate on the key must not withhold it here. This is the artifact the
+     * field capture is actually read from -- the CSV is the raw fact and the
+     * analysis document is what a differential runs against -- and the two
+     * disagreeing would be worse than either alone.
+     */
+    @Test
+    fun `the archive's analysis document carries the marks as well as the CSV`() = runTest {
+        val marks = listOf(1_100L, 4_350L, 8_020L)
+        val entries = zipOf(listOf(row(id = 5L)), mapOf(5L to listOf(repStream(5L, marks))))
+        val set =
+            Json.parseToJsonElement(entries.getValue("session.json"))
+                .jsonObject.getValue("exercises").jsonArray.single()
+                .jsonObject.getValue("sets").jsonArray.single().jsonObject
+        assertEquals(marks, set.getValue("repMarks").jsonArray.map { it.jsonPrimitive.content.toLong() })
     }
 
     /**
