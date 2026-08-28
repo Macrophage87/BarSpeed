@@ -9,6 +9,7 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.ResolvedGeometry
+import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
@@ -223,6 +224,39 @@ class SessionRepository(
                         kind = RawStreamEntity.KIND_IMU,
                         csvGzip = Gzip.compress(ImuCsv.encode(set.imuSamples)),
                         sampleRateHz = set.analysis.sampleRateHz,
+                        // The role of the stream the DSP analysed, and null on
+                        // a one-sensor set -- where there is no second stream
+                        // to tell it from, and a label nobody assigned would
+                        // state which physical unit the capture came from.
+                        role = set.sensors?.analysed?.let(SensorCapturePolicy::wireOf),
+                    ),
+                )
+            }
+            // The second accelerometer, immediately after the one its figures
+            // are NOT drawn from, so the archive lists the set's own analysed
+            // capture first (#156).
+            //
+            // sampleRateHz is null and that is the whole of the reasoning: the
+            // column holds `analysis.sampleRateHz`, measured over the stream
+            // the DSP analysed, and there is no analysis of this one. Anything
+            // written here is either a fabrication or a second, differently
+            // derived quantity in a column that already means one thing.
+            // Nothing is lost -- the exporter measures a rate from the stream
+            // itself and treats the column only as a fallback.
+            //
+            // Written only when samples exist. An armed unit that captured
+            // nothing gets no row, because a row holding a header and no data
+            // would publish a stream that recorded nothing; the DECLARATION
+            // below is what says the role was armed, and the pair of those two
+            // facts is what makes a flat battery readable afterwards.
+            set.secondary?.takeIf { it.samples.isNotEmpty() }?.let { secondary ->
+                add(
+                    RawStreamEntity(
+                        setId = 0L,
+                        kind = RawStreamEntity.KIND_IMU,
+                        csvGzip = Gzip.compress(ImuCsv.encode(secondary.samples)),
+                        sampleRateHz = null,
+                        role = SensorCapturePolicy.wireOf(secondary.role),
                     ),
                 )
             }
@@ -300,6 +334,14 @@ class SessionRepository(
                 // measured one and would be believed.
                 geometryJson =
                 set.geometry?.let { json.encodeToString(ResolvedGeometry.serializer(), it) },
+                // Written whenever the caller states one, which is every set
+                // that is not the plain one-sensor default -- including a set
+                // that asked for two and armed one. What arrived is observable
+                // from the streams; what was ASKED FOR is observable from
+                // nothing, so leaving this null on a shortfall would make it
+                // indistinguishable from an ordinary one-sensor set forever.
+                sensorsJson =
+                set.sensors?.let { json.encodeToString(RecordedSensors.serializer(), it) },
                 hrEndOfSetBpm = hr.endOfSetBpm,
                 hrAvgBpm = hr.avgBpm,
                 hrMaxBpm = hr.maxBpm,

@@ -14,8 +14,10 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RepMetricsExport
 import com.macrophage.barspeed.model.ResolvedGeometry
+import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.SetExport
+import com.macrophage.barspeed.model.SetSensorsExport
 import com.macrophage.barspeed.model.SetSummaryExport
 import com.macrophage.barspeed.model.TempoComplianceExport
 import com.macrophage.barspeed.model.WeightUnit
@@ -290,6 +292,21 @@ class SessionExporter(
             // state, and a fabricated "vertical, drive up, sensor on the bar"
             // would read identically to a squat that really was measured so.
             geometry = sessionRepository.decodeGeometry(record)?.let(::geometryExport),
+            // How many accelerometers this set was armed with (#156).
+            //
+            // Read off the ROW and the raw-stream ROWS, both already fetched
+            // above -- no stream is inflated for it, so the standalone share
+            // path costs exactly what it cost before. `present` is the one
+            // observation in the block: which armed roles actually produced a
+            // row. Everything else is what the set declared when it began.
+            //
+            // Absent on the ordinary one-sensor set, which is what keeps such
+            // an export what earlier versions wrote. Not gated on
+            // includeRepDetail: how many sensors a set was recorded with
+            // qualifies every figure the summary publishes, and a caveat that
+            // appears only in the detailed export leaves the summary-only
+            // reader holding the numbers with the warning removed.
+            sensors = sensorsExport(record, streams),
             repMetrics =
             if (includeRepDetail && reps.isNotEmpty()) {
                 reps.map {
@@ -350,6 +367,34 @@ class SessionExporter(
         streams.firstOrNull { it.kind == RawStreamEntity.KIND_HRM }
             ?.let { stream -> runCatching { HrCsv.decode(Gzip.decompress(stream.csvGzip)) }.getOrNull() }
             ?.let { HrTrust.summarize(it).minBpm }
+
+    /**
+     * The set's sensor declaration, with the roles that actually arrived
+     * filled in, or null when the row states none.
+     *
+     * [SensorCapturePolicy.present] decides the intersection, in `:core:model`
+     * where a test runs on it: which roles count as present is the kind of
+     * rule that would otherwise be restated here and in `RawExporter` and
+     * disagree in one of them.
+     *
+     * A stream whose role string this build does not recognise is dropped by
+     * [SensorCapturePolicy.roleFromWire] rather than mapped onto a role it
+     * does know, so a document written by a later version cannot relabel
+     * somebody's capture on the way through.
+     */
+    private fun sensorsExport(record: SetRecordEntity, streams: List<RawStreamEntity>): SetSensorsExport? {
+        val declared = sessionRepository.decodeSensors(record) ?: return null
+        val captured =
+            streams.filter { it.kind == RawStreamEntity.KIND_IMU }
+                .mapNotNull { SensorCapturePolicy.roleFromWire(it.role) }
+        return SetSensorsExport(
+            plannedCount = declared.plannedCount,
+            count = declared.count,
+            expected = declared.expected.map(SensorCapturePolicy::wireOf),
+            present = SensorCapturePolicy.present(declared.expected, captured).map(SensorCapturePolicy::wireOf),
+            analysedRole = declared.analysed?.let(SensorCapturePolicy::wireOf),
+        )
+    }
 
     /**
      * Into the plan's own vocabulary, so a reader holding both schemas reads
@@ -470,16 +515,28 @@ class RawExporter(
             for ((idx, record) in sets.withIndex()) {
                 val streams = sessionRepository.rawStreams(record.id)
                 val files = mutableListOf<String>()
-                var imuText: String? = null
+                // Keyed by role, not a single `var`, and that is issue #156's
+                // near miss rather than a tidy-up. This used to be
+                // `var imuText` assigned in the loop, so a set carrying two
+                // `imu` rows handed the descriptor only the LAST one seen --
+                // one of the lifter's two captures silently missing from a
+                // manifest that looked complete. The key is nullable because a
+                // one-sensor stream carries no role, and that entry is exactly
+                // what the unchanged single-sensor path reads back.
+                val imuTextByRole = LinkedHashMap<String?, String>()
+                val imuFileByRole = LinkedHashMap<String?, String>()
                 for (stream in streams) {
-                    val name = "set%02d_%s_%s.csv".format(idx + 1, record.exerciseId, stream.kind)
+                    val name = entryName(idx, record, stream)
                     val text = Gzip.decompress(stream.csvGzip)
                     zip.putNextEntry(ZipEntry(name))
                     zip.write(text.toByteArray(Charsets.UTF_8))
                     zip.closeEntry()
                     files += name
                     when (stream.kind) {
-                        RawStreamEntity.KIND_IMU -> imuText = text
+                        RawStreamEntity.KIND_IMU -> {
+                            imuTextByRole[stream.role] = text
+                            imuFileByRole[stream.role] = name
+                        }
                         RawStreamEntity.KIND_HRM -> minBpmBySet[record.id] = minBpmFrom(text)
                     }
                 }
@@ -488,7 +545,7 @@ class RawExporter(
                 // only the CSVs must still be able to tell left from right, a
                 // warm-up from a working set, and which sets were rotating
                 // enough for attitude error to matter.
-                setLines += buildSetDescriptor(idx, record, streams, files, imuText)
+                setLines += buildSetDescriptor(idx, record, streams, files, imuTextByRole, imuFileByRole)
             }
             meta.append(setLines.joinToString(",\n")).append("\n  ]\n}\n")
             zip.putNextEntry(ZipEntry("meta.json"))
@@ -512,12 +569,28 @@ class RawExporter(
     private fun minBpmFrom(hrText: String): Int? =
         runCatching { HrCsv.decode(hrText) }.getOrNull()?.let { HrTrust.summarize(it).minBpm }
 
+    /**
+     * What a stream is called inside the archive.
+     *
+     * The role is appended to the KIND segment rather than being folded into
+     * the kind itself: `raw_streams.kind` stays the equality-matched vocabulary
+     * every selector in this package relies on, and the hyphenated form exists
+     * only here, in a filename, where a person reads it. A one-sensor stream
+     * carries no role and keeps the name it has always had, which is what makes
+     * a single-sensor archive byte-identical to what earlier versions wrote.
+     */
+    private fun entryName(idx: Int, record: SetRecordEntity, stream: RawStreamEntity): String {
+        val kind = stream.role?.let { "${stream.kind}-$it" } ?: stream.kind
+        return "set%02d_%s_%s.csv".format(idx + 1, record.exerciseId, kind)
+    }
+
     private fun buildSetDescriptor(
         idx: Int,
         record: SetRecordEntity,
         streams: List<RawStreamEntity>,
         files: List<String>,
-        imuText: String?,
+        imuTextByRole: Map<String?, String>,
+        imuFileByRole: Map<String?, String>,
     ): String {
         val fields = mutableListOf<String>()
         fun num(key: String, value: Any?) = value?.let { fields += "\"$key\": $it" }
@@ -576,13 +649,43 @@ class RawExporter(
             str("kind", g.kind.name.lowercase())
             bool("bodyweight", g.bodyweight)
         }
+        // How many accelerometers this set was armed with, which roles they
+        // carried and which one everything else in this descriptor describes
+        // (#156). Omitted entirely on the ordinary one-sensor set, which is
+        // what keeps that archive's manifest what it has always been.
+        //
+        // Flat keys here and a nested object in session.json, which is what
+        // the two documents already do with geometry and with the time zone;
+        // the names differ deliberately, so one key never means a number in
+        // one artifact and an object in the other.
+        val declared = sessionRepository.decodeSensors(record)
+        val analysedRole = declared?.analysed?.let(SensorCapturePolicy::wireOf)
+        declared?.let { d ->
+            num("sensorsPlanned", d.plannedCount)
+            num("sensorsArmed", d.count)
+            // Written even when empty. An empty list is a set that asked for
+            // two and could arm neither by role, which is a statement; an
+            // absent key would read as this version not stating it.
+            fields += "\"sensorRolesExpected\": " +
+                "[${d.expected.joinToString(", ") { "\"${SensorCapturePolicy.wireOf(it)}\"" }}]"
+            str("analysedRole", analysedRole)
+        }
         num("startedAt_ms", record.startedAtMs)
         num("endedAt_ms", record.endedAtMs)
         // Parsed from the text buildZip's own loop already inflated -- not
         // re-inflated here, and shared with sampleRate_hz and
         // rollExcursion_deg below besides: decoding a whole IMU capture even
         // once more for either figure would buy nothing.
-        val samples = imuSamples(imuText)
+        //
+        // The ANALYSED stream, selected by role rather than by "whichever IMU
+        // row came first". On a one-sensor set there is no declaration and the
+        // unroled entry is read, which is byte-for-byte the behaviour this
+        // manifest has always had. On a dual set whose analysed unit dropped
+        // out there is no entry at all, and every figure below is withheld
+        // rather than taken from the surviving stream -- publishing one
+        // sensor's cadence under a key every reader takes to describe the
+        // other is the wrong pair in its sharpest form.
+        val samples = imuSamples(if (declared == null) imuTextByRole[null] else imuTextByRole[analysedRole])
         // Measured from the stream this key describes, not read off the row.
         //
         // What this states is the mean rate at which the rows in that file
@@ -608,14 +711,63 @@ class RawExporter(
                     (it.last().timestampMs - it.first().timestampMs) / 1000.0,
                 )
             }
-        val storedRate = streams.firstOrNull { it.kind == RawStreamEntity.KIND_IMU }?.sampleRateHz
+        // Matched on the role as well as the kind. `firstOrNull { kind ==
+        // KIND_IMU }` would take the first IMU row on a dual set whatever it
+        // was, which on a set whose analysed unit produced no row is the OTHER
+        // sensor's stored figure under the analysed sensor's key.
+        val storedRate =
+            streams.firstOrNull { it.kind == RawStreamEntity.KIND_IMU && it.role == analysedRole }?.sampleRateHz
         num("sampleRate_hz", (measuredRate ?: storedRate)?.takeIf { it > 0.0 })
         // Attitude excursion decides which analysis is even valid on this set:
         // a rail-guided machine barely rotates and integrates cleanly, while a
         // barbell tumbling through 300 degrees leaks gravity into every sample.
         rollExcursionDeg(samples)?.let { num("rollExcursion_deg", Math.round(it * 10.0) / 10.0) }
+        // One entry per capture that actually arrived, each figure measured
+        // from ITS OWN stream. A role that is armed and absent has no entry
+        // here and appears in sensorRolesExpected only; the roles MISSING are
+        // the set difference between the two, deliberately not a third key
+        // that could disagree with its own inputs.
+        sensorStreamEntries(imuTextByRole, imuFileByRole)?.let { fields += "\"sensors\": $it" }
         fields += "\"files\": [${files.joinToString(", ") { "\"$it\"" }}]"
         return "    {${fields.joinToString(", ")}}"
+    }
+
+    /**
+     * The `sensors` array of a dual set's descriptor, or null when there is
+     * none to write.
+     *
+     * Null on every set whose IMU streams carry no role, which is every
+     * one-sensor set and every set recorded before roles existed -- so the
+     * descriptor those produce is untouched.
+     *
+     * Each entry's `samples`, `sampleRate_hz` and `rollExcursion_deg` are
+     * computed from that entry's own decoded stream. That is one extra
+     * `ImuCsv.decode` per dual set and no extra INFLATE: the text is the one
+     * `buildZip`'s loop already decompressed to write the CSV entry. A rate is
+     * omitted where the stream cannot state one, and never written as zero,
+     * the same rule the set-level key follows.
+     */
+    private fun sensorStreamEntries(
+        imuTextByRole: Map<String?, String>,
+        imuFileByRole: Map<String?, String>,
+    ): String? {
+        val roled = imuTextByRole.entries.filter { it.key != null }
+        if (roled.isEmpty()) return null
+        val entries =
+            roled.map { (role, text) ->
+                val samples = imuSamples(text)
+                val parts = mutableListOf("\"role\": \"$role\"", "\"file\": \"${imuFileByRole[role]}\"")
+                samples?.let { s ->
+                    parts += "\"samples\": ${s.size}"
+                    VelocityEstimator.measuredSampleRateOrNull(
+                        s.size,
+                        (s.last().timestampMs - s.first().timestampMs) / 1000.0,
+                    )?.takeIf { it > 0.0 }?.let { parts += "\"sampleRate_hz\": $it" }
+                }
+                rollExcursionDeg(samples)?.let { parts += "\"rollExcursion_deg\": ${Math.round(it * 10.0) / 10.0}" }
+                "{${parts.joinToString(", ")}}"
+            }
+        return "[${entries.joinToString(", ")}]"
     }
 
     /**
