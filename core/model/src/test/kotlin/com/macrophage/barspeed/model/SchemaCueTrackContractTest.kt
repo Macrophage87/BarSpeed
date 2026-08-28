@@ -81,4 +81,35 @@ class SchemaCueTrackContractTest {
             "the version log does not say the cue track gained the calls the guide merges",
         )
     }
+
+    /**
+     * The version log says where the warning is WITHHELD, not only where it is
+     * written down.
+     *
+     * #176 makes `Last rep` a row for the first time on the plans that merge
+     * the call, and #173 then stops the guide speaking it on the subset of
+     * those plans whose only slot for it is the beat the rep ends on. Both
+     * land under 1.13, so the two together decide what a reader may conclude
+     * from a track that names no `Last rep` -- and without this sentence they
+     * cannot conclude anything, because the defect #176 fixed and the
+     * suppression #173 added leave the same evidence: no row.
+     *
+     * That is the whole point of pinning it. An absence a reader cannot
+     * interpret is worse than a value they can question, and nothing but the
+     * published description can tell them which absence they are looking at.
+     */
+    @Test
+    fun `the version log says where the last-rep warning is withheld, not only where it is written`() {
+        val description =
+            schema("session-export.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
+                .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "not spoken at all" in description,
+            "the version log does not say the warning is withheld on the plans that cannot carry it in time",
+        )
+        assertTrue(
+            "absence of a Last rep row" in description,
+            "nothing tells a reader whether a track with no Last rep row is by design or is the defect 176 fixed",
+        )
+    }
 }
