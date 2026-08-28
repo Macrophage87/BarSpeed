@@ -591,24 +591,28 @@ private const val PREP_STEP_S = 5
 /**
  * How many accelerometers the next set records with, issue #156.
  *
- * Drawn only when a second IMU is paired: with one sensor there is nothing to
- * choose, and a control offering a 2 that cannot be armed is worse than no
- * control. The count is stored against the exercise, so it holds for the rest
- * of that exercise's sets and for the same exercise next week -- `PrepAdjuster`
- * exactly, and for the same reason.
+ * The CHIPS are drawn only when a second IMU is paired: with one sensor there
+ * is nothing to choose, and a control offering a 2 that cannot be armed is
+ * worse than no control. The line underneath is drawn whenever two sensors are
+ * asked for, paired or not, because a shortfall the lifter can still fix has to
+ * be visible before the set and not only in the export afterwards.
  *
- * The line underneath is the whole point of the control. It names what the plan
- * declared whenever the two differ, so an adjustment is visible as an
- * adjustment; and when 2 is chosen but cannot be armed it says WHICH gap --
- * the shortfall this arrangement refuses to paper over by labelling a unit
- * nobody labelled.
+ * That line names what the plan declared whenever the two differ, so an
+ * adjustment is visible as an adjustment; and when 2 is chosen but cannot be
+ * armed it says WHICH gap -- the shortfall this arrangement refuses to paper
+ * over by labelling a unit nobody labelled.
+ *
+ * The count is stored against the exercise, so it holds for the rest of that
+ * exercise's sets and for the same exercise next week -- `PrepAdjuster`
+ * exactly, and for the same reason.
  */
 @Composable
 private fun SensorCountChooser(state: RecordState, viewModel: RecordViewModel) {
-    if (state.pairedImuAddresses.size < SensorCapturePolicy.MAX_COUNT) return
     val slot = state.upcomingSlot
     val chosen = state.sensorCountFor(slot)
     val planned = state.plannedSensorCountFor(slot)
+    val chipsDrawn = state.pairedImuAddresses.size >= SensorCapturePolicy.MAX_COUNT
+    if (!chipsDrawn && chosen <= 1 && planned <= 1) return
     val roster = state.rosterFor(slot)
     Spacer(Modifier.height(8.dp))
     Row(
@@ -627,16 +631,18 @@ private fun SensorCountChooser(state: RecordState, viewModel: RecordViewModel) {
                 color = if (roster.shortfall == null) BarColors.Sub else BarColors.Amber,
             )
         }
-        FilterChip(
-            selected = chosen == 1,
-            onClick = { viewModel.setSensorCount(1) },
-            label = { Text("1") },
-        )
-        FilterChip(
-            selected = chosen == SensorCapturePolicy.MAX_COUNT,
-            onClick = { viewModel.setSensorCount(SensorCapturePolicy.MAX_COUNT) },
-            label = { Text("2") },
-        )
+        if (chipsDrawn) {
+            FilterChip(
+                selected = chosen == 1,
+                onClick = { viewModel.setSensorCount(1) },
+                label = { Text("1") },
+            )
+            FilterChip(
+                selected = chosen == SensorCapturePolicy.MAX_COUNT,
+                onClick = { viewModel.setSensorCount(SensorCapturePolicy.MAX_COUNT) },
+                label = { Text("2") },
+            )
+        }
     }
 }
 
@@ -649,7 +655,10 @@ private fun SensorCountChooser(state: RecordState, viewModel: RecordViewModel) {
  * -- the same shape `SensorDot` uses for `ConnectionState`.
  */
 private fun sensorCountDetail(chosen: Int, planned: Int, roster: SensorRoster): String = when (roster.shortfall) {
-    DualShortfall.ONE_SENSOR_PAIRED -> "Only one sensor is paired - this set will record one."
+    // `roster` returns this whenever it cannot name two distinct addresses,
+    // which includes NONE paired as well as one. The enum's name is narrower
+    // than the states it covers; the sentence is not.
+    DualShortfall.ONE_SENSOR_PAIRED -> "Fewer than two sensors are paired - this set will record one."
     DualShortfall.ROLES_UNASSIGNED -> "Label both sensors A and B under Devices - this set will record one."
     DualShortfall.ROLES_COLLIDE -> "Both sensors are labelled the same - fix it under Devices."
     null ->
