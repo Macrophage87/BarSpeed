@@ -162,6 +162,50 @@ class SetEndWindowTest {
     }
 
     /**
+     * The two answers the REST clock will be seeded from, at the cue-track
+     * shapes `:app` actually freezes into a pending write (#172).
+     *
+     * Characterization, not new behaviour: [SetEnd.of] is unchanged by #172.
+     * What is new is a second consumer of it. The rest period is due to start
+     * when the set was called over rather than when the rest screen draws, and
+     * the instant it starts from is this cue's stamp -- so the two facts that
+     * consumer rests on are pinned here before anything depends on them.
+     *
+     * The first is that a guided set's full track, rep calls and all, yields
+     * the `Done` stamp UNCHANGED -- no rounding, no offset, the same host
+     * arrival millisecond `speakCues` wrote. A rest clock seeded from a
+     * shifted instant would be wrong by that shift on every set.
+     *
+     * The second is the one that decides the fallback exists at all: a hold's
+     * track ends on `Time`, which this deliberately does not bound on, so a
+     * timed set is [SetEnd.NotCued] and its rest has no cue instant to start
+     * from. That is an absence and the caller has to treat it as one. It is
+     * also harmless there -- a hold ends on its own clock, so the instant the
+     * set write freezes IS the instant it ended.
+     */
+    @Test
+    fun `the rest clock's seed instant is the Done stamp, and a hold has none`() {
+        val guided = listOf(
+            VoiceCue(1_000L, "Ready"),
+            VoiceCue(2_000L, "Brace"),
+            VoiceCue(3_000L, "Down"),
+            VoiceCue(4_000L, "Up"),
+            VoiceCue(4_000L, "Rep 1"),
+            VoiceCue(9_000L, "Last rep"),
+            VoiceCue(13_517L, "Done"),
+        )
+        assertEquals(SetEnd.Cued(13_517L), SetEnd.of(guided), "the Done stamp, unshifted")
+
+        val hold = listOf(
+            VoiceCue(1_000L, "Hold"),
+            VoiceCue(31_000L, "15 seconds"),
+            VoiceCue(45_000L, "1"),
+            VoiceCue(46_000L, "Time"),
+        )
+        assertEquals(SetEnd.NotCued, SetEnd.of(hold), "a hold names no set-over cue")
+    }
+
+    /**
      * Set 6 through the analyzer, with and without its own cue track.
      *
      * The count is what the rule found, reported whether or not anything is
