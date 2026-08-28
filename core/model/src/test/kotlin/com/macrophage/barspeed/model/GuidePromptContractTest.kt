@@ -60,7 +60,41 @@ class GuidePromptContractTest {
 
     @Test
     fun `the plan prompt documents every top-level key`() {
-        listOf("schemaVersion", "planName", "sessions", "name", "exercises").forEach(::assertDocuments)
+        listOf(
+            "schemaVersion",
+            "planName",
+            "sessions",
+            "name",
+            "exercises",
+            "bodyweight_kg",
+            "bodyweight_lb",
+        ).forEach(::assertDocuments)
+    }
+
+    /**
+     * The prompt tells the model what a guessed bodyweight costs, and gives it
+     * the spelling of "not known".
+     *
+     * This is the one key in the contract whose WRONG value is silent: it
+     * becomes the base load of every `bodyweight: true` set, so a guess does
+     * not fail validation, does not warn, and shows up only as recorded loads
+     * and powers that are wrong by a constant nobody can recover afterwards.
+     * The model has to be told to omit it, which means being told why.
+     *
+     * Narrow, and said so: this cannot check that the prompt teaches the rule
+     * well, only that the omit-when-unknown instruction and the consequence
+     * that motivates it are both in the text an LLM is actually handed.
+     */
+    @Test
+    fun `the plan prompt tells the model to omit an unknown bodyweight, and why`() {
+        assertTrue(
+            "do not guess" in prompt,
+            "the plan prompt never tells the model not to guess a bodyweight it was not given",
+        )
+        assertTrue(
+            "base load" in prompt,
+            "the plan prompt never names what a wrong bodyweight costs, so omitting it reads as stylistic",
+        )
     }
 
     @Test

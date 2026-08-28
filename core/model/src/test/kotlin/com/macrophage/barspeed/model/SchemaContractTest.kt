@@ -193,6 +193,85 @@ class SchemaContractTest {
     }
 
     /**
+     * The same pin one level up. The top level had no such assertion until the
+     * bodyweight keys were added to it (#161), so a key declared on [PlanFile]
+     * and missing from the published document -- or the reverse -- was
+     * invisible here.
+     *
+     * A literal set, for the reason the exercise-level assertion gives: a
+     * descriptor-derived list follows a `@SerialName` rename silently, which is
+     * the drift this class exists to catch.
+     */
+    @Test
+    fun `the plan's top-level keys are exactly the ones the app declares`() {
+        val topLevel = schema("plan.schema.json")["properties"]!!.jsonObject.keys
+        assertEquals(
+            setOf("schemaVersion", "planName", "notes", "bodyweight_kg", "bodyweight_lb", "sessions"),
+            topLevel,
+            "PlanFile and the schema disagree on top-level keys",
+        )
+    }
+
+    /**
+     * The published bodyweight is nullable, positive-only, and declarable in
+     * one unit or the other but not both.
+     *
+     * All three halves matter separately. Nullable, because the owner's rule is
+     * that an unknown weight is written as `null` or omitted and that both mean
+     * the same thing -- a schema forbidding `null` would make the safe spelling
+     * of absence invalid in the one document a generating model validates
+     * against. Positive-only, because a 0 is not a weight and reading it as one
+     * would put the base load of every bodyweight set at zero. And at most one
+     * unit, because two figures for one weight is the contradiction `load_kg`
+     * with `load_lb` already refuses.
+     */
+    @Test
+    fun `the published bodyweight is nullable, positive-only and declarable in one unit`() {
+        val plan = schema("plan.schema.json")
+        val props = plan["properties"]!!.jsonObject
+        for (key in listOf("bodyweight_kg", "bodyweight_lb")) {
+            val field = assertNotNull(props[key], "the published plan schema does not declare $key").jsonObject
+            assertEquals(
+                listOf("number", "null"),
+                field["type"]!!.jsonArray.map { it.jsonPrimitive.content },
+                "$key is not a nullable number, so the documented spelling of an unknown weight is invalid",
+            )
+            assertEquals(
+                0,
+                field["exclusiveMinimum"]!!.jsonPrimitive.int,
+                "$key does not exclude zero, which the app refuses",
+            )
+        }
+        assertEquals(
+            listOf("bodyweight_kg", "bodyweight_lb"),
+            assertNotNull(plan["not"], "the published plan schema permits both bodyweight units at once")
+                .jsonObject["required"]!!.jsonArray.map { it.jsonPrimitive.content },
+            "the top-level exclusion is not the bodyweight pair",
+        )
+    }
+
+    /**
+     * The plan's 1.8 entry records that the bodyweight declaration landed under
+     * it, and states the one rule a reader cannot infer from the property: that
+     * a null and an omission mean the same thing.
+     *
+     * Modelled on the sensors entry above, and third of the three additions
+     * made to 1.8 inside the v0.1.44 window. Each addition keeps its own
+     * identity in the log rather than being folded into one paragraph, because
+     * a reader asking "when did this key appear" is asking about one key.
+     */
+    @Test
+    fun `the plan's 1_8 entry records the bodyweight declaration as landed`() {
+        val description = schema("plan.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue("`bodyweight_kg`" in description, "the plan version log never names the bodyweight key")
+        assertTrue(
+            "null and an omission mean the same thing" in description,
+            "the plan version log never states that a null bodyweight and an omitted one mean the same",
+        )
+    }
+
+    /**
      * The floor the published schema advertises and the floor
      * [PlanFile.validate] enforces are the same floor.
      *
