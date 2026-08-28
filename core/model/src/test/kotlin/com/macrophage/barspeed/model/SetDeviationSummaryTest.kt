@@ -68,4 +68,104 @@ class SetDeviationSummaryTest {
         // between a Double and a null.
         assertEquals(emptyList(), parts(plannedLoadKg = null, statedLoadKg = 0.0))
     }
+
+    @Test
+    fun `a load the lifter changed is named where the card still says the plan's`() {
+        // The whole reason the button is allowed to hide the box. The "Up
+        // next" card goes on saying 90; this is the only thing on the screen
+        // that says the set will record 100.
+        assertEquals(listOf("100 kg"), parts(statedLoadKg = 100.0))
+    }
+
+    @Test
+    fun `stripping the bar is a change and is said as one`() {
+        // Zero is a statement, not an absence -- the same rule
+        // SetLoadPolicy.standingStatedAddedKg keeps one module over. A lifter
+        // who took every plate off has said something, and the line has to
+        // carry it or the card's 90 stands unchallenged.
+        assertEquals(listOf("0 kg"), parts(statedLoadKg = 0.0))
+    }
+
+    @Test
+    fun `a changed load on body-weight work keeps the BW notation`() {
+        // One notation for the added load, not two: the card above says
+        // "BW − 50 kg" and this must not say "-50 kg" under it. #160.
+        assertEquals(
+            listOf("BW − 20 kg"),
+            parts(bodyweight = true, plannedLoadKg = -50.0, statedLoadKg = -20.0),
+        )
+    }
+
+    @Test
+    fun `a changed rep count is named`() {
+        assertEquals(listOf("8 reps"), parts(statedReps = 8))
+    }
+
+    @Test
+    fun `a changed hold is named with the word for the movement`() {
+        // A carry is not a hold. Both screens that render this pair already
+        // choose the word from the kind; deciding it here rather than in a
+        // third place is why the kind is a parameter.
+        assertEquals(
+            listOf("45s hold"),
+            parts(
+                kind = ExerciseKind.HOLD,
+                plannedReps = null,
+                statedReps = null,
+                plannedDurationS = 30,
+                statedDurationS = 45,
+            ),
+        )
+        assertEquals(
+            listOf("45s carry"),
+            parts(
+                kind = ExerciseKind.CARRY,
+                plannedReps = null,
+                statedReps = null,
+                plannedDurationS = 30,
+                statedDurationS = 45,
+            ),
+        )
+    }
+
+    @Test
+    fun `a changed tempo is named`() {
+        assertEquals(listOf("tempo 6010"), parts(tempo = "6010"))
+    }
+
+    @Test
+    fun `a tempo written with dashes is not a change from the same tempo without`() {
+        // "4-0-1-0" and "4010" are one prescription in two spellings, and a
+        // plan may write either. A string compare would report a deviation the
+        // lifter never made, on every set of every plan written the long way
+        // -- and a line that cries wolf on set one is not read on set five.
+        assertEquals(emptyList(), parts(plannedTempo = "4-0-1-0", tempo = "4010"))
+        assertEquals(emptyList(), parts(plannedTempo = "4010", tempo = "4-0-1-0"))
+    }
+
+    @Test
+    fun `a changed prep is named`() {
+        assertEquals(listOf("prep 20s"), parts(prepS = 20))
+    }
+
+    @Test
+    fun `every change is named, in the order the controls behind the button run`() {
+        // Load, reps, tempo, prep -- the layout order inside the dialog, so
+        // the line reads as an index of what was touched rather than as an
+        // arbitrary list.
+        assertEquals(
+            listOf("100 kg", "8 reps", "tempo 6010", "prep 20s"),
+            parts(statedLoadKg = 100.0, statedReps = 8, tempo = "6010", prepS = 20),
+        )
+    }
+
+    @Test
+    fun `nothing is invented from a declaration the plan never made`() {
+        // A tempo cannot be ADDED by the control -- TempoAdjuster refuses a
+        // slot with no tempo -- so a null declaration has nothing to deviate
+        // from, and neither has a rep count on a timed set. Reporting either
+        // would put a "change" on screen for a set the lifter never touched.
+        assertEquals(emptyList(), parts(plannedTempo = null, tempo = "4010"))
+        assertEquals(emptyList(), parts(plannedReps = null, statedReps = 8))
+    }
 }
