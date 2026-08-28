@@ -18,6 +18,7 @@ import com.macrophage.barspeed.data.SetJournalStore
 import com.macrophage.barspeed.dsp.LiveSetState
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
+import com.macrophage.barspeed.dsp.SetEnd
 import com.macrophage.barspeed.dsp.SetTargets
 import com.macrophage.barspeed.dsp.StreamingSetTracker
 import com.macrophage.barspeed.dsp.TempoSchedule
@@ -38,6 +39,7 @@ import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.ResolvedGeometry
+import com.macrophage.barspeed.model.RestClockPolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SensorRoster
@@ -826,6 +828,14 @@ private fun recordedTimedSeconds(
  * [RecordState.statedTempo] is re-decided by the same rule on the same
  * boundaries, so a tempo the lifter set on the wheels holds for the rest of the
  * block and no further. #148.
+ *
+ * [restS] is the whole prescribed period and [restRemainingS] is what is left
+ * of it at the moment this state is built. TWO arguments rather than one, and
+ * the second is not derivable from the first here: how much of the rest has
+ * already gone is a decision about instants, taken by
+ * [com.macrophage.barspeed.model.RestClockPolicy] where a test can reach it,
+ * and this function only places the answer. The progress ring reads the pair,
+ * so a period seeded part-drained draws part-drained. #172.
  */
 private fun restingState(
     s: RecordState,
@@ -833,6 +843,7 @@ private fun restingState(
     analysis: SetAnalysis,
     failed: Boolean,
     restS: Int,
+    restRemainingS: Int,
 ): RecordState {
     val nextSlot = s.nextSlot
     // Where the block ends. Hoisted to a local because the load and the tempo
@@ -905,7 +916,7 @@ private fun restingState(
         // OR-ed in, and that OR is what this field exists to see past.
         lastSetTappedFailed = p.rating?.failed == true,
         lastSetWarmup = p.rating?.warmup ?: false,
-        restRemainingS = restS,
+        restRemainingS = restRemainingS,
         // Set from the frozen index rather than incremented, so a retry cannot
         // count the same set twice.
         setsCompleted = p.orderIdx + 1,
@@ -2423,7 +2434,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         journal = null
 
         val restS = p.slot?.restS ?: DEFAULT_REST_S
-        stateFlow.value = restingState(stateFlow.value, p, analysis, failed, restS)
+        // Where the rest period started, and how much of it is left now. The
+        // instant comes off the set's own frozen cue track -- the same `Done`
+        // stamp SetEnd bounds the rep window at -- so there is one instant and
+        // nothing recomputes it. A set nothing called over falls back to the
+        // instant this write froze, which is every hold and every set recorded
+        // with the voice off. #172.
+        val restStartedAtMs =
+            RestClockPolicy.startedAtMs(
+                setOverCueAtMs = (SetEnd.of(p.cues) as? SetEnd.Cued)?.atMs,
+                endedAtMs = p.endedAtMs,
+            )
+        val restRemainingS = RestClockPolicy.remainingS(restS, restStartedAtMs, System.currentTimeMillis())
+        stateFlow.value = restingState(stateFlow.value, p, analysis, failed, restS, restRemainingS)
         pendingWrite = null
         writtenSetId = null
         startRestCountdown()
