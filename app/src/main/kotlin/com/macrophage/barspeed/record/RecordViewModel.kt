@@ -229,6 +229,51 @@ private data class PendingSetWrite(
 )
 
 /**
+ * The frozen set-write, in the shape the repository stores.
+ *
+ * A free function taking what it needs, rather than the inline construction
+ * this replaces and for the same reason [openSession] is one: [RecordViewModel]
+ * sits at detekt's LargeClass limit -- 599 of 600 logical lines before this
+ * change -- so a thirty-line argument list living inside it means the next
+ * field anywhere in the class reds `:app:detekt`, which is CI's first step.
+ * Nothing else about it moved: every argument is the same expression over the
+ * same three inputs, all of them already frozen.
+ *
+ * [failed] is passed rather than derived here. It is the OR of the lifter's own
+ * tap and the app's derivation, computed at the call site from state this
+ * function cannot see, and re-deriving it from [p] alone would silently drop
+ * the half the lifter stated.
+ */
+private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Boolean) = CompletedSet(
+    exerciseId = p.exercise.id,
+    exerciseName = p.exercise.displayName,
+    loadKg = p.loadKg,
+    plannedLoadKg = p.plannedLoadKg,
+    plannedReps = p.plannedReps,
+    manualReps = p.manualReps,
+    actualDurationS = p.actualDurationS,
+    plannedDurationS = p.plannedDurationS,
+    side = p.side,
+    tempo = p.tempoText,
+    targetMeanConVelMps = p.slot?.targetMeanConVelMps,
+    velocityLossStopPct = p.slot?.velocityLossStopPct,
+    plannedRestS = p.slot?.restS,
+    plannedPrepS = p.plannedPrepS,
+    prepS = p.prepS,
+    startedAtMs = p.startedAtMs,
+    endedAtMs = p.endedAtMs,
+    analysis = analysis,
+    geometry = p.geometry,
+    imuSamples = p.samples,
+    hrSamples = p.hrSamples,
+    restHrSamples = p.restHrSamples,
+    voiceCues = p.cues,
+    rpe = p.rating?.rpe,
+    failed = failed,
+    warmup = p.rating?.warmup == true,
+)
+
+/**
  * Open the session row the first set of a session hangs off.
  *
  * A free function taking what it needs, rather than a method, so that the one
@@ -1997,35 +2042,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             writtenSetId ?: sessionRepository.recordSet(
                 sessionId = sessionId,
                 orderIdx = p.orderIdx,
-                set =
-                CompletedSet(
-                    exerciseId = p.exercise.id,
-                    exerciseName = p.exercise.displayName,
-                    loadKg = p.loadKg,
-                    plannedLoadKg = p.plannedLoadKg,
-                    plannedReps = p.plannedReps,
-                    manualReps = p.manualReps,
-                    actualDurationS = p.actualDurationS,
-                    plannedDurationS = p.plannedDurationS,
-                    side = p.side,
-                    tempo = p.tempoText,
-                    targetMeanConVelMps = p.slot?.targetMeanConVelMps,
-                    velocityLossStopPct = p.slot?.velocityLossStopPct,
-                    plannedRestS = p.slot?.restS,
-                    plannedPrepS = p.plannedPrepS,
-                    prepS = p.prepS,
-                    startedAtMs = p.startedAtMs,
-                    endedAtMs = p.endedAtMs,
-                    analysis = analysis,
-                    geometry = p.geometry,
-                    imuSamples = p.samples,
-                    hrSamples = p.hrSamples,
-                    restHrSamples = p.restHrSamples,
-                    voiceCues = p.cues,
-                    rpe = p.rating?.rpe,
-                    failed = failed,
-                    warmup = p.rating?.warmup == true,
-                ),
+                set = completedSetOf(p, analysis, failed),
             ).also { writtenSetId = it }
         ratings.attachTo(setId)
         // The row and every stream belonging to it are in one transactional
