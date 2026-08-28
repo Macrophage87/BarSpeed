@@ -242,12 +242,20 @@ class SchemaContractTest {
                 "$key does not exclude zero, which the app refuses",
             )
         }
+        val exclusion = assertNotNull(plan["not"], "the published plan schema permits both bodyweight units at once")
+            .jsonObject
         assertEquals(
             listOf("bodyweight_kg", "bodyweight_lb"),
-            assertNotNull(plan["not"], "the published plan schema permits both bodyweight units at once")
-                .jsonObject["required"]!!.jsonArray.map { it.jsonPrimitive.content },
+            exclusion["required"]!!.jsonArray.map { it.jsonPrimitive.content },
             "the top-level exclusion is not the bodyweight pair",
         )
+        listOf("bodyweight_kg", "bodyweight_lb").forEach { key ->
+            assertEquals(
+                "number",
+                exclusion["properties"]!!.jsonObject[key]!!.jsonObject["type"]!!.jsonPrimitive.content,
+                "the exclusion refuses a pair of nulls, which the app accepts",
+            )
+        }
     }
 
     /**
