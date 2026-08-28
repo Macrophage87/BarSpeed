@@ -2,8 +2,10 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * [TempoAdjustPolicy], the decision half of the between-sets tempo picker.
@@ -169,6 +171,76 @@ class TempoAdjustPolicyTest {
             TempoAdjustPolicy.withDigit("3-0-1.5-0", TempoAdjustPolicy.BOTTOM_PAUSE, "1"),
             "a tempo the control could not have drawn cannot be written back through it",
         )
+    }
+
+    /**
+     * The inputs a stepper is not drawn for at all, checked through the stepping
+     * pair rather than assumed to follow from [TempoAdjustPolicy.wheelValues].
+     *
+     * Same six tempos as the no-control pin above plus the two positions outside
+     * the notation, because [TempoAdjustPolicy.steppedValue] takes a position and
+     * `wheelValues` does not: a stepper drawn for digit 5 would have no digit to
+     * move and must say so rather than moving digit 4.
+     */
+    @Test
+    fun `a tempo with no control on it cannot be stepped, and neither can a digit that is not there`() {
+        listOf(null, "", "3-0-1.5-0", "10-0-1-0", "0010", "3000").forEach { tempo ->
+            (1..TempoAdjustPolicy.DIGITS).forEach { position ->
+                assertNull(TempoAdjustPolicy.steppedValue(tempo, position, 1), "'$tempo' digit $position up")
+                assertNull(TempoAdjustPolicy.steppedValue(tempo, position, -1), "'$tempo' digit $position down")
+                assertFalse(TempoAdjustPolicy.canStep(tempo, position, 1), "'$tempo' digit $position offers up")
+                assertFalse(TempoAdjustPolicy.canStep(tempo, position, -1), "'$tempo' digit $position offers down")
+            }
+        }
+        listOf(0, 5).forEach { position ->
+            assertNull(TempoAdjustPolicy.steppedValue("3010", position, 1), "there is no digit $position")
+            assertFalse(TempoAdjustPolicy.canStep("3010", position, 1), "and no button on it either")
+        }
+    }
+
+    /**
+     * What a tap may produce, over every tempo the control can draw.
+     *
+     * 39 x 4 x 25 = 3,900 taps: every single-digit variation of `3010` (9 down
+     * strokes, 10 up strokes, 10 of each pause), every digit, every delta from
+     * -12 to 12 -- both ends well past the length of the longest choice list, so
+     * the clamp is exercised rather than trusted.
+     * Three invariants, each of which the app depends on somewhere else: the
+     * result is a value that digit is allowed to take, the tempo it spells is
+     * one `Tempo.parseOrNull` accepts (`beginSet`, `PlanFile.validate` and the
+     * in-set ring all read a tempo through it), and no other digit moved.
+     *
+     * It says nothing about WHICH value a tap produces. That is the differential
+     * pins' job below; this one would pass on a control that never moved at all.
+     */
+    @Test
+    fun `every tap of every digit lands on a value that digit is allowed to take`() {
+        (1..TempoAdjustPolicy.DIGITS).forEach { source ->
+            TempoAdjustPolicy.choices(source).forEach { value ->
+                val tempo = TempoAdjustPolicy.withDigit("3010", source, value)
+                assertNotNull(tempo, "digit $source = $value spells nothing")
+                (1..TempoAdjustPolicy.DIGITS).forEach { position ->
+                    (-12..12).forEach { delta ->
+                        val stepped = TempoAdjustPolicy.steppedValue(tempo, position, delta)
+                        assertNotNull(stepped, "'$tempo' digit $position by $delta")
+                        assertTrue(
+                            stepped in TempoAdjustPolicy.choices(position),
+                            "'$tempo' digit $position by $delta gives '$stepped', which that digit may not take",
+                        )
+                        val after = TempoAdjustPolicy.withDigit(tempo, position, stepped)
+                        assertNotNull(after, "'$tempo' digit $position by $delta spells nothing")
+                        assertNotNull(Tempo.parseOrNull(after), "'$after' will not parse")
+                        val moved = TempoAdjustPolicy.wheelValues(after)!!
+                        val before = TempoAdjustPolicy.wheelValues(tempo)!!
+                        assertEquals(
+                            before.indices.filter { before[it] != moved[it] }.toSet() - (position - 1),
+                            emptySet(),
+                            "'$tempo' digit $position by $delta moved a digit it was not asked to",
+                        )
+                    }
+                }
+            }
+        }
     }
 
     @Test

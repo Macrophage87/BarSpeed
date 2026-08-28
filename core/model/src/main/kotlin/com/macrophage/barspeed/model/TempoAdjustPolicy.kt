@@ -203,6 +203,51 @@ object TempoAdjustPolicy {
     }
 
     /**
+     * The value digit [position] takes after [delta] taps of a stepper, or null
+     * when [tempoText] has no such control to tap.
+     *
+     * The index moves along [choices] and is COERCED into that list's indices,
+     * never wrapped. Wrapping would turn a 9 into a 1 on one mis-tap, which on
+     * the down stroke is an eight-second difference in what the voice paces and
+     * what the compliance scorer grades; clamping makes the end of the range
+     * feel like the end of the range. A tap that cannot move is what [canStep]
+     * reports, so the button can be drawn disabled rather than lying.
+     *
+     * The alphabet is [choices]', so nothing new is reachable through stepping:
+     * "X" is the last entry of the up stroke's list, which makes `+` from 9 give
+     * X and `-` from X give 9 without a second statement of where X is legal.
+     *
+     * Null exactly where [wheelValues] is null -- a set that declares no tempo,
+     * a fractional or two-character component, a stroke below [MIN_STROKE_S] --
+     * plus a [position] outside the notation. The caller draws no control at all
+     * for any of them.
+     *
+     * A digit value rather than the whole tempo, because the state entry point
+     * this feeds takes a digit and routes it through [withDigit]: the guarantee
+     * that a tempo the control could not have DRAWN cannot be written back is
+     * inherited rather than restated here.
+     *
+     * The body ignores [delta] as it stands: this commit introduces the seam and
+     * the guards, and the differential pins that make a tap MOVE the digit are
+     * pushed red before the arithmetic lands. The suppression goes with it.
+     */
+    @Suppress("UnusedParameter")
+    fun steppedValue(tempoText: String?, position: Int, delta: Int): String? = valueAt(tempoText, position)
+
+    /**
+     * Whether one tap of [delta] on digit [position] would actually move it.
+     *
+     * The enabled state of a stepper button, decided here rather than in the
+     * screen: false at both ends of a digit's [choices] and false wherever
+     * [steppedValue] is null. A button that is drawn enabled and does nothing is
+     * the state #154 was raised about, one control over.
+     */
+    fun canStep(tempoText: String?, position: Int, delta: Int): Boolean {
+        val current = valueAt(tempoText, position) ?: return false
+        return steppedValue(tempoText, position, delta) != current
+    }
+
+    /**
      * The tempo to offer for the set coming up, or null to offer none.
      *
      * [hasPlannedNext] separates two facts that must not share an answer,
@@ -278,6 +323,16 @@ object TempoAdjustPolicy {
      * same way `plannedLoadKg` is for load.
      */
     fun carriedIntoNextSet(declaredTempo: String?, adjustedTempo: String?): String? = adjustedTempo ?: declaredTempo
+
+    /**
+     * The value digit [position] currently shows, or null when there is no
+     * control on it.
+     *
+     * [wheelValues] is the whole guard: it is null for every tempo the control
+     * cannot draw, and `getOrNull` covers a position outside the notation
+     * without a second bounds test to keep in agreement with [DIGITS].
+     */
+    private fun valueAt(tempoText: String?, position: Int): String? = wheelValues(tempoText)?.getOrNull(position - 1)
 
     private const val ECCENTRIC = "eccentric"
 
