@@ -2279,7 +2279,10 @@ private fun RestHeader(state: RecordState, viewModel: RecordViewModel) {
                         // timed branch directly above already uses, rather
                         // than a new punctuation invented for this case; with
                         // no split the line is byte-identical to before.
-                        feedback.actualDurationS?.let { "$name ${it}s @ $loadText" }
+                        // effectiveDurationS, not actualDurationS: a hold
+                        // corrected on this screen moves this line the way the
+                        // rep branch below already moves for a rep correction.
+                        feedback.effectiveDurationS?.let { "$name ${it}s @ $loadText" }
                             ?: split?.let { "$name ${feedback.effectiveReps} reps @ $loadText ($it)" }
                             ?: "$name ${feedback.effectiveReps} × $loadText",
                         style = MaterialTheme.typography.titleMedium,
@@ -2329,7 +2332,10 @@ private fun FeedbackChips(feedback: SetFeedback, hrBpm: Int?, hrvMs: Int? = null
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        feedback.actualDurationS?.let { actual ->
+        // effectiveDurationS, not actualDurationS: this chip's tone is the
+        // shortfall signal, and a hold corrected up past its target left it
+        // red against a record that says the target was met.
+        feedback.effectiveDurationS?.let { actual ->
             val planned = feedback.plannedDurationS
             VerdictChip(
                 if (planned != null) "Held $actual/${planned}s" else "Held ${actual}s",
