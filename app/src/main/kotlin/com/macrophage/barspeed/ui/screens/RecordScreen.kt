@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -2068,37 +2071,48 @@ private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel)
  * whether the wording reads right at the end of a real workout is a [Field]
  * item and is not claimed.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SessionRpePanel(viewModel: RecordViewModel) {
-    SectionCaption("How did the whole session feel?")
-    Spacer(Modifier.height(2.dp))
-    Text(
-        "1 = easy · 10 = all you had",
-        style = MaterialTheme.typography.bodySmall,
-        color = BarColors.Sub,
-    )
-    Spacer(Modifier.height(8.dp))
-    SessionRpe.VALUES.chunked(5).forEach { row ->
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        ) {
-            row.forEach { rating ->
-                OutlinedButton(
-                    onClick = { viewModel.finishSession(rating) },
-                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp),
-                ) {
-                    Text("$rating", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+    // The whole panel is one bring-into-view target, requested once when it is
+    // composed. The rest screen scrolls and the panel is drawn after the
+    // next-set block, so at the scroll position a lifter reaches the finish
+    // control from, the numbers can be on screen while "Finish without rating"
+    // is below the fold. Ten buttons that each write a rating, reachable, with
+    // the skip not reachable, is the arrangement this requester exists to stop.
+    val requester = remember { BringIntoViewRequester() }
+    LaunchedEffect(Unit) { requester.bringIntoView() }
+    Column(modifier = Modifier.fillMaxWidth().bringIntoViewRequester(requester)) {
+        SectionCaption("How did the whole session feel?")
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "1 = easy · 10 = all you had",
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+        Spacer(Modifier.height(8.dp))
+        SessionRpe.VALUES.chunked(5).forEach { row ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            ) {
+                row.forEach { rating ->
+                    OutlinedButton(
+                        onClick = { viewModel.finishSession(rating) },
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp),
+                    ) {
+                        Text("$rating", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                    }
                 }
             }
         }
-    }
-    // Null at the call site, not a default on the ViewModel: an unrated session
-    // is a decision the lifter made here, and it is recorded as an absence
-    // rather than as a number nobody said.
-    TextButton(onClick = { viewModel.finishSession(null) }, modifier = Modifier.fillMaxWidth()) {
-        Text("Finish without rating", color = BarColors.Sub)
+        // Null at the call site, not a default on the ViewModel: an unrated
+        // session is a decision the lifter made here, and it is recorded as an
+        // absence rather than as a number nobody said.
+        TextButton(onClick = { viewModel.finishSession(null) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Finish without rating", color = BarColors.Sub)
+        }
     }
 }
 

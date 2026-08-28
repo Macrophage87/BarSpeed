@@ -1724,7 +1724,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * pass straight through it untouched.
      */
     fun beginSet() {
-        stateFlow.value = startedFromReadyState(stateFlow.value)
+        // The rating panel goes with it. Starting another set is how a lifter
+        // backs out of a mistapped Finish, and a flag left set here would
+        // reopen the panel the next time they reach the rest screen -- asking
+        // about a workout they have carried on with.
+        stateFlow.value = startedFromReadyState(stateFlow.value).copy(askingSessionRpe = false)
         val s = stateFlow.value
         val exercise = s.currentExercise
         val tracker = StreamingSetTracker.forLift(exercise.liftDirection())
@@ -2450,11 +2454,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     /** Advance to the next planned set, applying any in-rest load/rep edits. */
     fun startNextSet() {
         restJob?.cancel()
-        // The rating panel goes with it. Starting another set is how a lifter
-        // backs out of a mistapped Finish, and a flag left set here would
-        // reopen the panel the next time they reach the rest screen -- asking
-        // about a workout they have carried on with.
-        stateFlow.value = advancedState(stateFlow.value).copy(askingSessionRpe = false)
+        stateFlow.value = advancedState(stateFlow.value)
         beginSet()
     }
 
