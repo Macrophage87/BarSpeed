@@ -49,13 +49,21 @@ object BodyweightLoadDisplay {
      * it because the answer says "body weight", not "0 kg": the load is
      * reported, it is simply the lifter.
      */
-    @Suppress("UnusedParameter")
-    fun label(addedKg: Double?, unit: WeightUnit): String =
-        // SEAM ONLY. This is what the plan screen renders today, moved here
-        // unchanged so the differentials that add the sign and the prefix can
-        // be pushed red against it first: a positive added load renders as a
-        // bare total and a negative one disappears entirely.
-        addedKg?.takeIf { it > 0 }?.let { unit.format(it) } ?: BARE
+    fun label(addedKg: Double?, unit: WeightUnit): String {
+        val magnitude = Math.abs(addedKg ?: 0.0)
+        // Asked of the RENDERED magnitude, not the stored one. WeightUnit.format
+        // quantises to a tenth of the display unit, so a load under half of that
+        // has no digits left to show, and the sign would then decorate a zero:
+        // "BW + 0 kg" states an addition of nothing. The zero of this notation
+        // already has a spelling, and it is BARE. Comparing the formatted text
+        // rather than the double is what makes the rule the same rule at both
+        // units -- 0.02 kg is a rendered zero in kilograms and in pounds alike,
+        // and no epsilon has to be chosen to say so.
+        val text = unit.format(magnitude)
+        if (text == unit.format(0.0)) return BARE
+        val sign = if ((addedKg ?: 0.0) > 0) "+" else "−"
+        return "$BARE $sign $text"
+    }
 
     /**
      * What the editable load box takes, said in the box's own label so it
@@ -76,11 +84,11 @@ object BodyweightLoadDisplay {
      * added load whether it is on a belt or in two hands, and the split is
      * shown under the box rather than asked for in it.
      */
-    @Suppress("UnusedParameter")
-    fun fieldLabel(bodyweight: Boolean, implementCount: Int?, unit: WeightUnit): String =
-        // SEAM ONLY: today's two answers, with the body-weight case still
-        // falling through to them so its differential can be pushed red.
-        if (ImplementLoad.count(implementCount) > 1) "Total load (${unit.suffix})" else "Load (${unit.suffix})"
+    fun fieldLabel(bodyweight: Boolean, implementCount: Int?, unit: WeightUnit): String = when {
+        bodyweight -> "Added to body weight (${unit.suffix})"
+        ImplementLoad.count(implementCount) > 1 -> "Total load (${unit.suffix})"
+        else -> "Load (${unit.suffix})"
+    }
 
     /**
      * The line under the load box saying which way the sign runs, or null when
@@ -96,10 +104,6 @@ object BodyweightLoadDisplay {
      * [SetLoadPolicy.totalKg] subtracts it, and until now the only place the
      * convention was written down was a KDoc.
      */
-    // SEAM ONLY, and both suppressions are the marker for it: today no screen
-    // says this at all, so the seam says nothing and the differential that
-    // gives the body-weight case a sentence can be pushed red. Both leave with
-    // that sentence.
-    @Suppress("UnusedParameter", "FunctionOnlyReturningConstant")
-    fun fieldHint(bodyweight: Boolean): String? = null
+    fun fieldHint(bodyweight: Boolean): String? =
+        "Negative for a band or assist machine taking weight off".takeIf { bodyweight }
 }
