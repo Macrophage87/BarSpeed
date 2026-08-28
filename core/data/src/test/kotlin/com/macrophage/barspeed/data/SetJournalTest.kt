@@ -195,6 +195,10 @@ class SetJournalTest {
      * not surface as an error: the directory is dropped and the capture is
      * never offered back. The default on the field is what stands between an
      * added header fact and a discarded orphan.
+     *
+     * The VALUE is asserted too, not only the recovery: `secondaryImuConnected`
+     * is what the interrupted-set card reads to say a second stream is missing,
+     * and a legacy header never had one.
      */
     @Test
     fun `a header written before the second link existed still decodes`() = runTest {
@@ -205,6 +209,7 @@ class SetJournalTest {
         assertEquals("back_squat", found.header.exerciseId)
         assertEquals(0, found.header.orderIdx)
         assertEquals(true, found.header.imuConnected)
+        assertEquals(false, found.header.secondaryImuConnected)
         assertEquals(cues, found.cues)
     }
 
