@@ -222,6 +222,24 @@ private data class PendingSetWrite(
     /** The rest window before this set, frozen with everything else. */
     val restHrSamples: List<HrSample>,
     val cues: List<VoiceCue>,
+    /**
+     * The instants a rep was counted this set, frozen with everything else
+     * (#158).
+     *
+     * Taken from the journal rather than from a buffer of this class's own,
+     * because the journal is already the one writer every mark goes through:
+     * `addManualRep` and the guided runner's `onRepCounted` both call
+     * [SetJournal.appendRepMark] and nothing else records a mark. A second
+     * accumulator here would be a second thing to remember at each of those
+     * sites, and the artifact it fed -- the stored set -- would then be able
+     * to disagree with the recovered capture about which reps happened.
+     *
+     * The cost is stated rather than hidden: when no journal could be opened,
+     * the marks of that set are lost. That is the same window in which the
+     * interrupted-set capture does not exist either, and before this the
+     * marks were discarded on every set regardless.
+     */
+    val repMarks: List<Long>,
     val rating: SetRating?,
     val planName: String?,
     val planSessionName: String?,
@@ -268,6 +286,7 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
     hrSamples = p.hrSamples,
     restHrSamples = p.restHrSamples,
     voiceCues = p.cues,
+    repMarks = p.repMarks,
     rpe = p.rating?.rpe,
     failed = failed,
     warmup = p.rating?.warmup == true,
@@ -1876,6 +1895,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 hrSamples = hrBuffer.toList(),
                 restHrSamples = restHrBuffer.toList(),
                 cues = cueBuffer.toList(),
+                repMarks = journal?.repMarks.orEmpty(),
                 rating = rating,
                 planName = s.planName.takeIf { !s.adHoc },
                 planSessionName = s.planSessionName.takeIf { !s.adHoc },

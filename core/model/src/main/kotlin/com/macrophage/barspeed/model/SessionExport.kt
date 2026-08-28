@@ -107,6 +107,16 @@ data class SessionExport(
          * schema's `schemaVersion` description carries what a 1.12 reader may
          * assume and a 1.13 reader may not; this is the warning, not a second
          * copy of it.
+         *
+         * 1.13 also carries a second, ADDITIVE change (#158): a set may carry
+         * [SetExport.repMarks], the instants a rep was counted at. One version
+         * with two changes of different kinds, because 1.13 is unreleased at
+         * the time this is written and minting 1.14 for a key nothing has
+         * shipped a reader for would publish a version boundary that never
+         * existed. The two halves must not be read as one: `duration_s`'s
+         * semantic is not additive and a 1.12 reader must be re-checked
+         * against it, while `repMarks` changes no existing key and is absent
+         * on every set that produced no marks.
          */
         const val SCHEMA_VERSION = "1.13"
 

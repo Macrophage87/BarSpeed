@@ -175,6 +175,29 @@ class SessionExporter(
             } else {
                 null
             }
+        // The instants a rep was COUNTED, issue #158, from the same fetch the
+        // cue track came out of.
+        //
+        // Detail-gated on the same terms as voiceCues: both are per-set event
+        // lists on the raw clock, read against the IMU stream rather than
+        // read in prose, and the summary export exists to be short.
+        //
+        // takeIf isNotEmpty is what keeps absence a single state. A stream
+        // holding nothing but its header would otherwise publish an empty
+        // array, which is a CLAIM -- that the app counted, and counted
+        // nothing -- and false on the ordinary sensor-counted set, which
+        // never counts out loud. runCatching for the decode: a mark is the
+        // least of what this document carries and a stream that will not
+        // parse is not worth failing an export over, the same shape the HRM
+        // decode below uses.
+        val repMarks =
+            if (includeRepDetail) {
+                streams.firstOrNull { it.kind == RawStreamEntity.KIND_REPS }
+                    ?.let { stream -> runCatching { RepMarkCsv.decode(Gzip.decompress(stream.csvGzip)) }.getOrNull() }
+                    ?.takeIf { it.isNotEmpty() }
+            } else {
+                null
+            }
         // Issue #83 reaches ALREADY-RECORDED sets here, not only new ones.
         // endOfSetBpm, avgBpm and maxBpm are frozen columns written when the
         // set was recorded; gating only the record path would leave every set
@@ -245,6 +268,7 @@ class SessionExporter(
                 null
             },
             voiceCues = voiceCues,
+            repMarks = repMarks,
             // The stored rep count comes from the lifter or the voice guide; the
             // sensor segmenter is a separate opinion. Say so when they disagree
             // rather than letting a short per-rep array look like the whole set.
@@ -427,6 +451,12 @@ class RawExporter(
         meta.append("  \"analysisFile\": \"session.json\",\n")
         meta.append("  \"csvHeaderImu\": \"${ImuCsv.HEADER}\",\n  \"csvHeaderHrm\": \"${HrCsv.HEADER}\",\n")
         meta.append("  \"csvHeaderCues\": \"${CueCsv.HEADER}\",\n")
+        // A header per format the archive can contain. The rep-mark CSV needs
+        // no change to the zip loop -- every stream is written as
+        // set%02d_<exercise>_<kind>.csv and the kind alone names the file --
+        // but a column layout stated nowhere is one a reader has to guess at,
+        // and this manifest has no published schema to guess from.
+        meta.append("  \"csvHeaderReps\": \"${RepMarkCsv.HEADER}\",\n")
         meta.append("  \"sets\": [\n")
 
         // zipCompressionLevel is documented on the constructor parameter, not

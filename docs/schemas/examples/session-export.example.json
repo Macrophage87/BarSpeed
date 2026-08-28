@@ -58,6 +58,7 @@
           "load_kg": 45,
           "load_lb": 99.2,
           "reps": 10,
+          "repsManual": true,
           "plannedReps": 10,
           "rest_s": 90,
           "tempoPrescribed": "1030",
@@ -87,6 +88,7 @@
               "travelRatio": "default"
             }
           },
+          "repMarks": [1784397124000, 1784397128120, 1784397132060, 1784397136210, 1784397140340, 1784397144290, 1784397148480, 1784397152610, 1784397156900, 1784397161180],
           "summary": { "meanConVel_mps": 0.41, "peakConVel_mps": 0.66, "meanEcc_s": 2.8, "meanCon_s": 1.1, "meanRom_m": 0.34, "romSpread_pct": 11.8 }
         }
       ]

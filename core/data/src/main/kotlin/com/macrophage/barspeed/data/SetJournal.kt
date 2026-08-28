@@ -165,6 +165,7 @@ class SetJournal internal constructor(
      * only fact in a set that no reprocessing of any stream can rebuild.
      */
     fun appendRepMark(timestampMs: Long) {
+        marks += timestampMs
         channel.trySend(Row(REPS, timestampMs.toString()))
     }
 

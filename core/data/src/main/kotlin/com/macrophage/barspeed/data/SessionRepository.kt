@@ -211,6 +211,21 @@ class SessionRepository(
                     ),
                 )
             }
+            // Last, and beside the cue track on purpose: the two are the
+            // set's two clocks and the pair is only readable together. A cue
+            // is what the app SAID, on a schedule; a mark is what was
+            // COUNTED. Written only when marks exist, because an empty file
+            // would claim the app counted and counted nothing -- false on
+            // every sensor-counted set, which never counts out loud at all.
+            if (set.repMarks.isNotEmpty()) {
+                add(
+                    RawStreamEntity(
+                        setId = 0L,
+                        kind = RawStreamEntity.KIND_REPS,
+                        csvGzip = Gzip.compress(RepMarkCsv.encode(set.repMarks)),
+                    ),
+                )
+            }
         }
         return sessionDao.insertSetWithStreams(
             SetRecordEntity(
