@@ -30,6 +30,14 @@ class TempoAdjustPolicyTest {
 
     private fun labelled(digits: List<TempoDigit>) = digits.map { "${it.label}/${it.caption}" }
 
+    /**
+     * The tempo one tap of a stepper leaves behind: the screen's own two calls,
+     * in the order the screen makes them, so the pins cover the round trip
+     * rather than the digit alone.
+     */
+    private fun tapped(tempo: String, position: Int, delta: Int): String? =
+        TempoAdjustPolicy.steppedValue(tempo, position, delta)?.let { TempoAdjustPolicy.withDigit(tempo, position, it) }
+
     @Test
     fun `a drive-up vertical lift calls digit 1 the down stroke and its eccentric`() {
         assertEquals(
@@ -241,6 +249,105 @@ class TempoAdjustPolicyTest {
                 }
             }
         }
+    }
+
+    /**
+     * One tap, one place, on the digit that was tapped.
+     *
+     * The whole content of "each change feels deliberate": the lifter taps once
+     * and one number moves by one. A tap that moved two places, or moved the
+     * digit beside it, would be the wheel's own defect wearing a button.
+     */
+    @Test
+    fun `one tap moves the digit it is on by one place`() {
+        assertEquals("4", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.DOWN_STROKE, 1))
+        assertEquals("2", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.DOWN_STROKE, -1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.BOTTOM_PAUSE, 1))
+        assertEquals("2", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.UP_STROKE, 1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.TOP_PAUSE, 1))
+        assertEquals("3010", tapped("2010", TempoAdjustPolicy.DOWN_STROKE, 1))
+        assertEquals("3010", tapped("3011", TempoAdjustPolicy.TOP_PAUSE, -1))
+    }
+
+    /**
+     * A stroke stops at one second and never reaches zero.
+     *
+     * [TempoAdjustPolicy.MIN_STROKE_S] is measured, not chosen: `CadencePlan.of`
+     * floors every stroke at a second because the runner can only sleep in whole
+     * ones, so a stroke prescribed as 0 is PLAYED as 1 while the scorer goes on
+     * grading the lifter against the 0. A stepper that could walk a digit down
+     * to 0 would build that state one tap at a time.
+     */
+    @Test
+    fun `a stroke steps down to one second and stops there`() {
+        assertEquals("2", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.DOWN_STROKE, -1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("2010", TempoAdjustPolicy.DOWN_STROKE, -1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("1010", TempoAdjustPolicy.DOWN_STROKE, -1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("1010", TempoAdjustPolicy.DOWN_STROKE, -5))
+        assertFalse(TempoAdjustPolicy.canStep("1010", TempoAdjustPolicy.DOWN_STROKE, -1), "no tap left to offer")
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3020", TempoAdjustPolicy.UP_STROKE, -1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.UP_STROKE, -1))
+    }
+
+    /**
+     * The up stroke steps into X and stops, and steps back out into 9.
+     *
+     * "X" is the last entry of the up stroke's choices and nothing else needed
+     * saying: no new alphabet, no second statement of where X is legal. It is
+     * the top of that digit's range because there is nothing faster than as
+     * fast as possible.
+     */
+    @Test
+    fun `the up stroke steps into X at the top and back out into nine`() {
+        assertEquals("X", TempoAdjustPolicy.steppedValue("3090", TempoAdjustPolicy.UP_STROKE, 1))
+        assertEquals("X", TempoAdjustPolicy.steppedValue("30X0", TempoAdjustPolicy.UP_STROKE, 1))
+        assertFalse(TempoAdjustPolicy.canStep("30X0", TempoAdjustPolicy.UP_STROKE, 1), "nothing faster than X")
+        assertEquals("9", TempoAdjustPolicy.steppedValue("30X0", TempoAdjustPolicy.UP_STROKE, -1))
+        assertEquals("30X0", tapped("3090", TempoAdjustPolicy.UP_STROKE, 1))
+    }
+
+    /** A pause steps down to zero -- the pause where the lifter does not stop -- and stops. */
+    @Test
+    fun `a pause steps down to zero and stops`() {
+        assertEquals("0", TempoAdjustPolicy.steppedValue("3011", TempoAdjustPolicy.TOP_PAUSE, -1))
+        assertTrue(TempoAdjustPolicy.canStep("3011", TempoAdjustPolicy.TOP_PAUSE, -1))
+        assertEquals("0", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.TOP_PAUSE, -1))
+        assertFalse(TempoAdjustPolicy.canStep("3010", TempoAdjustPolicy.TOP_PAUSE, -1), "zero is the floor")
+        assertEquals("0", TempoAdjustPolicy.steppedValue("3110", TempoAdjustPolicy.BOTTOM_PAUSE, -3))
+    }
+
+    /**
+     * A step past the end of a range clamps; it does not wrap.
+     *
+     * Wrapping would turn a 9 into a 1 on one mis-tap. On the down stroke that
+     * is an eight-second difference between what the voice paces and what the
+     * lifter is graded against, and it would arrive silently, at the exact
+     * moment the lifter was not looking at the screen.
+     */
+    @Test
+    fun `a step past the end of the range clamps rather than wrapping`() {
+        assertEquals("9", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.DOWN_STROKE, 99))
+        assertEquals("9", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.BOTTOM_PAUSE, 99))
+        assertEquals("X", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.UP_STROKE, 99))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3050", TempoAdjustPolicy.UP_STROKE, -99))
+        assertEquals("0", TempoAdjustPolicy.steppedValue("3919", TempoAdjustPolicy.TOP_PAUSE, -99))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3919", TempoAdjustPolicy.DOWN_STROKE, -99))
+    }
+
+    /**
+     * A button is offered only where it would move something.
+     *
+     * The stepper's enabled state, decided here so the screen holds no rule of
+     * its own. A button drawn enabled that does nothing is the state #154 was
+     * raised about, one control over.
+     */
+    @Test
+    fun `a tap that would move nothing is not offered`() {
+        assertTrue(TempoAdjustPolicy.canStep("3010", TempoAdjustPolicy.DOWN_STROKE, 1), "3 has an up")
+        assertTrue(TempoAdjustPolicy.canStep("3010", TempoAdjustPolicy.DOWN_STROKE, -1), "and a down")
+        assertFalse(TempoAdjustPolicy.canStep("9010", TempoAdjustPolicy.DOWN_STROKE, 1), "9 is the ceiling")
+        assertFalse(TempoAdjustPolicy.canStep("3010", TempoAdjustPolicy.DOWN_STROKE, 0), "a tap of nothing")
+        assertEquals("3", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.DOWN_STROKE, 0))
     }
 
     @Test
