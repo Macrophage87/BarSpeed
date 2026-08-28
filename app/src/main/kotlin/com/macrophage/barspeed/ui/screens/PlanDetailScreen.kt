@@ -187,11 +187,17 @@ private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
                     color = BarColors.Sub,
                 )
             }
-            // Everything the plan wrote, in full and behind no tap. This is the
-            // approval gate -- the one screen whose job is to show the lifter
-            // what they are about to accept -- and hiding a paragraph here
-            // would hide it at the only moment it can still be questioned. The
-            // split matters on the rest screen and is drawn there.
+            // Everything the EXERCISE declared, in full and behind no tap.
+            // This is the approval gate -- the one screen whose job is to show
+            // the lifter what they are about to accept -- and hiding a
+            // paragraph here would hide it at the only moment it can still be
+            // questioned. The split matters on the rest screen and is drawn
+            // there.
+            //
+            // Not everything the plan wrote: a set's own `note` (PlanSetDef)
+            // is drawn nowhere on this screen. `setNote` is passed as null
+            // below, and the rest screen is the only place it reaches the
+            // lifter.
             //
             // Ordered by the same function that orders it there, rather than by
             // a second copy of the precedence that could drift from it: what

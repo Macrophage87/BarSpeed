@@ -46,11 +46,14 @@ the code; when the two disagree, that one is right.
 > days/week, equipment, current working weights or estimated 1RMs].
 >
 > Reply with ONLY a JSON document (no prose, no code fences) conforming exactly to
-> this schema: top level `{"schemaVersion": "1.7", "planName": string,
+> this schema: top level `{"schemaVersion": "1.8", "planName": string,
 > "sessions": [...]}`. Each session is `{"name": string, "exercises": [...]}`.
 > Each exercise is `{"exercise": snake_case_id, "sets": [...]}` plus an optional
-> `"notes"` string (form cues or intent — it's shown to me in the app with each
-> set of that exercise) — use ids like
+> `"description"` string (the form cue I read between sets without touching the
+> phone — MAXIMUM 220 characters, front-loaded with the part that decides how
+> the set is performed) and an optional `"additional_notes"` string (no limit —
+> the rest of the cue, which I see only after tapping to expand). The older
+> single-blob `"notes"` string is still accepted — use ids like
 > `back_squat`, `bench_press`, `deadlift`, `overhead_press`, `barbell_row`,
 > `romanian_deadlift`, `front_squat`, `hip_thrust`; for timed work `plank`,
 > `side_plank`, `dead_hang`, `farmers_walk`, `suitcase_carry`; and for

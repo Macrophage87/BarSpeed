@@ -11,7 +11,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -47,13 +46,17 @@ private const val NOTE_COLLAPSED_LINES = 4
  * paragraph pushes the next-set controls off screen, and the lifter did not ask
  * for it. The expansion resets whenever the text changes, so the next
  * exercise's cue starts collapsed rather than inheriting the last one's state,
- * and [rememberSaveable] keeps it expanded across a rotation mid-rest.
+ * and [rememberSaveable] keeps it expanded across a rotation mid-rest. The
+ * overflow latch is saved by the same mechanism, and an open block always
+ * carries its own control: an expansion that outlives the reason the control
+ * was drawn would strand the note open with no way back.
  *
  * The button also appears when nothing is hidden behind a tap but the visible
- * text itself overflowed [NOTE_COLLAPSED_LINES] — the 1.7 case. What is claimed
- * here is what this composable draws; whether a lifter notices the control
- * between sets is a [Field] question on issue #155 and no test in this
- * repository can answer it.
+ * text itself overflowed [NOTE_COLLAPSED_LINES] — the 1.7 case, where the cue
+ * is cut with an ellipsis rather than drawn in full. What is claimed here is
+ * what this composable draws; whether a lifter notices the control between
+ * sets is a [Field] question on issue #155 and no test in this repository can
+ * answer it.
  */
 @Composable
 fun ExpandableNote(visible: String?, behindTap: String?, color: Color, modifier: Modifier = Modifier) {
@@ -63,8 +66,15 @@ fun ExpandableNote(visible: String?, behindTap: String?, color: Color, modifier:
     // count is right at one font scale and one screen width and wrong at every
     // other. Guarded on !expanded because an expanded layout reports no
     // overflow and would clear the latch on the way back.
-    var overflowed by remember(visible) { mutableStateOf(false) }
-    val hasMore = behindTap != null || overflowed
+    //
+    // Saved alongside [expanded], not merely remembered. A rotation recreates
+    // the activity; an expansion that survives while the latch that justified
+    // it does not leaves a note expanded with nothing to collapse it.
+    var overflowed by rememberSaveable(visible) { mutableStateOf(false) }
+    // `expanded` is a term in its own right, not only through the latch: while
+    // the block is open there is a control to close it, whatever the layout
+    // last reported.
+    val hasMore = behindTap != null || overflowed || expanded
 
     Column(
         modifier.clickable(enabled = hasMore) { expanded = !expanded },

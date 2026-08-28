@@ -132,10 +132,12 @@ class PlanNoteDisplayTest {
     }
 
     @Test
-    fun `a plan written before the split renders exactly as it did`() {
+    fun `a plan written before the split puts all its text on the visible line`() {
         // The 1.7 case, pinned as its own test rather than left implied by the
-        // two above: an already-staged plan carrying only `notes` must not lose
-        // text or gain a tap.
+        // two above: an already-staged plan carrying only `notes` keeps all of
+        // it on the visible line and puts none of it behind the tap. Whether
+        // the drawn block gains a SHOW MORE control is `ExpandableNote`'s
+        // decision, and nothing in this module reaches it.
         val shown = display(notes = "Keep the eccentric honest.", setNote = "closer to the plate")
 
         assertEquals("Keep the eccentric honest. · closer to the plate", shown.visible)
