@@ -420,7 +420,7 @@ private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: M
  * which `beginSet` answers from the roster for its own slot.
  *
  * For a lifter with two labelled units that makes
- * three concurrent GATT links the steady state of EVERY set,
+ * up to three concurrent GATT links the steady state of EVERY set,
  * including one recorded at count 1, and the
  * second client still unlocks, sets 100 Hz and subscribes. Whether that costs
  * the analysed stream is unmeasured -- field item F1b -- and if it does, the
@@ -619,11 +619,12 @@ private fun openJournal(
         sensorRoles = roster.expected,
         analysedRole = roster.analysed,
         // The second link's state at that same moment, for the reading
-        // `imuConnected` is here for. The roster arms a role from pairing and
-        // labelling and consults no `ConnectionState`, so without this an
-        // absent or empty `imu-b.csv` reads the same whether the unit went
-        // quiet or was never connected at all.
-        secondaryImuConnected = s.imuConnectedB,
+        // `imuConnected` is here for -- but only on a set actually armed for
+        // two. The link is kept warm whenever two units are labelled, so an
+        // ungated write would record it on a count-1 set that never opened
+        // `imu-b.csv`, and the interrupted-set card would then report a second
+        // stream missing that nothing ever asked for.
+        secondaryImuConnected = roster.secondary != null && s.imuConnectedB,
     ),
 )
 
