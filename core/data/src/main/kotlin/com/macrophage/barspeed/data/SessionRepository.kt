@@ -22,7 +22,16 @@ data class CompletedSet(
     val plannedReps: Int?,
     /** Lifter-counted reps for sensorless sets; overrides the analysis count. */
     val manualReps: Int? = null,
-    /** Timed sets (planks, carries): actual and planned hold/carry seconds. */
+    /**
+     * Timed sets (planks, carries): recorded and planned hold/carry seconds.
+     *
+     * `actualDurationS` is the prescription on a set that ran to its planned
+     * end (#168), the measurement on one the lifter stopped, and the stated
+     * figure on one corrected afterwards from the rest screen. This is the
+     * object [SessionRepository.recordSet] fills [SetRecordEntity] from, so
+     * the two carry the same three cases and neither says which one a given
+     * row is in.
+     */
     val actualDurationS: Int? = null,
     val plannedDurationS: Int? = null,
     /** Unilateral sets: "left" or "right". */
