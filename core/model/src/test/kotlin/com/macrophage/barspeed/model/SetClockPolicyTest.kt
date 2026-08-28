@@ -68,4 +68,40 @@ class SetClockPolicyTest {
     fun `a part second is dropped rather than rounded up`() {
         assertEquals(45, SetClockPolicy.heldSeconds(PrepCase.NONE, tap, null, tap + 45_999))
     }
+
+    /**
+     * A hold the lifter puts down before its target reports what it actually
+     * lasted, and nothing rounds it up towards the prescription.
+     *
+     * Pinned here ahead of #168, which makes a hold END at its target. The
+     * short set is the case that must not move: auto-end fires at the planned
+     * boundary and never before it, so a 60 s plank abandoned at 30 s is 30 s
+     * on every path -- and 30 is what the shortfall rule then judges against
+     * the prescription. Asserting it before the auto-end exists is what makes
+     * the assertion evidence rather than a description of the new code.
+     *
+     * Reds if the TIMED branch ever clamps, floors or substitutes the
+     * prescription for the measured figure.
+     */
+    @Test
+    fun `a timed set stopped short of its target reports what it actually lasted`() {
+        val clockStart = tap + 10_000
+        assertEquals(30, SetClockPolicy.heldSeconds(PrepCase.TIMED, tap, clockStart, clockStart + 30_000))
+        assertEquals(1, SetClockPolicy.heldSeconds(PrepCase.TIMED, tap, clockStart, clockStart + 1_000))
+    }
+
+    /**
+     * The function knows nothing about the prescription and takes no argument
+     * carrying one, which is the property #168 relies on: the recorded figure
+     * for an auto-ended set is decided one layer up, by the policy that owns
+     * the planned-end instant, and this one keeps reporting the measurement.
+     *
+     * Stated as a measurement that runs PAST a plausible target rather than as
+     * a comment, so it reds if a cap is ever added here instead of there.
+     */
+    @Test
+    fun `a hold measured past any target is still reported as measured`() {
+        val clockStart = tap + 10_000
+        assertEquals(67, SetClockPolicy.heldSeconds(PrepCase.TIMED, tap, clockStart, clockStart + 67_000))
+    }
 }

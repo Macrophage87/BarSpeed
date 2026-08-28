@@ -74,4 +74,24 @@ class TimedSetVoiceTest {
             assertNull(TimedSetVoice.cueFor(it), "$it seconds past the target")
         }
     }
+
+    /**
+     * The terminal word is spoken at exactly one value of the argument, and
+     * that value is zero.
+     *
+     * Pinned before #168 wires the auto-end to the same instant. The whole
+     * risk in that change is two components each working out when the target
+     * is reached and disagreeing by a second -- the word arriving after the
+     * set has already been written, or the set running a beat past the word.
+     * This states, over a range wide enough to catch an off-by-one in either
+     * direction, that the voice's own boundary is here and nowhere else, so
+     * the commit that ties the end to it is tying it to a measured thing.
+     *
+     * Reds if the terminal branch is widened to `<= 0` or moved to 1.
+     */
+    @Test
+    fun `the terminal word lands on exactly one second and it is the target`() {
+        val terminal = (-30..30).filter { TimedSetVoice.cueFor(it) == "Time" }
+        assertEquals(listOf(0), terminal)
+    }
 }
