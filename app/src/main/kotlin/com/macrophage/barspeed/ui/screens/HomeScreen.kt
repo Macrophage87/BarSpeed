@@ -305,10 +305,10 @@ private fun volumeUnit(unit: WeightUnit): String = when (unit) {
  * and rendering one as history would put invented figures beside real ones.
  *
  * The two numbers shown are the ones that let the lifter check this against
- * their own memory of what happened: how many sensor samples reached the disk,
- * and when the last of them did. Neither is stated when the sensor was not
- * connected -- a count of zero would otherwise read as a measurement, when what
- * it means is that there was nothing to measure.
+ * their own memory of what happened: how many samples of each captured stream
+ * reached the disk, and when the last of them did. Neither is stated when no
+ * sensor was connected -- a count of zero would otherwise read as a
+ * measurement, when what it means is that there was nothing to measure.
  */
 @Composable
 private fun InterruptedSetNotice(
@@ -356,22 +356,39 @@ private fun InterruptedSetNotice(
 /**
  * What survived, in the terms the field check reads.
  *
- * The sample count and the last sample's wall clock are what distinguish a
+ * The sample counts and the last sample's wall clock are what distinguish a
  * capture that genuinely reached the filesystem from one the app merely
- * remembered. With no sensor connected there is no count to give and the card
- * says so in words rather than printing a zero.
+ * remembered. With neither sensor connected there is no count to give and the
+ * card says so in words rather than printing a zero.
+ *
+ * BOTH recovered streams are counted, issue #156. The analysed unit is the one
+ * that can be flat while the second one captured the whole set, and this card
+ * is the only thing standing between that capture and the DISCARD button
+ * beside it.
  */
 private fun interruptedDetail(orphan: OrphanedSet, clock: DateTimeFormatter): String {
     val reps = orphan.repMarks.size
+    val second =
+        when {
+            orphan.secondaryImuSamples.isNotEmpty() ->
+                ", ${orphan.secondaryImuSamples.size} from the second sensor"
+            orphan.header.secondaryImuConnected -> ", none from the second sensor"
+            else -> ""
+        }
+    val lastMs =
+        listOfNotNull(
+            orphan.imuSamples.lastOrNull()?.timestampMs,
+            orphan.secondaryImuSamples.lastOrNull()?.timestampMs,
+        ).maxOrNull()
     val parts =
         listOfNotNull(
-            if (orphan.header.imuConnected) {
-                "${orphan.imuSamples.size} sensor samples"
-            } else {
-                "no sensor connected"
+            when {
+                orphan.header.imuConnected -> "${orphan.imuSamples.size} analysed samples$second"
+                second.isNotEmpty() -> "no analysed sensor connected$second"
+                else -> "no sensor connected"
             },
-            orphan.imuSamples.lastOrNull()?.let {
-                "last at ${clock.format(Instant.ofEpochMilli(it.timestampMs).atZone(ZoneId.systemDefault()))}"
+            lastMs?.let {
+                "last at ${clock.format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()))}"
             },
             if (reps > 0) "$reps reps counted" else null,
         )
