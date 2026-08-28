@@ -185,9 +185,9 @@ class SchemaContractTest {
         // every plan already written in the wild breaks with the test green.
         val declared =
             setOf(
-                "exercise", "notes", "start", "concentric", "sensorInverted", "sensorOnStack",
-                "travelRatio", "plane", "bodyweight", "implementCount", "optional",
-                "kind", "prep_s", "sets",
+                "exercise", "notes", "description", "additional_notes", "start", "concentric",
+                "sensorInverted", "sensorOnStack", "travelRatio", "plane", "bodyweight",
+                "implementCount", "optional", "kind", "prep_s", "sets",
             )
         assertEquals(declared, exerciseKeys, "PlanExerciseDef and the schema disagree on exercise keys")
     }
@@ -213,6 +213,72 @@ class SchemaContractTest {
             1,
             implementCount["minimum"]!!.jsonPrimitive.int,
             "the published implement floor drifted from the one PlanFile.validate enforces",
+        )
+    }
+
+    /**
+     * The cap the published schema advertises and the cap [PlanFile.validate]
+     * enforces are the same cap.
+     *
+     * Modelled on `the schema's implement floor is the one the app validates`,
+     * and it guards the same shape: a bound in one document the other
+     * contradicts. A generator conforming to the published `maxLength` must not
+     * then be refused at the import gate, and a document the gate accepts must
+     * not be one the schema calls invalid.
+     *
+     * The other half is that `additional_notes` carries NO cap. It is where the
+     * overflow goes; a limit on it would leave the plan's author nowhere to put
+     * the paragraph and is how text starts getting deleted to fit.
+     */
+    @Test
+    fun `the published description cap is the one the app validates, and the overflow key has none`() {
+        val exercise = schema("plan.schema.json")["\$defs"]!!.jsonObject["exercise"]!!
+            .jsonObject["properties"]!!.jsonObject
+        val description =
+            assertNotNull(exercise["description"], "the published schema does not declare description")
+                .jsonObject
+        assertEquals("string", description["type"]!!.jsonPrimitive.content, "description is not a string")
+        assertEquals(
+            PlanFile.DESCRIPTION_MAX_CHARS,
+            description["maxLength"]!!.jsonPrimitive.int,
+            "the published description cap drifted from the one PlanFile.validate enforces",
+        )
+        val additional =
+            assertNotNull(exercise["additional_notes"], "the published schema does not declare additional_notes")
+                .jsonObject
+        assertEquals("string", additional["type"]!!.jsonPrimitive.content, "additional_notes is not a string")
+        assertTrue(
+            "maxLength" !in additional,
+            "additional_notes carries a cap, so the overflow from description has nowhere to go",
+        )
+    }
+
+    /**
+     * The published `notes` description says the key still renders, and where.
+     *
+     * The same shape as the `prep_s` pin below: a sentence in a published
+     * schema is read every week, and this one has to answer the question every
+     * author of an already-staged plan will have — whether their text is about
+     * to disappear behind a tap. It does not, and the document a generator is
+     * pointed at has to say so.
+     *
+     * Narrow, and said so: this cannot check the description is right, only
+     * that it names the newer key and does not tell the reader the older one is
+     * gone.
+     */
+    @Test
+    fun `the published notes description says what happens to it under the split`() {
+        val exercise = schema("plan.schema.json")["\$defs"]!!.jsonObject["exercise"]!!
+            .jsonObject["properties"]!!.jsonObject
+        val notes = exercise["notes"]!!.jsonObject["description"]!!.jsonPrimitive.content
+
+        assertTrue(
+            "description" in notes,
+            "the published notes description never mentions the key that replaces it: $notes",
+        )
+        assertTrue(
+            "additional_notes" in notes,
+            "the published notes description never says where a long cue goes now: $notes",
         )
     }
 

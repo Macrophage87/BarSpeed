@@ -232,6 +232,65 @@ class PlanImportWarningTest {
         assertEquals(listOf("lost", "undeclared", "undeclared", "seed", "shape", "guess", "extra"), shape)
     }
 
+    /**
+     * Both coaching keys on one exercise. Nothing is dropped and nothing is
+     * wrong, so it is a warning — but which of the two the lifter reads without
+     * touching the phone is a decision the app has made on the author's behalf,
+     * and the import gate is the only place that can say so.
+     */
+    @Test
+    fun `declaring both description and notes says which of the two is read at a glance`() {
+        val result = parse(
+            """{"exercise":"back_squat","description":"Brace, then break at the hips.",
+               "notes":"Third week of the block - keep the eccentric honest.","sets":[{"reps":5}]}""",
+        )
+
+        assertEquals(emptyList(), result.errors, "carrying both keys is not a reason to refuse the plan")
+        assertEquals(
+            listOf(
+                "sessions[0].exercises[0]: back_squat declares both \"description\" and \"notes\" - " +
+                    "\"description\" is what shows between sets and \"notes\" moves behind the expand " +
+                    "tap. Neither is dropped, but only one of them is read at a glance.",
+            ),
+            result.warnings,
+        )
+    }
+
+    /**
+     * An exercise whose whole cue is behind a tap. Legal, and left alone on
+     * screen — promoting it would put the paragraph back where the split just
+     * took it from — but the author almost certainly did not mean the lifter to
+     * see nothing, and this is the only surface that can ask.
+     */
+    @Test
+    fun `additional notes with nothing visible warn that the whole cue is behind a tap`() {
+        val result = parse(
+            """{"exercise":"back_squat","additional_notes":"Bar low on the traps, elbows down.",
+               "sets":[{"reps":5}]}""",
+        )
+
+        assertEquals(emptyList(), result.errors)
+        assertEquals(
+            listOf(
+                "sessions[0].exercises[0]: \"additional_notes\" is declared on back_squat with no " +
+                    "\"description\" and no \"notes\", so nothing this exercise declares shows until the " +
+                    "lifter expands it. Put the line that decides how the set is performed in " +
+                    "\"description\".",
+            ),
+            result.warnings,
+        )
+    }
+
+    @Test
+    fun `a plan carrying only the old notes key draws no note warning at all`() {
+        // The 1.7 shape. Every plan already written is this shape, and a
+        // warning on all of them is a warning nobody reads.
+        val result = parse("""{"exercise":"back_squat","notes":"Keep the eccentric honest.","sets":[{"reps":5}]}""")
+
+        assertEquals(emptyList(), result.errors)
+        assertEquals(emptyList(), result.warnings)
+    }
+
     @Test
     fun `a declaration the app cannot read is an error, not a warning`() {
         // Unlike an extra key, this is not extraneous: the plan asked for

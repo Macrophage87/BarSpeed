@@ -44,9 +44,9 @@ class GuidePromptContractTest {
     @Test
     fun `the plan prompt documents every declared exercise key`() {
         listOf(
-            "exercise", "notes", "start", "concentric", "sensorInverted",
-            "sensorOnStack", "travelRatio", "plane", "bodyweight", "implementCount",
-            "optional", "prep_s", "sets",
+            "exercise", "notes", "description", "additional_notes", "start", "concentric",
+            "sensorInverted", "sensorOnStack", "travelRatio", "plane", "bodyweight",
+            "implementCount", "optional", "prep_s", "sets",
         ).forEach(::assertDocuments)
     }
 
@@ -90,6 +90,34 @@ class GuidePromptContractTest {
         assertTrue(
             "a hold or a carry" in prompt,
             "the plan prompt never tells the model a prep applies to a hold or a carry",
+        )
+    }
+
+    /**
+     * The prompt states the character cap, in figures, and stops telling the
+     * model to put form cues in `notes`.
+     *
+     * A cap the generating model is never told about is a cap that only ever
+     * surfaces as a refusal at the import gate, after the plan is written --
+     * and the owner's requirement on this change is stronger than that: the
+     * model has to know the limit exists so it FRONT-LOADS the cue that
+     * decides how the set is performed, rather than writing 220 characters of
+     * preamble and putting the safety line in the overflow.
+     *
+     * Narrow, and said so: this cannot check the prompt teaches the split well,
+     * only that the number is in it and that the sentence pointing form cues at
+     * the old key is gone.
+     */
+    @Test
+    fun `the plan prompt states the description cap in figures`() {
+        assertTrue(
+            "${PlanFile.DESCRIPTION_MAX_CHARS} characters" in prompt,
+            "the plan prompt never states the ${PlanFile.DESCRIPTION_MAX_CHARS}-character description cap, " +
+                "so a generated plan will hit it as a refusal instead of writing to it",
+        )
+        assertFalse(
+            "put form cues in exercise notes" in prompt,
+            "the plan prompt still sends form cues to \"notes\", which is now the slot behind the tap",
         )
     }
 

@@ -106,6 +106,44 @@ class ShippedPlanExampleTest {
         )
     }
 
+    /**
+     * The shipped example uses the split, and the gate is quiet about it.
+     *
+     * Same reasoning as the prep-on-a-hold pin above: a capability nothing in
+     * the published example exercises is one an LLM writing a plan from that
+     * document will never use. The example is also the only place a reader sees
+     * how long a `description` is meant to be, so at least one has to be a real
+     * cue rather than three words.
+     */
+    @Test
+    fun `the shipped example splits a cue across the two keys, within the cap`() {
+        val plan = shippedExample()
+        val exercises = plan.sessions.flatMap { it.exercises }
+
+        val described = exercises.filter { it.description != null }
+        assertTrue(described.isNotEmpty(), "no exercise in the shipped example declares a description")
+        described.forEach {
+            val length = checkNotNull(it.description).length
+            assertTrue(
+                length <= PlanFile.DESCRIPTION_MAX_CHARS,
+                "${it.exercise} publishes a description of $length characters, over the cap",
+            )
+        }
+        assertTrue(
+            exercises.any { it.additionalNotes != null },
+            "no exercise in the shipped example declares additional_notes, so ajv never validates the key",
+        )
+        assertTrue(
+            exercises.any { it.description != null && it.additionalNotes != null },
+            "the shipped example never shows the two keys used together, which is the whole shape",
+        )
+        assertTrue(plan.validate().isEmpty(), "expected clean validation: ${plan.validate()}")
+        assertTrue(
+            plan.warnings().none { "description" in it || "additional_notes" in it },
+            "the shipped example warns about its own cue: ${plan.warnings()}",
+        )
+    }
+
     @Test
     fun `the published schema permits a set with no load and says to omit both`() {
         val schema =

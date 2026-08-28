@@ -33,6 +33,60 @@ class PlanValidationTest {
         assertTrue(plan.validate().isEmpty())
     }
 
+    /**
+     * The character cap is the mechanism, not decoration: `description` is
+     * what the lifter reads without touching the phone, and a cue that keeps
+     * growing takes back the screen the split exists to reclaim. Tier two of
+     * three — the published schema states `maxLength` for a generator, this
+     * names the path for a document that reached the app, and the display caps
+     * lines whatever either of them let through.
+     *
+     * An error rather than a warning, and reachable by no plan written before
+     * schema 1.8: the key did not exist, so nothing already staged can be
+     * refused by it.
+     */
+    @Test
+    fun `a description over the cap is an error naming the path and where the rest goes`() {
+        val over = "x".repeat(PlanFile.DESCRIPTION_MAX_CHARS + 1)
+        val plan =
+            json.decodeFromString(
+                PlanFile.serializer(),
+                validPlan.replace(
+                    "\"exercise\": \"back_squat\",",
+                    "\"exercise\": \"back_squat\", \"description\": \"$over\",",
+                ),
+            )
+
+        assertEquals(
+            listOf(
+                "sessions[0].exercises[0].description is ${PlanFile.DESCRIPTION_MAX_CHARS + 1} characters, " +
+                    "over the ${PlanFile.DESCRIPTION_MAX_CHARS}-character limit - move the rest into " +
+                    "\"additional_notes\", which has no limit",
+            ),
+            plan.validate(),
+        )
+    }
+
+    @Test
+    fun `a description exactly at the cap is accepted, and so is a long additional note`() {
+        // The boundary in both directions, because an off-by-one here refuses a
+        // document the published schema accepts.
+        val atCap = "x".repeat(PlanFile.DESCRIPTION_MAX_CHARS)
+        val long = "y".repeat(PlanFile.DESCRIPTION_MAX_CHARS * 4)
+        val plan =
+            json.decodeFromString(
+                PlanFile.serializer(),
+                validPlan.replace(
+                    "\"exercise\": \"back_squat\",",
+                    "\"exercise\": \"back_squat\", \"description\": \"$atCap\", \"additional_notes\": \"$long\",",
+                ),
+            )
+
+        assertEquals(emptyList(), plan.validate())
+        assertEquals(atCap, plan.sessions[0].exercises[0].description)
+        assertEquals(long, plan.sessions[0].exercises[0].additionalNotes)
+    }
+
     @Test
     fun `invalid tempo and reps are reported with paths`() {
         val bad =
