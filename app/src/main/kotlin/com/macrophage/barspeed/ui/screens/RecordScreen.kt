@@ -505,6 +505,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
             modifier = Modifier.fillMaxWidth(),
         )
         PerImplementEcho(state, slot)
+        LoadSignHint(slot)
     } else {
         AdHocForm(state, viewModel)
     }
@@ -866,6 +867,23 @@ private fun PerImplementEcho(state: RecordState, slot: PlannedSlot?) {
             color = BarColors.Sub,
         )
     }
+}
+
+/**
+ * Which way the sign runs, under a load box that takes one.
+ *
+ * DUMB, and drawn on exactly the sets whose box accepts a negative:
+ * [BodyweightLoadDisplay.fieldHint] answers null for loaded work, and a null
+ * here draws nothing rather than an empty line holding space open. The
+ * population is every `bodyweight: true` exercise with no subset -- the same
+ * population `PlanFile.validate` already passes `allowNegativeLoad` for -- so
+ * a dead hang can be assisted and a push-up can take a plate whether or not
+ * the plan declared a load for them. #160.
+ */
+@Composable
+private fun LoadSignHint(slot: PlannedSlot?) {
+    val hint = BodyweightLoadDisplay.fieldHint(slot?.exercise?.bodyweight == true) ?: return
+    Text(hint, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
 }
 
 @Composable
@@ -1296,10 +1314,18 @@ private fun InSetHeader(state: RecordState, slot: PlannedSlot?) {
             // in brackets, never instead of it. `loadKg` above is
             // SetLoadPolicy.resolve's answer, which is the ADDED load -- the
             // one figure here that may be divided.
-            loadKg.takeIf { it > 0 }?.let { added ->
-                val split = ImplementLoad.decomposition(added, slot?.implementCount, state.weightUnit)
-                state.weightUnit.format(added) + (split?.let { " ($it)" } ?: "")
-            } ?: "bodyweight".takeIf { state.currentIsTimed },
+            if (state.currentExercise.bodyweight) {
+                // The same notation the "Up next" card used a moment ago, so
+                // the number the lifter checked against the bar is the number
+                // still on screen under it. #160.
+                val split = ImplementLoad.decomposition(loadKg, slot?.implementCount, state.weightUnit)
+                BodyweightLoadDisplay.label(loadKg, state.weightUnit) + (split?.let { " ($it)" } ?: "")
+            } else {
+                loadKg.takeIf { it > 0 }?.let { added ->
+                    val split = ImplementLoad.decomposition(added, slot?.implementCount, state.weightUnit)
+                    state.weightUnit.format(added) + (split?.let { " ($it)" } ?: "")
+                } ?: "bodyweight".takeIf { state.currentIsTimed }
+            },
         )
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1645,6 +1671,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
             }
         }
         PerImplementEcho(state, next)
+        LoadSignHint(next)
         TempoAdjuster(state, viewModel)
         PrepAdjuster(state, viewModel)
         Spacer(Modifier.height(12.dp))
@@ -2273,8 +2300,16 @@ private fun SlotCard(
                     slot.durationS?.let {
                         "${it}s " + if (slot.exercise.kind == ExerciseKind.CARRY) "carry" else "hold"
                     },
-                    slot.loadKg?.takeIf { it > 0 }?.let { unit.format(it) }
-                        ?: "bodyweight".takeIf { slot.isTimed },
+                    // On body-weight work the slot's load is what was ADDED, so
+                    // it is said as an addition to the lifter rather than as a
+                    // weight on its own -- and the assisted case, which the
+                    // takeIf below drops on the floor, is said at all. #160.
+                    if (slot.exercise.bodyweight) {
+                        BodyweightLoadDisplay.label(slot.loadKg, unit)
+                    } else {
+                        slot.loadKg?.takeIf { it > 0 }?.let { unit.format(it) }
+                            ?: "bodyweight".takeIf { slot.isTimed }
+                    },
                     slot.tempo?.let { "tempo $it" },
                 ).joinToString(" · ")
             Row(
@@ -2322,12 +2357,21 @@ private fun SlotCard(
             // Both lines read the same load, which is the ADDED load: the
             // slot's own number, or what the lifter has stated in its place.
             // Never a body-weight-inclusive total -- see ImplementLoad.
+            //
+            // No plate line on body-weight work, whatever usesBarbell says.
+            // That flag is inferred from the exercise id where the plan does
+            // not declare it, and "pull_up" carries none of the non-barbell
+            // hints, so a weighted pull-up currently draws "Plates/side: 5
+            // (20 kg bar)" -- an instruction to load a bar that is not in the
+            // movement. The "Pick up" line survives, because a plate held on a
+            // dip belt or a pair of dumbbells on a weighted dip is a real
+            // thing to pick up. #160.
             val instructionKg = (plateLoadKgOverride ?: slot.loadKg)?.takeIf { it > 0 }
             val instruction =
                 if (ImplementLoad.count(slot.implementCount) > 1) {
                     ImplementLoad.decomposition(instructionKg, slot.implementCount, unit)
                         ?.let { "Pick up: $it" }
-                } else if (slot.exercise.usesBarbell) {
+                } else if (slot.exercise.usesBarbell && !slot.exercise.bodyweight) {
                     instructionKg?.let { plateLine(it, unit) }
                 } else {
                     null

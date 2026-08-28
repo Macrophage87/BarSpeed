@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.data.PlanEntity
+import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.PlanExerciseDef
@@ -242,7 +243,7 @@ private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
             Spacer(Modifier.height(10.dp))
             val groups = groupSets(exercise.sets)
             groups.forEach { group ->
-                SetGroupRow(group, unit, kind, common)
+                SetGroupRow(group, unit, kind, exercise.bodyweight, common)
             }
         }
     }
@@ -277,7 +278,13 @@ private fun commonPrescriptions(sets: List<PlanSetDef>): List<String> {
 }
 
 @Composable
-private fun SetGroupRow(group: SetGroup, unit: WeightUnit, kind: ExerciseKind, common: List<String>) {
+private fun SetGroupRow(
+    group: SetGroup,
+    unit: WeightUnit,
+    kind: ExerciseKind,
+    bodyweight: Boolean,
+    common: List<String>,
+) {
     val set = group.set
     val setLabel = if (group.firstSet == group.lastSet) "${group.firstSet}" else "${group.firstSet}–${group.lastSet}"
     val sidePrefix = set.side?.let { "${it.replaceFirstChar { c -> c.uppercase() }} · " } ?: ""
@@ -288,7 +295,18 @@ private fun SetGroupRow(group: SetGroup, unit: WeightUnit, kind: ExerciseKind, c
                     ?: set.durationS?.let { "${it}s ${if (kind == ExerciseKind.CARRY) "carry" else "hold"}" }
                     ?: "—"
                 )
-    val load = set.resolvedLoadKg?.takeIf { it > 0 }?.let { unit.format(it) } ?: "BW"
+    // "BW" was already this row's answer for a set with no load, and on
+    // body-weight work it is now the whole notation rather than the fallback:
+    // an added plate reads "BW + 10 kg" instead of "10 kg", and an assisted
+    // set reads "BW − 50 kg" instead of collapsing to bare BW beside an
+    // unassisted one. This is the approval gate, so it is where a lifter is
+    // most likely to notice the plan writer meant something else. #160.
+    val load =
+        if (bodyweight) {
+            BodyweightLoadDisplay.label(set.resolvedLoadKg, unit)
+        } else {
+            set.resolvedLoadKg?.takeIf { it > 0 }?.let { unit.format(it) } ?: BodyweightLoadDisplay.BARE
+        }
 
     Column(Modifier.padding(vertical = 3.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
