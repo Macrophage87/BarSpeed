@@ -411,6 +411,9 @@ data class PlanFile(
  * [PlanFile.warnings]: WeightUnit.format is the app's renderer and converts,
  * which is exactly what a message about the plan's own text must not do.
  */
+private fun plainNumber(value: Double): String =
+    if (value == Math.floor(value)) value.toLong().toString() else value.toString()
+
 /**
  * Named for both bodyweight keys, so the two messages cannot drift apart. It
  * says what to write instead, because the alternative to a refused zero is not
@@ -418,9 +421,6 @@ data class PlanFile(
  */
 private fun nonPositiveBodyweight(key: String): String =
     "$key must be positive - omit it, or write null, when the weight is not known"
-
-private fun plainNumber(value: Double): String =
-    if (value == Math.floor(value)) value.toLong().toString() else value.toString()
 
 @Serializable
 data class PlanSessionDef(
