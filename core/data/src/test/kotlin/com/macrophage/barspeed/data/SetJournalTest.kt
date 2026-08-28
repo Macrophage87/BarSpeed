@@ -65,6 +65,18 @@ class SetJournalTest {
 
     private val cues = listOf(VoiceCue(1_100L, "Down"), VoiceCue(1_600L, "Up"))
 
+    /**
+     * A `header.json` as a build before issue #156 wrote one: the keys that
+     * build had, and nothing for anything added since. Written as literal text
+     * rather than encoded from the current class, which would re-acquire every
+     * field added after the fact and pin nothing.
+     */
+    private val legacyHeaderJson =
+        """
+        {"journalVersion":1,"exerciseId":"back_squat","exerciseName":"Back Squat","sessionId":null,
+        "sessionStartedAtMs":900,"startedAtMs":1000,"orderIdx":0,"imuConnected":true}
+        """.trimIndent()
+
     private fun header(
         orderIdx: Int = 0,
         startedAtMs: Long = 1_000L,
@@ -154,6 +166,46 @@ class SetJournalTest {
         val found = store.orphans().single()
         assertEquals(emptyList(), found.imuSamples)
         assertEquals(false, found.header.imuConnected)
+    }
+
+    /**
+     * The header names the second link's observed state, as it names the
+     * first's.
+     *
+     * Encoded with `encodeDefaults`, not through the production writer.
+     * kotlinx.serialization omits a property equal to its default, so a real
+     * `header.json` for a one-sensor set carries no such key and a check
+     * against one would pass or fail on the wrong evidence.
+     */
+    @Test
+    fun `the header carries the second link's observed connection`() {
+        val text = Json { encodeDefaults = true }.encodeToString(SetJournalHeader.serializer(), header())
+        assertTrue(
+            "secondaryImuConnected" in text,
+            "SetJournalHeader has no field for the second link's observed state: $text",
+        )
+    }
+
+    /**
+     * A header written by a build that had never heard of a second link is
+     * still recovered whole.
+     *
+     * `SetJournalStore.read` decodes inside `runCatching { }.getOrNull() ?:
+     * return null`, so a required field an older document cannot supply does
+     * not surface as an error: the directory is dropped and the capture is
+     * never offered back. The default on the field is what stands between an
+     * added header fact and a discarded orphan.
+     */
+    @Test
+    fun `a header written before the second link existed still decodes`() = runTest {
+        val dir = File(root, "s900/set0-1000").apply { mkdirs() }
+        File(dir, SetJournalStore.HEADER_FILE).writeText(legacyHeaderJson)
+        File(dir, SetJournal.CUES).writeText(CueCsv.encode(cues))
+        val found = store().orphans().single()
+        assertEquals("back_squat", found.header.exerciseId)
+        assertEquals(0, found.header.orderIdx)
+        assertEquals(true, found.header.imuConnected)
+        assertEquals(cues, found.cues)
     }
 
     // ---- the second accelerometer, issue #156 -------------------------------
