@@ -6,8 +6,10 @@ import com.macrophage.barspeed.hrm.HrTrust
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.ResolvedGeometry
+import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.flow.Flow
@@ -112,6 +114,46 @@ data class CompletedSet(
     val rpe: Int? = null,
     val failed: Boolean = false,
     val warmup: Boolean = false,
+    /**
+     * How many accelerometers this set was armed with and which stream was
+     * analysed, or null on the ordinary one-sensor set (#156).
+     *
+     * Null covers both "one sensor, one asked for" and "recorded by a build
+     * that could not capture two". It does NOT cover a set that asked for two
+     * and armed one -- that carries a declaration, because the ask is
+     * recoverable from nothing else.
+     */
+    val sensors: RecordedSensors? = null,
+    /**
+     * The second accelerometer's capture, or null when there was not one.
+     *
+     * A role and its samples as ONE object rather than two parallel fields, so
+     * that samples cannot exist without a label. The alternative -- a bare
+     * `imuSamplesB` list beside a nullable role -- makes a state constructible
+     * in which a full stream has no role, and every way out of that state is
+     * bad: dropping it is silent data loss, and writing it with a guessed role
+     * puts a fabricated provenance on a real capture. Making it unconstructible
+     * is cheaper than choosing.
+     *
+     * [imuSamples] keeps its exact meaning: the ANALYSED stream, whatever role
+     * it carries.
+     */
+    val secondary: SecondaryCapture? = null,
+)
+
+/**
+ * The stream from the accelerometer that is not analysed, with the role that
+ * identifies it.
+ *
+ * Non-null role by construction -- see [CompletedSet.secondary]. The samples
+ * may still be empty, which is the armed-but-absent case: the unit was
+ * declared, its battery was flat, and no row is written for it. That is a
+ * different fact from the set not having been armed for it at all, and
+ * [CompletedSet.sensors] is what keeps the two apart.
+ */
+data class SecondaryCapture(
+    val role: SensorRole,
+    val samples: List<ImuSample>,
 )
 
 class SessionRepository(
@@ -363,6 +405,22 @@ class SessionRepository(
      */
     fun decodeGeometry(entity: SetRecordEntity): ResolvedGeometry? = try {
         entity.geometryJson?.let { json.decodeFromString(ResolvedGeometry.serializer(), it) }
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * How many accelerometers this set was armed with, or null when the row
+     * does not say.
+     *
+     * Null covers three cases and deliberately distinguishes none of them, on
+     * [decodeGeometry]'s reasoning: a row written before the column existed, an
+     * ordinary one-sensor set, and a column that will not decode. All three
+     * mean the same thing to a reader -- one stream, no role -- and none may
+     * fall back to a plausible-looking default.
+     */
+    fun decodeSensors(entity: SetRecordEntity): RecordedSensors? = try {
+        entity.sensorsJson?.let { json.decodeFromString(RecordedSensors.serializer(), it) }
     } catch (e: Exception) {
         null
     }

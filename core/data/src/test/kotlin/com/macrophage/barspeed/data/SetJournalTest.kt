@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -153,6 +154,166 @@ class SetJournalTest {
         val found = store.orphans().single()
         assertEquals(emptyList(), found.imuSamples)
         assertEquals(false, found.header.imuConnected)
+    }
+
+    // ---- the second accelerometer, issue #156 -------------------------------
+
+    /**
+     * A dual capture puts the analysed stream where it has always been and the
+     * other one beside it.
+     *
+     * `imu.csv` keeping its name is the whole reason `JOURNAL_VERSION` does not
+     * move: the version gate refuses only a FUTURE format, so an older build
+     * meeting this directory still recovers the header, the analysed capture,
+     * heart rate, cues and marks, and ignores one file it has never heard of.
+     * Bumping would make it return null for the directory and DISCARD a set it
+     * could have offered back.
+     */
+    @Test
+    fun `a dual capture writes the analysed stream to imu csv and the other beside it`() = runTest {
+        val store = store()
+        val journal =
+            requireNotNull(
+                store.open(
+                    header().copy(
+                        sensorRoles = listOf(SensorRole.A, SensorRole.B),
+                        analysedRole = SensorRole.A,
+                    ),
+                ),
+            )
+        imu.forEach { journal.appendImu(it) }
+        imu.forEach { journal.appendSecondaryImu(it, SensorRole.B) }
+        journal.sync()
+
+        assertEquals(
+            setOf("header.json", "imu.csv", "imu-b.csv"),
+            journal.directory.listFiles().orEmpty().map { it.name }.toSet(),
+        )
+        assertEquals(
+            ImuCsv.HEADER,
+            File(journal.directory, "imu-b.csv").readLines().first(),
+            "the second stream is not written in the canonical format",
+        )
+    }
+
+    /**
+     * Each file's `sample_idx` counts its own rows.
+     *
+     * `ImuCsv`'s contract for that column is "THIS loop's own index, 0..n-1 by
+     * construction", and the reader that decodes this file reads one file. A
+     * shared counter would publish a stream whose indices begin at whatever
+     * the other stream had reached, which reads as a capture that dropped its
+     * first rows.
+     */
+    @Test
+    fun `each capture indexes its own rows from zero`() = runTest {
+        val journal =
+            requireNotNull(
+                store().open(
+                    header().copy(sensorRoles = listOf(SensorRole.A, SensorRole.B), analysedRole = SensorRole.A),
+                ),
+            )
+        imu.forEach { journal.appendImu(it) }
+        imu.forEach { journal.appendSecondaryImu(it, SensorRole.B) }
+        journal.sync()
+
+        fun indices(name: String) = File(journal.directory, name)
+            .readLines().drop(1).filter { it.isNotBlank() }.map { it.substringAfterLast(',') }
+        assertEquals(listOf("0", "1"), indices("imu.csv"))
+        assertEquals(listOf("0", "1"), indices("imu-b.csv"))
+    }
+
+    /**
+     * The second stream comes back off disk as the second stream, and the
+     * analysed one is untouched by its presence.
+     */
+    @Test
+    fun `a recovered dual capture carries both streams, kept apart`() = runTest {
+        val store = store()
+        val journal =
+            requireNotNull(
+                store.open(
+                    header().copy(sensorRoles = listOf(SensorRole.A, SensorRole.B), analysedRole = SensorRole.A),
+                ),
+            )
+        journal.appendImu(imu.first())
+        imu.forEach { journal.appendSecondaryImu(it, SensorRole.B) }
+        journal.sync()
+
+        val found = store.orphans().single()
+        assertEquals(1, found.imuSamples.size, "the analysed stream picked up the other one's rows")
+        assertEquals(2, found.secondaryImuSamples.size)
+        assertEquals(listOf(SensorRole.A, SensorRole.B), found.header.sensorRoles)
+        assertEquals(SensorRole.A, found.header.analysedRole)
+    }
+
+    /**
+     * A one-sensor capture reads back exactly as it always did.
+     *
+     * The header's two new fields default, so a directory written by any
+     * earlier build decodes, and nothing about the recovered object moved for
+     * a set that had one sensor.
+     */
+    @Test
+    fun `a one-sensor capture recovers with no second stream and no roles`() = runTest {
+        val store = store()
+        val journal = requireNotNull(store.open(header()))
+        imu.forEach { journal.appendImu(it) }
+        journal.sync()
+
+        val found = store.orphans().single()
+        assertEquals(imu.size, found.imuSamples.size)
+        assertEquals(emptyList(), found.secondaryImuSamples)
+        assertEquals(emptyList(), found.header.sensorRoles)
+        assertEquals(null, found.header.analysedRole)
+    }
+
+    /**
+     * A header written before these fields existed still decodes, and reads as
+     * one sensor.
+     *
+     * The JSON is written by hand rather than by copying an old build's
+     * output, because what is being asserted is the absence of the two keys:
+     * `ignoreUnknownKeys` handles a key the reader does not know, and does
+     * nothing at all for a key the reader requires and cannot find. That is
+     * the failure mode that would silently drop every orphaned set on disk at
+     * upgrade.
+     */
+    @Test
+    fun `a header written before roles existed still recovers its set`() = runTest {
+        val legacy =
+            """
+            {"journalVersion":1,"exerciseId":"back_squat","exerciseName":"Back Squat","sessionId":null,
+             "sessionStartedAtMs":900,"startedAtMs":1000,"orderIdx":0,"imuConnected":true}
+            """.trimIndent()
+        val dir = File(root, "s900/set0-1000").apply { mkdirs() }
+        File(dir, SetJournalStore.HEADER_FILE).writeText(legacy)
+        File(dir, SetJournal.IMU).writeText(ImuCsv.encode(imu))
+
+        val found = store().orphans().single()
+        assertEquals(imu.size, found.imuSamples.size)
+        assertEquals(emptyList(), found.header.sensorRoles)
+        assertEquals(emptyList(), found.secondaryImuSamples)
+    }
+
+    /**
+     * A stray `imu-b.csv` the header never declared is not read.
+     *
+     * The header is written and closed before the first sample line of any
+     * stream, so it is the one thing in the directory that cannot be a
+     * half-truth. Scanning for whichever role file happened to be present
+     * would present a leftover -- from an interrupted build, or a directory
+     * the lifter copied -- as this capture's second sensor.
+     */
+    @Test
+    fun `an undeclared second stream on disk is not offered as this set's`() = runTest {
+        val dir = File(root, "s900/set0-1000").apply { mkdirs() }
+        File(dir, SetJournalStore.HEADER_FILE)
+            .writeText(Json.encodeToString(SetJournalHeader.serializer(), header()))
+        File(dir, SetJournal.IMU).writeText(ImuCsv.encode(imu))
+        File(dir, "imu-b.csv").writeText(ImuCsv.encode(imu))
+
+        assertEquals(emptyList(), store().orphans().single().secondaryImuSamples)
     }
 
     // ---- the streams --------------------------------------------------------

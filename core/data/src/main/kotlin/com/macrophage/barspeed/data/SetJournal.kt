@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -48,6 +49,27 @@ data class SetJournalHeader(
     val imuConnected: Boolean,
     val planName: String? = null,
     val planSessionName: String? = null,
+    /**
+     * The accelerometer roles this set was armed for, in order, or empty when
+     * its streams carry no role (#156).
+     *
+     * Defaulted so that a header written by any earlier build still decodes --
+     * `SetJournalStore`'s reader is `ignoreUnknownKeys`, which handles a key it
+     * does not know but not a key it requires and cannot find.
+     *
+     * [SetJournalStore.JOURNAL_VERSION] is deliberately NOT bumped for this.
+     * Its own contract is that it moves when the on-disk layout stops being
+     * readable by older code, and the version gate refuses only a FUTURE
+     * format; the analysed stream keeps the filename `imu.csv`, so an older
+     * build still recovers the header, the analysed capture, heart rate, cues
+     * and rep marks, and simply ignores one file it has never heard of.
+     * Bumping would make that build return null for the whole directory and
+     * DISCARD an orphaned set it could otherwise have offered back, which is
+     * strictly worse than it missing a second stream.
+     */
+    val sensorRoles: List<SensorRole> = emptyList(),
+    /** Which role's capture is in `imu.csv`; null when the streams carry no role. */
+    val analysedRole: SensorRole? = null,
 )
 
 /**
@@ -67,6 +89,16 @@ data class OrphanedSet(
     val cues: List<VoiceCue>,
     val repMarks: List<Long>,
     val directory: File,
+    /**
+     * The second accelerometer's capture, empty on every set that had one
+     * sensor and on every capture written before the app could have two.
+     *
+     * [imuSamples] keeps its meaning -- the ANALYSED stream -- so nothing that
+     * already reads this type sees a different number. Defaulted last for the
+     * same reason: a positional constructor call in a test or a screen keeps
+     * compiling and keeps meaning what it meant.
+     */
+    val secondaryImuSamples: List<ImuSample> = emptyList(),
 )
 
 /**
@@ -97,6 +129,7 @@ class SetJournal internal constructor(
     private val writers = mutableMapOf<String, BufferedWriter>()
     private val marks = mutableListOf<Long>()
     private var imuIndex = 0L
+    private var secondaryImuIndex = 0L
     private var sinceFlush = 0
     private var lastFlushMs = System.currentTimeMillis()
 
@@ -117,16 +150,44 @@ class SetJournal internal constructor(
         }
 
     fun appendImu(sample: ImuSample) {
-        val text =
-            String.format(
-                Locale.US,
-                "%d,%.6f,%.6f,%.6f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%d",
-                sample.timestampMs, sample.axG, sample.ayG, sample.azG,
-                sample.wxDps, sample.wyDps, sample.wzDps,
-                sample.rollDeg, sample.pitchDeg, sample.yawDeg, imuIndex++,
-            )
-        channel.trySend(Row(IMU, text))
+        channel.trySend(Row(IMU, imuRow(sample, imuIndex++)))
     }
+
+    /**
+     * A sample from the accelerometer that is NOT analysed, into its own file
+     * (#156).
+     *
+     * `imu-a.csv` or `imu-b.csv` beside `imu.csv`, never instead of it. The
+     * analysed stream keeps the name every earlier build knows, which is what
+     * lets [SetJournalStore.JOURNAL_VERSION] stay where it is -- see
+     * [SetJournalHeader.sensorRoles].
+     *
+     * The role is in the FILENAME rather than in a column of the shared
+     * `imu.csv`, because [ImuCsv] is one format shared with the stored stream
+     * and with every `field-*.csv` regression fixture; a role column would
+     * either break that format or be a second format wearing its name. Two
+     * files also mean a half-written line in one costs nothing in the other.
+     *
+     * Its own row counter, not a continuation of the analysed stream's.
+     * `ImuCsv`'s own contract for `sample_idx` is "THIS loop's own index,
+     * 0..n-1 by construction", and the decoder that reads this file back reads
+     * one file: a shared counter would publish a stream whose indices start at
+     * whatever the other stream had reached. The two captures are aligned by
+     * their arrival timestamps -- one host clock stamps both, since both
+     * clients read `System.currentTimeMillis` per notification -- and never by
+     * row number.
+     */
+    fun appendSecondaryImu(sample: ImuSample, role: SensorRole) {
+        channel.trySend(Row(secondaryImuFile(role), imuRow(sample, secondaryImuIndex++)))
+    }
+
+    private fun imuRow(sample: ImuSample, index: Long): String = String.format(
+        Locale.US,
+        "%d,%.6f,%.6f,%.6f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%d",
+        sample.timestampMs, sample.axG, sample.ayG, sample.azG,
+        sample.wxDps, sample.wyDps, sample.wzDps,
+        sample.rollDeg, sample.pitchDeg, sample.yawDeg, index,
+    )
 
     fun appendHr(sample: HrSample) {
         val rr = sample.rrIntervalsMs.joinToString("|") { String.format(Locale.US, "%.1f", it) }
@@ -198,7 +259,13 @@ class SetJournal internal constructor(
         IMU -> ImuCsv.HEADER
         HRM -> HrCsv.HEADER
         REPS -> REPS_HEADER
-        else -> CueCsv.HEADER
+        // Matched by prefix rather than by equality because the secondary
+        // capture's filename carries its role -- imu-a.csv, imu-b.csv -- and
+        // there is no reason to enumerate two of them here. The prefix is safe
+        // in a way `kind` prefixes are not: this is a fixed set of four
+        // filenames chosen in this file, not a free-form column, and `hrm.csv`,
+        // `cues.csv` and `reps.csv` cannot begin with `imu`.
+        else -> if (kind.startsWith(IMU_PREFIX)) ImuCsv.HEADER else CueCsv.HEADER
     }
 
     /**
@@ -238,6 +305,20 @@ class SetJournal internal constructor(
         const val HRM = "hrm.csv"
         const val CUES = "cues.csv"
         const val REPS = "reps.csv"
+
+        /** What [IMU] and every [secondaryImuFile] begin with, and nothing else here does. */
+        const val IMU_PREFIX = "imu"
+
+        /**
+         * Where the capture from the accelerometer that is NOT analysed goes.
+         *
+         * Derived from the role rather than fixed, so the file says which unit
+         * it came from without the header having to be read first -- the same
+         * reasoning [RawStreamEntity.KIND_REST_BEFORE_HRM] gives for putting a
+         * direction in a name. A recovered capture zipped and mailed to the
+         * lifter is read by a person before it is read by anything else.
+         */
+        fun secondaryImuFile(role: SensorRole): String = "$IMU_PREFIX-${role.name.lowercase()}.csv"
 
         /**
          * One epoch-ms instant per line; the count is the number of lines.
@@ -359,6 +440,17 @@ class SetJournalStore(
             cues = decode(dir, SetJournal.CUES) { CueCsv.decode(it) },
             repMarks = decode(dir, SetJournal.REPS) { line -> RepMarkCsv.decodeLine(line) },
             directory = dir,
+            // Read from the header's own declaration rather than by looking
+            // for whichever imu-*.csv happens to be on disk. The header is
+            // written and closed before the first sample line of any stream,
+            // so it is the one thing in the directory that cannot be a
+            // half-truth; a file scan would pick up a role this set was never
+            // armed for -- a leftover from a build, or a directory the lifter
+            // copied -- and present it as this capture's second sensor.
+            secondaryImuSamples =
+            header.sensorRoles.firstOrNull { it != header.analysedRole }
+                ?.let { role -> decode(dir, SetJournal.secondaryImuFile(role)) { ImuCsv.decode(it) } }
+                .orEmpty(),
         )
     }
 

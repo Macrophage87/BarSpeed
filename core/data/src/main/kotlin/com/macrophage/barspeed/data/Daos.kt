@@ -89,7 +89,15 @@ interface SessionDao {
     @Query("SELECT * FROM set_records WHERE sessionId = :sessionId ORDER BY orderIdx")
     fun observeSetsForSession(sessionId: Long): Flow<List<SetRecordEntity>>
 
-    @Query("SELECT * FROM raw_streams WHERE setId = :setId")
+    // ORDER BY id, added with issue #156. With one stream per kind the order
+    // was incidental and insertion order is what every existing pin observes;
+    // with two `imu` rows on one set the archive's file order and its `files`
+    // array would be unspecified, and a reader diffing two exports of the same
+    // session could see the two streams swap places for no reason. Insertion
+    // order is exactly what the rowid gives back, so this guarantees the order
+    // that was already being relied on rather than choosing a new one. A new
+    // ORDER BY changes no table, so DATABASE_VERSION does not move for it.
+    @Query("SELECT * FROM raw_streams WHERE setId = :setId ORDER BY id")
     suspend fun rawStreamsForSet(setId: Long): List<RawStreamEntity>
 
     @Query("UPDATE set_records SET rpe = :rpe, failed = :failed, warmup = :warmup WHERE id = :setId")

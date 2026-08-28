@@ -143,6 +143,24 @@ data class SetRecordEntity(
      * id would publish a declaration the app never made.
      */
     val geometryJson: String? = null,
+    /**
+     * kotlinx-serialized [com.macrophage.barspeed.model.RecordedSensors] — how
+     * many accelerometers this set was armed with, which roles they carried and
+     * which one its figures came from (#156).
+     *
+     * One JSON column rather than four typed ones, following [geometryJson]:
+     * nothing queries these in SQL, and a fifth value added later then costs no
+     * further migration.
+     *
+     * Null on the ordinary one-sensor set and on every row written before v11,
+     * and those two are deliberately not distinguished -- both mean the same
+     * thing to a reader, which is that this set has one unroled stream. What is
+     * NOT folded into that null is a set that asked for two sensors and armed
+     * one: that row carries a declaration saying so, because what arrived is
+     * observable from the streams and what was EXPECTED is observable from
+     * nothing at all.
+     */
+    val sensorsJson: String? = null,
     val hrEndOfSetBpm: Int? = null,
     val hrAvgBpm: Int? = null,
     val hrMaxBpm: Int? = null,
@@ -168,6 +186,26 @@ data class RawStreamEntity(
     /** Gzipped CSV in the canonical format (see ImuCsv / HrCsv / CueCsv / RepMarkCsv). */
     val csvGzip: ByteArray,
     val sampleRateHz: Double? = null,
+    /**
+     * Which physical accelerometer this stream came from, lowercased
+     * [com.macrophage.barspeed.model.SensorRole], issue #156.
+     *
+     * A COLUMN rather than a role-tagged [kind], and that is a ruling. Carrying
+     * the role on both streams through the kind would mean `imu-a`/`imu-b`,
+     * which every equality selector in this package would then miss -- and the
+     * fix for that is prefix matching, which is the one idiom
+     * [KIND_REST_BEFORE_HRM] exists to outlaw: it CONTAINS the string `hrm` and
+     * is a different population from [KIND_HRM]. A nullable column keeps every
+     * `kind` comparison an equality and makes selecting the analysed stream
+     * explicit instead of string-derived.
+     *
+     * Null on every non-IMU stream, where a role means nothing, and on every
+     * IMU stream of a one-sensor set, where there is nothing to tell apart.
+     * Null is never backfilled: the migration that adds this column states no
+     * role for any row already on disk, because a role that nobody assigned is
+     * a claim about which unit a capture came from.
+     */
+    val role: String? = null,
 ) {
     override fun equals(other: Any?): Boolean = other is RawStreamEntity && other.id == id
 

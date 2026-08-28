@@ -18,21 +18,27 @@ import java.io.File
  * MOVING THIS NUMBER IS ALSO A UI EVENT -- issue #118, which is not closed by
  * this comment. [DatabaseRescue] fires only when the file on disk is NEWER than
  * this constant, and the rescue shipped in v0.1.40 with the constant at 9. So
- * no stock install could produce a `rescued/` directory, and the rescued-database
- * card -- three tiers, their titles, the discard dialog and the share path --
- * had never been reachable outside a test. Ten is the first value above the one
- * the rescue shipped at, so it is the first that can make that card appear.
+ * until 10 no stock install could produce a `rescued/` directory, and the
+ * rescued-database card -- three tiers, their titles, the discard dialog and
+ * the share path -- had never been reachable outside a test. Ten was the first
+ * value that could make that card appear; eleven is simply the next such value,
+ * and the first-time claim that used to stand here is history rather than
+ * something this bump repeats.
  *
- * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 10 writes the
- * file, then a build carrying 9 opens it. A forward install runs
- * [MIGRATION_9_10] and never enters the rescue at all, so an ordinary upgrade
+ * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 11 writes the
+ * file, then any build carrying 10 or less opens it. A forward install runs
+ * [MIGRATION_10_11] and never enters the rescue at all, so an ordinary upgrade
  * sees none of it.
  *
- * The version has moved before -- eight times, shipped in v0.1.5, v0.1.10,
- * v0.1.13, v0.1.15, v0.1.16, v0.1.20 and twice in v0.1.38. What is new is not
- * the bump; it is that a bump now has a downgrade path with a screen attached.
+ * The version has moved before -- nine times, shipped in v0.1.5, v0.1.10,
+ * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, and once in v0.1.42 --
+ * the last read off the tag rather than remembered.
+ * What is new at 11 is neither the bump nor the downgrade screen: it is that
+ * `core/data/schemas/…/10.json` is committed, so for the first time in this
+ * repository a migration has a baseline to be read against and, on a bench,
+ * executed against.
  */
-const val DATABASE_VERSION = 10
+const val DATABASE_VERSION = 11
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -138,9 +144,12 @@ abstract class AppDatabase : RoomDatabase() {
          *
          * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2]
          * already does. Nothing in this repository can execute either of them:
-         * there are no migration tests, no committed schema baseline for any
-         * version, and no instrumented tests at all, so the first time this
-         * runs is on the lifter's phone against their real history.
+         * there are no migration tests and no instrumented tests at all, so
+         * the first time this runs is on the lifter's phone against their real
+         * history. This used to add "no committed schema baseline for any
+         * version"; that half went false at 7db7046 and is deleted rather than
+         * reworded. What a baseline changed and what it did not is stated once,
+         * at [MIGRATION_10_11], and not repeated here.
          */
         private val MIGRATION_8_9 =
             object : Migration(8, 9) {
@@ -165,16 +174,72 @@ abstract class AppDatabase : RoomDatabase() {
          *
          * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2] and
          * [MIGRATION_8_9] already do. Nothing in this repository can execute
-         * either of them: there are no migration tests, no committed schema
-         * baseline for any version, and no instrumented tests at all, so the
-         * first time this runs is on the lifter's phone against their real
-         * history. The SQL was read against the entity diff by hand.
+         * either of them: there are no migration tests and no instrumented
+         * tests at all, so the first time this runs is on the lifter's phone
+         * against their real history. The SQL was read against the entity diff
+         * by hand.
+         *
+         * That paragraph used to add "no committed schema baseline for any
+         * version". It was true when written and is not now:
+         * `core/data/schemas/…/10.json` was committed at 7db7046, which is
+         * what gives [MIGRATION_10_11] a document to be diffed against. The
+         * false half is deleted rather than reworded, and only the half that
+         * is still true is left standing -- there is still no test in this
+         * repository that executes any migration.
          */
         private val MIGRATION_9_10 =
             object : Migration(9, 10) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE set_records ADD COLUMN plannedPrepS INTEGER")
                     db.execSQL("ALTER TABLE set_records ADD COLUMN prepS INTEGER")
+                }
+            }
+
+        /**
+         * v11: which accelerometer a raw stream came from, and how many a set
+         * was armed with, issue #156.
+         *
+         * Nullable with no default, so existing rows are untouched and read
+         * back as "not captured" -- the same shape and the same refusal
+         * [MIGRATION_7_8], [MIGRATION_8_9] and [MIGRATION_9_10] each wrote
+         * down. A blanket backfill of `role` was considered and refused twice
+         * over: a role is meaningless on an `hrm`, `rest_before_hrm`, `cues` or
+         * `reps` row, and on an `imu` row it would state which physical unit a
+         * capture came from when nobody assigned one. `sensorsJson` is refused
+         * for the same reason from the other end -- a row written before this
+         * column had one stream, and saying so explicitly would be
+         * indistinguishable from a set that declared it.
+         *
+         * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2],
+         * [MIGRATION_8_9] and [MIGRATION_9_10] already do, and neither carries
+         * NOT NULL or a DEFAULT -- which is what keeps them the plain
+         * column-append form SQLite performs without recreating the table, so
+         * every existing row and every gzipped blob is left byte-for-byte where
+         * it was.
+         *
+         * WHAT HAS AND HAS NOT BEEN RUN, said exactly. The SQL was read against
+         * the 10.json/11.json diff by hand, and 11.json in this same commit is
+         * Room's own generated description of the schema this build compiles
+         * to -- so the two columns, their affinities and their nullability are
+         * checked against the entity by the build rather than by eye. What has
+         * NOT happened yet is execution: no test in this repository runs a
+         * migration, and the two-way emulator exercise for this bump runs once
+         * at the end of the v0.1.44 cluster, after #159 and #161, before the
+         * cut. Until then this migration is unexecuted.
+         *
+         * IT IS ALSO EXPECTED TO CHANGE BEFORE IT SHIPS. #159 adds a session
+         * RPE column and will EXTEND this migration rather than mint a v12,
+         * because v11 is unreleased -- no build in the world has ever written
+         * a v11 file, so there is no version boundary to preserve. An edit to
+         * an unreleased migration is a normal act; an edit to a released one
+         * is not, and this comment is the record of which of the two v11 is at
+         * the time of writing.
+         */
+        internal val MIGRATION_10_11 =
+            object : Migration(10, 11) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE raw_streams ADD COLUMN role TEXT")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN sensorsJson TEXT")
                 }
             }
 
@@ -201,10 +266,12 @@ abstract class AppDatabase : RoomDatabase() {
          * was deleted there rather than reworded. A crash with the data
          * recoverable beats a clean start with it gone.
          *
-         * WHAT THIS RELEASE MEETS is the branch that was theoretical until now.
-         * [DATABASE_VERSION] moves to 10 here, so a rollback from this build to
-         * any build carrying 9 is the first rollback the rescue can act on. What
-         * that exposes on screen is stated at the constant, with issue #118.
+         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 11
+         * here, so a rollback from this build to any build carrying 10 or less
+         * enters the rescue; the first version at which that was true of a
+         * stock install was 10, and what it exposes on screen is stated at the
+         * constant, with issue #118. An ordinary forward install runs the
+         * migration chain and never comes near it.
          *
          * The EXISTING migrations are untouched, and a missing UPGRADE
          * migration still throws exactly as before.
@@ -227,6 +294,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
+                    MIGRATION_10_11,
                 )
                 .build()
         }
