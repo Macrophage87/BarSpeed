@@ -82,12 +82,58 @@ data class CadenceBeat(
  * `2011` with an isometric pause between the strokes. It still rides a movement
  * word the lifter is listening for, and the number it carries counts FINISHED
  * reps and instructs no movement, so arriving late cannot be mistaken for a cue
- * to move. Whether a count that lands mid-rep is followable at gym speed is a
- * question for a session and not for this file.
+ * to move.
  *
- * `"Last rep"` travels the same channel and arrives after the final rep has
- * begun. On these pairs it was not spoken at all before, so this is an
- * improvement bounded by that lateness, not a regression.
+ * This file used to end that paragraph by deferring the rest to a session --
+ * *"whether a count that lands mid-rep is followable at gym speed is a question
+ * for a session and not for this file"* -- and then answered half of it in
+ * advance: *"`\"Last rep\"` travels the same channel and arrives after the final
+ * rep has begun. On these pairs it was not spoken at all before, so this is an
+ * improvement bounded by that lateness, not a regression."*
+ *
+ * **The session happened and refuted that, and it is deleted rather than
+ * softened.** From the gym, 2026-08-28: *"It sometimes says 'last rep', done,
+ * with no rep in between."* Measured on that session's sixteen cue tracks,
+ * eleven sets read 2.00 s from their last stroke word to `Done` and five read
+ * 1.00 s, and the split is exactly this case against case 2. The trade the
+ * deleted sentence assumed -- late beats silent -- is the wrong way round for a
+ * WARNING: an announcement implying a rep the lifter cannot perceive reads as
+ * the app losing count, and costs more trust than saying nothing. Issue #173.
+ *
+ * What survives the refutation, because it was never the same claim: the
+ * FINISHED-rep count. `"Rep 3"` reports and instructs nothing, the lifter has
+ * nothing to do differently on hearing it late, and issue #147 added it to
+ * exactly these plans because they had no spoken count at all. It stays, and it
+ * is what [announcementAfter] returns here on every rep but the last. Whether a
+ * count that lands mid-rep is followable at gym speed is still a question for a
+ * session; what the session answered is the warning, and only the warning.
+ *
+ * So on this case the warning is not spoken. It is not RESCHEDULED, and the
+ * reason is structural rather than a preference: this case is reached only
+ * because the closing pause and the opening stroke were both ruled out, so
+ * every beat of the rep before its last is shorter than [MERGE_MIN_STROKE_S]
+ * and there is no unoccupied slot to move the warning into. The choice was late
+ * or silent, never early. See [warningWouldOpenTheLastBeatOfItsOwnRep].
+ *
+ * One consequence is worth naming because it is a gain rather than a loss: the
+ * carrying stroke gives up its first tempo count only when an announcement
+ * actually rode it, so a suppressed warning hands the final rep its count back.
+ * The second the archive used to leave silent now carries a `1`.
+ *
+ * The alternative considered and rejected was to speak the ordinary
+ * finished-rep count in the warning's place -- `"Rep 11"` on the twelfth of
+ * twelve, which is true and carries the same information to a lifter who knows
+ * their target. It was rejected because it invents an utterance neither issue
+ * asked for on the final rep of every set of this shape, and because it keeps
+ * the tempo count suppressed, which is the silence the whole investigation
+ * started from. That the lifter therefore hears no count higher than
+ * `plannedReps - 2` on these plans is a real cost and a `[Field]` question, not
+ * a settled one.
+ *
+ * Nothing here touches `RecordViewModel.announceRepMilestones`, the UNGUIDED
+ * counter. That one speaks its own `"Last rep"` at the instant a rep is
+ * counted, not on a metronome schedule, so the whole final rep is still ahead
+ * of the lifter when it arrives.
  *
  * ## What stays uncarryable, and what was rejected
  *
@@ -168,6 +214,50 @@ data class CadencePlan(
     val deliveredCycleS: Int get() = beats.sumOf { it.seconds }
 
     /**
+     * Beats of the rep an announcement is ABOUT that are still to come when it
+     * is spoken, counting the beat it opens; 0 when nothing is announced.
+     *
+     * Derived from the two indices rather than from the tempo, because the
+     * tempo string does not decide either of them. `3010` puts the call at the
+     * START of the announced rep on an eccentric-first incline press and at its
+     * END on a concentric-first overhead press, and session 33 ran both.
+     *
+     * Three shapes, and the arithmetic is the same reading of one timeline:
+     *
+     * - [announceOnBeat] AFTER [repCompleteAfterBeat] -- a closing pause. The
+     *   call is spoken in the PREVIOUS rep's tail, so the announced rep has not
+     *   started and all of it is ahead.
+     * - [announceOnBeat] before [repCompleteAfterBeat] -- the announced rep's
+     *   opening stroke. What is left is that stroke and everything after it.
+     * - the two EQUAL -- the announced rep's own last stroke. One beat left,
+     *   and the lifter is already in it when they hear the words.
+     */
+    val beatsOfRepLeftWhenAnnounced: Int
+        get() = when {
+            announceOnBeat == null -> 0
+            announceOnBeat > repCompleteAfterBeat -> repCompleteAfterBeat + 1
+            else -> repCompleteAfterBeat - announceOnBeat + 1
+        }
+
+    /**
+     * True when an announcement would open the LAST beat of the rep it is
+     * about, so nothing of that rep is left to prepare for.
+     *
+     * This is what decides whether [LAST_REP] is spoken. It is a statement
+     * about the schedule and never about the four digits: see
+     * [beatsOfRepLeftWhenAnnounced] for why those are different things, and
+     * `LastRepWarningTest` for the sixteen (tempo, lift) pairs that assert it
+     * both ways.
+     *
+     * Not a threshold in SECONDS, deliberately. A three-second closing stroke
+     * gives the lifter longer than a two-second one and no more of the rep: on
+     * a concentric-first `3010` the working stroke is finished either way, and
+     * that is what a warning about the rep is about.
+     */
+    val warningWouldOpenTheLastBeatOfItsOwnRep: Boolean
+        get() = announceOnBeat != null && beatsOfRepLeftWhenAnnounced <= 1
+
+    /**
      * What the guide says once rep [repsCompleted] of [plannedReps] is done, or
      * null when it says nothing.
      *
@@ -177,10 +267,16 @@ data class CadencePlan(
      *
      * [plannedReps] is null on a set with no prescribed count, which has no
      * last rep to warn about and so only ever counts finished ones.
+     *
+     * The [LAST_REP] warning is withheld where it would arrive with only the
+     * closing stroke of its own rep left -- issue #173, and the reasoning is
+     * above under "What case 3 costs". The finished-rep count is not withheld
+     * there or anywhere: it reports and instructs nothing.
      */
     fun announcementAfter(repsCompleted: Int, plannedReps: Int?): String? = when {
         announceOnBeat == null -> null
-        plannedReps != null && repsCompleted == plannedReps - 1 -> LAST_REP
+        plannedReps != null && repsCompleted == plannedReps - 1 ->
+            LAST_REP.takeUnless { warningWouldOpenTheLastBeatOfItsOwnRep }
         else -> "$REP_CALL_PREFIX$repsCompleted"
     }
 
