@@ -392,6 +392,121 @@ class SessionRepositoryEndSessionTest {
 
     // ---- heart rate across the session -------------------------------------
 
+    // ---- the session rating, issue #159 -------------------------------------
+
+    /**
+     * The rating the lifter stated reaches the row. DIFFERENTIAL: fails at
+     * this commit, where `endSession` accepts the argument and drops it.
+     *
+     * Write-once, like the four columns beside it. `updateSession` has one
+     * caller and it is this function, so a rating stated at the finish is the
+     * only rating this session will ever carry -- there is no correction
+     * surface for it anywhere, unlike a set's rpe, which the rest screen can
+     * still change. Capture-once and unrecoverable: how a workout felt is
+     * recorded in no artifact and cannot be recomputed from one.
+     */
+    @Test
+    fun `closing a session stores the rating the lifter stated`() = runTest {
+        val dao = FakeSessionDao(seedSessions = listOf(session()))
+        repo(dao).endSession(1L, endedAtMs = 9_000L, sessionRpe = 7)
+
+        assertEquals(7, dao.updates.single().sessionRpe)
+    }
+
+    /**
+     * Both ends of the scale are stored as themselves. DIFFERENTIAL: fails at
+     * this commit.
+     *
+     * 1 is the session that barely touched the lifter and 10 is the one that
+     * took everything; neither is a sentinel. A 1 in particular has to survive
+     * every layer that might treat a low number as a default, which is the
+     * defect class this app has already shipped once with a sample rate of 0.0.
+     */
+    @Test
+    fun `both ends of the scale are stored as themselves`() = runTest {
+        val easiest = FakeSessionDao(seedSessions = listOf(session()))
+        repo(easiest).endSession(1L, endedAtMs = 9_000L, sessionRpe = 1)
+        assertEquals(1, easiest.updates.single().sessionRpe)
+
+        val hardest = FakeSessionDao(seedSessions = listOf(session()))
+        repo(hardest).endSession(1L, endedAtMs = 9_000L, sessionRpe = 10)
+        assertEquals(10, hardest.updates.single().sessionRpe)
+    }
+
+    /**
+     * A skipped rating is stored as absent. NOT a differential: this passes at
+     * this commit for the reason nothing writes the column at all, and starts
+     * meaning something one commit later.
+     *
+     * Kept beside its differential rather than filed later because absence is
+     * the ORDINARY outcome here -- the capture is skippable with one tap -- and
+     * a pin on the stated case alone cannot tell a skip from a default.
+     */
+    @Test
+    fun `a session the lifter did not rate is closed with no rating`() = runTest {
+        val dao = FakeSessionDao(seedSessions = listOf(session()))
+        repo(dao).endSession(1L, endedAtMs = 9_000L, sessionRpe = null)
+
+        assertNull(dao.updates.single().sessionRpe)
+        // The close still happened. A skipped rating is not a skipped close.
+        assertEquals(9_000L, dao.updates.single().endedAtMs)
+    }
+
+    /**
+     * A rating off the scale is refused rather than clamped or stored.
+     *
+     * NOT a differential, and I labelled it as one when I wrote it: it was
+     * going to fail at this commit, and it does not, because a parameter that
+     * is dropped stores null for an 11 exactly as it does for a 7. The claim
+     * is corrected here rather than reworded away. What the test is worth is
+     * unchanged and lands one commit later: once the value IS stored, a fix
+     * that forgets `SessionRpe.accepted` writes the 11 straight through and
+     * this is what catches it.
+     *
+     * Nothing the app draws can produce one -- the control is built from
+     * `SessionRpe.VALUES` -- so an 11 arriving here is a programming error at
+     * the last durable write of a session. Storing it publishes a rating the
+     * schema's own bounds reject; clamping it to 10 turns the bug into the
+     * hardest session the lifter ever recorded; throwing kills the close and
+     * takes `hrvRmssdMs` with it, which is the one figure here that cannot be
+     * rebuilt from anything. Dropping the rating loses the rating and nothing
+     * else, and it is the only one of the four that loses only what went wrong.
+     */
+    @Test
+    fun `a rating off the scale is refused rather than stored or clamped`() = runTest {
+        val tooHigh = FakeSessionDao(seedSessions = listOf(session()))
+        repo(tooHigh).endSession(1L, endedAtMs = 9_000L, sessionRpe = 11)
+        assertNull(tooHigh.updates.single().sessionRpe)
+
+        val tooLow = FakeSessionDao(seedSessions = listOf(session()))
+        repo(tooLow).endSession(1L, endedAtMs = 9_000L, sessionRpe = 0)
+        assertNull(tooLow.updates.single().sessionRpe)
+    }
+
+    /**
+     * A second close cannot erase a rating the first one stored, and cannot
+     * add one to a session that was closed unrated.
+     *
+     * NOT a differential: the write-once guard already returns before touching
+     * the row, so this holds at this commit and is pinned because the rating
+     * joins the population that guard protects. It matters more here than for
+     * the heart-rate columns, which can be rebuilt from the set rows: a
+     * session's rating exists nowhere else, so a second close that overwrote
+     * it with the null of a caller that omitted the argument would destroy the
+     * only copy -- exactly the hazard `a second close cannot erase the HRV the
+     * first one stored` records.
+     */
+    @Test
+    fun `a second close cannot erase or invent a session rating`() = runTest {
+        val rated = FakeSessionDao(seedSessions = listOf(session(endedAtMs = 9_000L).copy(sessionRpe = 7)))
+        repo(rated).endSession(1L, endedAtMs = 12_000L, sessionRpe = null)
+        assertEquals(7, rated.sessions.getValue(1L).sessionRpe)
+
+        val unrated = FakeSessionDao(seedSessions = listOf(session(endedAtMs = 9_000L)))
+        repo(unrated).endSession(1L, endedAtMs = 12_000L, sessionRpe = 3)
+        assertNull(unrated.sessions.getValue(1L).sessionRpe)
+    }
+
     /**
      * A set that recorded no heart rate is skipped, not counted as a zero.
      *
