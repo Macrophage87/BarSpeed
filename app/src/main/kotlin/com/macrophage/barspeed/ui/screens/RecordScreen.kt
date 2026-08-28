@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -1758,34 +1759,33 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * by when it happened.
  *
  * The rest countdown and START NEXT SET are the two things this screen exists
- * for, and they were at opposite ends of it. Everything about the set that had
- * just finished -- the effort line, the rep-correction row and a rep-quality
- * card carrying a 64dp chart -- sat between the countdown and the next-set
- * block, so the button that starts the set was below all of it. The field
- * report for v0.1.37 is "try to get the rest dialog to fit on one page without
- * scrolling"; that report, not this arithmetic, is the evidence it did not fit,
- * because `:app` has no test source set and nothing here has been measured on a
- * device.
+ * for (#153), and [RestHeader] now puts them in the same row: [StartNextSetButton]
+ * sits beside the ring rather than at the foot of [NextSetBlock], because they
+ * are the only two facts a lifter needs before the phone comes off the floor.
+ * Everything about the set that had just finished -- the effort line, the
+ * rep-correction row and a rep-quality card carrying a 64dp chart -- still sits
+ * below the next-set block, in [LastSetDetail]. The field report for v0.1.37 is
+ * "try to get the rest dialog to fit on one page without scrolling"; that
+ * report, not this arithmetic, is the evidence it did not fit, because `:app`
+ * has no reachable test seam for a Compose layout and nothing here has been
+ * measured on a device -- see the bench-harness evidence in the commit that
+ * moved START.
  *
- * So the next-set half now comes first and the last-set half second. The
- * distance the button moves up is exactly the height of the block that used to
- * precede it -- summing the declared and default heights of that block gives
- * roughly 270dp with a chart and roughly 90dp without -- and it is bought
- * without removing a control, hiding one behind a disclosure or shrinking any
- * text. The screen still scrolls: a per-rep chart and a rest countdown do not
- * both fit above the fold on a phone. What is below the fold is now the detail
- * rather than the control.
+ * The screen still scrolls: a per-rep chart and a rest countdown do not both
+ * fit above the fold on a phone. What is below the fold is the detail rather
+ * than the control.
  *
- * [SessionCloseControls] stays where it has always been, directly under
- * [StartNextSetButton], and that is deliberate rather than incidental. In
- * `SessionCloseState.FAILED` it draws THIS SESSION DID NOT FINISH and the retry;
- * moving it to the foot of the screen would put the one control that recovers an
- * unclosed session underneath the chart, which is the defect this change is
- * fixing, one control over.
+ * [SessionCloseControls] does NOT follow [StartNextSetButton] to the top. It
+ * stays after [NextSetBlock], where it has sat since the next-set block was
+ * consolidated (#152), because in `SessionCloseState.FAILED` it draws THIS
+ * SESSION DID NOT FINISH and the retry, and putting a session-ending control
+ * directly beside a repeatedly-tapped START would recreate the stacked-target
+ * hazard #137 removed elsewhere on this screen. Keeping it separated by the
+ * whole next-set block, rather than adjacent to START, is the point.
  */
 @Composable
 private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
-    RestHeader(state)
+    RestHeader(state, viewModel)
     Spacer(Modifier.height(6.dp))
     // Sets two onwards start from here, not from READY, and this is the screen
     // where the lifter has a rest period to spend fixing it.
@@ -1818,13 +1818,9 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
         DeviationLine(state, next)
         ChangeSetButton(state, viewModel, next, next = true)
         SwitchExerciseSection(state, viewModel)
-        Spacer(Modifier.height(12.dp))
-        StartNextSetButton(state, viewModel)
     } else if (state.adHoc) {
         AdHocForm(state, viewModel)
         PrepAdjuster(state, viewModel)
-        Spacer(Modifier.height(12.dp))
-        StartNextSetButton(state, viewModel)
     } else {
         Card(Modifier.fillMaxWidth()) {
             Text(
@@ -1878,14 +1874,20 @@ private fun LastSetDetail(state: RecordState, viewModel: RecordViewModel) {
  * close landing on top of that overwrites the stage with FINISHED and stops the
  * service while the lifter is under a loaded bar with the buffers filling, on a
  * screen that has no way to end a set.
+ *
+ * `heightIn(min = ...)`, not a fixed `height`, since #153 (issue #153): the
+ * button now sits in the narrow column beside the 110dp ring rather than the
+ * full screen width, so "START NEXT SET" wraps to two lines at font scale 2.
+ * A fixed 52dp height clipped the second line; a minimum lets the button grow
+ * to fit its own text while keeping the 52dp floor as the tap target.
  */
 @Composable
 private fun StartNextSetButton(state: RecordState, viewModel: RecordViewModel) {
     if (RestControl.START_NEXT_SET !in RestControlPolicy.controls(state.sessionClose)) return
     Button(
         onClick = viewModel::startNextSet,
-        modifier = Modifier.fillMaxWidth().height(52.dp),
-    ) { Text("START NEXT SET") }
+        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+    ) { Text("START NEXT SET", textAlign = TextAlign.Center) }
 }
 
 /**
@@ -2154,7 +2156,7 @@ private fun RepCorrectionRow(feedback: SetFeedback, viewModel: RecordViewModel) 
 }
 
 @Composable
-private fun RestHeader(state: RecordState) {
+private fun RestHeader(state: RecordState, viewModel: RecordViewModel) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         val total = state.restTotalS.takeIf { it > 0 } ?: 1
         ProgressRing(
@@ -2165,7 +2167,15 @@ private fun RestHeader(state: RecordState) {
             Text(formatMmSs(state.restRemainingS), style = MaterialTheme.typography.headlineMedium)
         }
         Spacer(Modifier.padding(horizontal = 8.dp))
-        Column {
+        Column(Modifier.weight(1f)) {
+            // The two things a resting lifter acts on -- how long is left, and
+            // go -- are the first things on screen. StartNextSetButton is
+            // unconditional here rather than gated on lastFeedback below: the
+            // button's own visibility already comes from RestControlPolicy, so
+            // nothing extra is needed to keep it hidden in SessionClose states
+            // where starting is not allowed.
+            StartNextSetButton(state, viewModel)
+            Spacer(Modifier.height(6.dp))
             SectionCaption("Last set")
             state.lastFeedback?.let { feedback ->
                 val loadText =
@@ -2199,10 +2209,15 @@ private fun RestHeader(state: RecordState) {
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
-                Spacer(Modifier.height(6.dp))
-                FeedbackChips(feedback, state.hrBpm, state.hrvMs)
             }
         }
+    }
+    // Moved out of the column beside the ring so the pills get the whole
+    // screen width rather than what is left after the ring and the button's
+    // column -- see FeedbackChips' own KDoc for the arithmetic this changes.
+    state.lastFeedback?.let { feedback ->
+        Spacer(Modifier.height(6.dp))
+        FeedbackChips(feedback, state.hrBpm, state.hrvMs)
     }
 }
 
@@ -2211,23 +2226,21 @@ private fun RestHeader(state: RecordState) {
  *
  * A [FlowRow], because the pill count is variable and the width they are given
  * is not. Five can be emitted at once -- held, tempo, velocity loss, heart rate,
- * HRV -- and they are laid out inside [RestHeader]'s column, which is measured
- * with what is left of the row: the screen width less the 16dp screen padding
- * either side, less the 110dp ring, less the 16dp the gap Spacer contributes.
- * On a 411dp-wide phone that arithmetic gives 253dp and on a 360dp one 202dp,
- * and a plain `Row` does not wrap: children that do not fit are placed past its
- * own width rather than moved to a second line. The field report for v0.1.37 is
- * "the heart rate marker doesn't fit on the page and runs to the side"; heart
- * rate is the fourth pill of the five, and HRV the fifth.
+ * HRV. [RestHeader] draws these full width, below the ring/START row rather than
+ * inside its column (#153): the screen width less the 16dp screen padding either
+ * side, with no ring or button column to subtract. On a 411dp-wide phone that
+ * arithmetic gives 379dp and on a 360dp one 328dp, up from the 253dp/202dp this
+ * had when the pills shared the column beside the ring, and a plain `Row` does
+ * not wrap: children that do not fit are placed past its own width rather than
+ * moved to a second line. The field report for v0.1.37 is "the heart rate
+ * marker doesn't fit on the page and runs to the side"; heart rate is the
+ * fourth pill of the five, and HRV the fifth.
  *
  * Wrapping rather than widening, because no width is safe: the pill text is
  * data-dependent (a three-digit heart rate, a two-digit rep count either side of
- * the tempo ratio) and nothing bounds it. Wrapping usually costs the header no
- * height at all: the ring is 110dp and the column beside it comes to about
- * 100dp with a single-line title and two pill rows, so the ring is still what
- * sets the row's height. A third pill row, or a title long enough to wrap,
- * grows it -- which is why the header keeps the ring and gives the pills the
- * whole of the remaining column.
+ * the tempo ratio) and nothing bounds it. A third pill row, or a title long
+ * enough to wrap in the column above, only grows the header -- it does not
+ * narrow the chips, which now have the whole row to themselves.
  *
  * The `@OptIn` is on this function alone, not the file or the module, which is
  * how `PlanDetailScreen` already carries the same import for the same reason.
