@@ -264,6 +264,30 @@ class SessionRepositoryEndSessionTest {
         assertEquals("felt strong", written.notes)
     }
 
+    /**
+     * The close copies the row it read, so every column it was not asked about
+     * survives it unchanged.
+     *
+     * The time-zone pair is the one named here because it is the one that
+     * cannot be rebuilt: no artifact records the offset a past session was
+     * recorded on, not the set rows and not the raw CSVs, all of which carry
+     * epoch milliseconds. `endSession` builds its update with `session.copy`,
+     * so this holds today by construction -- which is exactly why it is pinned
+     * before a column is added to that copy. A `copy` that starts naming
+     * columns explicitly, or one that reconstructs the entity, drops this pair
+     * silently and the loss is discovered a corpus later.
+     */
+    @Test
+    fun `closing a session leaves the recorded time zone exactly as it was`() = runTest {
+        val recorded = session().copy(zoneId = "America/New_York", utcOffsetMinutes = -240)
+        val dao = FakeSessionDao(seedSessions = listOf(recorded))
+        repo(dao).endSession(1L, endedAtMs = 9_000L)
+
+        val written = dao.updates.single()
+        assertEquals("America/New_York", written.zoneId)
+        assertEquals(-240, written.utcOffsetMinutes)
+    }
+
     @Test
     fun `closing an unknown session writes nothing at all`() = runTest {
         val dao = FakeSessionDao()

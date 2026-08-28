@@ -803,4 +803,58 @@ class SchemaContractTest {
             "the set of values carrying no provenance changed",
         )
     }
+
+    // ---- what the session level says today, ahead of issue #159 -------------
+
+    /**
+     * The session-level key set of the published export, stated as a literal.
+     *
+     * The root object is NOT `additionalProperties: false` -- only `$defs.set`
+     * and the blocks under it are -- so an undeclared session-level key does
+     * not make an export invalid the way an undeclared set key does. It goes
+     * UNMENTIONED instead, which is the quieter failure: the exporter writes
+     * something no reader has been told about, and nothing anywhere fails.
+     * This pin is the substitute for the schema check that cannot fire.
+     *
+     * A literal for the reason `every declared plan key is documented in the
+     * schema` keeps one: a set derived from the serializer descriptor follows
+     * a rename silently, and following it silently is the drift this class
+     * exists to catch.
+     */
+    @Test
+    fun `the published export declares exactly the session-level keys it declares today`() {
+        val keys = schema("session-export.schema.json")["properties"]!!.jsonObject.keys
+        assertEquals(
+            setOf("schemaVersion", "startedAt", "endedAt", "timeZone", "planRef", "notes", "heartRate", "exercises"),
+            keys,
+            "a session-level key was added or removed without moving this pin",
+        )
+    }
+
+    /**
+     * The published per-set `rpe` accepts 1 to 10, which is WIDER than the grid
+     * the app draws.
+     *
+     * Characterization, not endorsement. `rpeOptions` in `RecordScreen.kt`
+     * offers 6 through 10 and is the only thing that writes this key --
+     * `rateLastSet` is its one caller, reaching `SessionRepository.rateSet` and
+     * `SessionDao.updateRpe` -- so nothing the app ships produces a 1 here.
+     * The bound is pinned as it is because the next change adds a SECOND
+     * rating whose range genuinely is 1 to 10, and a reader meeting two 1-to-10
+     * integers in one document has nothing but the descriptions to tell them
+     * apart.
+     */
+    @Test
+    fun `the published per-set rpe is bounded one to ten, wider than the grid the app draws`() {
+        val set = schema("session-export.schema.json")["\$defs"]!!.jsonObject["set"]!!
+            .jsonObject["properties"]!!.jsonObject
+        val rpe = assertNotNull(set["rpe"], "the published export schema does not declare a set's rpe").jsonObject
+        assertEquals("integer", rpe["type"]!!.jsonPrimitive.content, "a set's rpe is not published as an integer")
+        assertEquals(1, rpe["minimum"]!!.jsonPrimitive.int, "the published per-set rpe floor moved")
+        assertEquals(10, rpe["maximum"]!!.jsonPrimitive.int, "the published per-set rpe ceiling moved")
+        assertTrue(
+            rpe["description"]?.jsonPrimitive?.content?.isNotBlank() == true,
+            "a set's rpe is declared with no description, which is the shape of issue #76",
+        )
+    }
 }
