@@ -8,6 +8,8 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.macrophage.barspeed.model.LeadInPolicy
+import com.macrophage.barspeed.model.SensorCapturePolicy
+import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -80,6 +82,83 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    /**
+     * Which accelerometer is which, by device address, issue #156.
+     *
+     * Here rather than in `DeviceRegistry` for two concrete reasons, both
+     * about that class rather than about this one: its `keyFor` is a binary
+     * `if` that maps any role other than IMU onto the heart-rate strap's
+     * preferred key, and `KnownDevice` puts the role enum on the wire, so a
+     * build meeting a value it has never seen throws inside a decode whose
+     * catch returns an EMPTY list. Keeping the label out of that document
+     * leaves the paired-device list byte-compatible in both directions.
+     *
+     * Keyed by MAC and not by position. `DeviceRegistry.pair` makes every
+     * newly paired device its role's preferred address, so anything derived
+     * from "which one is preferred" changes meaning the next time either unit
+     * is re-paired -- and every capture either side of that moment would be
+     * labelled consistently and wrongly. An address is the only thing about a
+     * WT901 that survives a power cycle.
+     *
+     * One flow over the whole preference map, and validated on the way OUT,
+     * both for [prepOverrides]' reasons: the key set changes whenever a device
+     * is paired or forgotten, and a value written by a later build has been
+     * seen by no validator here. An unrecognised role is DROPPED rather than
+     * defaulted -- `SensorCapturePolicy.roleFromWire` answers null, and a
+     * default would relabel the other unit's stream.
+     */
+    val sensorRoles: Flow<Map<String, SensorRole>> =
+        context.settingsDataStore.data.map { prefs ->
+            prefs.asMap()
+                .mapNotNull { (key, value) ->
+                    val address = key.name.removePrefix(SENSOR_ROLE_KEY_PREFIX)
+                    if (address == key.name || value !is String) {
+                        null
+                    } else {
+                        SensorCapturePolicy.roleFromWire(value)?.let { address to it }
+                    }
+                }
+                .toMap()
+        }
+
+    /**
+     * How many accelerometers the lifter has chosen for an exercise, where
+     * they have chosen anything.
+     *
+     * The plan DECLARES the count and this is the adjustment on top of it, the
+     * same two-layer shape prep uses; [SensorCapturePolicy.resolve] is where
+     * the precedence lives and this map is only its second argument. Absent
+     * means no adjustment, which is a different fact from a stored 1 -- a
+     * stored 1 on an exercise a plan declares as 2 is the lifter turning dual
+     * off, and the export publishes both figures.
+     *
+     * Keyed by exercise id, so an ad-hoc set of a planned exercise picks up the
+     * same choice for free, exactly as [prepOverrides] does.
+     */
+    val sensorCounts: Flow<Map<String, Int>> =
+        context.settingsDataStore.data.map { prefs ->
+            prefs.asMap()
+                .mapNotNull { (key, value) ->
+                    val id = key.name.removePrefix(SENSOR_COUNT_KEY_PREFIX)
+                    if (id == key.name || value !is Int) null else id to SensorCapturePolicy.clamp(value)
+                }
+                .toMap()
+        }
+
+    /** Label a device, or clear its label when [role] is null. */
+    suspend fun setSensorRole(address: String, role: SensorRole?) {
+        val key = stringPreferencesKey("$SENSOR_ROLE_KEY_PREFIX$address")
+        context.settingsDataStore.edit { prefs ->
+            if (role == null) prefs.remove(key) else prefs[key] = SensorCapturePolicy.wireOf(role)
+        }
+    }
+
+    suspend fun setSensorCount(exerciseId: String, count: Int) {
+        context.settingsDataStore.edit {
+            it[intPreferencesKey("$SENSOR_COUNT_KEY_PREFIX$exerciseId")] = SensorCapturePolicy.clamp(count)
+        }
+    }
+
     suspend fun setWeightUnit(unit: WeightUnit) {
         context.settingsDataStore.edit { it[weightUnitKey] = unit.name }
     }
@@ -98,5 +177,15 @@ class SettingsStore(private val context: Context) {
          * this store and none of them begins with [PREP_KEY_PREFIX].
          */
         const val PREP_KEY_PREFIX = "prep_s_"
+
+        /**
+         * Neither of these is a prefix of the other, nor of [PREP_KEY_PREFIX],
+         * nor of any scalar key in this store -- which is what the two
+         * prefix-scanning flows above rely on. `sensor_role_` holds a role per
+         * device ADDRESS and `sensors_` a count per EXERCISE ID; a shared
+         * prefix would have each flow reading the other's rows.
+         */
+        const val SENSOR_ROLE_KEY_PREFIX = "sensor_role_"
+        const val SENSOR_COUNT_KEY_PREFIX = "sensors_"
     }
 }

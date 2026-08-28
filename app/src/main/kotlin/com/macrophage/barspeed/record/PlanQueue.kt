@@ -77,6 +77,13 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     velocityLossStopPct = set.velocityLossStopPct,
                     restS = set.restS,
                     prepS = exerciseDef.prepS,
+                    // The set's own declaration beats the exercise block's,
+                    // the precedence every other per-set key already has --
+                    // a warm-up and its working set are not always mounted
+                    // the same way. Null when neither declared anything,
+                    // which is a different fact from a declared 1 and is
+                    // what lets the export publish both figures (#156).
+                    sensors = set.sensors ?: exerciseDef.sensors,
                     isExerciseChange = setIdx == 0 && exerciseIdx > 0,
                 )
         }

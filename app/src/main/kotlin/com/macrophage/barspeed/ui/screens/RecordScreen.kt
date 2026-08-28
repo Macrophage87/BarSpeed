@@ -59,6 +59,7 @@ import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.model.BlePermissionStep
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.DualShortfall
 import com.macrophage.barspeed.model.EffortCorrectionPolicy
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
@@ -72,6 +73,8 @@ import com.macrophage.barspeed.model.RestControl
 import com.macrophage.barspeed.model.RestControlPolicy
 import com.macrophage.barspeed.model.SensorAdvice
 import com.macrophage.barspeed.model.SensorAdvicePolicy
+import com.macrophage.barspeed.model.SensorCapturePolicy
+import com.macrophage.barspeed.model.SensorRoster
 import com.macrophage.barspeed.model.SetDeviationSummary
 import com.macrophage.barspeed.model.SetEndControl
 import com.macrophage.barspeed.model.SetEndControlPolicy
@@ -176,7 +179,17 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(end = 16.dp),
                     ) {
-                        SensorDot("IMU", state.imuState, demoActive = state.demoMode)
+                        // Two dots only when a second sensor is really in play:
+                        // two paired, both labelled, and this set armed for
+                        // both. Otherwise the bar would carry a permanently
+                        // grey dot for every single-sensor lifter, which reads
+                        // as something being broken. Labelled with the ROLE
+                        // rather than "IMU"/"IMU B" so the dot that goes amber
+                        // names the unit to go and look at -- and the analysed
+                        // one is not always A (#156).
+                        val roster = state.rosterFor(state.currentSlot)
+                        SensorDot(roster.analysed?.name ?: "IMU", state.imuState, demoActive = state.demoMode)
+                        roster.secondary?.let { SensorDot(it.name, state.imuStateB) }
                         SensorDot("HRM", state.hrmState)
                     }
                 },
@@ -510,6 +523,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         // its inline form, so it keeps its inline prep too.
         PrepAdjuster(state, viewModel)
     }
+    SensorCountChooser(state, viewModel)
     Spacer(Modifier.height(12.dp))
     // The bar sensor is record-only for standard lifts: the lifter (or the
     // voice guide) counts; explosive lifts stay sensor-counted.
@@ -574,6 +588,79 @@ private const val PREP_STEP_S = 5
  * changed from is named beside it whenever the two differ -- the plan's
  * declaration where it made one, the app's default otherwise.
  */
+/**
+ * How many accelerometers the next set records with, issue #156.
+ *
+ * Drawn only when a second IMU is paired: with one sensor there is nothing to
+ * choose, and a control offering a 2 that cannot be armed is worse than no
+ * control. The count is stored against the exercise, so it holds for the rest
+ * of that exercise's sets and for the same exercise next week -- `PrepAdjuster`
+ * exactly, and for the same reason.
+ *
+ * The line underneath is the whole point of the control. It names what the plan
+ * declared whenever the two differ, so an adjustment is visible as an
+ * adjustment; and when 2 is chosen but cannot be armed it says WHICH gap --
+ * the shortfall this arrangement refuses to paper over by labelling a unit
+ * nobody labelled.
+ */
+@Composable
+private fun SensorCountChooser(state: RecordState, viewModel: RecordViewModel) {
+    if (state.pairedImuAddresses.size < SensorCapturePolicy.MAX_COUNT) return
+    val slot = state.upcomingSlot
+    val chosen = state.sensorCountFor(slot)
+    val planned = state.plannedSensorCountFor(slot)
+    val roster = state.rosterFor(slot)
+    Spacer(Modifier.height(8.dp))
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                if (chosen == 1) "One sensor" else "Two sensors",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                sensorCountDetail(chosen, planned, roster),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (roster.shortfall == null) BarColors.Sub else BarColors.Amber,
+            )
+        }
+        FilterChip(
+            selected = chosen == 1,
+            onClick = { viewModel.setSensorCount(1) },
+            label = { Text("1") },
+        )
+        FilterChip(
+            selected = chosen == SensorCapturePolicy.MAX_COUNT,
+            onClick = { viewModel.setSensorCount(SensorCapturePolicy.MAX_COUNT) },
+            label = { Text("2") },
+        )
+    }
+}
+
+/**
+ * What the sensor-count line says, as a pure function of the three facts it
+ * has.
+ *
+ * A `when` over the shortfall rather than a boolean, so a fourth reason added
+ * to [DualShortfall] fails this compile instead of falling into a silent else
+ * -- the same shape `SensorDot` uses for `ConnectionState`.
+ */
+private fun sensorCountDetail(chosen: Int, planned: Int, roster: SensorRoster): String = when (roster.shortfall) {
+    DualShortfall.ONE_SENSOR_PAIRED -> "Only one sensor is paired - this set will record one."
+    DualShortfall.ROLES_UNASSIGNED -> "Label both sensors A and B under Devices - this set will record one."
+    DualShortfall.ROLES_COLLIDE -> "Both sensors are labelled the same - fix it under Devices."
+    null ->
+        when {
+            chosen != planned && planned == 1 -> "Plan says one - your change is recorded in the export"
+            chosen != planned -> "Plan says $planned - your change is recorded in the export"
+            chosen == 1 -> "One stream, as always"
+            else -> "Both streams are recorded; nothing is derived from the second one yet"
+        }
+}
+
 @Composable
 private fun PrepAdjuster(state: RecordState, viewModel: RecordViewModel) {
     if (!state.upcomingPlaysPrep) return

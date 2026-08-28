@@ -6,7 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.SettingsStore
 import com.macrophage.barspeed.VoiceCounter
+import com.macrophage.barspeed.ble.AutoConnectManager
+import com.macrophage.barspeed.ble.DeviceRegistry
+import com.macrophage.barspeed.ble.DeviceRole
 import com.macrophage.barspeed.data.CompletedSet
+import com.macrophage.barspeed.data.SecondaryCapture
 import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.data.SetJournal
 import com.macrophage.barspeed.data.SetJournalHeader
@@ -30,9 +34,13 @@ import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PrepCase
+import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.ResolvedGeometry
+import com.macrophage.barspeed.model.SensorCapturePolicy
+import com.macrophage.barspeed.model.SensorRole
+import com.macrophage.barspeed.model.SensorRoster
 import com.macrophage.barspeed.model.SessionCloseState
 import com.macrophage.barspeed.model.SetClockPolicy
 import com.macrophage.barspeed.model.SetGeometryPolicy
@@ -51,7 +59,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
@@ -123,6 +133,17 @@ data class PlannedSlot(
      * [LeadInPolicy], never read raw.
      */
     val prepS: Int? = null,
+    /**
+     * How many accelerometers the plan declared for this set: the set's own
+     * `sensors` where it has one, else the exercise block's, else null when
+     * neither declared anything (#156).
+     *
+     * Resolved at flatten time because both levels are in hand there and only
+     * one of them can be right for a given set; resolved against the lifter's
+     * adjustment and the default by [SensorCapturePolicy], never read raw --
+     * the same arrangement [prepS] has.
+     */
+    val sensors: Int? = null,
     val isExerciseChange: Boolean = false,
 ) {
     /**
@@ -240,6 +261,17 @@ private data class PendingSetWrite(
      * marks were discarded on every set regardless.
      */
     val repMarks: List<Long>,
+    /**
+     * What this set was armed with, and the capture from the accelerometer
+     * that is not analysed -- both frozen with everything else (#156).
+     *
+     * [samples] keeps its meaning: the ANALYSED stream. [secondary] is null on
+     * every one-sensor set, and non-null with an empty sample list when a role
+     * was armed and its unit produced nothing, which is the state the
+     * repository turns into "no row, and the declaration still names it".
+     */
+    val sensors: RecordedSensors?,
+    val secondary: SecondaryCapture?,
     val rating: SetRating?,
     val planName: String?,
     val planSessionName: String?,
@@ -287,6 +319,8 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
     restHrSamples = p.restHrSamples,
     voiceCues = p.cues,
     repMarks = p.repMarks,
+    sensors = p.sensors,
+    secondary = p.secondary,
     rpe = p.rating?.rpe,
     failed = failed,
     warmup = p.rating?.warmup == true,
@@ -356,6 +390,146 @@ private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: M
     launch { settings.prepOverrides.collect { state.value = state.value.copy(prepOverrides = it) } }
 
 /**
+ * Mirror everything that decides which accelerometer is which onto the state,
+ * and keep the second link pointed at the right device (#156).
+ *
+ * Four sources in one collector rather than four collectors, because the
+ * roster is a function of all of them together: a role assigned to a device
+ * that has since been forgotten arms nothing, and a second device paired
+ * without a label arms nothing either. Emitting a state that is right about
+ * three of the four and then correcting it is a window in which the READY
+ * screen shows a dot for a sensor that will not be captured.
+ *
+ * [onSecondaryAddress] is called with the address the second link should
+ * maintain, and it deliberately ignores the per-exercise COUNT: the link is
+ * kept warm whenever two labelled units are paired, so arming dual for one
+ * exercise does not have to wait out a BLE connect at the moment the lifter
+ * taps START. What the count decides is whether the set CAPTURES from it,
+ * which `beginSet` answers from the roster for its own slot.
+ *
+ * A free function for [openSession]'s reason: [RecordViewModel] is a class
+ * detekt measures as being at its size limit.
+ */
+private fun CoroutineScope.mirrorSensorSettings(
+    settings: SettingsStore,
+    registry: DeviceRegistry,
+    state: MutableStateFlow<RecordState>,
+    onSecondaryAddress: (String?) -> Unit,
+) = launch {
+    combine(
+        settings.sensorRoles,
+        settings.sensorCounts,
+        registry.knownDevices,
+        registry.preferred(DeviceRole.IMU),
+    ) { roles, counts, known, preferred ->
+        val paired = known.filter { it.role == DeviceRole.IMU }.map { it.address }
+        state.value.copy(
+            sensorRoles = roles,
+            sensorCountOverrides = counts,
+            pairedImuAddresses = paired,
+            preferredImuAddress = preferred?.address,
+        )
+    }.collect { next ->
+        state.value = next
+        onSecondaryAddress(
+            SensorCapturePolicy.roster(
+                pairedImuAddresses = next.pairedImuAddresses,
+                preferredAddress = next.preferredImuAddress,
+                roleByAddress = next.sensorRoles,
+                requestedCount = SensorCapturePolicy.MAX_COUNT,
+            ).secondaryAddress,
+        )
+    }
+}
+
+/**
+ * Apply one tap of the sensor-count control: work out which exercise it
+ * changes and write the new value.
+ *
+ * [applyPrepAdjustment]'s shape exactly, and for its reasons -- the value is
+ * written to the store and read back through its flow rather than copied onto
+ * the state, and it runs on [appScope] because the rest screen is where this
+ * is tapped and the pop that leaves it cancels the ViewModel's own scope.
+ */
+private fun applySensorCount(s: RecordState, count: Int, appScope: CoroutineScope, settings: SettingsStore) {
+    val slot = s.upcomingSlot
+    appScope.launch { settings.setSensorCount(s.sensorExerciseId(slot), SensorCapturePolicy.clamp(count)) }
+}
+
+/**
+ * The collect job for the accelerometer that is NOT analysed.
+ *
+ * Deliberately not routed through `onSample`. That function feeds the tracker,
+ * the live readout and the rep announcements, and every one of those is about
+ * the stream the set is judged on -- a second stream reaching them would make
+ * the bar appear to move twice. In the capture release the secondary reaches
+ * the buffer and the journal and nothing else.
+ *
+ * The journal is passed as a lambda rather than a reference because the field
+ * it reads is reassigned by `beginSet` and cleared when a set is stored; the
+ * in-set HR collector reads the same field the same way.
+ */
+private fun CoroutineScope.openSecondaryCollector(
+    samples: SharedFlow<ImuSample>,
+    buffer: MutableList<ImuSample>,
+    journal: () -> SetJournal?,
+    role: SensorRole,
+): Job = launch {
+    samples.collect { sample ->
+        buffer += sample
+        journal()?.appendSecondaryImu(sample, role)
+    }
+}
+
+/**
+ * Mirror all three links' connection state onto the screen state.
+ *
+ * One free function rather than three collectors in `init`, and free for
+ * [openSession]'s reason: [RecordViewModel] is a class detekt measures at its
+ * size limit, and the third link took it over. The behaviour is unchanged by
+ * the move -- three independent collectors, each copying one link's state onto
+ * its own fields.
+ *
+ * `imuConnected`, `imuConnecting` and `imuState` still mean THE ANALYSED
+ * SENSOR and nothing else. They have four consumers between them -- the dot,
+ * the SETUP advice, whether an explosive lift is sensor-counted, and the set
+ * journal's header -- and the correct answer for a second sensor differs at
+ * each, so the second link gets its own fields rather than widening these
+ * (#156).
+ */
+private fun CoroutineScope.mirrorLinkStates(autoConnect: AutoConnectManager, state: MutableStateFlow<RecordState>) {
+    launch {
+        autoConnect.imuState.collect { s ->
+            state.value =
+                state.value.copy(
+                    imuConnected = s is ConnectionState.Connected,
+                    imuConnecting = s is ConnectionState.Connecting,
+                    imuState = s,
+                )
+        }
+    }
+    launch {
+        autoConnect.imuStateB.collect { s ->
+            state.value =
+                state.value.copy(
+                    imuConnectedB = s is ConnectionState.Connected,
+                    imuStateB = s,
+                )
+        }
+    }
+    launch {
+        autoConnect.hrmState.collect { s ->
+            state.value =
+                state.value.copy(
+                    hrmConnected = s is ConnectionState.Connected,
+                    hrmConnecting = s is ConnectionState.Connecting,
+                    hrmState = s,
+                )
+        }
+    }
+}
+
+/**
  * Open the durable capture for a set that is about to begin.
  *
  * A free function taking what it needs, for the reason [openSession] gives:
@@ -384,6 +558,7 @@ private fun openJournal(
     exercise: ExerciseDef,
     sessionStartedAtMs: Long,
     startedAtMs: Long,
+    roster: SensorRoster,
 ): SetJournal? = store.open(
     SetJournalHeader(
         exerciseId = exercise.id,
@@ -395,6 +570,11 @@ private fun openJournal(
         imuConnected = s.imuConnected,
         planName = s.planName.takeIf { !s.adHoc },
         planSessionName = s.planSessionName.takeIf { !s.adHoc },
+        // The roles this set was armed for, so a recovered capture holding one
+        // stream can be told from one that was only ever armed for one -- the
+        // same reason `imuConnected` is here. Empty on every one-sensor set.
+        sensorRoles = roster.expected,
+        analysedRole = roster.analysed,
     ),
 )
 
@@ -973,6 +1153,26 @@ data class RecordState(
      * [prepSecondsFor] falls back through the plan's declaration to the default.
      */
     val prepOverrides: Map<String, Int> = emptyMap(),
+    /**
+     * The second accelerometer's link, issue #156.
+     *
+     * [imuConnected] and [imuState] are NOT redefined to mean "any IMU" or
+     * "all IMUs". They have four consumers between them -- the dot, the SETUP
+     * advice, whether an explosive lift is sensor-counted, and the set
+     * journal's header, which exists so that a capture of zero samples can be
+     * read correctly -- and the right answer differs per consumer, so one flag
+     * cannot serve both sensors. These are separate fields and every existing
+     * reader is untouched.
+     */
+    val imuStateB: ConnectionState = ConnectionState.Disconnected,
+    val imuConnectedB: Boolean = false,
+    /** Device address to role, as the lifter labelled them; see `SettingsStore.sensorRoles`. */
+    val sensorRoles: Map<String, SensorRole> = emptyMap(),
+    /** Exercise id to the count the lifter chose, where they chose one. */
+    val sensorCountOverrides: Map<String, Int> = emptyMap(),
+    /** Every paired IMU address, and which of them the analysed link maintains. */
+    val pairedImuAddresses: List<String> = emptyList(),
+    val preferredImuAddress: String? = null,
 ) {
     val currentSlot: PlannedSlot? get() = queue.getOrNull(queueIndex)
     val nextSlot: PlannedSlot? get() = queue.getOrNull(queueIndex + 1)
@@ -1014,6 +1214,40 @@ data class RecordState(
 
     /** What the plan prescribed for [slot]: its declaration, or the default. */
     fun plannedPrepSecondsFor(slot: PlannedSlot?): Int = LeadInPolicy.planned(slot?.prepS)
+
+    /** Which exercise's sensor count a control on screen is editing. */
+    fun sensorExerciseId(slot: PlannedSlot?): String = slot?.exercise?.id ?: currentExercise.id
+
+    /**
+     * How many accelerometers a set of [slot] will run with: the lifter's
+     * stored choice, else the plan's declaration, else one.
+     *
+     * A function taking the slot rather than a property, for
+     * [prepSecondsFor]'s reason -- the screen and [RecordViewModel.beginSet]
+     * ask about different slots. The RULE is stated once, in
+     * [SensorCapturePolicy.resolve].
+     */
+    fun sensorCountFor(slot: PlannedSlot?): Int =
+        SensorCapturePolicy.resolve(slot?.sensors, sensorCountOverrides[sensorExerciseId(slot)])
+
+    /** What the PLAN prescribed for [slot], which is what the export pairs the actual against. */
+    fun plannedSensorCountFor(slot: PlannedSlot?): Int = SensorCapturePolicy.planned(slot?.sensors)
+
+    /**
+     * What a set of [slot] would be armed with right now.
+     *
+     * Everything about which physical unit is which is decided by
+     * [SensorCapturePolicy.roster] in `:core:model`, where a test runs on it.
+     * This only hands it what it needs; the screen reads the answer to draw
+     * the count chip and the second dot, and `beginSet` reads it again at the
+     * moment the set starts, which is the only moment it is true.
+     */
+    fun rosterFor(slot: PlannedSlot?): SensorRoster = SensorCapturePolicy.roster(
+        pairedImuAddresses = pairedImuAddresses,
+        preferredAddress = preferredImuAddress,
+        roleByAddress = sensorRoles,
+        requestedCount = sensorCountFor(slot),
+    )
 
     /**
      * True when the set coming up will play a prep -- a tempo'd lift, or a hold
@@ -1096,6 +1330,15 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<RecordState> = stateFlow
 
     private val imuBuffer = mutableListOf<ImuSample>()
+
+    /**
+     * The capture from the accelerometer that is NOT analysed (#156).
+     *
+     * [imuBuffer] keeps its meaning -- the analysed stream -- so nothing that
+     * already reads it changes. This one is filled by a collector that reaches
+     * the buffer and the journal and nothing else.
+     */
+    private val imuBufferB = mutableListOf<ImuSample>()
     private val hrBuffer = mutableListOf<HrSample>()
 
     /**
@@ -1120,6 +1363,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private val cueBuffer = mutableListOf<VoiceCue>()
     private var tracker: StreamingSetTracker? = null
     private var collectJob: Job? = null
+    private var collectJobB: Job? = null
+
+    /**
+     * What the set in progress was armed with, frozen at [beginSet].
+     *
+     * Read at the moment the set starts and not again, because that is the
+     * only moment it is true: the lifter can label a device or forget one
+     * mid-session, and a set already recording must be stored as the thing it
+     * was armed as. Null between sets.
+     */
+    private var armedSensors: RecordedSensors? = null
+    private var armedSecondaryRole: SensorRole? = null
     private var hrJob: Job? = null
     private var tickJob: Job? = null
     private var restJob: Job? = null
@@ -1243,26 +1498,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var announceReps = false
 
     init {
-        viewModelScope.launch {
-            autoConnect.imuState.collect { s ->
-                stateFlow.value =
-                    stateFlow.value.copy(
-                        imuConnected = s is ConnectionState.Connected,
-                        imuConnecting = s is ConnectionState.Connecting,
-                        imuState = s,
-                    )
-            }
-        }
-        viewModelScope.launch {
-            autoConnect.hrmState.collect { s ->
-                stateFlow.value =
-                    stateFlow.value.copy(
-                        hrmConnected = s is ConnectionState.Connected,
-                        hrmConnecting = s is ConnectionState.Connecting,
-                        hrmState = s,
-                    )
-            }
-        }
+        viewModelScope.mirrorLinkStates(autoConnect, stateFlow)
         viewModelScope.launch {
             container.planRepository.activePlan.collect { entity ->
                 val plan = entity?.let { container.planRepository.decode(it) }
@@ -1313,6 +1549,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.mirrorPrepOverrides(container.settings, stateFlow)
+        viewModelScope.mirrorSensorSettings(container.settings, container.deviceRegistry, stateFlow) { address ->
+            autoConnect.setSecondaryImuAddress(address)
+        }
         viewModelScope.launch {
             container.settings.audioCues.collect { enabled ->
                 stateFlow.value = stateFlow.value.copy(audioCues = enabled)
@@ -1429,8 +1668,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val tracker = StreamingSetTracker.forLift(exercise.liftDirection())
         this.tracker = tracker
         imuBuffer.clear()
+        imuBufferB.clear()
         hrBuffer.clear()
         cueBuffer.clear()
+        // What this set is armed with, read once, here. The lifter can label a
+        // device or forget one mid-session, so a set already recording has to
+        // be stored as the thing it was armed as rather than as whatever the
+        // settings say when it ends. `recorded` returns null on the ordinary
+        // one-sensor set, which is what keeps that set's row and both export
+        // documents exactly what they were.
+        val roster = s.rosterFor(s.currentSlot)
+        armedSensors = SensorCapturePolicy.recorded(s.plannedSensorCountFor(s.currentSlot), roster)
+        armedSecondaryRole = roster.secondary
         endingSet = false
         lastCountedPhase = Phase.IDLE
         lastSpokenSecond = 0
@@ -1499,7 +1748,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // with nowhere durable to go. A null here is the disk refusing, which
         // is the state this whole mechanism replaces -- it must not also stop
         // the set being recorded in memory as it always was.
-        journal = openJournal(container.setJournals, s, exercise, sessionStartedAtMs, setStartedAtMs)
+        journal = openJournal(container.setJournals, s, exercise, sessionStartedAtMs, setStartedAtMs, roster)
         // Every set, not just the first. All three catch clauses in
         // RecordingService.onStartCommand end in stopSelf(startId), so a start
         // that was refused leaves nothing running and this is the only retry.
@@ -1509,6 +1758,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         collectJob =
             viewModelScope.launch {
                 autoConnect.imuSamples.collect { sample -> onSample(sample) }
+            }
+        // Opened after the journal and only when a role was armed, so no
+        // sample can arrive with nowhere durable to go and no unlabelled
+        // stream can be captured. Null role means one sensor, and this job
+        // does not exist.
+        collectJobB =
+            roster.secondary?.let { role ->
+                viewModelScope.openSecondaryCollector(autoConnect.imuSamplesB, imuBufferB, { journal }, role)
             }
         if (s.demoMode && !s.currentIsTimed) startDemoStream(s, exercise)
         hrJob =
@@ -1811,6 +2068,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         if (endingSet) return
         endingSet = true
         collectJob?.cancel()
+        collectJobB?.cancel()
         hrJob?.cancel()
         tickJob?.cancel()
         demoJob?.cancel()
@@ -1896,6 +2154,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 restHrSamples = restHrBuffer.toList(),
                 cues = cueBuffer.toList(),
                 repMarks = journal?.repMarks.orEmpty(),
+                sensors = armedSensors,
+                // A role and its samples together, so a full stream cannot
+                // exist without a label. Non-null with an EMPTY list when the
+                // role was armed and its unit produced nothing -- which the
+                // repository turns into no row and a declaration that still
+                // names the role, the state that makes a flat battery readable
+                // afterwards rather than invisible.
+                secondary = armedSecondaryRole?.let { SecondaryCapture(it, imuBufferB.toList()) },
                 rating = rating,
                 planName = s.planName.takeIf { !s.adHoc },
                 planSessionName = s.planSessionName.takeIf { !s.adHoc },
@@ -2115,6 +2381,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     /** One tap of the prep control; the work is in the free [applyPrepAdjustment]. */
     fun adjustPrep(deltaS: Int) = applyPrepAdjustment(stateFlow.value, deltaS, container.appScope, container.settings)
+
+    /** One tap of the sensor-count control; the work is in the free [applySensorCount]. */
+    fun setSensorCount(count: Int) = applySensorCount(stateFlow.value, count, container.appScope, container.settings)
 
     /** Advance to the next planned set, applying any in-rest load/rep edits. */
     fun startNextSet() {
