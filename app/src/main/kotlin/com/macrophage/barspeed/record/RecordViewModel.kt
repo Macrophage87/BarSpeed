@@ -385,6 +385,18 @@ private fun applyPrepAdjustment(s: RecordState, deltaS: Int, appScope: Coroutine
     appScope.launch { settings.setPrepS(exerciseId, seconds) }
 }
 
+/**
+ * The four facts [mirrorSensorSettings] combines, carried out of the combine
+ * transform so that the state read and the state write are one statement in
+ * the collector.
+ */
+private data class SensorSettings(
+    val roles: Map<String, SensorRole>,
+    val counts: Map<String, Int>,
+    val paired: List<String>,
+    val preferred: String?,
+)
+
 /** Mirror the stored prep adjustments onto the state; free for the same reason. */
 private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: MutableStateFlow<RecordState>) =
     launch { settings.prepOverrides.collect { state.value = state.value.copy(prepOverrides = it) } }
@@ -407,6 +419,18 @@ private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: M
  * taps START. What the count decides is whether the set CAPTURES from it,
  * which `beginSet` answers from the roster for its own slot.
  *
+ * The transform returns a [SensorSettings] and the state is read and written
+ * in one statement inside `collect`, as `mirrorPrepOverrides` and all three
+ * collectors of [mirrorLinkStates] do. Reading `state.value` in the transform
+ * and assigning it in `collect` put the read and the write on either side of
+ * `combine`'s channel hand-off. The three mirrors run as separate jobs on one
+ * scope writing one `MutableStateFlow`, so anything [mirrorLinkStates] wrote
+ * between the two was discarded by the write, and `imuConnected`,
+ * `imuConnecting` and `imuState` re-emit only on a link-state CHANGE, so such
+ * a loss does not heal itself. Read from source and reasoned about: nothing
+ * in this repository can exercise [RecordViewModel], and this has not been
+ * watched happen on a device.
+ *
  * A free function for [openSession]'s reason: [RecordViewModel] is a class
  * detekt measures as being at its size limit.
  */
@@ -422,20 +446,25 @@ private fun CoroutineScope.mirrorSensorSettings(
         registry.knownDevices,
         registry.preferred(DeviceRole.IMU),
     ) { roles, counts, known, preferred ->
-        val paired = known.filter { it.role == DeviceRole.IMU }.map { it.address }
-        state.value.copy(
-            sensorRoles = roles,
-            sensorCountOverrides = counts,
-            pairedImuAddresses = paired,
-            preferredImuAddress = preferred?.address,
+        SensorSettings(
+            roles = roles,
+            counts = counts,
+            paired = known.filter { it.role == DeviceRole.IMU }.map { it.address },
+            preferred = preferred?.address,
         )
     }.collect { next ->
-        state.value = next
+        state.value =
+            state.value.copy(
+                sensorRoles = next.roles,
+                sensorCountOverrides = next.counts,
+                pairedImuAddresses = next.paired,
+                preferredImuAddress = next.preferred,
+            )
         onSecondaryAddress(
             SensorCapturePolicy.roster(
-                pairedImuAddresses = next.pairedImuAddresses,
-                preferredAddress = next.preferredImuAddress,
-                roleByAddress = next.sensorRoles,
+                pairedImuAddresses = next.paired,
+                preferredAddress = next.preferred,
+                roleByAddress = next.roles,
                 requestedCount = SensorCapturePolicy.MAX_COUNT,
             ).secondaryAddress,
         )
@@ -448,8 +477,14 @@ private fun CoroutineScope.mirrorSensorSettings(
  *
  * [applyPrepAdjustment]'s shape exactly, and for its reasons -- the value is
  * written to the store and read back through its flow rather than copied onto
- * the state, and it runs on [appScope] because the rest screen is where this
- * is tapped and the pop that leaves it cancels the ViewModel's own scope.
+ * the state.
+ *
+ * On [appScope] rather than the ViewModel's own scope, for
+ * [applyPrepAdjustment]'s reason -- a pop that leaves the record screen
+ * cancels anything still running on the ViewModel's scope, and a DataStore
+ * write must not be lost to it. Unlike the prep control this one is drawn on
+ * READY only, not on the rest screen, so `upcomingSlot` and `currentSlot` are
+ * the same slot at every point it can be tapped.
  */
 private fun applySensorCount(s: RecordState, count: Int, appScope: CoroutineScope, settings: SettingsStore) {
     val slot = s.upcomingSlot
