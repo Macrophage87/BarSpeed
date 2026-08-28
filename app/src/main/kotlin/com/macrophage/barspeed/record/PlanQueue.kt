@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.data.SessionRepository
+import com.macrophage.barspeed.model.PlanNoteDisplay
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.SetGeometryPolicy
 
@@ -22,6 +23,17 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
         // so what the export publishes is what the DSP was handed.
         val geometry = SetGeometryPolicy.describe(exercise, exerciseDef)
         exerciseDef.sets.forEachIndexed { setIdx, set ->
+            // Which of the exercise's coaching keys the lifter reads without
+            // touching the phone is decided in :core:model, where a test can
+            // run on it. This file has one test class and it covers a different
+            // function; the join it replaces lived here and was unreachable.
+            val note =
+                PlanNoteDisplay.forSet(
+                    description = exerciseDef.description,
+                    additionalNotes = exerciseDef.additionalNotes,
+                    notes = exerciseDef.notes,
+                    setNote = set.note,
+                )
             slots +=
                 PlannedSlot(
                     exercise = exercise,
@@ -46,8 +58,7 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     // nothing can leak between them. Display only: loadKg
                     // above is untouched by it.
                     implementCount = exerciseDef.implementCount,
-                    exerciseNotes = listOfNotNull(exerciseDef.notes, set.note)
-                        .takeIf { it.isNotEmpty() }?.joinToString(" · "),
+                    exerciseNotes = note.visible,
                     targetMeanConVelMps = set.targetMeanConcentricVelocityMps,
                     velocityLossStopPct = set.velocityLossStopPct,
                     restS = set.restS,

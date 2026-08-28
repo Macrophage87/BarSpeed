@@ -280,6 +280,26 @@ data class PlanFile(
          * against the published schema.
          */
         val VALID_KINDS = setOf("dynamic", "hold", "carry", "explosive")
+
+        /**
+         * How many characters of [PlanExerciseDef.description] the rest screen
+         * has room for without the cue taking the space the next-set controls
+         * need.
+         *
+         * The figure is an ESTIMATE from declared sizes, not a measurement of a
+         * device: the `SlotCard` note draws in `bodySmall` (12sp) inside a card
+         * padded 14dp, on a screen padded 16dp, so a 411dp phone leaves ~351dp
+         * of text width; at roughly 6.4dp of advance per character that is ~55
+         * characters a line, and the owner's calibration for this cue is four
+         * lines. 4 × 55 = 220. What is NOT claimed is that 220 characters
+         * renders as four lines on any particular phone at any particular font
+         * scale — it does not at fontScale 2.0, which is why the display caps
+         * lines as well and why the cap is the third tier rather than the only
+         * one.
+         *
+         * Declared in this commit and enforced by nothing yet.
+         */
+        const val DESCRIPTION_MAX_CHARS = 220
     }
 }
 
@@ -302,7 +322,31 @@ data class PlanSessionDef(
 @Serializable
 data class PlanExerciseDef(
     val exercise: String,
+    /**
+     * The whole coaching cue, in the shape every plan written before schema
+     * 1.8 states it. Still accepted, still decoded, and still what the lifter
+     * sees when no [description] is declared — a plan already staged must not
+     * lose text because a newer key exists.
+     */
     val notes: String? = null,
+    /**
+     * The part of the cue the lifter reads between sets without touching the
+     * phone, capped at [PlanFile.DESCRIPTION_MAX_CHARS] characters so it cannot
+     * take the screen the rest of the rest screen needs.
+     *
+     * Declared in this commit and read by nothing yet:
+     * [PlanNoteDisplay.forSet] accepts it and ignores it, and no length is
+     * enforced. Both move in the commit that implements the split.
+     */
+    val description: String? = null,
+    /**
+     * Everything the cue says beyond [description] — the paragraph, the safety
+     * detail, the setup ritual. Reachable only by expanding the note, so
+     * nothing that decides how the next set is performed belongs here.
+     *
+     * Declared in this commit and read by nothing yet.
+     */
+    @SerialName("additional_notes") val additionalNotes: String? = null,
     /**
      * Where the lift begins in space, so the app knows which way the first
      * movement of every rep goes: `"top"` (squat, bench, leg curl — first

@@ -172,9 +172,9 @@ class PlanDecodeCharacterizationTest {
         // be asserted until the commit that adds it.
         assertEquals(
             setOf(
-                "exercise", "notes", "start", "concentric", "sensorInverted", "sensorOnStack",
-                "travelRatio", "plane", "bodyweight", "implementCount", "optional",
-                "kind", "prep_s", "sets",
+                "exercise", "notes", "description", "additional_notes", "start", "concentric",
+                "sensorInverted", "sensorOnStack", "travelRatio", "plane", "bodyweight",
+                "implementCount", "optional", "kind", "prep_s", "sets",
             ),
             PlanExerciseDef.serializer().descriptor.elementNames.toSet(),
         )
