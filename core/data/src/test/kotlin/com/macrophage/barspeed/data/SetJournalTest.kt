@@ -377,6 +377,41 @@ class SetJournalTest {
     }
 
     /**
+     * The journal remembers, in memory, every mark it was handed -- in order,
+     * and without waiting for the pump.
+     *
+     * This is what the set that LANDS is built from (#158). `reps.csv` is what
+     * survives the process dying, and it cannot answer for a set that finished
+     * normally: the capture is discarded the moment the row is stored, and the
+     * write that stores it needs the marks BEFORE that. Reading the file back
+     * at set end instead would make the stored set depend on how much of the
+     * capture had reached the filesystem, which is the one property the pump
+     * exists to keep the recording path from caring about.
+     *
+     * No `sync()` here, deliberately: this must hold before anything is
+     * flushed, because the freeze that reads it happens on the main thread the
+     * instant the set ends.
+     */
+    @Test
+    fun `the journal remembers in memory every mark it was given`() = runTest {
+        val journal = requireNotNull(store().open(header()))
+        journal.appendRepMark(1_100L)
+        journal.appendRepMark(4_350L)
+        journal.appendRepMark(8_020L)
+        assertEquals(listOf(1_100L, 4_350L, 8_020L), journal.repMarks)
+        journal.close()
+    }
+
+    /** A set that counted nothing has no marks, and says so as an empty list. */
+    @Test
+    fun `a journal nobody counted on remembers no marks`() = runTest {
+        val journal = requireNotNull(store().open(header()))
+        journal.appendCue(cues.first())
+        assertEquals(emptyList(), journal.repMarks)
+        journal.close()
+    }
+
+    /**
      * The bytes of `reps.csv`, exactly: a header line, then one epoch-ms
      * instant per line and nothing else.
      *

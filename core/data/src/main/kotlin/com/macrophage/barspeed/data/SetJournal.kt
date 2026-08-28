@@ -95,6 +95,7 @@ class SetJournal internal constructor(
 
     private val channel = Channel<Cmd>(Channel.UNLIMITED)
     private val writers = mutableMapOf<String, BufferedWriter>()
+    private val marks = mutableListOf<Long>()
     private var imuIndex = 0L
     private var sinceFlush = 0
     private var lastFlushMs = System.currentTimeMillis()
@@ -135,6 +136,24 @@ class SetJournal internal constructor(
     fun appendCue(cue: VoiceCue) {
         channel.trySend(Row(CUES, "${cue.timestampMs},${cue.cue.replace(",", " ")}"))
     }
+
+    /**
+     * The instants this journal has been told a rep was counted at, in order.
+     *
+     * Held here as well as written to `reps.csv` because the two answer
+     * different questions and only one of them can be asked while the set is
+     * still running: the file is what survives the process dying, and this is
+     * what the set that LANDS is built from (#158). One writer feeds both, so
+     * a recovered capture and a stored set cannot disagree about a mark.
+     *
+     * Read and written on the caller's thread, which for both production call
+     * sites is the main thread -- unlike the streams, which are handed to the
+     * pump. A copy, so a caller holding it cannot see the list grow under it.
+     *
+     * The marks are lost if no journal could be opened at all, which is the
+     * same window in which the interrupted-set capture does not exist either.
+     */
+    val repMarks: List<Long> get() = marks.toList()
 
     /**
      * A rep was counted at [timestampMs], by the lifter or by the guide.
