@@ -415,6 +415,47 @@ class RawExporterTest {
     }
 
     /**
+     * A one-sensor set's descriptor states exactly these keys and no others.
+     *
+     * Characterization written before a second accelerometer exists (#156).
+     * The neighbouring test pins the manifest's TOP-LEVEL keys and would go on
+     * passing while every set inside it grew a key; this is the same
+     * instrument one level down, and it is the whole of what "a single-sensor
+     * archive did not move" can be asserted as. `meta.json` has no published
+     * schema, so an exact key set is its only definition.
+     *
+     * The fixture carries an IMU and an HRM stream, which is what an ordinary
+     * recorded set has, and no geometry -- geometry's own presence and absence
+     * are pinned by their own tests below and would only blur what this one is
+     * about.
+     */
+    @Test
+    fun `a one-sensor set's descriptor states exactly the keys it states today`() = runTest {
+        val manifest =
+            meta(
+                listOf(row(id = 5L)),
+                mapOf(5L to listOf(imuStream(5L, stillSamples(45.0), storedRate = 100.0), hrStream(5L))),
+            )
+        assertEquals(
+            setOf(
+                "set",
+                "exercise",
+                "load_kg",
+                "load_lb",
+                "reps",
+                "duration_s",
+                "startedAt_ms",
+                "endedAt_ms",
+                "sampleRate_hz",
+                "rollExcursion_deg",
+                "files",
+            ),
+            manifest.set(0).keys,
+            "the per-set descriptor's key set moved for a one-sensor set",
+        )
+    }
+
+    /**
      * The rep-mark capture reaches the archive, and the manifest says how to
      * read it (#158).
      *
