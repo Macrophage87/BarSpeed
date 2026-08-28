@@ -2,7 +2,7 @@ package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.dsp.CadenceBeat
 import com.macrophage.barspeed.dsp.CadencePlan
-import com.macrophage.barspeed.dsp.GuidedCadence
+import com.macrophage.barspeed.dsp.CadenceVoice
 import com.macrophage.barspeed.dsp.LeadInPlan
 import com.macrophage.barspeed.dsp.TempoSchedule
 import kotlinx.coroutines.CoroutineScope
@@ -44,20 +44,21 @@ class GuidedCadenceRunner(
      * Guided cadence is an audio feature: it speaks even with the count toggle
      * off.
      *
-     * Two arguments, and the split is load-bearing. The first is the CUE — the
-     * phase that was called, which is what gets written to the set's cue track
-     * and is a persisted format every cue-track consumer parses. The second is
-     * the UTTERANCE actually spoken, which may carry a rep announcement along
-     * with the cue. Merging the announcement into the logged cue would rename
-     * "Down" to "Down, Rep 1" in every capture made afterwards and break every
-     * one of those consumers.
+     * Two arguments, and the split is load-bearing. The first is the CUE ROWS —
+     * the words that go on the set's cue track, which is a persisted format
+     * every cue-track consumer parses. The second is the UTTERANCE actually
+     * spoken. One utterance can carry two words the record wants kept apart:
+     * a merged rep call is spoken as `"Down, Rep 1"` and recorded as `Down`
+     * and `Rep 1`, because renaming the `Down` row would break every consumer
+     * that matches it while dropping the call would lose what the app said.
+     * All rows of one call share one instant, so the caller stamps them once.
      *
-     * A NULL cue means speak it and write nothing down. The lead-in needs that
-     * third state — its countdown digits and its `"N seconds"` opener are
+     * An EMPTY list means speak it and write nothing down. The lead-in needs
+     * that third state — its countdown digits and its `"N seconds"` opener are
      * spoken and not recorded. [LeadInPlan.RECORDED] decides which lead-in
      * words reach the record, and nothing else may.
      */
-    private val speak: (cue: String?, utterance: String) -> Unit,
+    private val speak: (cues: List<String>, utterance: String) -> Unit,
     /** Pushes the on-screen phase label + countdown (label, remaining, total). */
     private val update: (String, Int, Int) -> Unit,
     /** Called each time a full rep cycle completes, with the running count. */
@@ -96,17 +97,12 @@ class GuidedCadenceRunner(
                         if (index != plan.repCompleteAfterBeat) continue
                         onRepCounted(rep)
                         if (plannedReps != null && rep >= plannedReps) {
-                            speak("Done", "Done")
+                            speak(listOf(CadenceVoice.DONE), CadenceVoice.DONE)
                             update("DONE", 0, 1)
                             onFinished()
                             return@launch
                         }
-                        pending =
-                            when {
-                                plan.announceOnBeat == null -> null
-                                plannedReps != null && rep == plannedReps - 1 -> "Last rep"
-                                else -> "Rep $rep"
-                            }
+                        pending = plan.announcementAfter(rep, plannedReps)
                         rep++
                     }
                 }
@@ -145,7 +141,7 @@ class GuidedCadenceRunner(
         job =
             scope.launch {
                 playLeadIn(LeadInPlan.of(prepS), speaks)
-                if (speaks) speak(startWord, startWord)
+                if (speaks) speak(listOf(startWord), startWord)
                 onStarted()
             }
     }
@@ -158,36 +154,23 @@ class GuidedCadenceRunner(
     /**
      * Play one beat, optionally opening with a rep announcement.
      *
-     * The announcement is merged into the beat's own call rather than spoken
-     * separately: TTS runs with QUEUE_FLUSH, so a second utterance a moment
-     * later would cancel the first. Strokes long enough to lose your place in
-     * are counted out loud ("Down, one, two, three"); a one-second drive just
-     * gets its call.
+     * What is said and what is written down are [CadenceVoice]'s decisions, in
+     * `:core:dsp` where a test can reach them; this walks the seconds. The
+     * announcement is merged into the beat's own utterance rather than spoken
+     * separately, because TTS runs with QUEUE_FLUSH and a second utterance a
+     * moment later would cancel the first.
      */
     private suspend fun play(beat: CadenceBeat, announcement: String?) {
-        // The announcement rides the utterance, never the cue.
-        val cue = beat.spokenLabel
-        if (cue != null) {
-            speak(cue, if (announcement != null) "$cue, $announcement" else cue)
-        } else if (announcement != null) {
-            speak(announcement, announcement)
-        }
+        CadenceVoice.beatCall(beat, announcement)?.let { speak(it.recorded, it.utterance) }
         if (!beat.isStroke) {
             countdownPhase(beat.label, beat.seconds)
             return
         }
         update(beat.label, beat.seconds, beat.seconds)
-        val countAloud = beat.seconds >= GuidedCadence.COUNT_ALOUD_FROM_S
         for (second in 1..beat.seconds) {
             delay(1_000)
-            if (second < beat.seconds) {
-                // Only give up the count when an announcement actually took
-                // its place: rep 1 has none pending, and a one-rep set never
-                // has one at all.
-                val gaveUpCount = beat.suppressFirstCount && announcement != null && second == 1
-                if (countAloud && !gaveUpCount) speak("$second", "$second")
-                update(beat.label, beat.seconds - second, beat.seconds)
-            }
+            CadenceVoice.countCall(beat, announcement, second)?.let { speak(it.recorded, it.utterance) }
+            if (second < beat.seconds) update(beat.label, beat.seconds - second, beat.seconds)
         }
     }
 
@@ -204,7 +187,7 @@ class GuidedCadenceRunner(
         update(LEAD_IN_LABEL, plan.prepS, total)
         for ((index, beat) in plan.beats.withIndex()) {
             val spoken = beat.spoken
-            if (spoken != null && speaks) speak(beat.cue, spoken)
+            if (spoken != null && speaks) speak(listOfNotNull(beat.cue), spoken)
             delay(1_000)
             update(LEAD_IN_LABEL, plan.secondsBeforeStart(index) - 1, total)
         }

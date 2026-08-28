@@ -92,8 +92,39 @@ class MergedCallCueTrackTest {
         return (done.timestampMs - lastStroke.timestampMs) / 1000.0
     }
 
-    private fun counts(fixture: String): Map<String, Int> =
-        CueTrack.read(fixture).groupingBy { it.label }.eachCount()
+    private fun counts(fixture: String) = CueTrack.read(fixture).groupingBy { it.label }.eachCount()
+
+    /** The lead-in's own rows, which the cadence script does not model. */
+    private val leadIn = setOf("Ready", "Brace")
+
+    /**
+     * A track's rows as (second of the cadence, row), the first movement call
+     * being second zero -- the same origin [CadenceVoice.script] counts from.
+     *
+     * The device speaks on wall-clock `delay(1_000)`, so a beat drifts by a
+     * millisecond or two and forty beats accumulate tens; the drift is asserted
+     * to stay small enough that rounding to the nearest second is exact.
+     */
+    private fun cadenceRows(fixture: String): List<Pair<Int, String>> {
+        val rows = CueTrack.read(fixture).filter { it.label !in leadIn }
+        val origin = rows.first().timestampMs
+        return rows.map { row ->
+            val offsetMs = row.timestampMs - origin
+            val second = Math.round(offsetMs / 1000.0).toInt()
+            assertTrue(
+                kotlin.math.abs(offsetMs - second * 1000L) < 100,
+                "$fixture: ${row.label} at $offsetMs ms is not within 100 ms of a whole second",
+            )
+            second to row.label
+        }
+    }
+
+    /** True when every element of [inner] appears in [outer], in order. */
+    private fun <T> isSubsequence(inner: List<T>, outer: List<T>): Boolean {
+        var i = 0
+        for (e in outer) if (i < inner.size && inner[i] == e) i++
+        return i == inner.size
+    }
 
     @Test
     fun `the tempo string does not say which plan case a set was paced on`() {
@@ -184,6 +215,39 @@ class MergedCallCueTrackTest {
             // stroke, and one merged call was spoken there for each.
             val silent = carriers.drop(1).filter { c -> rows.none { it.timestampMs in (c + 500)..(c + 1_500) } }
             assertEquals(reps - 1, silent.size, "$fixture: calls spoken and written nowhere")
+        }
+    }
+
+    @Test
+    fun `the model of the guide accounts for every row three real sets recorded`() {
+        // What holds CadenceVoice.script to the truth. The script is a model of
+        // a loop in :app that no test can run; these are three tracks that loop
+        // actually produced, on a phone, in a gym. Every row it wrote appears in
+        // the script at the same second of the cadence, in the same order.
+        //
+        // INCLUSION rather than equality, deliberately: what issue 176 changes
+        // is that the script starts accounting for rows the shipped app spoke
+        // and did not write, so the script may exceed a 0.1.43 track and may
+        // never contradict one. Which rows it adds is asserted where they are
+        // added, not here.
+        listOf(
+            Triple(set01, plan("3010", inclinePress), 10),
+            Triple(set05, plan("3010", seatedOhp), 8),
+            Triple(set13, plan("1120", pushdown), 12),
+        ).forEach { (fixture, p, reps) ->
+            val recorded = cadenceRows(fixture)
+            val script = CadenceVoice.script(p, reps).flatMap { call -> call.recorded.map { call.atSecond to it } }
+            assertTrue(
+                isSubsequence(recorded, script),
+                "$fixture: the recording is not accounted for by the plan.\nrecorded: $recorded\nscript:   $script",
+            )
+            val (lastSecond, lastRow) = recorded.last()
+            assertEquals(CadenceVoice.DONE, lastRow, "$fixture: the last row of a completed set")
+            assertEquals(
+                reps * p.deliveredCycleS,
+                lastSecond,
+                "$fixture: and its Done lands where the prescription says it does",
+            )
         }
     }
 

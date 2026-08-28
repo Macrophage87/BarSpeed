@@ -156,7 +156,30 @@ data class CadencePlan(
     /** Seconds the metronome will actually play per rep. */
     val deliveredCycleS: Int get() = beats.sumOf { it.seconds }
 
+    /**
+     * What the guide says once rep [repsCompleted] of [plannedReps] is done, or
+     * null when it says nothing.
+     *
+     * The decision, not the delivery: WHERE the returned words land is
+     * [announceOnBeat]'s business, and on cases 2 and 3 that is one or two
+     * strokes after this is decided.
+     *
+     * [plannedReps] is null on a set with no prescribed count, which has no
+     * last rep to warn about and so only ever counts finished ones.
+     */
+    fun announcementAfter(repsCompleted: Int, plannedReps: Int?): String? = when {
+        announceOnBeat == null -> null
+        plannedReps != null && repsCompleted == plannedReps - 1 -> LAST_REP
+        else -> "$REP_CALL_PREFIX$repsCompleted"
+    }
+
     companion object {
+        /** The warning that the rep now due is the set's last. */
+        const val LAST_REP = "Last rep"
+
+        /** Prefix of a rep call, which counts FINISHED reps: `"Rep 3"`. */
+        const val REP_CALL_PREFIX = "Rep "
+
         /**
          * Shortest stroke that can carry a merged announcement, either stroke.
          *

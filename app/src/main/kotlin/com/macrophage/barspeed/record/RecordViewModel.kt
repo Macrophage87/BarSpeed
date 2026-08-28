@@ -1949,7 +1949,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         if (voice == null) voice = VoiceCounter(getApplication())
         return GuidedCadenceRunner(
             scope = viewModelScope,
-            speak = { cue, utterance -> if (cue == null) speakOnly(utterance) else speakCue(cue, utterance) },
+            speak = { cues, utterance -> if (cues.isEmpty()) speakOnly(utterance) else speakCues(cues, utterance) },
             update = { label, remaining, total ->
                 stateFlow.value =
                     stateFlow.value.copy(guidedLabel = label, guidedCountdown = remaining, guidedPhaseTotal = total)
@@ -1998,9 +1998,26 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * rep announcement alongside the cue.
      */
     private fun speakCue(cueText: String, utterance: String = cueText) {
-        val cue = VoiceCue(System.currentTimeMillis(), cueText)
-        cueBuffer += cue
-        journal?.appendCue(cue)
+        speakCues(listOf(cueText), utterance)
+    }
+
+    /**
+     * Speak one utterance and log every word of it that belongs on the record.
+     *
+     * One utterance, several rows: the guide merges a rep call into a stroke's
+     * own word -- "Down, Rep 3" -- because TTS speaks with QUEUE_FLUSH and a
+     * second utterance would cancel the first. Both words were said, at the
+     * same instant, so both are written at ONE timestamp read once. Reading the
+     * clock per row would let two words of a single utterance straddle a
+     * millisecond boundary and appear as two things the app said in sequence.
+     */
+    private fun speakCues(cueTexts: List<String>, utterance: String) {
+        val at = System.currentTimeMillis()
+        for (text in cueTexts) {
+            val cue = VoiceCue(at, text)
+            cueBuffer += cue
+            journal?.appendCue(cue)
+        }
         voice?.speak(utterance)
     }
 
