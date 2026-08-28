@@ -319,6 +319,38 @@ private fun openJournal(
 )
 
 /**
+ * The state opening a plan session leaves behind. Free function for
+ * [openSession]'s reason: [RecordViewModel] is a class detekt measures as being
+ * at its size limit, and the two seeds added below took it over.
+ */
+private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue: List<PlannedSlot>): RecordState =
+    s.copy(
+        stage = Stage.READY,
+        planSessionName = planSession.name,
+        queue = queue,
+        queueIndex = 0,
+        adHoc = false,
+        // Empty, not the plan's number rendered through inputValue: that
+        // render is lossy, and seeding the field with it would put a
+        // display-quantised value one keystroke away from being recorded as
+        // the lifter's own. Empty also stops the field opening on "60" -- or
+        // on whatever the last session left -- under a card stating the plan's
+        // load, which is #22's shape in an editable box.
+        loadInput = "",
+        statedLoadKg = null,
+        // Seeded from the first slot the way every later rest transition seeds
+        // them, and REQUIRED now rather than cosmetic. These two fields opened
+        // on "5" and "60" -- the class defaults, or whatever the last session
+        // left -- and nothing on READY read them, so a plan asking 8 reps was
+        // recorded as 8 anyway. beginSet's bake reads them, so an unseeded
+        // field would write 5 over the plan's 8 at set one, and the reps box
+        // the change dialog now offers would have opened showing a number the
+        // plan never wrote.
+        repsInput = queue.firstOrNull()?.reps?.toString() ?: s.repsInput,
+        durationInput = queue.firstOrNull()?.durationS?.toString() ?: s.durationInput,
+    )
+
+/**
  * The state "Equipment busy? Switch exercise" leaves behind.
  *
  * A free function taking what it needs, rather than a method, for the reason
@@ -575,6 +607,54 @@ private fun adHocSessionState(s: RecordState): RecordState =
 private fun advancedState(s: RecordState): RecordState {
     val next = s.nextSlot
     if (s.adHoc || next == null) return s.copy(stage = Stage.READY, statedLoadKg = null, statedTempo = null)
+    return bakedState(s, next, s.queueIndex + 1)
+}
+
+/**
+ * The same bake, applied to the set already current, when START is tapped on
+ * READY.
+ *
+ * READY is drawn once per session and it now carries the whole change-set
+ * dialog (#152), because the owner's case is walking into a gym where every
+ * squat rack is occupied: set one is exactly when rerouting matters. Three of
+ * the four controls in that dialog wrote nothing that reached set one before
+ * this function existed, and the failure was silent in the worst way -- the
+ * control accepted the tap, the screen showed the new value, and `beginSet`
+ * read past it:
+ *
+ *  - `beginSet` takes the rep target from `currentSlot.reps`, never
+ *    `repsInput`, on a planned set.
+ *  - It takes the tempo from `currentSlot.tempo`, never `statedTempo`, so the
+ *    metronome, the voice guide and the compliance verdict all ran the plan's
+ *    tempo while the screen showed the lifter's.
+ *  - The hold seconds come from `currentSlot.durationS` through
+ *    `currentTimedTargetS`.
+ *
+ * Only the load already worked, because `SetLoadPolicy.resolve` reads
+ * `statedLoadKg` directly. From set two onwards all four have always worked,
+ * because `startNextSet` runs [advancedState] first and the bake is what makes
+ * them work. This is that same bake with the same arguments on the slot
+ * `upcomingIndex` already names -- one rule reaching both screens, rather than
+ * a second copy of it for the first set.
+ *
+ * Not merged into `beginSet`: `beginSet` is also the ad-hoc entry point, where
+ * there is no slot to bake into and the typed fields are read directly.
+ */
+private fun startedFromReadyState(s: RecordState): RecordState {
+    val slot = s.currentSlot
+    if (s.adHoc || slot == null) return s
+    return bakedState(s, slot, s.queueIndex)
+}
+
+/**
+ * The lifter's edits written into the slot the next START will run.
+ *
+ * One function for both entry points, because two copies of "which of the
+ * plan's numbers does a statement displace" is two rules. [index] is
+ * `upcomingIndex` at both call sites -- `queueIndex + 1` during rest,
+ * `queueIndex` on READY -- and the stage becomes READY either way.
+ */
+private fun bakedState(s: RecordState, next: PlannedSlot, index: Int): RecordState {
     val edited =
         next.copy(
             loadKg =
@@ -601,8 +681,8 @@ private fun advancedState(s: RecordState): RecordState {
             ),
         )
     val queue = s.queue.toMutableList()
-    queue[s.queueIndex + 1] = edited
-    return s.copy(queue = queue, queueIndex = s.queueIndex + 1, stage = Stage.READY)
+    queue[index] = edited
+    return s.copy(queue = queue, queueIndex = index, stage = Stage.READY)
 }
 
 data class RecordState(
@@ -1098,23 +1178,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             restHrBuffer.clear()
             sessionStartedAtMs = System.currentTimeMillis()
             val queue = sessionRepository.flattenPlan(planSession)
-            stateFlow.value =
-                stateFlow.value.copy(
-                    stage = Stage.READY,
-                    planSessionName = planSession.name,
-                    queue = queue,
-                    queueIndex = 0,
-                    adHoc = false,
-                    // Empty, not the plan's number rendered through
-                    // inputValue: that render is lossy, and seeding the field
-                    // with it would put a display-quantised value one keystroke
-                    // away from being recorded as the lifter's own. Empty also
-                    // stops the field opening on "60" -- or on whatever the
-                    // last session left -- under a card stating the plan's
-                    // load, which is #22's shape in an editable box.
-                    loadInput = "",
-                    statedLoadKg = null,
-                )
+            stateFlow.value = planSessionState(stateFlow.value, planSession, queue)
         }
     }
 
@@ -1178,8 +1242,20 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = tempoAdjustedState(stateFlow.value, position, value)
     }
 
-    /** Begin recording the current set. */
+    /**
+     * Begin recording the current set.
+     *
+     * The first statement is the bake, and it is here rather than beside the
+     * START button because this is the one door every set goes through. See
+     * [startedFromReadyState] for what silently failed to reach set one
+     * without it. On the rest-screen path `startNextSet` has already run the
+     * same bake through `advancedState`, and running it again is a no-op:
+     * every field it writes has already been given the value it would write,
+     * and `upcomingIndex` is `queueIndex` once the stage is READY. Ad-hoc sets
+     * pass straight through it untouched.
+     */
     fun beginSet() {
+        stateFlow.value = startedFromReadyState(stateFlow.value)
         val s = stateFlow.value
         val exercise = s.currentExercise
         val tracker = StreamingSetTracker.forLift(exercise.liftDirection())

@@ -69,6 +69,7 @@ import com.macrophage.barspeed.model.RestControl
 import com.macrophage.barspeed.model.RestControlPolicy
 import com.macrophage.barspeed.model.SensorAdvice
 import com.macrophage.barspeed.model.SensorAdvicePolicy
+import com.macrophage.barspeed.model.SetDeviationSummary
 import com.macrophage.barspeed.model.SetEndControl
 import com.macrophage.barspeed.model.SetEndControlPolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
@@ -486,30 +487,25 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
             highlight = true,
             plateLoadKgOverride = state.statedLoadKg,
         )
+        // Everything the lifter can change about set one now lives behind one
+        // button, and the change itself is stated above it. READY renders at
+        // most once per session -- startNextSet writes READY and calls
+        // beginSet in the same frame -- so this is set one's only chance to
+        // say anything, and until this button it could say only the load.
+        DeviationLine(state, slot)
+        ChangeSetButton(state, viewModel, slot, next = false)
+        // Kept in place and NOT moved into the dialog: it is one line, it
+        // opens a chooser of its own, and a dialog inside a dialog is a shape
+        // this app has never used. It already reached READY, which is half of
+        // what the owner asked for when every rack is busy on arrival; the
+        // other half is the button above.
         SwitchExerciseSection(state, viewModel)
-        Spacer(Modifier.height(8.dp))
-        // The only load input a plan set gets. READY renders at most once per
-        // session -- startNextSet writes READY and calls beginSet in the same
-        // frame -- so without this, set 1 is the one set of a plan session the
-        // lifter cannot say anything about, and it records the prescription
-        // whatever went on the bar.
-        Text(
-            "Adjust this set (deviations are recorded)",
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Sub,
-        )
-        OutlinedTextField(
-            value = state.loadInput,
-            onValueChange = viewModel::updateLoadInput,
-            label = { Text(loadFieldLabel(slot, state.weightUnit)) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        PerImplementEcho(state, slot)
-        LoadSignHint(slot)
     } else {
         AdHocForm(state, viewModel)
+        // Plan sets take their prep from the dialog. The ad-hoc layout keeps
+        // its inline form, so it keeps its inline prep too.
+        PrepAdjuster(state, viewModel)
     }
-    PrepAdjuster(state, viewModel)
     Spacer(Modifier.height(12.dp))
     // The bar sensor is record-only for standard lifts: the lifter (or the
     // voice guide) counts; explosive lifts stay sensor-counted.
@@ -767,6 +763,173 @@ private fun TempoDigitStepper(digit: TempoDigit, tempo: String, selected: String
             Text("+")
         }
     }
+}
+
+/**
+ * What the lifter has changed about the coming set, under the card that still
+ * states the plan.
+ *
+ * DUMB: every word of it is [SetDeviationSummary.parts], which is pinned in
+ * :core:model. This draws the answer and draws nothing when the answer is
+ * empty -- absence is absence, and a line reading "no changes" on every rest
+ * screen of every session is a line that stops being read before the one rest
+ * period where it matters.
+ *
+ * This is the compensation that makes [ChangeSetButton] safe. The "Up next"
+ * card goes on stating the PLAN's load and tempo, deliberately, and the load
+ * box that used to sit under it -- where the lifter reconciled the two -- is
+ * now behind a tap. Without this line, "Up next — 90 kg" would sit above a set
+ * that records 100 with nothing on screen saying so.
+ */
+@Composable
+private fun DeviationLine(state: RecordState, slot: PlannedSlot) {
+    val parts =
+        SetDeviationSummary.parts(
+            kind = slot.exercise.kind,
+            bodyweight = slot.exercise.bodyweight,
+            unit = state.weightUnit,
+            plannedLoadKg = slot.plannedLoadKg,
+            statedLoadKg = state.statedLoadKg,
+            plannedReps = if (slot.isTimed) null else slot.reps,
+            statedReps = if (slot.isTimed) null else state.repsInput.toIntOrNull(),
+            plannedDurationS = if (slot.isTimed) slot.durationS else null,
+            statedDurationS = if (slot.isTimed) state.durationInput.toIntOrNull() else null,
+            plannedTempo = slot.plannedTempo,
+            tempo = state.statedTempo ?: slot.tempo,
+            plannedPrepS = state.plannedPrepSecondsFor(slot),
+            prepS = state.prepSecondsFor(slot),
+        )
+    if (parts.isEmpty()) return
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Your changes: ${parts.joinToString(" · ")}",
+        style = MaterialTheme.typography.bodySmall,
+        color = BarColors.Volt,
+    )
+}
+
+/**
+ * The one control that reaches every upcoming-set change, and the dialog it
+ * opens.
+ *
+ * #152: the load box, the reps box, four tempo rows and the prep row sat
+ * between the countdown and START, and the owner's report is that the sum
+ * crowds the screen out of usefulness. They are all here now, behind one
+ * outlined button.
+ *
+ * Drawn on the rest screen AND on READY. READY renders at most once per
+ * session and used to offer only the load box, so set one was the one set of a
+ * plan session whose reps, tempo and prep could not be touched. The owner's
+ * case for closing that is the gym itself: "What if someone is using all the
+ * squat racks when you walk in." Set one is exactly when rerouting matters,
+ * and it is where the app was least flexible. `RecordViewModel.beginSet`'s
+ * first statement is what makes the three new controls actually reach that
+ * set -- see `startedFromReadyState`, and note that until it existed they
+ * would have accepted the tap and changed nothing.
+ *
+ * Outlined, never filled: START is the only filled button on either screen,
+ * and two full-width filled buttons is how a thumb picks the wrong one. A
+ * mis-tap here opens a dialog and costs one tap to close; a mis-tap on START
+ * begins a set that can only be ended by recording it.
+ */
+@Composable
+private fun ChangeSetButton(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot, next: Boolean) {
+    var open by remember(state.queueIndex, state.stage) { mutableStateOf(false) }
+    Spacer(Modifier.height(8.dp))
+    OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+        Text(if (next) "CHANGE NEXT SET" else "CHANGE THIS SET")
+    }
+    if (open) {
+        ChangeSetDialog(state, viewModel, slot, next) { open = false }
+    }
+}
+
+/**
+ * Every change the coming set can take, in one scrolling dialog.
+ *
+ * A LENS, NOT A FORM. Every control binds to the same ViewModel entry point it
+ * bound to when it sat on the screen -- `updateLoadInput`, `updateRepsInput`,
+ * `updateDurationInput`, `adjustTempoDigit`, `adjustPrep` -- and this holds no
+ * local copy of any of them. So there is one button, "Done", and no Cancel:
+ * the scrim, the system back gesture and Done are the same action because
+ * nothing is buffered for either of them to discard.
+ *
+ * That is a decision and not an omission. A Cancel here would promise a
+ * rollback nothing can perform -- `adjustPrep` writes through to the DataStore
+ * on `appScope` and is read back through a flow, and the load and tempo
+ * statements feed carry rules whose semantics #152 says must not change -- and
+ * a Cancel that silently discarded instead would be the worse failure: the
+ * lifter types 100, dismisses by scrim, and lifts 90 believing they changed
+ * it. The consequence, stated rather than hidden: dismissing by scrim is
+ * indistinguishable from Done, which is correct precisely because nothing is
+ * thrown away.
+ *
+ * The caption stays attached to the load and reps row rather than being
+ * promoted to the dialog's subtitle, and that is the one thing here it would
+ * be easy to get wrong. "deviations are recorded" is a claim about the export,
+ * and it is TRUE of load, reps and prep -- each publishes a planned/actual
+ * pair -- and FALSE of tempo, which publishes one field holding what ran
+ * (#151). The tempo control carries its own caption saying something different
+ * for that reason; a subtitle would silently extend the true claim over the
+ * control it is false for.
+ *
+ * Plan sets only. The ad-hoc rest and READY layouts keep their inline form:
+ * `AdHocForm` carries an exercise grid, a unit toggle and side chips, which is
+ * a different problem, and the owner's report is about the plan path.
+ */
+@Composable
+private fun ChangeSetDialog(
+    state: RecordState,
+    viewModel: RecordViewModel,
+    slot: PlannedSlot,
+    next: Boolean,
+    onDone: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text(if (next) "Change next set" else "Change this set") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    if (next) {
+                        "Adjust next set (deviations are recorded)"
+                    } else {
+                        "Adjust this set (deviations are recorded)"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BarColors.Sub,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = state.loadInput,
+                        onValueChange = viewModel::updateLoadInput,
+                        label = { Text(loadFieldLabel(slot, state.weightUnit)) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (slot.isTimed) {
+                        OutlinedTextField(
+                            value = state.durationInput,
+                            onValueChange = viewModel::updateDurationInput,
+                            label = { Text("Hold (s)") },
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value = state.repsInput,
+                            onValueChange = viewModel::updateRepsInput,
+                            label = { Text("Reps") },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                PerImplementEcho(state, slot)
+                LoadSignHint(slot)
+                TempoAdjuster(state, viewModel)
+                PrepAdjuster(state, viewModel)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDone) { Text("Done") } },
+    )
 }
 
 /** Equipment busy? Offer the session's other remaining exercises out of order. */
@@ -1640,40 +1803,13 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
             highlight = true,
             plateLoadKgOverride = state.statedLoadKg,
         )
+        // The change first, then the way into it. Never the other way round:
+        // the deviation has to be readable without a tap, because the card
+        // above still states the plan's numbers and the box that used to
+        // reconcile them is now behind the button.
+        DeviationLine(state, next)
+        ChangeSetButton(state, viewModel, next, next = true)
         SwitchExerciseSection(state, viewModel)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Adjust next set (deviations are recorded)",
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Sub,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = state.loadInput,
-                onValueChange = viewModel::updateLoadInput,
-                label = { Text(loadFieldLabel(next, state.weightUnit)) },
-                modifier = Modifier.weight(1f),
-            )
-            if (next.isTimed) {
-                OutlinedTextField(
-                    value = state.durationInput,
-                    onValueChange = viewModel::updateDurationInput,
-                    label = { Text("Hold (s)") },
-                    modifier = Modifier.weight(1f),
-                )
-            } else {
-                OutlinedTextField(
-                    value = state.repsInput,
-                    onValueChange = viewModel::updateRepsInput,
-                    label = { Text("Reps") },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        PerImplementEcho(state, next)
-        LoadSignHint(next)
-        TempoAdjuster(state, viewModel)
-        PrepAdjuster(state, viewModel)
         Spacer(Modifier.height(12.dp))
         StartNextSetButton(state, viewModel)
     } else if (state.adHoc) {
