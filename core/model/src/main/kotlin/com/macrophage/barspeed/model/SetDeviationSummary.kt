@@ -34,7 +34,7 @@ object SetDeviationSummary {
      * so comparing those two would compare a number against itself and this
      * line would go blank at the exact moment it has something to say.
      */
-    @Suppress("UnusedParameter", "LongParameterList")
+    @Suppress("LongParameterList")
     fun parts(
         kind: ExerciseKind,
         bodyweight: Boolean,
@@ -50,10 +50,43 @@ object SetDeviationSummary {
         plannedPrepS: Int,
         prepS: Int,
     ): List<String> {
-        // SEAM ONLY: today there is no deviation line at all, so the seam says
-        // nothing and every differential that gives it something to say can be
-        // pushed red against it. The two suppressions are the marker and leave
-        // with the body.
-        return emptyList()
+        val plannedLoad = plannedLoadKg ?: 0.0
+        // What will be RECORDED, by SetLoadPolicy.resolve's own rule for a
+        // planned set: the statement if there is one, else the declaration,
+        // else nothing added. Comparing that against the declaration is what
+        // keeps a stated 0 on a loadless plan silent while a stated 0 on a
+        // 90 kg plan speaks -- a lifter who stripped the bar has said
+        // something, and a truthiness guard here would silence exactly them.
+        val load = statedLoadKg ?: plannedLoad
+        val loadPart =
+            (load != plannedLoad).ifTrue {
+                if (bodyweight) BodyweightLoadDisplay.label(load, unit) else unit.format(load)
+            }
+        val repsPart =
+            (statedReps != null && plannedReps != null && statedReps != plannedReps)
+                .ifTrue { "$statedReps reps" }
+        val holdPart =
+            (statedDurationS != null && plannedDurationS != null && statedDurationS != plannedDurationS)
+                .ifTrue { "${statedDurationS}s ${if (kind == ExerciseKind.CARRY) "carry" else "hold"}" }
+        // Compared as the four values a stepper can show rather than as text,
+        // so "4-0-1-0" and "4010" are one prescription. wheelValues is the
+        // same function the control itself is drawn from, so a tempo it cannot
+        // show falls back to the raw strings -- unequal there means the plan
+        // and the set really do differ, and the control was not what changed
+        // it.
+        val tempoPart =
+            (plannedTempo != null && tempo != null && !sameTempo(plannedTempo, tempo))
+                .ifTrue { "tempo $tempo" }
+        val prepPart = (prepS != plannedPrepS).ifTrue { "prep ${prepS}s" }
+        return listOfNotNull(loadPart, repsPart, holdPart, tempoPart, prepPart)
     }
+
+    /** Whether two tempo strings are the same prescription, dashes and all. */
+    private fun sameTempo(a: String, b: String): Boolean {
+        val left = TempoAdjustPolicy.wheelValues(a)?.joinToString("") ?: a
+        val right = TempoAdjustPolicy.wheelValues(b)?.joinToString("") ?: b
+        return left == right
+    }
+
+    private inline fun Boolean.ifTrue(text: () -> String): String? = if (this) text() else null
 }
