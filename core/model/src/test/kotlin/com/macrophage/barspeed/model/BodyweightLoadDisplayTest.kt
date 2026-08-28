@@ -120,12 +120,31 @@ class BodyweightLoadDisplayTest {
     }
 
     @Test
-    fun `a body-weight box says whose weight the number is added to`() {
+    fun `a body-weight box asks for an addition and not a load`() {
         // "Load (kg)" on a pull-up invites the whole loaded weight, which is
         // then recorded as the ADDED load and has body weight added to it
         // again at SetLoadPolicy.totalKg. The box has to say what it takes.
-        assertEquals("Added to body weight (kg)", BodyweightLoadDisplay.fieldLabel(true, null, WeightUnit.KG))
-        assertEquals("Added to body weight (lb)", BodyweightLoadDisplay.fieldLabel(true, 1, WeightUnit.LB))
+        // Whose weight it is added to is said by fieldHint, below.
+        assertEquals("Added (kg)", BodyweightLoadDisplay.fieldLabel(true, null, WeightUnit.KG))
+        assertEquals("Added (lb)", BodyweightLoadDisplay.fieldLabel(true, 1, WeightUnit.LB))
+    }
+
+    @Test
+    fun `a body-weight box label is no longer than the labels it sits beside`() {
+        // The floated label of this box was "Added to body weight (lb)" and it
+        // composited with the dialog's "deviations are recorded" caption at
+        // 360dp / font scale 2, both texts illegible, in both the rest dialog
+        // and the READY dialog. The box shares a row with Reps or Hold (s) and
+        // sits under that caption, so its label is held to the width the
+        // loaded labels already fit in.
+        val longestLoaded = "Total load (kg)".length
+        for (unit in WeightUnit.entries) {
+            val label = BodyweightLoadDisplay.fieldLabel(true, null, unit)
+            assertTrue(
+                label.length <= longestLoaded,
+                "\"$label\" is ${label.length} characters, past the $longestLoaded of \"Total load (kg)\"",
+            )
+        }
     }
 
     @Test
@@ -135,15 +154,20 @@ class BodyweightLoadDisplayTest {
         // belt or in two hands, and "Total load" beside a dip would read as
         // the whole loaded weight -- the exact misreading the label exists to
         // stop. The split still shows UNDER the box, where it is derived.
-        assertEquals("Added to body weight (kg)", BodyweightLoadDisplay.fieldLabel(true, 2, WeightUnit.KG))
+        assertEquals("Added (kg)", BodyweightLoadDisplay.fieldLabel(true, 2, WeightUnit.KG))
     }
 
     @Test
-    fun `a body-weight box says which way the sign runs`() {
+    fun `the line under a body-weight box says whose weight it is and which way the sign runs`() {
         // A signed box is unusable unless the lifter knows the direction, and
-        // nothing else on the screen says it.
+        // nothing else on the screen says it. This line also carries "to body
+        // weight", which the floated label gave up to stop it compositing with
+        // the caption above the box at font scale 2.
         val hint = BodyweightLoadDisplay.fieldHint(true)
-        assertEquals("Negative for a band or assist machine taking weight off", hint)
+        assertEquals(
+            "Added to body weight. Negative for a band or assist machine taking weight off",
+            hint,
+        )
     }
 
     @Test

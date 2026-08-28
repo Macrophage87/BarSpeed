@@ -77,6 +77,13 @@ object BodyweightLoadDisplay {
      * because a second statement of "when does this say Total" in the screen
      * would be a second rule.
      *
+     * The body-weight label is two words and not five. It was "Added to body
+     * weight (kg)" until the gate on this branch read the 360dp / font-scale-2
+     * harness shots and found that floated label and the dialog's "deviations
+     * are recorded" caption drawn over one another, both illegible. "To body
+     * weight" is carried by [fieldHint], which has a full-width line to wrap
+     * into and is drawn on exactly this population.
+     *
      * [implementCount] is the plan's declaration, read through
      * [ImplementLoad.count] so absence and a declared 1 give the same answer.
      * "Total" there is about the objects held, not about body weight; the two
@@ -85,14 +92,18 @@ object BodyweightLoadDisplay {
      * shown under the box rather than asked for in it.
      */
     fun fieldLabel(bodyweight: Boolean, implementCount: Int?, unit: WeightUnit): String = when {
-        bodyweight -> "Added to body weight (${unit.suffix})"
+        bodyweight -> "Added (${unit.suffix})"
         ImplementLoad.count(implementCount) > 1 -> "Total load (${unit.suffix})"
         else -> "Load (${unit.suffix})"
     }
 
     /**
-     * The line under the load box saying which way the sign runs, or null when
-     * there is no sign to explain.
+     * The line under the load box saying whose weight the number is added to
+     * and which way the sign runs, or null when there is neither to explain.
+     *
+     * It carries "to body weight" for [fieldLabel], which says only "Added
+     * (kg)" so that it cannot composite with the caption above it at
+     * font-scale 2 in a 360dp dialog.
      *
      * Null on loaded work is an absence and not an empty string: a barbell box
      * takes a positive number and has nothing to say about negatives, so it
@@ -105,5 +116,6 @@ object BodyweightLoadDisplay {
      * convention was written down was a KDoc.
      */
     fun fieldHint(bodyweight: Boolean): String? =
-        "Negative for a band or assist machine taking weight off".takeIf { bodyweight }
+        "Added to body weight. Negative for a band or assist machine taking weight off"
+            .takeIf { bodyweight }
 }

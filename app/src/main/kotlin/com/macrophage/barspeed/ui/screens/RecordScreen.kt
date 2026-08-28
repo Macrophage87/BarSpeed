@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -43,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -899,11 +901,17 @@ private fun ChangeSetDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = BarColors.Sub,
                 )
+                // The load box's floated label wraps to two lines at font
+                // scale 2 in a 360dp dialog and the second line is drawn above
+                // the box, into the caption's line. Shortening the label was
+                // not enough on its own to separate them.
+                Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = state.loadInput,
                         onValueChange = viewModel::updateLoadInput,
                         label = { Text(loadFieldLabel(slot, state.weightUnit)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                     )
                     if (slot.isTimed) {
