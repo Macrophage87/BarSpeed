@@ -469,6 +469,61 @@ class SchemaContractTest {
     }
 
     /**
+     * The published cue vocabulary names the rep call the track now carries.
+     *
+     * `voiceCues` is the one place a reader is told what a cue row can say,
+     * and until #176 it listed a vocabulary the app did not emit: every merged
+     * rep call was spoken and no row was written, so a reader counting calls in
+     * an archive counted none. A schema that lists `'Rep 4'` as an example while
+     * the rows exist only on one of three code paths describes a document
+     * nobody has.
+     *
+     * Narrow, and said so: this checks the vocabulary is NAMED, not that the
+     * exporter emits it. What emits it is `CadenceVoice` in `:core:dsp`, pinned
+     * there.
+     */
+    @Test
+    fun `the published export documents the rep call among the cues a set records`() {
+        val voiceCues = schema("session-export.schema.json")["\$defs"]!!.jsonObject["set"]!!
+            .jsonObject["properties"]!!.jsonObject["voiceCues"]!!.jsonObject
+        val description = voiceCues["description"]!!.jsonPrimitive.content
+        assertTrue("Rep 4" in description, "the cue vocabulary stopped naming the rep count")
+        assertTrue(
+            "Last rep" in description,
+            "the cue vocabulary does not name Last rep, which the guide speaks and now records",
+        )
+        assertTrue(
+            "same instant" in description,
+            "nothing tells a reader two rows can share one instant, which a merged call writes",
+        )
+    }
+
+    /**
+     * The 1.13 version-log entry names the cue-track change too.
+     *
+     * Same reasoning as the rep-marks and sensors entries above: 1.13 is
+     * unreleased, so this extends it rather than minting 1.14 for a boundary no
+     * reader has shipped against. What makes this one worth naming separately
+     * is that it changes what an EXISTING key contains for a given session
+     * rather than adding a new one, which is the half of a version a reader
+     * skips at their peril.
+     */
+    @Test
+    fun `the 1_13 version log names the cue-track change as well`() {
+        val description =
+            schema("session-export.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
+                .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "voiceCues" in description,
+            "the version log never mentions voiceCues, so 1.13 changes a key it does not explain",
+        )
+        assertTrue(
+            "Last rep" in description,
+            "the version log does not say the cue track gained the calls the guide merges",
+        )
+    }
+
+    /**
      * The published example carries a set's rep marks.
      *
      * `ci.yml` validates this example against the schema with ajv, and that is
