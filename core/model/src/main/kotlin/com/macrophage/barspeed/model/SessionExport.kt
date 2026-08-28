@@ -246,6 +246,30 @@ data class SetExport(
     /** Spoken cues with epoch-ms stamps, cross-referenceable with the raw IMU stream (detailed export only). */
     val voiceCues: List<VoiceCue>? = null,
     /**
+     * The instants a rep was COUNTED during this set, epoch milliseconds on
+     * the same clock as the raw IMU, heart-rate and cue streams. Detailed
+     * export only, the same terms [voiceCues] is published on.
+     *
+     * What was counted, never what the bar did. A mark is written when the
+     * lifter taps the rep button or when the voice guide calls a rep, so on a
+     * straight-rep set carrying no tempo these are the only per-rep instants
+     * that exist anywhere in the document: [repMetrics] entries carry
+     * durations and an ordinal position and no clock, and [voiceCues] is what
+     * the app SAID rather than what was counted.
+     *
+     * Absent rather than empty, and the absence is weak. A sensor-counted set
+     * produces no marks at all, and neither does any set recorded before the
+     * app stored them; nothing here tells those two apart, and neither is
+     * evidence that no rep was performed.
+     *
+     * The number of marks may disagree with [reps], in both directions. A
+     * rest-screen correction rewrites [reps] and cannot reach a mark already
+     * written, and the guide calls a rep on its own schedule whether or not
+     * the lifter followed it. Where they disagree, [reps] is what the set was
+     * recorded as and this is what was counted while it happened.
+     */
+    val repMarks: List<Long>? = null,
+    /**
      * False when the sensor segmenter resolved a different number of reps than
      * the set records — the lifter or the voice guide counted something else.
      *

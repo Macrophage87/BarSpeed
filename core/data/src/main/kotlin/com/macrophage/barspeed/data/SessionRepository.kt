@@ -86,6 +86,16 @@ data class CompletedSet(
     /** Spoken cues during the set, epoch-ms stamped for IMU cross-reference. */
     val voiceCues: List<VoiceCue> = emptyList(),
     /**
+     * The instants a rep was COUNTED during this set, epoch-ms, issue #158.
+     *
+     * Empty is the ordinary case and does NOT mean no rep was performed: marks
+     * exist only where something counted them out loud -- the lifter's `+1
+     * REP` tap or the guided cadence runner -- and a sensor-counted set
+     * produces none at all. The segmenter's reps carry an ordinal index and no
+     * instant, so nothing can supply these after the fact.
+     */
+    val repMarks: List<Long> = emptyList(),
+    /**
      * How the set was rated at the moment it ended, stored with the row rather
      * than updated onto it afterwards.
      *

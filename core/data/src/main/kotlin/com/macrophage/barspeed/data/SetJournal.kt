@@ -219,8 +219,14 @@ class SetJournal internal constructor(
         const val CUES = "cues.csv"
         const val REPS = "reps.csv"
 
-        /** One epoch-ms instant per line; the count is the number of lines. */
-        const val REPS_HEADER = "timestamp_ms"
+        /**
+         * One epoch-ms instant per line; the count is the number of lines.
+         *
+         * [RepMarkCsv.HEADER] rather than a second literal: the journal and
+         * the stored stream are one format, and a header written in two
+         * places is a header that drifts in one of them.
+         */
+        const val REPS_HEADER = RepMarkCsv.HEADER
 
         /**
          * How much sits in this process before a line reaches the filesystem.
@@ -331,7 +337,7 @@ class SetJournalStore(
             imuSamples = decode(dir, SetJournal.IMU) { ImuCsv.decode(it) },
             hrSamples = decode(dir, SetJournal.HRM) { HrCsv.decode(it) },
             cues = decode(dir, SetJournal.CUES) { CueCsv.decode(it) },
-            repMarks = decode(dir, SetJournal.REPS) { line -> repMark(line) },
+            repMarks = decode(dir, SetJournal.REPS) { line -> RepMarkCsv.decodeLine(line) },
             directory = dir,
         )
     }
@@ -362,12 +368,6 @@ class SetJournalStore(
             }
         }
         return out
-    }
-
-    private fun repMark(line: String): List<Long> {
-        val text = line.trim()
-        if (text.isEmpty() || text.startsWith("#") || text.startsWith(SetJournal.REPS_HEADER)) return emptyList()
-        return listOf(text.toLong())
     }
 
     companion object {

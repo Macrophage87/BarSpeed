@@ -163,9 +163,9 @@ data class SetRecordEntity(
 data class RawStreamEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val setId: Long,
-    /** One of: imu, hrm, rest_before_hrm, cues. */
+    /** One of: imu, hrm, rest_before_hrm, cues, reps. */
     val kind: String,
-    /** Gzipped CSV in the canonical format (see ImuCsv / HrCsv / CueCsv). */
+    /** Gzipped CSV in the canonical format (see ImuCsv / HrCsv / CueCsv / RepMarkCsv). */
     val csvGzip: ByteArray,
     val sampleRateHz: Double? = null,
 ) {
@@ -203,6 +203,17 @@ data class RawStreamEntity(
         const val KIND_REST_BEFORE_HRM = "rest_before_hrm"
 
         const val KIND_CUES = "cues"
+
+        /**
+         * The instants a rep was COUNTED during this set, issue #158.
+         *
+         * A different population from [KIND_CUES] and nothing may blur them:
+         * a cue is what the app said, on a schedule, whether or not anybody
+         * moved, and a mark is what was counted. The stream exists only for
+         * sets that produced marks -- a tap-counted set or a guided one --
+         * and its absence is not a statement that no rep was performed.
+         */
+        const val KIND_REPS = "reps"
     }
 }
 
