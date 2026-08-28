@@ -44,9 +44,12 @@ import com.macrophage.barspeed.ui.components.PermissionBanner
  * Assignment is by ADDRESS and survives power cycles and reconnection order,
  * which is the whole point -- a positional default would change meaning the
  * next time either unit was re-paired, since pairing makes a device its role's
- * preferred one. Two units may advertise identical names, so the reliable way
- * to tell which row is which is to pick one up and watch its chip: the labelled
- * row is the one that goes green when that unit is switched on.
+ * preferred one. Two units may advertise identical names, so telling the rows
+ * apart takes a ritual -- and only the PREFERRED unit's row can go green
+ * before labelling. The second link is pointed at no address until both units
+ * carry distinct labels, and it is pointed there by the Record screen, not
+ * this one. So switch both units on, note which single row is green, and label
+ * the OTHER row by elimination.
  *
  * Clearing a label is offered because a wrong one is worse than none: an
  * unlabelled pair records one stream and says so, a mislabelled pair records

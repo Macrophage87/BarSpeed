@@ -49,10 +49,13 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      * link. That was latent while nobody paired two IMUs and issue #156 makes
      * it real, so the rows are keyed by ADDRESS here instead.
      *
-     * The analysed link follows `preferred_imu`; the second link follows the
-     * first paired IMU that is not the preferred one, which is the same rule
-     * `SensorCapturePolicy.roster` applies -- asked of the paired list rather
-     * than restated, so the two cannot drift about which unit is which.
+     * The analysed link follows `preferred_imu`; the second row follows the
+     * first paired IMU that is not the preferred one. This is NOT the address
+     * the second link is maintaining. `SensorCapturePolicy.roster` returns a
+     * null `secondaryAddress` under every `DualShortfall`, and that is the
+     * only value `setSecondaryImuAddress` is ever given, so until both units
+     * carry distinct labels the second link is pointed at nothing and this
+     * row's chip reads Disconnected for a healthy unit.
      */
     val linkAddresses =
         combine(
