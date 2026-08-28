@@ -52,8 +52,8 @@ import kotlin.test.assertTrue
  * track refutes that in its own rows: on set 13 rep ONE carries a `1` at the
  * second second of its `Up` stroke and no later rep does. Nothing suppresses
  * that count except an announcement riding the same stroke
- * (`GuidedCadenceRunner.play`'s `gaveUpCount` requires a non-null
- * announcement), and rep 1 has none pending yet. So the silence is the
+ * (`CadenceVoice.countCall` drops a stroke's first count only when an
+ * announcement is non-null), and rep 1 has none pending yet. So the silence is the
  * GIVEN-UP TEMPO COUNT, and the call rode the stroke word one second earlier --
  * `"Up, Last rep"` as a single utterance, recorded as a bare `Up`.
  *

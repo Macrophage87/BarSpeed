@@ -17,8 +17,9 @@ import kotlin.test.assertTrue
  * in between."* The "sometimes" is the whole content of the defect, and it is
  * not the tempo. `"Last rep"` is a WARNING about a rep not yet performed, and
  * on some schedules the only beat that can carry it is the beat the rep ENDS
- * on -- so the lifter is told to brace for a rep whose working stroke they
- * have already finished, and then hears `Done`.
+ * on -- so the lifter is told to brace for a rep with only its closing stroke
+ * left -- on every schedule measured, the eccentric, so the working stroke is
+ * already finished -- and then hears `Done`.
  *
  * Measured on session 33's cue tracks, sixteen sets, app 0.1.43: THREE sets
  * carry the call with a whole rep still in front of it, and THIRTEEN do not.
@@ -130,6 +131,10 @@ class LastRepWarningTest {
         Row("2010", seatedOhp, 12, null),
         Row("1120", pushdown, 12, null),
         Row("1020", pushdown, 12, null),
+        // Eccentric-first, so the carrying stroke is the CONCENTRIC and the
+        // working stroke is NOT finished. Pinned as it behaves, not as it
+        // should.
+        Row("1120", benchPress, 12, null),
         // Case 4 -- every second of the cycle already has a word in it, so
         // nothing is decided at all and nothing changes here.
         Row("1010", legPress, 6, null),
@@ -160,7 +165,7 @@ class LastRepWarningTest {
         // A table of all-null or all-LAST_REP would pass a rule that ignores
         // the plan entirely, so the corpus is asserted to contain both.
         assertEquals(4, outcomes.count { it == CadencePlan.LAST_REP }, "plans that still warn")
-        assertEquals(12, outcomes.count { it == null }, "plans that do not")
+        assertEquals(13, outcomes.count { it == null }, "plans that do not")
 
         // And the argument for suppressing rather than rescheduling, as an
         // assertion rather than a claim in a comment. `CadencePlan.of` reaches
@@ -243,5 +248,21 @@ class LastRepWarningTest {
                 .filter { it.first >= finalRepStarts }
             assertEquals(expected, rows, "the final rep of ${p.beats.map { it.label to it.seconds }}")
         }
+    }
+
+    @Test
+    fun `the returned count makes the final rep sound like the first`() {
+        // The count handed back is also what leaves rep 1 and rep N with the
+        // same words: they are the only two reps of a suppressed plan with no
+        // merged call on them. Asserted here rather than named in a comment.
+        val p = plan("1120", pushdown)
+        val reps = 12
+        val rows = CadenceVoice.script(p, reps)
+            .flatMap { call -> call.recorded.map { call.atSecond to it } }
+        val cycle = p.deliveredCycleS
+        val first = rows.filter { it.first < cycle }.map { it.first % cycle to it.second }
+        val last = rows.filter { it.first >= (reps - 1) * cycle && it.second != CadenceVoice.DONE }
+            .map { it.first % cycle to it.second }
+        assertEquals(first, last, "rep 1 and rep $reps carry the same words at the same offsets")
     }
 }

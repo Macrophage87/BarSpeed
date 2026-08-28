@@ -12,8 +12,8 @@ import kotlin.test.assertNull
  * These decisions used to live inside `GuidedCadenceRunner.play` in `:app`,
  * beside the sleeps, where the module's one test file could not reach them.
  * Everything asserted here was previously unassertable -- which is why the app
- * could speak a rep call on eleven of twelve reps and write none of them down
- * for as long as it did (issue 176).
+ * could speak all eleven rep calls of a twelve-rep set and write none of them
+ * down for as long as it did (issue 176).
  *
  * The cases chosen are eccentric-first, because [CadencePlan]'s case 2 is the
  * home whose behaviour neither issue 176 nor issue 173 changes. Case 3 -- the

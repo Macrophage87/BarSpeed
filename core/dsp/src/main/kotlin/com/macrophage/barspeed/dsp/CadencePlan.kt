@@ -93,12 +93,18 @@ data class CadenceBeat(
  *
  * **The session happened and refuted that, and it is deleted rather than
  * softened.** From the gym, 2026-08-28: *"It sometimes says 'last rep', done,
- * with no rep in between."* Measured on that session's sixteen cue tracks,
- * eleven sets read 2.00 s from their last stroke word to `Done` and five read
- * 1.00 s, and the split is exactly this case against case 2. The trade the
- * deleted sentence assumed -- late beats silent -- is the wrong way round for a
- * WARNING: an announcement implying a rep the lifter cannot perceive reads as
- * the app losing count, and costs more trust than saying nothing. Issue #173.
+ * with no rep in between."* Re-derived from that session's sixteen cue tracks:
+ * THREE sets carry the call with a whole rep still in front of it -- sets 1, 2
+ * and 3, eccentric-first `3010`, reading 1.001 s from their last stroke word to
+ * `Done` -- and THIRTEEN do not. Of the thirteen, eleven read 2.00 s, set 5
+ * reads 3.002 s because its closing stroke is three seconds rather than two,
+ * and set 4 says no `Done` at all so nothing can be measured from it (#141,
+ * firing in the field). 3 + 11 + 1 + 1 = 16.
+ *
+ * The trade the deleted sentence assumed -- late beats silent -- is the wrong
+ * way round for a WARNING: an announcement implying a rep the lifter cannot
+ * perceive reads as the app losing count, and costs more trust than saying
+ * nothing. Issue #173.
  *
  * What survives the refutation, because it was never the same claim: the
  * FINISHED-rep count. `"Rep 3"` reports and instructs nothing, the lifter has
@@ -129,6 +135,13 @@ data class CadenceBeat(
  * started from. That the lifter therefore hears no count higher than
  * `plannedReps - 2` on these plans is a real cost and a `[Field]` question, not
  * a settled one.
+ *
+ * A second cost sits beside it, and the returned tempo count is what creates
+ * it: rep 1 and the final rep are then the only two reps carrying no merged
+ * call, so they carry the same words at the same offsets and `Done` is the
+ * set's only ending marker. `LastRepWarningTest` asserts that rather than
+ * claiming it. Whether the lifter hears the set ending is a `[Field]` question
+ * too.
  *
  * Nothing here touches `RecordViewModel.announceRepMilestones`, the UNGUIDED
  * counter. That one speaks its own `"Last rep"` at the instant a rep is
@@ -169,7 +182,8 @@ data class CadenceBeat(
  *   of case 3 and the one a later author will reach for, because it fixes the
  *   lateness case 3 accepts. It is the dangerous one. The utterance it deletes
  *   is a MOVEMENT INSTRUCTION, and on a leg press it is specifically the
- *   `Down` row, which is the row `CueTrack.calledReps` counts a rep as. Every
+ *   `Down` row, which is the row the committed cue-track fixtures and
+ *   `CueTrack.calledReps` in the test source set count a rep as. Every
  *   capture made afterwards would report one called rep for a set of ten, in
  *   the persisted record, with nothing to reprocess: the rows were never
  *   written. Which label goes is lift-dependent -- on a leg curl it is `Up`
@@ -185,15 +199,17 @@ data class CadenceBeat(
  *
  * A merged call rides ONE utterance and writes TWO rows at that instant: the
  * stroke word, unchanged and unrenamed, and the call beside it. The stroke row
- * must stay exactly what it was -- `CueTrack.calledReps` counts `Down` rows and
- * every committed fixture matches them literally -- so the call is a second
+ * must stay exactly what it was -- the committed cue-track fixtures match
+ * `Down` rows literally and `CueTrack.calledReps` in the test source set counts
+ * them -- so the call is a second
  * row rather than a suffix on the first.
  *
  * This is issue 176 and it is a correction. Until it was fixed, cases 2 and 3
  * recorded `Down` and nothing else, so every merged call was spoken and written
- * nowhere: on session 33 that was eleven of the twelve rep calls of a 1120
+ * nowhere: on session 33 that was all eleven rep calls of a twelve-rep 1120
  * pushdown, and the string `"Last rep"` did not appear once in a sixteen-set
- * archive where the lifter heard it on every set. The one visible trace was a
+ * archive where the lifter heard it on fifteen of the sixteen -- set 4 ended
+ * before the beat that would have carried it. The one visible trace was a
  * REMOVED row -- the carrying stroke's first tempo count, given up from rep 2
  * onward -- which is how the calls were eventually counted, from the silence
  * they left rather than from anything written.
@@ -246,13 +262,20 @@ data class CadencePlan(
      * This is what decides whether [LAST_REP] is spoken. It is a statement
      * about the schedule and never about the four digits: see
      * [beatsOfRepLeftWhenAnnounced] for why those are different things, and
-     * `LastRepWarningTest` for the sixteen (tempo, lift) pairs that assert it
+     * `LastRepWarningTest` for the seventeen (tempo, lift) pairs that assert it
      * both ways.
      *
      * Not a threshold in SECONDS, deliberately. A three-second closing stroke
-     * gives the lifter longer than a two-second one and no more of the rep: on
-     * a concentric-first `3010` the working stroke is finished either way, and
-     * that is what a warning about the rep is about.
+     * gives the lifter longer than a two-second one and no more of the rep. On
+     * every schedule this has been observed on, the closing stroke is the
+     * ECCENTRIC and the working stroke is therefore finished -- all thirteen
+     * affected sets of session 33 are concentric-first -- but the predicate
+     * does not test that. On an eccentric-first lift the closing stroke is the
+     * CONCENTRIC: `1120` on an eccentric-first bench press suppresses the
+     * warning with the whole two-second press still ahead. That shape is
+     * pinned in `LastRepWarningTest` and appears nowhere in the corpus this was
+     * derived from; whether the warning should be kept there is a `[Field]`
+     * question this file does not answer.
      */
     val warningWouldOpenTheLastBeatOfItsOwnRep: Boolean
         get() = announceOnBeat != null && beatsOfRepLeftWhenAnnounced <= 1

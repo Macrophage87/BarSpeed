@@ -62,11 +62,12 @@ object CadenceVoice {
      *
      * A merged call writes TWO rows at one instant, the stroke word and the
      * call. It used to write only the stroke word, so on the tempo families
-     * that merge -- roughly eleven of every twelve rep calls on the session
-     * that found it -- the archive was silent about a call the lifter heard
-     * (issue 176). The stroke row is unchanged and unrenamed, because
-     * `CueTrack.calledReps` counts those rows and every committed fixture
-     * matches them exactly; the call is a row beside it, not a suffix on it.
+     * that merge -- every one of the sixteen sets on the session that found it,
+     * 157 calls spoken and none written -- the archive was silent about a call
+     * the lifter heard (issue 176). The stroke row is unchanged and unrenamed, because
+     * the committed cue-track fixtures match those rows exactly and
+     * `CueTrack.calledReps` in the test source set counts them; the call is a
+     * row beside it, not a suffix on it.
      */
     fun beatCall(beat: CadenceBeat, announcement: String?): SpokenCall? {
         val label = beat.spokenLabel
