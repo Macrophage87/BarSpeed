@@ -2431,7 +2431,20 @@ private fun RestHeader(state: RecordState, viewModel: RecordViewModel) {
             diameter = 110.dp,
             strokeWidth = 9.dp,
         ) {
-            Text(formatMmSs(state.restRemainingS), style = MaterialTheme.typography.headlineMedium)
+            // Words at zero, digits above it. Since #172 a rest can already be
+            // over when this screen first draws -- the period runs from the
+            // instant the set ended, so a long rating stop can spend all of it
+            // -- and "0:00" then reads as a countdown that has not started
+            // rather than one that has finished. It says the same thing at the
+            // end of an ordinary period, where it is also what the lifter
+            // wants to know. Nothing is SPOKEN here that was not spoken
+            // before: the voice cue for the end of the rest is the countdown
+            // loop's, and a period seeded at zero never enters that loop.
+            if (state.restRemainingS == 0) {
+                Text("REST OVER", style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            } else {
+                Text(formatMmSs(state.restRemainingS), style = MaterialTheme.typography.headlineMedium)
+            }
         }
         Spacer(Modifier.padding(horizontal = 8.dp))
         Column(Modifier.weight(1f)) {

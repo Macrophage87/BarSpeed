@@ -26,14 +26,13 @@ package com.macrophage.barspeed.model
  * gave and does not know it gave, and it then counts a full period on top of
  * them.
  *
- * ## Today's rule, which #172 replaces
+ * ## The rule
  *
- * This commit states the rule the app follows NOW, unchanged, so that it is a
- * pinned statement in a module with tests before it is altered: the countdown
- * is seeded with the whole prescribed period, whatever has already elapsed.
- * [remainingS] therefore ignores its clock arguments. That is not an oversight
- * and it is not the intended end state -- it is today's behaviour, lifted out
- * of `:app` where nothing could assert it.
+ * The period starts at the instant the set was over, so what a countdown is
+ * seeded with is the prescription MINUS what has already gone, floored at
+ * zero. The seeding used to be the prescription flat; that statement was
+ * pinned here for one commit so this change could be a differential against
+ * it, and is deleted rather than reworded.
  *
  * ## What this cannot check
  *
@@ -74,18 +73,34 @@ object RestClockPolicy {
      * Seconds of rest left at [nowMs], for a period of [restS] that started at
      * [startedAtMs].
      *
-     * TODAY'S RULE, which is the whole period regardless of the clock. #172
-     * changes it to subtract the elapsed time; this states what the app does
-     * now so the change is a differential against a pinned statement rather
-     * than against a memory of one.
+     * WHOLE elapsed seconds are subtracted, floored, the way
+     * [SetClockPolicy.heldSeconds] measures a hold. Rounding up would take a
+     * second of rest off every set for a reason the lifter had no part in, and
+     * the countdown would then reach zero before the period it names had run.
      *
-     * A non-positive prescription is zero seconds of rest and not a negative
-     * countdown.
+     * Clamped at BOTH ends, and each end is a separate hazard.
      *
-     * [startedAtMs] and [nowMs] are declared and not read. That is deliberate:
-     * they are the arguments the fixed rule needs, so #172 changes one
-     * expression in this file and no call site anywhere.
+     * Zero at the bottom: a rest that fully elapsed while the lifter was still
+     * on the set-end screen has none left, and it must read as none rather
+     * than starting a fresh full period. That zero is a measured zero -- the
+     * rest happened and none of it remains -- and not an absence, so it is a
+     * number and not a null. Negative seconds have nowhere to go: the screen
+     * formats mm:ss, and the countdown loop asks `> 0` to decide whether to
+     * tick at all.
+     *
+     * [restS] at the top: [nowMs] is a WALL clock, so NTP, a timezone update
+     * or the lifter setting the time can move it backwards between the two
+     * readings, and a negative elapsed would otherwise ADD to the countdown.
+     * The ceiling is the same figure the progress ring divides by, so without
+     * it the ring can draw more than full.
+     *
+     * Arithmetic in Long throughout. The two instants are epoch milliseconds
+     * and their difference does not fit an Int for any interval worth naming.
+     *
+     * A non-positive prescription is zero seconds of rest, by the same floor.
      */
-    @Suppress("UNUSED_PARAMETER")
-    fun remainingS(restS: Int, startedAtMs: Long, nowMs: Long): Int = restS.coerceAtLeast(0)
+    fun remainingS(restS: Int, startedAtMs: Long, nowMs: Long): Int {
+        val elapsedS = ((nowMs - startedAtMs) / 1_000L).coerceAtLeast(0L)
+        return (restS.toLong() - elapsedS).coerceIn(0L, restS.toLong().coerceAtLeast(0L)).toInt()
+    }
 }
