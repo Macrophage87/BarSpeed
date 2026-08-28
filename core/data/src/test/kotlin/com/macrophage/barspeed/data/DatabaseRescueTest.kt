@@ -24,9 +24,9 @@ import kotlin.test.assertTrue
  * version, that deleting the destructive fallback makes a downgrade throw, that
  * Room creates a fresh database when the file is absent, or that WAL is on at
  * all. Nothing here executes Room's open path -- no room-testing dependency, no
- * MigrationTestHelper, no committed baseline, no instrumented test. Those four
- * are reasoned, and the design is arranged so that being wrong about any of
- * them fails loudly rather than quietly.
+ * MigrationTestHelper, no instrumented test. The four properties above are
+ * reasoned, and the design is arranged so that being wrong about any of them
+ * fails loudly rather than quietly.
  */
 class DatabaseRescueTest {
     private val root: File = Files.createTempDirectory("db-rescue").toFile()
