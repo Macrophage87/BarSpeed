@@ -54,6 +54,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.model.BlePermissionStep
+import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.EffortCorrectionPolicy
 import com.macrophage.barspeed.model.ExerciseKind
@@ -832,9 +833,15 @@ private fun MoveSensorCard(exerciseName: String) {
  * meaning flipped to per-implement, every read and every re-seed of
  * `loadInput` would carry a divide-or-multiply obligation forever, in the one
  * module with no test source set.
+ *
+ * DUMB. The wording is [BodyweightLoadDisplay.fieldLabel]'s, which is in a
+ * module where a test can read it; this reads the slot and asks.
  */
-private fun loadFieldLabel(slot: PlannedSlot?, unit: WeightUnit): String =
-    if (ImplementLoad.count(slot?.implementCount) > 1) "Total load (${unit.suffix})" else "Load (${unit.suffix})"
+private fun loadFieldLabel(slot: PlannedSlot?, unit: WeightUnit): String = BodyweightLoadDisplay.fieldLabel(
+    bodyweight = slot?.exercise?.bodyweight == true,
+    implementCount = slot?.implementCount,
+    unit = unit,
+)
 
 /**
  * "= 2 × 45 lb each" under the load box, recomputed on every keystroke.
