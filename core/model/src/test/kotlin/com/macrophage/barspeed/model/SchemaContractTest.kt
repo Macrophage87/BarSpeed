@@ -811,11 +811,12 @@ class SchemaContractTest {
      *
      * The root object IS `additionalProperties: false`, so an undeclared
      * session-level key fails ajv exactly as an undeclared `$defs.set` key
-     * does. This pin is not a substitute for a schema check that cannot fire.
-     * What it substitutes for is narrower: CI ajv step validates only the two
-     * hand-written files under `docs/schemas/examples/`, never an export the
-     * app produced, so a session-level key the exporter writes and the schema
-     * omits is invisible to CI. That is the gap this pin closes.
+     * does. What this pin catches is narrower: it fails when the schema's
+     * own session-level key list changes, so a declaration cannot be added
+     * or removed here without this literal moving. It does not compare the
+     * schema against what the exporter writes; the exact-set pin on that
+     * side is `SessionExporterTest`'s `the export root states exactly the
+     * keys it states today`, in `:core:data`.
      *
      * A literal for the reason `every declared plan key is documented in the
      * schema` keeps one: a set derived from the serializer descriptor follows
