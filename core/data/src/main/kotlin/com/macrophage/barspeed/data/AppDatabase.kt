@@ -143,9 +143,10 @@ abstract class AppDatabase : RoomDatabase() {
          * had been measured.
          *
          * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2]
-         * already does. Nothing in this repository can execute either of them:
-         * there are no migration tests and no instrumented tests at all, so
-         * the first time this runs is on the lifter's phone against their real
+         * already does. Nothing in this repository executes either of them:
+         * [Migration10To11Test] covers the v10 to v11 step and no other, and
+         * there is no androidTest source set at all, so the first time this
+         * runs is on the lifter's phone against their real
          * history. This used to add "no committed schema baseline for any
          * version"; that half went false at 7db7046 and is deleted rather than
          * reworded. What a baseline changed and what it did not is stated once,
@@ -173,19 +174,18 @@ abstract class AppDatabase : RoomDatabase() {
          * explosive lift plays no lead-in at all.
          *
          * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2] and
-         * [MIGRATION_8_9] already do. Nothing in this repository can execute
-         * either of them: there are no migration tests and no instrumented
-         * tests at all, so the first time this runs is on the lifter's phone
-         * against their real history. The SQL was read against the entity diff
-         * by hand.
+         * [MIGRATION_8_9] already do. Nothing in this repository executes
+         * either of them: [Migration10To11Test] covers the v10 to v11 step and
+         * no other, and there is no androidTest source set at all, so the
+         * first time this runs is on the lifter's phone against their real
+         * history. The SQL was read against the entity diff by hand.
          *
          * That paragraph used to add "no committed schema baseline for any
          * version". It was true when written and is not now:
          * `core/data/schemas/…/10.json` was committed at 7db7046, which is
          * what gives [MIGRATION_10_11] a document to be diffed against. The
          * false half is deleted rather than reworded, and only the half that
-         * is still true is left standing -- there is still no test in this
-         * repository that executes any migration.
+         * is still true is left standing.
          */
         private val MIGRATION_9_10 =
             object : Migration(9, 10) {
@@ -217,15 +217,19 @@ abstract class AppDatabase : RoomDatabase() {
          * every existing row and every gzipped blob is left byte-for-byte where
          * it was.
          *
-         * WHAT HAS AND HAS NOT BEEN RUN, said exactly. The SQL was read against
-         * the 10.json/11.json diff by hand, and 11.json in this same commit is
-         * Room's own generated description of the schema this build compiles
-         * to -- so the two columns, their affinities and their nullability are
-         * checked against the entity by the build rather than by eye. What has
-         * NOT happened yet is execution: no test in this repository runs a
-         * migration, and the two-way emulator exercise for this bump runs once
-         * at the end of the v0.1.44 cluster, after #159 and #161, before the
-         * cut. Until then this migration is unexecuted.
+         * WHAT HAS AND HAS NOT BEEN RUN, said exactly. The two columns, their
+         * affinities and their nullability are checked against the entity by
+         * the build, because 11.json in this same commit is Room's own
+         * generated description of the schema this build compiles to.
+         * [Migration10To11Test] then runs this migration body -- not a copy of
+         * its SQL -- against a recording SupportSQLiteDatabase and diffs what
+         * it executes against the committed 10.json/11.json baselines, so a
+         * column added to an entity and forgotten here is caught, and so is
+         * the reverse. What has NOT happened is execution against a real
+         * engine: there is no SQLite on the JVM test classpath and no
+         * androidTest source set, so nothing here says SQLite accepts these
+         * statements. The two-way emulator exercise for this bump runs once at
+         * the end of the v0.1.44 cluster, after #159 and #161, before the cut.
          *
          * IT IS ALSO EXPECTED TO CHANGE BEFORE IT SHIPS. #159 adds a session
          * RPE column and will EXTEND this migration rather than mint a v12,
