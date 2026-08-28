@@ -575,6 +575,12 @@ private fun openJournal(
         // same reason `imuConnected` is here. Empty on every one-sensor set.
         sensorRoles = roster.expected,
         analysedRole = roster.analysed,
+        // The second link's state at that same moment, for the reading
+        // `imuConnected` is here for. The roster arms a role from pairing and
+        // labelling and consults no `ConnectionState`, so without this an
+        // absent or empty `imu-b.csv` reads the same whether the unit went
+        // quiet or was never connected at all.
+        secondaryImuConnected = s.imuConnectedB,
     ),
 )
 

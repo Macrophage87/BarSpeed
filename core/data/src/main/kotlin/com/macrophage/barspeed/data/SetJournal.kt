@@ -33,6 +33,12 @@ import java.util.zip.ZipOutputStream
  * samples with no sensor is the correct outcome of a manually counted set.
  * Nothing else in the directory can tell those two apart.
  *
+ * [secondaryImuConnected] is that same fact for the second link, and it is
+ * here for that same reading. A role is armed from pairing and labelling
+ * alone -- `SensorCapturePolicy.roster` consults no `ConnectionState` -- so
+ * [sensorRoles] cannot supply it, and an absent or empty `imu-b.csv` would
+ * otherwise be indistinguishable from a second unit that was never connected.
+ *
  * [sessionId] is nullable and the null is load-bearing. No session row exists
  * until the first set of a session has been durably written, so a journal
  * opened for that first set genuinely has no session to name.
@@ -70,6 +76,18 @@ data class SetJournalHeader(
     val sensorRoles: List<SensorRole> = emptyList(),
     /** Which role's capture is in `imu.csv`; null when the streams carry no role. */
     val analysedRole: SensorRole? = null,
+    /**
+     * Whether the SECOND link was connected at the moment the set began, as
+     * the caller observed it (#156).
+     *
+     * False on every one-sensor set and on every header written before this
+     * field existed. Defaulted for [sensorRoles]'s reason and one sharper
+     * one: `SetJournalStore`'s reader decodes inside
+     * `runCatching { }.getOrNull() ?: return null`, so a field an older
+     * header cannot supply does not surface as an error -- the whole
+     * directory is dropped and the capture is never offered back.
+     */
+    val secondaryImuConnected: Boolean = false,
 )
 
 /**
