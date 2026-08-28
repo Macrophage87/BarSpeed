@@ -7,6 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -26,26 +27,97 @@ class AutoConnectManager(
     val imuClient = WitmotionClient(context)
     val hrmClient = HrmClient(context)
 
+    /**
+     * The second accelerometer, issue #156.
+     *
+     * A second CLIENT and not a second address fed to the first one, and that
+     * is forced rather than preferred. [WitmotionStreamDecoder] holds a single
+     * `ArrayDeque` that `feed` drains with a resync-on-0x55 loop, and the
+     * WT901's 20-byte frames carry NO CHECKSUM -- the decoder's own KDoc says
+     * so. Interleaving two devices' notification payloads into one buffer
+     * therefore lets the resync assemble a "frame" from the tail of one unit's
+     * packet and the head of the other's. That does not merely confuse the
+     * stream; it fabricates plausible samples. `BluetoothGatt` is per-remote
+     * device in any case.
+     *
+     * [imuClient], [imuState] and [imuSamples] keep their exact present
+     * meaning -- THE ANALYSED SENSOR -- and everything that reads them is
+     * untouched. This is the sibling, and the app decides which physical unit
+     * it maintains.
+     */
+    val imuClientB = WitmotionClient(context)
+
     val imuState: StateFlow<ConnectionState> = imuClient.connectionState
+    val imuStateB: StateFlow<ConnectionState> = imuClientB.connectionState
     val hrmState: StateFlow<ConnectionState> = hrmClient.connectionState
     val imuSamples: SharedFlow<com.macrophage.barspeed.model.ImuSample> = imuClient.samples
+    val imuSamplesB: SharedFlow<com.macrophage.barspeed.model.ImuSample> = imuClientB.samples
     val hrSamples: SharedFlow<com.macrophage.barspeed.model.HrSample> = hrmClient.samples
 
     private var imuJob: Job? = null
+    private var imuJobB: Job? = null
     private var hrmJob: Job? = null
 
-    /** Begin maintaining connections to both preferred devices in parallel. */
+    /**
+     * Which device the second link maintains, or null to leave it down.
+     *
+     * A plain address handed in from outside rather than a third
+     * [DeviceRole], because [DeviceRole] cannot safely grow one:
+     * [DeviceRegistry.keyFor] is a binary `if` that maps anything other than
+     * IMU to `preferred_hrm`, so pairing under a new role would overwrite the
+     * heart-rate strap's preferred address, and [KnownDevice] is
+     * `@Serializable` with the enum on the wire -- a build that has never seen
+     * the new value throws on decode and its `catch` returns an EMPTY list,
+     * losing every paired device. Both WT901s stay ordinary `DeviceRole.IMU`
+     * rows, which is the shape [DeviceRegistry]'s own KDoc already describes.
+     */
+    private val secondaryImuAddress = MutableStateFlow<String?>(null)
+
+    /**
+     * Point the second link at a device, or take it down.
+     *
+     * Disconnecting on null is done HERE rather than inside the reconnect
+     * loop, so that loop's behaviour is byte-for-byte what it was for the two
+     * links that already used it: a null address there has always meant
+     * "nothing paired yet, look again in three seconds", and turning that into
+     * "disconnect" would change what happens to the analysed sensor and the
+     * strap while the registry is momentarily empty.
+     */
+    fun setSecondaryImuAddress(address: String?) {
+        if (secondaryImuAddress.value == address) return
+        secondaryImuAddress.value = address
+        // Dropped on EVERY change, not only on null. The loop's Connected
+        // branch waits for the link to fall over before doing anything else,
+        // so a client already holding the old device would sit there for the
+        // rest of the session and the new one would never be reached.
+        imuClientB.disconnect()
+    }
+
+    /** Begin maintaining connections to the preferred devices in parallel. */
     fun start() {
-        if (imuJob == null) imuJob = scope.launch { maintain(DeviceRole.IMU) }
-        if (hrmJob == null) hrmJob = scope.launch { maintain(DeviceRole.HRM) }
+        if (imuJob == null) {
+            imuJob = scope.launch { maintain(imuClient) { registry.preferredNow(DeviceRole.IMU)?.address } }
+        }
+        if (hrmJob == null) {
+            hrmJob = scope.launch { maintain(hrmClient) { registry.preferredNow(DeviceRole.HRM)?.address } }
+        }
+        // The third link runs whether or not an address has been set: with
+        // none it sits in the same three-second idle the other two use before
+        // anything is paired, so arming dual mid-session costs no restart.
+        if (imuJobB == null) {
+            imuJobB = scope.launch { maintain(imuClientB) { secondaryImuAddress.value } }
+        }
     }
 
     fun stop() {
         imuJob?.cancel()
+        imuJobB?.cancel()
         hrmJob?.cancel()
         imuJob = null
+        imuJobB = null
         hrmJob = null
         imuClient.disconnect()
+        imuClientB.disconnect()
         hrmClient.disconnect()
     }
 
@@ -56,11 +128,11 @@ class AutoConnectManager(
     }
 
     /**
-     * The reconnect loop for one role. It runs on the process-wide `appScope`,
+     * The reconnect loop for one link. It runs on the process-wide `appScope`,
      * a `SupervisorJob` with no `CoroutineExceptionHandler`, and `start()`
      * launches it exactly once behind `if (imuJob == null)` — so anything that
      * escapes this function reaches the default uncaught handler and kills the
-     * process, and nothing ever relaunches the role.
+     * process, and nothing ever relaunches the link.
      *
      * Hence the whole body is guarded, not just the connect call. The other
      * throw in here is [DeviceRegistry.preferredNow], whose try/catch covers
@@ -68,18 +140,26 @@ class AutoConnectManager(
      * DataStore raises something that is not a [SecurityException] from this
      * same coroutine. A catch narrowed to permission errors would have missed
      * it.
+     *
+     * Takes the CLIENT and an address provider rather than a [DeviceRole], since
+     * #156: there are three links and only two roles, because both
+     * accelerometers are ordinary `DeviceRole.IMU` devices. Nothing else about
+     * the loop moved -- the backoff, the Connected-then-wait branch and the
+     * blanket catch are per-link already and their reasoning never depended on
+     * there being two links rather than three. The `if (imuJob == null)`
+     * sentence above is kept verbatim because it is still the guarantee that
+     * matters and it is still true of each of the three.
      */
-    private suspend fun maintain(role: DeviceRole) {
+    private suspend fun maintain(client: GattClient, addressOf: suspend () -> String?) {
         var backoffS = 1L
         while (true) {
             try {
-                val preferred = registry.preferredNow(role)
-                if (preferred == null) {
-                    // Nothing paired for this role yet; check again when the user pairs.
+                val address = addressOf()
+                if (address == null) {
+                    // Nothing paired for this link yet; check again when the user pairs.
                     delay(3_000)
                     continue
                 }
-                val client = clientFor(role)
                 when (client.connectionState.value) {
                     is ConnectionState.Connected -> {
                         backoffS = 1L
@@ -88,7 +168,7 @@ class AutoConnectManager(
                     }
                     is ConnectionState.Connecting -> delay(2_000)
                     else -> {
-                        client.connect(preferred.address, autoConnect = true)
+                        client.connect(address, autoConnect = true)
                         delay(backoffS * 1_000)
                         backoffS = min(backoffS * 2, 30L)
                     }
