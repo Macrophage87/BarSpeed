@@ -61,8 +61,15 @@ class TimedSetVoiceTest {
     }
 
     /**
-     * Past the target nothing is said. The screen calls it bonus time and the
-     * set is still measured; the voice does not comment.
+     * Past the target nothing is said.
+     *
+     * This used to read "the screen calls it bonus time and the set is still
+     * measured", which went false with #168 -- the set now ends at the target,
+     * so seconds past it are neither measured nor scored and the screen's
+     * bonus-time branch is gone. Corrected rather than reworded. The case
+     * itself still matters: a tick the loop was late for presents a remainder
+     * already past zero on the tick before the set ends, and the answer has to
+     * be silence rather than a spoken negative.
      *
      * Reds if the `remainingS > 0` guard is dropped from the milestone branch:
      * -15 and -30 are both multiples of fifteen and would speak a negative

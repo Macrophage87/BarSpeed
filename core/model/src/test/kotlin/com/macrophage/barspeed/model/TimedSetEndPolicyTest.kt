@@ -218,4 +218,23 @@ class TimedSetEndPolicyTest {
         assertEquals(0, TimedSetEndPolicy.adjustedSeconds(currentS = 3, deltaS = -5))
         assertEquals(0, TimedSetEndPolicy.adjustedSeconds(currentS = 0, deltaS = -5))
     }
+
+    /**
+     * The correction step is five seconds.
+     *
+     * Added because mutation M4 in the fix commit SURVIVED: every test above
+     * passes 5 as a literal delta and none of them reads the constant, so
+     * moving the step to 1 changed what the rest screen does and reddened
+     * nothing. A literal, for the reason `TimedSetVoiceTest`'s KDoc gives --
+     * asserting the constant against itself would pass for any value.
+     *
+     * Five and not one because the thing being corrected is the walk back to
+     * the phone, which is seconds to tens of seconds; at one second a lifter
+     * says with ten taps what one tap says here, on a rest screen with a
+     * countdown running.
+     */
+    @Test
+    fun `the correction step is five seconds`() {
+        assertEquals(5, TimedSetEndPolicy.CORRECTION_STEP_S)
+    }
 }
