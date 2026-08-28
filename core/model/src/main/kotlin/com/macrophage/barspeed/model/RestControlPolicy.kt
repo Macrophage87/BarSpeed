@@ -8,6 +8,19 @@ enum class RestControl {
     /** Close the session row and stop recording. */
     FINISH_SESSION,
 
+    /**
+     * Ask for the session rating, and close the session on the answer or on
+     * the skip beside it (#159).
+     *
+     * Drawn in place of [FINISH_SESSION], never beside it, for the reason
+     * [RETRY_FINISH] replaces it too: two controls that both close the session
+     * are two ways to launch the same work from different inputs, and one of
+     * them would be the wrong one. Here the wrong one would be the one that
+     * closes with no rating while the lifter is looking at the panel that asks
+     * for it.
+     */
+    RATE_SESSION,
+
     /** Run a close that came back failed again, from the input frozen at the first tap. */
     RETRY_FINISH,
 }
@@ -56,5 +69,41 @@ object RestControlPolicy {
         // close the session would be two ways to launch the same work, from
         // different inputs, and one of them would be the wrong one.
         SessionCloseState.FAILED -> setOf(RestControl.START_NEXT_SET, RestControl.RETRY_FINISH)
+    }
+
+    /**
+     * The controls to draw while the close is in [close] and the lifter has
+     * asked to finish but not yet answered the session rating (#159).
+     *
+     * Layered on [controls] rather than restating it, so the two cannot drift:
+     * the rating panel appears exactly where the finish control would have
+     * been, and nowhere the finish control is not offered. A close that is in
+     * flight still draws nothing and a failed close still draws its retry,
+     * because [askedToFinish] cannot resurrect a control this object has
+     * already withheld.
+     *
+     * START NEXT SET is deliberately LEFT DRAWN while the panel is up. The
+     * close has not begun -- nothing is in flight and no row has been written
+     * -- so the set-destroying hazard that empties the in-flight set does not
+     * exist here, and a lifter who reached the panel by mistapping Finish
+     * needs a way back that is not "answer a question about a workout you have
+     * not finished". Today a mistap of Finish closes the session outright with
+     * no confirmation at all, so this is strictly less trapping than what it
+     * replaces.
+     *
+     * TWO FORMS, ON PURPOSE, and which one a call site asks matters. The
+     * one-argument form answers the close's own question and is what the next-set
+     * control asks; this form answers the session-close block's question. A
+     * call site that asks the one-argument form while the panel is up gets the
+     * plain finish control back, which is why the block that draws the finish
+     * control asks this one.
+     */
+    fun controls(close: SessionCloseState, askedToFinish: Boolean): Set<RestControl> {
+        val base = controls(close)
+        return if (askedToFinish && RestControl.FINISH_SESSION in base) {
+            base - RestControl.FINISH_SESSION + RestControl.RATE_SESSION
+        } else {
+            base
+        }
     }
 }

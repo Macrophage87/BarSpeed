@@ -33,9 +33,10 @@ import kotlin.test.assertTrue
  * that SQLite accepts these statements, that the file on a phone survives
  * them, or that Room's own `TableInfo` check passes afterwards. Those are the
  * emulator exercise, which for the v0.1.44 cluster runs once at the end, after
- * #159 and #161, before the cut. Until it has run, this migration is
- * UNEXECUTED and this file is the strongest thing that can be said about it
- * from a JVM.
+ * #161, before the cut -- #159 is this commit's own issue and has extended the
+ * migration rather than discharged that exercise. Until it has run, this
+ * migration is UNEXECUTED and this file is the strongest thing that can be said
+ * about it from a JVM.
  *
  * The recording database is a `java.lang.reflect.Proxy` rather than a
  * hand-written fake, deliberately. `SupportSQLiteDatabase` has some three
@@ -123,24 +124,38 @@ class Migration10To11Test {
     }
 
     /**
-     * v11 differs from v10 by exactly two columns, both nullable TEXT with no
-     * default.
+     * v11 differs from v10 by exactly three columns: two nullable TEXT and one
+     * nullable INTEGER, none of them defaulted.
      *
      * The whole risk of a hand-written migration is that the entity moved
      * further than the SQL did. This reads the difference off Room's own
-     * generated descriptions, so it sees a third column, a retyped column and
+     * generated descriptions, so it sees a fourth column, a retyped column and
      * a dropped one alike -- none of which the SQL below would carry.
+     *
+     * The affinity is asserted PER COLUMN rather than over the union, since
+     * #159 put a column of a different type in the same migration. Asserting
+     * one shared affinity over all three would have had to be weakened to pass,
+     * and a weakened assertion is how `sessionRpe INTEGER` and a `sessionRpe
+     * TEXT` in the entity stop being distinguishable.
      */
     @Test
-    fun `the schema baselines differ by exactly the two nullable text columns`() {
+    fun `the schema baselines differ by exactly the three columns the migration appends`() {
         val rawAdded = columnsOf(11, "raw_streams") - columnsOf(10, "raw_streams").keys
         val setAdded = columnsOf(11, "set_records") - columnsOf(10, "set_records").keys
+        val sessionAdded = columnsOf(11, "sessions") - columnsOf(10, "sessions").keys
 
         assertEquals(setOf("role"), rawAdded.keys, "raw_streams gained something other than role")
         assertEquals(setOf("sensorsJson"), setAdded.keys, "set_records gained something other than sensorsJson")
-        for ((name, spec) in rawAdded + setAdded) {
+        assertEquals(setOf("sessionRpe"), sessionAdded.keys, "sessions gained something other than sessionRpe")
+
+        val expectedAffinity = mapOf("role" to "TEXT", "sensorsJson" to "TEXT", "sessionRpe" to "INTEGER")
+        for ((name, spec) in rawAdded + setAdded + sessionAdded) {
             val (affinity, notNull, default) = spec
-            assertEquals("TEXT", affinity, "$name is not TEXT, so the migration's column type is wrong")
+            assertEquals(
+                expectedAffinity.getValue(name),
+                affinity,
+                "$name is not ${expectedAffinity.getValue(name)}, so the migration's column type is wrong",
+            )
             assertTrue(!notNull, "$name is NOT NULL, which an ADD COLUMN with no default cannot produce")
             assertNull(default, "$name carries a default the migration does not write")
         }
@@ -175,12 +190,17 @@ class Migration10To11Test {
     // ---- the SQL the migration runs ------------------------------------------
 
     /**
-     * The migration executes exactly the two statements the baselines call for
-     * and nothing else.
+     * The migration executes exactly the three statements the baselines call
+     * for, in order, and nothing else.
      *
      * Read off the real migration body through a recording database, so this
      * is the SQL that will run rather than a second copy of it kept beside the
      * first.
+     *
+     * A LIST, so the order is pinned as well as the membership. Three plain
+     * column appends against three different tables commute, so nothing breaks
+     * if they are reordered -- but a reordering is still a change to what runs
+     * on the lifter's phone, and the cheapest place to notice one is here.
      */
     @Test
     fun `the migration runs one plain add-column statement per new column`() {
@@ -188,14 +208,15 @@ class Migration10To11Test {
             listOf(
                 "ALTER TABLE raw_streams ADD COLUMN role TEXT",
                 "ALTER TABLE set_records ADD COLUMN sensorsJson TEXT",
+                "ALTER TABLE sessions ADD COLUMN sessionRpe INTEGER",
             ),
             executedSql(),
         )
     }
 
     /**
-     * Neither statement carries NOT NULL or a DEFAULT, and that is what keeps
-     * them cheap and non-destructive.
+     * No statement carries NOT NULL or a DEFAULT, and that is what keeps them
+     * cheap and non-destructive.
      *
      * SQLite performs a plain `ADD COLUMN` by appending to the table
      * definition; a NOT NULL column without a default is refused outright on a
@@ -205,7 +226,7 @@ class Migration10To11Test {
      * only one that cannot lose a row.
      */
     @Test
-    fun `neither statement can rewrite a table or refuse a populated one`() {
+    fun `no statement can rewrite a table or refuse a populated one`() {
         for (sql in executedSql()) {
             assertTrue(sql.startsWith("ALTER TABLE "), "not a column append: $sql")
             assertTrue("ADD COLUMN" in sql, "not a column append: $sql")
@@ -216,11 +237,17 @@ class Migration10To11Test {
     }
 
     /**
-     * Nothing already recorded is given a role or a sensor declaration.
+     * Nothing already recorded is given a role, a sensor declaration or a
+     * session rating.
      *
-     * A backfill was refused twice over: a role is meaningless on an `hrm`,
-     * `rest_before_hrm`, `cues` or `reps` row, and on an `imu` row it would
-     * state which physical unit a capture came from when nobody assigned one.
+     * A backfill was refused twice over for the sensor columns: a role is
+     * meaningless on an `hrm`, `rest_before_hrm`, `cues` or `reps` row, and on
+     * an `imu` row it would state which physical unit a capture came from when
+     * nobody assigned one. For `sessionRpe` it is sharper still -- how a past
+     * workout FELT is recorded in no artifact this app has ever written, so any
+     * value written here would be invented outright, and a midpoint would be
+     * the most believable invention of all.
+     *
      * This is the pin against a later "helpful" UPDATE being added to the
      * migration -- the shape the v8 -> v9 migration's own KDoc refused for
      * time zones, where a plausible value is indistinguishable from a measured

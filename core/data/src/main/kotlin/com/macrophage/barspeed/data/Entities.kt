@@ -53,6 +53,25 @@ data class SessionEntity(
     val hrMaxBpm: Int? = null,
     /** Session-wide HRV (RMSSD, ms) from R-R intervals, sets and rests included. */
     val hrvRmssdMs: Double? = null,
+    /**
+     * How the whole session felt to the lifter, 1 to 10, stated once at the
+     * finish (#159). See [com.macrophage.barspeed.model.SessionRpe], which owns
+     * the scale.
+     *
+     * NOT [SetRecordEntity.rpe]. That column is reps-in-reserve for one set on
+     * the app's 6-to-10 grid; this is the whole workout on 1 to 10. Two columns
+     * of the same type in the same database, both called RPE, so the difference
+     * is written at both of them.
+     *
+     * Null means the lifter did not rate the session -- the rating is skippable
+     * with one tap -- and null on every row recorded before this column existed.
+     * There is no default and no midpoint: a 5 would be an answer nobody gave,
+     * and a 0 would be an answer off the scale that reads as the easiest session
+     * ever recorded. Nothing backfills it, the refusal every migration since
+     * v8 has written down, and here it is not even guessable: no artifact
+     * anywhere records how a past workout felt.
+     */
+    val sessionRpe: Int? = null,
 )
 
 @Entity(

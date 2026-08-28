@@ -375,8 +375,27 @@ class SessionRepository(
      * ViewModel, which is where the concurrent case is actually closed. A
      * `Mutex` here would be the wrong instrument for a residue whose whole harm
      * is an end time and an HRV differing by the gap between two taps.
+     *
+     * [sessionRpe] is ACCEPTED AND NOT YET STORED at this commit, deliberately
+     * and for one commit only (#159).
+     *
+     * This is the "room" half of the partition: the parameter exists so that
+     * the differential asserting the rating reaches the row can be written and
+     * SEEN TO FAIL on the assertion -- "expected 7, was null" -- rather than
+     * on the Kotlin compiler, which would red every test in this module at
+     * once and name none of them. The commit after the differentials is what
+     * writes it onto the row.
+     *
+     * Nothing passes it here. It has a null default and `:app` does not call
+     * it with an argument until that same later commit, so no rating can be
+     * dropped by this intermediate state in any build that ever ran.
      */
-    suspend fun endSession(sessionId: Long, endedAtMs: Long, hrvRmssdMs: Double? = null) {
+    suspend fun endSession(
+        sessionId: Long,
+        endedAtMs: Long,
+        hrvRmssdMs: Double? = null,
+        @Suppress("UNUSED_PARAMETER") sessionRpe: Int? = null,
+    ) {
         val session = sessionDao.sessionById(sessionId) ?: return
         if (session.endedAtMs != null) return
         val sets = sessionDao.setsForSession(sessionId)

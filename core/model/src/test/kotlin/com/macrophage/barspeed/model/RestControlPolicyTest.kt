@@ -81,6 +81,86 @@ class RestControlPolicyTest {
         }
     }
 
+    // ---- the session rating step, issue #159 --------------------------------
+
+    /**
+     * Asking for the session rating REPLACES the finish control rather than
+     * joining it.
+     *
+     * Green on arrival: the two-argument form is a new function nothing called
+     * when this was written. What it guards is the same rule the retry already
+     * obeys -- two controls that both close the session are two ways to launch
+     * the same work from different inputs -- and here the wrong one would be
+     * the one that closes with no rating while the lifter is looking at the
+     * panel asking for it.
+     */
+    @Test
+    fun `asking for the session rating replaces the finish control`() {
+        assertEquals(
+            setOf(RestControl.START_NEXT_SET, RestControl.RATE_SESSION),
+            RestControlPolicy.controls(SessionCloseState.NONE, askedToFinish = true),
+        )
+    }
+
+    @Test
+    fun `not having asked leaves the two forms saying the same thing`() {
+        SessionCloseState.entries.forEach { close ->
+            assertEquals(
+                RestControlPolicy.controls(close),
+                RestControlPolicy.controls(close, askedToFinish = false),
+                "$close disagrees with itself between the one- and two-argument forms",
+            )
+        }
+    }
+
+    /**
+     * The next set stays reachable while the panel is up.
+     *
+     * The close has not begun -- nothing is in flight and no row has been
+     * written -- so the hazard that empties the in-flight state does not exist
+     * here, and a lifter who reached the panel by mistapping Finish needs a way
+     * out that is not answering a question about a workout they have not
+     * finished.
+     */
+    @Test
+    fun `the next set is still reachable while the rating is being asked for`() {
+        assertTrue(
+            RestControl.START_NEXT_SET in RestControlPolicy.controls(SessionCloseState.NONE, askedToFinish = true),
+        )
+    }
+
+    /**
+     * Asking cannot resurrect a control the close state already withheld.
+     *
+     * The flag is the lifter's intent, not an override. An in-flight close
+     * draws nothing whatever the lifter tapped a moment ago, and a failed close
+     * still draws its retry rather than a fresh rating panel -- the retry
+     * replays a close frozen at the first tap, and the rating that was frozen
+     * with it is the one that gets written.
+     */
+    @Test
+    fun `asking to finish adds nothing to a state that already withholds the finish`() {
+        assertEquals(emptySet(), RestControlPolicy.controls(SessionCloseState.IN_FLIGHT, askedToFinish = true))
+        assertEquals(
+            setOf(RestControl.START_NEXT_SET, RestControl.RETRY_FINISH),
+            RestControlPolicy.controls(SessionCloseState.FAILED, askedToFinish = true),
+        )
+    }
+
+    @Test
+    fun `no state offers the rating panel and a way to close beside it`() {
+        SessionCloseState.entries.forEach { close ->
+            listOf(true, false).forEach { asked ->
+                val controls = RestControlPolicy.controls(close, asked)
+                assertFalse(
+                    RestControl.RATE_SESSION in controls &&
+                        (RestControl.FINISH_SESSION in controls || RestControl.RETRY_FINISH in controls),
+                    "$close/$asked offers the rating panel beside another way to close",
+                )
+            }
+        }
+    }
+
     @Test
     fun `every close state names its controls explicitly`() {
         // A set per state rather than a boolean per control, so a control added

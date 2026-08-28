@@ -196,8 +196,9 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
-         * v11: which accelerometer a raw stream came from, and how many a set
-         * was armed with, issue #156.
+         * v11: which accelerometer a raw stream came from and how many a set
+         * was armed with (issue #156), and how the whole session felt to the
+         * lifter (issue #159).
          *
          * Nullable with no default, so existing rows are untouched and read
          * back as "not captured" -- the same shape and the same refusal
@@ -208,16 +209,31 @@ abstract class AppDatabase : RoomDatabase() {
          * capture came from when nobody assigned one. `sensorsJson` is refused
          * for the same reason from the other end -- a row written before this
          * column had one stream, and saying so explicitly would be
-         * indistinguishable from a set that declared it.
+         * indistinguishable from a set that declared it. `sessionRpe` is the
+         * sharpest of the three: how a past workout FELT is recorded in no
+         * artifact this app has ever written, so there is nothing to backfill
+         * from and any value put there would be invented outright.
          *
-         * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2],
-         * [MIGRATION_8_9] and [MIGRATION_9_10] already do, and neither carries
-         * NOT NULL or a DEFAULT -- which is what keeps them the plain
-         * column-append form SQLite performs without recreating the table, so
-         * every existing row and every gzipped blob is left byte-for-byte where
-         * it was.
+         * Three ALTER TABLE statements in one migration, where [MIGRATION_1_2],
+         * [MIGRATION_8_9] and [MIGRATION_9_10] each carry two, and none of the
+         * three carries NOT NULL or a DEFAULT -- which is what keeps them the
+         * plain column-append form SQLite performs without recreating the
+         * table, so every existing row and every gzipped blob is left
+         * byte-for-byte where it was.
          *
-         * WHAT HAS AND HAS NOT BEEN RUN, said exactly. The two columns, their
+         * THE EXTENSION THIS COMMENT PREDICTED HAS HAPPENED. It used to say
+         * #159 would add a session RPE column and EXTEND this migration rather
+         * than mint a v12; that is this third statement, and the reasoning
+         * stands as the record of why an edit to a migration was a normal act
+         * here. v11 is unreleased -- no build in the world has ever written a
+         * v11 file, so there is no version boundary to preserve, and 10.json is
+         * untouched while 11.json moves. An edit to a RELEASED migration would
+         * not be this; it would need a v12. Read the absence of any further
+         * such note as the absence of a further extension, not as this
+         * paragraph having gone stale: v11 is still unreleased at the time of
+         * writing, so a fourth column may still join it before the cut.
+         *
+         * WHAT HAS AND HAS NOT BEEN RUN, said exactly. The three columns, their
          * affinities and their nullability are checked against the entity by
          * the build, because 11.json in this same commit is Room's own
          * generated description of the schema this build compiles to.
@@ -228,22 +244,18 @@ abstract class AppDatabase : RoomDatabase() {
          * the reverse. What has NOT happened is execution against a real
          * engine: there is no SQLite on the JVM test classpath and no
          * androidTest source set, so nothing here says SQLite accepts these
-         * statements. The two-way emulator exercise for this bump runs once at
-         * the end of the v0.1.44 cluster, after #159 and #161, before the cut.
-         *
-         * IT IS ALSO EXPECTED TO CHANGE BEFORE IT SHIPS. #159 adds a session
-         * RPE column and will EXTEND this migration rather than mint a v12,
-         * because v11 is unreleased -- no build in the world has ever written
-         * a v11 file, so there is no version boundary to preserve. An edit to
-         * an unreleased migration is a normal act; an edit to a released one
-         * is not, and this comment is the record of which of the two v11 is at
-         * the time of writing.
+         * statements. The two-way emulator exercise for this bump still runs
+         * ONCE at the end of the v0.1.44 cluster, after #161, before the cut --
+         * this commit does not discharge it and does not claim to. Extending
+         * the migration does not move that exercise earlier; it changes what
+         * the exercise will have to cover when it runs.
          */
         internal val MIGRATION_10_11 =
             object : Migration(10, 11) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE raw_streams ADD COLUMN role TEXT")
                     db.execSQL("ALTER TABLE set_records ADD COLUMN sensorsJson TEXT")
+                    db.execSQL("ALTER TABLE sessions ADD COLUMN sessionRpe INTEGER")
                 }
             }
 

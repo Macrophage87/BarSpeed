@@ -39,6 +39,31 @@ data class SessionExport(
     val timeZone: RecordedTimeZone? = null,
     val planRef: String? = null,
     val notes: String? = null,
+    /**
+     * How the whole session felt to the lifter, [SessionRpe.MIN] to
+     * [SessionRpe.MAX], stated once when they finished it (#159).
+     *
+     * NOT THE PER-SET SCALE. [SetExport.rpe] is reps-in-reserve on the app's
+     * 6-to-10 effort grid and is a statement about one set's proximity to
+     * failure; this is the whole workout on 1 to 10, and the two must never be
+     * averaged or compared as one quantity. [SessionRpe] states the difference
+     * once and the published schema states it again in both descriptions,
+     * because an archive reader has only the descriptions to tell two 1-to-10
+     * integers apart.
+     *
+     * Absent means UNRATED, which is not a low rating. The rating is skippable
+     * with one tap, a lifter who skips it records no answer, and every session
+     * recorded before this version is absent for the different reason that the
+     * app could not ask. Those two are not distinguishable here and no attempt
+     * is made to distinguish them: both mean the lifter never said.
+     *
+     * Ground truth rather than a proxy. A downstream reader can already
+     * estimate session effort by aggregating set RPEs; where this key is
+     * present it is the lifter's own answer and should be preferred over any
+     * such estimate, and where it is absent no estimate should be written into
+     * it.
+     */
+    val sessionRpe: Int? = null,
     val heartRate: HrSessionSummary? = null,
     val exercises: List<ExerciseExport>,
 ) {
@@ -126,6 +151,18 @@ data class SessionExport(
          * still unreleased. Absent on every ordinary one-sensor set, which is
          * what keeps a single-sensor export byte-for-byte what 1.12 wrote
          * apart from the version string itself.
+         *
+         * 1.13 carries a FOURTH change, additive on the same terms and under
+         * the same version for the same reason (#159): a session may carry
+         * [sessionRpe], the lifter's own 1-to-10 answer to how the whole
+         * workout felt. No key from 1.12 changes type or stops being written
+         * for it, and it is absent on every session the lifter did not rate
+         * and on every session recorded before this version. Four changes
+         * under one number is what an unreleased version is FOR; the count is
+         * not itself the warning. The warning is that ONE of the four --
+         * `duration_s` -- is not additive, and a 1.12 reader must be
+         * re-checked against that one and need not be re-checked against
+         * `repMarks`, `sensors` or `sessionRpe`.
          */
         const val SCHEMA_VERSION = "1.13"
 
@@ -218,7 +255,16 @@ data class SetExport(
     @SerialName("plannedDuration_s") val plannedDurationS: Int? = null,
     /** Unilateral sets: "left" or "right". */
     val side: String? = null,
-    /** Lifter-reported RPE (6–10). */
+    /**
+     * PER-SET RPE, reps-in-reserve: how close this ONE set came to failure.
+     *
+     * The app's effort grid offers 6 through 10 -- 6 is four or more reps
+     * left, 10 is nothing left -- and it is the only thing that writes this.
+     * The published schema's bound is 1 to 10, wider than the grid, and that
+     * width is why the scale is named here: [SessionExport.sessionRpe] is a
+     * different instrument over the same published range, and the two must
+     * never be averaged or compared as one quantity.
+     */
     val rpe: Int? = null,
     /**
      * True when the set is marked failed: the lifter tapped it as failed, the

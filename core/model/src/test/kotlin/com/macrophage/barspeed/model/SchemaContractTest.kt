@@ -825,9 +825,150 @@ class SchemaContractTest {
     fun `the published export declares exactly the session-level keys it declares today`() {
         val keys = schema("session-export.schema.json")["properties"]!!.jsonObject.keys
         assertEquals(
-            setOf("schemaVersion", "startedAt", "endedAt", "timeZone", "planRef", "notes", "heartRate", "exercises"),
+            setOf(
+                "schemaVersion", "startedAt", "endedAt", "timeZone", "planRef", "notes",
+                "sessionRpe", "heartRate", "exercises",
+            ),
             keys,
             "a session-level key was added or removed without moving this pin",
+        )
+    }
+
+    /**
+     * The published session rating is an integer bounded by the scale
+     * [SessionRpe] owns (#159).
+     *
+     * Bounds pinned against the Kotlin constants rather than against literals,
+     * the arrangement `the schema's implement floor is the one the app
+     * validates` uses: the control the lifter taps is built from
+     * [SessionRpe.VALUES], so a scale widened in Kotlin and left alone here
+     * would ship a control offering a number the published contract rejects.
+     */
+    @Test
+    fun `the published session rating is bounded by the scale the app offers`() {
+        val props = schema("session-export.schema.json")["properties"]!!.jsonObject
+        val rating =
+            assertNotNull(props["sessionRpe"], "the published export schema does not declare sessionRpe").jsonObject
+        assertEquals("integer", rating["type"]!!.jsonPrimitive.content, "sessionRpe is not published as an integer")
+        assertEquals(
+            SessionRpe.MIN,
+            rating["minimum"]!!.jsonPrimitive.int,
+            "the published session-rating floor drifted",
+        )
+        assertEquals(
+            SessionRpe.MAX,
+            rating["maximum"]!!.jsonPrimitive.int,
+            "the published session-rating ceiling drifted",
+        )
+    }
+
+    /**
+     * Both published descriptions name their own scale and deny the other's.
+     *
+     * The owner's ruling, and the whole reason this key needed a design round:
+     * the app now carries two things called RPE over overlapping published
+     * ranges -- a set's is reps-in-reserve on a 6-to-10 grid, a session's is
+     * 1-to-10 overall -- and a reader has nothing but these descriptions to
+     * tell two integers apart. A reader that averages them is the #139/#151
+     * defect class, pre-empted rather than filed later.
+     *
+     * Narrow, and said so: this cannot check either description is RIGHT. It
+     * checks that neither is silent about which instrument it is, and that
+     * each names the other, so a reader meeting one is sent to the other.
+     */
+    @Test
+    fun `both published rpe descriptions name their own scale and point at the other`() {
+        val root = schema("session-export.schema.json")
+        val session = root["properties"]!!.jsonObject["sessionRpe"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+        val set = root["\$defs"]!!.jsonObject["set"]!!.jsonObject["properties"]!!.jsonObject["rpe"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+
+        assertTrue("1-10" in session, "the session rating never states its own range: $session")
+        assertTrue("reps-in-reserve" in session, "the session rating never denies the set scale: $session")
+        assertTrue("`rpe`" in session, "the session rating never names the key it is confused with: $session")
+        assertTrue("reps-in-reserve" in set, "the per-set rpe never states which instrument it is: $set")
+        assertTrue("6 through 10" in set, "the per-set rpe never states the range the app offers: $set")
+        assertTrue("`sessionRpe`" in set, "the per-set rpe never names the key it is confused with: $set")
+        // Case-insensitive: the session description shouts the sentence and the
+        // set description does not, and which one is in capitals is a matter of
+        // where the reader most needs stopping, not of contract.
+        listOf(session, set).forEach { description ->
+            assertTrue(
+                "never be averaged or compared as one quantity" in description.lowercase(),
+                "a description omits the one instruction that keeps the two scales apart: $description",
+            )
+        }
+    }
+
+    /**
+     * Absence is published as unrated, and the description says it is not a low
+     * rating.
+     *
+     * The rating is skippable by design, so absence is the ORDINARY state of
+     * this key, not an edge case -- and the reader most likely to meet it is a
+     * model aggregating sessions, for which "no answer" and "an easy session"
+     * differ by everything. Absence rendered as a value is the defect class;
+     * this is the published half of refusing it.
+     */
+    @Test
+    fun `the published session rating says absence means unrated, not easy`() {
+        val session = schema("session-export.schema.json")["properties"]!!.jsonObject["sessionRpe"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "ABSENT MEANS UNRATED, WHICH IS NOT A LOW RATING" in session,
+            "the published session rating never says what its absence means: $session",
+        )
+        assertTrue(
+            "Do not substitute a default, a midpoint or an estimate" in session,
+            "the published session rating never refuses a substituted value: $session",
+        )
+    }
+
+    /**
+     * The 1.13 version-log entry names its fourth change and still says which
+     * one of the four is not additive.
+     *
+     * The same shape as `the 1_13 version log names the rep marks as well as
+     * the duration change`, one change further on. The hazard grows with the
+     * count: four changes under one unreleased number is exactly when a reader
+     * starts treating the version as a bucket, and the one non-additive member
+     * is what they must not miss.
+     */
+    @Test
+    fun `the 1_13 version log names the session rating and still flags the one non-additive change`() {
+        val description =
+            schema("session-export.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
+                .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "sessionRpe" in description,
+            "the version log never mentions sessionRpe, so 1.13 publishes a key it does not explain",
+        )
+        assertTrue(
+            "duration_s" in description,
+            "the version log lost the duration_s half of 1.13",
+        )
+        assertTrue(
+            "exactly one of the four -- `duration_s` -- is not additive" in description,
+            "the version log no longer says which of 1.13's changes a 1.12 reader must be re-checked against",
+        )
+    }
+
+    /**
+     * The published example carries a session rating.
+     *
+     * `ci.yml` validates this example against the schema with ajv, and that is
+     * the schema half's only automated coverage. An example carrying none of
+     * the new key passes a schema that declares it and a schema that does not
+     * -- the same reasoning the prep-pair and rep-mark example pins carry.
+     */
+    @Test
+    fun `the published export example carries a session rating`() {
+        val rating = schema("examples/session-export.example.json")["sessionRpe"]
+        assertNotNull(rating, "the published example carries no sessionRpe, so ajv never validates it")
+        assertTrue(
+            rating.jsonPrimitive.int in SessionRpe.MIN..SessionRpe.MAX,
+            "the published example's session rating is off the scale it is supposed to demonstrate",
         )
     }
 

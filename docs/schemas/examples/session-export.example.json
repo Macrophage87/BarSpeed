@@ -4,6 +4,7 @@
   "endedAt": "2026-07-18T18:11:00Z",
   "timeZone": { "id": "America/New_York", "utcOffsetMinutes": -240 },
   "planRef": "Hypertrophy Block W3 / Lower A",
+  "sessionRpe": 8,
   "heartRate": { "avgBpm": 112, "maxBpm": 156 },
   "exercises": [
     {
