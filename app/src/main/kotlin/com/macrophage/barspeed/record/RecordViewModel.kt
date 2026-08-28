@@ -520,21 +520,21 @@ private fun restingState(
 }
 
 /**
- * The state one turn of a tempo wheel leaves behind. Free function for
+ * The state one tap of a tempo stepper leaves behind. Free function for
  * [openSession]'s reason.
  *
- * The wheel that was turned is read from [RecordState.statedTempo] falling back
- * to the upcoming slot's own declaration -- the same expression the control
- * draws itself from, so what is on screen and what is written back cannot
- * disagree about which tempo is being edited.
+ * The tempo the tapped digit belongs to is read from [RecordState.statedTempo]
+ * falling back to the upcoming slot's own declaration -- the same expression
+ * the control draws itself from, so what is on screen and what is written back
+ * cannot disagree about which tempo is being edited.
  *
- * A turn that would not spell a tempo returns the state UNCHANGED rather than
+ * A tap that would not spell a tempo returns the state UNCHANGED rather than
  * clamping to something near it. [TempoAdjustPolicy.withDigit] is what decides,
  * and it refuses anything the control could not have drawn, so this cannot
  * write a prescription the metronome will not play or the exporter will not
  * recognise. In practice the control only offers values that pass; a refusal
- * here means the slot's tempo was not one four wheels can show, and the control
- * is not drawn for those at all.
+ * here means the slot's tempo was not one four single-character digits can
+ * show, and the control is not drawn for those at all.
  */
 private fun tempoAdjustedState(s: RecordState, position: Int, value: String): RecordState {
     val editing = s.statedTempo ?: s.upcomingSlot?.tempo
@@ -636,24 +636,25 @@ data class RecordState(
     val sideInput: String? = null,
     /**
      * The AD-HOC tempo text field. A plan session neither draws it nor reads
-     * it: its control is the digit wheels, and what they produce is
+     * it: its control is the digit steppers, and what they produce is
      * [statedTempo].
      */
     val tempoInput: String = "",
     /**
-     * The tempo the lifter has set on the wheels for the set now being set up,
+     * The tempo the lifter has set on the steppers for the set now being set up,
      * and null when they have set none.
      *
      * The tempo analogue of [statedLoadKg] and separate from [tempoInput] for
      * the reason given there: this has no default that means anything, is
-     * written only by a turn of a wheel or by
-     * [TempoAdjustPolicy.standingAdjustedTempo] ruling that an earlier turn
+     * written only by a tap of a stepper or by
+     * [TempoAdjustPolicy.standingAdjustedTempo] ruling that an earlier tap
      * still applies, and cannot outlive the block it was made in. Seeding a
      * text field does not set it.
      *
      * It cannot hold a tempo the app will not run. Every value that reaches it
      * comes from [TempoAdjustPolicy.withDigit], which refuses anything four
-     * wheels could not have drawn, and there is no wheel value that clears it.
+     * single-character digits could not have drawn, and no value a digit takes
+     * clears it.
      */
     val statedTempo: String? = null,
     val live: LiveSetState = LiveSetState(),
@@ -1172,7 +1173,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = stateFlow.value.copy(tempoInput = text)
     }
 
-    /** One turn of a tempo wheel between sets; every decision is [tempoAdjustedState]'s. */
+    /** One tap of a tempo digit's stepper between sets; every decision is [tempoAdjustedState]'s. */
     fun adjustTempoDigit(position: Int, value: String) {
         stateFlow.value = tempoAdjustedState(stateFlow.value, position, value)
     }

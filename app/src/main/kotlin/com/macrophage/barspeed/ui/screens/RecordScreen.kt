@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -41,7 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -558,8 +558,8 @@ private const val PREP_STEP_S = 5
  * Reachable on the plan this repo publishes -- Upper A runs
  * dumbbell_bench_press (3010) into single_arm_dumbbell_row, which declares
  * none. Closed by #148: nothing now displaces the declaration except a tempo
- * the lifter set on the wheels for THIS block, and the wheels can neither clear
- * a tempo nor add one, so the adjustment cannot move
+ * the lifter set on the tempo control for THIS block, and the tempo control
+ * can neither clear a tempo nor add one, so the adjustment cannot move
  * [LeadInPolicy.playsPrep]'s answer either way.
  *
  * Rendered on READY and again on the rest screen because READY is drawn at most
@@ -614,33 +614,42 @@ private fun PrepAdjuster(state: RecordState, viewModel: RecordViewModel) {
     }
 }
 
-/** One value's height in a tempo wheel, and how much of the wheel is on screen. */
-private const val WHEEL_ITEM_DP = 40
+/** How wide a digit's value sits, so four rows line their steppers up. */
+private const val STEPPER_VALUE_DP = 32
 
-private const val WHEEL_DP = 96
+/** One tap of a stepper, in places along that digit's own choices. */
+private const val STEPPER_STEP = 1
 
 /**
- * The tempo of the next set, as four separated wheels.
+ * The tempo of the next set, as one stepper row per digit.
  *
  * DUMB. Every decision here is [TempoAdjustPolicy]'s: which word and which
- * phase each digit is for this lift, which values its wheel offers, whether
- * this tempo can be shown on wheels at all, and what one turn produces. This
- * renders the answer and reports a digit change. `:app` has no test that can
- * run a composable, so nothing that decides anything may live in this file.
+ * phase each digit is for this lift, which values it may take, whether this
+ * tempo can be shown as four single characters at all, what one tap produces
+ * and whether a tap would move anything. This renders the answer and reports a
+ * digit change.
  *
  * Shown only when the coming set already has a tempo four single-character
- * wheels can show. It cannot CLEAR one and cannot ADD one: the ask was to
+ * digits can show. It cannot CLEAR one and cannot ADD one: the ask was to
  * adjust a tempo, and either of those moves the set across
  * [LeadInPolicy.prepCase]'s boundary, taking the prep, the voice pacing, the
  * guide's rep count and the compliance verdict with it. A set that declares no
  * tempo, or one written with a fraction or a two-character component, gets no
  * control rather than a rewritten one.
  *
- * **A tap selects; scrolling does not.** The wheel's scroll offset is never
- * read back, so a lifter who flicks the page and catches a wheel spins it and
- * changes nothing. That is deliberate: the alternative -- a snap-to-centre
- * wheel whose resting position IS the value -- would let a stray drag rewrite
- * the prescription of the set they are about to do.
+ * **Nothing here scrolls, and that is the change #154 asked for.** This was
+ * four scrolling wheels whose offset was never read back, so a drag left a
+ * wheel resting between two numbers with the selection unchanged: the control
+ * showed one thing and the app believed another, and what the metronome played
+ * was the latter. #148's stray-flick property -- only a deliberate tap changes
+ * a prescription -- is not merely preserved but made structural, because there
+ * is no scrollable surface left in the control for a flick to catch.
+ *
+ * One row per digit rather than four abreast, and that is load-bearing too: the
+ * wheels fixed their caption box at 36dp because "after the eccentric" needs
+ * two lines in a quarter-width column, and that constant is retired here rather
+ * than carried into a container it was not measured in. A full-width row gives
+ * the caption the room to be one line.
  *
  * The plan's own declaration is named beside the total whenever the two differ,
  * as [PrepAdjuster] names it for the prep.
@@ -648,8 +657,9 @@ private const val WHEEL_DP = 96
  * Not drawn on READY, so the first set of a session cannot be adjusted -- the
  * same gap the load field had before READY got one of its own. Reaching it
  * needs `beginSet`, `endSet`, the in-set ring and `upcomingPlaysPrep` to read
- * the stated tempo as well as the slot's, which is four more reads in the
- * module with no tests, for a case the ask did not name. Every other set of a
+ * the stated tempo as well as the slot's, which is four more reads in a module
+ * whose one test file cannot run a composable, for a case the ask did not name.
+ * Every other set of a
  * session is reachable, because the rest screen is drawn before each of them.
  */
 @Composable
@@ -657,10 +667,14 @@ private fun TempoAdjuster(state: RecordState, viewModel: RecordViewModel) {
     val slot = state.upcomingSlot ?: return
     val tempo = state.statedTempo ?: slot.tempo
     val values = TempoAdjustPolicy.wheelValues(tempo) ?: return
+    // The compact form of the same tempo, and what the steppers are asked
+    // about: `tempo` may be the dash form a plan wrote, which is the same
+    // prescription and a different string.
+    val shown = values.joinToString("")
     val planned = slot.plannedTempo
     Spacer(Modifier.height(10.dp))
     Text(
-        "Tempo ${values.joinToString("")}",
+        "Tempo $shown",
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
     )
@@ -681,72 +695,74 @@ private fun TempoAdjuster(state: RecordState, viewModel: RecordViewModel) {
         style = MaterialTheme.typography.bodySmall,
         color = BarColors.Sub,
     )
-    Spacer(Modifier.height(6.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-        TempoAdjustPolicy.digits(slot.exercise.concentricUp, slot.exercise.horizontal)
-            .forEachIndexed { index, digit ->
-                TempoWheel(digit, values[index], Modifier.weight(1f)) { picked ->
-                    viewModel.adjustTempoDigit(digit.position, picked)
-                }
+    TempoAdjustPolicy.digits(slot.exercise.concentricUp, slot.exercise.horizontal)
+        .forEachIndexed { index, digit ->
+            TempoDigitStepper(digit, shown, values[index]) { value ->
+                viewModel.adjustTempoDigit(digit.position, value)
             }
-    }
+        }
 }
 
-/** One digit's wheel: its word, what it is for this lift, and the values it takes. */
+/**
+ * One digit's stepper: its word, what it is for this lift, its value, and a
+ * button either side.
+ *
+ * The same Row as [PrepAdjuster] one control down -- a weighted column holding
+ * a bold title and a caption, then the controls -- so the two adjusters on this
+ * screen are one idiom and not two.
+ *
+ * Both buttons ask [TempoAdjustPolicy] what a tap would produce and whether it
+ * would move anything; nothing here knows that "X" is the top of the up stroke
+ * or that a stroke floors at one second. A disabled button rather than a tap
+ * that does nothing is the whole point of asking twice.
+ *
+ * [onPick] hands back the digit's new VALUE, not a tempo, because
+ * `adjustTempoDigit` routes it through `TempoAdjustPolicy.withDigit` -- which
+ * refuses anything the control could not have drawn. The refusal stays in one
+ * place whichever control is on screen.
+ */
 @Composable
-private fun TempoWheel(digit: TempoDigit, selected: String, modifier: Modifier, onPick: (String) -> Unit) {
-    val scroll = rememberScrollState()
-    val itemPx = with(LocalDensity.current) { WHEEL_ITEM_DP.dp.roundToPx() }
-    val windowPx = with(LocalDensity.current) { WHEEL_DP.dp.roundToPx() }
-    // Bring the current value into view when the control appears and after each
-    // tap. Never the other way round: see TempoAdjuster on why a scroll offset
-    // is not a selection.
-    LaunchedEffect(selected) {
-        scroll.scrollTo(digit.choices.indexOf(selected) * itemPx - (windowPx - itemPx) / 2)
-    }
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+private fun TempoDigitStepper(digit: TempoDigit, tempo: String, selected: String, onPick: (String) -> Unit) {
+    Spacer(Modifier.height(4.dp))
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                digit.label,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                digit.caption,
+                style = MaterialTheme.typography.bodySmall,
+                color = BarColors.Sub,
+            )
+        }
+        OutlinedButton(
+            onClick = {
+                TempoAdjustPolicy.steppedValue(tempo, digit.position, -STEPPER_STEP)?.let(onPick)
+            },
+            enabled = TempoAdjustPolicy.canStep(tempo, digit.position, -STEPPER_STEP),
+        ) {
+            Text("-")
+        }
         Text(
-            digit.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = BarColors.Sub,
+            selected,
+            Modifier.width(STEPPER_VALUE_DP.dp),
+            style = MaterialTheme.typography.titleMedium,
+            color = BarColors.Volt,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
-        // Fixed so the four wheels line up whatever their captions wrap to; the
-        // value is two lines of labelSmall rather than one, because "after the
-        // eccentric" does not fit one line of a quarter-width column. 30 dp
-        // was the first guess and is under the 32 sp two lines occupy at
-        // fontScale 1.0, so it clips before a lifter has changed anything.
-        Text(
-            digit.caption,
-            Modifier.height(36.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = BarColors.Ghost,
-            textAlign = TextAlign.Center,
-        )
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .height(WHEEL_DP.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(BarColors.Track)
-                .verticalScroll(scroll),
+        OutlinedButton(
+            onClick = {
+                TempoAdjustPolicy.steppedValue(tempo, digit.position, STEPPER_STEP)?.let(onPick)
+            },
+            enabled = TempoAdjustPolicy.canStep(tempo, digit.position, STEPPER_STEP),
         ) {
-            digit.choices.forEach { value ->
-                val picked = value == selected
-                Text(
-                    value,
-                    Modifier
-                        .fillMaxWidth()
-                        .height(WHEEL_ITEM_DP.dp)
-                        .clickable { onPick(value) }
-                        .padding(top = 8.dp),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (picked) BarColors.Volt else BarColors.Sub,
-                    fontWeight = if (picked) FontWeight.Bold else FontWeight.Normal,
-                    textAlign = TextAlign.Center,
-                )
-            }
+            Text("+")
         }
     }
 }
