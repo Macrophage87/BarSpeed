@@ -59,11 +59,20 @@ object CadenceVoice {
      *
      * A pause has no word of its own, so an announcement handed to one is
      * spoken alone; a stroke's announcement rides the stroke's word.
+     *
+     * A merged call writes TWO rows at one instant, the stroke word and the
+     * call. It used to write only the stroke word, so on the tempo families
+     * that merge -- roughly eleven of every twelve rep calls on the session
+     * that found it -- the archive was silent about a call the lifter heard
+     * (issue 176). The stroke row is unchanged and unrenamed, because
+     * `CueTrack.calledReps` counts those rows and every committed fixture
+     * matches them exactly; the call is a row beside it, not a suffix on it.
      */
     fun beatCall(beat: CadenceBeat, announcement: String?): SpokenCall? {
         val label = beat.spokenLabel
         return when {
-            label != null && announcement != null -> SpokenCall("$label, $announcement", listOf(label))
+            label != null && announcement != null ->
+                SpokenCall("$label, $announcement", listOf(label, announcement))
             label != null -> SpokenCall(label, listOf(label))
             announcement != null -> SpokenCall(announcement, listOf(announcement))
             else -> null

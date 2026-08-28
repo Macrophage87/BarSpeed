@@ -100,15 +100,16 @@ data class CadenceBeat(
  *   overloaded string in the cue vocabulary: the guided metronome's tempo
  *   counts, the unguided metronome's and the timed-set countdown all emit
  *   them, and `session-export.schema.json` gives `'3'` as an example cue
- *   meaning a tempo count. That objection binds case 1 only, where the
- *   announcement IS the cue row: a merged call on cases 2 or 3 writes no row
- *   at all, so a bare digit there would be spoken and never recorded -- the
- *   state [LeadInPlan.RECORDED] puts the lead-in digits in, not the one it
- *   refuses. What rejects it on the merged path is the audio: `"Up, three"`
- *   sits one second from the same stroke's own tempo count `"2"`, so the
- *   lifter hears digits meaning two different things inside one stroke.
- *   Whether the shorter utterance would in fact survive the window is
- *   unmeasured either way.
+ *   meaning a tempo count. An earlier version of this bullet said that
+ *   objection bound case 1 only, because a merged call wrote no row at all and
+ *   a bare digit there would be spoken and never recorded. Issue 176 removed
+ *   that escape: a merged call writes its own row now, so a bare digit on ANY
+ *   of the three homes would land in the archive indistinguishable from a
+ *   tempo count. The objection binds everywhere. The audio objection stands
+ *   beside it: `"Up, three"` sits one second from the same stroke's own tempo
+ *   count `"2"`, so the lifter hears digits meaning two different things
+ *   inside one stroke. Whether the shorter utterance would in fact survive the
+ *   window is unmeasured either way.
  * - **Let it clip**, accepting a call cut off mid-word. A count you cannot
  *   trust is worse than no count, which is why case 4 exists at all.
  * - **Replace a mid-stroke tempo count with the call** instead of merging it
@@ -134,15 +135,25 @@ data class CadenceBeat(
  * nothing exercises is a home nothing checks, so it is named here and not
  * built.
  *
- * ## Cases 2 and 3 write nothing to the cue track
+ * ## What cases 2 and 3 write to the cue track
  *
- * A merged call rides the UTTERANCE; the CUE written down stays the bare stroke
- * word. `GuidedCadenceRunner.play` speaks `(cue, "$cue, $announcement")`, so a
- * set paced on case 2 or case 3 records `Down`, never `Down, Rep 3`, and no
- * `Rep N` row appears. Only case 1 writes one, a closing pause having no word
- * of its own. What case 3 does change in a future cue track is a REMOVED row:
- * the second stroke's first tempo count, given up from rep 2 onwards, exactly
- * as case 2 already gives up the first stroke's.
+ * A merged call rides ONE utterance and writes TWO rows at that instant: the
+ * stroke word, unchanged and unrenamed, and the call beside it. The stroke row
+ * must stay exactly what it was -- `CueTrack.calledReps` counts `Down` rows and
+ * every committed fixture matches them literally -- so the call is a second
+ * row rather than a suffix on the first.
+ *
+ * This is issue 176 and it is a correction. Until it was fixed, cases 2 and 3
+ * recorded `Down` and nothing else, so every merged call was spoken and written
+ * nowhere: on session 33 that was eleven of the twelve rep calls of a 1120
+ * pushdown, and the string `"Last rep"` did not appear once in a sixteen-set
+ * archive where the lifter heard it on every set. The one visible trace was a
+ * REMOVED row -- the carrying stroke's first tempo count, given up from rep 2
+ * onward -- which is how the calls were eventually counted, from the silence
+ * they left rather than from anything written.
+ *
+ * `CadenceVoice` decides what is said and what is written; this file decides
+ * only which beat carries it.
  */
 data class CadencePlan(
     val beats: List<CadenceBeat>,
