@@ -430,9 +430,9 @@ class SchemaContractTest {
             "SetSensorsExport and the published sensors block disagree on keys",
         )
         assertEquals(
-            listOf("plannedCount", "count"),
+            listOf("plannedCount", "count", "expected", "present"),
             sensors["required"]!!.jsonArray.map { it.jsonPrimitive.content },
-            "the two DECLARED counts must be required; the lists and the analysed role may be absent",
+            "the counts and both role lists must be required; only the analysed role may be absent",
         )
         sensors["properties"]!!.jsonObject.forEach { (key, value) ->
             assertTrue(
@@ -440,6 +440,40 @@ class SchemaContractTest {
                 "the published sensors.$key carries no description, which is the shape of issue #76",
             )
         }
+    }
+
+    /**
+     * An empty role list reaches the wire instead of being dropped as a
+     * default.
+     *
+     * The exporter serializes with `encodeDefaults = false`, so a list
+     * defaulted to empty would vanish from the document exactly when it is
+     * empty -- and an absent key reads as "not stated" where an empty one
+     * means "no role was armed" or "nothing arrived". Those are the two most
+     * informative states this object has. `GeometryExport` carries the same
+     * rule for the same reason.
+     *
+     * The two settings that decide it are mirrored here rather than shared,
+     * because the exporter that owns them lives in `:core:data` and this
+     * module cannot see it -- the dependency runs the other way, the same
+     * arrangement `VALID_VELOCITY_LOSS_BASES` uses.
+     */
+    @Test
+    fun `an empty role list is written out rather than dropped as a default`() {
+        val wire =
+            Json {
+                encodeDefaults = false
+                explicitNulls = false
+            }
+        val text =
+            wire.encodeToString(
+                SetSensorsExport.serializer(),
+                SetSensorsExport(plannedCount = 2, count = 1, expected = emptyList(), present = emptyList()),
+            )
+
+        assertTrue("\"expected\"" in text, "an empty expected list was dropped from the wire: $text")
+        assertTrue("\"present\"" in text, "an empty present list was dropped from the wire: $text")
+        assertFalse("analysedRole" in text, "a null analysed role reached the wire: $text")
     }
 
     /**

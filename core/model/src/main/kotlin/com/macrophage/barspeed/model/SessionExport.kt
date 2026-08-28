@@ -363,6 +363,15 @@ data class SetExport(
  * them here would force the standalone share path to inflate and parse every
  * IMU stream, which it does not do today -- reintroducing the double
  * decompression issue #29 removed.
+ *
+ * **[expected] and [present] have no Kotlin default, and that is deliberate**
+ * -- the reasoning [GeometryExport] gives for its own fields. The exporter
+ * writes JSON with `encodeDefaults = false`, so a list defaulted to empty
+ * would be DROPPED from the wire exactly when it is empty, and its absence
+ * would read as "not stated" when it meant "no role was armed" or "nothing
+ * arrived". Those are the two most informative states this object has: a set
+ * that asked for two sensors and armed none of them by role, and one whose
+ * every unit went silent. Both are written out.
  */
 @Serializable
 data class SetSensorsExport(
@@ -394,7 +403,7 @@ data class SetSensorsExport(
      * bar or which hand it was on -- a mounting swapped between sets is a
      * post-processing question, not a corruption.
      */
-    val expected: List<String> = emptyList(),
+    val expected: List<String>,
     /**
      * The roles whose stream reached the archive, in [expected]'s order.
      *
@@ -402,7 +411,7 @@ data class SetSensorsExport(
      * them: a duplicate statement of one fact is one that can disagree with
      * its own inputs.
      */
-    val present: List<String> = emptyList(),
+    val present: List<String>,
     /**
      * Which role's stream every figure in this set was computed from.
      *

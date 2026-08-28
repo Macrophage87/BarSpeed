@@ -349,7 +349,9 @@
       "description": "How many accelerometers this set was armed with, which roles they carried, which of those reached the raw archive, and which one the set's figures were computed from. DECLARED, never derived: nothing here counts files, and a reader must not either. Absent on the ordinary one-sensor set, which is what keeps a single-sensor export identical to what earlier versions wrote; absent therefore covers both a set recorded in single-sensor mode and a set recorded before the app could capture two, and does not distinguish them, exactly as an absent `geometry` does not. A role is the identity of a PHYSICAL UNIT and asserts nothing about which end of a bar or which hand it was on -- units get swapped and are corrected in post-processing, so the export deliberately makes no anatomical claim. Do not read a role as `side`, which is a different fact about which limb was worked.",
       "required": [
         "plannedCount",
-        "count"
+        "count",
+        "expected",
+        "present"
       ],
       "properties": {
         "plannedCount": {
@@ -366,7 +368,7 @@
         },
         "expected": {
           "type": "array",
-          "description": "The roles this set was armed for, in order. Empty when its streams carry no role at all. The roles that are MISSING are the set difference against `present`; there is no third key for them, because a duplicate statement of one fact is one that can disagree with its own inputs.",
+          "description": "The roles this set was armed for, in order. ALWAYS WRITTEN when this object is, INCLUDING EMPTY: an empty list means the set's streams carry no role -- which is what a set that asked for two sensors and could arm none of them by role looks like -- and that is a statement, not an absence. The roles that are MISSING are the set difference against `present`; there is no third key for them, because a duplicate statement of one fact is one that can disagree with its own inputs.",
           "items": {
             "type": "string",
             "enum": [
@@ -377,7 +379,7 @@
         },
         "present": {
           "type": "array",
-          "description": "The roles whose stream reached the raw archive, in the order of `expected`. The one observation in this object; everything else is a declaration made when the set began. It is stated rather than left to be inferred because this document lists no filenames, so a reader holding only session.json could not otherwise tell a captured role from a missing one.",
+          "description": "The roles whose stream reached the raw archive, in the order of `expected`. The one observation in this object; everything else is a declaration made when the set began. It is stated rather than left to be inferred because this document lists no filenames, so a reader holding only session.json could not otherwise tell a captured role from a missing one. ALWAYS WRITTEN when this object is, INCLUDING EMPTY -- an empty list is a set whose every armed unit went silent, which is the most informative state here and must not read as 'not stated'.",
           "items": {
             "type": "string",
             "enum": [
