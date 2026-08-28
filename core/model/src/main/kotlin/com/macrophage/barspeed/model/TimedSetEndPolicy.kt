@@ -105,12 +105,31 @@ object TimedSetEndPolicy {
      * [autoEnded] says the set ended because [endsNow] said so rather than
      * because the lifter ended it.
      *
-     * SEAM ONLY at this commit: returns the measurement in every case, which
-     * is what the app records today. The differential that reds this is in the
-     * commit after it.
+     * A set that ran to its planned end records the prescription exactly,
+     * and nothing else does.
+     *
+     * Not a rounding nicety. The tick loop counts ticks and [measuredS] comes
+     * off `System.currentTimeMillis()` deltas, so the two disagree by whatever
+     * the dispatcher did: `delay(1_000)` drifts positive, and a sixty-tick
+     * hold measures 60 or 61 depending on the scheduler. Recording 61 for a
+     * 60 s prescription says the lifter carried it a second past target, on
+     * every set, for a reason that has nothing to do with the lifter. A paused
+     * process drifts the other way and records a hold that ran to its word as
+     * having fallen short of it.
+     *
+     * Recording the prescription is honest here precisely BECAUSE the app
+     * ended the set: the instant is the app's, announced a second earlier by
+     * the same figure, so the prescription is the measurement of an event the
+     * app itself timed. It is not honest anywhere else, which is why the
+     * lifter's own end returns the measurement untouched -- a hold stopped
+     * short is never rounded up to what it was asked for.
+     *
+     * A hold with no prescription records its measurement whatever [autoEnded]
+     * says, because there is no target to substitute and inventing one is the
+     * only alternative.
      */
-    @Suppress("UnusedParameter") // seam: both arguments start answering in the fix commit.
-    fun recordedSeconds(measuredS: Int, targetS: Int?, autoEnded: Boolean): Int = measuredS
+    fun recordedSeconds(measuredS: Int, targetS: Int?, autoEnded: Boolean): Int =
+        if (autoEnded && targetS != null) targetS else measuredS
 
     /**
      * Whether a recorded hold fell short of its prescription.
@@ -128,9 +147,11 @@ object TimedSetEndPolicy {
     /**
      * The recorded seconds after one tap of the post-set correction.
      *
-     * SEAM ONLY at this commit: returns the figure unchanged. The
-     * differentials that red it are in the commit after it.
+     * Floored at zero. Negative seconds are not a hold that ran backwards:
+     * `duration_s` is published with `"minimum": 0`, and a negative would make
+     * every downstream comparison meaningless. The zero it floors to is a
+     * measured zero -- the set happened and lasted no time worth recording --
+     * not an absence, which is why it is a number and not a null.
      */
-    @Suppress("UnusedParameter") // seam: the delta starts moving the figure in the fix commit.
-    fun adjustedSeconds(currentS: Int, deltaS: Int): Int = currentS
+    fun adjustedSeconds(currentS: Int, deltaS: Int): Int = (currentS + deltaS).coerceAtLeast(0)
 }

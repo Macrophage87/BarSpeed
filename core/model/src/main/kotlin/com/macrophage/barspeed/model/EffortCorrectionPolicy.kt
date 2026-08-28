@@ -86,7 +86,7 @@ object EffortCorrectionPolicy {
         ratedDescription != null && failed -> "$ratedDescription · short of target"
         ratedDescription != null -> ratedDescription
         failed -> FAILED
-        else -> ""
+        else -> NOT_RATED
     }
 
     /** The line's wording for a set carrying only the derived shortfall. */

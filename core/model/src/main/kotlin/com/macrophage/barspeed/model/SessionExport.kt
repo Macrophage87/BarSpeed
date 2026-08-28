@@ -157,7 +157,19 @@ data class SetExport(
     /** True when reps were entered or corrected manually rather than sensor-counted. */
     val repsManual: Boolean = false,
     val plannedReps: Int? = null,
-    /** Actual hold/carry time for timed sets (planks, farmer's walks). */
+    /**
+     * Hold/carry seconds recorded for timed sets (planks, farmer's walks).
+     *
+     * Since #168 a timed set ENDS when its clock reaches
+     * [plannedDurationS], so a set that ran to its target publishes that
+     * figure; one the lifter ended by hand publishes what it lasted, and one
+     * corrected afterwards on the rest screen publishes the corrected
+     * seconds. The three are not distinguishable from each other here --
+     * [repsManual] has no counterpart for duration -- so a reader comparing
+     * holds across the version this shipped in is comparing figures whose
+     * upper end moved: before it, every timed set carried the walk back to
+     * the phone inside it.
+     */
     @SerialName("duration_s") val durationS: Int? = null,
     @SerialName("plannedDuration_s") val plannedDurationS: Int? = null,
     /** Unilateral sets: "left" or "right". */

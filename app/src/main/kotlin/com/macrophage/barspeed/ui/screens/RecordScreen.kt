@@ -81,6 +81,7 @@ import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TempoDigit
+import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.record.PlannedSlot
 import com.macrophage.barspeed.record.RecordState
@@ -1416,13 +1417,28 @@ private fun TimedPrepRing(state: RecordState, carry: Boolean) {
     }
 }
 
-/** The hold itself, counting down to the target and then past it. */
+/**
+ * The hold itself, counting down to the target the set now ends at.
+ *
+ * "and then past it" until #168, when the clock ran on and the screen called
+ * the overrun bonus time. It is not bonus time any more and saying so would be
+ * false: the set ends at the target and records the target, so seconds past it
+ * are not measured and not scored. A genuine overage is stated afterwards on
+ * the rest screen.
+ *
+ * A negative remainder is still handled rather than assumed away. The tick
+ * loop runs on `delay(1_000)` in a process Android may pause, so a skipped
+ * second can push the displayed remainder below zero for the one frame before
+ * `endsNow` fires on the following tick. It shows zero for that frame instead
+ * of a negative, and no longer changes colour or wording -- the set is about
+ * to end, which is not a state worth a label of its own.
+ */
 @Composable
 private fun TimedClockRing(state: RecordState, carry: Boolean) {
     val targetS = state.currentTimedTargetS
     val elapsed = state.setElapsedS
-    val remaining = targetS?.let { it - elapsed }
-    val ringColor = if (remaining != null && remaining < 0) BarColors.Amber else BarColors.Volt
+    val remaining = TimedSetEndPolicy.remainingS(elapsed, targetS)
+    val ringColor = BarColors.Volt
     ProgressRing(
         progress = targetS?.let { (elapsed / it.toFloat()) } ?: 0f,
         color = ringColor,
@@ -1447,11 +1463,7 @@ private fun TimedClockRing(state: RecordState, carry: Boolean) {
                 )
             }
             Text(
-                when {
-                    targetS == null -> "elapsed"
-                    remaining != null && remaining < 0 -> "target ${targetS}s — bonus time!"
-                    else -> "of ${targetS}s target"
-                },
+                if (targetS == null) "elapsed" else "of ${targetS}s target",
                 style = MaterialTheme.typography.bodySmall,
                 color = BarColors.Sub,
             )
@@ -1858,6 +1870,7 @@ private fun LastSetDetail(state: RecordState, viewModel: RecordViewModel) {
         RpeSelector(state, viewModel) { changingEffort = false }
     }
     state.lastFeedback?.let { RepCorrectionRow(it, viewModel) }
+    state.lastFeedback?.let { HoldCorrectionRow(it, viewModel) }
     Spacer(Modifier.height(6.dp))
     state.lastFeedback?.let { RepQualityCard(it) }
 }
@@ -2082,27 +2095,39 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
 @Composable
 private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
     val feedback = state.lastFeedback ?: return
-    if (state.lastSetRpe == null && !state.lastSetFailed && !state.lastSetWarmup) return
+    // No early return for a set carrying no rating, since #168. A hold now
+    // ends on its clock rather than on a tap of the effort grid, so every
+    // timed set that meets its target arrives here unrated -- and this line is
+    // what carries the "Change" button that is the only way into the grid.
+    // Returning early took that button with it, so the lifter saw no effort
+    // and had nothing to tap to supply one. RPE is captured once, at set end,
+    // and no reprocessing of the stream rebuilds how hard a hold felt.
     val options =
         rpeOptions(timed = feedback.actualDurationS != null, explosive = feedback.explosive)
     val tapped =
         options.firstOrNull {
             if (state.lastSetWarmup) it.warmup else !it.warmup && !it.failed && it.rpe == state.lastSetRpe
         }?.description
-    val text =
-        when {
-            tapped != null && state.lastSetFailed -> "$tapped · short of target"
-            tapped != null -> tapped
-            state.lastSetFailed -> "Failed"
-            else -> null
-        }
+    // The wording is EffortCorrectionPolicy's, including the named absence for
+    // a set with nothing logged; `:app` cannot test a composable, so the
+    // decision lives one module over where every case is a literal in a test.
+    val text = EffortCorrectionPolicy.lineText(tapped, state.lastSetFailed)
+    val unrated = text == EffortCorrectionPolicy.NOT_RATED
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         SectionCaption(
-            "Effort · ${text ?: ""}",
-            color = if (state.lastSetFailed) BarColors.Red else BarColors.Volt,
+            "Effort · $text",
+            color =
+            when {
+                state.lastSetFailed -> BarColors.Red
+                // Amber rather than Volt: nothing is wrong, but there is
+                // something for the lifter to do, and the rest period is the
+                // only window in which it can be done.
+                unrated -> BarColors.Amber
+                else -> BarColors.Volt
+            },
             modifier = Modifier.weight(1f),
         )
-        TextButton(onClick = onChange) { Text("Change", color = BarColors.Sub) }
+        TextButton(onClick = onChange) { Text(if (unrated) "Rate" else "Change", color = BarColors.Sub) }
     }
     Spacer(Modifier.height(4.dp))
 }
@@ -2125,6 +2150,57 @@ private fun RpeTile(option: RpeOption, selected: Boolean, modifier: Modifier = M
             style = MaterialTheme.typography.titleSmall,
             color = option.color,
         )
+    }
+}
+
+/**
+ * Held it longer than the app stopped you at? State it here (#168).
+ *
+ * A hold or a carry now ends when its clock reaches the prescription, so the
+ * recorded figure is the announced one and the phone-retrieval walk is no
+ * longer inside it. The rare genuine overage -- the lifter deliberately
+ * carrying on past the word -- is stated on the rest screen and nowhere else,
+ * because the owner does not look at the phone mid-set: "There are rare
+ * instances I even look at the phone mid set." A mid-set control would be
+ * exercised never, and the rest screen is already where every other post-set
+ * correction lives.
+ *
+ * The mirror of [RepCorrectionRow], and exactly one of the two is ever drawn:
+ * that one returns for a timed set, this one for anything else. The step is
+ * [TimedSetEndPolicy.CORRECTION_STEP_S] rather than one second, because what
+ * is being added is a walk back to the phone.
+ *
+ * The corrected figure is amber and labelled as corrected, the same way a
+ * corrected rep count is: what is stored is no longer what was measured, and
+ * the screen has to say which it is showing. What the EXPORT cannot say is the
+ * same thing -- `set_records` has `repsManual` for reps and no such column for
+ * seconds -- and that gap is named in the commit body rather than papered
+ * over here.
+ */
+@Composable
+private fun HoldCorrectionRow(feedback: SetFeedback, viewModel: RecordViewModel) {
+    val seconds = feedback.effectiveDurationS ?: return
+    val corrected = feedback.durationOverrideS != null
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            if (corrected) "Held (corrected)" else "Held",
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+        TextButton(onClick = { viewModel.addLastSetSeconds(-TimedSetEndPolicy.CORRECTION_STEP_S) }) {
+            Text("−", style = MaterialTheme.typography.titleMedium)
+        }
+        Text(
+            "${seconds}s",
+            style = MaterialTheme.typography.titleMedium,
+            color = if (corrected) BarColors.Amber else BarColors.Text,
+        )
+        TextButton(onClick = { viewModel.addLastSetSeconds(TimedSetEndPolicy.CORRECTION_STEP_S) }) {
+            Text("+", style = MaterialTheme.typography.titleMedium)
+        }
     }
 }
 

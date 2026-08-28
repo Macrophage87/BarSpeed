@@ -28,9 +28,18 @@ package com.macrophage.barspeed.dsp
  * [MILESTONE_EVERY_S] seconds of what remains -- and only the last
  * [FINAL_COUNTDOWN_FROM_S] seconds get every digit.
  *
- * Nothing is said past zero. A set held longer than it was asked for is
- * measured and scored the same way, and the screen calls it bonus time; the
- * voice does not comment.
+ * Nothing is said past zero, and since #168 there is nothing there to say
+ * anything about: the terminal word and the end of the set are the same
+ * instant, decided once by `TimedSetEndPolicy` and handed to both. This used
+ * to read "a set held longer than it was asked for is measured and scored the
+ * same way, and the screen calls it bonus time" -- that went false with
+ * auto-end and is corrected rather than reworded. Seconds past the target are
+ * not measured and not scored; a genuine overage is stated afterwards on the
+ * rest screen.
+ *
+ * [cueFor] still answers for negative input, and that is not vestigial. A
+ * missed tick can present a remainder already past zero, and the answer has to
+ * be silence rather than a spoken negative.
  */
 object TimedSetVoice {
     /**
@@ -60,8 +69,9 @@ object TimedSetVoice {
      * What is said when [remainingS] seconds of the target are left, or null
      * for a second that passes in silence.
      *
-     * Negative input -- a set held past its target -- is silence, and so is
-     * every second between milestones.
+     * Negative input -- a tick the loop was late for, past a target the set is
+     * about to end at -- is silence, and so is every second between
+     * milestones.
      */
     fun cueFor(remainingS: Int): String? = when {
         remainingS == 0 -> TIME_UP

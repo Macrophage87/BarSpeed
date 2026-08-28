@@ -79,7 +79,15 @@ data class SetRecordEntity(
     /** True when actualReps was entered or corrected by the lifter, not the sensor. */
     val repsManual: Boolean = false,
     val plannedReps: Int? = null,
-    /** Timed sets (planks, carries): actual and planned hold/carry seconds. */
+    /**
+     * Timed sets (planks, carries): recorded and planned hold/carry seconds.
+     *
+     * `actualDurationS` is the prescription on a set that ran to its planned
+     * end (#168), the measurement on one the lifter stopped, and the stated
+     * figure on one corrected afterwards from the rest screen. No column
+     * says which: reps have `repsManual` and seconds have no counterpart,
+     * and adding one is a migration #168 deliberately did not make.
+     */
     val actualDurationS: Int? = null,
     val plannedDurationS: Int? = null,
     /** Unilateral sets: "left" or "right". */

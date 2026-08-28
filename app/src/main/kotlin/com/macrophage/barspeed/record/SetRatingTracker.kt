@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.data.SessionRepository
+import com.macrophage.barspeed.model.TimedSetEndPolicy
 
 /**
  * Effort-rating bookkeeping for the set that just finished.
@@ -20,6 +21,7 @@ class SetRatingTracker(private val repository: SessionRepository) {
     private var autoFailed = false
     private var tappedFailed = false
     private var plannedReps: Int? = null
+    private var plannedDurationS: Int? = null
 
     /**
      * Work out the failed verdict for a set that is about to be stored, and
@@ -37,8 +39,9 @@ class SetRatingTracker(private val repository: SessionRepository) {
      * failed existed in the database rated as nothing, permanently, because no
      * screen can edit a set's rating once the rest screen is gone.
      */
-    fun onSetRecorded(plannedReps: Int?, stoppedEarly: Boolean, rating: SetRating?): Boolean {
+    fun onSetRecorded(plannedReps: Int?, plannedDurationS: Int?, stoppedEarly: Boolean, rating: SetRating?): Boolean {
         this.plannedReps = plannedReps
+        this.plannedDurationS = plannedDurationS
         autoFailed = stoppedEarly
         tappedFailed = rating?.failed == true
         return tappedFailed || autoFailed
@@ -75,6 +78,31 @@ class SetRatingTracker(private val repository: SessionRepository) {
         autoFailed = planned != null && reps < planned
         val effective = tappedFailed || autoFailed
         repository.overrideReps(id, reps)
+        repository.rateSet(id, rpe = rpe, failed = effective, warmup = warmup)
+        return effective
+    }
+
+    /**
+     * Correct the seconds a hold or a carry is recorded at, from the rest
+     * screen (#168).
+     *
+     * The counterpart of [correctReps] for sets that have no reps, and it
+     * re-derives the shortfall for the same reason: the verdict came off the
+     * seconds, so a lifter who states they carried on past the target must not
+     * be left with a set marked failed on a figure that has since moved.
+     * [TimedSetEndPolicy.fellShort] is the same function the set write asked,
+     * so a correction cannot land on a different boundary from the original
+     * judgement.
+     *
+     * The lifter's own tapped failure is untouched here, exactly as in
+     * [correctReps]: correcting a duration says nothing about whether the
+     * lifter felt they failed, and the two facts stay two facts.
+     */
+    suspend fun correctDuration(seconds: Int, rpe: Int?, warmup: Boolean): Boolean? {
+        val id = setId ?: return null
+        autoFailed = TimedSetEndPolicy.fellShort(seconds, plannedDurationS)
+        val effective = tappedFailed || autoFailed
+        repository.overrideDuration(id, seconds)
         repository.rateSet(id, rpe = rpe, failed = effective, warmup = warmup)
         return effective
     }

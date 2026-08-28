@@ -13,19 +13,25 @@ package com.macrophage.barspeed.model
  * Measured from the tap, a 45 s hang with a 10 s prep records 55 s. Nothing in
  * `session.json` separates the two: `duration_s` and `plannedDuration_s` agree
  * with each other either way, and `startedAt` is not a key in that document's
- * set object. The raw archive is where it shows: its per-set `meta.json`
- * carries `startedAt_ms`, `endedAt_ms` and `prep_s` beside `duration_s`, and
- * `endSet` reads the clock once for both `duration_s` and `endedAt`, so a
- * tap-started hold satisfies `duration_s == floor((endedAt_ms -
- * startedAt_ms) / 1000)` exactly where a correct one falls short of it by
- * about `prep_s`. The other witness is audible: `TimedSetVoice` counts against
- * the same figure, so `"15 seconds"` would arrive with 25 seconds of holding
- * still to go.
+ * set object. The raw archive is where it showed: its per-set `meta.json`
+ * carries `startedAt_ms`, `endedAt_ms` and `prep_s` beside `duration_s`. The
+ * other witness is audible: `TimedSetVoice` counts against the same figure, so
+ * `"15 seconds"` would arrive with 25 seconds of holding still to go.
+ *
+ * The archive recipe that used to be written here -- that a tap-started hold
+ * satisfies `duration_s == floor((endedAt_ms - startedAt_ms) / 1000)` exactly
+ * where a correct one falls short of it by about `prep_s` -- went FALSE with
+ * #168 and is deleted rather than reworded. Under auto-end a hold that reached
+ * its target records `plannedDuration_s`, so neither side of that equation is
+ * the measurement any more and the test separates nothing. It still holds for
+ * a hold the LIFTER ended, which is the only case the equation may now be
+ * applied to.
  *
  * The same figure decides whether the set counts as met: `setTargetMet` on the
- * in-set screen and the auto-fail rule at `endSet` both compare it against
- * `TIMED_CLOSE_ENOUGH_FRACTION` of the prescription, so a prep folded into it
- * turns a short hold into a passed one.
+ * in-set screen compares the live seconds against
+ * `TimedSetEndPolicy.CLOSE_ENOUGH_FRACTION` of the prescription and the
+ * auto-fail rule at `endSet` compares the RECORDED seconds against the same
+ * boundary, so a prep folded into either turns a short hold into a passed one.
  *
  * ## Why the tap is still used where no timed prep ran
  *
@@ -44,6 +50,11 @@ package com.macrophage.barspeed.model
 object SetClockPolicy {
     /**
      * Whole seconds the set was measured for.
+     *
+     * The MEASUREMENT, which since #168 is not always the figure the set
+     * records: a hold that ran to its planned end records the prescription
+     * instead, and that substitution is [TimedSetEndPolicy]'s decision, taken
+     * on this function's output. Nothing is clamped here.
      *
      * [tappedAtMs] is when the lifter started the set. [clockStartedAtMs] is
      * when the set's own clock began ticking, and is null when it never did --

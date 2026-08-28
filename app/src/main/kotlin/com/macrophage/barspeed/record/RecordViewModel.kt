@@ -42,6 +42,7 @@ import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
+import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.CancellationException
@@ -160,8 +161,23 @@ data class SetFeedback(
     val explosive: Boolean = false,
     /** Manually entered/corrected rep count; overrides the sensor count when set. */
     val repsOverride: Int? = null,
+    /**
+     * Seconds the lifter stated for a hold or a carry on the rest screen,
+     * overriding what was recorded when the set ended (#168).
+     *
+     * Null is no correction, not zero seconds: a hold corrected DOWN to zero
+     * is a different statement from one never corrected, and the display says
+     * so.
+     */
+    val durationOverrideS: Int? = null,
 ) {
     val effectiveReps: Int get() = repsOverride ?: analysis.reps.size
+
+    /**
+     * Seconds this set stands at now, the lifter's correction ahead of the
+     * recorded figure. Null on a set that is not timed at all.
+     */
+    val effectiveDurationS: Int? get() = durationOverrideS ?: actualDurationS
 }
 
 /** One pick in the "equipment busy — switch exercise" chooser. */
@@ -420,6 +436,77 @@ private fun ratedState(
     lastSetTappedFailed = tappedFailed,
     lastSetWarmup = warmup,
 )
+
+/**
+ * The state a set that has just begun recording leaves behind. Free function
+ * for [ratedState]'s reason, and unchanged in content by the commit that moved
+ * it out: every field it writes is written to the same value it was written to
+ * inline.
+ */
+private fun inSetState(s: RecordState, manualSet: Boolean, guidedSet: Boolean, prepRunning: Boolean): RecordState =
+    s.copy(
+        stage = Stage.IN_SET,
+        setElapsedS = 0,
+        live = LiveSetState(),
+        manualSet = manualSet,
+        manualReps = 0,
+        guidedSet = guidedSet,
+        guidedLabel = "",
+        guidedCountdown = 0,
+        guidedFinished = false,
+        timedPrepRunning = prepRunning,
+    )
+
+/**
+ * The state a rest-screen duration correction leaves behind (#168). Free
+ * function for [ratedState]'s reason, and it mirrors that one exactly:
+ * `lastSetTappedFailed` is absent on purpose, because correcting how long a
+ * hold lasted re-derives the shortfall and says nothing about whether the
+ * lifter felt they failed.
+ *
+ * Why the correction is here at all, and post-set rather than mid-set: a hold
+ * or a carry now ends when its clock reaches the prescription, so the recorded
+ * figure is the announced one and the walk back to the phone is no longer
+ * inside it. The rare deliberate overage is stated on the rest screen, where
+ * every other post-set correction already lives, because the owner does not
+ * look at the phone while holding -- "There are rare instances I even look at
+ * the phone mid set" -- so a mid-set affordance would be exercised never. The
+ * delta moves the figure that currently stands, so repeated taps accumulate,
+ * and `TimedSetEndPolicy.adjustedSeconds` floors the result at zero.
+ */
+private fun durationCorrectedState(s: RecordState, seconds: Int, effectiveFailed: Boolean): RecordState = s.copy(
+    lastFeedback = s.lastFeedback?.copy(durationOverrideS = seconds),
+    lastSetFailed = effectiveFailed,
+)
+
+/**
+ * The seconds a finished timed set records, or null for a set that is not
+ * timed at all.
+ *
+ * Free function for [ratedState]'s reason, and it is the join of the two rules
+ * rather than either of them: [SetClockPolicy] says which instant the set is
+ * measured from, [TimedSetEndPolicy] says whether the measurement or the
+ * prescription is what gets written down. Both are pinned in `:core:model`;
+ * what lives here is only the wiring, which nothing in this repository can
+ * execute.
+ */
+private fun recordedTimedSeconds(
+    isTimed: Boolean,
+    prepCase: PrepCase,
+    tappedAtMs: Long,
+    clockStartedAtMs: Long?,
+    endedAtMs: Long,
+    targetS: Int?,
+    autoEnded: Boolean,
+): Int? = if (!isTimed) {
+    null
+} else {
+    TimedSetEndPolicy.recordedSeconds(
+        measuredS = SetClockPolicy.heldSeconds(prepCase, tappedAtMs, clockStartedAtMs, endedAtMs),
+        targetS = targetS,
+        autoEnded = autoEnded,
+    )
+}
 
 /**
  * The rest-screen state the set just written leaves behind. Free function for
@@ -921,8 +1008,12 @@ data class RecordState(
      */
     val setTargetMet: Boolean
         get() = when {
-            currentIsTimed ->
-                currentTimedTargetS?.let { setElapsedS >= (it * TIMED_CLOSE_ENOUGH_FRACTION).toInt() } ?: true
+            // The same rule the set write applies, asked of the same function
+            // rather than written out a second time here (#168): a threshold
+            // stated twice is a threshold that can disagree with itself, and
+            // this one decides which controls the lifter is offered while the
+            // write decides whether the set is recorded as failed.
+            currentIsTimed -> !TimedSetEndPolicy.fellShort(setElapsedS, currentTimedTargetS)
             // The guide finishing IS the set being done. Its rep count lands one
             // stroke early, before the closing cue is even spoken, and a guided
             // set given no rep target never finishes on its own at all.
@@ -983,6 +1074,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Which prep the set in progress played; frozen at [beginSet] for [endSet]. */
     private var prepCaseForSet: PrepCase = PrepCase.NONE
+
+    /**
+     * The set in progress is ending because its clock reached the planned
+     * duration, not because the lifter ended it.
+     *
+     * Set by [startSetTimer] on the tick [TimedSetEndPolicy.endsNow] answers
+     * for, immediately before it calls [endSet], and cleared at [beginSet].
+     * [endSet] reads it to decide which figure the set records: the
+     * prescription for an end the app timed, the measurement for one the
+     * lifter made. Written from the tick coroutine and read in [endSet], both
+     * on the main dispatcher, as every other field here is.
+     */
+    private var autoEndedSet = false
 
     /** When this session began, for grouping a session's captures on disk. */
     private var sessionStartedAtMs = 0L
@@ -1324,6 +1428,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         prepSForSet = prepS.takeIf { prepCase != PrepCase.NONE }
         prepCaseForSet = prepCase
         clockStartedAtMs = null
+        autoEndedSet = false
         setStartedAtMs = System.currentTimeMillis()
         if (sessionStartedAtMs == 0L) sessionStartedAtMs = setStartedAtMs
         // Opened before the collectors below start, so no sample can arrive
@@ -1353,19 +1458,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // A timed prep starts the clock itself, when it ends. Every other set
         // is measured from here, exactly as before.
         if (timedStartWord == null) startSetTimer(timedTargetS)
-        stateFlow.value =
-            s.copy(
-                stage = Stage.IN_SET,
-                setElapsedS = 0,
-                live = LiveSetState(),
-                manualSet = manualSet,
-                manualReps = 0,
-                guidedSet = guidedSet,
-                guidedLabel = "",
-                guidedCountdown = 0,
-                guidedFinished = false,
-                timedPrepRunning = timedStartWord != null,
-            )
+        stateFlow.value = inSetState(s, manualSet, guidedSet, prepRunning = timedStartWord != null)
         if (timedStartWord != null) {
             val speaks = LeadInPolicy.speaks(prepCase, s.audioCues)
             startTimedPrep(prepS, timedStartWord, speaks) { startSetTimer(timedTargetS) }
@@ -1401,6 +1494,30 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * of it is a literal in a test. This walks the seconds and hands each cue to
      * [speakCue], which writes it to the cue track as the tempo calls are
      * written.
+     *
+     * ## Why the loop ends the set (#168)
+     *
+     * A hold used to run until the lifter ended it by hand. The voice already
+     * announced the planned end, so the bar went down on the word and
+     * everything from there until the phone was back out was recorded as hold
+     * time -- inflation in one direction, on every timed set, indistinguishable
+     * in the record from a longer hold. The clock ends the set now, and the
+     * rare genuine overage is stated afterwards on the rest screen where every
+     * other post-set correction lives.
+     *
+     * The remainder is computed ONCE per tick, by
+     * [TimedSetEndPolicy.remainingS], and the same value is handed to the voice
+     * and to [TimedSetEndPolicy.endsNow]. That is the whole guard against the
+     * word and the end landing on different seconds; a second expression of
+     * "has it reached the target" anywhere in this function is the defect.
+     *
+     * The order within the tick is load-bearing. The cue is spoken and written
+     * BEFORE [endSet] runs, because [endSet] freezes `cueBuffer` into the
+     * pending write -- speaking after it would drop the terminal word from the
+     * set's own cue track, which is the boundary the exporter's rep window is
+     * cut at. `break` after it, because [endSet] cancels [tickJob] from inside
+     * the job's own coroutine and the cancellation is not observed until the
+     * next suspension point.
      */
     private fun startSetTimer(timedTargetS: Int?) {
         clockStartedAtMs = System.currentTimeMillis()
@@ -1412,8 +1529,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     delay(1_000)
                     seconds++
                     stateFlow.value = stateFlow.value.copy(setElapsedS = seconds)
-                    if (timedTargetS != null && LeadInPolicy.speaks(prepCaseForSet, stateFlow.value.audioCues)) {
-                        TimedSetVoice.cueFor(timedTargetS - seconds)?.let { speakCue(it) }
+                    val remainingS = TimedSetEndPolicy.remainingS(seconds, timedTargetS)
+                    if (remainingS != null && LeadInPolicy.speaks(prepCaseForSet, stateFlow.value.audioCues)) {
+                        TimedSetVoice.cueFor(remainingS)?.let { speakCue(it) }
+                    }
+                    if (TimedSetEndPolicy.endsNow(remainingS)) {
+                        autoEndedSet = true
+                        endSet()
+                        break
                     }
                 }
             }
@@ -1548,6 +1671,22 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Rest-screen correction of a hold or a carry's recorded seconds (#168):
+     * the only way a genuine overage is entered, and it is entered after the
+     * set. See [durationCorrectedState] for why it is not offered mid-set, and
+     * [overrideLastSetReps] for why this runs on appScope.
+     */
+    fun addLastSetSeconds(deltaS: Int) {
+        val current = stateFlow.value.lastFeedback?.effectiveDurationS ?: return
+        val seconds = TimedSetEndPolicy.adjustedSeconds(current, deltaS)
+        container.appScope.launch(Dispatchers.Main.immediate) {
+            val s = stateFlow.value
+            val failed = ratings.correctDuration(seconds, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
+            stateFlow.value = durationCorrectedState(stateFlow.value, seconds, failed)
+        }
+    }
+
+    /**
      * Voice at each lockout: "Rep N" as reps complete, "Last rep" going into the
      * final planned rep, and "Done" when the count is hit.
      */
@@ -1640,12 +1779,23 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // instants and the case that decides between them. One reading of the
         // clock, shared with the row's own endedAt, so the two cannot disagree.
         val endedAtMs = System.currentTimeMillis()
+        // Then, for a hold the CLOCK ended rather than the lifter, the figure
+        // the set records is the prescription and not the measurement (#168).
+        // The two disagree by whatever the dispatcher did -- delay(1_000)
+        // drifts positive, so a sixty-tick hold measures 60 or 61 -- and 61
+        // against a 60 s target reads as a hold carried past target on every
+        // set, for a reason that is nothing to do with the lifter. A set the
+        // lifter ended is never touched: it records what it lasted.
         val actualDurationS =
-            if (isTimed) {
-                SetClockPolicy.heldSeconds(prepCaseForSet, setStartedAtMs, clockStartedAtMs, endedAtMs)
-            } else {
-                null
-            }
+            recordedTimedSeconds(
+                isTimed = isTimed,
+                prepCase = prepCaseForSet,
+                tappedAtMs = setStartedAtMs,
+                clockStartedAtMs = clockStartedAtMs,
+                endedAtMs = endedAtMs,
+                targetS = plannedDurationS,
+                autoEnded = autoEndedSet,
+            )
         val tempoText =
             when {
                 isTimed -> null
@@ -1823,14 +1973,21 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // own rep count — never against a possibly-miscounted sensor total.
         val stoppedEarly =
             when {
+                // #168: the same function the in-set control gate asks, so the
+                // screen and the record cannot draw the boundary in different
+                // places. The `?: 0` this replaces was unreachable -- a timed
+                // set's actualDurationS is an Int by construction a few lines
+                // up -- so nothing observable changes here; fellShort simply
+                // declines to grade an absent figure rather than reading it as
+                // a zero-second hold.
                 p.isTimed && p.plannedDurationS != null ->
-                    (p.actualDurationS ?: 0) < (p.plannedDurationS * TIMED_CLOSE_ENOUGH_FRACTION).toInt()
+                    TimedSetEndPolicy.fellShort(p.actualDurationS, p.plannedDurationS)
                 p.manualReps != null && p.plannedReps != null -> p.manualReps < p.plannedReps
                 else -> false
             }
         // The lifter's tap is authoritative for effort, but a set that ended
         // short of its target is still a failed set — both facts are recorded.
-        val failed = ratings.onSetRecorded(p.plannedReps, stoppedEarly, p.rating)
+        val failed = ratings.onSetRecorded(p.plannedReps, p.plannedDurationS, stoppedEarly, p.rating)
 
         // Reusing an id already returned is what keeps a retry from writing the
         // set twice. The rating travels with the row rather than following it as
