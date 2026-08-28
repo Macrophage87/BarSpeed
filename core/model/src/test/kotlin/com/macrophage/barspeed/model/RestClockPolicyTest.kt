@@ -7,9 +7,9 @@ import kotlin.test.assertEquals
  * The rest clock: which instant it runs from, and what it says at a given
  * moment. Issue #172.
  *
- * At this commit [RestClockPolicy.remainingS] states TODAY'S rule -- the whole
- * period, whatever has already elapsed -- so the characterization below is
- * green and is meant to be. The differential that reds it lands next.
+ * The differentials below are RED at this commit and are meant to be:
+ * [RestClockPolicy.remainingS] still states today's rule, which is the whole
+ * period whatever has already elapsed. The fix lands next.
  */
 class RestClockPolicyTest {
     // ------------------------------------------------------------------
@@ -51,22 +51,114 @@ class RestClockPolicyTest {
     }
 
     // ------------------------------------------------------------------
-    // What the clock says. Today's rule.
+    // What the clock says. The differentials for #172.
     // ------------------------------------------------------------------
 
     /**
-     * TODAY'S RULE, pinned so #172's change is a differential against a
-     * statement rather than against a memory. The countdown is seeded with the
-     * whole period however long the set has been over.
+     * Nothing has elapsed, so the whole period is left.
      *
-     * This test is DELETED by the differential commit; it is here to make the
-     * red mean something.
+     * The one case today's rule and the fixed rule agree on, kept because it
+     * is the case every set that goes straight to the rest screen lands in and
+     * a subtraction that got its sign wrong would show it here.
      */
     @Test
-    fun `today the whole period is offered however long the set has been over`() {
+    fun `an instant that has only just passed leaves the whole period`() {
         assertEquals(150, RestClockPolicy.remainingS(restS = 150, startedAtMs = 1_000L, nowMs = 1_000L))
-        assertEquals(150, RestClockPolicy.remainingS(restS = 150, startedAtMs = 1_000L, nowMs = 16_000L))
-        assertEquals(150, RestClockPolicy.remainingS(restS = 150, startedAtMs = 1_000L, nowMs = 900_000L))
+    }
+
+    /**
+     * The defect. Time between the set ending and the rest screen drawing is
+     * rest that was taken, and it comes off the countdown.
+     *
+     * Fifteen seconds is the owner's own figure from the gym: "rate a set for
+     * fifteen seconds today and the app gives fifteen seconds of rest it does
+     * not know about, then counts a full period on top". 150 s is
+     * DEFAULT_REST_S.
+     */
+    @Test
+    fun `time already spent since the set ended comes off the countdown`() {
+        assertEquals(135, RestClockPolicy.remainingS(restS = 150, startedAtMs = 1_000L, nowMs = 16_000L))
+    }
+
+    /**
+     * The interval this actually costs on a guided set, from a capture rather
+     * than from a guess.
+     *
+     * The eleven sets of session 32 carrying both a `Done` cue and an IMU
+     * stream keep recording for 4.3 to 13.7 s past the cue, measured as last
+     * sample minus cue and recorded in `SetEnd`'s own documentation. Both ends
+     * of that range are asserted against a 90 s prescription, because a rule
+     * that only holds at one arbitrary elapsed value is a rule fitted to its
+     * test.
+     */
+    @Test
+    fun `both ends of session 32's measured tail come off a 90 second rest`() {
+        assertEquals(86, RestClockPolicy.remainingS(restS = 90, startedAtMs = 0L, nowMs = 4_300L), "the 4.3 s tail")
+        assertEquals(77, RestClockPolicy.remainingS(restS = 90, startedAtMs = 0L, nowMs = 13_700L), "the 13.7 s tail")
+    }
+
+    /**
+     * A rest that fully elapsed while the lifter was still on the set-end
+     * screen shows zero, not a fresh full period.
+     *
+     * Floored rather than allowed to go negative: the countdown formats
+     * mm:ss and a negative would render as a nonsense duration, and the
+     * countdown loop reads `> 0` to decide whether to keep ticking at all.
+     * The zero is a measured zero -- the rest happened and none of it is left
+     * -- not an absence.
+     */
+    @Test
+    fun `a rest that fully elapsed during the interaction is zero, not a full period`() {
+        assertEquals(0, RestClockPolicy.remainingS(restS = 60, startedAtMs = 0L, nowMs = 60_000L), "exactly elapsed")
+        assertEquals(0, RestClockPolicy.remainingS(restS = 60, startedAtMs = 0L, nowMs = 600_000L), "long elapsed")
+    }
+
+    /**
+     * Whole elapsed seconds only, floored, the way SetClockPolicy measures a
+     * hold.
+     *
+     * Not a nicety. Rounding up would take a second of rest away from every
+     * set for no reason the lifter did anything about, and the countdown then
+     * reaches zero before the period it names has actually run.
+     */
+    @Test
+    fun `a part second of elapsed time is not a second of rest taken`() {
+        assertEquals(150, RestClockPolicy.remainingS(restS = 150, startedAtMs = 0L, nowMs = 999L), "just under one")
+        assertEquals(149, RestClockPolicy.remainingS(restS = 150, startedAtMs = 0L, nowMs = 1_000L), "exactly one")
+        assertEquals(149, RestClockPolicy.remainingS(restS = 150, startedAtMs = 0L, nowMs = 1_999L), "just under two")
+    }
+
+    /**
+     * A clock that moved backwards cannot hand out more rest than was
+     * prescribed.
+     *
+     * `System.currentTimeMillis()` is a wall clock: NTP, a timezone database
+     * update or the lifter setting the time can move it either way between the
+     * cue being stamped and the rest screen being built. A negative elapsed
+     * would otherwise ADD to the countdown, and the ceiling is the same figure
+     * the progress ring divides by -- a remainder above the total draws a ring
+     * more than full.
+     */
+    @Test
+    fun `a clock that went backwards cannot inflate the period`() {
+        assertEquals(150, RestClockPolicy.remainingS(restS = 150, startedAtMs = 60_000L, nowMs = 1_000L))
+    }
+
+    /**
+     * A partly-elapsed period leaves exactly the seconds that remain, so the
+     * countdown speaks only those.
+     *
+     * The cue half of #172, pinned at the only place a JVM test can reach it.
+     * `:app` speaks a digit each second from REST_COUNTDOWN_FROM_S = 3 as the
+     * counter ticks DOWN through it, so a period seeded at 2 can never utter
+     * "3": the digits already gone are gone because the number they would have
+     * been spoken at was never held. Nothing in :app is asserted here -- that
+     * the loop obeys this seed is compile-gated only and was checked on the
+     * bench.
+     */
+    @Test
+    fun `a period with two seconds left is seeded at two, so the passed digits cannot be spoken`() {
+        assertEquals(2, RestClockPolicy.remainingS(restS = 150, startedAtMs = 0L, nowMs = 148_000L))
     }
 
     /**
