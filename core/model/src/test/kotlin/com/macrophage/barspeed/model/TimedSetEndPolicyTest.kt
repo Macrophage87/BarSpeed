@@ -112,4 +112,110 @@ class TimedSetEndPolicyTest {
         assertFalse(TimedSetEndPolicy.fellShort(recordedS = null, plannedS = 60))
         assertFalse(TimedSetEndPolicy.fellShort(recordedS = null, plannedS = null))
     }
+
+    // ---- #168 differentials -------------------------------------------------
+
+    /**
+     * A hold that ran to its planned end records the planned duration exactly,
+     * whatever the wall clock made of it.
+     *
+     * This is the one the whole change turns on, and it is not a rounding
+     * nicety. The tick loop counts ticks; the recorded figure comes off
+     * `System.currentTimeMillis()` deltas. `delay(1_000)` drifts positive, so
+     * a sixty-tick hold measures 60 or 61 seconds depending on how the
+     * scheduler felt, and 61 against a 60 s prescription is a hold that reads
+     * as having been carried a second past target -- on every set, for a
+     * reason that is a property of the coroutine dispatcher and not of the
+     * lifter. Auto-end records what was announced.
+     *
+     * Also the drift the other way: a paused process can leave the wall clock
+     * measurement SHORT of the ticks counted, and 17 recorded against a 20 s
+     * hold that ran to its word is a set the app then grades as failed.
+     */
+    @Test
+    fun `a hold that reached its target records the target and not the clock`() {
+        assertEquals(60, TimedSetEndPolicy.recordedSeconds(measuredS = 61, targetS = 60, autoEnded = true))
+        assertEquals(60, TimedSetEndPolicy.recordedSeconds(measuredS = 60, targetS = 60, autoEnded = true))
+        assertEquals(20, TimedSetEndPolicy.recordedSeconds(measuredS = 17, targetS = 20, autoEnded = true))
+    }
+
+    /**
+     * A hold the lifter stopped by hand records what it actually lasted, and
+     * auto-end never rounds a short set up to its prescription.
+     *
+     * The owner's third requirement, stated as an assertion rather than
+     * assumed from the fact that the auto-end branch is guarded. Green against
+     * the seam, which returns the measurement in every case -- said out loud
+     * because a pin that passes before the fix is not evidence for the fix,
+     * and the mutation table in the next commit is what makes it one.
+     */
+    @Test
+    fun `a hold stopped by hand records what it lasted and is never rounded up`() {
+        assertEquals(30, TimedSetEndPolicy.recordedSeconds(measuredS = 30, targetS = 60, autoEnded = false))
+        assertEquals(1, TimedSetEndPolicy.recordedSeconds(measuredS = 1, targetS = 60, autoEnded = false))
+        assertEquals(0, TimedSetEndPolicy.recordedSeconds(measuredS = 0, targetS = 60, autoEnded = false))
+    }
+
+    /**
+     * An ad-hoc hold has no prescription to record instead of the
+     * measurement, so it records the measurement even if something claims it
+     * auto-ended. Reds if the fix reads `autoEnded` without checking there is
+     * a target behind it -- the crash-adjacent case, since substituting a
+     * null target would have to invent a number.
+     */
+    @Test
+    fun `a hold with no prescription records its measurement`() {
+        assertEquals(83, TimedSetEndPolicy.recordedSeconds(measuredS = 83, targetS = null, autoEnded = true))
+        assertEquals(83, TimedSetEndPolicy.recordedSeconds(measuredS = 83, targetS = null, autoEnded = false))
+    }
+
+    /**
+     * The shortfall verdict a hold gets is computed from what it RECORDS, and
+     * the two ends of that chain have to agree.
+     *
+     * #137's family: a hold stopped short flows into the same shortfall
+     * handling a dynamic set gets, and a hold that ran to its word does not.
+     * Chained through both functions rather than asserted on each, because
+     * the defect this guards against is the join -- a correct cap and a
+     * correct threshold, wired to different figures, marks every auto-ended
+     * hold on a paused process as failed.
+     */
+    @Test
+    fun `a hold that ran to its word is not judged short and one stopped early is`() {
+        val ranToWord = TimedSetEndPolicy.recordedSeconds(measuredS = 17, targetS = 20, autoEnded = true)
+        assertFalse(TimedSetEndPolicy.fellShort(ranToWord, plannedS = 20))
+        val stoppedEarly = TimedSetEndPolicy.recordedSeconds(measuredS = 11, targetS = 20, autoEnded = false)
+        assertTrue(TimedSetEndPolicy.fellShort(stoppedEarly, plannedS = 20))
+    }
+
+    /**
+     * One tap of the post-set correction adds [TimedSetEndPolicy.CORRECTION_STEP_S]
+     * seconds, and one the other way takes them off.
+     *
+     * The rest-screen control is where the genuine overage is entered, because
+     * the owner does not look at the phone mid-set: *"There are rare instances
+     * I even look at the phone mid set."* A mid-set affordance would be
+     * exercised never.
+     */
+    @Test
+    fun `one tap of the correction moves the recorded hold by the step`() {
+        assertEquals(25, TimedSetEndPolicy.adjustedSeconds(currentS = 20, deltaS = 5))
+        assertEquals(30, TimedSetEndPolicy.adjustedSeconds(currentS = 25, deltaS = 5))
+        assertEquals(20, TimedSetEndPolicy.adjustedSeconds(currentS = 25, deltaS = -5))
+    }
+
+    /**
+     * A correction cannot drive the recorded hold below zero.
+     *
+     * Negative seconds are not a hold that ran backwards; they are a figure
+     * the export schema declares `"minimum": 0` for, and one that would make
+     * every downstream comparison meaningless. The floor is zero, and zero
+     * here is a measured zero -- the set happened and lasted no time worth
+     * recording -- not an absence.
+     */
+    @Test
+    fun `a correction cannot take the recorded hold below zero`() {
+        assertEquals(0, TimedSetEndPolicy.adjustedSeconds(currentS = 3, deltaS = -5))
+        assertEquals(0, TimedSetEndPolicy.adjustedSeconds(currentS = 0, deltaS = -5))
+    }
 }
