@@ -116,11 +116,15 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                 )
             }
             known.forEach { device ->
-                // Keyed on the ADDRESS the link is maintaining, not on the
-                // role. Keyed on role, two saved devices of one role showed the
-                // same link on both rows -- latent while nobody paired two
-                // IMUs, and real the moment #156 asks them to. A device no link
-                // is maintaining reads Disconnected, which is what it is.
+                // Keyed on ADDRESS, not on role. Keyed on role, two saved
+                // devices of one role showed the same link on both rows --
+                // latent while nobody paired two IMUs, and real the moment #156
+                // asks them to. `links.imu` and `links.hrm` are the addresses
+                // their links are maintaining; `links.imuB` is not -- it is the
+                // first non-preferred paired IMU, and the second link is
+                // pointed at no address until both units carry distinct labels,
+                // so that row shows a link maintaining nothing and reads
+                // Disconnected for a healthy unit. See `LinkAddresses`.
                 val state =
                     when (device.address) {
                         links.imu -> imuState

@@ -17,10 +17,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * The device each link is maintaining, so a row can show ITS OWN state.
+ * Which paired device each row shows the state of.
  *
- * Null where a link is maintaining nothing, which is the ordinary state of the
- * second IMU link on a one-sensor setup.
+ * [imu] and [hrm] ARE the addresses their links are maintaining. [imuB] is
+ * not: it is the first paired IMU that is not the preferred one, and the
+ * second link is pointed at no address until both units carry distinct labels,
+ * so that row can show a Disconnected link beside a perfectly healthy unit.
+ * `linkAddresses` states the mechanism once; this type does not restate it.
  */
 data class LinkAddresses(
     val imu: String? = null,
@@ -42,7 +45,7 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
     val hrmState = container.autoConnect.hrmState
 
     /**
-     * Which paired device each of the three links is maintaining right now.
+     * Which paired device each of the three rows shows the state of.
      *
      * The screen used to pick a link by ROLE, and its own comment said what
      * that costs: with two saved devices of one role every row showed the same
