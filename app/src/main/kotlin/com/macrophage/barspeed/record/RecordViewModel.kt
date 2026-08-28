@@ -1194,6 +1194,18 @@ data class RecordState(
      * commit that moves the close off `viewModelScope`.
      */
     val sessionClose: SessionCloseState = SessionCloseState.NONE,
+    /**
+     * True once the lifter has tapped Finish session and before they have
+     * answered or skipped the session rating (#159).
+     *
+     * The lifter's intent and nothing else. It does not gate the close, does
+     * not gate any write, and is not a fourth value on [sessionClose]: what may
+     * be drawn while it is true is [RestControlPolicy]'s decision, taken from
+     * this and the close state together, so that the rating panel can only ever
+     * appear where the finish control would have. Cleared by answering, by
+     * skipping and by starting another set.
+     */
+    val askingSessionRpe: Boolean = false,
     val weightUnit: WeightUnit = WeightUnit.KG,
     /** Lifter body weight, the base load for pull-ups and dips; null until set. */
     val bodyWeightKg: Double? = null,
@@ -2438,7 +2450,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     /** Advance to the next planned set, applying any in-rest load/rep edits. */
     fun startNextSet() {
         restJob?.cancel()
-        stateFlow.value = advancedState(stateFlow.value)
+        // The rating panel goes with it. Starting another set is how a lifter
+        // backs out of a mistapped Finish, and a flag left set here would
+        // reopen the panel the next time they reach the rest screen -- asking
+        // about a workout they have carried on with.
+        stateFlow.value = advancedState(stateFlow.value).copy(askingSessionRpe = false)
         beginSet()
     }
 
@@ -2475,18 +2491,47 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * HRV that is otherwise lost; nothing false is written. The screen no longer
      * offers "Leave without finishing" during that window at all, which is what
      * makes this a completed instruction rather than a contradicted one.
+     *
+     * [sessionRpe] is the lifter's own 1-to-10 answer for the whole session,
+     * or null where they skipped it or were never asked (#159). It is frozen
+     * with everything else, so a retry after a failed close writes the answer
+     * they actually gave rather than nothing. Null is a real outcome and not a
+     * fallback: an unrated session records an absence, and no midpoint is
+     * substituted for it anywhere between here and the export.
      */
-    fun finishSession() {
+    fun finishSession(sessionRpe: Int?) {
         restJob?.cancel()
+        stateFlow.value = stateFlow.value.copy(askingSessionRpe = false)
         closer.close(
             sessionId = stateFlow.value.sessionId,
             endedAtMs = System.currentTimeMillis(),
             // Snapshotted, not handed the live list: the passive HR collector
             // keeps appending to it for as long as this ViewModel lives.
             rrMs = sessionRrMs.toList(),
+            sessionRpe = sessionRpe,
             onState = ::onSessionCloseState,
             onClosed = ::onSessionClosed,
         )
+    }
+
+    /**
+     * Ask how the session felt, before closing it (#159).
+     *
+     * The rest and ready screens' Finish session control lands here rather
+     * than on [finishSession], so the rating is asked for at the one moment the
+     * lifter has finished and is still holding the phone. There is no other
+     * moment: the close writes the column once and nothing corrects it
+     * afterwards.
+     *
+     * NO PARAMETER AND NO DEFAULT ON [finishSession], deliberately. Every route
+     * that closes a session now states its own answer at its own call site --
+     * a number, or null for the skip, or null for the exit dialog's Finish
+     * session, which closes immediately and does not ask. A default would let a
+     * new caller record an absence without deciding to.
+     */
+    fun askSessionRpe() {
+        if (stateFlow.value.sessionClose != SessionCloseState.NONE) return
+        stateFlow.value = stateFlow.value.copy(askingSessionRpe = true)
     }
 
     /**

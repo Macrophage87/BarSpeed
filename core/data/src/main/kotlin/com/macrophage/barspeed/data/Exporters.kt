@@ -100,6 +100,15 @@ class SessionExporter(
             listOfNotNull(session.planName, session.planSessionName)
                 .takeIf { it.isNotEmpty() }?.joinToString(" / "),
             notes = session.notes,
+            // Copied from the row and gated by nothing (#159). It is the
+            // lifter's own statement about the whole session, so unlike every
+            // heart-rate figure below it there is no population it could
+            // outlive: it is not aggregated from the set rows and withholding
+            // it with them would delete an answer that was given. Null when
+            // the lifter skipped the rating or when the session predates it,
+            // and `explicitNulls = false` drops the key rather than writing a
+            // number nobody said.
+            sessionRpe = session.sessionRpe,
             // The session block is aggregated from the set rows, so it must not
             // outlive them. When a session HAS sets and not one of them can
             // still say anything about heart rate, its frozen columns were

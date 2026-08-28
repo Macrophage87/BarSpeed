@@ -11,6 +11,7 @@ import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
+import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.flow.Flow
@@ -351,10 +352,11 @@ class SessionRepository(
     }
 
     /**
-     * Close a session: stamp when it ended and summarise its heart rate.
+     * Close a session: stamp when it ended, summarise its heart rate and store
+     * how the whole thing felt.
      *
      * Written once per session or never. [SessionDao.updateSession] has one
-     * caller and it is this function, so nothing corrects these four columns
+     * caller and it is this function, so nothing corrects these five columns
      * afterwards, and a session that is already closed is therefore left exactly
      * as it is.
      *
@@ -376,26 +378,25 @@ class SessionRepository(
      * `Mutex` here would be the wrong instrument for a residue whose whole harm
      * is an end time and an HRV differing by the gap between two taps.
      *
-     * [sessionRpe] is ACCEPTED AND NOT YET STORED at this commit, deliberately
-     * and for one commit only (#159).
+     * [sessionRpe] is the lifter's own 1-to-10 answer for the whole session
+     * (#159), and it joins [hrvRmssdMs] in the population that guard protects
+     * rather than the heart-rate summary. It is stated once, at the finish,
+     * with no correction surface anywhere -- unlike a set's rpe, which the rest
+     * screen can still change -- and it is recorded in no artifact, so a second
+     * close overwriting it with the null of a caller that omitted the argument
+     * would destroy the only copy. The guard above is what stops that, and the
+     * pin is `a second close cannot erase or invent a session rating`.
      *
-     * This is the "room" half of the partition: the parameter exists so that
-     * the differential asserting the rating reaches the row can be written and
-     * SEEN TO FAIL on the assertion -- "expected 7, was null" -- rather than
-     * on the Kotlin compiler, which would red every test in this module at
-     * once and name none of them. The commit after the differentials is what
-     * writes it onto the row.
-     *
-     * Nothing passes it here. It has a null default and `:app` does not call
-     * it with an argument until that same later commit, so no rating can be
-     * dropped by this intermediate state in any build that ever ran.
+     * Passed through [SessionRpe.accepted], so a value off the published scale
+     * is stored as absent rather than written or clamped. Nothing the app draws
+     * can produce one -- the control is built from `SessionRpe.VALUES` -- so
+     * one arriving here is a programming error at the last durable write of a
+     * session, and dropping the rating is the only response that loses nothing
+     * but the thing that went wrong. Clamping an 11 to 10 would record the
+     * hardest session the lifter ever had; throwing would take [hrvRmssdMs]
+     * down with the close.
      */
-    suspend fun endSession(
-        sessionId: Long,
-        endedAtMs: Long,
-        hrvRmssdMs: Double? = null,
-        @Suppress("UNUSED_PARAMETER") sessionRpe: Int? = null,
-    ) {
+    suspend fun endSession(sessionId: Long, endedAtMs: Long, hrvRmssdMs: Double? = null, sessionRpe: Int? = null) {
         val session = sessionDao.sessionById(sessionId) ?: return
         if (session.endedAtMs != null) return
         val sets = sessionDao.setsForSession(sessionId)
@@ -406,6 +407,7 @@ class SessionRepository(
                 hrAvgBpm = if (avg.isEmpty()) null else avg.average().toInt(),
                 hrMaxBpm = sets.mapNotNull { it.hrMaxBpm }.maxOrNull(),
                 hrvRmssdMs = hrvRmssdMs,
+                sessionRpe = SessionRpe.accepted(sessionRpe),
             ),
         )
     }

@@ -27,6 +27,16 @@ private data class PendingSessionClose(
     val sessionId: Long?,
     val endedAtMs: Long,
     val hrvRmssdMs: Double?,
+    /**
+     * The rating the lifter gave at the finish, or null where they skipped it
+     * (#159).
+     *
+     * Frozen here for a reason the other two do not have. A retry cannot ask
+     * again -- the panel is gone and the lifter is looking at a failure notice
+     * -- so a rating not held here is a rating lost, and the column it goes to
+     * is written once per session with no correction surface anywhere.
+     */
+    val sessionRpe: Int?,
 )
 
 /**
@@ -46,6 +56,11 @@ private data class PendingSessionClose(
  * whole session, rests included, and the only R-R that reaches storage is the
  * per-set `hrm` stream covering the sets themselves. A cancelled close is the
  * difference between the lifter having that number and never having it.
+ *
+ * The session rating (#159) is in the same position and is worse: HRV could in
+ * principle be recomputed if the R-R ever reached disk, and how a workout FELT
+ * is recorded in no artifact at all. It is stated once, at the finish, and a
+ * close that never lands takes it with it.
  *
  * [scope] is the process-wide one, created once in `AppContainer` and never
  * cancelled. Dispatching on `Dispatchers.Main.immediate` is the load-bearing
@@ -87,12 +102,13 @@ class SessionCloser(
         sessionId: Long?,
         endedAtMs: Long,
         rrMs: List<Double>,
+        sessionRpe: Int?,
         onState: (SessionCloseState) -> Unit,
         onClosed: () -> Unit,
     ): Boolean {
         if (asked) return false
         asked = true
-        pending = PendingSessionClose(sessionId, endedAtMs, Hrv.rmssdMs(rrMs))
+        pending = PendingSessionClose(sessionId, endedAtMs, Hrv.rmssdMs(rrMs), sessionRpe)
         run(onState, onClosed)
         return true
     }
@@ -112,7 +128,7 @@ class SessionCloser(
         holds.acquire(RecordingHold.SESSION_CLOSE)
         scope.launch(Dispatchers.Main.immediate) {
             try {
-                p.sessionId?.let { repository.endSession(it, p.endedAtMs, p.hrvRmssdMs) }
+                p.sessionId?.let { repository.endSession(it, p.endedAtMs, p.hrvRmssdMs, p.sessionRpe) }
                 pending = null
                 onClosed()
             } catch (e: CancellationException) {

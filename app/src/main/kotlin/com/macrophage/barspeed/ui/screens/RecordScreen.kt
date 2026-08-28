@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -75,6 +76,7 @@ import com.macrophage.barspeed.model.SensorAdvice
 import com.macrophage.barspeed.model.SensorAdvicePolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRoster
+import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.SetDeviationSummary
 import com.macrophage.barspeed.model.SetEndControl
 import com.macrophage.barspeed.model.SetEndControlPolicy
@@ -143,7 +145,17 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
             // race the write — it no longer can, the close runs on appScope —
             // but because FINISHED is where the lifter asked to go, and it is
             // the screen that offers the session and its export.
-            ExitAction.FINISH_SESSION -> viewModel.finishSession()
+            //
+            // UNRATED, stated at the call site rather than defaulted (#159).
+            // This route is a lifter pressing Back and being asked what to do
+            // about an open session; interposing a rating panel would leave
+            // them on the record screen with the dialog gone and the session
+            // still open, which is not what the button they tapped promised.
+            // So it closes immediately and records no rating, and the absence
+            // is a real absence rather than a midpoint. Whether the Back route
+            // is common enough that it should ask too is a [Field] question,
+            // not something this file can answer.
+            ExitAction.FINISH_SESSION -> viewModel.finishSession(null)
             ExitAction.DISCARD_SET_AND_LEAVE,
             ExitAction.LEAVE_SESSION_OPEN,
             // Same navigation, a different promise. The close runs on a scope
@@ -2010,14 +2022,83 @@ private fun StartNextSetButton(state: RecordState, viewModel: RecordViewModel) {
  */
 @Composable
 private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel) {
-    val controls = RestControlPolicy.controls(state.sessionClose)
+    // The two-argument form, because this is the block that draws the finish
+    // control and the rating panel takes its place. StartNextSetButton asks the
+    // one-argument form on purpose: whether another set may be started is the
+    // close's question and not the lifter's intent to finish.
+    val controls = RestControlPolicy.controls(state.sessionClose, state.askingSessionRpe)
     if (RestControl.FINISH_SESSION in controls) {
-        TextButton(onClick = viewModel::finishSession, modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = viewModel::askSessionRpe, modifier = Modifier.fillMaxWidth()) {
             Text("Finish session", color = BarColors.Sub)
         }
     }
+    if (RestControl.RATE_SESSION in controls) {
+        SessionRpePanel(viewModel)
+    }
     if (RestControl.RETRY_FINISH in controls) {
         UnclosedSessionNotice(viewModel)
+    }
+}
+
+/**
+ * How was the whole session? One tap answers it, one tap skips it, and either
+ * way the session closes (#159).
+ *
+ * DELIBERATELY NOT THE EFFORT GRID'S VOCABULARY. That grid says "Solid — 3
+ * reps left", which is reps-in-reserve for one set on a 6-10 band; this is the
+ * whole workout on 1-10 and there are no reps left in a session. Bare numbers
+ * with the two ends labelled, so nothing here can be read as the other scale.
+ * The numbers come from [SessionRpe.VALUES] rather than a literal `1..10`, so
+ * the control cannot offer a value the stored column and the published schema
+ * refuse.
+ *
+ * Two rows of five rather than one row of ten. At 360dp with font scale 2 a
+ * ten-across row gives each number about 32dp of width before padding, which is
+ * under the 48dp tap-target floor; five across is roughly 64dp. `heightIn(min =
+ * 52.dp)` rather than a fixed height for the reason [StartNextSetButton] uses
+ * one: a fixed height clips at large font scales instead of growing.
+ *
+ * SKIPPABLE WITHOUT FRICTION, which is the owner's rule and is why the skip is
+ * a labelled button of its own rather than a dismiss gesture or a corner X. It
+ * says what it does -- the session finishes either way -- so a lifter who does
+ * not want to rate is not choosing between answering and not finishing.
+ *
+ * Nothing here has been in front of a lifter. What the panel looks like at
+ * 411dp/fs1.0 and 360dp/fs2.0 is bench-harness evidence in this commit's body;
+ * whether the wording reads right at the end of a real workout is a [Field]
+ * item and is not claimed.
+ */
+@Composable
+private fun SessionRpePanel(viewModel: RecordViewModel) {
+    SectionCaption("How did the whole session feel?")
+    Spacer(Modifier.height(2.dp))
+    Text(
+        "1 = easy · 10 = all you had",
+        style = MaterialTheme.typography.bodySmall,
+        color = BarColors.Sub,
+    )
+    Spacer(Modifier.height(8.dp))
+    SessionRpe.VALUES.chunked(5).forEach { row ->
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        ) {
+            row.forEach { rating ->
+                OutlinedButton(
+                    onClick = { viewModel.finishSession(rating) },
+                    modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp),
+                ) {
+                    Text("$rating", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                }
+            }
+        }
+    }
+    // Null at the call site, not a default on the ViewModel: an unrated session
+    // is a decision the lifter made here, and it is recorded as an absence
+    // rather than as a number nobody said.
+    TextButton(onClick = { viewModel.finishSession(null) }, modifier = Modifier.fillMaxWidth()) {
+        Text("Finish without rating", color = BarColors.Sub)
     }
 }
 
