@@ -226,13 +226,14 @@ object TempoAdjustPolicy {
      * this feeds takes a digit and routes it through [withDigit]: the guarantee
      * that a tempo the control could not have DRAWN cannot be written back is
      * inherited rather than restated here.
-     *
-     * The body ignores [delta] as it stands: this commit introduces the seam and
-     * the guards, and the differential pins that make a tap MOVE the digit are
-     * pushed red before the arithmetic lands. The suppression goes with it.
      */
-    @Suppress("UnusedParameter")
-    fun steppedValue(tempoText: String?, position: Int, delta: Int): String? = valueAt(tempoText, position)
+    fun steppedValue(tempoText: String?, position: Int, delta: Int): String? {
+        val current = valueAt(tempoText, position) ?: return null
+        val choices = choices(position)
+        // indexOf cannot answer -1: wheelValues has already checked every value
+        // against the same list, and valueAt is null wherever it did not.
+        return choices[(choices.indexOf(current) + delta).coerceIn(choices.indices)]
+    }
 
     /**
      * Whether one tap of [delta] on digit [position] would actually move it.
