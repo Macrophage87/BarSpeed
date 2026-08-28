@@ -20,13 +20,19 @@ import kotlin.test.assertTrue
  * on -- so the lifter is told to brace for a rep whose working stroke they
  * have already finished, and then hears `Done`.
  *
- * Measured on session 33's cue tracks, sixteen sets, app 0.1.43: five sets
- * carry the call with a whole rep still in front of it and eleven do not. The
- * eleven read 2.00 s from the last stroke word to `Done`; the five read
- * 1.00 s. Set 4 could not be measured because it says no `Done` at all
- * (issue #141) and set 5 reads 3.002 s, which the measurement filed on the
- * issue tabulated as 1.00 s -- `MergedCallCueTrackTest` carries that
- * correction and the archive it was re-derived from.
+ * Measured on session 33's cue tracks, sixteen sets, app 0.1.43: THREE sets
+ * carry the call with a whole rep still in front of it, and THIRTEEN do not.
+ * Of the thirteen, eleven read 2.00 s from their last stroke word to `Done`;
+ * one reads 3.002 s, set 5, whose closing stroke is three seconds rather than
+ * two; and one cannot be measured at all because it says no `Done`, set 4
+ * (issue #141, firing in the field). The three read 1.001 s.
+ *
+ * An earlier version of this paragraph said five and eleven. That is wrong and
+ * it is corrected rather than reworded: the five came from the measurement
+ * filed on the issue, which tabulates all five 3010 sets at 1.00 s and reads
+ * the family as safe, and two of those five are concentric-first and are not
+ * safe -- they are the same case as the eleven. `MergedCallCueTrackTest`
+ * carries the re-derivation from the archive and asserts both readings.
  *
  * ## The predicate is the SCHEDULE, never the tempo string
  *
