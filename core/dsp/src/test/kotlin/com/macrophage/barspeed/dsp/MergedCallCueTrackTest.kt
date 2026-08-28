@@ -315,6 +315,59 @@ class MergedCallCueTrackTest {
     }
 
     @Test
+    fun `what issue 173 changes is readable in these tracks, as a warning gone and a count returned`() {
+        // Issue 176 makes issue 173's fix OBSERVABLE, which is the whole
+        // reason the two travel together: before it, a suppressed warning and
+        // a spoken one wrote the same cue track and no session could tell
+        // them apart.
+        //
+        // Each row here is (the last rep's window in the 0.1.43 archive, the
+        // same window as the guide now scripts it). Two things change and both
+        // are rows: the `Last rep` the app spoke at the start of the final
+        // stroke is not spoken at all, and the tempo count that stroke had
+        // given up to make room for it comes back -- landing on the exact
+        // second the recorded track leaves silent.
+        listOf(
+            Triple(
+                Triple(set13, plan("1120", pushdown), 12),
+                listOf(44 to "Down", 45 to "Hold", 46 to "Up", 48 to CadenceVoice.DONE),
+                listOf(44 to "Down", 45 to "Hold", 46 to "Up", 47 to "1", 48 to CadenceVoice.DONE),
+            ),
+            Triple(
+                Triple(set05, plan("3010", seatedOhp), 8),
+                listOf(28 to "Up", 29 to "Down", 31 to "2", 32 to CadenceVoice.DONE),
+                listOf(28 to "Up", 29 to "Down", 30 to "1", 31 to "2", 32 to CadenceVoice.DONE),
+            ),
+        ).forEach { (input, archived, scripted) ->
+            val (fixture, p, reps) = input
+            val finalRepStarts = (reps - 1) * p.deliveredCycleS
+            assertEquals(archived, cadenceRows(fixture).filter { it.first >= finalRepStarts }, "$fixture, recorded")
+            assertEquals(scripted, scriptRows(p, reps).filter { it.first >= finalRepStarts }, "$fixture, scripted")
+            assertTrue(
+                scriptRows(p, reps).none { it.second == CadencePlan.LAST_REP },
+                "$fixture: the guide warns on a set whose warning has no rep left to be about",
+            )
+        }
+        // The counter-case, and it is the reason this is not a blanket rule:
+        // set 1 is the same session and the same four digits, its call opens
+        // the final rep's FIRST stroke, and it keeps the warning. What issue
+        // 176 adds to its archive is that same warning, at second 36, where
+        // the recorded track has the bare `Down` it rode.
+        val set01Plan = plan("3010", inclinePress)
+        val finalRep = 9 * set01Plan.deliveredCycleS
+        assertEquals(
+            listOf(36 to "Down", 38 to "2", 39 to "Up", 40 to CadenceVoice.DONE),
+            cadenceRows(set01).filter { it.first >= finalRep },
+            "$set01, recorded",
+        )
+        assertEquals(
+            listOf(36 to "Down", 36 to CadencePlan.LAST_REP, 38 to "2", 39 to "Up", 40 to CadenceVoice.DONE),
+            scriptRows(set01Plan, 10).filter { it.first >= finalRep },
+            "$set01, scripted",
+        )
+    }
+
+    @Test
     fun `the final rep of a merged-on-its-own-last-stroke set has one stroke left when the call lands`() {
         // Issue #173, stated in the rows rather than in the KDoc that deferred
         // it to a session. The call rides the last stroke word of the LAST rep,
