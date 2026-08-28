@@ -174,14 +174,14 @@ class PlanDecodeCharacterizationTest {
             setOf(
                 "exercise", "notes", "description", "additional_notes", "start", "concentric",
                 "sensorInverted", "sensorOnStack", "travelRatio", "plane", "bodyweight",
-                "implementCount", "optional", "kind", "prep_s", "sets",
+                "implementCount", "optional", "kind", "prep_s", "sensors", "sets",
             ),
             PlanExerciseDef.serializer().descriptor.elementNames.toSet(),
         )
         assertEquals(
             setOf(
                 "reps", "duration_s", "load_kg", "load_lb", "tempo", "side", "note",
-                "targetMeanConcentricVelocity_mps", "velocityLossStop_pct", "rest_s",
+                "targetMeanConcentricVelocity_mps", "velocityLossStop_pct", "rest_s", "sensors",
             ),
             PlanSetDef.serializer().descriptor.elementNames.toSet(),
         )

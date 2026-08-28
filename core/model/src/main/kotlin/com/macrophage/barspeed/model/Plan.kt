@@ -68,6 +68,18 @@ data class PlanFile(
                             "${LeadInPolicy.MIN_S} and ${LeadInPolicy.MAX_S} seconds"
                     }
                 }
+                // Refused rather than clamped, and with an upper bound unlike
+                // [PlanExerciseDef.implementCount]. The bound here is not a
+                // taste: the app runs one collector per stream and knows two
+                // roles, so a 3 has no client, no journal file and no column
+                // value, and silently recording it as 2 would tell the author
+                // their declaration was honoured.
+                exercise.sensors?.let {
+                    if (it < SensorCapturePolicy.MIN_COUNT || it > SensorCapturePolicy.MAX_COUNT) {
+                        errors += "sessions[$si].exercises[$ei].sensors must be " +
+                            "${SensorCapturePolicy.MIN_COUNT} or ${SensorCapturePolicy.MAX_COUNT}"
+                    }
+                }
                 if (exercise.sets.isEmpty()) errors += "sessions[$si].exercises[$ei] must contain at least one set"
                 exercise.sets.forEachIndexed { xi, set ->
                     // On bodyweight work the load is what was ADDED, and a band or
@@ -516,6 +528,30 @@ data class PlanExerciseDef(
      * authored from an export should take what was played rather than re-guess.
      */
     @SerialName("prep_s") val prepS: Int? = null,
+    /**
+     * How many accelerometers each set of this exercise is recorded with: 1
+     * (the default) or 2, issue #156.
+     *
+     * Declared in the plan because the choice belongs to the SETUP, not to a
+     * build: a cable machine wants one sensor on the stack, a barbell may want
+     * one on each sleeve, and the same lifter does both in one session. Both
+     * counts are permanent supported modes; neither is a legacy path.
+     *
+     * A set may override it -- see [PlanSetDef.sensors] -- exactly as load and
+     * tempo are declared per set inside an exercise block.
+     *
+     * `Int?` and never `Int = 1`: omitted and 1 are the same OUTCOME but not
+     * the same statement, and a plan authored back from an export should be
+     * able to see which of the two the last one made. The lifter can change it
+     * in the app, and the change comes back in the export as `count` beside
+     * `plannedCount`.
+     *
+     * Two sensors are captured only when two are paired and each carries a
+     * role assigned in the app against its MAC address. Where that is not so
+     * the set records with one, and the export says two were asked for --
+     * [SensorCapturePolicy.roster] is where that decision is made and pinned.
+     */
+    val sensors: Int? = null,
     val sets: List<PlanSetDef>,
 ) {
     /**
@@ -596,6 +632,16 @@ data class PlanSetDef(
     @SerialName("targetMeanConcentricVelocity_mps") val targetMeanConcentricVelocityMps: Double? = null,
     @SerialName("velocityLossStop_pct") val velocityLossStopPct: Double? = null,
     @SerialName("rest_s") val restS: Int? = null,
+    /**
+     * How many accelerometers THIS set is recorded with, overriding the
+     * exercise's [PlanExerciseDef.sensors] when both are declared.
+     *
+     * Per set as well as per exercise because a working set and its warm-up
+     * are not always mounted the same way, and because the owner's ruling puts
+     * the declaration "at set or exercise level". The set wins, which is the
+     * precedence every other per-set key already has over its exercise block.
+     */
+    val sensors: Int? = null,
 ) {
     /** Canonical load in kilograms regardless of which unit the plan used. */
     val resolvedLoadKg: Double?
@@ -631,6 +677,15 @@ data class PlanSetDef(
         }
         velocityLossStopPct?.let {
             if (it <= 0 || it > 100) errors += "$path.velocityLossStop_pct must be in (0, 100]"
+        }
+        // The same bound the exercise block is held to, stated at the same
+        // strength. A set-level 3 that the exercise never declared would
+        // otherwise reach the record flow through a different door.
+        sensors?.let {
+            if (it < SensorCapturePolicy.MIN_COUNT || it > SensorCapturePolicy.MAX_COUNT) {
+                errors += "$path.sensors must be ${SensorCapturePolicy.MIN_COUNT} " +
+                    "or ${SensorCapturePolicy.MAX_COUNT}"
+            }
         }
         return errors
     }

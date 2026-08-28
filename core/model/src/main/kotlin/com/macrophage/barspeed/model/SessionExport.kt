@@ -117,6 +117,15 @@ data class SessionExport(
          * semantic is not additive and a 1.12 reader must be re-checked
          * against it, while `repMarks` changes no existing key and is absent
          * on every set that produced no marks.
+         *
+         * 1.13 carries a THIRD change, additive on the same terms (#156): a
+         * set may carry [SetExport.sensors], which says how many
+         * accelerometers it was armed with, which roles they carried, which
+         * of those reached the archive and which one the set's figures came
+         * from. Under 1.13 as well, and for the same reason -- the version is
+         * still unreleased. Absent on every ordinary one-sensor set, which is
+         * what keeps a single-sensor export byte-for-byte what 1.12 wrote
+         * apart from the version string itself.
          */
         const val SCHEMA_VERSION = "1.13"
 
@@ -139,6 +148,18 @@ data class SessionExport(
 
         /** How a geometry value was arrived at, lowercased [GeometrySource] names. */
         val VALID_GEOMETRY_SOURCES = setOf("declared", "seeded", "inferred", "default")
+
+        /**
+         * Which accelerometer a stream came from, lowercased [SensorRole]
+         * names. 1:1 with the enum, so it is pinned in both directions the way
+         * [VALID_STARTS_WITH] is rather than only against the published schema.
+         *
+         * Physical unit identity and nothing else. It is deliberately not the
+         * `side` vocabulary: `side` says which limb was worked, this says
+         * where a sensor was, and a document in which one word meant both
+         * would let a reader believe a per-limb measurement exists.
+         */
+        val VALID_SENSOR_ROLES = SensorRole.entries.map { it.name.lowercase() }.toSet()
 
         /**
          * Why a set does or does not carry `velocityLoss_pct`, the values
@@ -307,8 +328,91 @@ data class SetExport(
      * worse than no declaration, so nothing is defaulted in.
      */
     val geometry: GeometryExport? = null,
+    /**
+     * How many accelerometers this set was armed with, and which stream its
+     * figures came from (#156).
+     *
+     * Absent on the ordinary one-sensor set, which is what keeps a
+     * single-sensor export identical to what earlier versions wrote. Absent
+     * therefore covers two cases -- a set recorded in single-sensor mode, and
+     * a set recorded before the app could capture two -- and deliberately does
+     * not distinguish them, exactly as [geometry]'s absence does not.
+     *
+     * DECLARED throughout, never derived from what happens to be in the
+     * archive. Nothing here counts files, and a reader must not either: a set
+     * that armed two and captured one is a different fact from a set that
+     * armed one, and only [SetSensorsExport.count] against
+     * [SetSensorsExport.present] can tell them apart.
+     */
+    val sensors: SetSensorsExport? = null,
     /** Always-included summary across reps. */
     val summary: SetSummaryExport,
+)
+
+/**
+ * A set's accelerometer configuration: what was asked for, what was armed,
+ * what arrived, and which of it the numbers came from.
+ *
+ * Four statements rather than one because each answers a question the others
+ * cannot, and every one of them is a declaration made when the set began --
+ * except [present], which is the one observation here and is stated rather
+ * than left to be inferred from filenames this document does not contain.
+ *
+ * No per-stream sample counts or rates. Those live in the raw archive's
+ * `meta.json`, where the exporter already holds the inflated text; putting
+ * them here would force the standalone share path to inflate and parse every
+ * IMU stream, which it does not do today -- reintroducing the double
+ * decompression issue #29 removed.
+ */
+@Serializable
+data class SetSensorsExport(
+    /**
+     * How many sensors the PLAN prescribed for this set, or the app's default
+     * of 1 where it prescribed nothing.
+     *
+     * Paired with [count] so an adjustment the lifter made in the app is
+     * visible in the document rather than lost, the same shape
+     * [SetExport.plannedPrepS] and [SetExport.prepS] carry. They are equal
+     * whenever nothing was adjusted.
+     */
+    val plannedCount: Int,
+    /**
+     * How many sensors the set was actually armed with.
+     *
+     * Not [expected]`.size`, and the difference is load-bearing: a set that
+     * asked for two and could not arm them -- one unit paired, or a pair
+     * carrying no role assignment -- records `count: 1` with an EMPTY
+     * `expected`, because its single stream carries no role and inventing one
+     * would label a capture nobody labelled.
+     */
+    val count: Int,
+    /**
+     * The roles this set was armed for. Empty when its streams carry no role.
+     *
+     * Values are drawn from [SessionExport.VALID_SENSOR_ROLES]. A role is the
+     * identity of a physical unit and asserts nothing about which end of the
+     * bar or which hand it was on -- a mounting swapped between sets is a
+     * post-processing question, not a corruption.
+     */
+    val expected: List<String> = emptyList(),
+    /**
+     * The roles whose stream reached the archive, in [expected]'s order.
+     *
+     * The roles MISSING are the set difference. There is no third key for
+     * them: a duplicate statement of one fact is one that can disagree with
+     * its own inputs.
+     */
+    val present: List<String> = emptyList(),
+    /**
+     * Which role's stream every figure in this set was computed from.
+     *
+     * A fact about which sensor the app was pointed at when the set began, not
+     * about which one produced data. It can name a role absent from [present]
+     * -- that is a set whose analysed unit dropped out, and the summary
+     * figures for it are empty rather than wrong. Null when no role is in
+     * play.
+     */
+    val analysedRole: String? = null,
 )
 
 /**

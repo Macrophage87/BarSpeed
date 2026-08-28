@@ -187,7 +187,7 @@ class SchemaContractTest {
             setOf(
                 "exercise", "notes", "description", "additional_notes", "start", "concentric",
                 "sensorInverted", "sensorOnStack", "travelRatio", "plane", "bodyweight",
-                "implementCount", "optional", "kind", "prep_s", "sets",
+                "implementCount", "optional", "kind", "prep_s", "sensors", "sets",
             )
         assertEquals(declared, exerciseKeys, "PlanExerciseDef and the schema disagree on exercise keys")
     }
@@ -400,6 +400,206 @@ class SchemaContractTest {
                 "no set in the published example carries repMarks, so ajv never validates it",
             )
         assertTrue(marks.jsonArray.isNotEmpty(), "the example's repMarks array is empty, which nothing emits")
+    }
+
+    // ---- the sensor declaration, issue #156 ---------------------------------
+
+    /**
+     * The published `sensors` block declares the four things it declares, each
+     * described, and refuses anything else.
+     *
+     * `$defs.set` is `additionalProperties: false`, so an undeclared key would
+     * make every dual export INVALID against the contract its consumer was
+     * pointed at -- which is why the block is declared here before anything
+     * emits it, rather than in the commit that starts writing it.
+     */
+    @Test
+    fun `the published export declares the sensor block, described, closed and required where it must be`() {
+        val defs = schema("session-export.schema.json")["\$defs"]!!.jsonObject
+        val set = defs["set"]!!.jsonObject["properties"]!!.jsonObject
+        assertNotNull(set["sensors"], "the published export schema does not declare a set's sensors")
+        val sensors = assertNotNull(defs["setSensors"], "the sensors block has no \$defs entry").jsonObject
+        assertEquals(
+            false,
+            sensors["additionalProperties"]!!.jsonPrimitive.content.toBoolean(),
+            "the sensors block accepts undeclared keys, so a typo would validate",
+        )
+        assertEquals(
+            setOf("plannedCount", "count", "expected", "present", "analysedRole"),
+            sensors["properties"]!!.jsonObject.keys,
+            "SetSensorsExport and the published sensors block disagree on keys",
+        )
+        assertEquals(
+            listOf("plannedCount", "count"),
+            sensors["required"]!!.jsonArray.map { it.jsonPrimitive.content },
+            "the two DECLARED counts must be required; the lists and the analysed role may be absent",
+        )
+        sensors["properties"]!!.jsonObject.forEach { (key, value) ->
+            assertTrue(
+                value.jsonObject["description"]?.jsonPrimitive?.content?.isNotBlank() == true,
+                "the published sensors.$key carries no description, which is the shape of issue #76",
+            )
+        }
+    }
+
+    /**
+     * The role vocabulary is exactly the enum, everywhere it appears.
+     *
+     * Pinned in BOTH directions, the arrangement [PlanFile.VALID_KINDS] uses:
+     * against the published schema so a document cannot declare a role the app
+     * refuses, and against [SensorRole] so the app cannot record one the
+     * published schema refuses. Three sites in the schema state the same set,
+     * and a role added to two of them is a role a reader accepts in one field
+     * and rejects in another.
+     */
+    @Test
+    fun `the published sensor roles are exactly the roles the app records`() {
+        val sensors = schema("session-export.schema.json")["\$defs"]!!.jsonObject["setSensors"]!!
+            .jsonObject["properties"]!!.jsonObject
+        assertEquals(
+            SensorRole.entries.map { it.name.lowercase() }.toSet(),
+            SessionExport.VALID_SENSOR_ROLES,
+            "VALID_SENSOR_ROLES drifted from the SensorRole enum",
+        )
+        assertEquals(
+            SessionExport.VALID_SENSOR_ROLES,
+            enumOf(sensors["expected"]!!.jsonObject["items"]!!.jsonObject),
+            "the published expected-role vocabulary drifted",
+        )
+        assertEquals(
+            SessionExport.VALID_SENSOR_ROLES,
+            enumOf(sensors["present"]!!.jsonObject["items"]!!.jsonObject),
+            "the published present-role vocabulary drifted",
+        )
+        assertEquals(
+            SessionExport.VALID_SENSOR_ROLES,
+            enumOf(sensors["analysedRole"]!!.jsonObject),
+            "the published analysed-role vocabulary drifted",
+        )
+    }
+
+    /**
+     * The role vocabulary is NOT the side vocabulary, and the schema says why.
+     *
+     * The owner's ruling is that a role is the identity of a physical unit and
+     * carries no anatomical claim -- units get flipped and are corrected in
+     * post-processing. A schema that let `a` and `left` mean the same thing
+     * would put that claim back in the document by the back door, and a reader
+     * would believe a per-limb measurement exists.
+     */
+    @Test
+    fun `a sensor role is not a side, in the vocabulary and in the prose`() {
+        val description = schema("session-export.schema.json")["\$defs"]!!.jsonObject["setSensors"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            SessionExport.VALID_SENSOR_ROLES.none { it in PlanFile.VALID_SIDES },
+            "a sensor role and a worked side share a value, so one word means two facts",
+        )
+        assertTrue(
+            "side" in description,
+            "the published sensors block never warns a reader off reading a role as a side",
+        )
+    }
+
+    /**
+     * The 1.13 version-log entry names its third change too.
+     *
+     * Same reasoning as the rep-marks entry above: 1.13 is unreleased, so this
+     * extends it rather than minting 1.14, and one entry now carries three
+     * changes. A consumer reading the log to decide whether to re-check a
+     * reader must be told all three are in there.
+     */
+    @Test
+    fun `the 1_13 version log names the sensor declaration as its third change`() {
+        val description =
+            schema("session-export.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
+                .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "sensors" in description,
+            "the version log never mentions sensors, so 1.13 publishes a key it does not explain",
+        )
+        assertTrue(
+            "imu-a.csv" in description,
+            "the version log never says how the raw archive names a role-tagged stream",
+        )
+    }
+
+    /**
+     * The published example carries a dual set's sensors block.
+     *
+     * `ci.yml` validates this example with ajv and that is the schema half's
+     * only automated coverage; an example carrying none of the new key passes
+     * a schema that declares it and one that does not. The same reasoning as
+     * the prep-pair and rep-mark examples.
+     */
+    @Test
+    fun `the published export example carries a dual set's sensor block`() {
+        val sets = schema("examples/session-export.example.json")["exercises"]!!
+            .jsonArray.flatMap { it.jsonObject["sets"]!!.jsonArray }
+        val sensors =
+            assertNotNull(
+                sets.firstNotNullOfOrNull { it.jsonObject["sensors"] },
+                "no set in the published example carries sensors, so ajv never validates the block",
+            ).jsonObject
+        assertEquals(2, sensors["count"]!!.jsonPrimitive.int, "the example's sensors block is not a dual set")
+        assertEquals(
+            listOf("a", "b"),
+            sensors["expected"]!!.jsonArray.map { it.jsonPrimitive.content },
+            "the example does not exercise both roles",
+        )
+    }
+
+    /**
+     * The plan's sensor bounds are the bounds [PlanFile.validate] enforces, at
+     * both levels it can be declared at.
+     *
+     * The same failure shape `the schema's implement floor is the one the app
+     * validates` guards, and with an upper bound as well because there is one:
+     * the app runs one collector per stream and knows two roles, so a 3 has no
+     * client, no journal file and no column value.
+     */
+    @Test
+    fun `the plan's sensor bounds are the ones the app validates, on the exercise and on the set`() {
+        val defs = schema("plan.schema.json")["\$defs"]!!.jsonObject
+        for (level in listOf("exercise", "set")) {
+            val sensors =
+                assertNotNull(
+                    defs[level]!!.jsonObject["properties"]!!.jsonObject["sensors"],
+                    "the published plan schema does not declare sensors on a $level",
+                ).jsonObject
+            assertEquals("integer", sensors["type"]!!.jsonPrimitive.content, "$level sensors is not an integer")
+            assertEquals(
+                SensorCapturePolicy.MIN_COUNT,
+                sensors["minimum"]!!.jsonPrimitive.int,
+                "the published $level sensor floor drifted from the one PlanFile.validate enforces",
+            )
+            assertEquals(
+                SensorCapturePolicy.MAX_COUNT,
+                sensors["maximum"]!!.jsonPrimitive.int,
+                "the published $level sensor ceiling drifted from the one PlanFile.validate enforces",
+            )
+        }
+    }
+
+    /**
+     * The plan's 1.8 entry records that the sensors declaration landed under
+     * it.
+     *
+     * 1.8 was minted for the coaching-text split and is unreleased, so this
+     * extends it. The entry already ANTICIPATED the key by name before it
+     * existed; an anticipation left standing after the fact reads as a plan,
+     * not as a record, so what is pinned here is that the entry says it has
+     * landed and states the additive terms.
+     */
+    @Test
+    fun `the plan's 1_8 entry records the sensors declaration as landed and additive`() {
+        val description = schema("plan.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue("`sensors`" in description, "the plan version log never names the sensors key")
+        assertTrue(
+            "an omitted `sensors` is one sensor" in description,
+            "the plan version log never states what an omitted sensors declaration means",
+        )
     }
 
     @Test

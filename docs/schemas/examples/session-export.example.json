@@ -39,6 +39,13 @@
               "travelRatio": "seeded"
             }
           },
+          "sensors": {
+            "plannedCount": 2,
+            "count": 2,
+            "expected": ["a", "b"],
+            "present": ["a", "b"],
+            "analysedRole": "a"
+          },
           "hr": { "endOfSetBpm": 148, "avgBpm": 131, "maxBpm": 152, "minBpm": 118 },
           "repMetrics": [
             { "ecc_s": 3.9, "bottomPause_s": 0.2, "con_s": 0.8, "topPause_s": 1.1, "meanConVel_mps": 0.52, "peakConVel_mps": 0.85, "meanEccVel_mps": -0.16, "rom_m": 0.61, "peakPower_w": 980.2 },
