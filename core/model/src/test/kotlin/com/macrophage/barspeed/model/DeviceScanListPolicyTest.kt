@@ -7,10 +7,11 @@ import kotlin.test.assertTrue
 /**
  * The found-devices list, issue #183.
  *
- * The tests marked CHARACTERIZATION below pin what the app does TODAY, not
- * what it should do. They exist so the differentials that replace them can be
- * shown failing against the shipped rule rather than against nothing, and they
- * are deleted in the same commit that adds those differentials.
+ * Two of these are differentials: they fail against the rule the app ships
+ * today and pass only once it changes. The characterizations they replaced --
+ * "today a device moves the moment a packet arrives" and "today a row does not
+ * know the device is already paired" -- are gone, having done their job of
+ * showing that the shipped rule is what these now contradict.
  */
 class DeviceScanListPolicyTest {
     private val near = "AA:AA:AA:AA:AA:01"
@@ -37,27 +38,34 @@ class DeviceScanListPolicyTest {
     // ---- the scan list -------------------------------------------------------
 
     /**
-     * CHARACTERIZATION. Today every packet re-sorts the whole list by RSSI.
+     * The property #183 exists for: a device must not move because a packet
+     * arrived.
      *
-     * Two assertions, because one is not enough to tell the shipped rule from
-     * a plain append: the first sighting of a strong device has to overtake
-     * devices already listed, which only a re-sort does. Written that way
-     * after a mutation removing `sortedByDescending` reddened nothing.
+     * `SCAN_MODE_LOW_LATENCY` delivers a result for every advertisement
+     * packet, several a second per device, each carrying that packet's own
+     * RSSI -- which jitters a few dBm on a unit lying still on the bench. Any
+     * rule that reads the signal to decide the ORDER therefore reorders the
+     * list many times a second. First-seen order is the only one that cannot,
+     * and the signal is shown as a value on the row instead.
+     *
+     * Three assertions, because fewer cannot tell this rule from the two
+     * plausible near-misses: a strong newcomer must not overtake (that is the
+     * re-sort), and a re-sighted device must not fall to the end (that is a
+     * plain remove-and-append).
      */
     @Test
-    fun `today a device moves the moment a packet arrives`() {
+    fun `a device does not move because a packet arrived`() {
         var list = DeviceScanListPolicy.sighted(emptyList(), Sighting(far, -70))
         list = DeviceScanListPolicy.sighted(list, Sighting(near, -55))
-        assertEquals(listOf(near, far), list.map { it.address }, "the newcomer overtakes on its first packet")
+        assertEquals(listOf(far, near), list.map { it.address }, "a strong newcomer joins at the end")
 
         list = DeviceScanListPolicy.sighted(list, Sighting(third, -60))
-        assertEquals(listOf(near, third, far), list.map { it.address })
+        assertEquals(listOf(far, near, third), list.map { it.address })
 
-        // Five dBm of jitter on a unit lying still on the bench, and it falls
-        // two places without moving an inch.
-        list = DeviceScanListPolicy.sighted(list, Sighting(near, -75))
+        list = DeviceScanListPolicy.sighted(list, Sighting(near, -95))
 
-        assertEquals(listOf(third, far, near), list.map { it.address })
+        assertEquals(listOf(far, near, third), list.map { it.address }, "a re-sighted device holds its place")
+        assertEquals(-95, list.first { it.address == near }.rssi, "and still reports its latest reading")
     }
 
     /** An address seen twice is one row, whatever the order rule is. */
@@ -73,15 +81,54 @@ class DeviceScanListPolicyTest {
 
     // ---- what the rows claim -------------------------------------------------
 
-    /** CHARACTERIZATION. Today a saved device is offered for pairing again. */
+    /**
+     * A saved device is shown, marked, and never offered for pairing again.
+     *
+     * Shown rather than hidden, and that is the decision #183 left open.
+     * Hiding it risks the lifter reading a missing row as "the scan did not
+     * find my sensor", which is the one thing this list is for; and while a
+     * second unit is being paired, a row proving the FIRST unit is powered and
+     * in range is exactly the diagnostic that is wanted. What must not survive
+     * is the offer to pair it again, because pairing is what moves the
+     * analysed link (#184).
+     */
     @Test
-    fun `today a row does not know the device is already paired`() {
+    fun `a device already paired is shown, marked, and not offered again`() {
         val list = listOf(Sighting(near, -55), Sighting(far, -70))
 
         val rows = DeviceScanListPolicy.displayRows(list, setOf(near))
 
-        assertEquals(listOf(near, far), rows.map { it.address })
-        assertTrue(rows.none { it.alreadyPaired }, "today nothing removes a known address from the scan list")
+        assertEquals(setOf(near, far), rows.map { it.address }.toSet(), "the paired unit is still on screen")
+        assertTrue(rows.single { it.address == near }.alreadyPaired)
+        assertTrue(!rows.single { it.address == far }.alreadyPaired)
+    }
+
+    /**
+     * The marked rows sink below the pairable ones, and that is the ONE way a
+     * row is allowed to move: in answer to the lifter's own tap, never to a
+     * packet. `knownAddresses` changes only when something is paired or
+     * forgotten, so pairing a device drops it out of the offers immediately
+     * rather than at the next scan.
+     */
+    @Test
+    fun `pairing a device moves it below the ones still on offer, and nothing else moves`() {
+        val list = listOf(Sighting(near, -55), Sighting(far, -70), Sighting(third, -90))
+
+        val before = DeviceScanListPolicy.displayRows(list, emptySet())
+        val after = DeviceScanListPolicy.displayRows(list, setOf(near))
+
+        assertEquals(listOf(near, far, third), before.map { it.address })
+        assertEquals(listOf(far, third, near), after.map { it.address })
+    }
+
+    /** Paired rows keep first-seen order among themselves too. */
+    @Test
+    fun `the already-paired rows are ordered as they were first seen`() {
+        val list = listOf(Sighting(near, -55), Sighting(far, -70), Sighting(third, -90))
+
+        val rows = DeviceScanListPolicy.displayRows(list, setOf(near, third))
+
+        assertEquals(listOf(far, near, third), rows.map { it.address })
     }
 
     @Test
