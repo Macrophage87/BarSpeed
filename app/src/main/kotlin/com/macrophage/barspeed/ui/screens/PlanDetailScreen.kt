@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,8 +26,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -43,9 +48,11 @@ import com.macrophage.barspeed.model.PlanExerciseDef
 import com.macrophage.barspeed.model.PlanNoteDisplay
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PlanSetDef
+import com.macrophage.barspeed.model.PlanStartDecision
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
+import com.macrophage.barspeed.ui.components.ExpandableNote
 import com.macrophage.barspeed.ui.components.SectionCaption
 import com.macrophage.barspeed.ui.components.VerdictChip
 import java.util.Locale
@@ -64,6 +71,13 @@ fun PlanDetailScreen(navController: NavController, planId: Long) {
         )
     val state by viewModel.state.collectAsState()
     val weightUnit by viewModel.weightUnit.collectAsState()
+    var confirming by rememberSaveable { mutableStateOf(false) }
+
+    // The ViewModel says when to navigate, not the tap: the activation has to
+    // land before the record screen reads which plan is active.
+    LaunchedEffect(Unit) {
+        viewModel.recordRequests.collect { navController.navigate("record") }
+    }
 
     Scaffold(
         topBar = {
@@ -89,7 +103,17 @@ fun PlanDetailScreen(navController: NavController, planId: Long) {
                     Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    item { PlanHero(plan.planName, plan.notes, state.entity, viewModel, plan.sessions) }
+                    item {
+                        PlanHero(
+                            name = plan.planName,
+                            notes = plan.notes,
+                            entity = state.entity,
+                            viewModel = viewModel,
+                            sessions = plan.sessions,
+                            start = state.start,
+                            onConfirmSwitch = { confirming = true },
+                        )
+                    }
                     plan.sessions.forEach { session ->
                         item { SessionHeader(session) }
                         items(session.exercises.size) { i ->
@@ -100,6 +124,10 @@ fun PlanDetailScreen(navController: NavController, planId: Long) {
                 }
         }
     }
+
+    if (confirming) {
+        ConfirmSwitchDialog(state.start, viewModel) { confirming = false }
+    }
 }
 
 @Composable
@@ -109,6 +137,8 @@ private fun PlanHero(
     entity: PlanEntity?,
     viewModel: PlanDetailViewModel,
     sessions: List<PlanSessionDef>,
+    start: PlanStartDecision?,
+    onConfirmSwitch: () -> Unit,
 ) {
     val shape = RoundedCornerShape(16.dp)
     val active = entity?.status == PlanEntity.STATUS_ACTIVE
@@ -140,13 +170,69 @@ private fun PlanHero(
             Spacer(Modifier.height(6.dp))
             Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
         }
+        // The start control belongs here as well as on the plans list, and this
+        // is the better of the two places for it: the lifter has just read what
+        // the plan prescribes, which is the moment they know whether they want
+        // to do it. #182.
+        //
+        // MAKE ACTIVE stays beneath it and keeps its own job. Switching plans
+        // without lifting today is a real thing to want, and folding it into
+        // START would take it away.
+        when (start) {
+            null -> Unit
+            is PlanStartDecision.Unstartable -> {
+                Spacer(Modifier.height(12.dp))
+                Text(start.reason, style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
+            }
+            is PlanStartDecision.Startable -> {
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        if (start.switch == null) {
+                            viewModel.start(activateFirst = false)
+                        } else {
+                            onConfirmSwitch()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                ) {
+                    Text("START WORKOUT", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
         if (!active && entity != null) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             Button(onClick = viewModel::activate, modifier = Modifier.fillMaxWidth().height(44.dp)) {
                 Text("MAKE ACTIVE", style = MaterialTheme.typography.titleSmall)
             }
         }
     }
+}
+
+/**
+ * Said in words before the app starts following a different plan. The same
+ * prompt the plans list shows, from the same decision, so the two screens
+ * cannot describe one write differently.
+ */
+@Composable
+private fun ConfirmSwitchDialog(start: PlanStartDecision?, viewModel: PlanDetailViewModel, onDismiss: () -> Unit) {
+    val switch = (start as? PlanStartDecision.Startable)?.switch ?: return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(switch.title) },
+        text = { Text(switch.body, style = MaterialTheme.typography.bodySmall) },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onDismiss()
+                    viewModel.start(activateFirst = true)
+                },
+            ) { Text(switch.confirmLabel) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 @Composable
@@ -188,21 +274,30 @@ private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
                     color = BarColors.Sub,
                 )
             }
-            // Everything the EXERCISE declared, in full and behind no tap.
-            // This is the approval gate -- the one screen whose job is to show
-            // the lifter what they are about to accept -- and hiding a
-            // paragraph here would hide it at the only moment it can still be
-            // questioned. The split matters on the rest screen and is drawn
-            // there.
+            // Split by the same function the rest screen splits by, and now
+            // drawn by the same component: what the lifter reads at a glance,
+            // and what one labelled tap reveals. This screen used to draw both
+            // halves in full, which is what #182 asked for and what the owner
+            // meant by "only really show the shortened descriptions".
+            //
+            // The previous comment argued the opposite -- that the approval
+            // gate must show everything behind no tap, because hiding a
+            // paragraph hides it at the only moment it can be questioned. That
+            // argument is retracted here rather than reworded: nothing is
+            // hidden, it is one tap away and the control saying so is labelled,
+            // and a plan whose exercises each carry a paragraph made the gate
+            // itself unreadable, which hides more than a tap does.
+            //
+            // Reusing ExpandableNote also closes #170 item 4. `behindTap` is
+            // `notes` and `additional_notes` joined by a blank line, and this
+            // screen wrapped that whole join in ONE pair of quote marks, so two
+            // separate statements read as one quotation with a hole in it.
+            // ExpandableNote quotes the visible line only.
             //
             // Not everything the plan wrote: a set's own `note` (PlanSetDef)
             // is drawn nowhere on this screen. `setNote` is passed as null
             // below, and the rest screen is the only place it reaches the
             // lifter.
-            //
-            // Ordered by the same function that orders it there, rather than by
-            // a second copy of the precedence that could drift from it: what
-            // shows without a tap, then what would have been behind one.
             val cue =
                 PlanNoteDisplay.forSet(
                     description = exercise.description,
@@ -210,9 +305,9 @@ private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
                     notes = exercise.notes,
                     setNote = null,
                 )
-            listOfNotNull(cue.visible, cue.behindTap).forEach {
+            if (cue.visible != null || cue.behindTap != null) {
                 Spacer(Modifier.height(2.dp))
-                Text("“$it”", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
+                ExpandableNote(cue.visible, cue.behindTap, BarColors.Amber)
             }
             // Stated ONCE, on the header, because the count is declared on the
             // exercise and not on a set. This screen is the approval gate --

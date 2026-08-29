@@ -71,22 +71,65 @@ sealed interface PlanStartDecision {
  * before tapping through it is a [Field] question and no test in this
  * repository can answer it.
  *
- * This commit states TODAY's rule so the differentials that follow are red
- * against a rule rather than against a missing symbol: today the only way into
- * a session is the home screen's hero card, which starts whatever plan is
- * active, refuses nothing and announces nothing. #182.
+ * The three refusals and the two promptings below are #182's whole rule. What
+ * it is NOT is a guard against starting a session on top of one already
+ * running: that state is not reachable from here, and inventing a check
+ * against a signal that does not exist would be a claim stronger than its
+ * evidence. Reaching the plans tab means the "record" nav entry was popped,
+ * which clears `RecordViewModel` and every buffer in it; an abandoned session
+ * row is left open with `endedAtMs` null and nothing queries for one. See the
+ * commit body.
  */
 object PlanStartPolicy {
-    // Every parameter is deliberately unread while this states today's rule.
-    // The suppression goes away with the rule, in the commit that implements
-    // the differentials; it is here so that the signature the differentials are
-    // written against exists before them.
-    @Suppress("UnusedParameter")
+    /** Drawn where the control would have been when the stored JSON will not decode. */
+    const val UNREADABLE = "This plan could not be read, so there is nothing to start."
+
+    /** Drawn when the plan decodes but prescribes nothing to do. */
+    const val NO_SETS = "This plan prescribes no sets, so there is nothing to start."
+
+    /** The consent word on a start that switches plans. */
+    const val START = "START"
+
+    /** The consent word on a start that also performs the approval. */
+    const val APPROVE_AND_START = "APPROVE & START"
+
     fun decide(plan: PlanFile?, lifecycle: PlanLifecycle, activePlanName: String?): PlanStartDecision {
-        // Today's behaviour, as a function: the hero card navigates to "record"
-        // whatever the plan says, refuses nothing and announces nothing. Every
-        // parameter is deliberately unread here; the differentials in the next
-        // commit are what give them work.
-        return PlanStartDecision.Startable(switch = null)
+        if (plan == null) return PlanStartDecision.Unstartable(UNREADABLE)
+        // Counted rather than taken from validate(): a row staged under an
+        // older rule still decodes, and PlanRepository.decode returns it on
+        // purpose. An empty queue is a session the lifter cannot do anything
+        // with, and it would have opened a session row to hold it.
+        val sets = plan.sessions.sumOf { session -> session.exercises.sumOf { it.sets.size } }
+        if (sets == 0) return PlanStartDecision.Unstartable(NO_SETS)
+        // Already active: starting writes nothing, so there is nothing to ask
+        // about. This is the hero card's case, and it keeps the hero card's
+        // behaviour.
+        if (lifecycle == PlanLifecycle.ACTIVE) return PlanStartDecision.Startable(switch = null)
+
+        val staged = lifecycle == PlanLifecycle.STAGED
+        return PlanStartDecision.Startable(
+            PlanSwitchPrompt(
+                title = "Start \"${plan.planName}\"?",
+                body =
+                buildString {
+                    append(
+                        if (staged) {
+                            "This plan is staged and has never been approved. Starting it approves " +
+                                "it and makes it the active plan."
+                        } else {
+                            "Starting this makes it the active plan."
+                        },
+                    )
+                    append(" Every new session follows it until you switch again.")
+                    // Named, not implied. PlanDao.activate archives whatever is
+                    // active before marking this one, so the plan the lifter
+                    // has been following stops being followed -- and the only
+                    // other place that would show is the plan quietly missing
+                    // from the home screen next session.
+                    activePlanName?.let { append(" \"$it\" is archived.") }
+                },
+                confirmLabel = if (staged) APPROVE_AND_START else START,
+            ),
+        )
     }
 }

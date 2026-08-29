@@ -6,21 +6,103 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
+import com.macrophage.barspeed.data.PlanEntity
 import com.macrophage.barspeed.data.PlanImportResult
+import com.macrophage.barspeed.model.PlanLifecycle
+import com.macrophage.barspeed.model.PlanStartDecision
+import com.macrophage.barspeed.model.PlanStartPolicy
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/**
+ * One row of the plans list: the stored plan, and what a START control on it
+ * would do.
+ *
+ * The decision is carried on the row rather than computed while drawing,
+ * because computing it means decoding the plan JSON, and a decode per plan per
+ * recomposition is work on the frame thread for an answer that only changes
+ * when the list does.
+ */
+data class PlanRow(val entity: PlanEntity, val start: PlanStartDecision)
 
 class PlansViewModel(app: Application) : AndroidViewModel(app) {
     private val container = (app as LiftingApp).container
     private val repository = container.planRepository
 
-    val plans = repository.allPlans.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /**
+     * Every stored plan with its start decision, decoded off the main thread.
+     *
+     * The active plan's NAME comes from the entity column rather than from a
+     * second decode: `importPlan` writes `name = plan.planName`, so the column
+     * is that name already. A plan is never told it displaces itself — the
+     * active row's own decision is computed with a null displaced name, and
+     * `PlanStartPolicy` returns no prompt for it anyway.
+     */
+    val planRows: Flow<List<PlanRow>> =
+        repository.allPlans
+            .map { plans ->
+                val activeName = plans.firstOrNull { it.status == PlanEntity.STATUS_ACTIVE }?.name
+                plans.map { entity ->
+                    PlanRow(
+                        entity = entity,
+                        start =
+                        PlanStartPolicy.decide(
+                            plan = repository.decode(entity),
+                            lifecycle = PlanLifecycle.of(entity.status),
+                            activePlanName = activeName?.takeIf { entity.status != PlanEntity.STATUS_ACTIVE },
+                        ),
+                    )
+                }
+            }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val importResult = MutableStateFlow<PlanImportResult?>(null)
+
+    /**
+     * Emitted once the plan the lifter chose is the active one, so the record
+     * screen it opens reads the plan they asked for and not the one they were
+     * switching away from.
+     *
+     * A one-shot event and not a flag in state: navigation that survives in
+     * state gets replayed by the next recomposition, and a screen that
+     * re-navigates itself on rotation is worse than one that does not navigate
+     * at all.
+     *
+     * A Channel and not a SharedFlow: a shared flow with replay 0 drops an
+     * emission that lands while nothing is collecting, and the collector is
+     * exactly what a configuration change tears down between the tap and the
+     * activation completing. A conflated channel holds the one pending request
+     * until a collector returns, and delivers it once.
+     */
+    private val startRequests = Channel<Unit>(Channel.CONFLATED)
+    val recordRequests: Flow<Unit> = startRequests.receiveAsFlow()
+
+    /**
+     * Start a session from [planId], making it the active plan first when
+     * [activateFirst].
+     *
+     * The activation is awaited before the event is emitted. The record
+     * screen's ViewModel reads `activePlan` when it is constructed, so
+     * navigating first would race the write and could open the session against
+     * the plan being switched away from.
+     */
+    fun start(planId: Long, activateFirst: Boolean) {
+        viewModelScope.launch {
+            if (activateFirst) repository.activate(planId)
+            startRequests.send(Unit)
+        }
+    }
 
     /**
      * The lifter's display unit, for the one line at the gate that quotes a

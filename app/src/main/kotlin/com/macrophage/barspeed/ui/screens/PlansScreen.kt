@@ -25,10 +25,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -40,22 +42,33 @@ import androidx.navigation.NavController
 import com.macrophage.barspeed.data.PlanEntity
 import com.macrophage.barspeed.data.PlanImportResult
 import com.macrophage.barspeed.model.PlanBodyWeightPolicy
+import com.macrophage.barspeed.model.PlanStartDecision
 import com.macrophage.barspeed.ui.BarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewModel()) {
-    val plans by viewModel.plans.collectAsState()
+    val plans by viewModel.planRows.collectAsState(emptyList())
     val importResult by viewModel.importResult.collectAsState()
     val weightUnit by viewModel.weightUnit.collectAsState()
     var showImportDialog by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
+    // The id survives a rotation; the prompt is re-derived from the list, so a
+    // plan deleted underneath the dialog takes the dialog with it rather than
+    // leaving a confirm button pointed at a row that no longer exists.
+    var confirmingPlanId by rememberSaveable { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val filePicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) viewModel.importFromUri(context, uri)
         }
+
+    // Navigation is driven by the ViewModel rather than by the tap, because the
+    // activation has to land first: see PlansViewModel.start.
+    LaunchedEffect(Unit) {
+        viewModel.recordRequests.collect { navController.navigate("record") }
+    }
 
     Scaffold(
         topBar = {
@@ -86,12 +99,21 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
             )
             Spacer(Modifier.height(12.dp))
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(plans) { plan ->
-                    PlanCard(plan, viewModel) { navController.navigate("plan/${plan.id}") }
+                items(plans) { row ->
+                    PlanCard(
+                        row = row,
+                        viewModel = viewModel,
+                        onConfirmSwitch = { confirmingPlanId = row.entity.id },
+                        onOpen = { navController.navigate("plan/${row.entity.id}") },
+                    )
                 }
             }
         }
     }
+
+    confirmingPlanId
+        ?.let { id -> plans.firstOrNull { it.entity.id == id } }
+        ?.let { row -> ConfirmSwitchDialog(row, viewModel) { confirmingPlanId = null } }
 
     if (showImportDialog) {
         AlertDialog(
@@ -247,12 +269,38 @@ private fun relayText(heading: String, lines: List<String>): String =
     (listOf("$heading:") + lines.map { "- $it" }).joinToString("\n")
 
 @Composable
-private fun PlanCard(plan: PlanEntity, viewModel: PlansViewModel, onOpen: () -> Unit) {
+private fun PlanCard(row: PlanRow, viewModel: PlansViewModel, onConfirmSwitch: () -> Unit, onOpen: () -> Unit) {
+    val plan = row.entity
     Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(plan.name, style = MaterialTheme.typography.titleSmall)
             Text("${plan.status} · tap to view", style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                when (val start = row.start) {
+                    // The refusal is drawn where the control would have been. A
+                    // card that simply has no START button looks like a screen
+                    // that forgot to draw one.
+                    is PlanStartDecision.Unstartable ->
+                        Text(
+                            start.reason,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = BarColors.Amber,
+                        )
+                    // A null switch means this plan is already active, so
+                    // starting writes nothing and there is nothing to agree to.
+                    // Anything else changes which plan the app follows, and the
+                    // dialog is where that is said in words.
+                    is PlanStartDecision.Startable ->
+                        TextButton(
+                            onClick = {
+                                if (start.switch == null) {
+                                    viewModel.start(plan.id, activateFirst = false)
+                                } else {
+                                    onConfirmSwitch()
+                                }
+                            },
+                        ) { Text("Start", color = BarColors.Volt) }
+                }
                 if (plan.status != PlanEntity.STATUS_ACTIVE) {
                     TextButton(onClick = { viewModel.activate(plan.id) }) { Text("Make active") }
                 }
@@ -260,4 +308,33 @@ private fun PlanCard(plan: PlanEntity, viewModel: PlansViewModel, onOpen: () -> 
             }
         }
     }
+}
+
+/**
+ * The one place a start from this screen can change which plan the app
+ * follows, said in words before it happens.
+ *
+ * Dismissing is a refusal: nothing is written and nothing is started. That is
+ * the whole reason the activation is deferred to the confirm button rather than
+ * done on the tap that opens this.
+ */
+@Composable
+private fun ConfirmSwitchDialog(row: PlanRow, viewModel: PlansViewModel, onDismiss: () -> Unit) {
+    val switch = (row.start as? PlanStartDecision.Startable)?.switch ?: return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(switch.title) },
+        text = { Text(switch.body, style = MaterialTheme.typography.bodySmall) },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onDismiss()
+                    viewModel.start(row.entity.id, activateFirst = true)
+                },
+            ) { Text(switch.confirmLabel) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
