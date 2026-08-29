@@ -33,6 +33,7 @@ class PlanValueCaptionContractTest {
         assertNull(
             PlanValueCaption.load(
                 adHoc = false,
+                added = false,
                 bodyweight = false,
                 unit = WeightUnit.KG,
                 plannedAddedKg = 90.0,
@@ -54,6 +55,7 @@ class PlanValueCaptionContractTest {
         assertNull(
             PlanValueCaption.load(
                 adHoc = false,
+                added = false,
                 bodyweight = false,
                 unit = WeightUnit.KG,
                 plannedAddedKg = declared,
@@ -74,6 +76,7 @@ class PlanValueCaptionContractTest {
             "Plan says 90 kg - the rest of this exercise runs 100 kg unless the plan changes it",
             PlanValueCaption.load(
                 adHoc = false,
+                added = false,
                 bodyweight = false,
                 unit = WeightUnit.KG,
                 plannedAddedKg = 90.0,
@@ -96,6 +99,7 @@ class PlanValueCaptionContractTest {
             "Plan says 90 kg - your change is recorded in the export",
             PlanValueCaption.load(
                 adHoc = false,
+                added = false,
                 bodyweight = false,
                 unit = WeightUnit.KG,
                 plannedAddedKg = 90.0,
@@ -112,6 +116,7 @@ class PlanValueCaptionContractTest {
             "Plan says BW + 10 lb - the rest of this exercise runs BW + 25 lb unless the plan changes it",
             PlanValueCaption.load(
                 adHoc = false,
+                added = false,
                 bodyweight = true,
                 unit = WeightUnit.LB,
                 plannedAddedKg = 10 / WeightUnit.LB_PER_KG,
@@ -132,6 +137,7 @@ class PlanValueCaptionContractTest {
             "Plan says BW - the rest of this exercise runs BW + 20 kg unless the plan changes it",
             PlanValueCaption.load(
                 adHoc = false,
+                added = false,
                 bodyweight = true,
                 unit = WeightUnit.KG,
                 plannedAddedKg = null,
@@ -151,6 +157,7 @@ class PlanValueCaptionContractTest {
         assertNull(
             PlanValueCaption.load(
                 adHoc = false,
+                added = false,
                 bodyweight = false,
                 unit = WeightUnit.KG,
                 plannedAddedKg = null,
@@ -170,6 +177,7 @@ class PlanValueCaptionContractTest {
         assertNull(
             PlanValueCaption.load(
                 adHoc = true,
+                added = false,
                 bodyweight = true,
                 unit = WeightUnit.KG,
                 plannedAddedKg = null,
@@ -177,9 +185,23 @@ class PlanValueCaptionContractTest {
                 standsForLaterSets = true,
             ),
         )
-        assertNull(PlanValueCaption.reps(adHoc = true, plannedReps = 8, shownReps = 10, standsForLaterSets = true))
         assertNull(
-            PlanValueCaption.hold(adHoc = true, plannedDurationS = 45, shownDurationS = 30, standsForLaterSets = true),
+            PlanValueCaption.reps(
+                adHoc = true,
+                added = false,
+                plannedReps = 8,
+                shownReps = 10,
+                standsForLaterSets = true,
+            ),
+        )
+        assertNull(
+            PlanValueCaption.hold(
+                adHoc = true,
+                added = false,
+                plannedDurationS = 45,
+                shownDurationS = 30,
+                standsForLaterSets = true,
+            ),
         )
     }
 
@@ -188,11 +210,23 @@ class PlanValueCaptionContractTest {
     fun `a changed rep count names the plan's count`() {
         assertEquals(
             "Plan says 8 - the rest of this exercise runs 6 unless the plan changes it",
-            PlanValueCaption.reps(adHoc = false, plannedReps = 8, shownReps = 6, standsForLaterSets = true),
+            PlanValueCaption.reps(
+                adHoc = false,
+                added = false,
+                plannedReps = 8,
+                shownReps = 6,
+                standsForLaterSets = true,
+            ),
         )
         assertEquals(
             "Plan says 8 - your change is recorded in the export",
-            PlanValueCaption.reps(adHoc = false, plannedReps = 8, shownReps = 6, standsForLaterSets = false),
+            PlanValueCaption.reps(
+                adHoc = false,
+                added = false,
+                plannedReps = 8,
+                shownReps = 6,
+                standsForLaterSets = false,
+            ),
         )
     }
 
@@ -201,16 +235,36 @@ class PlanValueCaptionContractTest {
     fun `a changed hold names the plan's seconds`() {
         assertEquals(
             "Plan says 45s - the rest of this exercise runs 30s unless the plan changes it",
-            PlanValueCaption.hold(adHoc = false, plannedDurationS = 45, shownDurationS = 30, standsForLaterSets = true),
+            PlanValueCaption.hold(
+                adHoc = false,
+                added = false,
+                plannedDurationS = 45,
+                shownDurationS = 30,
+                standsForLaterSets = true,
+            ),
         )
     }
 
     /** Green before the fix and after it. */
     @Test
     fun `an unchanged rep count and an unchanged hold say nothing`() {
-        assertNull(PlanValueCaption.reps(adHoc = false, plannedReps = 8, shownReps = 8, standsForLaterSets = true))
         assertNull(
-            PlanValueCaption.hold(adHoc = false, plannedDurationS = 45, shownDurationS = 45, standsForLaterSets = true),
+            PlanValueCaption.reps(
+                adHoc = false,
+                added = false,
+                plannedReps = 8,
+                shownReps = 8,
+                standsForLaterSets = true,
+            ),
+        )
+        assertNull(
+            PlanValueCaption.hold(
+                adHoc = false,
+                added = false,
+                plannedDurationS = 45,
+                shownDurationS = 45,
+                standsForLaterSets = true,
+            ),
         )
     }
 
@@ -221,10 +275,19 @@ class PlanValueCaptionContractTest {
      */
     @Test
     fun `a box holding nothing readable says nothing`() {
-        assertNull(PlanValueCaption.reps(adHoc = false, plannedReps = 8, shownReps = null, standsForLaterSets = true))
+        assertNull(
+            PlanValueCaption.reps(
+                adHoc = false,
+                added = false,
+                plannedReps = 8,
+                shownReps = null,
+                standsForLaterSets = true,
+            ),
+        )
         assertNull(
             PlanValueCaption.hold(
                 adHoc = false,
+                added = false,
                 plannedDurationS = 45,
                 shownDurationS = null,
                 standsForLaterSets = true,
@@ -239,10 +302,19 @@ class PlanValueCaptionContractTest {
      */
     @Test
     fun `a set the plan gave no count for gets no caption`() {
-        assertNull(PlanValueCaption.reps(adHoc = false, plannedReps = null, shownReps = 10, standsForLaterSets = true))
+        assertNull(
+            PlanValueCaption.reps(
+                adHoc = false,
+                added = false,
+                plannedReps = null,
+                shownReps = 10,
+                standsForLaterSets = true,
+            ),
+        )
         assertNull(
             PlanValueCaption.hold(
                 adHoc = false,
+                added = false,
                 plannedDurationS = null,
                 shownDurationS = 30,
                 standsForLaterSets = true,
@@ -269,15 +341,23 @@ class PlanValueCaptionContractTest {
                 listOf(
                     PlanValueCaption.load(
                         adHoc = false,
+                        added = false,
                         bodyweight = false,
                         unit = WeightUnit.KG,
                         plannedAddedKg = 90.0,
                         shownAddedKg = 100.0,
                         standsForLaterSets = reach,
                     ),
-                    PlanValueCaption.reps(adHoc = false, plannedReps = 8, shownReps = 6, standsForLaterSets = reach),
+                    PlanValueCaption.reps(
+                        adHoc = false,
+                        added = false,
+                        plannedReps = 8,
+                        shownReps = 6,
+                        standsForLaterSets = reach,
+                    ),
                     PlanValueCaption.hold(
                         adHoc = false,
+                        added = false,
                         plannedDurationS = 45,
                         shownDurationS = 30,
                         standsForLaterSets = reach,

@@ -157,12 +157,35 @@ data class SessionExport(
          * [sessionRpe], the lifter's own 1-to-10 answer to how the whole
          * workout felt. No key from 1.12 changes type or stops being written
          * for it, and it is absent on every session the lifter did not rate
-         * and on every session recorded before this version. Four changes
-         * under one number is what an unreleased version is FOR; the count is
-         * not itself the warning. The warning is that ONE of the four --
-         * `duration_s` -- is not additive, and a 1.12 reader must be
-         * re-checked against that one and need not be re-checked against
-         * `repMarks`, `sensors` or `sessionRpe`.
+         * and on every session recorded before this version.
+         *
+         * 1.13 carries a FIFTH change (#176, #173) and a SIXTH (#157, #174),
+         * both under the same unreleased version for the same reason and
+         * NEITHER of them additive: `voiceCues` gains the rep call the guide
+         * merges into a stroke's own word, so an existing array's contents
+         * change; and `plannedReps` / `plannedDuration_s` publish what the plan
+         * declared, frozen at import, rather than the box the lifter left
+         * behind. The published schema's `schemaVersion` description carries
+         * both arguments in full and the measured sizes; these two lines are
+         * the pointer, not a second copy.
+         *
+         * 1.13 carries a SEVENTH change, additive on the same terms and under
+         * the same version for the same reason (#177): a set may carry
+         * [SetExport.added], saying the LIFTER appended it to the exercise
+         * mid-session rather than the plan prescribing it. No key from 1.12
+         * changes type or stops being written for it, and it is absent on every
+         * prescribed set and on every set recorded before database v12.
+         *
+         * SEVEN CHANGES UNDER ONE NUMBER is what an unreleased version is FOR;
+         * the count is not itself the warning. The warning is WHICH of them are
+         * not additive: `duration_s`, `voiceCues`, and the `plannedReps` /
+         * `plannedDuration_s` pair. A 1.12 reader must be re-checked against
+         * those three and need not be re-checked against `repMarks`, `sensors`,
+         * `sessionRpe` or `added`. That sentence used to read "ONE of the four
+         * -- `duration_s`", which was true when the fourth change landed and
+         * has been false since the fifth; it is corrected here rather than
+         * reworded around, because it undercounted the re-checks a reader owes
+         * by two.
          */
         const val SCHEMA_VERSION = "1.13"
 
@@ -277,6 +300,30 @@ data class SetExport(
     val failed: Boolean = false,
     /** True for warm-up sets (no RPE recorded). Omitted when false. */
     val warmup: Boolean = false,
+    /**
+     * True when the LIFTER appended this set to the exercise mid-session, and
+     * the plan did not prescribe it. Omitted when false (#177).
+     *
+     * WHY A READER NEEDS IT. Adherence is read from [plannedReps] beside
+     * [reps], and from how many sets an exercise carries against how many the
+     * plan asked for. An appended set occupying a prescribed slot corrupts both
+     * readings at once: it inflates the count, and -- because it has no
+     * prescription of its own -- it publishes no [plannedReps] either, so it
+     * reads as a prescribed set whose prescription went missing.
+     *
+     * An appended set therefore publishes NO [plannedLoadKg], [plannedReps],
+     * [plannedDurationS] or [tempoPrescribed], and that absence is a statement
+     * rather than a gap: nothing prescribed it. Its `load_kg`, `reps` and
+     * tempo are what the lifter was standing on when they added it -- the
+     * corrected load, not the plan's.
+     *
+     * OMISSION IS NOT PROOF OF THE OPPOSITE for old documents. The flag is a
+     * column added at database v12; every set recorded before it reads false,
+     * so on those sessions an appended set is indistinguishable from a
+     * prescribed one. A missing key means "prescribed, or recorded before the
+     * app could tell".
+     */
+    val added: Boolean = false,
     /**
      * The prep prescribed before this set, and the prep that played, in whole
      * seconds.

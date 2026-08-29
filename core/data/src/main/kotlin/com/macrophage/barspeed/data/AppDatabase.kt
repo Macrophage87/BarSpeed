@@ -21,24 +21,29 @@ import java.io.File
  * until 10 no stock install could produce a `rescued/` directory, and the
  * rescued-database card -- three tiers, their titles, the discard dialog and
  * the share path -- had never been reachable outside a test. Ten was the first
- * value that could make that card appear; eleven is simply the next such value,
- * and the first-time claim that used to stand here is history rather than
- * something this bump repeats.
+ * value that could make that card appear; eleven and twelve are simply the next
+ * such values, and the first-time claim that used to stand here is history
+ * rather than something these bumps repeat.
  *
- * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 11 writes the
- * file, then any build carrying 10 or less opens it. A forward install runs
- * [MIGRATION_10_11] and never enters the rescue at all, so an ordinary upgrade
- * sees none of it.
+ * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 12 writes the
+ * file, then any build carrying 11 or less opens it. A forward install runs
+ * the migration chain and never enters the rescue at all, so an ordinary
+ * upgrade sees none of it.
  *
- * The version has moved before -- nine times, shipped in v0.1.5, v0.1.10,
- * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, and once in v0.1.42 --
- * the last read off the tag rather than remembered.
- * What is new at 11 is neither the bump nor the downgrade screen: it is that
+ * The version has moved before -- ten times, shipped in v0.1.5, v0.1.10,
+ * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, once in v0.1.42, and
+ * once more at 11 in the v0.1.44 cluster -- the tagged ones read off the tags
+ * rather than remembered. What was new at 11 was that
  * `core/data/schemas/…/10.json` is committed, so for the first time in this
- * repository a migration has a baseline to be read against and, on a bench,
- * executed against.
+ * repository a migration had a baseline to be read against; 12 is the second
+ * such bump and `11.json` is its baseline.
+ *
+ * BOTH bumps of this cluster reach the emulator in the SAME exercise. v0.1.44
+ * has not been cut, so no stock install carries 11 either: a phone upgrading
+ * to this build runs 10 -> 11 -> 12 back to back, and the two-way exercise has
+ * to cover the pair rather than the last hop.
  */
-const val DATABASE_VERSION = 11
+const val DATABASE_VERSION = 12
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -260,6 +265,36 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
+         * v12: `added` on set_records -- whether the lifter appended this set
+         * to the exercise mid-session rather than the plan prescribing it
+         * (#177).
+         *
+         * NOT NULL DEFAULT 0, which is a different statement from the three
+         * appends at [MIGRATION_10_11] and matches [MIGRATION_4_5]'s `warmup`
+         * instead. The entity's field is a non-null `Boolean`, so Room's
+         * generated v12 description says `notNull: true`; a plain nullable
+         * append would disagree with that description and Room's own TableInfo
+         * check would throw on the lifter's phone. SQLite refuses a NOT NULL
+         * append with no default on a populated table, so the default is
+         * required for the statement to run at all -- and 0 is the only value
+         * it can be, because it is the same claim the column's own KDoc makes:
+         * nothing in this app's history records which past sets were
+         * improvised, so every existing row reads "prescribed" and a set
+         * appended on an older build is indistinguishable from one the plan
+         * asked for.
+         *
+         * That is a default written by SQLite into existing rows, not a
+         * backfill computed from anything -- no UPDATE runs, and
+         * [Migration11To12Test] pins that.
+         */
+        internal val MIGRATION_11_12 =
+            object : Migration(11, 12) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN added INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+
+        /**
          * Open the database, having first made sure opening it cannot destroy
          * it. Issue #101.
          *
@@ -282,8 +317,8 @@ abstract class AppDatabase : RoomDatabase() {
          * was deleted there rather than reworded. A crash with the data
          * recoverable beats a clean start with it gone.
          *
-         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 11
-         * here, so a rollback from this build to any build carrying 10 or less
+         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 12
+         * here, so a rollback from this build to any build carrying 11 or less
          * enters the rescue; the first version at which that was true of a
          * stock install was 10, and what it exposes on screen is stated at the
          * constant, with issue #118. An ordinary forward install runs the
@@ -311,6 +346,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_8_9,
                     MIGRATION_9_10,
                     MIGRATION_10_11,
+                    MIGRATION_11_12,
                 )
                 .build()
         }

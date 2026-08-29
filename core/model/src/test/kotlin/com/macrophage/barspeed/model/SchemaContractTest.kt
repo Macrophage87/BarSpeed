@@ -1055,7 +1055,7 @@ class SchemaContractTest {
             "the version log lost the duration_s half of 1.13",
         )
         assertTrue(
-            "exactly three of the six -- `duration_s`, `voiceCues` and the `plannedReps` / " +
+            "exactly three of the seven -- `duration_s`, `voiceCues` and the `plannedReps` / " +
                 "`plannedDuration_s` pair -- are not additive" in description,
             "the version log no longer says which of 1.13's changes a 1.12 reader must be re-checked against",
         )

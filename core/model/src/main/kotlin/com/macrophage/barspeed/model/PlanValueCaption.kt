@@ -47,6 +47,25 @@ package com.macrophage.barspeed.model
  * a box gets no caption for that box -- with one deliberate exception, stated
  * at [load].
  *
+ * `added` is `adHoc`'s neighbour and is here for the identical reason: a set the
+ * LIFTER appended to the exercise mid-session has no prescription either, so
+ * naming one would be an invention (#177). The two are separate parameters and
+ * not one "has no plan" flag, because they are false in different directions --
+ * an ad-hoc set has no plan at all, while an appended set sits inside a plan
+ * block whose other sets do have prescriptions, and only the slot knows which.
+ *
+ * IT IS ACCEPTED AND NOT YET READ. This commit adds the parameter and leaves
+ * every answer exactly as it was, so nothing at any existing call site moves;
+ * the guard and the differential that reds without it land together in #177's
+ * fix commit. The reason it matters at all is the body-weight case: [load] goes
+ * through [plannedLoadText], which answers "BW" for a body-weight set that
+ * declared no load -- deliberately, because BW is the zero of that notation --
+ * so an appended pull-up would be captioned "Plan says BW" on a set nothing
+ * prescribed. [reps] and [hold] already answer null on a null prescription, so
+ * for them the parameter is belt-and-braces rather than a live defect; it is on
+ * all three anyway, because a rule that holds for one box and is enforced by
+ * accident on the other two is a rule nothing states.
+ *
  * `adHoc` is a parameter on all three rather than a call-site guard, and it is
  * [SetLoadPolicy.resolve]'s parameter by the same name for the same reason. The
  * dialog these captions draw in is plan-sets-only today -- the ad-hoc rest and
@@ -91,9 +110,10 @@ object PlanValueCaption {
      * block. This is #45 one control over, and comparing what the lifter can
      * actually see is what makes the rule the same rule at both units.
      */
-    @Suppress("LongParameterList")
+    @Suppress("LongParameterList", "UNUSED_PARAMETER")
     fun load(
         adHoc: Boolean,
+        added: Boolean,
         bodyweight: Boolean,
         unit: WeightUnit,
         plannedAddedKg: Double?,
@@ -110,13 +130,27 @@ object PlanValueCaption {
      * The caption under the reps box. Bare numbers: the box is labelled "Reps"
      * and the sentence sits directly under it.
      */
-    fun reps(adHoc: Boolean, plannedReps: Int?, shownReps: Int?, standsForLaterSets: Boolean): String? {
+    @Suppress("UNUSED_PARAMETER")
+    fun reps(
+        adHoc: Boolean,
+        added: Boolean,
+        plannedReps: Int?,
+        shownReps: Int?,
+        standsForLaterSets: Boolean,
+    ): String? {
         if (adHoc || plannedReps == null || shownReps == null) return null
         return caption("$plannedReps", "$shownReps", standsForLaterSets)
     }
 
     /** The caption under the hold box, in seconds, as its label is. */
-    fun hold(adHoc: Boolean, plannedDurationS: Int?, shownDurationS: Int?, standsForLaterSets: Boolean): String? {
+    @Suppress("UNUSED_PARAMETER")
+    fun hold(
+        adHoc: Boolean,
+        added: Boolean,
+        plannedDurationS: Int?,
+        shownDurationS: Int?,
+        standsForLaterSets: Boolean,
+    ): String? {
         if (adHoc || plannedDurationS == null || shownDurationS == null) return null
         return caption("${plannedDurationS}s", "${shownDurationS}s", standsForLaterSets)
     }

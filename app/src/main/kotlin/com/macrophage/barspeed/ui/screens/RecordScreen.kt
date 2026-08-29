@@ -1179,6 +1179,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
         listOfNotNull(
             PlanValueCaption.load(
                 adHoc = state.adHoc,
+                added = false,
                 bodyweight = slot.exercise.bodyweight,
                 unit = state.weightUnit,
                 plannedAddedKg = slot.plannedLoadKg,
@@ -1194,6 +1195,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
             if (slot.isTimed) {
                 PlanValueCaption.hold(
                     adHoc = state.adHoc,
+                    added = false,
                     plannedDurationS = slot.plannedDurationS,
                     shownDurationS = state.durationInput.trim().toIntOrNull(),
                     standsForLaterSets =
@@ -1207,6 +1209,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
             } else {
                 PlanValueCaption.reps(
                     adHoc = state.adHoc,
+                    added = false,
                     plannedReps = slot.plannedReps,
                     shownReps = state.repsInput.trim().toIntOrNull(),
                     standsForLaterSets =

@@ -78,4 +78,50 @@ class PlanQueueTest {
             timedVerdicts(actualS = 8, plannedS = 10),
         )
     }
+
+    // ---- #177: where an appended set goes -----------------------------------
+
+    /** Three sets of one exercise, then two of another. */
+    private fun twoBlocks() = listOf(
+        QueueBlockKey("back_squat", 0),
+        QueueBlockKey("back_squat", 1),
+        QueueBlockKey("back_squat", 2),
+        QueueBlockKey("seated_row", 0),
+        QueueBlockKey("seated_row", 1),
+    )
+
+    /**
+     * On the LAST set of a block, "after the exercise's remaining sets" and
+     * "immediately next" are the same index, and both rules must say so.
+     *
+     * Pinned in the commit that adds the seam because it is one of the two
+     * answers the naive rule and the block rule agree on -- so it holds before
+     * the fix and after it, which is what a characterization pin is for.
+     */
+    @Test
+    fun `a set appended on the last set of a block goes immediately after it`() {
+        assertEquals(3, addedSetIndex(twoBlocks(), upcomingIndex = 2))
+    }
+
+    /** The same, on the last slot of the whole queue: the answer is the end. */
+    @Test
+    fun `a set appended on the final slot of the queue goes at the end`() {
+        assertEquals(5, addedSetIndex(twoBlocks(), upcomingIndex = 4))
+    }
+
+    /**
+     * An index outside the queue appends at the end rather than throwing or
+     * returning a position that would insert past it.
+     *
+     * `upcomingIndex` is `queueIndex + 1` during rest, so it is legitimately one
+     * past the last slot on the rest screen after the final set -- the state in
+     * which the screen says "That was the last planned set". Nothing offers the
+     * control there today, and a guard that depends on which composable happens
+     * to call you is a guard nothing states.
+     */
+    @Test
+    fun `an out-of-range upcoming index appends at the end`() {
+        assertEquals(5, addedSetIndex(twoBlocks(), upcomingIndex = 5))
+        assertEquals(0, addedSetIndex(emptyList(), upcomingIndex = 0))
+    }
 }

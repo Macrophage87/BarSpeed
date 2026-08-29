@@ -119,6 +119,13 @@ data class CompletedSet(
     val failed: Boolean = false,
     val warmup: Boolean = false,
     /**
+     * True when the lifter APPENDED this set to the exercise mid-session
+     * rather than the plan prescribing it (#177). See
+     * [SetRecordEntity.added], where what the flag means and why it is a
+     * column rather than a derivation is stated once.
+     */
+    val added: Boolean = false,
+    /**
      * How many accelerometers this set was armed with and which stream was
      * analysed, or null on the ordinary one-sensor set (#156).
      *

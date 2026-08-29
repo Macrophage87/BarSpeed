@@ -123,6 +123,26 @@ data class SetRecordEntity(
     val failed: Boolean = false,
     /** True for warm-up sets — kept out of the RPE scale so effort data stays clean. */
     val warmup: Boolean = false,
+    /**
+     * True when the lifter APPENDED this set to the exercise mid-session
+     * rather than the plan prescribing it (#177).
+     *
+     * A column and not a derivation. The obvious derivation -- `plannedReps`
+     * is null, so nothing prescribed it -- cannot tell an appended set from an
+     * ad-hoc one or from a plan block written without rep targets, and the
+     * question a coach asks of the export is exactly the one those three
+     * collapse: how many sets did the plan ask for, and how many did the
+     * lifter do. An appended set silently occupying a prescribed slot makes
+     * that unanswerable.
+     *
+     * FALSE IS THE HONEST DEFAULT AND ALSO AN AMBIGUITY, stated rather than
+     * hidden: every set recorded before v12 reads false, and a set the lifter
+     * appended on an older build is indistinguishable from a prescribed one.
+     * The migration writes nothing into existing rows, because which past sets
+     * were improvised is recorded in no artifact this app has ever written and
+     * a plausible backfill reads exactly like a measured one.
+     */
+    val added: Boolean = false,
     val tempo: String? = null,
     val targetMeanConVelMps: Double? = null,
     val velocityLossStopPct: Double? = null,

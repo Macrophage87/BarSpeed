@@ -169,6 +169,24 @@ data class PlannedSlot(
      */
     val sensors: Int? = null,
     val isExerciseChange: Boolean = false,
+    /**
+     * True when the LIFTER appended this slot to the exercise mid-session and
+     * the plan did not prescribe it (#177).
+     *
+     * An appended slot carries NO prescription at all -- [plannedLoadKg],
+     * [plannedReps], [plannedDurationS] and [plannedTempo] are all null on it,
+     * and that is a statement rather than a gap. Its [loadKg], [reps],
+     * [durationS] and [tempo] are what the lifter was standing on at the moment
+     * they added it: the corrected load, not the plan's, which is the whole
+     * point of the control. Three things read the difference. The change-set
+     * dialog's captions must not claim a prescription that does not exist
+     * (#175). The frozen declarations must stay frozen for the sets that DO
+     * have one, so a descending 10 / 8 / 6 keeps descending (#157, #174). And
+     * the set write carries this flag through to the export, where it is what
+     * stops an appended set occupying a prescribed slot and corrupting the
+     * adherence a coach reads.
+     */
+    val isAddedSet: Boolean = false,
 ) {
     /**
      * Whether this slot is measured on the clock, which is a question about the
@@ -1153,70 +1171,85 @@ private fun startedFromReadyState(s: RecordState): RecordState {
  * `queueIndex` on READY -- and the stage becomes READY either way.
  */
 private fun bakedState(s: RecordState, next: PlannedSlot, index: Int): RecordState {
-    val edited =
-        next.copy(
-            loadKg =
-            SetLoadPolicy.carriedIntoNextSet(
-                declaredAddedKg = next.loadKg,
-                statedAddedKg = s.statedLoadKg,
-            ),
-            // NOT behaviour-identical to the two `?:` expressions on main,
-            // which read `s.repsInput.toIntOrNull() ?: next.reps` and
-            // `s.durationInput.toIntOrNull() ?: next.durationS`. c1 moved those
-            // verbatim into SetRepsPolicy; this commit changes what is handed
-            // to them. The outcome coincides on a validated plan only because
-            // the boxes are re-seeded from the very declaration they fall back
-            // to, and PlanSetDef.validate requires exactly one of reps /
-            // duration_s, so no slot the bake reads is countless.
-            // The rule is SetRepsPolicy's now for the reason the load's is
-            // SetLoadPolicy's: it is about to grow a boundary, and a rule that
-            // grows in :app grows where no test on the CI path can reach it.
-            // statedReps / statedDurationS, not the text boxes. The boxes are
-            // re-seeded on every rest transition and hold a number whether or
-            // not the lifter typed one; reading them here is the same mistake
-            // #45 was for the load, where a seeded field was read back as a
-            // statement the lifter never made. What displaces the plan's
-            // declaration is a count the lifter actually gave, and nothing
-            // else.
-            //
-            // plannedReps and plannedDurationS are deliberately not in this
-            // copy: they stay frozen at the plan's declaration so restingState
-            // can tell a prescribed change from a standing statement one set
-            // later, and so the export can publish what was prescribed.
-            reps =
-            if (next.isTimed) {
-                next.reps
-            } else {
-                SetRepsPolicy.carriedIntoNextSet(declaredReps = next.reps, statedReps = s.statedReps)
-            },
-            durationS =
-            if (next.isTimed) {
-                SetRepsPolicy.carriedDurationIntoNextSet(
-                    declaredDurationS = next.durationS,
-                    statedDurationS = s.statedDurationS,
-                )
-            } else {
-                next.durationS
-            },
-            // statedTempo, not tempoInput. The text field is the ad-hoc
-            // control and reading it here is how one exercise's tempo reached
-            // the next: restingState seeded it from the set just finished
-            // whenever the coming one declared none. What displaces the plan's
-            // declaration now is a tempo the lifter actually set on the wheels
-            // for THIS block, and nothing else.
-            //
-            // plannedTempo is deliberately not in this copy: it stays frozen at
-            // the plan's declaration so restingState can tell a prescribed
-            // tempo change from a standing adjustment one set later.
-            tempo =
-            TempoAdjustPolicy.carriedIntoNextSet(
-                declaredTempo = next.tempo,
-                adjustedTempo = s.statedTempo,
-            ),
-        )
+    val edited = carriedValues(next, s)
     val queue = s.queue.toMutableList()
     queue[index] = edited
     return s.copy(queue = queue, queueIndex = index, stage = Stage.READY)
+}
+
+/**
+ * [slot] with the lifter's standing statements written into the four values a
+ * set is run with, and its frozen declarations untouched.
+ *
+ * Extracted from [bakedState] verbatim -- every argument is the same expression
+ * over the same inputs, and nothing about what it computes moved. It is a
+ * function of its own because a SECOND caller arrives with #177: an appended
+ * set starts from what the lifter is standing on, which is exactly this, and
+ * "what is standing" stated in two places is two rules that can disagree about
+ * a load carried across a warm-up.
+ */
+private fun carriedValues(slot: PlannedSlot, s: RecordState): PlannedSlot {
+    val next = slot
+    return next.copy(
+        loadKg =
+        SetLoadPolicy.carriedIntoNextSet(
+            declaredAddedKg = next.loadKg,
+            statedAddedKg = s.statedLoadKg,
+        ),
+        // NOT behaviour-identical to the two `?:` expressions on main,
+        // which read `s.repsInput.toIntOrNull() ?: next.reps` and
+        // `s.durationInput.toIntOrNull() ?: next.durationS`. c1 moved those
+        // verbatim into SetRepsPolicy; this commit changes what is handed
+        // to them. The outcome coincides on a validated plan only because
+        // the boxes are re-seeded from the very declaration they fall back
+        // to, and PlanSetDef.validate requires exactly one of reps /
+        // duration_s, so no slot the bake reads is countless.
+        // The rule is SetRepsPolicy's now for the reason the load's is
+        // SetLoadPolicy's: it is about to grow a boundary, and a rule that
+        // grows in :app grows where no test on the CI path can reach it.
+        // statedReps / statedDurationS, not the text boxes. The boxes are
+        // re-seeded on every rest transition and hold a number whether or
+        // not the lifter typed one; reading them here is the same mistake
+        // #45 was for the load, where a seeded field was read back as a
+        // statement the lifter never made. What displaces the plan's
+        // declaration is a count the lifter actually gave, and nothing
+        // else.
+        //
+        // plannedReps and plannedDurationS are deliberately not in this
+        // copy: they stay frozen at the plan's declaration so restingState
+        // can tell a prescribed change from a standing statement one set
+        // later, and so the export can publish what was prescribed.
+        reps =
+        if (next.isTimed) {
+            next.reps
+        } else {
+            SetRepsPolicy.carriedIntoNextSet(declaredReps = next.reps, statedReps = s.statedReps)
+        },
+        durationS =
+        if (next.isTimed) {
+            SetRepsPolicy.carriedDurationIntoNextSet(
+                declaredDurationS = next.durationS,
+                statedDurationS = s.statedDurationS,
+            )
+        } else {
+            next.durationS
+        },
+        // statedTempo, not tempoInput. The text field is the ad-hoc
+        // control and reading it here is how one exercise's tempo reached
+        // the next: restingState seeded it from the set just finished
+        // whenever the coming one declared none. What displaces the plan's
+        // declaration now is a tempo the lifter actually set on the wheels
+        // for THIS block, and nothing else.
+        //
+        // plannedTempo is deliberately not in this copy: it stays frozen at
+        // the plan's declaration so restingState can tell a prescribed
+        // tempo change from a standing adjustment one set later.
+        tempo =
+        TempoAdjustPolicy.carriedIntoNextSet(
+            declaredTempo = next.tempo,
+            adjustedTempo = s.statedTempo,
+        ),
+    )
 }
 
 data class RecordState(
