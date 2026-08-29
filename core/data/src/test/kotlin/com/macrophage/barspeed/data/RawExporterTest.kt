@@ -702,6 +702,31 @@ class RawExporterTest {
         assertNull(manifestSet(text)["warmup"])
     }
 
+    /**
+     * CHARACTERIZATION, before #177 adds anything. A set the lifter did not
+     * append carries no `added` key in the manifest, and the reason this is
+     * pinned BEFORE the key exists is that it must go on being true after: the
+     * flag is written through `flag()`, which omits a false, so absence must
+     * keep reading as "prescribed" for every set already archived as well as
+     * for every ordinary set recorded from now on.
+     *
+     * The whole-text assertion is the load-bearing half. A `"added": false`
+     * written by `bool()` instead of `flag()` would leave `manifestSet(text)`
+     * non-null and would also change every existing archive's byte content for
+     * no gain, and the two halves fail differently: the first names the key,
+     * the second catches it appearing anywhere in the document at all.
+     */
+    @Test
+    fun `an ordinary set's manifest says nothing about being appended`() = runTest {
+        val text =
+            zipOf(
+                listOf(row(id = 5L)),
+                mapOf(5L to listOf(imuStream(5L, stillSamples(45.0), storedRate = 100.0))),
+            ).getValue("meta.json")
+        assertNull(manifestSet(text)["added"])
+        assertTrue("added" !in text, "a set nobody appended names the appended flag anyway:\n$text")
+    }
+
     private fun manifestSet(text: String): JsonObject =
         Json.parseToJsonElement(text).jsonObject.getValue("sets").jsonArray[0].jsonObject
 

@@ -403,6 +403,23 @@ class SessionExporterTest {
     }
 
     /**
+     * CHARACTERIZATION, before #177 adds anything. A set the lifter did not
+     * append carries no `added` key on the wire.
+     *
+     * Pinned before the key exists because it must go on being true after.
+     * `encodeDefaults = false` drops a `false`, so absence is what tells a
+     * reader "the plan asked for this set" -- for every session already
+     * exported as well as for every ordinary set recorded from now on. A field
+     * added with `@EncodeDefault` instead would write `"added": false` onto
+     * every set of every export and change what a byte-comparison of two
+     * exports of the same session means.
+     */
+    @Test
+    fun `an ordinary set says nothing about being appended`() = runTest {
+        assertNull(setObject()["added"], "a set nobody appended publishes the appended flag anyway")
+    }
+
+    /**
      * A session recorded in New York in August publishes the zone it was
      * recorded in and the offset that applied.
      *
