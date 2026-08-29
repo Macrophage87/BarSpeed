@@ -7,8 +7,12 @@ import kotlin.test.assertNull
 /**
  * Pairing, preferring and what the Devices screen says, issue #184.
  *
- * The tests marked CHARACTERIZATION pin what the app does TODAY. They are
- * deleted in the commit that adds the differentials replacing them.
+ * Several of these are differentials: they fail against the rules the app
+ * ships today and pass only once those rules change. The characterizations
+ * they replaced -- "today pairing a second unit takes preferred off the
+ * first", "today forgetting the preferred unit promotes nothing" and "today
+ * the devices screen says nothing at any step" -- are gone, having shown that
+ * the shipped rules are what these contradict.
  */
 class DevicePairingPolicyTest {
     private val first = "AA:AA:AA:AA:AA:01"
@@ -17,15 +21,62 @@ class DevicePairingPolicyTest {
 
     // ---- which unit is preferred ---------------------------------------------
 
-    /** CHARACTERIZATION. Today pairing anything makes it its role's preferred device. */
+    /**
+     * The decision #184 left to the implementer: pairing a second unit of a
+     * role does NOT take the analysed link off the first.
+     *
+     * Preferred is not a display flag. `AutoConnectManager` maintains the
+     * analysed link to it and `SensorCapturePolicy.roster` reads it to decide
+     * which role's stream the DSP is pointed at, so moving it re-points a data
+     * path -- and it moved as a side effect of a UI act the lifter performed
+     * for an unrelated reason. Because labels are per-address, it also
+     * silently changed the analysed role from A to B. A wrong pixel is
+     * recoverable and a wrongly-attributed stream is not, so the tie goes to
+     * leaving it alone.
+     *
+     * Mid-sequence the lifter no longer watches the first row go dark and the
+     * second light up, which is the clunk the owner reported. Which unit is
+     * analysed stays changeable, but only by asking for it.
+     */
     @Test
-    fun `today pairing a second unit takes preferred off the first`() {
+    fun `pairing a second unit of a role leaves the analysed one alone`() {
         assertEquals(
-            second,
+            first,
             DevicePairingPolicy.preferredAfterPairing(
                 currentPreferred = first,
                 pairedOfRole = setOf(first),
                 justPaired = second,
+            ),
+        )
+    }
+
+    /**
+     * A preference naming a device that is no longer paired is not a
+     * preference. `DeviceRegistry` can hold `preferred_imu` for a forgotten
+     * address, and `roster` already refuses to treat that as one of the pair;
+     * keeping it here would leave the role with no live preferred device and
+     * the analysed link pointed at nothing.
+     */
+    @Test
+    fun `a preference naming a unit that is no longer paired gives way`() {
+        assertEquals(
+            second,
+            DevicePairingPolicy.preferredAfterPairing(
+                currentPreferred = strap,
+                pairedOfRole = setOf(first),
+                justPaired = second,
+            ),
+        )
+    }
+
+    @Test
+    fun `re-pairing the analysed unit keeps it analysed`() {
+        assertEquals(
+            first,
+            DevicePairingPolicy.preferredAfterPairing(
+                currentPreferred = first,
+                pairedOfRole = setOf(first, second),
+                justPaired = first,
             ),
         )
     }
@@ -42,14 +93,35 @@ class DevicePairingPolicyTest {
         )
     }
 
-    /** CHARACTERIZATION. Today forgetting the preferred unit leaves the role with none. */
+    /**
+     * The near neighbour of the change above, and it has to move with it.
+     *
+     * While pairing re-pointed the preference, forgetting the analysed unit
+     * was self-healing: the lifter re-paired something and the preference came
+     * back. Once pairing stops moving it, forgetting the analysed unit with
+     * another still paired would leave the role with NO preferred device, the
+     * analysed link idling on a null address, and no way back that does not
+     * involve forgetting the survivor too.
+     */
     @Test
-    fun `today forgetting the preferred unit promotes nothing`() {
-        assertNull(
+    fun `forgetting the analysed unit promotes the one that is left`() {
+        assertEquals(
+            second,
             DevicePairingPolicy.preferredAfterForget(
                 currentPreferred = first,
                 forgotten = first,
                 remainingOfRole = listOf(second),
+            ),
+        )
+    }
+
+    @Test
+    fun `forgetting the only unit of a role leaves no preference to promote`() {
+        assertNull(
+            DevicePairingPolicy.preferredAfterForget(
+                currentPreferred = first,
+                forgotten = first,
+                remainingOfRole = emptyList(),
             ),
         )
     }
@@ -194,12 +266,58 @@ class DevicePairingPolicyTest {
         assertEquals(3, DualShortfall.entries.size, "a new shortfall needs a sentence here")
     }
 
-    /** CHARACTERIZATION. Today the Devices screen says nothing about any of this. */
+    /**
+     * The Devices screen names the state and the next action, at the steps
+     * where there is one.
+     *
+     * The one sentence explaining that labelling is required lives on the
+     * RECORD screen and draws only when a plan declares two sensors, so the
+     * lifter doing the pairing has never been told. These are the same facts
+     * in this screen's own voice -- "under Devices" is not a useful locator
+     * when you are already there.
+     *
+     * Silent at the two steps with nothing to fix. A single-sensor setup is
+     * the ordinary one, for every exercise, and nagging it about a second unit
+     * it does not have would make the line noise.
+     */
     @Test
-    fun `today the devices screen says nothing at any step`() {
-        DualSetupStep.entries.forEach { step ->
-            assertNull(DualSensorSetup.devicesLine(step), "$step")
-            assertNull(DualSensorSetup.identifyHint(step), "$step")
-        }
+    fun `the devices screen names the step and the next action`() {
+        assertNull(DualSensorSetup.devicesLine(DualSetupStep.NO_SENSOR))
+        assertNull(DualSensorSetup.devicesLine(DualSetupStep.ONE_SENSOR), "one sensor is the ordinary setup")
+        assertEquals(
+            "Label both sensors A and B - a set asking for two records only one until they carry " +
+                "different labels.",
+            DualSensorSetup.devicesLine(DualSetupStep.LABEL_BOTH),
+        )
+        assertEquals(
+            "Both sensors are labelled the same - give one of them the other label.",
+            DualSensorSetup.devicesLine(DualSetupStep.LABELS_COLLIDE),
+        )
+        assertEquals(
+            "Both sensors are labelled. A set asking for two will record both streams.",
+            DualSensorSetup.devicesLine(DualSetupStep.READY),
+        )
+    }
+
+    /**
+     * The by-elimination ritual comes off the KDoc and onto the screen, and
+     * only where it is needed.
+     *
+     * It says to compare the two rows' live signal rather than to reason about
+     * which single row is green, because with the preference no longer moving
+     * there is no longer a moment when exactly one row is green. It claims
+     * nothing about a unit that is not advertising: a row with no reading
+     * shows no signal line at all.
+     */
+    @Test
+    fun `the identify hint is offered exactly where two units must be told apart`() {
+        val hint =
+            "Two units can advertise the same name. Scan below and hold one against the phone: " +
+                "the row whose signal reads strong is that unit."
+        assertEquals(hint, DualSensorSetup.identifyHint(DualSetupStep.LABEL_BOTH))
+        assertEquals(hint, DualSensorSetup.identifyHint(DualSetupStep.LABELS_COLLIDE))
+        assertNull(DualSensorSetup.identifyHint(DualSetupStep.NO_SENSOR))
+        assertNull(DualSensorSetup.identifyHint(DualSetupStep.ONE_SENSOR))
+        assertNull(DualSensorSetup.identifyHint(DualSetupStep.READY), "labelled units are told apart by their labels")
     }
 }
