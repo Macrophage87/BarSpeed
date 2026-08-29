@@ -7,9 +7,10 @@ import kotlin.test.assertEquals
  * The rest clock: which instant it runs from, and what it says at a given
  * moment. Issue #172.
  *
- * The differentials below are RED at this commit and are meant to be:
- * [RestClockPolicy.remainingS] still states today's rule, which is the whole
- * period whatever has already elapsed. The fix lands next.
+ * The differentials here were written red against the rule this issue
+ * replaced -- the whole period whatever had already elapsed -- and CI run
+ * 33221571539 holds that red at the differential commit. They are green from
+ * the fix commit on.
  */
 class RestClockPolicyTest {
     // ------------------------------------------------------------------

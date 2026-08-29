@@ -100,7 +100,7 @@ object RestClockPolicy {
      * A non-positive prescription is zero seconds of rest, by the same floor.
      */
     fun remainingS(restS: Int, startedAtMs: Long, nowMs: Long): Int {
-        val elapsedS = ((nowMs - startedAtMs) / 1_000L).coerceAtLeast(0L)
+        val elapsedS = (nowMs - startedAtMs) / 1_000L
         return (restS.toLong() - elapsedS).coerceIn(0L, restS.toLong().coerceAtLeast(0L)).toInt()
     }
 }
