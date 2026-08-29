@@ -799,6 +799,28 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  *
  * Repeatable, and removal is out of scope (#177 item 5): nothing here
  * shortens the queue.
+ *
+ * RUN ON A DEVICE, ONCE, and this is the only place that says so -- #177's own
+ * commit body listed all of it as `[Field]` because it was written before the
+ * bench run. On `barspeed-api35`, a three-set press block corrected 18.1 -> 13.6
+ * kg with two appends taken on READY: the queue ran prescribed 2, prescribed 3,
+ * then "Set 4 · you added this one" and "Set 5 · you added this one", both at
+ * 13.6 kg, and the lat pulldown block that followed opened at its own declared
+ * 27.2 kg. The appended sets' change dialog drew NO "Plan says" caption where
+ * the prescribed sets drew one. `sqlite3` read five `set_records`: the three
+ * prescribed carrying `plannedLoadKg` 18.14 and `added` 0, the two appended
+ * carrying NULL and `added` 1. The saved export published `"added": true` on
+ * exactly those two, omitted the key on the other three, and validated against
+ * `docs/schemas/session-export.schema.json` under the same ajv invocation
+ * `ci.yml` runs.
+ *
+ * That last line is what matters most here, because it covers the hop no JVM
+ * test can: `completedSetOf`'s `added = p.slot?.isAddedSet == true` survived
+ * mutation with the whole suite green, and the exported document is the
+ * evidence that it is wired. WHAT THE RUN DID NOT COVER: the install was fresh,
+ * so Room created v12 outright and `MIGRATION_11_12` did NOT execute. It is
+ * still unexecuted, and the cluster's two-way exercise still owes 10 -> 11 -> 12
+ * against real rows.
  */
 private fun appendedQueue(s: RecordState): List<PlannedSlot>? {
     if (s.adHoc) return null
