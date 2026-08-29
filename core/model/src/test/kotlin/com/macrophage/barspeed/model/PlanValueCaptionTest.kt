@@ -5,12 +5,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * [PlanValueCaption] as it stands on arrival: the notation it renders the
- * plan's load in, and the three captions it does not yet draw.
+ * The notation [PlanValueCaption] renders the plan's declared load in.
  *
- * Every pin here is green at the commit that adds it. The differentials that
- * demand the captions live in [PlanValueCaptionContractTest] and are red until
- * the fix.
+ * What the three boxes SAY is [PlanValueCaptionContractTest]'s, and the three
+ * pins that used to sit here saying they say nothing have been deleted rather
+ * than reworded: they characterized the pre-#175 behaviour, that file demands
+ * the opposite, and a reworded false claim is how this repository has produced
+ * fresh ones.
  */
 class PlanValueCaptionTest {
     @Test
@@ -58,41 +59,5 @@ class PlanValueCaptionTest {
     @Test
     fun `a loaded plan set that declared no load names nothing`() {
         assertNull(PlanValueCaption.plannedLoadText(bodyweight = false, unit = WeightUnit.KG, plannedAddedKg = null))
-    }
-
-    /**
-     * Shipped behaviour, written down: the three boxes the lifter adjusts most
-     * say nothing about the plan. #175. Replaced by
-     * [PlanValueCaptionContractTest] once the captions land.
-     */
-    @Test
-    fun `today the load box says nothing about the plan`() {
-        assertNull(
-            PlanValueCaption.load(
-                adHoc = false,
-                bodyweight = false,
-                unit = WeightUnit.KG,
-                plannedAddedKg = 90.0,
-                shownAddedKg = 100.0,
-                standsForLaterSets = true,
-            ),
-        )
-    }
-
-    @Test
-    fun `today the reps box says nothing about the plan`() {
-        assertNull(PlanValueCaption.reps(adHoc = false, plannedReps = 8, shownReps = 10, standsForLaterSets = true))
-    }
-
-    @Test
-    fun `today the hold box says nothing about the plan`() {
-        assertNull(
-            PlanValueCaption.hold(
-                adHoc = false,
-                plannedDurationS = 45,
-                shownDurationS = 30,
-                standsForLaterSets = true,
-            ),
-        )
     }
 }
