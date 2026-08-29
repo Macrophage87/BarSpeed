@@ -253,11 +253,11 @@ class SessionRepositoryRecordSetTest {
      * The rest screen's duration correction reaches the DAO with the set it
      * names and the seconds it was given, and issues nothing else.
      *
-     * #168's seam. A hold now ends when its clock reaches the prescription, so
-     * the rare genuine overage is stated afterwards on the rest screen -- the
-     * surface every other post-set correction already lives on -- and this is
-     * the write it turns into. Pinned at the seam, before a caller exists, so
-     * the caller is wired to something already measured.
+     * #168's seam. A hold now ends when its clock reaches the seconds it was
+     * working to, so the rare genuine overage is stated afterwards on the rest
+     * screen -- the surface every other post-set correction already lives on
+     * -- and this is the write it turns into. Pinned at the seam, before a
+     * caller exists, so the caller is wired to something already measured.
      *
      * Reds if the passthrough starts inventing an id or a figure, and reds if
      * it grows a second statement: a correction that also re-wrote the rating

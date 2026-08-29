@@ -2380,7 +2380,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // clock, shared with the row's own endedAt, so the two cannot disagree.
         val endedAtMs = System.currentTimeMillis()
         // Then, for a hold the CLOCK ended rather than the lifter, the figure
-        // the set records is the prescription and not the measurement (#168).
+        // the set records is the seconds it was working to and not the
+        // measurement (#168) -- plannedDurationS unless the lifter changed the
+        // hold in the change-set dialog, in which case theirs.
         // The two disagree by whatever the dispatcher did -- delay(1_000)
         // drifts positive, so a sixty-tick hold measures 60 or 61 -- and 61
         // against a 60 s target reads as a hold carried past target on every
