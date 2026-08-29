@@ -46,10 +46,6 @@ data class ScanRow(
  * against: `:core:ble` has no test source set and `:app` has one test file over
  * one pure function. "The order does not change when a packet arrives" is
  * exactly the kind of property a JVM test can hold and a screenshot cannot.
- *
- * The functions here are introduced reproducing TODAY's behaviour, so that the
- * differentials for #183 can be written against them and shown red before
- * anything is fixed.
  */
 object DeviceScanListPolicy {
     /** At or above this many dBm a sighting reads [SignalStrength.STRONG]. */
@@ -73,33 +69,61 @@ object DeviceScanListPolicy {
     }
 
     /**
-     * The scan list after one more packet arrives.
+     * The scan list after one more packet arrives: FIRST-SEEN order, with the
+     * sighted device's reading updated in place.
      *
-     * TODAY's rule, lifted verbatim from `DevicesViewModel.toggleScan`: drop
-     * any existing entry for the address, append the new sighting, re-sort the
-     * whole list by descending RSSI.
+     * A device must not move because a packet arrived. The rule this replaced
+     * re-sorted the whole list by descending RSSI on every result, and
+     * `SCAN_MODE_LOW_LATENCY` delivers one per advertisement packet -- several
+     * a second per device, each carrying that packet's own RSSI. A few dBm of
+     * jitter on a unit lying still on the bench was enough to swap any two
+     * rows within a few dBm of each other, continuously.
+     *
+     * Two alternatives were rejected. Coarse buckets as the sort key still
+     * reorder whenever a device sits on a boundary, which is the same defect
+     * at lower frequency. Smoothing needs a time base this function does not
+     * have and still moves rows the lifter did not touch. First-seen order
+     * cannot reorder at all, and the signal is not lost -- it is shown as a
+     * value on the row, where a changing number costs a redraw rather than a
+     * mis-tap.
+     *
+     * Removal-and-append is NOT the same rule and is the near-miss worth
+     * naming: it drops the re-sighted device at the end, so a device moves
+     * because a packet arrived, which is the property this exists to hold.
      */
-    fun sighted(current: List<Sighting>, seen: Sighting): List<Sighting> =
-        (current.filterNot { it.address == seen.address } + seen).sortedByDescending { it.rssi }
+    fun sighted(current: List<Sighting>, seen: Sighting): List<Sighting> {
+        val at = current.indexOfFirst { it.address == seen.address }
+        if (at < 0) return current + seen
+        return current.toMutableList().apply { this[at] = seen }
+    }
 
     /**
      * The rows the screen draws, from the sightings and the saved devices.
      *
-     * TODAY's rule: every sighting is a row, in scan-list order, and none of
-     * them knows it is already paired. [knownAddresses] is accepted and not
-     * consulted, which is precisely what #183 reports -- a sensor that is
-     * already saved, and already drawn above with its own row, is offered for
-     * pairing again below.
+     * A device the app has already saved is SHOWN, marked, and sunk below the
+     * ones still on offer -- not hidden. Hiding it risks the lifter reading a
+     * missing row as "the scan did not find my sensor", which is the one thing
+     * this list is for; and while a second unit is being paired, a row proving
+     * the first is powered and in range is exactly the diagnostic wanted. What
+     * the caller must not draw for a marked row is the offer to pair it again,
+     * because pairing is what moves the analysed link (#184).
+     *
+     * The partition is the ONE movement allowed here, and it answers the
+     * lifter's own tap: [knownAddresses] changes when something is paired or
+     * forgotten and at no other time, so a device leaves the offers the
+     * instant it is paired rather than at the next scan.
      */
     fun displayRows(sighted: List<Sighting>, knownAddresses: Set<String>): List<ScanRow> {
-        knownAddresses.size
-        return sighted.map {
-            ScanRow(
-                address = it.address,
-                rssi = it.rssi,
-                alreadyPaired = false,
-                strength = strengthOf(it.rssi),
-            )
-        }
+        val rows =
+            sighted.map {
+                ScanRow(
+                    address = it.address,
+                    rssi = it.rssi,
+                    alreadyPaired = it.address in knownAddresses,
+                    strength = strengthOf(it.rssi),
+                )
+            }
+        val (paired, onOffer) = rows.partition { it.alreadyPaired }
+        return onOffer + paired
     }
 }

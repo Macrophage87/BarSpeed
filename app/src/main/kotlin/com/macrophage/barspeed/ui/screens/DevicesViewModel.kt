@@ -7,7 +7,10 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.ble.DeviceRole
 import com.macrophage.barspeed.ble.DiscoveredDevice
 import com.macrophage.barspeed.ble.KnownDevice
+import com.macrophage.barspeed.model.DeviceScanListPolicy
+import com.macrophage.barspeed.model.ScanRow
 import com.macrophage.barspeed.model.SensorRole
+import com.macrophage.barspeed.model.Sighting
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,6 +33,16 @@ data class LinkAddresses(
     val imuB: String? = null,
     val hrm: String? = null,
 )
+
+/**
+ * One row of the found-devices list: the advertisement the scanner saw, and
+ * what [DeviceScanListPolicy] says the screen should make of it.
+ *
+ * The two are kept apart rather than flattened because they answer to
+ * different things: [device] is whatever the last packet carried, and [row] is
+ * a decision about the list as a whole.
+ */
+data class FoundDevice(val device: DiscoveredDevice, val row: ScanRow)
 
 class DevicesViewModel(app: Application) : AndroidViewModel(app) {
     private val container = (app as LiftingApp).container
@@ -90,6 +103,26 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
     val scanning = MutableStateFlow(false)
     val scanError = MutableStateFlow<String?>(null)
 
+    /**
+     * The found list as the screen draws it: what was scanned, in the order
+     * and with the marks [DeviceScanListPolicy.displayRows] decides.
+     *
+     * Combined with the saved devices rather than filtered once at scan time,
+     * so pairing a device marks its row on the next emission instead of at the
+     * next scan -- `knownDevices` is a flow off the registry and pairing
+     * writes to it.
+     */
+    val foundDevices =
+        combine(discovered, knownDevices) { found, known ->
+            val byAddress = found.associateBy { it.address }
+            val rows =
+                DeviceScanListPolicy.displayRows(
+                    found.map { Sighting(it.address, it.rssi) },
+                    known.map { it.address }.toSet(),
+                )
+            rows.mapNotNull { row -> byAddress[row.address]?.let { FoundDevice(it, row) } }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private var scanJob: Job? = null
 
     fun toggleScan() {
@@ -112,8 +145,19 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
                         scanning.value = false
                     }
                     .collect { device ->
-                        val current = discovered.value.filterNot { it.address == device.address }
-                        discovered.value = (current + device).sortedByDescending { it.rssi }
+                        // The ORDER is DeviceScanListPolicy's, not this
+                        // collector's: it used to re-sort by RSSI here, on
+                        // every advertisement packet, and #183 is what that
+                        // felt like. The full record stays keyed by address
+                        // because the policy deliberately holds only what the
+                        // ordering rule needs.
+                        val byAddress = discovered.value.associateBy { it.address } + (device.address to device)
+                        val order =
+                            DeviceScanListPolicy.sighted(
+                                discovered.value.map { Sighting(it.address, it.rssi) },
+                                Sighting(device.address, device.rssi),
+                            )
+                        discovered.value = order.mapNotNull { byAddress[it.address] }
                     }
             }
     }

@@ -30,7 +30,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.ble.DeviceRole
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.DevicePairingPolicy
 import com.macrophage.barspeed.model.SensorRole
+import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ConnectionChip
 import com.macrophage.barspeed.ui.components.PermissionBanner
 
@@ -78,7 +80,7 @@ private fun SensorRoleRow(assigned: SensorRole?, onAssign: (SensorRole?) -> Unit
 @Composable
 fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = viewModel()) {
     val known by viewModel.knownDevices.collectAsState()
-    val discovered by viewModel.discovered.collectAsState()
+    val found by viewModel.foundDevices.collectAsState()
     val scanning by viewModel.scanning.collectAsState()
     val scanError by viewModel.scanError.collectAsState()
     val imuState by viewModel.imuState.collectAsState()
@@ -168,21 +170,46 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
             }
             Spacer(Modifier.height(8.dp))
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(discovered) { device ->
+                items(found, key = { it.device.address }) { entry ->
+                    val device = entry.device
+                    // Keyed by address, so a re-sighting redraws the row it is
+                    // already in rather than being treated as a new one. The
+                    // ORDER is decided by DeviceScanListPolicy, which does not
+                    // read the signal: a device must not move because a packet
+                    // arrived (#183).
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(device.name, style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "${device.name} · ${DevicePairingPolicy.unitTag(device.address)}",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = if (entry.row.alreadyPaired) BarColors.Sub else BarColors.Text,
+                            )
                             Text(
                                 "${device.address} · ${device.rssi} dBm" +
                                     (device.likelyRole?.let { " · looks like $it" } ?: ""),
                                 style = MaterialTheme.typography.bodySmall,
+                                color = BarColors.Sub,
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { viewModel.pair(device, DeviceRole.IMU) }) {
-                                    Text("Pair as bar sensor")
-                                }
-                                OutlinedButton(onClick = { viewModel.pair(device, DeviceRole.HRM) }) {
-                                    Text("Pair as HRM")
+                            if (entry.row.alreadyPaired) {
+                                // Shown rather than hidden: a missing row reads
+                                // as "the scan did not find it", and while the
+                                // second unit is being paired this row is the
+                                // proof the first one is on and in range. The
+                                // pair buttons are what must not be here --
+                                // pairing again would move the analysed link.
+                                Text(
+                                    "Already paired · listed above",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = BarColors.Sub,
+                                )
+                            } else {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = { viewModel.pair(device, DeviceRole.IMU) }) {
+                                        Text("Pair as bar sensor")
+                                    }
+                                    OutlinedButton(onClick = { viewModel.pair(device, DeviceRole.HRM) }) {
+                                        Text("Pair as HRM")
+                                    }
                                 }
                             }
                         }
