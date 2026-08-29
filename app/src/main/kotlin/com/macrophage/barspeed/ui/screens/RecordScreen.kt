@@ -534,6 +534,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         // what the owner asked for when every rack is busy on arrival; the
         // other half is the button above.
         SwitchExerciseSection(state, viewModel)
+        AddSetSection(state, viewModel)
     } else {
         AdHocForm(state, viewModel)
         // Plan sets take their prep from the dialog. The ad-hoc layout keeps
@@ -1063,6 +1064,43 @@ private fun ChangeSetDialog(
     )
 }
 
+/**
+ * "Add another set" — one more set of the exercise the lifter is ON, at the
+ * values they are standing on (#177).
+ *
+ * BESIDE "Equipment busy? Switch exercise" and in the same form, on BOTH
+ * surfaces, which is #152's consolidated change surface: the rest screen and
+ * READY. The owner required switch-exercise in both places for the reason that
+ * applies here unchanged -- set one is when a wrong load first shows itself, and
+ * READY is the only screen set one has.
+ *
+ * NOT inside the change-set dialog. Everything in that dialog changes the set
+ * coming up; this changes the SESSION, and folding it in would put it under a
+ * subtitle reading "Adjust next set (deviations are recorded)" -- which would
+ * be a false description of it, and would also make it read as a deviation of
+ * the upcoming set on the line that describes deviations. It is not one: the
+ * upcoming set is untouched, its deviation line is unchanged, and the appended
+ * set is a set the plan does not contain rather than a change to a set it does.
+ *
+ * A TextButton, not an OutlinedButton, for [SwitchExerciseSection]'s reason:
+ * START is the only filled button on either screen, and this line sits beside
+ * one that already looks like this. A mis-tap here queues a set the lifter can
+ * simply not do -- the plan's remaining sets are dropped whenever a session is
+ * finished early, which is how every unwanted queued set has always been
+ * disposed of. Removal is out of scope and this is why that is survivable.
+ *
+ * Repeatable: every tap appends one more, and nothing here or in
+ * [RecordViewModel.addSetOfCurrentExercise] assumes at most one.
+ */
+@Composable
+private fun AddSetSection(state: RecordState, viewModel: RecordViewModel) {
+    val slot = state.upcomingSlot ?: return
+    if (state.adHoc) return
+    TextButton(onClick = viewModel::addSetOfCurrentExercise) {
+        Text("Load was wrong? Add another ${slot.exercise.displayName} set", color = BarColors.Blue)
+    }
+}
+
 /** Equipment busy? Offer the session's other remaining exercises out of order. */
 @Composable
 private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel) {
@@ -1179,7 +1217,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
         listOfNotNull(
             PlanValueCaption.load(
                 adHoc = state.adHoc,
-                added = false,
+                added = slot.isAddedSet,
                 bodyweight = slot.exercise.bodyweight,
                 unit = state.weightUnit,
                 plannedAddedKg = slot.plannedLoadKg,
@@ -1195,7 +1233,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
             if (slot.isTimed) {
                 PlanValueCaption.hold(
                     adHoc = state.adHoc,
-                    added = false,
+                    added = slot.isAddedSet,
                     plannedDurationS = slot.plannedDurationS,
                     shownDurationS = state.durationInput.trim().toIntOrNull(),
                     standsForLaterSets =
@@ -1209,7 +1247,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
             } else {
                 PlanValueCaption.reps(
                     adHoc = state.adHoc,
-                    added = false,
+                    added = slot.isAddedSet,
                     plannedReps = slot.plannedReps,
                     shownReps = state.repsInput.trim().toIntOrNull(),
                     standsForLaterSets =
@@ -1703,7 +1741,16 @@ private fun InSetHeader(state: RecordState, slot: PlannedSlot?) {
         listOfNotNull(
             exerciseName,
             side?.replaceFirstChar { it.uppercase() },
-            slot?.let { "Set ${it.setIndexInExercise + 1}/${it.setsInExercise}" },
+            // "added" rather than a count on an appended set: the plan asked
+            // for none of it, and "Set 4/4" beside a card of prescribed sets
+            // reading "of 3" is the reading #177 exists to stop (#177).
+            slot?.let {
+                if (it.isAddedSet) {
+                    "Set ${it.setIndexInExercise + 1} · added"
+                } else {
+                    "Set ${it.setIndexInExercise + 1}/${it.setsInExercise}"
+                }
+            },
             // The canonical total keeps its position and the split follows it
             // in brackets, never instead of it. `loadKg` above is
             // SetLoadPolicy.resolve's answer, which is the ADDED load -- the
@@ -2028,7 +2075,12 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
         }
         SlotCard(
             next,
-            heading = "Up next · Set ${next.setIndexInExercise + 1} of ${next.setsInExercise}",
+            heading =
+            if (next.isAddedSet) {
+                "Up next · Set ${next.setIndexInExercise + 1} · you added this one"
+            } else {
+                "Up next · Set ${next.setIndexInExercise + 1} of ${next.setsInExercise}"
+            },
             unit = state.weightUnit,
             highlight = true,
             plateLoadKgOverride = state.statedLoadKg,
@@ -2040,6 +2092,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
         DeviationLine(state, next)
         ChangeSetButton(state, viewModel, next, next = true)
         SwitchExerciseSection(state, viewModel)
+        AddSetSection(state, viewModel)
     } else if (state.adHoc) {
         AdHocForm(state, viewModel)
         PrepAdjuster(state, viewModel)

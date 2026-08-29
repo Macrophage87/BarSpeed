@@ -256,6 +256,11 @@ private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (record.failed) VerdictChip("FAILED", ChipTone.BAD)
         if (record.warmup) VerdictChip("WARM-UP", ChipTone.NEUTRAL)
+        // Beside WARM-UP because it answers the same kind of question about the
+        // set -- what KIND of set was this -- and because an appended set
+        // carries no plannedReps, so without the chip it reads on this screen
+        // as a prescribed set whose prescription went missing (#177).
+        if (record.added) VerdictChip("ADDED", ChipTone.NEUTRAL)
         if (record.repsManual) VerdictChip("MANUAL COUNT", ChipTone.NEUTRAL)
         record.rpe?.let { VerdictChip("RPE $it", if (it >= 10) ChipTone.WARN else ChipTone.NEUTRAL) }
         record.actualDurationS?.let { actual ->

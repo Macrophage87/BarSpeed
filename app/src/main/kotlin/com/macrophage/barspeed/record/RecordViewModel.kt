@@ -389,6 +389,12 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
     rpe = p.rating?.rpe,
     failed = failed,
     warmup = p.rating?.warmup == true,
+    // Off the FROZEN slot, never off live state: the queue has already moved on
+    // by the time a retry runs, and the question this answers is about the set
+    // that was performed. An ad-hoc set has no slot and is not appended to
+    // anything -- it is its own thing, and false is the right answer for it
+    // rather than a missing one (#177).
+    added = p.slot?.isAddedSet == true,
 )
 
 /**
@@ -731,6 +737,89 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
     )
 
 /**
+ * Add one more set of the exercise the lifter is on, at the values they are
+ * standing on right now (#177).
+ *
+ * The owner's case is in his own session's capture twice. Sets 4 and 5 of
+ * field-33 are a seated overhead press prescribed 8 at 40 lb, recorded 7 and
+ * failed, then dropped to 30 lb for a completed 8 -- the load was wrong for
+ * the day and correcting it cost a set. Sets 14 to 16 are a lat pulldown
+ * whose 60 lb opener is marked warm-up and whose working weight, 75 lb, was
+ * found only after it. When the first set reveals the load was wrong, the
+ * plan's remaining set count is the wrong count, and what the lifter wants
+ * is one more set of the exercise they are on -- without editing the plan,
+ * without an ad-hoc session, and without the added set being
+ * indistinguishable from a prescribed one afterwards.
+ *
+ * WHAT IT INHERITS. [carriedValues] -- the same function the bake uses, not
+ * a second copy of it -- so the appended slot opens on the carried load, the
+ * carried rep count or hold, and the carried tempo: what is STANDING, which
+ * after #124, #174 and #148 may be something the lifter said several sets
+ * ago. A set that reverted to the prescription would re-create the problem
+ * it exists to solve, by offering back the 40 lb that just failed.
+ *
+ * WHAT IT DOES NOT INHERIT. Every frozen declaration is cleared. Nothing
+ * prescribed this set, so `plannedLoadKg`, `plannedReps`, `plannedDurationS`
+ * and `plannedTempo` are null and their absence is a statement. That is what
+ * keeps #157's frozen figures honest for the sets that DO have one, and what
+ * makes `PlanValueCaption` draw nothing rather than claiming a prescription
+ * (#175).
+ *
+ * A CONSEQUENCE, STATED RATHER THAN HIDDEN. Because the appended slot
+ * declares nothing, `SetLoadPolicy.standingStatedAddedKg` and its three
+ * neighbours compare a declaration against a null and stop the carry AT it
+ * -- so a load the lifter states AFTER appending, on some set in between,
+ * does not reach the appended set. The values snapshotted here do. That is a
+ * re-statement the lifter has to make, not silent data loss: the rest
+ * screen's box shows the snapshot and the set records exactly what the box
+ * shows, which is the property #45 and #124 are about. Making the carry
+ * reach it would mean teaching four policies that an appended set prescribes
+ * no change, and that is a wider change than this issue.
+ *
+ * A FREE FUNCTION taking what it needs, for [jumpedState]'s reason:
+ * [RecordViewModel] is a class detekt measures as being AT its size limit, and
+ * this method's body took it over -- measured, not guessed, by running detekt
+ * with the body inline.
+ *
+ * WHERE IT GOES is [addedSetIndex]'s, which is pure and pinned in
+ * `PlanQueueTest`. The block's remaining sets keep their place; the appended
+ * set follows them.
+ *
+ * `setIndexInExercise` is the previous slot's plus one, which is both what
+ * the heading counts from and what makes the NEXT append land after this one
+ * -- `addedSetIndex` walks the block by that index, so an appended slot has
+ * to read as a continuation of it. `setsInExercise` is set to match, so the
+ * card cannot say "Set 4 of 3"; the prescribed sets keep the plan's own
+ * count, because that is what the plan asked of them.
+ *
+ * `isExerciseChange` is false and no other slot's flag is recomputed. The
+ * insertion point is inside the block or at its end, so the appended set's
+ * predecessor is always the same exercise, and the slot after the insertion
+ * point keeps whichever answer it already had.
+ *
+ * Repeatable, and removal is out of scope (#177 item 5): nothing here
+ * shortens the queue.
+ */
+private fun appendedQueue(s: RecordState): List<PlannedSlot>? {
+    if (s.adHoc) return null
+    val upcoming = s.upcomingSlot ?: return null
+    val at = addedSetIndex(s.queue.map { QueueBlockKey(it.exercise.id, it.setIndexInExercise) }, s.upcomingIndex)
+    val previous = s.queue[at - 1]
+    val appended =
+        carriedValues(upcoming, s).copy(
+            plannedLoadKg = null,
+            plannedReps = null,
+            plannedDurationS = null,
+            plannedTempo = null,
+            isAddedSet = true,
+            isExerciseChange = false,
+            setIndexInExercise = previous.setIndexInExercise + 1,
+            setsInExercise = previous.setIndexInExercise + 2,
+        )
+    return s.queue.toMutableList().apply { add(at, appended) }
+}
+
+/**
  * The state "Equipment busy? Switch exercise" leaves behind.
  *
  * A free function taking what it needs, rather than a method, for the reason
@@ -775,6 +864,37 @@ private fun jumpedState(s: RecordState, done: List<PlannedSlot>, fixed: List<Pla
         durationInput = upcoming.durationS?.toString() ?: s.durationInput,
         tempoInput = upcoming.tempo ?: "",
     )
+}
+
+/**
+ * Equipment busy: the chosen exercise's remaining sets pulled forward so they
+ * are done next, keeping everything else in order -- or null when nothing
+ * moves. Deviating set order is fine; recorded sets keep their actual
+ * timestamps.
+ *
+ * MOVED OUT OF [RecordViewModel] UNCHANGED by #177, and behaviour-preserving:
+ * every expression is the one that was inside the method, the three early
+ * returns became three nulls, and the caller writes what comes back. It moved
+ * because that class is AT detekt's LargeClass threshold -- measured, not
+ * guessed: adding #177's four-line entry point reds `:app:detekt`, which is
+ * CI's first step. This is the same relief [jumpedState], [restingState] and
+ * [advancedState] were each extracted for, and their KDocs say so.
+ */
+private fun jumpedToExerciseState(s: RecordState, exerciseId: String): RecordState? {
+    if (s.adHoc) return null
+    val done = s.queue.take(s.upcomingIndex)
+    val remaining = s.queue.drop(s.upcomingIndex)
+    if (remaining.firstOrNull()?.exercise?.id == exerciseId) return null
+    val (target, others) = remaining.partition { it.exercise.id == exerciseId }
+    if (target.isEmpty()) return null
+    val reordered = target + others
+    // Recompute "move the sensor" boundaries for the new order.
+    val fixed =
+        reordered.mapIndexed { i, slot ->
+            val prevId = if (i == 0) done.lastOrNull()?.exercise?.id else reordered[i - 1].exercise.id
+            slot.copy(isExerciseChange = prevId != null && prevId != slot.exercise.id)
+        }
+    return jumpedState(s, done, fixed)
 }
 
 /**
@@ -1862,27 +1982,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /**
-     * Equipment busy: pull the chosen exercise's remaining sets forward so they
-     * are done next, keeping everything else in order (deviating set order is fine
-     * — recorded sets keep their actual timestamps).
-     */
+    /** Equipment busy: every decision is [jumpedToExerciseState]'s; this is the tap. */
     fun jumpToExercise(exerciseId: String) {
-        val s = stateFlow.value
-        if (s.adHoc) return
-        val done = s.queue.take(s.upcomingIndex)
-        val remaining = s.queue.drop(s.upcomingIndex)
-        if (remaining.firstOrNull()?.exercise?.id == exerciseId) return
-        val (target, others) = remaining.partition { it.exercise.id == exerciseId }
-        if (target.isEmpty()) return
-        val reordered = target + others
-        // Recompute "move the sensor" boundaries for the new order.
-        val fixed =
-            reordered.mapIndexed { i, slot ->
-                val prevId = if (i == 0) done.lastOrNull()?.exercise?.id else reordered[i - 1].exercise.id
-                slot.copy(isExerciseChange = prevId != null && prevId != slot.exercise.id)
-            }
-        stateFlow.value = jumpedState(s, done, fixed)
+        stateFlow.value = jumpedToExerciseState(stateFlow.value, exerciseId) ?: return
+    }
+
+    /** One more set of the current exercise (#177); every decision is [appendedQueue]'s. */
+    fun addSetOfCurrentExercise() {
+        stateFlow.value = stateFlow.value.copy(queue = appendedQueue(stateFlow.value) ?: return)
     }
 
     fun startAdHocSession() {

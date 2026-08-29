@@ -242,6 +242,7 @@ class SessionExporter(
             rpe = record.rpe,
             failed = record.failed,
             warmup = record.warmup,
+            added = record.added,
             plannedPrepS = record.plannedPrepS,
             prepS = record.prepS,
             restS = record.plannedRestS,
@@ -624,6 +625,10 @@ class RawExporter(
         num("rpe", record.rpe)
         flag("failed", record.failed)
         flag("warmup", record.warmup)
+        // [flag], never [bool]: absence must go on reading as "prescribed"
+        // for every archive already written, and a `false` here would change
+        // the bytes of every past session's manifest for no gain (#177).
+        flag("added", record.added)
         flag("repsManual", record.repsManual)
         str("tempoPrescribed", record.tempo)
         // The prep, both halves. [num] drops a null, which is right -- a set

@@ -140,15 +140,29 @@ data class QueueBlockKey(val exerciseId: String, val setIndexInExercise: Int)
  * The answer is an INSERTION index, so a return of `blocks.size` means "at the
  * end" and is a valid answer rather than an error.
  *
- * NAIVE FOR NOW, DELIBERATELY. This commit returns `upcomingIndex + 1` --
- * immediately next, which is what incidental ordering gives you and what #177
- * item 3 says is wrong. The block rule and the differentials that red without
- * it land together in the fix commit; what this commit adds is the seam and the
- * two answers both rules agree on.
+ * THE BLOCK ENDS WHERE THE NEXT ONE STARTS, and a block start is
+ * `setIndexInExercise == 0` -- `SetLoadPolicy.sameExerciseBlock`'s rule, read
+ * from here rather than restated. The exercise id alone cannot end a block: a
+ * session may run one movement in two consecutive blocks, and scanning on the
+ * id would queue a set added to the opening squat block after the closing one,
+ * three exercises later. Both conditions are needed and neither is sufficient.
+ *
+ * REPEATABLE BY CONSTRUCTION. An appended slot carries the next index in the
+ * block, so the scan runs through it and a second addition lands after the
+ * first. That is item 4 falling out of the rule rather than being special-cased
+ * -- a rule that looked for the last PRESCRIBED set would have to grow a
+ * counter, and the counter is what would assume at most one.
+ *
+ * Removal is out of scope (#177 item 5) and nothing here shortens a queue.
  */
 fun addedSetIndex(blocks: List<QueueBlockKey>, upcomingIndex: Int): Int {
     if (upcomingIndex !in blocks.indices) return blocks.size
-    return upcomingIndex + 1
+    val exerciseId = blocks[upcomingIndex].exerciseId
+    var i = upcomingIndex + 1
+    while (i < blocks.size && blocks[i].exerciseId == exerciseId && blocks[i].setIndexInExercise > 0) {
+        i++
+    }
+    return i
 }
 
 /** Plain-language verdicts for a hold or carry, which is judged on the clock alone. */

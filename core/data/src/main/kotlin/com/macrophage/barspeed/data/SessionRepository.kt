@@ -330,6 +330,7 @@ class SessionRepository(
                 rpe = set.rpe,
                 failed = set.failed,
                 warmup = set.warmup,
+                added = set.added,
                 tempo = set.tempo,
                 targetMeanConVelMps = set.targetMeanConVelMps,
                 velocityLossStopPct = set.velocityLossStopPct,
