@@ -1033,6 +1033,13 @@ class SchemaContractTest {
      * no key changes type or stops being written -- the same shape 1.4, 1.8,
      * 1.9, 1.12 and `duration_s` each have. Leaving the old sentence standing
      * would publish a count that undercounts the re-checks a 1.12 reader owes.
+     *
+     * It moved a second time, to six changes and three non-additive, for #174:
+     * `plannedReps` and `plannedDuration_s` now publish the plan's frozen
+     * declaration rather than the box the lifter left behind, so the VALUE both
+     * keys carry changes on every set the lifter edited. This assertion is what
+     * reddened when that entry was first written -- the count sentence is
+     * pinned here and nowhere else.
      */
     @Test
     fun `the 1_13 version log names the session rating and still flags which changes are not additive`() {
@@ -1048,7 +1055,8 @@ class SchemaContractTest {
             "the version log lost the duration_s half of 1.13",
         )
         assertTrue(
-            "exactly two of the five -- `duration_s` and `voiceCues` -- are not additive" in description,
+            "exactly three of the six -- `duration_s`, `voiceCues` and the `plannedReps` / " +
+                "`plannedDuration_s` pair -- are not additive" in description,
             "the version log no longer says which of 1.13's changes a 1.12 reader must be re-checked against",
         )
     }

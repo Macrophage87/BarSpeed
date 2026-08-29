@@ -29,8 +29,10 @@ data class CompletedSet(
     /**
      * Timed sets (planks, carries): recorded and planned hold/carry seconds.
      *
-     * `actualDurationS` is the prescription on a set that ran to its planned
-     * end (#168), the measurement on one the lifter stopped, and the stated
+     * `actualDurationS` is the seconds the set was working to on a set that
+     * ran to its planned end (#168) -- `plannedDurationS` unless the lifter
+     * changed the hold in the change-set dialog, in which case theirs -- the
+     * measurement on one the lifter stopped, and the stated
      * figure on one corrected afterwards from the rest screen. This is the
      * object [SessionRepository.recordSet] fills [SetRecordEntity] from, so
      * the two carry the same three cases and neither says which one a given
@@ -435,8 +437,9 @@ class SessionRepository(
      *
      * The counterpart of [overrideReps] for the sets that have no reps. Its
      * one caller is the post-set addition #168 puts on the rest screen: a
-     * timed set now ends when its clock reaches the prescription, so a hold
-     * the lifter genuinely carried on past it is stated here afterwards
+     * timed set now ends when its clock reaches the seconds it was working
+     * to, so a hold the lifter genuinely carried on past it is stated here
+     * afterwards
      * rather than mid-set, where the owner would never see it.
      *
      * Unlike [overrideReps] this sets no "corrected by the lifter" flag,

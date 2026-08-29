@@ -816,7 +816,8 @@ private fun inSetState(s: RecordState, manualSet: Boolean, guidedSet: Boolean, p
  * lifter felt they failed.
  *
  * Why the correction is here at all, and post-set rather than mid-set: a hold
- * or a carry now ends when its clock reaches the prescription, so the recorded
+ * or a carry now ends when its clock reaches the seconds it was working to,
+ * so the recorded
  * figure is the announced one and the walk back to the phone is no longer
  * inside it. The rare deliberate overage is stated on the rest screen, where
  * every other post-set correction already lives, because the owner does not
@@ -1159,7 +1160,14 @@ private fun bakedState(s: RecordState, next: PlannedSlot, index: Int): RecordSta
                 declaredAddedKg = next.loadKg,
                 statedAddedKg = s.statedLoadKg,
             ),
-            // Behaviour-identical to the two `?:` expressions this replaces.
+            // NOT behaviour-identical to the two `?:` expressions on main,
+            // which read `s.repsInput.toIntOrNull() ?: next.reps` and
+            // `s.durationInput.toIntOrNull() ?: next.durationS`. c1 moved those
+            // verbatim into SetRepsPolicy; this commit changes what is handed
+            // to them. The outcome coincides on a validated plan only because
+            // the boxes are re-seeded from the very declaration they fall back
+            // to, and PlanSetDef.validate requires exactly one of reps /
+            // duration_s, so no slot the bake reads is countless.
             // The rule is SetRepsPolicy's now for the reason the load's is
             // SetLoadPolicy's: it is about to grow a boundary, and a rule that
             // grows in :app grows where no test on the CI path can reach it.

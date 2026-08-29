@@ -101,8 +101,10 @@ data class SetRecordEntity(
     /**
      * Timed sets (planks, carries): recorded and planned hold/carry seconds.
      *
-     * `actualDurationS` is the prescription on a set that ran to its planned
-     * end (#168), the measurement on one the lifter stopped, and the stated
+     * `actualDurationS` is the seconds the set was working to on a set that
+     * ran to its planned end (#168) -- `plannedDurationS` unless the lifter
+     * changed the hold in the change-set dialog, in which case theirs -- the
+     * measurement on one the lifter stopped, and the stated
      * figure on one corrected afterwards from the rest screen. No column
      * says which: reps have `repsManual` and seconds have no counterpart,
      * and adding one is a migration #168 deliberately did not make.

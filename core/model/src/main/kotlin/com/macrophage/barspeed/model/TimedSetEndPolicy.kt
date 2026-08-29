@@ -105,8 +105,9 @@ object TimedSetEndPolicy {
      * [autoEnded] says the set ended because [endsNow] said so rather than
      * because the lifter ended it.
      *
-     * A set that ran to its planned end records the prescription exactly,
-     * and nothing else does.
+     * A set that ran to its planned end records the seconds it was working
+     * to exactly -- [targetS], which is the plan's declaration unless the
+     * lifter changed the hold -- and nothing else does.
      *
      * Not a rounding nicety. The tick loop counts ticks and [measuredS] comes
      * off `System.currentTimeMillis()` deltas, so the two disagree by whatever
@@ -117,10 +118,10 @@ object TimedSetEndPolicy {
      * process drifts the other way and records a hold that ran to its word as
      * having fallen short of it.
      *
-     * Recording the prescription is honest here precisely BECAUSE the app
-     * ended the set: the instant is the app's, announced a second earlier by
-     * the same figure, so the prescription is the measurement of an event the
-     * app itself timed. It is not honest anywhere else, which is why the
+     * Recording [targetS] is honest here precisely BECAUSE the app ended the
+     * set: the instant is the app's, announced a second earlier by the same
+     * figure, so that figure is the measurement of an event the app itself
+     * timed. It is not honest anywhere else, which is why the
      * lifter's own end returns the measurement untouched -- a hold stopped
      * short is never rounded up to what it was asked for.
      *

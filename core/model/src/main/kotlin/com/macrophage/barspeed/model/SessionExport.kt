@@ -241,9 +241,11 @@ data class SetExport(
     /**
      * Hold/carry seconds recorded for timed sets (planks, farmer's walks).
      *
-     * Since #168 a timed set ENDS when its clock reaches
-     * [plannedDurationS], so a set that ran to its target publishes that
-     * figure; one the lifter ended by hand publishes what it lasted, and one
+     * Since #168 a timed set ENDS when its clock reaches the seconds the set
+     * was working to -- [plannedDurationS] unless the lifter changed the hold
+     * in the change-set dialog, in which case theirs -- so a set that ran to
+     * its target publishes [plannedDurationS] only when the lifter did not
+     * change it; one the lifter ended by hand publishes what it lasted, and one
      * corrected afterwards on the rest screen publishes the corrected
      * seconds. The three are not distinguishable from each other here --
      * [repsManual] has no counterpart for duration -- so a reader comparing

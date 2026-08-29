@@ -1132,6 +1132,12 @@ private fun MoveSensorCard(exerciseName: String) {
  * DUMB. The wording is [BodyweightLoadDisplay.fieldLabel]'s, which is in a
  * module where a test can read it; this reads the slot and asks.
  */
+private fun loadFieldLabel(slot: PlannedSlot?, unit: WeightUnit): String = BodyweightLoadDisplay.fieldLabel(
+    bodyweight = slot?.exercise?.bodyweight == true,
+    implementCount = slot?.implementCount,
+    unit = unit,
+)
+
 /**
  * What the plan prescribed for the load and for the reps or hold, drawn under
  * the pair of boxes that change them.
@@ -1144,10 +1150,15 @@ private fun MoveSensorCard(exerciseName: String) {
  * own answer about this slot and the one after it. Asking
  * SetLoadPolicy.standingStatedAddedKg and SetRepsPolicy whether the value on
  * screen would still stand for the set after this one is the same call
- * restingState will make when that set actually arrives, so the sentence and
- * the behaviour cannot disagree: on the last set of a block, and wherever the
- * plan prescribes a different number next, the answer is null and the caption
- * says the change is recorded rather than claiming a reach it does not have.
+ * restingState will make when that set actually arrives, with one argument
+ * different -- this passes the parsed box where restingState passes
+ * state.statedLoadKg / statedReps / statedDurationS. The two agree wherever a
+ * caption is drawn at all, because a caption is drawn only when the box's
+ * rendered text differs from the plan's and an untouched box is re-seeded from
+ * that same declaration. So the sentence and the behaviour cannot disagree: on
+ * the last set of a block, and wherever the plan prescribes a different number
+ * next, the answer is null and the caption says the change is recorded rather
+ * than claiming a reach it does not have.
  *
  * The PLANNED side is the FROZEN declaration and the SHOWN side is the box, so
  * the caption names the plan's prescription and the lifter's standing
@@ -1212,12 +1223,6 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
         Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     }
 }
-
-private fun loadFieldLabel(slot: PlannedSlot?, unit: WeightUnit): String = BodyweightLoadDisplay.fieldLabel(
-    bodyweight = slot?.exercise?.bodyweight == true,
-    implementCount = slot?.implementCount,
-    unit = unit,
-)
 
 /**
  * "= 2 × 45 lb each" under the load box, recomputed on every keystroke.
@@ -2438,8 +2443,9 @@ private fun RpeTile(option: RpeOption, selected: Boolean, modifier: Modifier = M
 /**
  * Held it longer than the app stopped you at? State it here (#168).
  *
- * A hold or a carry now ends when its clock reaches the prescription, so the
- * recorded figure is the announced one and the phone-retrieval walk is no
+ * A hold or a carry now ends when its clock reaches the seconds it was
+ * working to, so the recorded figure is the announced one and the
+ * phone-retrieval walk is no
  * longer inside it. The rare genuine overage -- the lifter deliberately
  * carrying on past the word -- is stated on the rest screen and nowhere else,
  * because the owner does not look at the phone mid-set: "There are rare
