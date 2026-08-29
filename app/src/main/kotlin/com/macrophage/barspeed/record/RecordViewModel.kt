@@ -86,6 +86,27 @@ data class PlannedSlot(
     val reps: Int?,
     /** Hold/carry seconds for timed sets (plank, farmer's walk); null for rep sets. */
     val durationS: Int? = null,
+    /**
+     * The rep count the PLAN declared for this set, frozen and never written
+     * back to, the way [plannedLoadKg] is for load and [plannedTempo] for tempo.
+     *
+     * [reps] carries the lifter's edit once `advancedState` has baked it in;
+     * this does not. Three things turn on the difference. It is what lets
+     * [SetRepsPolicy.standingStatedReps] tell "the plan prescribes 10 / 8 / 6"
+     * from "the lifter changed the count and it is still standing", which is
+     * the whole of #174's trap. It is what the export publishes as
+     * `plannedReps`, so a coach can see the deviation -- until now the export
+     * published the edit and called it the plan (#157). And it is what the
+     * rest screen's deviation line compares against, so a count changed and
+     * changed back no longer reads as no change (#170 item 6).
+     *
+     * Null on a slot the plan declared no count for, and on a slot built
+     * before this field existed -- nothing persists a PlannedSlot, so the
+     * second case lives only inside one running session.
+     */
+    val plannedReps: Int? = null,
+    /** The same for a hold or carry's seconds, frozen beside [durationS]. */
+    val plannedDurationS: Int? = null,
     val loadKg: Double?,
     val plannedLoadKg: Double?,
     val tempo: String?,
@@ -229,11 +250,34 @@ private data class PendingSetWrite(
     /** Paired with [loadKg] by [SetLoadPolicy.recordedPlannedLoadKg], same scale. */
     val plannedLoadKg: Double?,
     val addedKg: Double,
+    /**
+     * The rep count the PLAN prescribed, frozen from `PlannedSlot.plannedReps`
+     * and never the lifter's edit. This is the figure the set is RECORDED
+     * against and the one the export publishes as `plannedReps`; until #174 it
+     * was the edit, so a coach reading the export could not see that the lifter
+     * had deviated at all (#157).
+     */
     val plannedReps: Int?,
+    /**
+     * The rep count the set was actually WORKING TO: the prescription unless
+     * the lifter stated another, in which case theirs.
+     *
+     * Separate from [plannedReps] because the two answer different questions
+     * and only one of them can be right per consumer. This one judges -- the
+     * short-set derivation, the effort grid's gate, the guide's count, the
+     * rest-screen feedback -- because a lifter who said "6 today" and did 6 did
+     * not fail. [plannedReps] records, because what the plan asked for is not
+     * changed by the lifter saying otherwise. Collapsing them is the defect
+     * either way round.
+     */
+    val targetReps: Int?,
     val manualReps: Int?,
     val side: String?,
     val tempoText: String?,
+    /** The hold seconds the PLAN prescribed, frozen. Recorded and exported. */
     val plannedDurationS: Int?,
+    /** The hold seconds the set was working to. Judges, as [targetReps] does. */
+    val targetDurationS: Int?,
     val actualDurationS: Int?,
     /** The prep prescribed and the prep that played, frozen too. */
     val plannedPrepS: Int?,
@@ -661,6 +705,11 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
         // plan never wrote.
         repsInput = queue.firstOrNull()?.reps?.toString() ?: s.repsInput,
         durationInput = queue.firstOrNull()?.durationS?.toString() ?: s.durationInput,
+        // Seeded text is not a statement, one target over from statedLoadKg
+        // above: nothing has been typed for set one yet, so the plan's own
+        // count is what the bake will carry.
+        statedReps = null,
+        statedDurationS = null,
     )
 
 /**
@@ -699,6 +748,11 @@ private fun jumpedState(s: RecordState, done: List<PlannedSlot>, fixed: List<Pla
         // tempo set on the wheels for the exercise the lifter was about to do
         // is not a statement about the one they switched to.
         statedTempo = null,
+        // Cleared for statedLoadKg's reason, two fields over: a rep count or
+        // a hold set for the exercise the lifter was about to do is not a
+        // statement about the one they switched to.
+        statedReps = null,
+        statedDurationS = null,
         repsInput = upcoming.reps?.toString() ?: s.repsInput,
         durationInput = upcoming.durationS?.toString() ?: s.durationInput,
         tempoInput = upcoming.tempo ?: "",
@@ -879,6 +933,26 @@ private fun restingState(
             lastDeclaredTempo = p.slot?.plannedTempo,
             nextDeclaredTempo = nextSlot?.plannedTempo,
         )
+    // The same question again for the rep count and the hold, bounded by the
+    // same block and decided by the same rule. The two slots' FROZEN
+    // declarations on both sides, never their live reps/durationS: the bake
+    // writes the statement into those, so comparing them would compare a
+    // number against itself and a descending 10 / 8 / 6 would flatten to
+    // 12 / 12 / 12 the moment set one was changed. #174.
+    val standingReps =
+        SetRepsPolicy.standingStatedReps(
+            statedReps = s.statedReps,
+            sameExerciseBlock = sameBlock,
+            lastDeclaredReps = p.slot?.plannedReps,
+            nextDeclaredReps = nextSlot?.plannedReps,
+        )
+    val standingDurationS =
+        SetRepsPolicy.standingStatedDurationS(
+            statedDurationS = s.statedDurationS,
+            sameExerciseBlock = sameBlock,
+            lastDeclaredDurationS = p.slot?.plannedDurationS,
+            nextDeclaredDurationS = nextSlot?.plannedDurationS,
+        )
     val seedKg =
         SetLoadPolicy.seedAddedKg(
             hasPlannedNext = nextSlot != null,
@@ -902,10 +976,17 @@ private fun restingState(
             addedKg = p.addedKg,
             implementCount = p.slot?.implementCount,
             analysis = analysis,
-            plannedReps = p.plannedReps,
+            // The WORKING targets, not the plan's frozen prescription. This
+            // feedback is about the set just finished -- what it was trying to
+            // do -- and the hold verdict beside it reads the same pair: a
+            // lifter who cut a 45 s plank to 30 and held 30 made their hold,
+            // and grading them against the 45 the plan wrote would call it
+            // short for a change they made deliberately. The prescription is
+            // recorded separately and is what the export publishes.
+            plannedReps = p.targetReps,
             tempo = p.tempoText,
             actualDurationS = p.actualDurationS,
-            plannedDurationS = p.plannedDurationS,
+            plannedDurationS = p.targetDurationS,
             side = p.side,
             explosive = p.exercise.kind == ExerciseKind.EXPLOSIVE,
             repsOverride = p.manualReps,
@@ -927,8 +1008,17 @@ private fun restingState(
         // disagree.
         loadInput = (standingKg ?: seedKg)?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
         statedLoadKg = standingKg,
-        repsInput = (nextSlot?.reps ?: p.plannedReps ?: 5).toString(),
-        durationInput = (nextSlot?.durationS ?: p.plannedDurationS)?.toString() ?: s.durationInput,
+        // Same arrangement as the load one line up: a statement that still
+        // stands is shown ahead of the plan's number, so the box and what the
+        // set would record cannot disagree. The fallbacks are the WORKING
+        // targets of the set just finished, not its frozen prescription --
+        // they are reached only when the plan has run out, where what the
+        // lifter last did is the only thing to go on.
+        repsInput = (standingReps ?: nextSlot?.reps ?: p.targetReps ?: 5).toString(),
+        statedReps = standingReps,
+        durationInput =
+        (standingDurationS ?: nextSlot?.durationS ?: p.targetDurationS)?.toString() ?: s.durationInput,
+        statedDurationS = standingDurationS,
         statedTempo = standingTempo,
         // The AD-HOC field. On a plan session nothing draws or reads it -- the
         // wheels read statedTempo above, falling back to the slot's own
@@ -977,8 +1067,14 @@ private fun tempoAdjustedState(s: RecordState, position: Int, value: String): Re
  * reachable defect: resolve reads the typed field, never the stated one, on an
  * ad-hoc set.
  */
-private fun adHocSessionState(s: RecordState): RecordState =
-    s.copy(stage = Stage.READY, adHoc = true, queue = emptyList(), statedLoadKg = null)
+private fun adHocSessionState(s: RecordState): RecordState = s.copy(
+    stage = Stage.READY,
+    adHoc = true,
+    queue = emptyList(),
+    statedLoadKg = null,
+    statedReps = null,
+    statedDurationS = null,
+)
 
 /**
  * The state tapping through to the next planned set leaves behind, with any
@@ -999,7 +1095,15 @@ private fun adHocSessionState(s: RecordState): RecordState =
  */
 private fun advancedState(s: RecordState): RecordState {
     val next = s.nextSlot
-    if (s.adHoc || next == null) return s.copy(stage = Stage.READY, statedLoadKg = null, statedTempo = null)
+    if (s.adHoc || next == null) {
+        return s.copy(
+            stage = Stage.READY,
+            statedLoadKg = null,
+            statedTempo = null,
+            statedReps = null,
+            statedDurationS = null,
+        )
+    }
     return bakedState(s, next, s.queueIndex + 1)
 }
 
@@ -1059,20 +1163,29 @@ private fun bakedState(s: RecordState, next: PlannedSlot, index: Int): RecordSta
             // The rule is SetRepsPolicy's now for the reason the load's is
             // SetLoadPolicy's: it is about to grow a boundary, and a rule that
             // grows in :app grows where no test on the CI path can reach it.
+            // statedReps / statedDurationS, not the text boxes. The boxes are
+            // re-seeded on every rest transition and hold a number whether or
+            // not the lifter typed one; reading them here is the same mistake
+            // #45 was for the load, where a seeded field was read back as a
+            // statement the lifter never made. What displaces the plan's
+            // declaration is a count the lifter actually gave, and nothing
+            // else.
+            //
+            // plannedReps and plannedDurationS are deliberately not in this
+            // copy: they stay frozen at the plan's declaration so restingState
+            // can tell a prescribed change from a standing statement one set
+            // later, and so the export can publish what was prescribed.
             reps =
             if (next.isTimed) {
                 next.reps
             } else {
-                SetRepsPolicy.carriedIntoNextSet(
-                    declaredReps = next.reps,
-                    statedReps = s.repsInput.toIntOrNull(),
-                )
+                SetRepsPolicy.carriedIntoNextSet(declaredReps = next.reps, statedReps = s.statedReps)
             },
             durationS =
             if (next.isTimed) {
                 SetRepsPolicy.carriedDurationIntoNextSet(
                     declaredDurationS = next.durationS,
-                    statedDurationS = s.durationInput.toIntOrNull(),
+                    statedDurationS = s.statedDurationS,
                 )
             } else {
                 next.durationS
@@ -1124,7 +1237,21 @@ data class RecordState(
      */
     val statedLoadKg: Double? = null,
     val repsInput: String = "5",
+    /**
+     * The rep count the lifter has stated for the set now being set up, and
+     * null when they have stated nothing for it.
+     *
+     * A different fact from [repsInput], exactly as [statedLoadKg] is a
+     * different fact from [loadInput]: the text is one string reused across
+     * every set of a session and re-seeded on every rest transition, while this
+     * is written only by [RecordViewModel.updateRepsInput] -- a keystroke -- or
+     * by [SetRepsPolicy.standingStatedReps] ruling that an earlier keystroke
+     * still applies. Seeding the text does NOT set it. #174.
+     */
+    val statedReps: Int? = null,
     val durationInput: String = "60",
+    /** The hold analogue of [statedReps], one target over. */
+    val statedDurationS: Int? = null,
     /** Ad-hoc unilateral side: null (bilateral), "left", or "right". */
     val sideInput: String? = null,
     /**
@@ -1722,12 +1849,17 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = s.copy(loadInput = text, statedLoadKg = s.weightUnit.parseToKg(text))
     }
 
+    // The keystroke is the only thing that makes a count a STATEMENT, which is
+    // updateLoadInput's arrangement one target over: the text and the statement
+    // are written together here and nowhere else, so a re-seed of the text
+    // cannot manufacture one. An unparseable box states nothing rather than
+    // stating zero -- a lifter mid-retype has not asked for a zero-rep set.
     fun updateRepsInput(text: String) {
-        stateFlow.value = stateFlow.value.copy(repsInput = text)
+        stateFlow.value = stateFlow.value.copy(repsInput = text, statedReps = text.trim().toIntOrNull())
     }
 
     fun updateDurationInput(text: String) {
-        stateFlow.value = stateFlow.value.copy(durationInput = text)
+        stateFlow.value = stateFlow.value.copy(durationInput = text, statedDurationS = text.trim().toIntOrNull())
     }
 
     fun selectSide(side: String?) {
@@ -2207,9 +2339,21 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // reading, so a compliant set cannot disagree with itself: #25.
         val plannedLoadKg =
             SetLoadPolicy.recordedPlannedLoadKg(exercise.bodyweight, s.bodyWeightKg, slot?.plannedLoadKg)
-        val plannedReps = if (s.adHoc) s.repsInput.toIntOrNull() else slot?.reps
+        // THREE numbers, and this is where they part. The plan's PRESCRIPTION
+        // comes off the frozen declaration and is what the set is recorded and
+        // exported against; the WORKING target is the slot's live count, which
+        // carries the lifter's standing statement, and is what every judgment
+        // reads. An ad-hoc set has no plan, so the typed box is both.
+        val plannedReps = if (s.adHoc) s.repsInput.toIntOrNull() else slot?.plannedReps
+        val targetReps = s.currentTargetReps
         val side = if (s.adHoc) s.sideInput else slot?.side
-        val plannedDurationS = if (isTimed) s.currentTimedTargetS else null
+        val plannedDurationS =
+            when {
+                !isTimed -> null
+                s.adHoc -> s.durationInput.toIntOrNull()
+                else -> slot?.plannedDurationS
+            }
+        val targetDurationS = if (isTimed) s.currentTimedTargetS else null
         // Measured from the instant the set's CLOCK started, which is not the
         // instant recording started once a prep sits in front of a hold. The
         // rule is SetClockPolicy's, in a module with tests; this hands it both
@@ -2230,7 +2374,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 tappedAtMs = setStartedAtMs,
                 clockStartedAtMs = clockStartedAtMs,
                 endedAtMs = endedAtMs,
-                targetS = plannedDurationS,
+                // The target the CLOCK ran to, which is the lifter's if they
+                // set one: #168 replaces a measured 61 with the target it was
+                // counting down, and the countdown ran to what was on screen.
+                targetS = targetDurationS,
                 autoEnded = autoEndedSet,
             )
         val tempoText =
@@ -2254,10 +2401,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 plannedLoadKg = plannedLoadKg,
                 addedKg = addedKg,
                 plannedReps = plannedReps,
+                targetReps = targetReps,
                 manualReps = manualReps,
                 side = side,
                 tempoText = tempoText,
                 plannedDurationS = plannedDurationS,
+                targetDurationS = targetDurationS,
                 actualDurationS = actualDurationS,
                 plannedPrepS = plannedPrepSForSet,
                 prepS = prepSForSet,
@@ -2282,7 +2431,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 planSessionName = s.planSessionName.takeIf { !s.adHoc },
                 targets =
                 SetTargets(
-                    plannedReps = plannedReps,
+                    // The working target: SetAnalyzer grades the reps it
+                    // detected against what the set was trying to do.
+                    plannedReps = targetReps,
                     countedReps = if (s.manualSet) s.manualReps else null,
                     tempo = tempoText?.let { Tempo.parseOrNull(it) },
                     targetMeanConcentricVelocityMps = slot?.targetMeanConVelMps,
@@ -2387,7 +2538,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         0.0,
                         null,
                         null,
-                        timedVerdicts(p.actualDurationS, p.plannedDurationS),
+                        // The working target, the same figure the rest
+                        // screen's hold verdict reads: "Held 30s -- full 30s
+                        // target" on a hold the lifter shortened to 30, not
+                        // "30s of 45s -- just short".
+                        timedVerdicts(p.actualDurationS, p.targetDurationS),
                     )
                     p.samples.size >= 8 ->
                         // The set's own cue track, frozen into the pending
@@ -2426,14 +2581,20 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 // up -- so nothing observable changes here; fellShort simply
                 // declines to grade an absent figure rather than reading it as
                 // a zero-second hold.
-                p.isTimed && p.plannedDurationS != null ->
-                    TimedSetEndPolicy.fellShort(p.actualDurationS, p.plannedDurationS)
-                p.manualReps != null && p.plannedReps != null -> p.manualReps < p.plannedReps
+                // Judged against the WORKING target, never the frozen
+                // prescription. A lifter who states 6 and does 6 has not
+                // stopped early; judging them against the plan's 8 would
+                // record a failed set for a change they made deliberately,
+                // and after #137 that reaches the RPE record. The deviation
+                // is still visible, because plannedReps is stored beside it.
+                p.isTimed && p.targetDurationS != null ->
+                    TimedSetEndPolicy.fellShort(p.actualDurationS, p.targetDurationS)
+                p.manualReps != null && p.targetReps != null -> p.manualReps < p.targetReps
                 else -> false
             }
         // The lifter's tap is authoritative for effort, but a set that ended
         // short of its target is still a failed set — both facts are recorded.
-        val failed = ratings.onSetRecorded(p.plannedReps, p.plannedDurationS, stoppedEarly, p.rating)
+        val failed = ratings.onSetRecorded(p.targetReps, p.targetDurationS, stoppedEarly, p.rating)
 
         // Reusing an id already returned is what keeps a retry from writing the
         // set twice. The rating travels with the row rather than following it as

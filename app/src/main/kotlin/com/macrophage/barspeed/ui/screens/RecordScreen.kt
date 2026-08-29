@@ -905,10 +905,17 @@ private fun DeviationLine(state: RecordState, slot: PlannedSlot) {
             unit = state.weightUnit,
             plannedLoadKg = slot.plannedLoadKg,
             statedLoadKg = state.statedLoadKg,
-            plannedReps = if (slot.isTimed) null else slot.reps,
-            statedReps = if (slot.isTimed) null else state.repsInput.toIntOrNull(),
-            plannedDurationS = if (slot.isTimed) slot.durationS else null,
-            statedDurationS = if (slot.isTimed) state.durationInput.toIntOrNull() else null,
+            // The FROZEN declarations on the planned side and the lifter's
+            // statement on the other, which is what the load and the tempo
+            // above already do. Until #174 froze them these read slot.reps and
+            // slot.durationS, which advancedState bakes the edit into: on
+            // READY the bake has already run, so the line compared a number
+            // against itself and a rep count changed and changed back read as
+            // no change. #170 item 6.
+            plannedReps = if (slot.isTimed) null else slot.plannedReps,
+            statedReps = if (slot.isTimed) null else state.statedReps ?: slot.reps,
+            plannedDurationS = if (slot.isTimed) slot.plannedDurationS else null,
+            statedDurationS = if (slot.isTimed) state.statedDurationS ?: slot.durationS else null,
             plannedTempo = slot.plannedTempo,
             tempo = state.statedTempo ?: slot.tempo,
             plannedPrepS = state.plannedPrepSecondsFor(slot),

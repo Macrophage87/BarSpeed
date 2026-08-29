@@ -50,44 +50,71 @@ object SetRepsPolicy {
      * The rep count the lifter STATED that still stands for the set coming up,
      * or null when that set is offered whatever its own slot declares.
      *
-     * THIS IS THE SHIPPED BEHAVIOUR, WRITTEN DOWN, NOT THE FIX. Today a rep
-     * count typed for one set reaches that set and no further: the rest
-     * transition re-seeds `repsInput` from the plan and nothing carries the
-     * statement, which is #174's report — "while adjustments to the weight stay
-     * between sets, changing reps does not". Returning null unconditionally is
-     * exactly that, in a place a test can state it, so the boundary rules the
-     * carry must inherit can be pinned as differentials against it rather than
-     * asserted against a symbol that does not exist yet.
+     * A rep count typed for one set used to reach that set and no further,
+     * while a load typed for one set held for the block: "while adjustments to
+     * the weight stay between sets, changing reps does not". So a lifter who
+     * drops a set from 8 to 6 because the bar was heavier than the plan thought
+     * had to say so again on every remaining set. #174.
      *
-     * The parameters are [SetLoadPolicy.standingStatedAddedKg]'s, one target
-     * over, and they are already in the signature because the fix must not be
-     * able to change the shape of the question — only the answer.
+     * FOUR BOUNDARIES, INHERITED FROM [SetLoadPolicy.standingStatedAddedKg] AND
+     * NOT REDESIGNED. Read that function for the reasoning; what follows is
+     * what each one means for a count.
+     *
+     * [statedReps] is the statement as it stood when the set that just finished
+     * was written: what the lifter typed for it, null when they typed nothing
+     * or when the box held text that was not a number. Tested against null and
+     * never for truthiness — though unlike a load, where zero is a real
+     * statement, a zero rep count is not a set at all and the control does not
+     * offer one; the null test is what the two policies share rather than a
+     * claim that 0 is meaningful here.
+     *
+     * [sameExerciseBlock] bounds the carry and is [SetLoadPolicy.sameExerciseBlock]'s
+     * answer, passed in.
+     *
+     * [lastDeclaredReps] and [nextDeclaredReps] are the two slots' FROZEN
+     * declarations — `PlannedSlot.plannedReps`, never their `reps`, which the
+     * bake has already written the statement into; comparing those would
+     * compare a number against itself and the carry would never stop. THIS IS
+     * THE RULE THAT KEEPS A DESCENDING SCHEME DESCENDING: a plan writing
+     * 10 / 8 / 6 declares a different count for the next set, so it is
+     * prescribing a change and it is the plan's number the lifter is offered.
+     * Without it, changing set one to 12 would silently make the block
+     * 12 / 12 / 12 — the failure a naive carry produces, and a far worse one
+     * than the load's equivalent, because a rep scheme is usually written to
+     * change and a load is usually written to repeat.
+     *
+     * A null on one side only is not that case: the plan declared no count for
+     * one of the two sets rather than a different one. Null compares unequal to
+     * a number, so the carry drops there. Null on BOTH sides compares equal,
+     * which is a block written without rep targets — sets to failure, an AMRAP
+     * tail — keeping the number the lifter supplied, because nothing else
+     * offers them one.
+     *
+     * A carried count does not touch the frozen declaration. `plannedReps` is
+     * stored beside the count actually performed for every set, so a carry is
+     * visible afterwards as a deviation on each set it reached.
      */
-    // Both suppressions are TRANSIENT and belong to the constant body, not to
-    // the signature: detekt is right that a function returning a constant and
-    // ignoring its arguments is a stub, and it is one. The commit that
-    // implements the carry deletes both.
-    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
     fun standingStatedReps(
         statedReps: Int?,
         sameExerciseBlock: Boolean,
         lastDeclaredReps: Int?,
         nextDeclaredReps: Int?,
-    ): Int? = null
+    ): Int? = statedReps?.takeIf { sameExerciseBlock && lastDeclaredReps == nextDeclaredReps }
 
     /**
-     * The same, for the seconds of a hold or a carry, and shipped in the same
-     * state: a hold the lifter shortened is shortened for one set only.
+     * The same, for the seconds of a hold or a carry: a lifter who cuts a 45 s
+     * plank to 30 has said something about the exercise and not about one set
+     * of it, and a hold block that ramps 30 / 45 / 60 keeps its own seconds
+     * when the opener is changed.
+     *
+     * One rule, written once above and applied here to the other target. The
+     * separate name is what keeps a call site from handing the rep count to the
+     * seconds decision: both are `Int?` and nothing else distinguishes them.
      */
-    // Both suppressions are TRANSIENT and belong to the constant body, not to
-    // the signature: detekt is right that a function returning a constant and
-    // ignoring its arguments is a stub, and it is one. The commit that
-    // implements the carry deletes both.
-    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
     fun standingStatedDurationS(
         statedDurationS: Int?,
         sameExerciseBlock: Boolean,
         lastDeclaredDurationS: Int?,
         nextDeclaredDurationS: Int?,
-    ): Int? = null
+    ): Int? = statedDurationS?.takeIf { sameExerciseBlock && lastDeclaredDurationS == nextDeclaredDurationS }
 }

@@ -55,6 +55,15 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     setsInExercise = exerciseDef.sets.size,
                     reps = set.reps,
                     durationS = set.durationS,
+                    // The same two declarations twice, and one of each pair is
+                    // frozen. `reps` and `durationS` carry the lifter's
+                    // between-sets edit once `advancedState` bakes it in; these
+                    // never do, so a plan that prescribes a CHANGE mid-exercise
+                    // -- 10 / 8 / 6, or a hold ramping 30 / 45 / 60 -- stays
+                    // distinguishable from a lifter who changed it. Mirrors
+                    // loadKg / plannedLoadKg and tempo / plannedTempo below.
+                    plannedReps = set.reps,
+                    plannedDurationS = set.durationS,
                     loadKg = set.resolvedLoadKg,
                     plannedLoadKg = set.resolvedLoadKg,
                     tempo = set.tempo,
