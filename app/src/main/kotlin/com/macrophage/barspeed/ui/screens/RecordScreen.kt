@@ -71,6 +71,7 @@ import com.macrophage.barspeed.model.ExitPrompt
 import com.macrophage.barspeed.model.ImplementLoad
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.Phase
+import com.macrophage.barspeed.model.PlanValueCaption
 import com.macrophage.barspeed.model.PlateMath
 import com.macrophage.barspeed.model.RecordExitPolicy
 import com.macrophage.barspeed.model.RestControl
@@ -84,6 +85,7 @@ import com.macrophage.barspeed.model.SetDeviationSummary
 import com.macrophage.barspeed.model.SetEndControl
 import com.macrophage.barspeed.model.SetEndControlPolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
+import com.macrophage.barspeed.model.SetRepsPolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.Tempo
@@ -1050,6 +1052,7 @@ private fun ChangeSetDialog(
                         )
                     }
                 }
+                PlanValueCaptions(state, slot)
                 PerImplementEcho(state, slot)
                 LoadSignHint(slot)
                 TempoAdjuster(state, viewModel)
@@ -1129,6 +1132,87 @@ private fun MoveSensorCard(exerciseName: String) {
  * DUMB. The wording is [BodyweightLoadDisplay.fieldLabel]'s, which is in a
  * module where a test can read it; this reads the slot and asks.
  */
+/**
+ * What the plan prescribed for the load and for the reps or hold, drawn under
+ * the pair of boxes that change them.
+ *
+ * DUMB, the way [DeviationLine] is: every word is [PlanValueCaption]'s and is
+ * pinned in :core:model. This resolves the three facts each caption needs and
+ * draws whatever comes back, including nothing.
+ *
+ * The REACH each caption claims is not asserted here -- it is the carry policy's
+ * own answer about this slot and the one after it. Asking
+ * SetLoadPolicy.standingStatedAddedKg and SetRepsPolicy whether the value on
+ * screen would still stand for the set after this one is the same call
+ * restingState will make when that set actually arrives, so the sentence and
+ * the behaviour cannot disagree: on the last set of a block, and wherever the
+ * plan prescribes a different number next, the answer is null and the caption
+ * says the change is recorded rather than claiming a reach it does not have.
+ *
+ * The PLANNED side is the FROZEN declaration and the SHOWN side is the box, so
+ * the caption names the plan's prescription and the lifter's standing
+ * statement as two different things -- which is the point of it, once a value
+ * can differ from the plan because of something said several sets ago.
+ */
+@Composable
+private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
+    val after = state.slotAfterUpcoming
+    val sameBlock =
+        SetLoadPolicy.sameExerciseBlock(
+            lastExerciseId = slot.exercise.id,
+            nextExerciseId = after?.exercise?.id,
+            nextSetIndexInExercise = after?.setIndexInExercise,
+        )
+    val shownAddedKg = state.weightUnit.parseToKg(state.loadInput)
+    val captions =
+        listOfNotNull(
+            PlanValueCaption.load(
+                adHoc = state.adHoc,
+                bodyweight = slot.exercise.bodyweight,
+                unit = state.weightUnit,
+                plannedAddedKg = slot.plannedLoadKg,
+                shownAddedKg = shownAddedKg,
+                standsForLaterSets =
+                SetLoadPolicy.standingStatedAddedKg(
+                    statedAddedKg = shownAddedKg,
+                    sameExerciseBlock = sameBlock,
+                    lastDeclaredAddedKg = slot.plannedLoadKg,
+                    nextDeclaredAddedKg = after?.plannedLoadKg,
+                ) != null,
+            ),
+            if (slot.isTimed) {
+                PlanValueCaption.hold(
+                    adHoc = state.adHoc,
+                    plannedDurationS = slot.plannedDurationS,
+                    shownDurationS = state.durationInput.trim().toIntOrNull(),
+                    standsForLaterSets =
+                    SetRepsPolicy.standingStatedDurationS(
+                        statedDurationS = state.durationInput.trim().toIntOrNull(),
+                        sameExerciseBlock = sameBlock,
+                        lastDeclaredDurationS = slot.plannedDurationS,
+                        nextDeclaredDurationS = after?.plannedDurationS,
+                    ) != null,
+                )
+            } else {
+                PlanValueCaption.reps(
+                    adHoc = state.adHoc,
+                    plannedReps = slot.plannedReps,
+                    shownReps = state.repsInput.trim().toIntOrNull(),
+                    standsForLaterSets =
+                    SetRepsPolicy.standingStatedReps(
+                        statedReps = state.repsInput.trim().toIntOrNull(),
+                        sameExerciseBlock = sameBlock,
+                        lastDeclaredReps = slot.plannedReps,
+                        nextDeclaredReps = after?.plannedReps,
+                    ) != null,
+                )
+            },
+        )
+    captions.forEach {
+        Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+    }
+}
+
 private fun loadFieldLabel(slot: PlannedSlot?, unit: WeightUnit): String = BodyweightLoadDisplay.fieldLabel(
     bodyweight = slot?.exercise?.bodyweight == true,
     implementCount = slot?.implementCount,

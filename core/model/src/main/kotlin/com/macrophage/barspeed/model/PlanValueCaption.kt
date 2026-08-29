@@ -80,13 +80,18 @@ object PlanValueCaption {
     /**
      * The caption under the load box, or null for no caption.
      *
-     * THIS IS THE SHIPPED BEHAVIOUR, WRITTEN DOWN, NOT THE FIX. The load box
-     * carries a label and nothing else today, which is the whole of #175's
-     * report for this control. Returning null unconditionally is exactly that,
-     * in a place a test can state it, so each rule the caption owes can be
-     * pinned as a differential against a real answer.
+     * [shownAddedKg] is what the box currently holds, parsed — which after
+     * #124's carry may be a load the lifter stated several sets ago rather than
+     * one they typed for this set. Null when the box holds nothing readable.
+     *
+     * DECIDED ON THE RENDERED TEXT, not on the doubles. `inputValue` quantises
+     * to a tenth of the DISPLAY unit, so a plan declaring 175 lb seeds a kg box
+     * with 79.4 and reads back 79.3786647517562 ≠ 79.4 on a set nobody touched;
+     * comparing the two doubles would print a caption on every set of that
+     * block. This is #45 one control over, and comparing what the lifter can
+     * actually see is what makes the rule the same rule at both units.
      */
-    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant", "LongParameterList")
+    @Suppress("LongParameterList")
     fun load(
         adHoc: Boolean,
         bodyweight: Boolean,
@@ -94,13 +99,39 @@ object PlanValueCaption {
         plannedAddedKg: Double?,
         shownAddedKg: Double?,
         standsForLaterSets: Boolean,
-    ): String? = null
+    ): String? {
+        if (adHoc || shownAddedKg == null) return null
+        val planned = plannedLoadText(bodyweight, unit, plannedAddedKg) ?: return null
+        val shown = plannedLoadText(bodyweight, unit, shownAddedKg) ?: return null
+        return caption(planned, shown, standsForLaterSets)
+    }
 
-    /** The caption under the reps box. Shipped state, as [load]. */
-    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
-    fun reps(adHoc: Boolean, plannedReps: Int?, shownReps: Int?, standsForLaterSets: Boolean): String? = null
+    /**
+     * The caption under the reps box. Bare numbers: the box is labelled "Reps"
+     * and the sentence sits directly under it.
+     */
+    fun reps(adHoc: Boolean, plannedReps: Int?, shownReps: Int?, standsForLaterSets: Boolean): String? {
+        if (adHoc || plannedReps == null || shownReps == null) return null
+        return caption("$plannedReps", "$shownReps", standsForLaterSets)
+    }
 
-    /** The caption under the hold box. Shipped state, as [load]. */
-    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
-    fun hold(adHoc: Boolean, plannedDurationS: Int?, shownDurationS: Int?, standsForLaterSets: Boolean): String? = null
+    /** The caption under the hold box, in seconds, as its label is. */
+    fun hold(adHoc: Boolean, plannedDurationS: Int?, shownDurationS: Int?, standsForLaterSets: Boolean): String? {
+        if (adHoc || plannedDurationS == null || shownDurationS == null) return null
+        return caption("${plannedDurationS}s", "${shownDurationS}s", standsForLaterSets)
+    }
+
+    /**
+     * One sentence, chosen between the two that already ship, or null when the
+     * two figures read the same and there is nothing to say.
+     *
+     * The equality test is on the rendered strings for the reason [load]
+     * gives, and it is written once here so that the load, the reps and the
+     * hold cannot answer "has this changed" three different ways.
+     */
+    private fun caption(planned: String, shown: String, standsForLaterSets: Boolean): String? = when {
+        planned == shown -> null
+        standsForLaterSets -> "Plan says $planned - the rest of this exercise runs $shown unless the plan changes it"
+        else -> "Plan says $planned - your change is recorded in the export"
+    }
 }

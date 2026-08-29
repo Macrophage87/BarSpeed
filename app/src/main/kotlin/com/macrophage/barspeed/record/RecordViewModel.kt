@@ -1419,6 +1419,17 @@ data class RecordState(
     /** The slot the next START will run: the current one, or the next during rest. */
     val upcomingSlot: PlannedSlot? get() = queue.getOrNull(upcomingIndex)
 
+    /**
+     * The slot AFTER the one being set up, and null at the end of the queue.
+     *
+     * Read by the change-set dialog's captions and by nothing else: whether a
+     * statement the lifter is making right now will outlive this set is a
+     * question about the pair of slots the carry policies compare, so the
+     * caption asks those policies about this slot and this one rather than
+     * asserting a reach of its own (#174, #175).
+     */
+    val slotAfterUpcoming: PlannedSlot? get() = queue.getOrNull(upcomingIndex + 1)
+
     /** Which exercise's prep a control on screen is editing. */
     fun prepExerciseId(slot: PlannedSlot?): String = slot?.exercise?.id ?: currentExercise.id
 
