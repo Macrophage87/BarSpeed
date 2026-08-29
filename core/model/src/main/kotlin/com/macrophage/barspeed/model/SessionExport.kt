@@ -311,11 +311,16 @@ data class SetExport(
      * prescription of its own -- it publishes no [plannedReps] either, so it
      * reads as a prescribed set whose prescription went missing.
      *
-     * An appended set therefore publishes NO [plannedLoadKg], [plannedReps],
-     * [plannedDurationS] or [tempoPrescribed], and that absence is a statement
-     * rather than a gap: nothing prescribed it. Its `load_kg`, `reps` and
-     * tempo are what the lifter was standing on when they added it -- the
-     * corrected load, not the plan's.
+     * An appended set therefore publishes NO [plannedLoadKg], [plannedReps]
+     * or [plannedDurationS], and that absence is a statement rather than a
+     * gap: nothing prescribed it. [tempoPrescribed] is NOT in that list: it
+     * is read from the same run-value rule `load_kg` and `reps` use, not from
+     * a frozen plan declaration, so an appended set on a block that declares
+     * a tempo publishes it -- naming a tempo nothing prescribed for that
+     * occurrence. `rest_s` and `plannedPrep_s` are published too, unchanged
+     * from the rest of the block: neither is cleared for an appended slot.
+     * Its `load_kg`, `reps` and tempo are what the lifter was standing on
+     * when they added it -- the corrected load, not the plan's.
      *
      * OMISSION IS NOT PROOF OF THE OPPOSITE for old documents. The flag is a
      * column added at database v12; every set recorded before it reads false,
