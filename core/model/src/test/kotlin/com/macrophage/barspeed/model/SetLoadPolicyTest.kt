@@ -836,4 +836,56 @@ class SetLoadPolicyTest {
             ),
         )
     }
+
+    /**
+     * The FOURTH boundary #124's landed body records, and the only one of the
+     * four this file did not state until now: a declaration present on one side
+     * of the pair and absent on the other is not "the same prescription", so the
+     * carry drops.
+     *
+     * Written down here because a second policy is about to inherit these four
+     * rules for the rep count and the hold, and an unwritten rule is one the
+     * inheritance can quietly not inherit. Characterization only: green before
+     * and after, asserting what [SetLoadPolicy.standingStatedAddedKg] already
+     * does rather than asking it for anything new.
+     */
+    @Test
+    fun `standingStatedAddedKg drops a statement where only one of the two sets declares a load`() {
+        assertNull(
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 65.0,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = 60.0,
+                nextDeclaredAddedKg = null,
+            ),
+        )
+        assertNull(
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 65.0,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = null,
+                nextDeclaredAddedKg = 60.0,
+            ),
+        )
+    }
+
+    /**
+     * Two undeclared loads ARE the same prescription, so a statement made on a
+     * block the plan wrote no load for holds across it. The loadless block is
+     * the population this matters to: nothing else offers the lifter a number.
+     *
+     * Characterization only, for the reason above.
+     */
+    @Test
+    fun `standingStatedAddedKg carries across a block that declares no load on either set`() {
+        assertEquals(
+            20.0,
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 20.0,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = null,
+                nextDeclaredAddedKg = null,
+            ),
+        )
+    }
 }
