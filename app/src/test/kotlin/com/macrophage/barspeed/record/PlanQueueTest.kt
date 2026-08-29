@@ -183,4 +183,44 @@ class PlanQueueTest {
         assertEquals(2, addedSetIndex(twice, upcomingIndex = 0))
         assertEquals(4, addedSetIndex(twice, upcomingIndex = 2))
     }
+
+    /**
+     * FOUND BY MUTATION TESTING, and the only pin that covers the exercise-id
+     * half of the rule.
+     *
+     * Deleting `blocks[i].exerciseId == exerciseId` from [addedSetIndex] left
+     * the whole suite green at
+     * `2f16199d07e8f4093b07a2e82693bafd065463fa`, reported in that commit's own
+     * body as a surviving mutation. The reason is that every other fixture here
+     * has each block starting at `setIndexInExercise == 0`, so the index test
+     * alone stops the walk and the id test never decides anything.
+     *
+     * A REAL QUEUE CAN BREAK THAT. `jumpToExercise` pulls the chosen exercise's
+     * remaining sets forward and copies only `isExerciseChange`, so the slots
+     * keep the indices the plan gave them: a lifter who switches to the row
+     * after doing its first set leaves a row block whose first slot is index 1.
+     * Appending to the squat block that now precedes it must stop at that
+     * boundary. Without the id test it walks straight through, and the added
+     * squat set is queued after the ROW block instead -- which is the near
+     * neighbour of the two-consecutive-blocks case, failing in the opposite
+     * direction.
+     *
+     * Its own commit because c3 touches no test file; the pin is green with the
+     * fix in place and reds the moment the guard is removed, which is what
+     * makes it a pin rather than decoration.
+     */
+    @Test
+    fun `a block whose first slot survived a switch still ends the walk`() {
+        val afterSwitch =
+            listOf(
+                QueueBlockKey("back_squat", 0),
+                QueueBlockKey("back_squat", 1),
+                // What jumpToExercise leaves behind: the row's remaining sets,
+                // pulled forward, still carrying the plan's own indices.
+                QueueBlockKey("seated_row", 1),
+                QueueBlockKey("seated_row", 2),
+            )
+        assertEquals(2, addedSetIndex(afterSwitch, upcomingIndex = 0))
+        assertEquals(4, addedSetIndex(afterSwitch, upcomingIndex = 2))
+    }
 }
