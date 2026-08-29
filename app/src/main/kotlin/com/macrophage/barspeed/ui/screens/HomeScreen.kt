@@ -132,12 +132,6 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                     ) {
                         SensorDot("IMU", imuState)
                         SensorDot("HRM", hrmState)
-                        TextButton(onClick = { showBodyWeight = true }) {
-                            Text(
-                                state.bodyWeightKg?.let { "BW ${state.weightUnit.inputValue(it)}" } ?: "Set BW",
-                                color = if (state.bodyWeightKg == null) BarColors.Amber else BarColors.Sub,
-                            )
-                        }
                         TextButton(onClick = viewModel::toggleWeightUnit) {
                             Text("${state.weightUnit.suffix} ⇄", color = BarColors.Sub)
                         }
@@ -186,6 +180,22 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                 }
                 TextButton(onClick = { navController.navigate("guide") }, modifier = Modifier.weight(1f)) {
                     Text("Guide", color = BarColors.Sub)
+                }
+                // Demoted out of the top bar (#181). It used to sit beside the
+                // sensor dots reading an AMBER "Set BW" -- amber is this app's
+                // attention colour, so an unset body weight nagged from the
+                // first screen of every cold launch, including the great
+                // majority of sessions that put no bodyweight exercise on the
+                // bar. It is a setting, so it now sits in the settings row and
+                // is drawn in the subdued colour in both states. Nothing is
+                // lost by the demotion: a session that actually needs the
+                // number asks for it at the moment it needs it, in
+                // RecordScreen, gated by BodyWeightPromptPolicy.
+                TextButton(onClick = { showBodyWeight = true }, modifier = Modifier.weight(1f)) {
+                    Text(
+                        state.bodyWeightKg?.let { "BW ${state.weightUnit.inputValue(it)}" } ?: "Body wt",
+                        color = BarColors.Sub,
+                    )
                 }
             }
             Spacer(Modifier.height(6.dp))

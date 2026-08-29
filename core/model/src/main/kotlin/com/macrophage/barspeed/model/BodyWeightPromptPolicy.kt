@@ -134,23 +134,16 @@ object BodyWeightPromptPolicy {
      *
      * Not a decision about starting the session. A caller that gets `true`
      * shows a dialog; a caller that gets `false` starts. Both start.
-     *
-     * PLACEHOLDER AT THIS COMMIT. The body is a constant `false`, which is
-     * exactly what the app does today: nothing prompts, anywhere, ever. The
-     * gate described above is written as the red differentials of the next
-     * commit and implemented in the one after it, so the difference between
-     * the rule and the behaviour is a set of failing tests rather than a
-     * paragraph. Both suppressions below exist only for that placeholder and
-     * come off with it.
      */
-    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
     fun shouldPrompt(
         session: PlanSessionDef,
         kg: Double?,
         setAtMs: Long?,
         nowMs: Long,
         skippedThisSession: Boolean,
-    ): Boolean = false
+    ): Boolean = !skippedThisSession &&
+        sessionNeedsBodyWeight(session) &&
+        stateOf(kg, setAtMs, nowMs) != StoredBodyWeight.DATED_FRESH
 
     /**
      * Why the app is asking, in the lifter's terms, said once where the prompt

@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.macrophage.barspeed.model.LeadInPolicy
@@ -20,6 +21,7 @@ class SettingsStore(private val context: Context) {
     private val weightUnitKey = stringPreferencesKey("weight_unit")
     private val audioCuesKey = booleanPreferencesKey("audio_cues")
     private val bodyWeightKgKey = doublePreferencesKey("body_weight_kg")
+    private val bodyWeightSetAtKey = longPreferencesKey("body_weight_set_at_ms")
 
     val weightUnit: Flow<WeightUnit> =
         context.settingsDataStore.data.map { prefs ->
@@ -33,6 +35,22 @@ class SettingsStore(private val context: Context) {
      */
     val bodyWeightKg: Flow<Double?> =
         context.settingsDataStore.data.map { prefs -> prefs[bodyWeightKgKey]?.takeIf { it > 0 } }
+
+    /**
+     * When [bodyWeightKg] was last written, epoch millis, or null when the
+     * app does not know (issue #181).
+     *
+     * Null is a REAL state and not an error: every build up to 0.1.44 stored
+     * the weight and no date, so an upgrading lifter has a number whose age is
+     * unknowable. `BodyWeightPromptPolicy.stateOf` gives that its own case;
+     * nothing here guesses an age for it.
+     *
+     * Not filtered on the way out beyond nullability. A zero or a negative
+     * cannot be written by [setBodyWeightKg], and the policy treats either as
+     * the absence of a time rather than as a moment in 1970.
+     */
+    val bodyWeightSetAtMs: Flow<Long?> =
+        context.settingsDataStore.data.map { prefs -> prefs[bodyWeightSetAtKey] }
 
     /**
      * Everything the app says that the lifter did not prescribe: the tempo
@@ -167,14 +185,34 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[audioCuesKey] = enabled }
     }
 
+    /**
+     * Write the body weight AND the moment it was written, in one edit.
+     *
+     * The clock is read here rather than taken as a parameter, and that is the
+     * whole design of #181's freshness rule: there are two write paths -- the
+     * body-weight dialog and #161's plan import -- and neither can produce a
+     * dated-fresh value without also producing a date, because neither is
+     * given the chance to omit one. A parameter, even a defaulted one, is a
+     * way for a third write path added later to store a value the staleness
+     * rule then reads as UNKNOWN_AGE forever.
+     *
+     * One `edit` block, so the two keys move together. Two edits could be
+     * interrupted between them and leave a new weight carrying the old date,
+     * which is the one combination that would silence the prompt wrongly.
+     */
     suspend fun setBodyWeightKg(kg: Double) {
-        context.settingsDataStore.edit { it[bodyWeightKgKey] = kg }
+        val nowMs = System.currentTimeMillis()
+        context.settingsDataStore.edit {
+            it[bodyWeightKgKey] = kg
+            it[bodyWeightSetAtKey] = nowMs
+        }
     }
 
     private companion object {
         /**
-         * `weight_unit`, `audio_cues` and `body_weight_kg` are the other keys in
-         * this store and none of them begins with [PREP_KEY_PREFIX].
+         * `weight_unit`, `audio_cues`, `body_weight_kg` and
+         * `body_weight_set_at_ms` are the other keys in this store and none of
+         * them begins with [PREP_KEY_PREFIX].
          */
         const val PREP_KEY_PREFIX = "prep_s_"
 

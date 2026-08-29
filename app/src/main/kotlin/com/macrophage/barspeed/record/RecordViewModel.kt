@@ -26,6 +26,7 @@ import com.macrophage.barspeed.dsp.TimedSetVoice
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.hrm.Hrv
 import com.macrophage.barspeed.hrm.RrIngest
+import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
@@ -468,6 +469,23 @@ private data class SensorSettings(
     val preferred: String?,
 )
 
+/**
+ * Mirror the stored body weight AND the moment it was written onto the state;
+ * free for the same reason (#181).
+ *
+ * Two flows in one collector rather than two collectors, because the value and
+ * its date are one fact: `BodyWeightPromptPolicy.stateOf` reads both together,
+ * and a state carrying a new weight beside the previous weight's date -- which
+ * two independent collectors can produce for one recomposition -- is the one
+ * combination that classifies wrongly in the silencing direction.
+ */
+private fun CoroutineScope.mirrorBodyWeight(settings: SettingsStore, state: MutableStateFlow<RecordState>) = launch {
+    settings.bodyWeightKg.combine(settings.bodyWeightSetAtMs) { kg, atMs -> kg to atMs }
+        .collect { (kg, atMs) ->
+            state.value = state.value.copy(bodyWeightKg = kg, bodyWeightSetAtMs = atMs)
+        }
+}
+
 /** Mirror the stored prep adjustments onto the state; free for the same reason. */
 private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: MutableStateFlow<RecordState>) =
     launch { settings.prepOverrides.collect { state.value = state.value.copy(prepOverrides = it) } }
@@ -698,6 +716,71 @@ private fun openJournal(
         secondaryImuConnected = roster.secondary != null && s.imuConnectedB,
     ),
 )
+
+/**
+ * A tap on a plan session: either raise the body-weight prompt, or start (#181).
+ *
+ * Free function taking the state flow and a start callback, for
+ * [planSessionState]'s reason -- [RecordViewModel] is a class detekt measures
+ * at its size limit, and the prompt's three entry points took it over.
+ *
+ * [BodyWeightPromptPolicy] decides whether to ASK, never whether the lifter may
+ * train: both branches end in a started session, one of them after a dialog.
+ * [nowMs] is read at the tap and passed in rather than read inside the
+ * Composable, because a recomposing dialog re-deciding the staleness of the
+ * stored weight is a decision that could change underneath a lifter already
+ * typing into it.
+ */
+private fun askOrStartSession(
+    state: MutableStateFlow<RecordState>,
+    planSession: PlanSessionDef,
+    nowMs: Long,
+    onStart: (PlanSessionDef) -> Unit,
+) {
+    val s = state.value
+    val ask =
+        BodyWeightPromptPolicy.shouldPrompt(
+            session = planSession,
+            kg = s.bodyWeightKg,
+            setAtMs = s.bodyWeightSetAtMs,
+            nowMs = nowMs,
+            skippedThisSession = s.bodyWeightPromptSkipped,
+        )
+    if (ask) state.value = s.copy(pendingBodyWeightSession = planSession) else onStart(planSession)
+}
+
+/**
+ * The body-weight prompt has been answered. Either way the session starts (#181).
+ *
+ * [kg] null is the SKIP, and it is a real absence rather than a sentinel: a
+ * skip writes nothing at all, not even a confirmation of the figure already
+ * stored, because dating an unconfirmed number would buy fourteen days of
+ * quiet for a value nobody looked at. What a skip does write is the
+ * session-scoped flag that stops a second ask, cleared when the session closes.
+ *
+ * The write and the start are sequential inside one coroutine, so the stored
+ * weight is durable before the session's first set can be set up. The recorded
+ * load reads `bodyWeightKg` off the state at recordSet time, minutes later
+ * either way, so the ordering is belt-and-braces rather than the thing that
+ * makes the load right.
+ *
+ * Returns without doing anything when no prompt is pending, so a double tap on
+ * SKIP or SAVE cannot start the session twice.
+ */
+private fun CoroutineScope.answerBodyWeight(
+    state: MutableStateFlow<RecordState>,
+    settings: SettingsStore,
+    kg: Double?,
+    onStart: (PlanSessionDef) -> Unit,
+) {
+    val pending = state.value.pendingBodyWeightSession ?: return
+    state.value =
+        state.value.copy(pendingBodyWeightSession = null, bodyWeightPromptSkipped = kg == null)
+    launch {
+        if (kg != null) settings.setBodyWeightKg(kg)
+        onStart(pending)
+    }
+}
 
 /**
  * The state opening a plan session leaves behind. Free function for
@@ -1552,6 +1635,27 @@ data class RecordState(
     /** Lifter body weight, the base load for pull-ups and dips; null until set. */
     val bodyWeightKg: Double? = null,
     /**
+     * When [bodyWeightKg] was written, epoch millis, or null when the app does
+     * not know -- a value carried over from a build that stored no date. Read
+     * only by the start-of-session prompt (#181); nothing that records a set
+     * consults it.
+     */
+    val bodyWeightSetAtMs: Long? = null,
+    /**
+     * The plan session waiting on the body-weight prompt, or null when nothing
+     * is being asked.
+     *
+     * The session itself rather than a boolean, because the answer has to
+     * start THAT session and the picker the tap came from is a list. Holding a
+     * flag and re-reading a selection would be two facts about one intent.
+     */
+    val pendingBodyWeightSession: PlanSessionDef? = null,
+    /**
+     * The lifter has said "not now" to the body-weight prompt since the last
+     * session closed. Nothing asks again until then (#181).
+     */
+    val bodyWeightPromptSkipped: Boolean = false,
+    /**
      * The lifter's prep adjustments, exercise id to seconds. Empty until the
      * settings flow first emits, which is why nothing here reads it directly --
      * [prepSecondsFor] falls back through the plan's declaration to the default.
@@ -1958,11 +2062,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 stateFlow.value = stateFlow.value.copy(weightUnit = unit)
             }
         }
-        viewModelScope.launch {
-            container.settings.bodyWeightKg.collect { kg ->
-                stateFlow.value = stateFlow.value.copy(bodyWeightKg = kg)
-            }
-        }
+        viewModelScope.mirrorBodyWeight(container.settings, stateFlow)
         viewModelScope.mirrorPrepOverrides(container.settings, stateFlow)
         viewModelScope.mirrorSensorSettings(container.settings, container.deviceRegistry, stateFlow) { address ->
             autoConnect.setSecondaryImuAddress(address)
@@ -1989,8 +2089,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = stateFlow.value.copy(demoMode = !stateFlow.value.demoMode)
     }
 
+    /** The tap on a plan session in the picker; [askOrStartSession] decides. */
+    fun requestPlanSession(planSession: PlanSessionDef) =
+        askOrStartSession(stateFlow, planSession, System.currentTimeMillis(), ::startPlanSession)
+
+    /** The body-weight prompt's answer, null meaning skip; [answerBodyWeight] decides. */
+    fun answerBodyWeightPrompt(kg: Double?) =
+        viewModelScope.answerBodyWeight(stateFlow, container.settings, kg, ::startPlanSession)
+
     /** Start a session following the given plan session. */
-    fun startPlanSession(planSession: PlanSessionDef) {
+    private fun startPlanSession(planSession: PlanSessionDef) {
         viewModelScope.launch {
             sessionRrMs.clear()
             // A new session does not inherit the last one's trailing rest
@@ -2969,7 +3077,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private fun onSessionClosed() {
         holds.release(RecordingHold.SESSION)
         stateFlow.value =
-            stateFlow.value.copy(stage = Stage.FINISHED, sessionClose = SessionCloseState.NONE)
+            stateFlow.value.copy(
+                stage = Stage.FINISHED,
+                sessionClose = SessionCloseState.NONE,
+                // The skip lasted the session out and no longer applies (#181).
+                // Cleared here rather than at the next start so the flag names
+                // one session and cannot be read as a standing preference.
+                bodyWeightPromptSkipped = false,
+            )
     }
 
     fun abandonSetup() {

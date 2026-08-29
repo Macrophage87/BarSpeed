@@ -61,6 +61,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.model.BlePermissionStep
+import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.DualShortfall
@@ -71,6 +72,7 @@ import com.macrophage.barspeed.model.ExitPrompt
 import com.macrophage.barspeed.model.ImplementLoad
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.Phase
+import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PlanValueCaption
 import com.macrophage.barspeed.model.PlateMath
 import com.macrophage.barspeed.model.RecordExitPolicy
@@ -384,8 +386,85 @@ private fun exitColor(action: ExitAction): Color = when (action) {
     else -> Color.Unspecified
 }
 
+/**
+ * Ask for a body weight at the one moment it is about to matter (#181).
+ *
+ * Raised by [RecordViewModel.requestPlanSession] and only when
+ * [BodyWeightPromptPolicy.shouldPrompt] says so, which is never on a session
+ * with no bodyweight exercise in it. Every sentence in it comes from that
+ * policy rather than from here, so the threshold and the wording are pinned by
+ * tests that run on every push.
+ *
+ * SKIP is a first-class button and not a dismissal in disguise: it starts the
+ * session, and nothing asks again until this session closes. The dialog also
+ * refuses to be dismissed by an outside tap or a back press -- onDismissRequest
+ * skips explicitly rather than doing nothing, so there is no way to leave it on
+ * screen or to lose the session start behind it.
+ */
+@Composable
+private fun BodyWeightPromptDialog(
+    session: PlanSessionDef,
+    state: RecordState,
+    onSkip: () -> Unit,
+    onSet: (Double) -> Unit,
+) {
+    val unit = state.weightUnit
+    // One clock reading for the life of the dialog. Not an inline
+    // System.currentTimeMillis(): a Composable's body runs again on every
+    // recomposition, so an inline read would let the age line tick over while
+    // the lifter is typing into it. The decision to show this at all was taken
+    // in the ViewModel against its own reading; this one only formats.
+    val nowMs = rememberSaveable { System.currentTimeMillis() }
+    val stored = BodyWeightPromptPolicy.stateOf(state.bodyWeightKg, state.bodyWeightSetAtMs, nowMs)
+    var text by rememberSaveable { mutableStateOf(state.bodyWeightKg?.let { unit.inputValue(it) } ?: "") }
+    AlertDialog(
+        onDismissRequest = onSkip,
+        title = { Text("Body weight for ${session.name}") },
+        text = {
+            Column {
+                Text(
+                    BodyWeightPromptPolicy.storedLine(
+                        stored,
+                        state.bodyWeightKg,
+                        BodyWeightPromptPolicy.ageDays(state.bodyWeightSetAtMs, nowMs),
+                        unit,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    BodyWeightPromptPolicy.WHY_IT_MATTERS,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BarColors.Sub,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Body weight (${unit.suffix})") },
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { unit.parseToKg(text)?.takeIf { it > 0 }?.let(onSet) }) {
+                Text("Save and start")
+            }
+        },
+        dismissButton = { TextButton(onClick = onSkip) { Text("Skip", color = BarColors.Sub) } },
+    )
+}
+
 @Composable
 private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
+    state.pendingBodyWeightSession?.let { pending ->
+        BodyWeightPromptDialog(
+            session = pending,
+            state = state,
+            onSkip = { viewModel.answerBodyWeightPrompt(null) },
+            onSet = { viewModel.answerBodyWeightPrompt(it) },
+        )
+    }
     if (!state.imuConnected) {
         // The permission banner replaces this card's advice rather than sitting
         // beside it. The demo chip below is a sibling in this Column and stays
@@ -451,7 +530,7 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
         Spacer(Modifier.height(8.dp))
         state.planSessions.forEach { planSession ->
             Card(
-                onClick = { viewModel.startPlanSession(planSession) },
+                onClick = { viewModel.requestPlanSession(planSession) },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             ) {
                 Column(Modifier.padding(12.dp)) {
