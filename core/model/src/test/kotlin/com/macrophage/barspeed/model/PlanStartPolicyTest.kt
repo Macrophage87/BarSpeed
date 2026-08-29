@@ -2,7 +2,10 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Whether a plan can be started from the plans tab, and what the lifter is told
@@ -67,6 +70,93 @@ class PlanStartPolicyTest {
         assertEquals(PlanLifecycle.UNKNOWN, PlanLifecycle.of(null))
         assertEquals(PlanLifecycle.UNKNOWN, PlanLifecycle.of(""))
         assertEquals(PlanLifecycle.UNKNOWN, PlanLifecycle.of("ACTIVE"))
+    }
+
+    @Test
+    fun `a plan that could not be read is not startable, and says why`() {
+        // The screen already has this state -- PlanDetailScreen draws "This
+        // plan could not be read." -- and a START control beside that sentence
+        // would offer a session built from nothing. The reason is carried
+        // rather than the absence, so the card cannot look like a screen that
+        // forgot to draw a button.
+        val decision = PlanStartPolicy.decide(plan = null, PlanLifecycle.STAGED, activePlanName = "Winter Block")
+
+        assertEquals(
+            PlanStartDecision.Unstartable("This plan could not be read, so there is nothing to start."),
+            decision,
+        )
+    }
+
+    @Test
+    fun `a plan prescribing no sets is not startable`() {
+        // validate() refuses an empty plan at the import gate, so this is not
+        // reachable through today's import. It is reachable through storage:
+        // PlanRepository.decode deliberately returns a plan that no longer
+        // validates, so a row staged under an older rule still reads back. A
+        // start from one of those opens a session with an empty queue.
+        val empty = PlanFile(schemaVersion = "1.0", planName = "Winter Block", sessions = emptyList())
+
+        val expected = PlanStartDecision.Unstartable("This plan prescribes no sets, so there is nothing to start.")
+
+        assertEquals(expected, PlanStartPolicy.decide(empty, PlanLifecycle.ACTIVE, activePlanName = null))
+        assertEquals(expected, PlanStartPolicy.decide(plan(sets = 0), PlanLifecycle.STAGED, activePlanName = null))
+    }
+
+    @Test
+    fun `starting a staged plan is the approval that promotes it`() {
+        // The approval gate is the only thing standing between an LLM-authored
+        // document and the app following it. Starting a staged plan cannot walk
+        // round it, so the start IS the approval and the button says so: the
+        // lifter agrees to promote it, not merely to lift.
+        val decision = PlanStartPolicy.decide(plan(), PlanLifecycle.STAGED, activePlanName = "Autumn Block")
+        val switch = (decision as PlanStartDecision.Startable).switch
+
+        assertNotNull(switch)
+        assertEquals("Start \"Winter Block\"?", switch.title)
+        assertEquals("APPROVE & START", switch.confirmLabel)
+        assertTrue(switch.body.contains("staged"), "the lifter is told it was never approved")
+        assertTrue(switch.body.contains("active plan"), "and that approving makes it the active one")
+    }
+
+    @Test
+    fun `starting an archived plan says which plan it displaces`() {
+        // PlanDao.activate archives the current active row before marking the
+        // new one, so the plan the lifter was following stops being followed.
+        // Naming it is the difference between a switch and a plan quietly
+        // going missing from the home screen next session.
+        val decision = PlanStartPolicy.decide(plan(), PlanLifecycle.ARCHIVED, activePlanName = "Autumn Block")
+        val switch = (decision as PlanStartDecision.Startable).switch
+
+        assertNotNull(switch)
+        assertEquals("START", switch.confirmLabel)
+        assertTrue(switch.body.contains("Autumn Block"), "the displaced plan is named, not implied")
+        assertFalse(switch.body.contains("staged"), "an archived plan was approved once already")
+    }
+
+    @Test
+    fun `with no active plan at all there is nothing to say was displaced`() {
+        // First plan on a fresh install, or every plan archived. Claiming
+        // something was replaced when nothing was is the same defect as staying
+        // silent about a real switch, pointing the other way.
+        val decision = PlanStartPolicy.decide(plan(), PlanLifecycle.STAGED, activePlanName = null)
+        val switch = (decision as PlanStartDecision.Startable).switch
+
+        assertNotNull(switch)
+        assertFalse(switch.body.contains("archiv"), "nothing was archived, so nothing claims to have been")
+    }
+
+    @Test
+    fun `a status this app never wrote is a switch, not a silent start`() {
+        // UNKNOWN reaches the same prompt as ARCHIVED and for the same reason:
+        // whatever the row is, starting it writes a new active plan. It does
+        // not reach STAGED's wording, which would claim to know the row is
+        // awaiting an approval nobody recorded.
+        val decision = PlanStartPolicy.decide(plan(), PlanLifecycle.UNKNOWN, activePlanName = "Autumn Block")
+        val switch = (decision as PlanStartDecision.Startable).switch
+
+        assertNotNull(switch)
+        assertEquals("START", switch.confirmLabel)
+        assertFalse(switch.body.contains("staged"))
     }
 
     @Test
