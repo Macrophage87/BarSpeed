@@ -5,11 +5,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * [SetRepsPolicy] as it stands on arrival: the bake it already performs, and
- * the carry it does not.
+ * [SetRepsPolicy]'s bake: which of the plan's numbers a statement displaces
+ * when the lifter taps through to the next set.
  *
- * Every pin here is green at the commit that adds it. The carry differentials
- * live in [SetRepsCarryTest] and are red until the fix.
+ * How long a statement HOLDS is [SetRepsCarryTest]'s, and the two pins that
+ * used to sit here saying it holds for one set only have been deleted rather
+ * than reworded: they characterized the pre-#174 behaviour, that file demands
+ * the opposite, and a reworded false claim is how this repository has produced
+ * fresh ones.
  */
 class SetRepsPolicyTest {
     @Test
@@ -39,34 +42,5 @@ class SetRepsPolicyTest {
     @Test
     fun `a stated hold is what the next set carries`() {
         assertEquals(30, SetRepsPolicy.carriedDurationIntoNextSet(declaredDurationS = 45, statedDurationS = 30))
-    }
-
-    /**
-     * Shipped behaviour, written down: a rep count typed for one set dies with
-     * that set. #174. Replaced by [SetRepsCarryTest] once the carry lands.
-     */
-    @Test
-    fun `today a stated rep count does not stand for the next set`() {
-        assertNull(
-            SetRepsPolicy.standingStatedReps(
-                statedReps = 6,
-                sameExerciseBlock = true,
-                lastDeclaredReps = 8,
-                nextDeclaredReps = 8,
-            ),
-        )
-    }
-
-    /** The same, one target over: a shortened hold is shortened for one set. */
-    @Test
-    fun `today a stated hold does not stand for the next set`() {
-        assertNull(
-            SetRepsPolicy.standingStatedDurationS(
-                statedDurationS = 30,
-                sameExerciseBlock = true,
-                lastDeclaredDurationS = 45,
-                nextDeclaredDurationS = 45,
-            ),
-        )
     }
 }
