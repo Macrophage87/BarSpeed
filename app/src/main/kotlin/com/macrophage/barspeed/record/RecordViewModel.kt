@@ -47,6 +47,7 @@ import com.macrophage.barspeed.model.SessionCloseState
 import com.macrophage.barspeed.model.SetClockPolicy
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
+import com.macrophage.barspeed.model.SetRepsPolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.StartPhase
@@ -1054,8 +1055,28 @@ private fun bakedState(s: RecordState, next: PlannedSlot, index: Int): RecordSta
                 declaredAddedKg = next.loadKg,
                 statedAddedKg = s.statedLoadKg,
             ),
-            reps = if (next.isTimed) next.reps else s.repsInput.toIntOrNull() ?: next.reps,
-            durationS = if (next.isTimed) s.durationInput.toIntOrNull() ?: next.durationS else next.durationS,
+            // Behaviour-identical to the two `?:` expressions this replaces.
+            // The rule is SetRepsPolicy's now for the reason the load's is
+            // SetLoadPolicy's: it is about to grow a boundary, and a rule that
+            // grows in :app grows where no test on the CI path can reach it.
+            reps =
+            if (next.isTimed) {
+                next.reps
+            } else {
+                SetRepsPolicy.carriedIntoNextSet(
+                    declaredReps = next.reps,
+                    statedReps = s.repsInput.toIntOrNull(),
+                )
+            },
+            durationS =
+            if (next.isTimed) {
+                SetRepsPolicy.carriedDurationIntoNextSet(
+                    declaredDurationS = next.durationS,
+                    statedDurationS = s.durationInput.toIntOrNull(),
+                )
+            } else {
+                next.durationS
+            },
             // statedTempo, not tempoInput. The text field is the ad-hoc
             // control and reading it here is how one exercise's tempo reached
             // the next: restingState seeded it from the set just finished
