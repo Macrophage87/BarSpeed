@@ -203,6 +203,38 @@ class SensorCapturePolicyTest {
         assertEquals(DualShortfall.ONE_SENSOR_PAIRED, roster.shortfall)
     }
 
+    /**
+     * Every shortfall names a null [SensorRoster.secondaryAddress], and the
+     * cases are checked against [DualShortfall.entries] so a fourth reason
+     * cannot be added without this being re-decided.
+     *
+     * Pinned as a characterization before #183/#184 touch the Devices screen,
+     * because it is the fact that screen's honesty rests on: the second link
+     * is handed `secondaryAddress` and nothing else, so under any shortfall it
+     * is pointed at no device at all. A row that renders a `Disconnected` chip
+     * in that state is reporting a link failure where there is no link --
+     * absence rendered as a value -- and the fix depends on this staying true.
+     */
+    @Test
+    fun `no shortfall ever names a second address for the second link to hold`() {
+        val cases =
+            mapOf(
+                DualShortfall.ONE_SENSOR_PAIRED to
+                    SensorCapturePolicy.roster(listOf(a), a, mapOf(a to SensorRole.A), 2),
+                DualShortfall.ROLES_UNASSIGNED to
+                    SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A), 2),
+                DualShortfall.ROLES_COLLIDE to
+                    SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.A), 2),
+            )
+
+        assertEquals(DualShortfall.entries.toSet(), cases.keys, "every shortfall has to be exercised here")
+        cases.forEach { (shortfall, roster) ->
+            assertEquals(shortfall, roster.shortfall)
+            assertNull(roster.secondaryAddress, "$shortfall must leave the second link pointed at nothing")
+            assertTrue(!roster.isDual)
+        }
+    }
+
     // ---- what gets recorded --------------------------------------------------
 
     @Test
