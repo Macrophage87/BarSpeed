@@ -64,7 +64,7 @@ import com.macrophage.barspeed.model.BlePermissionStep
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.ConnectionState
-import com.macrophage.barspeed.model.DualShortfall
+import com.macrophage.barspeed.model.DualSensorSetup
 import com.macrophage.barspeed.model.EffortCorrectionPolicy
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
@@ -747,24 +747,24 @@ private fun SensorCountChooser(state: RecordState, viewModel: RecordViewModel) {
  * What the sensor-count line says, as a pure function of the three facts it
  * has.
  *
- * A `when` over the shortfall rather than a boolean, so a fourth reason added
- * to [DualShortfall] fails this compile instead of falling into a silent else
- * -- the same shape `SensorDot` uses for `ConnectionState`.
+ * The three shortfall sentences moved to [DualSensorSetup.recordLine] in
+ * `:core:model`, unchanged, so the Devices screen can read the SAME copy
+ * rather than write a second phrasing of the same gap (#184). The exhaustive
+ * `when` that made a fourth `DualShortfall` a compile error moved with them --
+ * it is still exhaustive, one module over, and pinned by a test there instead
+ * of by nothing here.
+ *
+ * What stays is the no-shortfall arm, which is about THIS screen's own
+ * adjustment and has no equivalent on Devices.
  */
-private fun sensorCountDetail(chosen: Int, planned: Int, roster: SensorRoster): String = when (roster.shortfall) {
-    // `roster` returns this whenever it cannot name two distinct addresses,
-    // which includes NONE paired as well as one. The enum's name is narrower
-    // than the states it covers; the sentence is not.
-    DualShortfall.ONE_SENSOR_PAIRED -> "Fewer than two sensors are paired - this set will record one."
-    DualShortfall.ROLES_UNASSIGNED -> "Label both sensors A and B under Devices - this set will record one."
-    DualShortfall.ROLES_COLLIDE -> "Both sensors are labelled the same - fix it under Devices."
-    null ->
-        when {
-            chosen != planned && planned == 1 -> "Plan says one - your change is recorded in the export"
-            chosen != planned -> "Plan says $planned - your change is recorded in the export"
-            chosen == 1 -> "One stream, as always"
-            else -> "Both streams are recorded; nothing is derived from the second one yet"
-        }
+private fun sensorCountDetail(chosen: Int, planned: Int, roster: SensorRoster): String {
+    roster.shortfall?.let { return DualSensorSetup.recordLine(it) }
+    return when {
+        chosen != planned && planned == 1 -> "Plan says one - your change is recorded in the export"
+        chosen != planned -> "Plan says $planned - your change is recorded in the export"
+        chosen == 1 -> "One stream, as always"
+        else -> "Both streams are recorded; nothing is derived from the second one yet"
+    }
 }
 
 @Composable
