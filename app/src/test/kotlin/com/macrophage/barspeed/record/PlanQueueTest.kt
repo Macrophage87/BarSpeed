@@ -124,4 +124,63 @@ class PlanQueueTest {
         assertEquals(5, addedSetIndex(twoBlocks(), upcomingIndex = 5))
         assertEquals(0, addedSetIndex(emptyList(), upcomingIndex = 0))
     }
+
+    /**
+     * RED before the fix. Appending on set ONE of a three-set block puts the
+     * new set after set three, not after set one.
+     *
+     * This is #177 item 3 and the whole reason the rule is a function rather
+     * than an insertion at `upcomingIndex + 1`. The lifter is adding to the
+     * block: they found the working weight on the opener and want one more set
+     * of the same exercise, and the two sets the plan already asked for are
+     * still wanted. Jumping the queue would run the appended set second and
+     * push the prescribed remainder behind it, which is a different session
+     * from the one anyone asked for.
+     */
+    @Test
+    fun `a set appended mid-block goes after the block's remaining sets`() {
+        assertEquals(3, addedSetIndex(twoBlocks(), upcomingIndex = 0))
+        assertEquals(3, addedSetIndex(twoBlocks(), upcomingIndex = 1))
+    }
+
+    /**
+     * RED before the fix. Adding two sets is adding one twice: the second lands
+     * after the first (#177 item 4).
+     *
+     * The queue here is what the first append leaves behind -- the appended
+     * slot carries the next index in the block, so it reads as a continuation
+     * of it rather than as the start of a new one. Nothing may assume at most
+     * one addition, and the shape that would break it is a rule scanning for
+     * the last PRESCRIBED set instead of the last set of the block.
+     */
+    @Test
+    fun `appending twice puts the second set after the first`() {
+        val afterOneAppend = twoBlocks().toMutableList().apply { add(3, QueueBlockKey("back_squat", 3)) }
+        assertEquals(4, addedSetIndex(afterOneAppend, upcomingIndex = 0))
+        val afterTwoAppends = afterOneAppend.toMutableList().apply { add(4, QueueBlockKey("back_squat", 4)) }
+        assertEquals(5, addedSetIndex(afterTwoAppends, upcomingIndex = 0))
+    }
+
+    /**
+     * RED before the fix. A session running one movement in two consecutive
+     * blocks appends to the block the lifter is IN, not to the far end of both.
+     *
+     * `setIndexInExercise == 0` is what marks the start of a block, and it is
+     * `SetLoadPolicy.sameExerciseBlock`'s rule read from here rather than
+     * restated. Without it the exercise id alone would swallow the second block
+     * -- so a lifter adding a set to their opening squat block would find it
+     * queued after the closing one, three exercises later.
+     */
+    @Test
+    fun `two consecutive blocks of one exercise are two blocks`() {
+        val twice =
+            listOf(
+                QueueBlockKey("back_squat", 0),
+                QueueBlockKey("back_squat", 1),
+                QueueBlockKey("back_squat", 0),
+                QueueBlockKey("back_squat", 1),
+            )
+        assertEquals(2, addedSetIndex(twice, upcomingIndex = 0))
+        assertEquals(4, addedSetIndex(twice, upcomingIndex = 2))
+    }
 }

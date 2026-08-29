@@ -372,4 +372,72 @@ class PlanValueCaptionContractTest {
             assertFalse(caption!!.contains(shownAsPlan[i % 3]), "caption $i attributes the lifter's number to the plan")
         }
     }
+
+    /**
+     * RED before the fix. A set the LIFTER appended gets no caption at all,
+     * on any of the three boxes (#177).
+     *
+     * The body-weight load box is the live defect and the reason this exists.
+     * `plannedLoadText` answers "BW" for a body-weight set that declared no
+     * load -- deliberately, because BW is the zero of that notation and a
+     * pull-up prescribed at body weight HAS prescribed something -- so an
+     * appended pull-up is captioned "Plan says BW - the rest of this exercise
+     * runs BW + 20 kg unless the plan changes it" on a set nothing prescribed.
+     * That is a claim stronger than its evidence in one line of UI text: it
+     * tells the lifter the plan asked for a set the plan does not know about.
+     *
+     * The reps and hold halves are belt-and-braces and are asserted anyway.
+     * Both already answer null on a null prescription, so they pass today by
+     * accident of an appended slot's `plannedReps` being null rather than
+     * because anything states the rule -- and a rule enforced by accident is
+     * one a later change can remove without failing anything. They are handed a
+     * NON-null prescription here precisely so they cannot pass that way.
+     */
+    @Test
+    fun `an appended set gets no caption on any box`() {
+        assertNull(
+            PlanValueCaption.load(
+                adHoc = false,
+                added = true,
+                bodyweight = true,
+                unit = WeightUnit.KG,
+                plannedAddedKg = null,
+                shownAddedKg = 20.0,
+                standsForLaterSets = true,
+            ),
+            "an appended body-weight set is told the plan says BW",
+        )
+        assertNull(
+            PlanValueCaption.load(
+                adHoc = false,
+                added = true,
+                bodyweight = false,
+                unit = WeightUnit.KG,
+                plannedAddedKg = 90.0,
+                shownAddedKg = 100.0,
+                standsForLaterSets = true,
+            ),
+            "an appended loaded set is told the plan says 90 kg",
+        )
+        assertNull(
+            PlanValueCaption.reps(
+                adHoc = false,
+                added = true,
+                plannedReps = 8,
+                shownReps = 6,
+                standsForLaterSets = true,
+            ),
+            "an appended set is told the plan asked for 8 reps",
+        )
+        assertNull(
+            PlanValueCaption.hold(
+                adHoc = false,
+                added = true,
+                plannedDurationS = 45,
+                shownDurationS = 30,
+                standsForLaterSets = true,
+            ),
+            "an appended hold is told the plan asked for 45s",
+        )
+    }
 }
