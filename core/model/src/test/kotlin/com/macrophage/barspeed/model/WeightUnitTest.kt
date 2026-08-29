@@ -94,6 +94,31 @@ class WeightUnitTest {
         assertNotEquals(hundredLbExact, WeightUnit.LB.parseToKg(WeightUnit.LB.inputValue(hundredLbExact)))
     }
 
+    /**
+     * The two loads the round trip above proves unequal RENDER identically, in
+     * both notations. 79.3786647517562 kg and the 79.4 a kg field hands back
+     * are "79.4 kg" and "BW + 79.4 kg" alike.
+     *
+     * Characterization only -- green before and after -- and written down
+     * because a caption about to name the plan's number beside the box's number
+     * has to decide what "unchanged" means. Decided on the doubles it would
+     * print "Plan says 79.4 kg" against a box reading 79.4, which is #45's
+     * phantom deviation with a sentence attached; decided on the rendered text
+     * it stays silent, which is the truth the lifter can see. Nothing in this
+     * file said so until now.
+     */
+    @Test
+    fun `a load the field rounded renders identically to the one the plan declared`() {
+        val declaredInLb = 175 / WeightUnit.LB_PER_KG
+        val throughTheField = WeightUnit.KG.parseToKg(WeightUnit.KG.inputValue(declaredInLb))!!
+        assertNotEquals(declaredInLb, throughTheField)
+        assertEquals(WeightUnit.KG.format(declaredInLb), WeightUnit.KG.format(throughTheField))
+        assertEquals(
+            BodyweightLoadDisplay.label(declaredInLb, WeightUnit.KG),
+            BodyweightLoadDisplay.label(throughTheField, WeightUnit.KG),
+        )
+    }
+
     @Test
     fun `other toggles`() {
         assertEquals(WeightUnit.LB, WeightUnit.KG.other())
