@@ -4,12 +4,14 @@ package com.macrophage.barspeed.model
  * The two facts [AddSetControl.placement] needs about one queued slot.
  *
  * Moved here from `:app`'s `QueueBlockKey` unchanged (#188). It was a `:app`
- * type because `PlanQueueTest` runs on a JDK 17 launcher while `:core:model`
- * emits class file version 65, so an `:app` test that LOADED a `:core:model`
- * type would die with `UnsupportedClassVersionError` before asserting
- * anything -- projecting two primitives kept the rule inside the one `:app`
- * file a test could reach. The rule now lives in a module whose tests run on
- * 21, so the projection stays but the trap does not apply to it.
+ * type because `:app` RAN its unit tests on a JDK 17 launcher while
+ * `:core:model` emits class file version 65, so an `:app` test that LOADED a
+ * `:core:model` type died with `UnsupportedClassVersionError` before
+ * asserting anything -- projecting two primitives kept the rule inside the
+ * one `:app` file a test could reach. `app/build.gradle.kts` now pins that
+ * launcher to 21 and the trap is closed, but the projection stays on its own
+ * merits: `placement` needs two facts about a slot and has no business
+ * knowing what an `ExerciseDef` is.
  *
  * [setIndexInExercise] is carried because an exercise id alone cannot say
  * where a block ENDS. A session may run the same movement in two consecutive

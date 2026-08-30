@@ -53,13 +53,15 @@ object TimedSetEndPolicy {
      *
      * The canonical copy. `TIMED_CLOSE_ENOUGH_FRACTION` in `:app` is declared
      * from this one, so there is a single number rather than two that agree
-     * today. It is a `const val` deliberately: `:app`'s unit tests run on JDK
-     * 17 against `:core:model` classes compiled to class-file version 65, so
-     * a `:app` test that caused this object to be LOADED would die with
-     * `UnsupportedClassVersionError` before asserting anything. A const is
-     * inlined into the caller's constant pool at compile time and loads
-     * nothing -- see `PlanQueueTest`'s KDoc, which found that trap the hard
-     * way.
+     * today. It is a `const val`, and until #188 that mattered for more than
+     * style: `:app` RAN its unit tests on JDK 17 against `:core:model`
+     * classes compiled to class-file version 65, so a `:app` test that caused
+     * this object to be LOADED died with `UnsupportedClassVersionError`
+     * before asserting anything, while a const is inlined into the caller's
+     * constant pool at compile time and loads nothing. `app/build.gradle.kts`
+     * now pins that launcher to 21, so the trap is closed; the const stays
+     * because one number beats two. `PlanQueueTest`'s KDoc found the trap the
+     * hard way and records it.
      */
     const val CLOSE_ENOUGH_FRACTION = 0.9
 

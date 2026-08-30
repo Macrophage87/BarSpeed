@@ -27,9 +27,11 @@ import kotlin.test.assertEquals
  * `build.gradle.kts` already found and fixed this same defect for itself
  * (`tasks.withType<Test>().configureEach { javaLauncher.set(...) }`,
  * pinning the test JVM to 21 without changing what the module compiles
- * to), with its own KDoc naming the identical error one module over. The
- * matching fix for `:app` is a build-file edit this tranche was told not
- * to make.
+ * to), with its own KDoc naming the identical error one module over.
+ * `:app` carries that same block as of #188, so the trap described in this
+ * paragraph is CLOSED: `AppendedSlotTest`, one file over, loads
+ * `ExerciseDef` and `SetGeometryPolicy` freely. The paragraph stays because
+ * it is why this file is shaped the way it is, not because it still binds.
  *
  * `PlanQueue.kt` itself DOES import from `:core:model`
  * (`PlanSessionDef`, `SetGeometryPolicy`, for the unrelated

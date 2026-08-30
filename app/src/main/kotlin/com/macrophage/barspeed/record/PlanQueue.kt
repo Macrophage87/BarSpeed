@@ -10,14 +10,18 @@ import com.macrophage.barspeed.model.TimedSetEndPolicy
  * Fraction of a timed target that still counts as having made the hold.
  *
  * Declared FROM [TimedSetEndPolicy.CLOSE_ENOUGH_FRACTION] rather than beside
- * it, so there is one number in the app and not two that agree today. It stays
- * a `const val` deliberately: `:app`'s unit tests run on a JDK 17 launcher and
- * `:core:model` compiles to class-file version 65, so a `:app` test that caused
- * `TimedSetEndPolicy` to be LOADED would die with `UnsupportedClassVersionError`
- * before asserting anything -- the trap `PlanQueueTest`'s own KDoc documents.
- * A const initialised from another const is inlined into this file's constant
- * pool at compile time and loads nothing at runtime, so [timedVerdicts] and its
- * five tests are unaffected.
+ * it, so there is one number in the app and not two that agree today.
+ *
+ * It is a `const val`, and until #188 that was load-bearing rather than
+ * stylistic: `:app` ran its unit tests on a JDK 17 launcher while
+ * `:core:model` compiles to class-file version 65, so a `:app` test that
+ * caused `TimedSetEndPolicy` to be LOADED died with
+ * `UnsupportedClassVersionError` before asserting anything, and a const
+ * inlined into this file's constant pool at compile time loaded nothing.
+ * `app/build.gradle.kts` now pins the test JVM to 21, so that trap is closed
+ * and a `:app` test may load a `:core:model` type. The const stays because one
+ * number is better than two; it is no longer what keeps [timedVerdicts]
+ * testable.
  */
 const val TIMED_CLOSE_ENOUGH_FRACTION = TimedSetEndPolicy.CLOSE_ENOUGH_FRACTION
 
