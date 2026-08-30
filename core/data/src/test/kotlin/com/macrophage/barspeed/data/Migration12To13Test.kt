@@ -28,7 +28,10 @@ import kotlin.test.assertTrue
  * classpath and no `androidTest` source set anywhere -- so this cannot say
  * that SQLite accepts the statements, that a real file survives them, or that
  * Room's own `TableInfo` check passes afterwards. The emulator exercise is
- * what says that, and this commit does not discharge it.
+ * what says that. It was run on AVD barspeed-api35 against a populated v12
+ * file written by v0.1.44 and is recorded in the commit body that landed this
+ * branch; nothing in CI executes SQL against this migration, so that run is
+ * the only thing that ever has.
  *
  * ## Why this hop is shaped like v10 -> v11 and not like v11 -> v12
  *

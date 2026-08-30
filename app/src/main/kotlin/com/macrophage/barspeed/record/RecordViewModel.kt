@@ -519,6 +519,13 @@ private fun applyPrepAdjustment(s: RecordState, deltaS: Int, appScope: Coroutine
  * there is no recorded set, and it decides that BEFORE it suspends, so the
  * restore runs in the same frame as the tap and no other tap can interleave
  * with it.
+ *
+ * What is NOT ordered is the two writes themselves. `markWarmup` suspends into
+ * Room and Room dispatches suspend queries to a pool, so two taps inside one
+ * write window can reach the database in either order and the row may keep the
+ * first tap's mark while this state keeps the second's. Read from source;
+ * never observed, and the bench's two taps did not prove the window was
+ * entered.
  */
 private fun applyWarmupMark(
     stateFlow: MutableStateFlow<RecordState>,
@@ -549,6 +556,14 @@ private fun applyWarmupMark(
  *
  * appScope, as `rateLastSet` uses: the rest screen is the only place this can
  * be given, and the pop that leaves it must not cancel the write.
+ *
+ * THE ANSWER IS PUBLISHED AFTER THE WRITE HERE, unlike [applyWarmupMark]. The
+ * page the app opens by itself closes on the published answer rather than on
+ * the tap, so until `limit` returns the tiles are still drawn under a finger
+ * that has already answered; a second tap inside that window writes a second
+ * valid answer rather than losing one, and the two writes are not ordered
+ * against each other. Whether the asymmetry should stay is raised here, not
+ * settled.
  */
 private fun applyLimiter(
     stateFlow: MutableStateFlow<RecordState>,

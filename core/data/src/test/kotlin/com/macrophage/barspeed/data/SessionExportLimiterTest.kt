@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 /**
  * Differentials for publishing why a set ended (#189).
  *
- * FOUR OF THESE SIX FAILED WHEN THEY WERE WRITTEN, at b5fdb50 (CI run
+ * FOUR OF THE FIRST SIX FAILED WHEN THEY WERE WRITTEN, at b5fdb50 (CI run
  * 33313909287, conclusion failure), and that was the point of the commit
  * carrying them: the columns existed and a row carried them from the commit
  * before it, and nothing read them. So the reason a lifter gave would be
@@ -31,6 +31,16 @@ import kotlin.test.assertTrue
  * The two absence assertions passed there, because nothing wrote the keys at
  * all. They are kept to fail LATER, if a fix ever gives a skipped question a
  * default answer.
+ *
+ * THE THREE PUBLISH-BOUNDARY DIFFERENTIALS BELOW ARE A LATER RED. `an answer
+ * the vocabulary does not know is published as no answer`, `words beside an
+ * unknown answer are not published either` and `a stored note the write path
+ * could not have produced cannot break the manifest` all failed at 6b8d7f2,
+ * when both writers still put the raw column on the wire; the third failed by
+ * throwing JsonDecodingException rather than by comparing strings. CI's run
+ * for that commit, 33320046206, stops at :core:model:test and never reaches
+ * them -- their red is recorded in 6b8d7f2's own commit body, from a local
+ * --continue run.
  *
  * BOTH WRITERS ARE COVERED HERE, DELIBERATELY. The session document is
  * serialised by kotlinx; the raw archive's `meta.json` is assembled as TEXT by
@@ -257,8 +267,9 @@ class SessionExportLimiterTest {
      * A stored answer this build has never heard of is published as NO answer.
      *
      * `limiter` is a TEXT column and the published schema declares it a CLOSED
-     * enum. Nothing between them checks: both writers put `record.limiter` on
-     * the wire raw. SetRecordEntity.limiter's own KDoc names the case that
+     * enum. At 6b8d7f2 (CI run 33320046206, conclusion failure) nothing
+     * between them checked: both writers put `record.limiter` on the wire
+     * raw. SetRecordEntity.limiter's own KDoc names the case that
      * breaks it -- a row written by a LATER build -- and SetLimiter.ofStored
      * exists precisely so such a row reads as an unrecognised string instead
      * of throwing.
@@ -294,9 +305,10 @@ class SessionExportLimiterTest {
      * A BACKSLASH IN THE COLUMN CANNOT DESTROY THE WHOLE MANIFEST.
      *
      * meta.json is assembled as text, and its string writer maps a double
-     * quote to an apostrophe and escapes nothing else. Today the note is safe
-     * there only because normalizeNote removed the backslash at the WRITE --
-     * an assumption about the writer, relied on at the reader. A row this
+     * quote to an apostrophe and escapes nothing else. At 6b8d7f2 (CI run
+     * 33320046206, conclusion failure) the note was safe there only because
+     * normalizeNote removed the backslash at the WRITE -- an assumption about
+     * the writer, relied on at the reader. A row this
      * build did not write, and the tree's own KDoc names one shape of those,
      * makes meta.json unparseable for EVERY SET IN THE SESSION rather than
      * corrupting one note.

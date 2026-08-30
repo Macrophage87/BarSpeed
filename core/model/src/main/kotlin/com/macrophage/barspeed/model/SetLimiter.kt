@@ -103,9 +103,9 @@ enum class SetLimiter {
          * So the note is reduced here to characters that survive both writers
          * byte for byte -- the serialised session document and the hand-built
          * manifest -- which is what makes "exported verbatim" a fact rather
-         * than an intention. What is removed is the double quote, the
-         * backslash, and every control character; runs of whitespace collapse
-         * to one space and the result is trimmed.
+         * than an intention. What is removed is the double quote and the
+         * backslash; every whitespace or control character becomes a space,
+         * runs of spaces collapse to one, and the result is trimmed.
          *
          * THE LIFTER SEES MOST OF THIS AS THEY TYPE, but not through this
          * function. [sanitizeForTyping] is what the field applies, because a
@@ -154,9 +154,9 @@ enum class SetLimiter {
          * keystrokes as they make them.
          *
          * What it does is what [normalizeNote] does MINUS the ends: the double
-         * quote, the backslash and every control character go, other
-         * whitespace becomes a space, a run of spaces collapses to one, and
-         * the cap is applied. The trim is left to the write, because a
+         * quote and the backslash go, every other whitespace or control
+         * character becomes a space, a run of spaces collapses to one, and the
+         * cap is applied. The trim is left to the write, because a
          * trailing space is not junk at the end of a finished note -- it is a
          * word boundary the lifter is in the middle of typing.
          *

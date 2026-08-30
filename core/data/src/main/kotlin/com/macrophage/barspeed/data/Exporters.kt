@@ -453,6 +453,20 @@ class SessionExporter(
 }
 
 /**
+ * The answer as it may be PUBLISHED: read back through the vocabulary, or
+ * absent (#189).
+ *
+ * THE PUBLISH BOUNDARY IS THE LAST GATE, NOT A SECOND OPINION. The vocabulary
+ * is enforced where the value is PRODUCED and this build cannot write a row
+ * that breaks it -- but the column is TEXT, and `SetLimiter.ofStored`'s own
+ * KDoc says a row written by a LATER build may carry a value this one has
+ * never heard of, so an unrecognised one publishes as NO answer rather than as
+ * a member of a closed enum the document promises.
+ */
+private val SetRecordEntity.publishedLimiter: String?
+    get() = SetLimiter.ofStored(limiter)?.stored
+
+/**
  * The free-text note as it may be PUBLISHED: only where an answer stands
  * beside it (#189).
  *
@@ -472,21 +486,11 @@ class SessionExporter(
  * neither group nor attribute, and the published schema promises it is not
  * there.
  *
- * THE PUBLISH BOUNDARY IS THE LAST GATE, NOT A SECOND OPINION. Both the
- * vocabulary and the note's shape are enforced where the value is PRODUCED,
- * and this build cannot write a row that breaks either -- but the column is
- * TEXT, and `SetLimiter.ofStored`'s own KDoc says a row written by a LATER
- * build may carry a value this one has never heard of. So the answer is read
- * back through the vocabulary and an unrecognised one publishes as NO answer
- * rather than as a member of a closed enum the document promises, and the note
- * is normalized again on the way out. The second matters more than the first:
- * the manifest is assembled as text and escapes nothing, so one stored
- * backslash does not corrupt one note, it makes meta.json unparseable for
- * every set in the session.
+ * The note is normalized again on the way out, and that second pass matters
+ * more than the gate above it: the manifest is assembled as text and escapes
+ * nothing, so one stored backslash does not corrupt one note, it makes
+ * meta.json unparseable for every set in the session.
  */
-private val SetRecordEntity.publishedLimiter: String?
-    get() = SetLimiter.ofStored(limiter)?.stored
-
 private val SetRecordEntity.publishedLimiterNote: String?
     get() = SetLimiter.normalizeNote(limiterNote)?.takeIf { publishedLimiter != null }
 

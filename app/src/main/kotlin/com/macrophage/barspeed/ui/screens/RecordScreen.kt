@@ -2215,9 +2215,13 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * for (#153), and [RestHeader] now puts them in the same row: [StartNextSetButton]
  * sits beside the ring rather than at the foot of [NextSetBlock], because they
  * are the only two facts a lifter needs before the phone comes off the floor.
- * Everything about the set that had just finished -- the effort line, the
- * rep-correction row and a rep-quality card carrying a 64dp chart -- still sits
- * below the next-set block, in [LastSetDetail]. The field report for v0.1.37 is
+ * Almost everything about the set that had just finished -- the effort line,
+ * the reason row, the warm-up row, the rep- and hold-correction rows and a
+ * rep-quality card carrying a 64dp chart -- sits below the next-set block, in
+ * [LastSetDetail]. The one exception is the reason page the app opens BY
+ * ITSELF, drawn here under the header: the screen scrolls to 0 on entering
+ * RESTING, so a question drawn below the fold is a question the lifter starts
+ * the next set without seeing. See [SetLimiterPagePlacement]. The field report for v0.1.37 is
  * "try to get the rest dialog to fit on one page without scrolling"; that
  * report, not this arithmetic, is the evidence it did not fit, because `:app`
  * has no reachable test seam for a Compose layout and nothing here has been
@@ -2281,6 +2285,14 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // correction crossing the planned count can flip the set to failed
     // mid-rest, and eight tiles appearing directly above the +/- under the
     // finger would store a reason nobody gave.
+    //
+    // What it does NOT do is stop the insertion reflowing the column: this is
+    // one verticalScroll Column, so a page opening above the fold still moves
+    // every control below it while the lifter's finger is on one. The mistap
+    // that follows lands on a neighbouring row rather than on a reason tile,
+    // so it can no longer store an answer nobody gave. Reasoned from Compose's
+    // scroll contract, not measured -- the bench performed no rep correction
+    // across the planned count.
     if (placement == SetLimiterPagePlacement.PROMPT) {
         LimiterPage(state, timed, viewModel, onSkip = { dismissed = true }) { changing = false }
         Spacer(Modifier.height(10.dp))

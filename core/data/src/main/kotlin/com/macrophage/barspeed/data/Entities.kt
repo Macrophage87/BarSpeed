@@ -227,7 +227,11 @@ data class SetRecordEntity(
      * what makes "exported verbatim" true rather than aspirational: the raw
      * archive's manifest is assembled as text, so a newline or a backslash
      * arriving here would make that whole document unparseable. What is
-     * stored is what was shown to the lifter and what is published.
+     * stored is what the lifter typed with the ends trimmed once, here at the
+     * write; the field itself drops the characters the manifest cannot carry
+     * as they are typed -- see
+     * [com.macrophage.barspeed.model.SetLimiter.sanitizeForTyping] for why the
+     * two transforms are not the same function.
      */
     val limiterNote: String? = null,
     val tempo: String? = null,

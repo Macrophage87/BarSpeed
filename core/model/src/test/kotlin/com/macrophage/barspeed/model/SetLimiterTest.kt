@@ -196,9 +196,11 @@ class SetLimiterTest {
     /**
      * Normalizing twice changes nothing.
      *
-     * It runs on every keystroke in the field AND again at the write, so a
-     * second pass that trimmed a little more would store something other than
-     * what the lifter watched themselves type.
+     * It runs at the write AND again at the publish boundary, over a note this
+     * build may not have written, so a second pass that trimmed or shortened a
+     * little more would publish something other than what the row holds. It no
+     * longer runs on a keystroke -- [SetLimiter.sanitizeForTyping] is what the
+     * field applies.
      */
     @Test
     fun `normalizing an already normalized note changes nothing`() {
@@ -286,11 +288,13 @@ class SetLimiterTest {
      * applied to every PREFIX of it, in turn, and the field can hold only what
      * that loop converges to.
      *
-     * `normalizeNote` ends by collapsing and trimming, so the keystroke that
-     * adds a trailing space produces a value identical to the one already on
-     * screen and the space is deleted the instant it is typed. "rack was
-     * taken" becomes "rackwastaken", and #189's one free-text answer can hold
-     * only a single run-on token.
+     * `normalizeNote` ends by collapsing and trimming, so while the FIELD
+     * applied it -- at 6b8d7f2 (CI run 33320046206, conclusion failure) and
+     * every commit before it -- the keystroke that added a trailing space
+     * produced a value identical to the one already on screen and the space
+     * was deleted the instant it was typed. "rack was taken" became
+     * "rackwastaken", and #189's one free-text answer could hold only a single
+     * run-on token. The field now applies [SetLimiter.sanitizeForTyping].
      *
      * The fold here is the field's own contract rather than an approximation
      * of it, and the expected value is `normalizeNote` of the finished phrase
