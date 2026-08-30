@@ -6,6 +6,7 @@ import com.macrophage.barspeed.model.Stage
 import java.lang.reflect.Modifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -85,7 +86,7 @@ private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     "prepS" to Append.INHERITED,
     "sensors" to Append.INHERITED,
     // What the lifter is standing on for that exercise.
-    "loadKg" to Append.CARRIED,
+    "loadKg" to Append.RESET,
     "reps" to Append.CARRIED,
     "durationS" to Append.CARRIED,
     "tempo" to Append.CARRIED,
@@ -433,6 +434,38 @@ class AppendedSlotTest {
                     "A carried field needs a fixture that states one; a field no statement " +
                     "reaches is not CARRIED.",
             )
+        }
+    }
+
+    @Test
+    fun `no field recorded RESET takes the value standing for the exercise`() {
+        // The fourth sweep, and it exists for one direction the other three
+        // leave open: CARRIED mislabelled RESET. The sweep above asserts only
+        // that a RESET field DIFFERS from the anchor in some fixture, and a
+        // genuinely carried field satisfies that too, because every fixture
+        // here deliberately states a carried value different from the
+        // anchor's. Measured, not argued: at the parent of this commit,
+        // relabelling `loadKg` CARRIED -> RESET left `:app:testDebugUnitTest`
+        // green at 12 tests, 0 failures.
+        //
+        // Vacuous for every field genuinely RESET today -- none of the nine
+        // has a `standing` entry, because `standing` is authored per CARRIED
+        // field. That is the point: it fires only on the mislabel it was
+        // built for, and a fixture stating a value for a RESET field would be
+        // a deliberate act by whoever wrote it.
+        for (name in fieldsDecided(Append.RESET)) {
+            for (sweep in sweeps()) {
+                val stated = sweep.standing[name] ?: continue
+                if (stated == fieldOf(sweep.anchor, name)) continue
+                assertNotEquals(
+                    stated,
+                    fieldOf(sweep.appended, name),
+                    "APPEND_DECISIONS records `$name` as RESET, but over ${sweep.what} the " +
+                        "appended slot took the value STANDING for the exercise rather than a " +
+                        "cleared or recomputed one. That is what CARRIED means. The recorded " +
+                        "decision is in the wrong group.",
+                )
+            }
         }
     }
 }
