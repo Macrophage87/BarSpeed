@@ -99,9 +99,16 @@ class DevicePairingPolicyTest {
      * While pairing re-pointed the preference, forgetting the analysed unit
      * was self-healing: the lifter re-paired something and the preference came
      * back. Once pairing stops moving it, forgetting the analysed unit with
-     * another still paired would leave the role with NO preferred device, the
-     * analysed link idling on a null address, and no way back that does not
-     * involve forgetting the survivor too.
+     * another still paired would leave the role with NO preferred device and
+     * the analysed link idling on a null address until the lifter noticed.
+     *
+     * Promoting the survivor is the convenience and not the only route back:
+     * the Devices screen draws "Use this one for analysis" on every paired
+     * unit that is not its role's live one, which in that state is the
+     * survivor. An earlier draft of this KDoc said there was no way back short
+     * of forgetting the survivor too; that was false when it was written --
+     * the same commit added the control -- and the sentence is deleted rather
+     * than reworded.
      */
     @Test
     fun `forgetting the analysed unit promotes the one that is left`() {
@@ -199,6 +206,84 @@ class DevicePairingPolicyTest {
         )
     }
 
+    /**
+     * DIFFERENTIAL, finding 1: the link holding the forgotten unit has to go
+     * down with it.
+     *
+     * `DeviceRegistry.forget` promotes a survivor into the role's preferred
+     * address, and `AutoConnectManager.maintain`'s Connected branch is parked
+     * on `connectionState.first { it !is Connected }` -- so a client left
+     * alone keeps streaming the FORGOTTEN unit while the screen, and
+     * `SensorCapturePolicy.roster` behind it, name the survivor. With three
+     * IMUs paired that misattribution reaches the archive: the stream recorded
+     * under the survivor's label is the forgotten unit's. Wrong pixels are
+     * recoverable; a wrongly attributed capture is not.
+     */
+    @Test
+    fun `forgetting the analysed unit drops the link that was holding it`() {
+        assertEquals(
+            setOf(DeviceLinkRole.ANALYSED),
+            DevicePairingPolicy.linksToDropOnForget(
+                forgotten = first,
+                preferredImu = first,
+                preferredHrm = strap,
+                secondImu = null,
+            ),
+        )
+    }
+
+    /**
+     * DIFFERENTIAL: the same reasoning for the role the commit body never
+     * mentioned. `keyFor` is role-generic and so is the defect.
+     */
+    @Test
+    fun `forgetting the strap drops the heart-rate link`() {
+        assertEquals(
+            setOf(DeviceLinkRole.HEART_RATE),
+            DevicePairingPolicy.linksToDropOnForget(
+                forgotten = strap,
+                preferredImu = first,
+                preferredHrm = strap,
+                secondImu = second,
+            ),
+        )
+    }
+
+    /**
+     * DIFFERENTIAL: the second link is pointed at a plain address rather than
+     * at a preference, so nothing else would ever take it off a unit that is
+     * no longer paired.
+     */
+    @Test
+    fun `forgetting the second unit takes the second link down`() {
+        assertEquals(
+            setOf(DeviceLinkRole.SECOND),
+            DevicePairingPolicy.linksToDropOnForget(
+                forgotten = second,
+                preferredImu = first,
+                preferredHrm = null,
+                secondImu = second,
+            ),
+        )
+    }
+
+    /**
+     * DIFFERENTIAL: one unit can be holding two links at once, and forgetting
+     * it has to take both down rather than the first one found.
+     */
+    @Test
+    fun `forgetting a unit holding two links drops both`() {
+        assertEquals(
+            setOf(DeviceLinkRole.ANALYSED, DeviceLinkRole.SECOND),
+            DevicePairingPolicy.linksToDropOnForget(
+                forgotten = first,
+                preferredImu = first,
+                preferredHrm = strap,
+                secondImu = first,
+            ),
+        )
+    }
+
     // ---- which row offers to move a preference -------------------------------
 
     /**
@@ -222,6 +307,40 @@ class DevicePairingPolicyTest {
             PreferenceControl.Offer("Use this one for analysis"),
             DevicePairingPolicy.preferenceControl(DeviceLinkRole.ANALYSED, DeviceLinkRole.SECOND),
             "holding the second link is not being analysed",
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, finding 6: a second heart-rate strap must be reachable
+     * without forgetting the first.
+     *
+     * `DeviceRegistry.pair` keeps the existing preference for EVERY role, so
+     * pairing a second strap no longer switches to it and
+     * `AutoConnectManager.pairAndConnect` then declines to connect it. With
+     * the control drawn for bar sensors only, the sole route to the new strap
+     * was to forget the old one -- discoverable by accident, which is the
+     * class of implicit behaviour #184 was filed to remove.
+     *
+     * The words are not a straight copy of the bar sensor's. "Connected strap"
+     * was considered and refused: this rule is answered from which link the
+     * address holds and knows nothing about whether that link is up, so it
+     * would be asserting a connection while the chip beside it read
+     * Disconnected.
+     */
+    @Test
+    fun `a strap that is not the live one offers to become it`() {
+        assertEquals(
+            PreferenceControl.Offer("Use this strap for heart rate"),
+            DevicePairingPolicy.preferenceControl(DeviceLinkRole.HEART_RATE, DeviceLinkRole.NOT_LINKED),
+        )
+    }
+
+    /** DIFFERENTIAL, finding 6: and the strap the app is reading says so instead. */
+    @Test
+    fun `the strap the app reads says so rather than offering to move`() {
+        assertEquals(
+            PreferenceControl.InUse("Heart rate · readings come from this strap"),
+            DevicePairingPolicy.preferenceControl(DeviceLinkRole.HEART_RATE, DeviceLinkRole.HEART_RATE),
         )
     }
 

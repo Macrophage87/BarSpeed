@@ -132,11 +132,17 @@ class SensorCapturePolicyTest {
      * A second unit with no label is refused rather than given one.
      *
      * A positional default -- "the preferred one is A" -- was the obvious
-     * alternative and is what this pins against. `DeviceRegistry.pair` makes
-     * every newly paired device its role's preferred address, so under that
-     * rule the meaning of A would change silently on the next re-pair, and
-     * every capture either side of that moment would be labelled consistently
-     * and wrongly.
+     * alternative and is what this pins against. The preferred address is
+     * movable at any time -- by "Use this one for analysis"
+     * (`DeviceRegistry.setPreferred`) and by forgetting the analysed unit --
+     * so the meaning of A would change under the lifter, and every capture
+     * either side of that moment would be labelled consistently and wrongly.
+     * The label has to be a property of the MAC or it is not a label.
+     *
+     * An earlier draft rested this on `DeviceRegistry.pair` making every newly
+     * paired device its role's preferred address. That stopped being true in
+     * the same branch; the premise is deleted rather than reworded, and the
+     * conclusion is unaffected.
      */
     @Test
     fun `an unlabelled second unit downgrades to one sensor rather than being labelled`() {

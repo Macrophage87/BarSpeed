@@ -89,8 +89,15 @@ class DeviceScanListPolicyTest {
      * find my sensor", which is the one thing this list is for; and while a
      * second unit is being paired, a row proving the FIRST unit is powered and
      * in range is exactly the diagnostic that is wanted. What must not survive
-     * is the offer to pair it again, because pairing is what moves the
-     * analysed link (#184).
+     * is the offer to pair it again: the second offer can only change the
+     * device's ROLE, and re-filing a saved bar sensor as an HRM leaves
+     * `preferred_imu` naming an address `DeviceRegistry.preferred(IMU)` no
+     * longer matches, so the analysed link idles on nothing (#184).
+     *
+     * An earlier draft said the reason was that pairing moves the analysed
+     * link. That stopped being true in the same branch, when
+     * `DeviceRegistry.pair` began keeping the existing preference; the
+     * sentence is deleted rather than reworded.
      */
     @Test
     fun `a device already paired is shown, marked, and not offered again`() {
@@ -162,5 +169,26 @@ class DeviceScanListPolicyTest {
 
         assertEquals(mapOf(near to -42, far to -88), readings)
         assertTrue(third !in readings, "an address no packet arrived for is absent, not weak")
+    }
+
+    /**
+     * DIFFERENTIAL, finding 2: a stopped scan has no readings, not the last
+     * scan's.
+     *
+     * `DevicesViewModel.toggleScan` clears the found list when a scan STARTS
+     * and never when one stops or errors, and nothing on the Devices screen is
+     * conditioned on the scan running -- so a paired row went on printing
+     * "Signal strong (-42 dBm)" indefinitely, indistinguishable from a live
+     * reading. That is load-bearing rather than cosmetic: the live signal is
+     * what replaced the by-elimination ritual, `DualSensorSetup.identifyHint`
+     * tells the lifter to label the unit whose row reads strong, and the label
+     * decides which physical stream the export files under which name.
+     */
+    @Test
+    fun `a stopped scan reports no readings at all`() {
+        assertEquals(
+            emptyMap(),
+            DeviceScanListPolicy.liveRssi(false, listOf(Sighting(near, -42), Sighting(far, -88))),
+        )
     }
 }
