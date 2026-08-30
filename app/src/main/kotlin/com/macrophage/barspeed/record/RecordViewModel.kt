@@ -26,6 +26,8 @@ import com.macrophage.barspeed.dsp.TimedSetVoice
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.hrm.Hrv
 import com.macrophage.barspeed.hrm.RrIngest
+import com.macrophage.barspeed.model.AddSetControl
+import com.macrophage.barspeed.model.AddSetSlotKey
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.ExerciseDef
@@ -895,13 +897,13 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * this method's body took it over -- measured, not guessed, by running detekt
  * with the body inline.
  *
- * WHERE IT GOES is [addedSetIndex]'s, which is pure and pinned in
- * `PlanQueueTest`. The block's remaining sets keep their place; the appended
- * set follows them.
+ * WHERE IT GOES is [AddSetControl.placement]'s, which is pure and pinned in
+ * `AddSetControlTest`. The block's remaining sets keep their place; the
+ * appended set follows them.
  *
  * `setIndexInExercise` is the previous slot's plus one, which is both what
  * the heading counts from and what makes the NEXT append land after this one
- * -- `addedSetIndex` walks the block by that index, so an appended slot has
+ * -- the placement rule walks the block by that index, so an appended slot has
  * to read as a continuation of it. `setsInExercise` is set to match, so the
  * card cannot say "Set 4 of 3"; the prescribed sets keep the plan's own
  * count, because that is what the plan asked of them.
@@ -939,7 +941,13 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
 private fun appendedQueue(s: RecordState): List<PlannedSlot>? {
     if (s.adHoc) return null
     val upcoming = s.upcomingSlot ?: return null
-    val at = addedSetIndex(s.queue.map { QueueBlockKey(it.exercise.id, it.setIndexInExercise) }, s.upcomingIndex)
+    val placement =
+        AddSetControl.placement(
+            s.queue.map { AddSetSlotKey(it.exercise.id, it.setIndexInExercise) },
+            queueIndex = s.queueIndex,
+            upcomingIndex = s.upcomingIndex,
+        ) ?: return null
+    val at = placement.insertAt
     val previous = s.queue[at - 1]
     val appended =
         carriedValues(upcoming, s).copy(

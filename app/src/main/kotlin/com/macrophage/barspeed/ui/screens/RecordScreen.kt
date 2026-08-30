@@ -61,6 +61,7 @@ import com.macrophage.barspeed.dsp.PhaseTempoTarget
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.dsp.liftDirection
+import com.macrophage.barspeed.model.AddSetControl
 import com.macrophage.barspeed.model.BlePermissionStep
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
@@ -1181,10 +1182,14 @@ private fun ChangeSetDialog(
  */
 @Composable
 private fun AddSetSection(state: RecordState, viewModel: RecordViewModel) {
-    val slot = state.upcomingSlot ?: return
     if (state.adHoc) return
+    state.upcomingSlot ?: return
+    val anchor = state.currentSlot ?: return
     TextButton(onClick = viewModel::addSetOfCurrentExercise) {
-        Text("Load was wrong? Add another ${slot.exercise.displayName} set", color = BarColors.Blue)
+        Text(
+            AddSetControl.label(anchor.exercise.displayName, state.upcomingSlot?.exercise?.displayName),
+            color = BarColors.Blue,
+        )
     }
 }
 
