@@ -125,8 +125,11 @@ abstract class GattClient(protected val context: Context) {
             // at a unit when Forget is tapped on it, setPreferredAndConnect
             // drops the role's link when "Use this one for analysis" (or its
             // strap wording) is tapped, and setSecondaryImuAddress drops the
-            // second link whenever the Record screen re-points it. stop() does
-            // still have no callers. An earlier version of this comment said
+            // second link whenever either screen re-points it --
+            // RecordViewModel.mirrorSensorSettings while a session is being
+            // set up, and DevicesViewModel's arming collector for as long as
+            // the Devices screen is open (#192). stop() does still have no
+            // callers. An earlier version of this comment said
             // stop() was disconnect()'s ONLY caller and that neither outcome
             // was reachable; that was already false when it was written --
             // setSecondaryImuAddress called imuClientB.disconnect() -- and it

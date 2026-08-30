@@ -65,10 +65,12 @@ import com.macrophage.barspeed.ui.components.PermissionBanner
  * scan shows its live signal, so holding one unit against the phone names it.
  * `DualSensorSetup.identifyHint` says so where it is needed.
  *
- * The second link is still pointed at an address by the Record screen and not
- * by this one, so a labelled second unit reads "Not linked" here until a set
- * arms it. That is now said as absence rather than drawn as a failed
- * connection.
+ * The second link is pointed at an address by this screen's own ViewModel
+ * since #192, so a labelled second unit is armed here rather than waiting for
+ * a set on the Record screen. An earlier draft said the Record screen and not
+ * this one pointed it; #192 made that false and it is deleted rather than
+ * reworded. A unit no link is maintaining still reads "Not linked", which is
+ * said as absence rather than drawn as a failed connection.
  *
  * Clearing a label is offered because a wrong one is worse than none: an
  * unlabelled pair records one stream and says so, a mislabelled pair records

@@ -122,11 +122,26 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      * Re-arming after a deliberate drop is safe because the target is
      * recomputed from the NEW preference: `imuLinkTargets` never names the
      * analysed unit as the second one, so this cannot point both clients at
-     * one WT901 -- the invariant `SensorCapture.kt:216-218` states, pinned
-     * exhaustively by `no arrangement points both links at the same unit`.
-     * It is also not a new race: `mirrorSensorSettings` already re-derives
-     * the same address off the same preference flow whenever the Record
-     * screen is open.
+     * one WT901 -- the invariant `AutoConnectManager.imuClientB`'s KDoc and
+     * `DevicePairingPolicy.linksToDropOnPrefer` state, pinned exhaustively by
+     * `no arrangement points both links at the same unit`.
+     *
+     * It is not the same write `mirrorSensorSettings` makes, and the
+     * difference is the point of this collector. That mirror combines four
+     * flows -- `sensorRoles`, `sensorCounts`, `knownDevices` and
+     * `preferred(IMU)` -- and NOT the held address, so it re-derives only
+     * when one of those four re-emits and cannot re-arm after a drop that
+     * changed none of them. This one can, which makes it a new write that
+     * can interleave with the two deliberate nulls above. An earlier draft
+     * of this paragraph said it was "not a new race" because the mirror
+     * already re-derived the same address off the same preference flow;
+     * that was a claim stronger than its evidence and is deleted rather
+     * than reworded. Every interleaving reachable on `viewModelScope`'s
+     * dispatcher was traced from source and converges, because
+     * `imuLinkTargets.second` is `roster`'s secondary address and never the
+     * analysed one at the emission it was computed from. An interleaving
+     * reasoned about is not an interleaving observed, and nothing in this
+     * repository executes a ViewModel: [Field].
      *
      * An `init` block rather than a `stateIn` property, because this has no
      * reader: `WhileSubscribed` would tie arming the link to whether

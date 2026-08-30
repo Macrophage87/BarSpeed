@@ -63,8 +63,8 @@ enum class DualSetupStep {
  *
  * The pair is answered together rather than one field at a time so that
  * "these two links are pointed at one remote" is a question a test can ask.
- * `SensorCapture.kt`'s invariant is that no path may leave two clients on one
- * WT901: `WitmotionStreamDecoder` holds one buffer per client and the WT901's
+ * The invariant is that no path may leave two clients on one WT901:
+ * `WitmotionStreamDecoder` holds one buffer per client and the WT901's
  * 20-byte frames carry no checksum, so nothing in the app could notice, and a
  * dual set's two archives would be two recordings of one unit filed under two
  * labels.
