@@ -10,8 +10,17 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** On-screen label held for the whole prep, unchanged from before the lead-in had a voice. */
-private const val LEAD_IN_LABEL = "GET READY"
+/**
+ * On-screen label held for the whole prep, unchanged from before the lead-in
+ * had a voice.
+ *
+ * `internal` rather than private so `RecordViewModel` can tell a lead-in push
+ * from a cadence push by comparing against THIS constant rather than a second
+ * copy of the string. Two copies of a label are two facts that can disagree,
+ * and the way they disagree here is a set spending its whole cadence marked as
+ * not yet started.
+ */
+internal const val LEAD_IN_LABEL = "GET READY"
 
 /**
  * Voice-guided cadence. The runner plays the tempo prescription and counts the

@@ -34,14 +34,18 @@ class SetEndControlPolicyTest {
         }
     }
 
+    private val rateAndFail = setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE)
+    private val rateAndSkip = setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED)
+    private val failOnly = setOf(SetEndControl.END_FAILED)
+
     private fun controls(c: Triple<SetEndKind, Boolean, Boolean?>) =
-        SetEndControlPolicy.controls(kind = c.first, targetMet = c.second, complete = c.third)
+        SetEndControlPolicy.controls(kind = c.first, targetMet = c.second, complete = c.third, started = true)
 
     @Test
     fun `a set that met its target rates and ends in one tap`() {
         assertEquals(
             setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE),
-            SetEndControlPolicy.controls(SetEndKind.STRAIGHT_REPS, targetMet = true, complete = null),
+            SetEndControlPolicy.controls(SetEndKind.STRAIGHT_REPS, true, complete = null, started = true),
         )
     }
 
@@ -49,7 +53,7 @@ class SetEndControlPolicyTest {
     fun `a set that stopped short is asked how it felt, and may still be skipped`() {
         assertEquals(
             setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED),
-            SetEndControlPolicy.controls(SetEndKind.STRAIGHT_REPS, targetMet = false, complete = null),
+            SetEndControlPolicy.controls(SetEndKind.STRAIGHT_REPS, false, complete = null, started = true),
         )
     }
 
@@ -65,7 +69,7 @@ class SetEndControlPolicyTest {
             listOf(true, false, null).forEach { complete ->
                 assertTrue(
                     SetEndControl.EFFORT_GRID in
-                        SetEndControlPolicy.controls(SetEndKind.STRAIGHT_REPS, targetMet, complete),
+                        SetEndControlPolicy.controls(SetEndKind.STRAIGHT_REPS, targetMet, complete, started = true),
                     "targetMet=$targetMet complete=$complete cannot rate the set",
                 )
             }
@@ -78,7 +82,7 @@ class SetEndControlPolicyTest {
         // nagged, and absence has to remain a state the record can hold.
         assertTrue(
             SetEndControl.END_UNRATED in
-                SetEndControlPolicy.controls(SetEndKind.STRAIGHT_REPS, targetMet = false, complete = null),
+                SetEndControlPolicy.controls(SetEndKind.STRAIGHT_REPS, false, complete = null, started = true),
         )
     }
 
@@ -90,7 +94,7 @@ class SetEndControlPolicyTest {
         // path a miscount lands on.
         assertFalse(
             SetEndControl.FAILED_TILE in
-                SetEndControlPolicy.controls(SetEndKind.STRAIGHT_REPS, targetMet = false, complete = null),
+                SetEndControlPolicy.controls(SetEndKind.STRAIGHT_REPS, false, complete = null, started = true),
         )
     }
 
@@ -165,7 +169,7 @@ class SetEndControlPolicyTest {
         listOf(true, false).forEach { targetMet ->
             assertEquals(
                 setOf(SetEndControl.END_FAILED),
-                SetEndControlPolicy.controls(SetEndKind.TEMPO_GUIDED, targetMet, complete = false),
+                SetEndControlPolicy.controls(SetEndKind.TEMPO_GUIDED, targetMet, false, started = true),
                 "an unfinished guided set offers something other than Fail (targetMet=$targetMet)",
             )
         }
@@ -176,7 +180,7 @@ class SetEndControlPolicyTest {
         listOf(true, false).forEach { targetMet ->
             assertEquals(
                 setOf(SetEndControl.END_FAILED),
-                SetEndControlPolicy.controls(SetEndKind.TIMED, targetMet, complete = false),
+                SetEndControlPolicy.controls(SetEndKind.TIMED, targetMet, false, started = true),
                 "an unfinished hold offers something other than Fail (targetMet=$targetMet)",
             )
         }
@@ -191,7 +195,7 @@ class SetEndControlPolicyTest {
         listOf(SetEndKind.TEMPO_GUIDED, SetEndKind.TIMED).forEach { kind ->
             listOf(true, false).forEach { targetMet ->
                 assertTrue(
-                    SetEndControl.EFFORT_GRID in SetEndControlPolicy.controls(kind, targetMet, complete = null),
+                    SetEndControl.EFFORT_GRID in SetEndControlPolicy.controls(kind, targetMet, null, started = true),
                     "$kind with no completion signal cannot rate the set (targetMet=$targetMet)",
                 )
             }
@@ -203,12 +207,12 @@ class SetEndControlPolicyTest {
         listOf(SetEndKind.TEMPO_GUIDED, SetEndKind.TIMED).forEach { kind ->
             assertEquals(
                 setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE),
-                SetEndControlPolicy.controls(kind, targetMet = true, complete = true),
+                SetEndControlPolicy.controls(kind, true, complete = true, started = true),
                 "$kind loses the grid after completing",
             )
             assertEquals(
                 setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED),
-                SetEndControlPolicy.controls(kind, targetMet = false, complete = true),
+                SetEndControlPolicy.controls(kind, false, complete = true, started = true),
                 "$kind that completed short of target loses the grid",
             )
         }
@@ -224,12 +228,13 @@ class SetEndControlPolicyTest {
             listOf(true, false).forEach { targetMet ->
                 listOf(true, false, null).forEach { complete ->
                     assertEquals(
-                        SetEndControlPolicy.controls(kind, targetMet, complete = null),
-                        SetEndControlPolicy.controls(kind, targetMet, complete),
+                        SetEndControlPolicy.controls(kind, targetMet, null, started = true),
+                        SetEndControlPolicy.controls(kind, targetMet, complete, started = true),
                         "$kind changed with complete=$complete, which it must not read",
                     )
                     assertTrue(
-                        SetEndControl.EFFORT_GRID in SetEndControlPolicy.controls(kind, targetMet, complete),
+                        SetEndControl.EFFORT_GRID in
+                            SetEndControlPolicy.controls(kind, targetMet, complete, started = true),
                         "$kind lost the grid at targetMet=$targetMet complete=$complete",
                     )
                 }
@@ -300,5 +305,70 @@ class SetEndControlPolicyTest {
             setOf(SetEndKind.TEMPO_GUIDED, SetEndKind.TIMED),
             SetEndKind.entries.filter { it.gatesOnCompletion }.toSet(),
         )
+    }
+
+    /**
+     * THE WHOLE TABLE, written out rather than swept.
+     *
+     * The invariance and membership sweeps above are well designed and each
+     * catches a class of mutation, but between them they leave 10 of the 24
+     * combinations pinned only by `in` or by equality with a sibling case: a
+     * mutation returning [SetEndControl.END_UNRATED] where EXPLOSIVE now
+     * answers [SetEndControl.FAILED_TILE] passes every one of them. So the
+     * expected answer is stated once, exhaustively, as data.
+     *
+     * `started = true` throughout. The lead-in window is a separate rule with
+     * its own table below, because folding it in would double 24 rows to 48
+     * of which half are the same answer, and a table nobody can read is not a
+     * pin.
+     */
+    private val expectedWhileRunning: Map<Triple<SetEndKind, Boolean, Boolean?>, Set<SetEndControl>> =
+        mapOf(
+            // A hand-counted set never reads `complete`: tapping an effort
+            // tile IS how the lifter says the set is over.
+            Triple(SetEndKind.STRAIGHT_REPS, true, true as Boolean?) to rateAndFail,
+            Triple(SetEndKind.STRAIGHT_REPS, true, false as Boolean?) to rateAndFail,
+            Triple(SetEndKind.STRAIGHT_REPS, true, null) to rateAndFail,
+            Triple(SetEndKind.STRAIGHT_REPS, false, true as Boolean?) to rateAndSkip,
+            Triple(SetEndKind.STRAIGHT_REPS, false, false as Boolean?) to rateAndSkip,
+            Triple(SetEndKind.STRAIGHT_REPS, false, null) to rateAndSkip,
+            // Explosive work keeps today's behaviour on the owner's third
+            // message, so it reads `complete` no more than a manual set does.
+            Triple(SetEndKind.EXPLOSIVE, true, true as Boolean?) to rateAndFail,
+            Triple(SetEndKind.EXPLOSIVE, true, false as Boolean?) to rateAndFail,
+            Triple(SetEndKind.EXPLOSIVE, true, null) to rateAndFail,
+            Triple(SetEndKind.EXPLOSIVE, false, true as Boolean?) to rateAndSkip,
+            Triple(SetEndKind.EXPLOSIVE, false, false as Boolean?) to rateAndSkip,
+            Triple(SetEndKind.EXPLOSIVE, false, null) to rateAndSkip,
+            // The gate: `complete == false` and nothing else withholds.
+            Triple(SetEndKind.TEMPO_GUIDED, true, false as Boolean?) to failOnly,
+            Triple(SetEndKind.TEMPO_GUIDED, false, false as Boolean?) to failOnly,
+            Triple(SetEndKind.TIMED, true, false as Boolean?) to failOnly,
+            Triple(SetEndKind.TIMED, false, false as Boolean?) to failOnly,
+            // Complete, so the grid it always got.
+            Triple(SetEndKind.TEMPO_GUIDED, true, true as Boolean?) to rateAndFail,
+            Triple(SetEndKind.TEMPO_GUIDED, false, true as Boolean?) to rateAndSkip,
+            Triple(SetEndKind.TIMED, true, true as Boolean?) to rateAndFail,
+            Triple(SetEndKind.TIMED, false, true as Boolean?) to rateAndSkip,
+            // Unjudgeable, so ungated. These four are the reason the argument
+            // is nullable at all, and none of them was pinned by equality
+            // before this table.
+            Triple(SetEndKind.TEMPO_GUIDED, true, null) to rateAndFail,
+            Triple(SetEndKind.TEMPO_GUIDED, false, null) to rateAndSkip,
+            Triple(SetEndKind.TIMED, true, null) to rateAndFail,
+            Triple(SetEndKind.TIMED, false, null) to rateAndSkip,
+        )
+
+    @Test
+    fun `every kind, target and completion combination has one stated answer`() {
+        assertEquals(24, expectedWhileRunning.size, "the table does not carry one row per combination")
+        assertEquals(
+            everyCase().toSet(),
+            expectedWhileRunning.keys,
+            "the table and the combinations it claims to cover have drifted apart",
+        )
+        everyCase().forEach { case ->
+            assertEquals(expectedWhileRunning.getValue(case), controls(case), "$case")
+        }
     }
 }

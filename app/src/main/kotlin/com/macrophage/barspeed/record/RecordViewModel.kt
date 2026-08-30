@@ -46,6 +46,7 @@ import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SensorRoster
 import com.macrophage.barspeed.model.SessionCloseState
 import com.macrophage.barspeed.model.SetClockPolicy
+import com.macrophage.barspeed.model.SetCompletionPolicy
 import com.macrophage.barspeed.model.SetEndKind
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
@@ -1064,7 +1065,7 @@ private fun ratedState(s: RecordState, rpe: Int?, tappedFailed: Boolean, effecti
  * it out: every field it writes is written to the same value it was written to
  * inline.
  */
-private fun inSetState(s: RecordState, manualSet: Boolean, guidedSet: Boolean, prepRunning: Boolean): RecordState =
+private fun inSetState(s: RecordState, manualSet: Boolean, guidedSet: Boolean, leadInRunning: Boolean): RecordState =
     s.copy(
         stage = Stage.IN_SET,
         setElapsedS = 0,
@@ -1075,7 +1076,7 @@ private fun inSetState(s: RecordState, manualSet: Boolean, guidedSet: Boolean, p
         guidedLabel = "",
         guidedCountdown = 0,
         guidedFinished = false,
-        timedPrepRunning = prepRunning,
+        leadInRunning = leadInRunning,
     )
 
 /**
@@ -1580,14 +1581,20 @@ data class RecordState(
     val guidedCountdown: Int = 0,
     val guidedPhaseTotal: Int = 1,
     /**
-     * True while the prep before a hold or a carry is playing.
+     * True while the lead-in before the set's own work is playing -- the prep
+     * before a hold or a carry, and the identical prep before a guided
+     * cadence.
      *
-     * The set is recording and its clock has not started: [setElapsedS] is 0
-     * and stays there until the prep ends. A different question from
-     * [guidedSet], which says whether a CADENCE follows the prep; a hold has
-     * none.
+     * The set is recording and nothing it will be measured on has started:
+     * [setElapsedS] is 0 and stays there until a hold's prep ends, and the
+     * guide has called no stroke. A different question from [guidedSet], which
+     * says whether a CADENCE follows the lead-in; a hold has none.
+     *
+     * One flag for both, and not two that must agree: the two windows are the
+     * same fact about the set -- it has not begun -- and [setStarted] is the
+     * only thing that reads it apart from the ring the prep draws.
      */
-    val timedPrepRunning: Boolean = false,
+    val leadInRunning: Boolean = false,
 
     /** True once the voice guide has called the prescription all the way through. */
     val guidedFinished: Boolean = false,
@@ -1886,11 +1893,24 @@ data class RecordState(
      * there.
      */
     val setComplete: Boolean?
-        get() = when {
-            currentIsTimed -> currentTimedTargetS?.let { !TimedSetEndPolicy.fellShort(setElapsedS, it) }
-            guidedSet -> if (currentTargetReps == null) null else guidedFinished
-            else -> null
-        }
+        get() = SetCompletionPolicy.complete(
+            timed = currentIsTimed,
+            timedTargetS = currentTimedTargetS,
+            elapsedS = setElapsedS,
+            guided = guidedSet,
+            targetReps = currentTargetReps,
+            guidedFinished = guidedFinished,
+        )
+
+    /**
+     * Whether the set's own clock or cadence has begun.
+     *
+     * False for the whole lead-in, which is a window in which the set is
+     * recording, nothing has been measured, and the question of how it went
+     * has no answer at all -- not even "not yet".
+     */
+    val setStarted: Boolean
+        get() = !leadInRunning
 
     /**
      * Which completion signal, if any, the set in progress has -- the decision
@@ -2383,7 +2403,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // A timed prep starts the clock itself, when it ends. Every other set
         // is measured from here, exactly as before.
         if (timedStartWord == null) startSetTimer(timedTargetS)
-        stateFlow.value = inSetState(s, manualSet, guidedSet, prepRunning = timedStartWord != null)
+        // Both lead-ins in one expression, read from the two branches below:
+        // set here rather than at the runner's first push, so no frame of a
+        // lead-in renders as a set already under way.
+        stateFlow.value = inSetState(s, manualSet, guidedSet, leadInRunning = timedStartWord != null || guidedSet)
         if (timedStartWord != null) {
             val speaks = LeadInPolicy.speaks(prepCase, s.audioCues)
             startTimedPrep(prepS, timedStartWord, speaks) { startSetTimer(timedTargetS) }
@@ -2446,7 +2469,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun startSetTimer(timedTargetS: Int?) {
         clockStartedAtMs = System.currentTimeMillis()
-        stateFlow.value = stateFlow.value.copy(timedPrepRunning = false)
+        stateFlow.value = stateFlow.value.copy(leadInRunning = false)
         tickJob =
             viewModelScope.launch {
                 var seconds = 0
@@ -2488,9 +2511,15 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         return GuidedCadenceRunner(
             scope = viewModelScope,
             speak = { cues, utterance -> if (cues.isEmpty()) speakOnly(utterance) else speakCues(cues, utterance) },
+            // `leadInRunning` off the runner's OWN constant, not a copy of the
+            // string: its first beat pushes a label before it sleeps, so this
+            // clears on the instant the lead-in ends. A hold's prep pushes
+            // nothing after it, so [startSetTimer] clears that one.
             update = { label, remaining, total ->
-                stateFlow.value =
-                    stateFlow.value.copy(guidedLabel = label, guidedCountdown = remaining, guidedPhaseTotal = total)
+                stateFlow.value = stateFlow.value.copy(
+                    guidedLabel = label, guidedCountdown = remaining, guidedPhaseTotal = total,
+                    leadInRunning = label == LEAD_IN_LABEL,
+                )
             },
             onRepCounted = { rep ->
                 journal?.appendRepMark(System.currentTimeMillis())

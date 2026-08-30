@@ -148,10 +148,17 @@ object SetEndControlPolicy {
      * Rendering that absence as false would leave those sets with no exit but
      * a failure they did not have.
      *
+     * [started] is whether the set's own clock or cadence has begun. IT IS NOT
+     * READ AT THIS COMMIT. The parameter lands first and inert so the
+     * differential for the lead-in window can be written against the final
+     * signature and fail on an assertion rather than on a compile error, which
+     * is not evidence of anything; the commit after next reads it.
+     *
      * A set rather than a boolean per control, so a control added later has to
      * be placed in every case rather than defaulting into all of them.
      */
-    fun controls(kind: SetEndKind, targetMet: Boolean, complete: Boolean?): Set<SetEndControl> =
+    @Suppress("UNUSED_PARAMETER")
+    fun controls(kind: SetEndKind, targetMet: Boolean, complete: Boolean?, started: Boolean): Set<SetEndControl> =
         // `complete == false` and not `complete != true`: null is a set whose
         // completion the app cannot judge, and it falls through to the ungated
         // rule below rather than into the gate. Written as an equality against

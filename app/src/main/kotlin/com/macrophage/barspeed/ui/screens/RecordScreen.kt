@@ -1706,7 +1706,7 @@ private fun TimedSetStage(state: RecordState, viewModel: RecordViewModel, slot: 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         InSetHeader(state, slot)
         Spacer(Modifier.height(10.dp))
-        if (state.timedPrepRunning) TimedPrepRing(state, carry) else TimedClockRing(state, carry)
+        if (state.leadInRunning) TimedPrepRing(state, carry) else TimedClockRing(state, carry)
         Spacer(Modifier.height(14.dp))
         Text(
             "Elapsed ${formatMmSs(state.setElapsedS)}",
@@ -2001,7 +2001,12 @@ private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
         SetWriteState.FAILED -> UnsavedSetNotice(viewModel)
         SetWriteState.NONE -> {
             val controls =
-                SetEndControlPolicy.controls(state.setEndKind, state.setTargetMet, state.setComplete)
+                SetEndControlPolicy.controls(
+                    kind = state.setEndKind,
+                    targetMet = state.setTargetMet,
+                    complete = state.setComplete,
+                    started = state.setStarted,
+                )
             if (SetEndControl.EFFORT_GRID in controls) {
                 EndSetRpeGrid(state, viewModel, failedTile = SetEndControl.FAILED_TILE in controls)
             }
@@ -2077,9 +2082,15 @@ private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
     // The failure wording of the set's own ladder, so the button and the tile
     // that replaces it after completion say the same word. A hold breaks
     // early; a snatch is missed.
+    //
+    // Named, never counted to. `.last()` was right only because EffortScale
+    // happens to append the failure tile last, and that order is pinned in a
+    // different module: reordering the tiles there would put a headroom
+    // caption on a red destructive button and nothing in `:app` would catch
+    // it.
     val label =
         rpeOptions(state.currentIsTimed, currentKind(state) == ExerciseKind.EXPLOSIVE, state.weightUnit)
-            .last().description
+            .first { it.failed }.description
     Button(
         onClick = { viewModel.endSet(SetRating(null, failed = true)) },
         modifier = Modifier.fillMaxWidth().height(64.dp),
