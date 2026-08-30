@@ -993,6 +993,23 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * so Room created v12 outright and `MIGRATION_11_12` did NOT execute. It is
  * still unexecuted, and the cluster's two-way exercise still owes 10 -> 11 -> 12
  * against real rows.
+ *
+ * RUN ON A DEVICE A THIRD TIME, for the `warmup` fix, and this is what
+ * discharges it. On `barspeed-api35`, a plan whose lat pulldown block declares
+ * its 27.2 kg opener `warmup: true` and its 34 kg working set not. TWO
+ * sessions, one per half of the leak: session 1 appended from the REST screen
+ * after the warm-up ran, session 2 appended from READY before the warm-up set
+ * was started. Both then ran all three sets. `sqlite3` read the same three
+ * rows for each session -- `warmup` 1 / `added` 0 on the opener, 0 / 0 on the
+ * working set, and 0 / 1 on the APPENDED set, with its `plannedLoadKg` and
+ * `plannedReps` NULL. Before this fix that last row read `warmup` 1. The
+ * session detail screen drew a WARM-UP chip on the opener and ADDED, with no
+ * WARM-UP, on the appended set; the saved export published `"warmup": true`
+ * on the opener, `"added": true` on the appended set, and no `warmup` key on
+ * it at all. Logcat scoped to the app's own pid carried no `SQLiteException`,
+ * no `FATAL` and no crash across both sessions. Same limits as the run above:
+ * no sensor, so nothing about BLE, sample capture or the DSP, and a fresh
+ * install, so no migration executed.
  */
 internal fun appendedState(s: RecordState): RecordState? {
     if (s.adHoc) return null
