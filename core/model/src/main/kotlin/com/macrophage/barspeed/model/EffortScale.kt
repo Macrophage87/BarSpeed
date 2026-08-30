@@ -187,12 +187,21 @@ object EffortScale {
      * here where the load table needs two. The wording says "gone" rather
      * than "held" because the same tile is drawn for a farmer's walk.
      *
-     * The figures are NOT measured. Nothing in this repository holds a
-     * capture of a lifter reporting how much longer a hold could have run,
-     * so 15-30 s and about a minute are a first authoring of the same
-     * one-step / two-step shape the load table uses. Revising them after a
-     * session is a change to this map and nothing else, which is why the
-     * table is here rather than inline at the tile.
+     * The figures are NOT measured. Nothing in this repository holds a capture
+     * of a lifter reporting how much longer a hold could have run. 15-30 s is
+     * the owner's own recommendation on #187 -- "could have held ~15-30 s
+     * longer" -- and the minute beside it is authored to the same one-step /
+     * two-step shape the load table uses. Revising them after a session is a
+     * change to this map and nothing else, which is why the table is here
+     * rather than inline at the tile.
+     *
+     * **The load table's justification does not transfer, and that is an open
+     * question rather than a settled one.** The load bands are fixed BECAUSE
+     * the equipment is quantised: the owner deleted proportional bands for
+     * exactly that reason, since you cannot add 8% to a machine. A hold is not
+     * quantised, so a fixed band is 75-150% of a 20 s plank and under 20% of a
+     * three-minute carry. Whether the time rungs should scale with the target
+     * is unanswered here and is carried as a field item.
      */
     private val TIME_CAPTIONS: Map<HeadroomTier, String> =
         mapOf(

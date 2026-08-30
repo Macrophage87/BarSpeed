@@ -1980,14 +1980,19 @@ private fun phaseLabel(phase: Phase): String = when (phase) {
 /**
  * The set-end control, which changes with what the set has actually delivered.
  *
- * The effort grid is drawn either way, with END SET EARLY under it on a set
- * that came up short. Rating an abandoned set does not log it as a good one:
- * the shortfall is derived at the write from the rep or second count and lands
- * as `failed` whether or not a tile was tapped, so "solid, had more in me"
- * three reps into a five-rep set now records an effort AND a failure, which is
- * the pair a reader of the export needs and could not get. Which controls
- * belong to which case is [SetEndControlPolicy]'s decision, in a module with
- * tests; this draws what it is told.
+ * WHAT IS DRAWN IS [SetEndControlPolicy]'S DECISION and this function only
+ * paints it. On a hand-counted or explosive set the effort grid is drawn
+ * either way, with END SET EARLY under it on a set that came up short. On a
+ * tempo-guided or timed set the grid is withheld until the app can say the set
+ * is over, and the one control before that is the standalone failure button
+ * (#186). During either kind's lead-in, before its clock or its cadence has
+ * started, the one control is END SET EARLY and no verdict is stored.
+ *
+ * Rating an abandoned set does not log it as a good one: the shortfall is
+ * derived at the write from the rep or second count and lands as `failed`
+ * whether or not a tile was tapped, so "3 reps left" three reps into a
+ * five-rep set records an effort AND a failure, which is the pair a reader of
+ * the export needs and could not get.
  *
  * Once the set HAS ended, neither of those is the control any more, and the
  * write's state decides what is. This is the single place all five in-set
@@ -2066,11 +2071,18 @@ private fun UnsavedSetNotice(viewModel: RecordViewModel) {
  * lifter's own TAPPED failure: [SetRating] with no RPE and `failed = true`,
  * the same value the grid's failure tile writes.
  *
- * WHAT IT COSTS, and it is not hidden from the lifter: every early exit on
- * these sets now records a failure, including the ones that are not -- a rack
- * taken, a cramp. The caption says the set is rateable afterwards, because
- * that is the half that keeps #137 from coming back: the rest screen's unrated
- * row carries a Rate action, and re-rating overwrites the tapped verdict.
+ * WHAT IT COSTS, and it is not hidden from the lifter: every early exit on a
+ * set that is UNDER WAY now records a failure, including the ones that are not
+ * -- a rack taken, a cramp. The caption says the set is rateable afterwards,
+ * because that is the half that keeps #137 from coming back: the rest screen's
+ * row for a Fail-ended set reads EFFORT -- FAILED and carries a Change action,
+ * and re-rating overwrites the tapped verdict. (EFFORT -- NOT RATED with a
+ * Rate action is the OTHER row, for a set carrying no verdict at all, such as
+ * an auto-ended hold; both open the same grid.)
+ *
+ * This control is not drawn during the set's lead-in. A set whose clock never
+ * started has not failed at anything, so that window offers
+ * [EndSetEarlyButton] instead (#186).
  *
  * Deliberately not the shape of [EndSetEarlyButton]. That one ends a set with
  * no verdict at all and is the SKIP beside a grid; this one is the only way
@@ -2338,10 +2350,12 @@ private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel)
  * How was the whole session? One tap answers it, one tap skips it, and either
  * way the session closes (#159).
  *
- * DELIBERATELY NOT THE EFFORT GRID'S VOCABULARY. That grid says "Solid — 3
- * reps left", which is reps-in-reserve for one set on a 6-10 band; this is the
- * whole workout on 1-10 and there are no reps left in a session. Bare numbers
- * with the two ends labelled, so nothing here can be read as the other scale.
+ * DELIBERATELY NOT THE EFFORT GRID'S VOCABULARY. That grid says "3 reps left"
+ * or "Could have added 10-15 lb" about ONE set on 1-10; this is the whole
+ * workout on 1-10 and there are no reps left in a session. The two scales now
+ * span the same range, so nothing but the wording keeps them apart. Bare
+ * numbers with the two ends labelled, so nothing here can be read as the other
+ * scale.
  * The numbers come from [SessionRpe.VALUES] rather than a literal `1..10`, so
  * the control cannot offer a value the stored column and the published schema
  * refuse.
@@ -2551,18 +2565,22 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
 /**
  * Rest-screen reminder of the effort recorded for the finished set.
  *
- * When an RPE or warm-up tile was tapped, its own label is shown, with
- * "short of target" appended if the set also fell short by rep count or
- * duration -- both are real, distinct facts and neither replaces the other.
+ * When an effort tile was tapped, its own label is shown, with "short of
+ * target" appended if the set also fell short by rep count or duration -- both
+ * are real, distinct facts and neither replaces the other.
  *
- * When neither was tapped, [RecordState.lastSetRpe] is null and
- * [RecordState.lastSetWarmup] is false whether the lifter tapped the grid's
- * own "Failed the set" tile or was offered the grid and declined it --
- * [EndSetEarlyButton] is the skip beside the grid on a set that came up
- * short, and ends it with no rating, landing on exactly the same two flags.
- * [RecordState.lastSetTappedFailed] now tells a tapped failure from a
- * derived one. This line still prints the shared word "Failed" for both,
- * by #139's deliberate choice, not because the state is incapable.
+ * When none was tapped, [RecordState.lastSetRpe] is null: the lifter tapped
+ * the grid's own "Failed the set" tile, tapped the standalone failure control
+ * (#186), was offered the grid and declined it via [EndSetEarlyButton], left
+ * during the set's lead-in, or had the set auto-ended by its clock (#168).
+ * [RecordState.lastSetTappedFailed] tells a tapped failure from a derived one;
+ * this line still prints the shared word "Failed" for both, by #139's
+ * deliberate choice, not because the state is incapable.
+ *
+ * [RecordState.lastSetWarmup] is NOT one of those flags any more. There is no
+ * warm-up tile since #187 -- `EffortScaleTest` pins its absence -- and the
+ * flag is the plan's declaration about the set, frozen at the write, so it is
+ * routinely true on a set carrying no rating at all.
  *
  * Issue #137 makes the declined case the common one and the tapped-tile case
  * rarer, because the failed tile is no longer drawn on a short set at all. This
@@ -2582,7 +2600,10 @@ private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
         rpeOptions(feedback.actualDurationS != null, feedback.explosive, state.weightUnit)
     // The warm-up branch this used to open with is gone with the tile (#187).
     // A warm-up set now carries an ordinary rating and reads as one; that it
-    // was a ramp is the plan's statement and is shown with the set, not here.
+    // was a ramp is the plan's statement and appears on the stored set in the
+    // session history, not anywhere in the record flow. The lifter is not told
+    // mid-session that the current set was declared preparatory, which is the
+    // same gap the missing in-app toggle leaves.
     val tapped = options.firstOrNull { !it.failed && it.rpe == state.lastSetRpe }?.description
     // The wording is EffortCorrectionPolicy's, including the named absence for
     // a set with nothing logged; `:app` cannot test a composable, so the

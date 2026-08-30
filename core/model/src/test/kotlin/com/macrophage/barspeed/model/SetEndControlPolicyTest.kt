@@ -22,10 +22,10 @@ import kotlin.test.assertTrue
  * expectations under "the completion gate" are that change's differentials:
  * they fail against the ungated policy this file was written for and pass once
  * it reads its own arguments. #137 is not reversed by them -- a guided set
- * ended via Fail is rated on the rest screen, where the unrated row carries a
- * Rate action -- and the sweep asserting the grid survives on a hand-counted
- * set is what keeps the reversal from spreading to the kinds that have no
- * completion signal at all.
+ * ended via Fail is rated on the rest screen, where its row reads
+ * EFFORT -- FAILED and carries a Change action -- and the sweep asserting the
+ * grid survives on a hand-counted set is what keeps the reversal from
+ * spreading to the kinds that have no completion signal at all.
  */
 class SetEndControlPolicyTest {
     private fun everyCase(): List<Triple<SetEndKind, Boolean, Boolean?>> = SetEndKind.entries.flatMap { kind ->

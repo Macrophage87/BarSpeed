@@ -99,9 +99,13 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
  * and the set the lifter stopped is where the fatigue information is, so the
  * record read easier the harder the session got. This gates on COMPLETION, and
  * a set ended via Fail is still rateable: #140's correction grid sits on the
- * rest screen, the unrated row reads EFFORT -- NOT RATED and carries a Rate
- * action. The rating moves from the moment of ending to the rest period rather
- * than disappearing. Two things must stay true or the defect IS back -- the
+ * rest screen, where a Fail-ended set's row reads EFFORT -- FAILED and carries
+ * a Change action that opens the same grid with the failure tile pre-lit. The
+ * rating moves from the moment of ending to the rest period rather than
+ * disappearing. (An auto-ended hold, which carries no verdict at all, is the
+ * row that reads EFFORT -- NOT RATED with a Rate action instead; both routes
+ * reach the same grid. `EffortCorrectionPolicy.lineText` decides which, and a
+ * tapped failure is not an absence.) Two things must stay true or the defect IS back -- the
  * rest-screen Rate path has to work on a Fail-ended set, which no test in this
  * repository can check and which is verified on a device instead; and the
  * gating must not spread to a kind with no completion signal, which is what

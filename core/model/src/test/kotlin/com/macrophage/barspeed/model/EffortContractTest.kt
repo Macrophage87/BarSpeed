@@ -231,9 +231,6 @@ class EffortContractTest {
             "9 one rep left",
             "8 two reps left",
             "7 three reps left",
-            "6 'could have added one equipment increment'",
-            "4 'two increments'",
-            "1 'much more'",
         ).forEach { rung ->
             assertTrue(rung in description, "the published rpe never names the rung \"$rung\": $description")
         }
@@ -242,6 +239,51 @@ class EffortContractTest {
             listOf(1, 4, 6, 7, 8, 9, 10),
             EffortScale.tiles(timed = false, explosive = false, unit = WeightUnit.LB).mapNotNull { it.rpe },
             "the app writes a set of anchors the published description does not describe",
+        )
+    }
+
+    /**
+     * The headroom rungs are published as the FIGURES the tiles say, coupled
+     * to the caption table rather than paraphrased.
+     *
+     * `EffortScale`'s governing rule is that the tile names a WEIGHT and never
+     * "one notch", because there is no declared equipment increment anywhere
+     * in the codebase. The published description did the opposite: it said
+     * "one equipment increment" and "two increments" and named no weight and
+     * no duration at all, publishing a quantity the code declares unknowable
+     * -- while `PLAN_PROMPT`, the copy users are actually handed, already
+     * carried the figures. One contract, two published statements, different
+     * content: the drift class that has already shipped a real bug here.
+     *
+     * Asserted against `headroomCaption` rather than against literals, so
+     * revising a band after a field session reds this test until the document
+     * moves with it. The figures live in one place and are quoted in the
+     * other.
+     */
+    @Test
+    fun `the published rpe description names the headroom figures the tiles offer`() {
+        val description = setProperty("rpe")["description"]!!.jsonPrimitive.content
+        val quoted =
+            HeadroomTier.entries.flatMap { tier ->
+                listOf(
+                    EffortScale.headroomCaption(tier, EffortAsk.LOAD, WeightUnit.LB),
+                    EffortScale.headroomCaption(tier, EffortAsk.LOAD, WeightUnit.KG),
+                    EffortScale.headroomCaption(tier, EffortAsk.TIME, WeightUnit.LB),
+                )
+            }.map { it.removePrefix("Could have added ").removePrefix("Could have gone ") }
+        quoted.forEach { figure ->
+            assertTrue(
+                figure in description,
+                "the published rpe never names the figure \"$figure\" the tile offers: $description",
+            )
+        }
+        assertFalse(
+            "one equipment increment" in description,
+            "the published rpe names a notch, which the app cannot know: $description",
+        )
+        assertTrue(
+            "DOES NOT RECORD which unit's caption was on screen" in description,
+            "the published rpe never says the unit is unrecoverable from the export: $description",
         )
     }
 

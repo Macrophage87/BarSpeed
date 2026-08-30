@@ -114,7 +114,16 @@ data class SetRecordEntity(
     val plannedDurationS: Int? = null,
     /** Unilateral sets: "left" or "right". */
     val side: String? = null,
-    /** Lifter-reported RPE (6–10), logged when the set ends; correctable afterward on the rest screen. */
+    /**
+     * Lifter-reported effort for ONE set, 1 to 10, logged when the set ends
+     * and correctable afterward on the rest screen.
+     *
+     * The grid writes 1, 4, 6, 7, 8, 9 or 10;
+     * [com.macrophage.barspeed.model.EffortScale] owns the scale, which is
+     * reps in reserve at 7 to 10 and load or time headroom at 6, 4 and 1. A
+     * pre-v0.1.45 value is on the old 6-to-10 ladder, where 6 was its FLOOR,
+     * "easy, 4+ reps left", and so absorbed everything 1 and 4 now separate.
+     */
     val rpe: Int? = null,
     /**
      * True when the set is marked failed: the lifter tapped it as failed, the
@@ -122,7 +131,18 @@ data class SetRecordEntity(
      * failure, or both. The derived case needs no lifter input at all.
      */
     val failed: Boolean = false,
-    /** True for warm-up sets — kept out of the RPE scale so effort data stays clean. */
+    /**
+     * True when the PLAN declared this set preparatory -- a ramp set, a
+     * warm-up.
+     *
+     * Since v0.1.45 it is written from `PlanSetDef.warmup` off the frozen slot
+     * and by nothing else. It says what the set was FOR and carries no claim
+     * about [rpe], because a warm-up set is now rated on the same scale as any
+     * other set. Before that the only producer was an effort TILE that stored
+     * this flag and a null [rpe] together, so on an older row the pair means
+     * the app could not record both. False on an ad-hoc or an appended set,
+     * because nothing declared those.
+     */
     val warmup: Boolean = false,
     /**
      * True when the lifter APPENDED this set to the exercise mid-session

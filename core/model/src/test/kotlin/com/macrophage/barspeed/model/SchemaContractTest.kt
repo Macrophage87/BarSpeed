@@ -1041,20 +1041,25 @@ class SchemaContractTest {
     }
 
     /**
-     * The published per-set `rpe` accepts 1 to 10, which is WIDER than the grid
-     * the app draws.
+     * The published per-set `rpe` accepts 1 to 10, which is the range the grid
+     * now spans.
      *
-     * Characterization, not endorsement. `rpeOptions` in `RecordScreen.kt`
-     * offers 6 through 10 and is the only thing that writes this key --
-     * `rateLastSet` is its one caller, reaching `SessionRepository.rateSet` and
-     * `SessionDao.updateRpe` -- so nothing the app ships produces a 1 here.
-     * The bound is pinned as it is because the next change adds a SECOND
-     * rating whose range genuinely is 1 to 10, and a reader meeting two 1-to-10
+     * The bound has always been 1 to 10 and is unchanged by #187; what changed
+     * is that the grid reaches both ends of it. `EffortScale.tiles` offers 1,
+     * 4, 6, 7, 8, 9 and 10 and is the only source of a written value --
+     * `rateLastSet` reaching `SessionRepository.rateSet` and
+     * `SessionDao.updateRpe`. 2, 3 and 5 remain valid and carry no tile.
+     *
+     * This test's name and this paragraph both said the bound was WIDER than
+     * the grid and that `rpeOptions` defined the ladder. Neither survived
+     * #187: `rpeOptions` paints what `EffortScale` decides, and the published
+     * example now carries `"rpe": 1`. The session rating (#159, landed in
+     * v0.1.44) shares this range exactly, so a reader meeting two 1-to-10
      * integers in one document has nothing but the descriptions to tell them
      * apart.
      */
     @Test
-    fun `the published per-set rpe is bounded one to ten, wider than the grid the app draws`() {
+    fun `the published per-set rpe is bounded one to ten, the range the grid now spans`() {
         val set = schema("session-export.schema.json")["\$defs"]!!.jsonObject["set"]!!
             .jsonObject["properties"]!!.jsonObject
         val rpe = assertNotNull(set["rpe"], "the published export schema does not declare a set's rpe").jsonObject

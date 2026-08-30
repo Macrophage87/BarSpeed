@@ -47,10 +47,10 @@ data class SessionExport(
      * was left", anchored as reps in reserve at 7 to 10 and as load or time
      * headroom below that; this is the whole workout on 1 to 10, and the two
      * must never be averaged or compared as one quantity. Both now span the
-     * same published range, so only these descriptions tell them apart. [SessionRpe] states the difference
-     * once and the published schema states it again in both descriptions,
-     * because an archive reader has only the descriptions to tell two 1-to-10
-     * integers apart.
+     * same published range, so only these descriptions tell them apart.
+     * [SessionRpe] states the difference once and the published schema states
+     * it again in both descriptions, because an archive reader has only the
+     * descriptions to tell two 1-to-10 integers apart.
      *
      * Absent means UNRATED, which is not a low rating. The rating is skippable
      * with one tap, a lifter who skips it records no answer, and every session
@@ -326,9 +326,22 @@ data class SetExport(
      *  - 10 nothing left, 9 one rep left, 8 two reps left, 7 three reps left
      *    -- reps in reserve, on a hold or an explosive lift the same rungs in
      *    that movement's own words.
-     *  - 6 could have added one equipment increment, 4 could have added two,
-     *    1 could have added much more -- a LOAD figure on a rep set, a TIME
-     *    figure on a hold.
+     *  - 6, 4 and 1 are HEADROOM, and the caption names a figure rather than
+     *    a notch, because there is no declared equipment increment anywhere
+     *    in this codebase and the app cannot know which is in front of the
+     *    lifter. On a rep set: 6 "could have added 10-15 lb" or "5 kg", 4
+     *    "20-30 lb" or "10 kg", 1 "much more". On a hold or a carry the same
+     *    three rungs ask in seconds: 6 "15-30 s longer", 4 "about a minute
+     *    longer", 1 "much longer". The pound band spans a bar's 10 lb and a
+     *    stack's 15 lb, which is why one tile serves both.
+     *
+     * WHICH CAPTION THE LIFTER SAW IS NOT RECORDED. The unit and the load or
+     * time branch are display decisions taken at set end and nothing here
+     * carries them; a reader wanting the unit reads the session's own, and a
+     * reader wanting to know whether the time rungs were drawn reads
+     * [durationS]. [EffortScale] owns the captions; the figures in SECONDS
+     * are authored rather than measured, while the pound and kilogram bands
+     * come from the equipment the lifter actually meets.
      *
      * 2, 3 and 5 are valid values with no tile: the gaps exist so the anchors
      * SORT, and a reader meeting one from an older session is looking at a
