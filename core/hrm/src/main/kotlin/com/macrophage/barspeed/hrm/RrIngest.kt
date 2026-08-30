@@ -6,13 +6,10 @@ import com.macrophage.barspeed.model.HrSample
  * Which beats a heart-rate notification brought.
  *
  * This exists because the decision has to be somewhere a test can reach. Its
- * only caller is `RecordViewModel`, in `:app`. `:app` DOES have a test source
- * set as of `ed274bd`, which falsifies the sentence that stood here -- it said
- * `:app` had none -- but not the conclusion: the caller sits inside an
- * `AndroidViewModel`, so reaching it in place would still need Robolectric on
- * the CI path, and a rule written there would be verified by reading it and by
- * nothing else. Here it is pure, and the batch form is a fold of the
- * per-notification form rather than a second implementation, so a
+ * only caller is `RecordViewModel`, in `:app`, which has no test source set at
+ * all -- a rule written there is verified by reading it and by nothing else, and
+ * inverting it would red nothing in CI. Here it is pure, and the batch form is a
+ * fold of the per-notification form rather than a second implementation, so a
  * fixture-driven test exercises the code the app runs.
  *
  * THE RULE: a notification whose R-R list is identical to that of the last

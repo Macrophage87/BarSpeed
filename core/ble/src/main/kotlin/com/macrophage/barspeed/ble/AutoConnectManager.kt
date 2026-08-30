@@ -200,7 +200,9 @@ class AutoConnectManager(
     }
 
     /**
-     * Forget a device, and drop whichever links were pointed at it.
+     * Forget a device, and drop whichever links were pointed at it -- plus the
+     * second link when it is holding whichever bar sensor is the analysed one
+     * after the forget.
      *
      * `DeviceRegistry.forget` promotes a survivor into the role's preferred
      * address (#184), and `maintain`'s Connected branch is parked on

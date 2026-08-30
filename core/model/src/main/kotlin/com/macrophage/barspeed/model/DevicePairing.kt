@@ -134,7 +134,8 @@ object DevicePairingPolicy {
 
     /**
      * Which links must be dropped when [forgotten] is forgotten: every link
-     * that was pointed at it.
+     * that was pointed at it, and the SECOND link when it is holding whichever
+     * bar sensor the analysed role points at after the forget.
      *
      * A link left holding a forgotten unit does not fall over on its own.
      * `AutoConnectManager.maintain`'s Connected branch is parked on
