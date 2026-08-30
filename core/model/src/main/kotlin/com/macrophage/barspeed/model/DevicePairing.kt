@@ -179,23 +179,46 @@ object DevicePairingPolicy {
      * the old device would sit there indefinitely and the new address would
      * never be read. Dropping it wakes that branch.
      *
+     * The SECOND link goes down too when it is the one holding
+     * [newlyPreferred], and this is the half that is not a lift. Promoting the
+     * unit the second link is already on would otherwise point `imuClient` and
+     * `imuClientB` at the same remote: `AutoConnectManager` drops the analysed
+     * client alone and `secondaryImuAddress` still names that address, so
+     * `maintain` brings both links up on one WT901. `WitmotionStreamDecoder`
+     * holds one buffer per client and the WT901's 20-byte frames carry no
+     * checksum, so nothing in the app can notice; if both links stream, a dual
+     * set's two raw archives are two recordings of ONE unit filed under two
+     * labels. That is the misattribution [linksToDropOnForget] exists to
+     * prevent, reached by a different tap.
+     *
+     * Only when it is the SAME address. Taking the second link down for every
+     * promotion would cost a dual set its second stream for no reason, and
+     * `preferring a unit the second link is not holding leaves the second link
+     * alone` is what holds that.
+     *
+     * Only for [DeviceLinkRole.ANALYSED]. The second link is a bar-sensor
+     * link, so a strap promotion cannot be the unit holding it; the guard is
+     * on the argument rather than on a state the screen can produce.
+     *
+     * What this does NOT do is re-point the second link at the unit the
+     * analysed link just left. `SensorCapturePolicy.roster` decides that and
+     * `RecordViewModel.mirrorSensorSettings` applies it, so the second link
+     * comes back when a set is next armed -- the Devices screen cannot arm one
+     * at all, which is #192 and not this rule's to answer. Until then the
+     * second unit reads "Not linked", which is what that state is for.
+     *
      * Here rather than in `:core:ble` for the reason [linksToDropOnForget] is
      * here: that module has no test source set, so which links a tap takes down
      * is a decision nothing can run against while it lives there.
-     *
-     * Answers with [newlyPreferred] and [secondImu] unread as of this commit.
-     * Those two arguments are what the differential in the next commit is
-     * about; the lift is deliberately behaviour-preserving so the red is the
-     * whole of the change. The suppression goes with them: detekt's
-     * `UnusedParameter` is correct about this commit and the commit that reads
-     * them removes it.
      */
-    @Suppress("UnusedParameter")
     fun linksToDropOnPrefer(
         ownedLink: DeviceLinkRole,
         newlyPreferred: String,
         secondImu: String?,
-    ): Set<DeviceLinkRole> = setOf(ownedLink)
+    ): Set<DeviceLinkRole> = setOfNotNull(
+        ownedLink,
+        DeviceLinkRole.SECOND.takeIf { ownedLink == DeviceLinkRole.ANALYSED && secondImu == newlyPreferred },
+    )
 
     /**
      * What a paired row draws about being its role's live unit, or null when
