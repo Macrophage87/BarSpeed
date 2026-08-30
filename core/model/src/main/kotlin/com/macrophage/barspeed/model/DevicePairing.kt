@@ -152,28 +152,49 @@ object DevicePairingPolicy {
      * A unit holding two links yields two, rather than the first match: one
      * WT901 can be both the analysed unit and the second one.
      *
-     * [remainingImu] is the bar-sensor addresses still paired AFTER the
-     * forget, in the order `DeviceRegistry.forget` keeps them, so this rule
-     * can ask [preferredAfterForget] what the forget is about to promote.
-     * Nothing here reads it yet and the answer is unchanged by its arrival; it
-     * is a parameter before it is a clause so that the case it exists for can
-     * be written as a failing test first. That is what the suppression below
-     * is: detekt's `UnusedParameter` is active, so an unread parameter cannot
-     * land silently, and the suppression is the marker that the clause reading
-     * it has not been written yet. It goes when the clause arrives.
+     * The SECOND link also goes down when the survivor [preferredAfterForget]
+     * promotes is the address that link is already holding, which is the same
+     * two-clients-on-one-WT901 state [linksToDropOnPrefer] refuses, reached
+     * from the Forget button instead of the preference button. Forgetting the
+     * analysed unit hands `preferred_imu` to a survivor; if that survivor is
+     * what the second link is on, dropping the analysed client alone wakes
+     * `maintain`, which re-reads the promoted address and brings `imuClient`
+     * up on the unit `imuClientB` is already streaming.
+     *
+     * [remainingImu] is what that costs to know: the bar-sensor addresses
+     * still paired AFTER the forget, in the order `DeviceRegistry.forget`
+     * keeps them. The promotion is derived here through
+     * [preferredAfterForget] rather than handed in already computed, so that
+     * function stays the single answer to "who gets promoted" and a change to
+     * it reaches the drop set without a second site having to follow.
+     *
+     * Only the SAME address, for [linksToDropOnPrefer]'s reason: with a third
+     * bar sensor ahead of it in the registry the second link's unit is not the
+     * one promoted, and taking the link down anyway would cost the next dual
+     * set a stream for nothing. Only the bar-sensor promotion is consulted,
+     * because [DeviceLinkRole.SECOND] is a bar-sensor link and a strap's
+     * survivor cannot be the address it holds.
+     *
+     * A null [secondImu] is checked for explicitly rather than left to the
+     * comparison. Forgetting the last bar sensor promotes nothing, and
+     * "no second link" must not come out equal to "nothing was promoted".
      */
-    @Suppress("UnusedParameter")
     fun linksToDropOnForget(
         forgotten: String,
         preferredImu: String?,
         preferredHrm: String?,
         secondImu: String?,
         remainingImu: List<String>,
-    ): Set<DeviceLinkRole> = setOfNotNull(
-        DeviceLinkRole.ANALYSED.takeIf { preferredImu == forgotten },
-        DeviceLinkRole.HEART_RATE.takeIf { preferredHrm == forgotten },
-        DeviceLinkRole.SECOND.takeIf { secondImu == forgotten },
-    )
+    ): Set<DeviceLinkRole> {
+        val promotedImu = preferredAfterForget(preferredImu, forgotten, remainingImu)
+        return setOfNotNull(
+            DeviceLinkRole.ANALYSED.takeIf { preferredImu == forgotten },
+            DeviceLinkRole.HEART_RATE.takeIf { preferredHrm == forgotten },
+            DeviceLinkRole.SECOND.takeIf {
+                secondImu != null && (secondImu == forgotten || secondImu == promotedImu)
+            },
+        )
+    }
 
     /**
      * Which links must be dropped when the role that owns [ownedLink] is
@@ -200,8 +221,11 @@ object DevicePairingPolicy {
      * holds one buffer per client and the WT901's 20-byte frames carry no
      * checksum, so nothing in the app can notice; if both links stream, a dual
      * set's two raw archives are two recordings of ONE unit filed under two
-     * labels. That is the misattribution [linksToDropOnForget] exists to
-     * prevent, reached by a different tap.
+     * labels. [linksToDropOnForget] refuses the same state reached from the
+     * Forget button. An earlier draft of this paragraph said that rule already
+     * prevented it; it did not -- it dropped the second link only when the
+     * forgotten unit was the one holding it -- and the sentence is deleted
+     * rather than reworded.
      *
      * Only when it is the SAME address. Taking the second link down for every
      * promotion would cost a dual set its second stream for no reason, and
