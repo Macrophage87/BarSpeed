@@ -571,6 +571,135 @@ class DevicePairingPolicyTest {
         assertEquals("Signal weak (-95 dBm)", DevicePairingPolicy.signalLine(-95))
     }
 
+    // ---- which unit each link should hold ------------------------------------
+
+    /**
+     * A ready pair points the two links at the two units, analysed first.
+     *
+     * New symbol, so red-before-green is not available for it and no pretence
+     * is made that it was: nothing here failed before the function existed.
+     * What stands in for it is mutation, and the mutations run are listed in
+     * the commit body with their measured totals.
+     */
+    @Test
+    fun `a ready pair names one unit for each link`() {
+        val targets =
+            DevicePairingPolicy.imuLinkTargets(
+                pairedImuAddresses = listOf(first, second),
+                preferredImuAddress = second,
+                roleByAddress = mapOf(first to SensorRole.A, second to SensorRole.B),
+            )
+
+        assertEquals(second, targets.analysed, "the preferred unit holds the analysed link")
+        assertEquals(first, targets.second)
+    }
+
+    /**
+     * One paired unit arms no second link, and that is not a failure.
+     *
+     * The ordinary setup, for every exercise. A null [ImuLinkTargets.second]
+     * is what `DeviceLinkRole.NOT_LINKED` draws, and drawing a disconnected
+     * chip there would report a link failure where there is no link (#184).
+     */
+    @Test
+    fun `one paired unit leaves the second link pointed at nothing`() {
+        val targets =
+            DevicePairingPolicy.imuLinkTargets(
+                pairedImuAddresses = listOf(first),
+                preferredImuAddress = first,
+                roleByAddress = mapOf(first to SensorRole.A),
+            )
+
+        assertEquals(first, targets.analysed)
+        assertNull(targets.second)
+    }
+
+    /**
+     * A pair that cannot be told apart arms no second link.
+     *
+     * Both halves of the not-ready pair: an unlabelled unit and two units
+     * carrying the same label. Arming either would put a stream in the
+     * archive under a label that does not identify the unit it came from,
+     * which is worse than capturing one stream.
+     */
+    @Test
+    fun `an unlabelled or colliding pair arms no second link`() {
+        val unlabelled =
+            DevicePairingPolicy.imuLinkTargets(
+                pairedImuAddresses = listOf(first, second),
+                preferredImuAddress = first,
+                roleByAddress = mapOf(first to SensorRole.A),
+            )
+        val collide =
+            DevicePairingPolicy.imuLinkTargets(
+                pairedImuAddresses = listOf(first, second),
+                preferredImuAddress = first,
+                roleByAddress = mapOf(first to SensorRole.A, second to SensorRole.A),
+            )
+
+        assertEquals(first, unlabelled.analysed, "the analysed link is unaffected by the other unit's label")
+        assertNull(unlabelled.second)
+        assertEquals(first, collide.analysed)
+        assertNull(collide.second)
+    }
+
+    /**
+     * A preference naming a unit that is not paired holds no link.
+     *
+     * `DeviceRegistry.forget` promotes a survivor, so this state is
+     * short-lived in practice -- but naming a forgotten address is exactly
+     * what the analysed link must not do, and answering the address anyway
+     * would have the second slot chosen against a unit that is not there.
+     */
+    @Test
+    fun `a preference naming a unit that is not paired names no link at all`() {
+        val targets =
+            DevicePairingPolicy.imuLinkTargets(
+                pairedImuAddresses = listOf(second),
+                preferredImuAddress = first,
+                roleByAddress = mapOf(first to SensorRole.A, second to SensorRole.B),
+            )
+
+        assertNull(targets.analysed)
+        assertNull(targets.second, "with no analysed unit there is no second unit either")
+    }
+
+    /**
+     * No arrangement ever points both links at one remote.
+     *
+     * The invariant `SensorCapture.kt` states, asked of this function over
+     * every arrangement of two addresses, three label assignments each and
+     * three preferences -- rather than of the one arrangement that motivated
+     * it. Two clients on one WT901 is the state #183/#184 found twice: the
+     * frames carry no checksum and each client has its own decoder buffer, so
+     * a dual set's two archives would be two recordings of one unit filed
+     * under two labels, and nothing in the app could tell.
+     */
+    @Test
+    fun `no arrangement points both links at the same unit`() {
+        val options = listOf(SensorRole.A, SensorRole.B, null)
+        listOf(first, second, null).forEach { preferred ->
+            options.forEach { one ->
+                options.forEach { two ->
+                    val roles =
+                        listOfNotNull(
+                            one?.let { first to it },
+                            two?.let { second to it },
+                        ).toMap()
+                    val targets =
+                        DevicePairingPolicy.imuLinkTargets(listOf(first, second), preferred, roles)
+                    if (targets.second != null) {
+                        assertNotEquals(
+                            targets.analysed,
+                            targets.second,
+                            "preferred=$preferred roles=$roles put both links on one unit",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     // ---- how far the setup has got -------------------------------------------
 
     @Test

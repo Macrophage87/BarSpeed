@@ -53,6 +53,30 @@ enum class DualSetupStep {
 }
 
 /**
+ * Which device each of the two bar-sensor links should be maintaining.
+ *
+ * Both are addresses, never roles: there are two links and only one
+ * [DeviceRole.IMU]-shaped role, because both WT901s are ordinary paired IMUs
+ * (`AutoConnectManager.imuClientB`). A null field means that link should be
+ * pointed at nothing -- which is a state, not a failure, and is what
+ * [DeviceLinkRole.NOT_LINKED] draws.
+ *
+ * The pair is answered together rather than one field at a time so that
+ * "these two links are pointed at one remote" is a question a test can ask.
+ * `SensorCapture.kt`'s invariant is that no path may leave two clients on one
+ * WT901: `WitmotionStreamDecoder` holds one buffer per client and the WT901's
+ * 20-byte frames carry no checksum, so nothing in the app could notice, and a
+ * dual set's two archives would be two recordings of one unit filed under two
+ * labels.
+ */
+data class ImuLinkTargets(
+    /** The unit the analysed link should hold, or null when no paired unit is preferred. */
+    val analysed: String?,
+    /** The unit the second link should hold, or null when no second link should be up. */
+    val second: String?,
+)
+
+/**
  * What pairing, forgetting and preferring do, issue #184.
  *
  * Lifted out of `:core:ble` for the usual reason -- that module has no test
@@ -297,6 +321,59 @@ object DevicePairingPolicy {
                 }
             DeviceLinkRole.SECOND, DeviceLinkRole.NOT_LINKED -> null
         }
+
+    /**
+     * Which device each bar-sensor link should be pointed at, given what is
+     * paired, which unit is preferred and how the lifter has labelled them.
+     *
+     * Issue #192. The Devices screen could pair a second bar sensor, label it
+     * and draw its row, and had no way to bring its link up: the only caller
+     * of `AutoConnectManager.setSecondaryImuAddress` was
+     * `RecordViewModel.mirrorSensorSettings`, so the second link was armed
+     * only as a side effect of setting a session up on another screen. That
+     * made #184's own field criterion -- reach both rows green on the Devices
+     * screen -- impossible rather than merely awkward.
+     *
+     * Here rather than in the ViewModel for [linksToDropOnForget]'s reason:
+     * `:app` has two test files over two pure functions, so which unit a link
+     * names is a decision nothing could run against while it lives there.
+     *
+     * [analysed] is `AutoConnectManager`'s own rule restated in one place a
+     * test can reach -- `registry.preferredNow(IMU)`, which
+     * `DeviceRegistry.preferred` already resolves against the paired list, so
+     * a preference naming a forgotten unit answers null here as it does
+     * there. It is not a second source of truth for the analysed link; it is
+     * what the second slot is checked against.
+     *
+     * [second] is [SensorCapturePolicy.roster]'s `secondaryAddress` asked for
+     * two sensors, and NOT a new rule beside it. One function decides which
+     * physical unit is the second one; a second copy of that decision would
+     * be free to disagree with the one the set is actually captured under,
+     * and the disagreement would be invisible until the export attributed one
+     * unit's samples to the other's label.
+     *
+     * Deliberately ignores the per-exercise sensor COUNT, as
+     * `mirrorSensorSettings` already did: the link is kept warm whenever the
+     * pair is ready, so arming dual for one exercise does not have to wait
+     * out a BLE connect at the moment the lifter taps START. What the count
+     * decides is whether the set CAPTURES from it.
+     */
+    fun imuLinkTargets(
+        pairedImuAddresses: List<String>,
+        preferredImuAddress: String?,
+        roleByAddress: Map<String, SensorRole>,
+    ): ImuLinkTargets {
+        val paired = pairedImuAddresses.distinct()
+        val analysed = preferredImuAddress?.takeIf { it in paired }
+        val roster =
+            SensorCapturePolicy.roster(
+                pairedImuAddresses = paired,
+                preferredAddress = analysed,
+                roleByAddress = roleByAddress,
+                requestedCount = SensorCapturePolicy.MAX_COUNT,
+            )
+        return ImuLinkTargets(analysed = analysed, second = roster.secondaryAddress)
+    }
 
     /**
      * The short, durable name for a unit: the last two octets of its address.
