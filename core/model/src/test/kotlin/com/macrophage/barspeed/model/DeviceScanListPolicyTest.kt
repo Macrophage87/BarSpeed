@@ -5,18 +5,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The found-devices list, issue #183.
+ * The found-devices list, issues #183 and #197.
  *
- * Two of these are differentials: they fail against the rule the app ships
- * today and pass only once it changes. The characterizations they replaced --
- * "today a device moves the moment a packet arrives" and "today a row does not
- * know the device is already paired" -- are gone, having done their job of
+ * Several of these are differentials: they fail against the rule the app
+ * ships today and pass only once it changes. The characterizations they
+ * replaced -- "today a device moves the moment a packet arrives", "today a
+ * row does not know the device is already paired", and "today the list does
+ * not order on `likelyRole` at all" -- are gone, having done their job of
  * showing that the shipped rule is what these now contradict.
  */
 class DeviceScanListPolicyTest {
     private val near = "AA:AA:AA:AA:AA:01"
     private val far = "BB:BB:BB:BB:BB:02"
     private val third = "CC:CC:CC:CC:CC:03"
+    private val fourth = "DD:DD:DD:DD:DD:04"
 
     // ---- signal buckets ------------------------------------------------------
 
@@ -165,6 +167,99 @@ class DeviceScanListPolicyTest {
             rows.map { it.strength },
         )
         assertEquals(listOf(-40, -70, -95), rows.map { it.rssi })
+    }
+
+    // ---- likely-role ordering, issue #197 ------------------------------------
+
+    /**
+     * DIFFERENTIAL: the owner's own ask -- "make the sensors that look like
+     * HRMs and IMUs appear first" -- did not hold before this change.
+     * `guessRole` already names a device's role from its advertised service
+     * UUIDs or its name; this is the first test that puts that guess to work
+     * for ORDER rather than only for the "looks like $role" caption
+     * `DevicesScreen` already draws.
+     *
+     * First-seen order holds inside each half, same as the paired split
+     * below: [near] and [third] are both classified but `near` was sighted
+     * first, so it leads.
+     */
+    @Test
+    fun `sensor-shaped rows come before ones the scan cannot classify`() {
+        val list =
+            listOf(
+                Sighting(near, -55, classified = true),
+                Sighting(far, -70, classified = false),
+                Sighting(third, -60, classified = true),
+            )
+
+        val rows = DeviceScanListPolicy.displayRows(list, emptySet())
+
+        assertEquals(listOf(near, third, far), rows.map { it.address })
+    }
+
+    /**
+     * DIFFERENTIAL, and the composition decision the issue asked to be stated
+     * rather than left to whichever sort runs last: paired-vs-on-offer is the
+     * OUTER split, classified-vs-not is the INNER one.
+     *
+     * `far` is paired AND classified; `third` is on-offer and classified too.
+     * If classification were the outer split, both classified rows would lead
+     * together (`third, far, near, fourth`) with the paired one still ahead of
+     * an unclassified ON-OFFER row -- exactly the "pairable candidate buried
+     * under an already-saved device" defect #183 introduced the outer split
+     * to prevent. With paired-vs-on-offer outer, `far` cannot leave the
+     * bottom half no matter how it classifies, which is the reading this test
+     * pins: `third, near, far, fourth`.
+     */
+    @Test
+    fun `the classified split is inner to the paired split, not the other way round`() {
+        val list =
+            listOf(
+                // on offer, unclassified
+                Sighting(near, -55, classified = false),
+                // paired, classified
+                Sighting(far, -70, classified = true),
+                // on offer, classified
+                Sighting(third, -60, classified = true),
+                // paired, unclassified
+                Sighting(fourth, -80, classified = false),
+            )
+
+        val rows = DeviceScanListPolicy.displayRows(list, setOf(far, fourth))
+
+        assertEquals(listOf(third, near, far, fourth), rows.map { it.address })
+    }
+
+    /**
+     * The #183 property, held ACROSS the new partition and not just inside
+     * the one #183 already guarded.
+     *
+     * `likelyRole` is safe to order on for the reason RSSI was not: it is a
+     * property of the DEVICE (its advertised service UUIDs and name), not of
+     * the packet, so it does not jitter. This test is what would catch it if
+     * that stopped being true, or if a future edit let RSSI leak back into
+     * the ordering: `far` picks up the strongest reading of the three packets
+     * sent here, strong enough to flip every [SignalStrength] bucket, and
+     * that must not pull it out of the unclassified group or past `third`,
+     * the other unclassified row.
+     */
+    @Test
+    fun `a device does not move across the classified split when a packet updates its signal`() {
+        var raw = DeviceScanListPolicy.sighted(emptyList(), Sighting(near, -70, classified = true))
+        raw = DeviceScanListPolicy.sighted(raw, Sighting(far, -60, classified = false))
+        raw = DeviceScanListPolicy.sighted(raw, Sighting(third, -55, classified = true))
+
+        val before = DeviceScanListPolicy.displayRows(raw, emptySet())
+        assertEquals(listOf(near, third, far), before.map { it.address })
+
+        raw = DeviceScanListPolicy.sighted(raw, Sighting(far, -30, classified = false))
+        val after = DeviceScanListPolicy.displayRows(raw, emptySet())
+
+        assertEquals(
+            before.map { it.address },
+            after.map { it.address },
+            "a much stronger reading does not move a row across, or within, the classified split",
+        )
     }
 
     // ---- what a paired row may show about signal -----------------------------
