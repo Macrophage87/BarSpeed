@@ -241,11 +241,18 @@ mutation killed, and that mapping is the whole content of a mutation table.
 - **`:core:ble` has no test source set at all** — `core/ble/src/` contains only `main`. Its
   `testDebugUnitTest`/`testReleaseUnitTest` report `NO-SOURCE`.
 - **`:app` has exactly one test file**: `app/src/test/kotlin/com/macrophage/barspeed/record/
-  PlanQueueTest.kt`, 5 `@Test` methods over one pure function. Earlier definitions said `:app`
-  had **zero** test source sets; that is false as of this measurement and is retracted here.
-  What remains true is the consequence: nothing that draws, records or connects in `:app`'s 37
-  Kotlin source files is test-gated, so a green `./gradlew test` **compiled** `:app` and
-  asserted almost nothing about it. Compiled is not tested.
+  PlanQueueTest.kt`, **12** `@Test` methods over one pure function — `grep -c '@Test'` on that
+  file, and 12 executed per variant in the JUnit XML, both measured at
+  `bea5d714532ee5cb458fa2ffa5f2503d1d532a00` by
+  `./gradlew test --rerun-tasks --no-build-cache --console=plain`. **This entry said 5 and that
+  was wrong**: 5 is the count in the stale 2026-08-22 `TEST-…PlanQueueTest.xml` quoted as a
+  schema example in §4, which that entry already warns is not evidence for any SHA — it was read
+  as a test count anyway. Earlier definitions said `:app` had **zero** test source sets; that is
+  false too and stays retracted. What remains true is the consequence: nothing that draws,
+  records or connects in `:app`'s other Kotlin source files is test-gated, so a green
+  `./gradlew test` **compiled** `:app` and asserted almost nothing about it. Compiled is not
+  tested. #193 tracks the wider sweep of sites that still assert a module has no test source
+  set; this line is one of them and is fixed here rather than waiting for it.
 - **There is no `androidTest` directory anywhere in the tree.**
 - **`./gradlew test` compiles both `:app:compileDebugKotlin` and `:app:compileReleaseKotlin`**, and
   the release variant additionally runs `isMinifyEnabled = true` with `proguard-rules.pro`
