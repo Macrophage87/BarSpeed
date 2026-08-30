@@ -284,6 +284,75 @@ class DevicePairingPolicyTest {
         )
     }
 
+    // ---- what preferring a unit takes down -----------------------------------
+
+    /**
+     * A characterization of what `AutoConnectManager.setPreferredAndConnect`
+     * already did as a bare `disconnect()`: the role's own link goes down so
+     * `maintain` re-reads the new address, and nothing else is touched.
+     */
+    @Test
+    fun `preferring a bar sensor drops the analysed link`() {
+        assertEquals(
+            setOf(DeviceLinkRole.ANALYSED),
+            DevicePairingPolicy.linksToDropOnPrefer(
+                ownedLink = DeviceLinkRole.ANALYSED,
+                newlyPreferred = second,
+                secondImu = null,
+            ),
+        )
+    }
+
+    /** The same characterization for the role the control was widened to. */
+    @Test
+    fun `preferring a strap drops the heart rate link`() {
+        assertEquals(
+            setOf(DeviceLinkRole.HEART_RATE),
+            DevicePairingPolicy.linksToDropOnPrefer(
+                ownedLink = DeviceLinkRole.HEART_RATE,
+                newlyPreferred = strap,
+                secondImu = null,
+            ),
+        )
+    }
+
+    /**
+     * A characterization that must SURVIVE the change: the second link is only
+     * in the way when it is holding the very unit being promoted. Taking it
+     * down for any other promotion would cost the dual set its second stream
+     * for no reason.
+     */
+    @Test
+    fun `preferring a unit the second link is not holding leaves the second link alone`() {
+        assertEquals(
+            setOf(DeviceLinkRole.ANALYSED),
+            DevicePairingPolicy.linksToDropOnPrefer(
+                ownedLink = DeviceLinkRole.ANALYSED,
+                newlyPreferred = second,
+                secondImu = first,
+            ),
+        )
+    }
+
+    /**
+     * A guard on the ARGUMENTS rather than a state the screen can produce, and
+     * said as such: [DeviceLinkRole.SECOND] is a bar-sensor link, so a strap
+     * address and the second IMU address cannot in practice be equal. It is
+     * here because it is the only case that fails if the rule stops asking
+     * which link the caller owns and drops the second one for every promotion.
+     */
+    @Test
+    fun `preferring a strap never takes the second bar sensor link down`() {
+        assertEquals(
+            setOf(DeviceLinkRole.HEART_RATE),
+            DevicePairingPolicy.linksToDropOnPrefer(
+                ownedLink = DeviceLinkRole.HEART_RATE,
+                newlyPreferred = strap,
+                secondImu = strap,
+            ),
+        )
+    }
+
     // ---- which row offers to move a preference -------------------------------
 
     /**

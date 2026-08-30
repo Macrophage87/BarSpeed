@@ -164,6 +164,40 @@ object DevicePairingPolicy {
     )
 
     /**
+     * Which links must be dropped when the role that owns [ownedLink] is
+     * deliberately re-pointed at [newlyPreferred].
+     *
+     * [ownedLink] is the link that role's preferred device holds:
+     * [DeviceLinkRole.ANALYSED] for a bar sensor, [DeviceLinkRole.HEART_RATE]
+     * for a strap. [secondImu] is the address the SECOND link is actually
+     * pointed at, or null when it is pointed at nothing.
+     *
+     * The role's own link is always dropped rather than redirected, which is
+     * the rule `AutoConnectManager.setPreferredAndConnect` already followed as
+     * a bare `disconnect()` call: `maintain`'s Connected branch is parked on
+     * `connectionState.first { it !is Connected }`, so a client already holding
+     * the old device would sit there indefinitely and the new address would
+     * never be read. Dropping it wakes that branch.
+     *
+     * Here rather than in `:core:ble` for the reason [linksToDropOnForget] is
+     * here: that module has no test source set, so which links a tap takes down
+     * is a decision nothing can run against while it lives there.
+     *
+     * Answers with [newlyPreferred] and [secondImu] unread as of this commit.
+     * Those two arguments are what the differential in the next commit is
+     * about; the lift is deliberately behaviour-preserving so the red is the
+     * whole of the change. The suppression goes with them: detekt's
+     * `UnusedParameter` is correct about this commit and the commit that reads
+     * them removes it.
+     */
+    @Suppress("UnusedParameter")
+    fun linksToDropOnPrefer(
+        ownedLink: DeviceLinkRole,
+        newlyPreferred: String,
+        secondImu: String?,
+    ): Set<DeviceLinkRole> = setOf(ownedLink)
+
+    /**
      * What a paired row draws about being its role's live unit, or null when
      * [ownedLink] is a link no device role owns.
      *

@@ -169,10 +169,30 @@ class AutoConnectManager(
      * the new address would never be read. Dropping it wakes that branch, and
      * the next pass reads the new preferred address -- the same reasoning
      * [setSecondaryImuAddress] already uses.
+     *
+     * WHICH links to drop is
+     * `DevicePairingPolicy.linksToDropOnPrefer`'s answer rather than this
+     * function's, for [forgetAndDrop]'s reason: `:core:ble` has no test source
+     * set. As of this commit the rule answers exactly what the bare
+     * `clientFor(device.role).disconnect()` here did, and nothing about what
+     * this function does has changed.
      */
     suspend fun setPreferredAndConnect(device: KnownDevice) {
+        val ownedLink =
+            if (device.role == DeviceRole.IMU) DeviceLinkRole.ANALYSED else DeviceLinkRole.HEART_RATE
+        val drop =
+            DevicePairingPolicy.linksToDropOnPrefer(
+                ownedLink = ownedLink,
+                newlyPreferred = device.address,
+                secondImu = secondaryImuAddress.value,
+            )
         registry.setPreferred(device.address, device.role)
-        clientFor(device.role).disconnect()
+        // Before the two GATT drops, for [forgetAndDrop]'s reason: this one
+        // also nulls the address the third link reads, so waking it cannot
+        // have it reconnect to a unit another link is now on.
+        if (DeviceLinkRole.SECOND in drop) setSecondaryImuAddress(null)
+        if (DeviceLinkRole.ANALYSED in drop) imuClient.disconnect()
+        if (DeviceLinkRole.HEART_RATE in drop) hrmClient.disconnect()
     }
 
     /**
