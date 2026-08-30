@@ -48,8 +48,12 @@ import com.macrophage.barspeed.ui.components.PermissionBanner
  * identity and makes no claim about which end of a bar it was on.
  *
  * Assignment is by ADDRESS and survives power cycles and reconnection order,
- * which is the whole point -- a positional default would change meaning the
- * next time either unit was re-paired.
+ * which is the whole point -- the preferred address is movable at any time, by
+ * "Use this one for analysis" (`DeviceRegistry.setPreferred`) and by forgetting
+ * the analysed unit, so a positional default would change meaning under the
+ * lifter. An earlier draft said it would change the next time either unit was
+ * re-paired; `DeviceRegistry.pair` no longer moves a preference that names a
+ * still-paired device, and that clause is deleted rather than reworded.
  *
  * Two units may advertise identical names. The ritual that used to live here
  * -- switch both on, note which single row is green, label the OTHER by

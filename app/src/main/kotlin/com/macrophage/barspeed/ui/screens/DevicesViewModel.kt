@@ -114,7 +114,8 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DualSetupStep.NO_SENSOR)
 
     /**
-     * Makes a paired device its role's analysed one, deliberately.
+     * Makes a paired device the one its role is read from, deliberately --
+     * the analysed bar sensor, or the strap the heart rate comes from.
      *
      * The control that replaces the side effect pairing used to have. It is
      * the only thing on this screen that moves the analysed link

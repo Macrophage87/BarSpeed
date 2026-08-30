@@ -116,6 +116,15 @@ object DeviceScanListPolicy {
      * `DeviceRegistry.pair` stopped doing that in the same branch, and the
      * sentence is deleted rather than reworded.
      *
+     * That stranded state is also invisible to
+     * `AutoConnectManager.forgetAndDrop`, which is the other reason to keep it
+     * unreachable: it reads the preference through `DeviceRegistry.preferred`,
+     * which filters on `d.role == role`, so a bar sensor re-filed as an HRM
+     * answers null and the drop set cannot name [DeviceLinkRole.ANALYSED] --
+     * the analysed client would go on holding a unit the registry no longer
+     * names. Withholding the second offer is what keeps that state out of
+     * reach, so the offer and the blind spot have to move together.
+     *
      * The partition is the ONE movement allowed here, and it answers the
      * lifter's own tap: [knownAddresses] changes when something is paired or
      * forgotten and at no other time, so a device leaves the offers the

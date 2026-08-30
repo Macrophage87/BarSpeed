@@ -119,10 +119,21 @@ abstract class GattClient(protected val context: Context) {
             // so a throwing disconnect() skips close() and the assignment
             // below then drops the only BluetoothGatt reference: the local
             // handle goes either way, but the native GATT client registration
-            // is not released on this path. Splitting the try would trade that
-            // leak for a second catch; neither is reachable today, since
-            // disconnect()'s only caller is AutoConnectManager.stop(), which
-            // has no callers.
+            // is not released on this path. Splitting the try would trade
+            // that leak for a second catch. This path is reachable from the
+            // lifter: AutoConnectManager.forgetAndDrop drops the links pointed
+            // at a unit when Forget is tapped on it, setPreferredAndConnect
+            // drops the role's link when "Use this one for analysis" (or its
+            // strap wording) is tapped, and setSecondaryImuAddress drops the
+            // second link whenever the Record screen re-points it. stop() does
+            // still have no callers. An earlier version of this comment said
+            // stop() was disconnect()'s ONLY caller and that neither outcome
+            // was reachable; that was already false when it was written --
+            // setSecondaryImuAddress called imuClientB.disconnect() -- and it
+            // is deleted rather than reworded. Read from source and reasoned
+            // about: nothing in this repository can exercise a GATT client, and
+            // a revoked BLUETOOTH_CONNECT on this path has not been watched
+            // happen on a device.
         }
         gatt = null
         stateFlow.value = ConnectionState.Disconnected

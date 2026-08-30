@@ -102,11 +102,12 @@ object DevicePairingPolicy {
      * link idling on a null address until the lifter noticed.
      *
      * Promoting the survivor is the convenience, not the only route back: the
-     * Devices screen draws "Use this one for analysis" on every paired unit
-     * that is not its role's live one, which in that state is the survivor. An
-     * earlier draft of this KDoc said there was no way back short of
-     * forgetting the survivor too; that was false when it was written -- the
-     * same commit added the control -- and it is deleted rather than reworded.
+     * Devices screen draws "Use this one for analysis" on every paired bar
+     * sensor that is not the analysed one, and the strap equivalent on a
+     * strap, which in that state is the survivor. An earlier draft of this
+     * KDoc said there was no way back short of forgetting the survivor too;
+     * that was false when it was written -- the same commit added the control
+     * -- and it is deleted rather than reworded.
      */
     fun preferredAfterForget(currentPreferred: String?, forgotten: String, remainingOfRole: List<String>): String? =
         if (currentPreferred != forgotten) currentPreferred else remainingOfRole.firstOrNull()
