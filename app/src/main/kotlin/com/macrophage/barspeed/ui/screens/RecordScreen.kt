@@ -2967,12 +2967,10 @@ private fun LimiterPage(
 /**
  * The free-text box, reachable only behind Other.
  *
- * The field removes on every keystroke the characters the raw archive's set
- * manifest cannot carry; the ends are trimmed once, when the note is saved.
- * The two are different transforms for a reason that is not tidiness: this
- * box is value-driven, so whatever it applies is applied to every PREFIX of
- * the note in turn, and a rule that trims would delete each space at the
- * moment it is typed.
+ * The field and the write apply different transforms, for a reason that is
+ * not tidiness: this box is value-driven, so whatever it applies is applied
+ * to every PREFIX of the note in turn, and a rule that trims would delete
+ * each space at the moment it is typed.
  *
  * A character dropped at save is a character the lifter believes they
  * recorded, and the characters this drops are not cosmetic: the manifest is
