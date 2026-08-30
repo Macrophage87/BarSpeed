@@ -243,11 +243,14 @@ class SensorCapturePolicyTest {
     }
 
     /**
-     * DIFFERENTIAL, issue #192. Fails against the rule shipped today.
+     * DIFFERENTIAL, issue #192. Failed at
+     * d3348808d831f2c16e288b8772d47fca111fc921 (CI run 33331307023,
+     * conclusion failure).
      *
      * A third paired bar sensor has nowhere to go: there are two links and
-     * two labels. Today the second one is chosen positionally -- the first
-     * paired address that is not the analysed one -- so which of three units
+     * two labels. At d334880 the second one was chosen positionally -- the
+     * first paired address that is not the analysed one -- so which of three
+     * units
      * gets armed depends on the order `DeviceRegistry` happens to keep, and
      * an unlabelled third unit sitting later in that list is silently skipped
      * while the set arms dual.
@@ -278,13 +281,15 @@ class SensorCapturePolicyTest {
     }
 
     /**
-     * DIFFERENTIAL, issue #192. Fails against the rule shipped today.
+     * DIFFERENTIAL, issue #192. Failed at
+     * d3348808d831f2c16e288b8772d47fca111fc921 (CI run 33331307023,
+     * conclusion failure).
      *
      * Three paired units that all carry a label must collide, because there
-     * are two labels. Today the collision check only compares the two units
-     * the positional rule picked, so a third unit duplicating the second's
-     * label passes unnoticed and the set arms dual with two units the lifter
-     * cannot tell apart -- while the Devices screen, which reads
+     * are two labels. At d334880 the collision check only compared the two
+     * units the positional rule picked, so a third unit duplicating the
+     * second's label passed unnoticed and the set armed dual with two units
+     * the lifter could not tell apart -- while the Devices screen, which reads
      * `DualSensorSetup.step`, is telling them the labels collide. The screen
      * and the capture disagreed about the same three units.
      */

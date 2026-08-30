@@ -701,14 +701,16 @@ class DevicePairingPolicyTest {
     }
 
     /**
-     * DIFFERENTIAL, issue #192. Fails against the rule shipped today.
+     * DIFFERENTIAL, issue #192. Failed at
+     * d3348808d831f2c16e288b8772d47fca111fc921 (CI run 33331307023,
+     * conclusion failure).
      *
      * The link half of the same decision: with three units paired, no second
-     * link comes up at all. Today `roster` names one positionally and this
-     * function returns it, so the Devices screen -- once it arms the link at
-     * all -- would bring a link up on whichever unit the registry happens to
-     * list first, and a set asking for two would file its stream under a
-     * label another paired unit also carries.
+     * link comes up at all. At d334880 `roster` named one positionally and
+     * this function returned it, so the Devices screen -- once it armed the
+     * link at all -- would have brought a link up on whichever unit the
+     * registry happened to list first, and a set asking for two would have
+     * filed its stream under a label another paired unit also carried.
      *
      * Two links, two labels: a third paired unit is a setup to fix, not a
      * candidate to choose between.
