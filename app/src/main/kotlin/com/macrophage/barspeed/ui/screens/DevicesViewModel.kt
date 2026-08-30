@@ -231,7 +231,7 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
             val byAddress = found.associateBy { it.address }
             val rows =
                 DeviceScanListPolicy.displayRows(
-                    found.map { Sighting(it.address, it.rssi) },
+                    found.map { Sighting(it.address, it.rssi, classified = it.likelyRole != null) },
                     known.map { it.address }.toSet(),
                 )
             rows.mapNotNull { row -> byAddress[row.address]?.let { FoundDevice(it, row) } }
@@ -252,7 +252,10 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      */
     val sightedRssi =
         combine(discovered, scanning) { found, on ->
-            DeviceScanListPolicy.liveRssi(on, found.map { Sighting(it.address, it.rssi) })
+            DeviceScanListPolicy.liveRssi(
+                on,
+                found.map { Sighting(it.address, it.rssi, classified = it.likelyRole != null) },
+            )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private var scanJob: Job? = null
@@ -286,8 +289,10 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
                         val byAddress = discovered.value.associateBy { it.address } + (device.address to device)
                         val order =
                             DeviceScanListPolicy.sighted(
-                                discovered.value.map { Sighting(it.address, it.rssi) },
-                                Sighting(device.address, device.rssi),
+                                discovered.value.map {
+                                    Sighting(it.address, it.rssi, classified = it.likelyRole != null)
+                                },
+                                Sighting(device.address, device.rssi, classified = device.likelyRole != null),
                             )
                         discovered.value = order.mapNotNull { byAddress[it.address] }
                     }

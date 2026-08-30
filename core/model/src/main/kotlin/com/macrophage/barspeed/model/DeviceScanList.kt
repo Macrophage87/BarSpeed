@@ -3,13 +3,19 @@ package com.macrophage.barspeed.model
 /**
  * What one advertisement packet told the app about a device.
  *
- * Deliberately just the address and that packet's RSSI: `:core:model` cannot
- * see `:core:ble`'s `DiscoveredDevice` (the dependency runs the other way), and
- * the ordering rule does not need the name or the guessed role anyway. The
- * caller keeps the full record keyed by address and reads this list for the
- * order.
+ * Just the address, that packet's RSSI, and whether `BleScanner.guessRole`
+ * could name a role for it (#197). `:core:model` still cannot see `:core:ble`'s
+ * `DiscoveredDevice` or its `DeviceRole` -- the dependency runs the other way --
+ * so [classified] is the boolean the ordering rule actually needs rather than
+ * the role itself: `displayRows` sorts sensor-shaped devices above ones it
+ * cannot name, and telling those two groups apart never requires knowing
+ * WHICH role was guessed. An earlier draft of this KDoc said the ordering rule
+ * needed neither the name nor the guessed role at all; #197 is exactly the
+ * change that made that false, and the sentence is deleted rather than
+ * reworded. The caller keeps the full record keyed by address and reads this
+ * list for the order.
  */
-data class Sighting(val address: String, val rssi: Int)
+data class Sighting(val address: String, val rssi: Int, val classified: Boolean)
 
 /**
  * How strong a sighting is, coarsely.
@@ -34,12 +40,17 @@ enum class SignalStrength { STRONG, MEDIUM, WEAK }
  * re-filing a saved bar sensor as an HRM leaves `preferred_imu` naming an
  * address `DeviceRegistry.preferred(IMU)` no longer matches, so the analysed
  * link idles on nothing (#184).
+ *
+ * [classified] is #197's half: whether the scan could guess a role for this
+ * device at all. It decides a second, INNER split -- see [displayRows] for how
+ * the two compose.
  */
 data class ScanRow(
     val address: String,
     val rssi: Int,
     val alreadyPaired: Boolean,
     val strength: SignalStrength,
+    val classified: Boolean,
 )
 
 /**
@@ -138,6 +149,7 @@ object DeviceScanListPolicy {
                     rssi = it.rssi,
                     alreadyPaired = it.address in knownAddresses,
                     strength = strengthOf(it.rssi),
+                    classified = it.classified,
                 )
             }
         val (paired, onOffer) = rows.partition { it.alreadyPaired }

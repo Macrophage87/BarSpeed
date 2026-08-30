@@ -55,14 +55,14 @@ class DeviceScanListPolicyTest {
      */
     @Test
     fun `a device does not move because a packet arrived`() {
-        var list = DeviceScanListPolicy.sighted(emptyList(), Sighting(far, -70))
-        list = DeviceScanListPolicy.sighted(list, Sighting(near, -55))
+        var list = DeviceScanListPolicy.sighted(emptyList(), Sighting(far, -70, classified = false))
+        list = DeviceScanListPolicy.sighted(list, Sighting(near, -55, classified = false))
         assertEquals(listOf(far, near), list.map { it.address }, "a strong newcomer joins at the end")
 
-        list = DeviceScanListPolicy.sighted(list, Sighting(third, -60))
+        list = DeviceScanListPolicy.sighted(list, Sighting(third, -60, classified = false))
         assertEquals(listOf(far, near, third), list.map { it.address })
 
-        list = DeviceScanListPolicy.sighted(list, Sighting(near, -95))
+        list = DeviceScanListPolicy.sighted(list, Sighting(near, -95, classified = false))
 
         assertEquals(listOf(far, near, third), list.map { it.address }, "a re-sighted device holds its place")
         assertEquals(-95, list.first { it.address == near }.rssi, "and still reports its latest reading")
@@ -71,9 +71,9 @@ class DeviceScanListPolicyTest {
     /** An address seen twice is one row, whatever the order rule is. */
     @Test
     fun `a second packet from a device already listed does not add a row`() {
-        var list = DeviceScanListPolicy.sighted(emptyList(), Sighting(near, -55))
-        list = DeviceScanListPolicy.sighted(list, Sighting(far, -70))
-        list = DeviceScanListPolicy.sighted(list, Sighting(near, -52))
+        var list = DeviceScanListPolicy.sighted(emptyList(), Sighting(near, -55, classified = false))
+        list = DeviceScanListPolicy.sighted(list, Sighting(far, -70, classified = false))
+        list = DeviceScanListPolicy.sighted(list, Sighting(near, -52, classified = false))
 
         assertEquals(2, list.size)
         assertEquals(-52, list.first { it.address == near }.rssi, "the latest packet's own RSSI is what is held")
@@ -101,7 +101,7 @@ class DeviceScanListPolicyTest {
      */
     @Test
     fun `a device already paired is shown, marked, and not offered again`() {
-        val list = listOf(Sighting(near, -55), Sighting(far, -70))
+        val list = listOf(Sighting(near, -55, classified = false), Sighting(far, -70, classified = false))
 
         val rows = DeviceScanListPolicy.displayRows(list, setOf(near))
 
@@ -119,7 +119,12 @@ class DeviceScanListPolicyTest {
      */
     @Test
     fun `pairing a device moves it below the ones still on offer, and nothing else moves`() {
-        val list = listOf(Sighting(near, -55), Sighting(far, -70), Sighting(third, -90))
+        val list =
+            listOf(
+                Sighting(near, -55, classified = false),
+                Sighting(far, -70, classified = false),
+                Sighting(third, -90, classified = false),
+            )
 
         val before = DeviceScanListPolicy.displayRows(list, emptySet())
         val after = DeviceScanListPolicy.displayRows(list, setOf(near))
@@ -131,7 +136,12 @@ class DeviceScanListPolicyTest {
     /** Paired rows keep first-seen order among themselves too. */
     @Test
     fun `the already-paired rows are ordered as they were first seen`() {
-        val list = listOf(Sighting(near, -55), Sighting(far, -70), Sighting(third, -90))
+        val list =
+            listOf(
+                Sighting(near, -55, classified = false),
+                Sighting(far, -70, classified = false),
+                Sighting(third, -90, classified = false),
+            )
 
         val rows = DeviceScanListPolicy.displayRows(list, setOf(near, third))
 
@@ -142,7 +152,11 @@ class DeviceScanListPolicyTest {
     fun `every row carries the bucket for its own last reading`() {
         val rows =
             DeviceScanListPolicy.displayRows(
-                listOf(Sighting(near, -40), Sighting(far, -70), Sighting(third, -95)),
+                listOf(
+                    Sighting(near, -40, classified = false),
+                    Sighting(far, -70, classified = false),
+                    Sighting(third, -95, classified = false),
+                ),
                 emptySet(),
             )
 
@@ -165,7 +179,11 @@ class DeviceScanListPolicyTest {
      */
     @Test
     fun `a running scan reports the last reading for each sighted address and nothing else`() {
-        val readings = DeviceScanListPolicy.liveRssi(true, listOf(Sighting(near, -42), Sighting(far, -88)))
+        val readings =
+            DeviceScanListPolicy.liveRssi(
+                true,
+                listOf(Sighting(near, -42, classified = false), Sighting(far, -88, classified = false)),
+            )
 
         assertEquals(mapOf(near to -42, far to -88), readings)
         assertTrue(third !in readings, "an address no packet arrived for is absent, not weak")
@@ -188,7 +206,10 @@ class DeviceScanListPolicyTest {
     fun `a stopped scan reports no readings at all`() {
         assertEquals(
             emptyMap(),
-            DeviceScanListPolicy.liveRssi(false, listOf(Sighting(near, -42), Sighting(far, -88))),
+            DeviceScanListPolicy.liveRssi(
+                false,
+                listOf(Sighting(near, -42, classified = false), Sighting(far, -88, classified = false)),
+            ),
         )
     }
 }
