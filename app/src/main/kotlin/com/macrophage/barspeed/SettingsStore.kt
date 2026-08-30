@@ -111,12 +111,14 @@ class SettingsStore(private val context: Context) {
      * catch returns an EMPTY list. Keeping the label out of that document
      * leaves the paired-device list byte-compatible in both directions.
      *
-     * Keyed by MAC and not by position. `DeviceRegistry.pair` makes every
-     * newly paired device its role's preferred address, so anything derived
-     * from "which one is preferred" changes meaning the next time either unit
-     * is re-paired -- and every capture either side of that moment would be
-     * labelled consistently and wrongly. An address is the only thing about a
-     * WT901 that survives a power cycle.
+     * Keyed by MAC and not by position. The preferred address is movable at
+     * any time -- by "Use this one for analysis" (`DeviceRegistry.setPreferred`)
+     * and by forgetting the analysed unit -- so anything derived from "which
+     * one is preferred" changes meaning under the lifter, and every capture
+     * either side of that moment would be labelled consistently and wrongly.
+     * An address is the only thing about a WT901 that survives a power cycle.
+     * An earlier draft rested this on `DeviceRegistry.pair` preferring whatever
+     * was paired last; that premise is deleted rather than reworded.
      *
      * One flow over the whole preference map, and validated on the way OUT,
      * both for [prepOverrides]' reasons: the key set changes whenever a device

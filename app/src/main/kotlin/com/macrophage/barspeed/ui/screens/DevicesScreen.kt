@@ -212,9 +212,12 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                                 )
                                 Text("${device.role} · ${device.address}", style = MaterialTheme.typography.bodySmall)
                                 DevicePairingPolicy.signalLine(rssi[device.address])?.let {
-                                    // Only while a scan is running and only for
-                                    // a unit that is advertising. Absent rather
-                                    // than weak when there is no reading.
+                                    // Only while a scan is running. A unit
+                                    // that stops advertising mid-scan keeps
+                                    // its last reading until the scan is
+                                    // restarted -- nothing here dates it.
+                                    // Absent rather than weak when there is no
+                                    // reading at all.
                                     Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                                 }
                                 if (state is ConnectionState.Failed) {
@@ -300,7 +303,10 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                                 // second unit is being paired this row is the
                                 // proof the first one is on and in range. The
                                 // pair buttons are what must not be here --
-                                // pairing again would move the analysed link.
+                                // pairing again could only re-file the unit
+                                // under the other role, which would strand
+                                // preferred_imu on an address preferred(IMU)
+                                // no longer matches.
                                 Text(
                                     "Already paired · listed above",
                                     style = MaterialTheme.typography.bodySmall,

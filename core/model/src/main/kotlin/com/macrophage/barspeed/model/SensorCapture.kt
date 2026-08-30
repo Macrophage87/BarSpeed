@@ -206,11 +206,15 @@ object SensorCapturePolicy {
      *
      * Dual is armed only when TWO paired addresses carry two DIFFERENT assigned
      * roles. A positional default -- "the preferred one is A" -- was considered
-     * and refused: `DeviceRegistry.pair` makes every newly paired device its
-     * role's preferred address, so the meaning of A would change under the
-     * lifter the next time either unit was re-paired, and every capture before
-     * and after that moment would be labelled consistently and wrongly. The
-     * label has to be a property of the MAC or it is not a label.
+     * and refused: the preferred address is movable at any time, by "Use this
+     * one for analysis" (`DeviceRegistry.setPreferred`) and by forgetting the
+     * analysed unit, so the meaning of A would change under the lifter and
+     * every capture before and after that moment would be labelled
+     * consistently and wrongly. The label has to be a property of the MAC or
+     * it is not a label. An earlier draft rested this on `DeviceRegistry.pair`
+     * making every newly paired device its role's preferred address; it stopped
+     * doing that in the same branch, and the premise is deleted rather than
+     * reworded. The conclusion is untouched.
      *
      * [preferredAddress] decides which role is [SensorRoster.analysed], and
      * nothing else does. The analysed stream is whichever unit the existing

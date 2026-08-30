@@ -98,9 +98,15 @@ object DevicePairingPolicy {
      * it. While pairing re-pointed the preference, losing it was self-healing
      * -- the lifter paired something and it came back. Now that pairing leaves
      * it alone, forgetting the analysed unit while another is still paired
-     * would leave the role with no preferred device at all, the analysed link
-     * idling on a null address, and no way back short of forgetting the
-     * survivor too.
+     * would leave the role with no preferred device at all and the analysed
+     * link idling on a null address until the lifter noticed.
+     *
+     * Promoting the survivor is the convenience, not the only route back: the
+     * Devices screen draws "Use this one for analysis" on every paired unit
+     * that is not its role's live one, which in that state is the survivor. An
+     * earlier draft of this KDoc said there was no way back short of
+     * forgetting the survivor too; that was false when it was written -- the
+     * same commit added the control -- and it is deleted rather than reworded.
      */
     fun preferredAfterForget(currentPreferred: String?, forgotten: String, remainingOfRole: List<String>): String? =
         if (currentPreferred != forgotten) currentPreferred else remainingOfRole.firstOrNull()
@@ -126,27 +132,35 @@ object DevicePairingPolicy {
     }
 
     /**
-     * Which links must be dropped when [forgotten] is forgotten.
+     * Which links must be dropped when [forgotten] is forgotten: every link
+     * that was pointed at it.
      *
-     * Today: none. Nothing disconnects anything on a forget, and that is what
-     * this characterizes.
+     * A link left holding a forgotten unit does not fall over on its own.
+     * `AutoConnectManager.maintain`'s Connected branch is parked on
+     * `connectionState.first { it !is Connected }`, so the client keeps
+     * streaming that unit for the rest of the session while
+     * [preferredAfterForget] has already re-pointed the role at a survivor --
+     * and `SensorCapturePolicy.roster` would then file the forgotten unit's
+     * stream under the survivor's label.
      *
      * Every address handed in is what a link is pointed at BEFORE the forget,
      * which is the only moment the question can be answered:
      * [preferredAfterForget] has already moved the preference by the time the
      * registry write has returned.
      *
-     * The suppression is the characterization: today's rule reads none of the
-     * arguments, and the fix commit that makes it read them takes the
-     * annotation off again.
+     * A unit holding two links yields two, rather than the first match: one
+     * WT901 can be both the analysed unit and the second one.
      */
-    @Suppress("UnusedParameter")
     fun linksToDropOnForget(
         forgotten: String,
         preferredImu: String?,
         preferredHrm: String?,
         secondImu: String?,
-    ): Set<DeviceLinkRole> = emptySet()
+    ): Set<DeviceLinkRole> = setOfNotNull(
+        DeviceLinkRole.ANALYSED.takeIf { preferredImu == forgotten },
+        DeviceLinkRole.HEART_RATE.takeIf { preferredHrm == forgotten },
+        DeviceLinkRole.SECOND.takeIf { secondImu == forgotten },
+    )
 
     /**
      * What a paired row draws about being its role's live unit, or null when
@@ -162,8 +176,15 @@ object DevicePairingPolicy {
      * preference is a rule that can be held in `:core:model` and cannot be
      * held there.
      *
-     * Today the strap answers null -- the control is drawn for bar sensors
-     * only -- and that is what this characterizes.
+     * Answered for the strap as well as the bar sensor, because the pairing
+     * rule that made the control necessary is role-generic:
+     * `DeviceRegistry.pair` keys off `keyFor(role)`, so pairing a second strap
+     * no longer switches to it either, and with the control drawn for bar
+     * sensors only the sole route to the new strap was to forget the old one.
+     *
+     * The strap's sentence claims nothing about the link being up. This rule
+     * is answered from which link holds the address; the connection chip
+     * beside it reads the link, and the two can disagree.
      */
     fun preferenceControl(ownedLink: DeviceLinkRole, currentLink: DeviceLinkRole): PreferenceControl? =
         when (ownedLink) {
@@ -173,7 +194,13 @@ object DevicePairingPolicy {
                 } else {
                     PreferenceControl.Offer("Use this one for analysis")
                 }
-            DeviceLinkRole.HEART_RATE, DeviceLinkRole.SECOND, DeviceLinkRole.NOT_LINKED -> null
+            DeviceLinkRole.HEART_RATE ->
+                if (currentLink == DeviceLinkRole.HEART_RATE) {
+                    PreferenceControl.InUse("Heart rate · readings come from this strap")
+                } else {
+                    PreferenceControl.Offer("Use this strap for heart rate")
+                }
+            DeviceLinkRole.SECOND, DeviceLinkRole.NOT_LINKED -> null
         }
 
     /**

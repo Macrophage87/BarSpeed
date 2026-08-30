@@ -190,9 +190,6 @@ class AutoConnectManager(
      * Which links to drop is asked BEFORE the forget, because the forget is
      * what moves the preference: afterwards there is nothing left to compare
      * the forgotten address against.
-     *
-     * Today it drops nothing: [DevicePairingPolicy.linksToDropOnForget]
-     * answers the empty set, which is what this app does now.
      */
     suspend fun forgetAndDrop(device: KnownDevice) {
         val drop =

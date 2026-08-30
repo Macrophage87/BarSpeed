@@ -30,7 +30,10 @@ enum class SignalStrength { STRONG, MEDIUM, WEAK }
  * [alreadyPaired] is the whole of #183's second half: a device the app has
  * already saved is still a legitimate row -- seeing it is how a lifter knows
  * the unit is powered and in range -- but it must not be offered for pairing a
- * second time, because pairing is what moves the analysed link (#184).
+ * second time: the second offer can only change the device's ROLE, and
+ * re-filing a saved bar sensor as an HRM leaves `preferred_imu` naming an
+ * address `DeviceRegistry.preferred(IMU)` no longer matches, so the analysed
+ * link idles on nothing (#184).
  */
 data class ScanRow(
     val address: String,
@@ -105,8 +108,13 @@ object DeviceScanListPolicy {
      * missing row as "the scan did not find my sensor", which is the one thing
      * this list is for; and while a second unit is being paired, a row proving
      * the first is powered and in range is exactly the diagnostic wanted. What
-     * the caller must not draw for a marked row is the offer to pair it again,
-     * because pairing is what moves the analysed link (#184).
+     * the caller must not draw for a marked row is the offer to pair it again:
+     * the second offer can only change the device's ROLE, and re-filing a
+     * saved bar sensor as an HRM strands `preferred_imu` on an address
+     * `DeviceRegistry.preferred(IMU)` no longer matches (#184). An earlier
+     * draft gave the reason as "pairing is what moves the analysed link";
+     * `DeviceRegistry.pair` stopped doing that in the same branch, and the
+     * sentence is deleted rather than reworded.
      *
      * The partition is the ONE movement allowed here, and it answers the
      * lifter's own tap: [knownAddresses] changes when something is paired or
@@ -128,20 +136,24 @@ object DeviceScanListPolicy {
     }
 
     /**
-     * The signal readings a paired row may show, keyed by address.
+     * The signal readings a paired row may show, keyed by address, and empty
+     * when no scan is running.
      *
-     * Today [scanning] is not read: the map is whatever the last scan left
-     * behind, and that is what this characterizes.
+     * The caller's found list is cleared when a scan STARTS and not when one
+     * stops, so without the [scanning] gate a stopped scan's readings stand
+     * indefinitely and a frozen number is drawn as a live one. That is not
+     * cosmetic: `DualSensorSetup.identifyHint` tells the lifter to label the
+     * unit whose row reads strong, and the label decides which physical stream
+     * the export files under which name.
      *
-     * An address the scan has no packet for is ABSENT rather than present with
-     * a low number, so `DevicePairingPolicy.signalLine` can answer null and the
-     * row can show nothing at all.
+     * An address the running scan has no packet for is ABSENT rather than
+     * present with a low number, so `DevicePairingPolicy.signalLine` can answer
+     * null and the row can show nothing at all.
      *
-     * The suppression is the characterization: today's rule does not read
-     * [scanning], and the fix commit that makes it read it takes the
-     * annotation off again.
+     * What this does NOT do is date a reading. A unit that stops advertising
+     * mid-scan keeps its last one until the scan is restarted; giving that an
+     * expiry needs a time base this policy deliberately does not have.
      */
-    @Suppress("UnusedParameter")
     fun liveRssi(scanning: Boolean, sighted: List<Sighting>): Map<String, Int> =
-        sighted.associate { it.address to it.rssi }
+        if (!scanning) emptyMap() else sighted.associate { it.address to it.rssi }
 }

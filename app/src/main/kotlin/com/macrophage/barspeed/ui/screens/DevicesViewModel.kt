@@ -117,8 +117,11 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      * Makes a paired device its role's analysed one, deliberately.
      *
      * The control that replaces the side effect pairing used to have. It is
-     * the only thing on this screen that moves the analysed link, and it says
-     * so on the button.
+     * the only thing on this screen that moves the analysed link
+     * DELIBERATELY, and it says so on the button -- not the only thing that
+     * moves it: forgetting the analysed unit still promotes a survivor, and
+     * pairing the first bar sensor of all still sets the preference. Both are
+     * reachable from this screen.
      */
     fun setPreferred(device: KnownDevice) {
         viewModelScope.launch { container.autoConnect.setPreferredAndConnect(device) }
@@ -149,13 +152,17 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
-     * The last reading the current scan has for each address, for the paired
+     * The last reading the RUNNING scan has for each address, for the paired
      * rows to show (#184).
      *
-     * A paired unit that is not advertising is simply absent from this map, so
-     * its row shows no signal line at all -- `DevicePairingPolicy.signalLine`
-     * answers null rather than the weakest bucket, because "no reading" and
-     * "far away" are different facts.
+     * Empty when no scan is running: [toggleScan] clears [discovered] on start
+     * and not on stop, so the raw flow keeps the previous scan's readings
+     * indefinitely and a stopped scan would show a frozen number as a live one.
+     *
+     * A paired unit the running scan has no packet for is simply absent from
+     * this map, so its row shows no signal line at all --
+     * `DevicePairingPolicy.signalLine` answers null rather than the weakest
+     * bucket, because "no reading" and "far away" are different facts.
      */
     val sightedRssi =
         combine(discovered, scanning) { found, on ->

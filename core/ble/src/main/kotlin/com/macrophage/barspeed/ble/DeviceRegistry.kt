@@ -108,8 +108,18 @@ class DeviceRegistry(private val context: Context) {
             // #184: losing it used to be self-healing because re-pairing
             // anything re-pointed it, and pairing no longer does. Left alone,
             // forgetting the analysed unit with a second one still paired
-            // would idle the analysed link on a null address with no way back
-            // short of forgetting the survivor too.
+            // would idle the analysed link on a null address until the lifter
+            // noticed and tapped "Use this one for analysis" on the survivor.
+            // An earlier version of this comment said there was no way back
+            // short of forgetting the survivor too; that was false and it is
+            // deleted rather than reworded.
+            //
+            // The promotion moves the ADDRESS and nothing else, which is why
+            // this is not the whole of the answer: a caller that does not also
+            // drop the link holding the forgotten unit leaves the client
+            // streaming it under the survivor's name.
+            // [AutoConnectManager.forgetAndDrop] is that caller and
+            // `DevicePairingPolicy.linksToDropOnForget` is the rule it uses.
             DeviceRole.entries.forEach { role ->
                 val next =
                     DevicePairingPolicy.preferredAfterForget(
