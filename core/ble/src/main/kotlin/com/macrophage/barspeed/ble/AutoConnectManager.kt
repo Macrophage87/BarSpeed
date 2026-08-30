@@ -173,9 +173,13 @@ class AutoConnectManager(
      * WHICH links to drop is
      * `DevicePairingPolicy.linksToDropOnPrefer`'s answer rather than this
      * function's, for [forgetAndDrop]'s reason: `:core:ble` has no test source
-     * set. As of this commit the rule answers exactly what the bare
-     * `clientFor(device.role).disconnect()` here did, and nothing about what
-     * this function does has changed.
+     * set. The rule also takes the SECOND link down when the promoted address
+     * is the one that link is already holding, so this is no longer equivalent
+     * to the bare `clientFor(device.role).disconnect()` it replaced. An earlier
+     * draft of this paragraph, written when the rule was a pure lift, said
+     * nothing about what this function does had changed; that stopped being
+     * true when the rule gained its SECOND clause, and it is deleted rather
+     * than reworded.
      */
     suspend fun setPreferredAndConnect(device: KnownDevice) {
         val ownedLink =
@@ -209,15 +213,20 @@ class AutoConnectManager(
      *
      * Which links to drop is asked BEFORE the forget, because the forget is
      * what moves the preference: afterwards there is nothing left to compare
-     * the forgotten address against.
+     * the forgotten address against. The paired bar sensors are read here for
+     * the same reason: `DevicePairingPolicy.linksToDropOnForget` needs to know
+     * what the forget is about to promote, and once `registry.forget` has
+     * returned that is no longer a question anything can ask.
      */
     suspend fun forgetAndDrop(device: KnownDevice) {
+        val pairedImu = registry.knownDevices.first().filter { it.role == DeviceRole.IMU }.map { it.address }
         val drop =
             DevicePairingPolicy.linksToDropOnForget(
                 forgotten = device.address,
                 preferredImu = registry.preferredNow(DeviceRole.IMU)?.address,
                 preferredHrm = registry.preferredNow(DeviceRole.HRM)?.address,
                 secondImu = secondaryImuAddress.value,
+                remainingImu = pairedImu.filterNot { it == device.address },
             )
         registry.forget(device.address)
         // Before the two GATT drops: this one also nulls the address the third

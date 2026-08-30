@@ -18,6 +18,7 @@ class DevicePairingPolicyTest {
     private val first = "AA:AA:AA:AA:AA:01"
     private val second = "BB:BB:BB:BB:BB:02"
     private val strap = "CC:CC:CC:CC:CC:03"
+    private val third = "DD:DD:DD:DD:DD:04"
 
     // ---- which unit is preferred ---------------------------------------------
 
@@ -202,6 +203,7 @@ class DevicePairingPolicyTest {
                 preferredImu = first,
                 preferredHrm = strap,
                 secondImu = null,
+                remainingImu = listOf(first),
             ),
         )
     }
@@ -228,6 +230,7 @@ class DevicePairingPolicyTest {
                 preferredImu = first,
                 preferredHrm = strap,
                 secondImu = null,
+                remainingImu = listOf(second),
             ),
         )
     }
@@ -245,6 +248,7 @@ class DevicePairingPolicyTest {
                 preferredImu = first,
                 preferredHrm = strap,
                 secondImu = second,
+                remainingImu = listOf(first, second),
             ),
         )
     }
@@ -263,6 +267,7 @@ class DevicePairingPolicyTest {
                 preferredImu = first,
                 preferredHrm = null,
                 secondImu = second,
+                remainingImu = listOf(first),
             ),
         )
     }
@@ -280,6 +285,51 @@ class DevicePairingPolicyTest {
                 preferredImu = first,
                 preferredHrm = strap,
                 secondImu = first,
+                remainingImu = listOf(second),
+            ),
+        )
+    }
+
+    /**
+     * A characterization that must SURVIVE the change: the second link only
+     * comes down for a promotion when it is holding the very unit being
+     * promoted. `preferredAfterForget` takes the FIRST survivor, so with a
+     * third bar sensor ahead of it in the registry the second link's unit is
+     * not the one promoted, and taking that link down would cost the next
+     * dual set its second stream for no reason.
+     */
+    @Test
+    fun `forgetting the analysed unit and promoting a third leaves the second link alone`() {
+        assertEquals(
+            setOf(DeviceLinkRole.ANALYSED),
+            DevicePairingPolicy.linksToDropOnForget(
+                forgotten = first,
+                preferredImu = first,
+                preferredHrm = null,
+                secondImu = second,
+                remainingImu = listOf(third, second),
+            ),
+        )
+    }
+
+    /**
+     * A characterization that must SURVIVE the change, and it is the one that
+     * fails if the rule compares a null second address against a null
+     * promotion. Forgetting the only bar sensor promotes nothing, and "no
+     * second link" must not come out equal to "nothing was promoted" -- that
+     * is absence rendered as a value, and it would drop a link that is not
+     * there and null an address that is already null.
+     */
+    @Test
+    fun `forgetting the only bar sensor with no second link drops the analysed link alone`() {
+        assertEquals(
+            setOf(DeviceLinkRole.ANALYSED),
+            DevicePairingPolicy.linksToDropOnForget(
+                forgotten = first,
+                preferredImu = first,
+                preferredHrm = null,
+                secondImu = null,
+                remainingImu = emptyList(),
             ),
         )
     }

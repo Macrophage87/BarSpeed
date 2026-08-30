@@ -151,12 +151,24 @@ object DevicePairingPolicy {
      *
      * A unit holding two links yields two, rather than the first match: one
      * WT901 can be both the analysed unit and the second one.
+     *
+     * [remainingImu] is the bar-sensor addresses still paired AFTER the
+     * forget, in the order `DeviceRegistry.forget` keeps them, so this rule
+     * can ask [preferredAfterForget] what the forget is about to promote.
+     * Nothing here reads it yet and the answer is unchanged by its arrival; it
+     * is a parameter before it is a clause so that the case it exists for can
+     * be written as a failing test first. That is what the suppression below
+     * is: detekt's `UnusedParameter` is active, so an unread parameter cannot
+     * land silently, and the suppression is the marker that the clause reading
+     * it has not been written yet. It goes when the clause arrives.
      */
+    @Suppress("UnusedParameter")
     fun linksToDropOnForget(
         forgotten: String,
         preferredImu: String?,
         preferredHrm: String?,
         secondImu: String?,
+        remainingImu: List<String>,
     ): Set<DeviceLinkRole> = setOfNotNull(
         DeviceLinkRole.ANALYSED.takeIf { preferredImu == forgotten },
         DeviceLinkRole.HEART_RATE.takeIf { preferredHrm == forgotten },
