@@ -178,6 +178,63 @@ class DevicePairingPolicyTest {
         assertEquals(DeviceLinkRole.ANALYSED, DevicePairingPolicy.linkRoleFor(first, first, first, null))
     }
 
+    // ---- what a forget takes down --------------------------------------------
+
+    /**
+     * A characterization of today: a forget drops nothing.
+     *
+     * This case survives the change, because a unit no link is pointed at is
+     * the one forget can safely leave the radios alone for.
+     */
+    @Test
+    fun `forgetting a unit no link is pointed at drops nothing`() {
+        assertEquals(
+            emptySet(),
+            DevicePairingPolicy.linksToDropOnForget(
+                forgotten = second,
+                preferredImu = first,
+                preferredHrm = strap,
+                secondImu = null,
+            ),
+        )
+    }
+
+    // ---- which row offers to move a preference -------------------------------
+
+    /**
+     * The unit a role's link is on states it; any other unit of that role
+     * offers to take it.
+     *
+     * Never both and never neither: a row that offered to move a preference it
+     * already holds would read as the app not knowing which unit it is on.
+     */
+    @Test
+    fun `the analysed bar sensor says so and every other one offers to take over`() {
+        assertEquals(
+            PreferenceControl.InUse("Analysed · the set's numbers come from this unit"),
+            DevicePairingPolicy.preferenceControl(DeviceLinkRole.ANALYSED, DeviceLinkRole.ANALYSED),
+        )
+        assertEquals(
+            PreferenceControl.Offer("Use this one for analysis"),
+            DevicePairingPolicy.preferenceControl(DeviceLinkRole.ANALYSED, DeviceLinkRole.NOT_LINKED),
+        )
+        assertEquals(
+            PreferenceControl.Offer("Use this one for analysis"),
+            DevicePairingPolicy.preferenceControl(DeviceLinkRole.ANALYSED, DeviceLinkRole.SECOND),
+            "holding the second link is not being analysed",
+        )
+    }
+
+    /**
+     * A guard on the argument, not a UI decision: no device role owns the
+     * second link or the absence of one, so nothing can be offered for them.
+     */
+    @Test
+    fun `a link no device role owns has no control to draw`() {
+        assertNull(DevicePairingPolicy.preferenceControl(DeviceLinkRole.SECOND, DeviceLinkRole.SECOND))
+        assertNull(DevicePairingPolicy.preferenceControl(DeviceLinkRole.NOT_LINKED, DeviceLinkRole.NOT_LINKED))
+    }
+
     // ---- telling two identical units apart -----------------------------------
 
     @Test

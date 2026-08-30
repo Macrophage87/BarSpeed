@@ -145,4 +145,22 @@ class DeviceScanListPolicyTest {
         )
         assertEquals(listOf(-40, -70, -95), rows.map { it.rssi })
     }
+
+    // ---- what a paired row may show about signal -----------------------------
+
+    /**
+     * A characterization of today's map: a running scan's last reading per
+     * address, and nothing for an address it has no packet for.
+     *
+     * Absence is the load-bearing half. `DevicePairingPolicy.signalLine`
+     * answers null for a missing reading rather than the weakest bucket, and
+     * it can only do that if the map leaves the key out.
+     */
+    @Test
+    fun `a running scan reports the last reading for each sighted address and nothing else`() {
+        val readings = DeviceScanListPolicy.liveRssi(true, listOf(Sighting(near, -42), Sighting(far, -88)))
+
+        assertEquals(mapOf(near to -42, far to -88), readings)
+        assertTrue(third !in readings, "an address no packet arrived for is absent, not weak")
+    }
 }

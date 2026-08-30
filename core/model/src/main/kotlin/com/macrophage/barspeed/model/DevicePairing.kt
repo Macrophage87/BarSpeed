@@ -14,6 +14,21 @@ package com.macrophage.barspeed.model
 enum class DeviceLinkRole { ANALYSED, SECOND, HEART_RATE, NOT_LINKED }
 
 /**
+ * What the deliberate-preference control on a paired row draws.
+ *
+ * Two cases and not a nullable button label, because "this unit is the live
+ * one" and "this unit could become the live one" are different sentences and a
+ * row must never draw both or neither.
+ */
+sealed interface PreferenceControl {
+    /** This row's unit already holds its role's link; the row says so and offers nothing. */
+    data class InUse(val line: String) : PreferenceControl
+
+    /** This row's unit does not hold its role's link; the row offers to move it. */
+    data class Offer(val label: String) : PreferenceControl
+}
+
+/**
  * How far a two-accelerometer setup has got, issue #184.
  *
  * Named steps rather than a boolean because the screen has to say which thing
@@ -109,6 +124,57 @@ object DevicePairingPolicy {
         hrmAddress -> DeviceLinkRole.HEART_RATE
         else -> DeviceLinkRole.NOT_LINKED
     }
+
+    /**
+     * Which links must be dropped when [forgotten] is forgotten.
+     *
+     * Today: none. Nothing disconnects anything on a forget, and that is what
+     * this characterizes.
+     *
+     * Every address handed in is what a link is pointed at BEFORE the forget,
+     * which is the only moment the question can be answered:
+     * [preferredAfterForget] has already moved the preference by the time the
+     * registry write has returned.
+     *
+     * The suppression is the characterization: today's rule reads none of the
+     * arguments, and the fix commit that makes it read them takes the
+     * annotation off again.
+     */
+    @Suppress("UnusedParameter")
+    fun linksToDropOnForget(
+        forgotten: String,
+        preferredImu: String?,
+        preferredHrm: String?,
+        secondImu: String?,
+    ): Set<DeviceLinkRole> = emptySet()
+
+    /**
+     * What a paired row draws about being its role's live unit, or null when
+     * [ownedLink] is a link no device role owns.
+     *
+     * [ownedLink] is the link a device of this row's role holds when it is the
+     * preferred one: [DeviceLinkRole.ANALYSED] for a bar sensor,
+     * [DeviceLinkRole.HEART_RATE] for a strap. [currentLink] is what
+     * [linkRoleFor] answered for this row's address.
+     *
+     * Here rather than as an `if` on the screen for the usual reason: `:app`
+     * has one test file over one pure function, so which rows offer to move a
+     * preference is a rule that can be held in `:core:model` and cannot be
+     * held there.
+     *
+     * Today the strap answers null -- the control is drawn for bar sensors
+     * only -- and that is what this characterizes.
+     */
+    fun preferenceControl(ownedLink: DeviceLinkRole, currentLink: DeviceLinkRole): PreferenceControl? =
+        when (ownedLink) {
+            DeviceLinkRole.ANALYSED ->
+                if (currentLink == DeviceLinkRole.ANALYSED) {
+                    PreferenceControl.InUse("Analysed · the set's numbers come from this unit")
+                } else {
+                    PreferenceControl.Offer("Use this one for analysis")
+                }
+            DeviceLinkRole.HEART_RATE, DeviceLinkRole.SECOND, DeviceLinkRole.NOT_LINKED -> null
+        }
 
     /**
      * The short, durable name for a unit: the last two octets of its address.

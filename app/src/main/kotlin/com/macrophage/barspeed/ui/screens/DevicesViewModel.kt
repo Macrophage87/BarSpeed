@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -159,9 +158,9 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      * "far away" are different facts.
      */
     val sightedRssi =
-        discovered
-            .map { found -> found.associate { it.address to it.rssi } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+        combine(discovered, scanning) { found, on ->
+            DeviceScanListPolicy.liveRssi(on, found.map { Sighting(it.address, it.rssi) })
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private var scanJob: Job? = null
 
@@ -209,7 +208,7 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun forget(device: KnownDevice) {
-        viewModelScope.launch { container.deviceRegistry.forget(device.address) }
+        viewModelScope.launch { container.autoConnect.forgetAndDrop(device) }
     }
 
     override fun onCleared() {

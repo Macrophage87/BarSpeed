@@ -34,6 +34,7 @@ import com.macrophage.barspeed.model.DeviceLinkRole
 import com.macrophage.barspeed.model.DevicePairingPolicy
 import com.macrophage.barspeed.model.DualSensorSetup
 import com.macrophage.barspeed.model.DualSetupStep
+import com.macrophage.barspeed.model.PreferenceControl
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ConnectionChip
@@ -118,24 +119,25 @@ private fun DualSetupCard(step: DualSetupStep) {
 }
 
 /**
- * Which bar sensor the app analyses, and how to move it.
+ * Which unit of a role the app actually reads, and how to move it.
  *
  * Pairing used to move this silently, which is what made the flow read as one
  * sensor knocking the other off (#184). It is now an act with its own control
- * and its own words. The second unit's stream is still recorded when both are
- * labelled; what "analysed" decides is which one the figures come from.
+ * and its own words. For a bar sensor the second unit's stream is still
+ * recorded when both are labelled; what "analysed" decides is which one the
+ * figures come from.
+ *
+ * The words are `DevicePairingPolicy.preferenceControl`'s, not this file's,
+ * because `:app` has one test file over one pure function and which rows offer
+ * to move a preference is a rule `:core:model` can hold.
  */
 @Composable
-private fun AnalysedRow(linkRole: DeviceLinkRole, onUseForAnalysis: () -> Unit) {
+private fun PreferenceRow(control: PreferenceControl, onUse: () -> Unit) {
     Spacer(Modifier.height(4.dp))
-    if (linkRole == DeviceLinkRole.ANALYSED) {
-        Text(
-            "Analysed · the set's numbers come from this unit",
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Sub,
-        )
-    } else {
-        TextButton(onClick = onUseForAnalysis) { Text("Use this one for analysis") }
+    when (control) {
+        is PreferenceControl.InUse ->
+            Text(control.line, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+        is PreferenceControl.Offer -> TextButton(onClick = onUse) { Text(control.label) }
     }
 }
 
@@ -239,11 +241,22 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                             }
                             TextButton(onClick = { viewModel.forget(device) }) { Text("Forget") }
                         }
+                        // Outside the IMU block: which unit of a role the app
+                        // reads is a question every role has, and the pairing
+                        // rule that made the control necessary is role-generic
+                        // (`DeviceRegistry.pair` keys off `keyFor(role)`).
+                        // Whether a strap row draws anything is
+                        // `preferenceControl`'s answer, not this `if`'s.
+                        val ownedLink =
+                            if (device.role == DeviceRole.IMU) {
+                                DeviceLinkRole.ANALYSED
+                            } else {
+                                DeviceLinkRole.HEART_RATE
+                            }
+                        DevicePairingPolicy.preferenceControl(ownedLink, linkRole)?.let {
+                            PreferenceRow(control = it, onUse = { viewModel.setPreferred(device) })
+                        }
                         if (device.role == DeviceRole.IMU) {
-                            AnalysedRow(
-                                linkRole = linkRole,
-                                onUseForAnalysis = { viewModel.setPreferred(device) },
-                            )
                             SensorRoleRow(
                                 assigned = roles[device.address],
                                 onAssign = { viewModel.setSensorRole(device.address, it) },

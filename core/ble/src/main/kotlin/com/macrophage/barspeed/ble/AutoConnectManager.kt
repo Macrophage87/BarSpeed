@@ -2,6 +2,8 @@ package com.macrophage.barspeed.ble
 
 import android.content.Context
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.DeviceLinkRole
+import com.macrophage.barspeed.model.DevicePairingPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -171,6 +173,42 @@ class AutoConnectManager(
     suspend fun setPreferredAndConnect(device: KnownDevice) {
         registry.setPreferred(device.address, device.role)
         clientFor(device.role).disconnect()
+    }
+
+    /**
+     * Forget a device, and drop whichever links were pointed at it.
+     *
+     * `DeviceRegistry.forget` promotes a survivor into the role's preferred
+     * address (#184), and `maintain`'s Connected branch is parked on
+     * `connectionState.first { it !is Connected }`, so a client holding the
+     * FORGOTTEN unit would keep streaming it while the screen and
+     * `SensorCapturePolicy.roster` both name the survivor. Dropping wakes that
+     * branch, and the next pass reads the promoted address -- the same
+     * reasoning [setSecondaryImuAddress] and [setPreferredAndConnect] already
+     * use.
+     *
+     * Which links to drop is asked BEFORE the forget, because the forget is
+     * what moves the preference: afterwards there is nothing left to compare
+     * the forgotten address against.
+     *
+     * Today it drops nothing: [DevicePairingPolicy.linksToDropOnForget]
+     * answers the empty set, which is what this app does now.
+     */
+    suspend fun forgetAndDrop(device: KnownDevice) {
+        val drop =
+            DevicePairingPolicy.linksToDropOnForget(
+                forgotten = device.address,
+                preferredImu = registry.preferredNow(DeviceRole.IMU)?.address,
+                preferredHrm = registry.preferredNow(DeviceRole.HRM)?.address,
+                secondImu = secondaryImuAddress.value,
+            )
+        registry.forget(device.address)
+        // Before the two GATT drops: this one also nulls the address the third
+        // link reads, so waking it cannot have it reconnect to the unit that
+        // was just forgotten.
+        if (DeviceLinkRole.SECOND in drop) setSecondaryImuAddress(null)
+        if (DeviceLinkRole.ANALYSED in drop) imuClient.disconnect()
+        if (DeviceLinkRole.HEART_RATE in drop) hrmClient.disconnect()
     }
 
     /**

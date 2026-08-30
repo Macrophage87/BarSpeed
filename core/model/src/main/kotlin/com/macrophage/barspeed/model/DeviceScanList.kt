@@ -126,4 +126,22 @@ object DeviceScanListPolicy {
         val (paired, onOffer) = rows.partition { it.alreadyPaired }
         return onOffer + paired
     }
+
+    /**
+     * The signal readings a paired row may show, keyed by address.
+     *
+     * Today [scanning] is not read: the map is whatever the last scan left
+     * behind, and that is what this characterizes.
+     *
+     * An address the scan has no packet for is ABSENT rather than present with
+     * a low number, so `DevicePairingPolicy.signalLine` can answer null and the
+     * row can show nothing at all.
+     *
+     * The suppression is the characterization: today's rule does not read
+     * [scanning], and the fix commit that makes it read it takes the
+     * annotation off again.
+     */
+    @Suppress("UnusedParameter")
+    fun liveRssi(scanning: Boolean, sighted: List<Sighting>): Map<String, Int> =
+        sighted.associate { it.address to it.rssi }
 }
