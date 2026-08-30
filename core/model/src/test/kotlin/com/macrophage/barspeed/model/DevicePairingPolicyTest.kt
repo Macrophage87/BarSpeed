@@ -2,6 +2,7 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 
 /**
@@ -609,6 +610,56 @@ class DevicePairingPolicyTest {
                 mapOf(first to SensorRole.A, second to SensorRole.B, strap to SensorRole.A),
             ),
         )
+    }
+
+    /**
+     * A third paired unit with no label leaves the setup at [DualSetupStep.LABEL_BOTH].
+     *
+     * The other half of the three-unit case, pinned before #192 changes what
+     * a third unit costs: the sibling above covers three units that all carry
+     * a label, and this covers the one that does not. Both matter because
+     * `SensorCapturePolicy.roster` is about to be gated on this function's
+     * answer, so what it says about three units becomes what a set of three
+     * captures.
+     */
+    @Test
+    fun `a third unlabelled unit leaves the setup asking for labels`() {
+        assertEquals(
+            DualSetupStep.LABEL_BOTH,
+            DualSensorSetup.step(
+                listOf(first, second, third),
+                mapOf(first to SensorRole.A, second to SensorRole.B),
+            ),
+        )
+    }
+
+    /**
+     * No arrangement of three paired units is ever [DualSetupStep.READY].
+     *
+     * Exhaustive over every assignment of A, B and "no label" to three paired
+     * addresses -- 27 arrangements -- rather than over the two that happen to
+     * be interesting, because this is the premise the two-link rule rests on:
+     * [SensorRole] has two entries, so three units cannot carry three
+     * distinct labels, and READY therefore means EXACTLY two paired units
+     * carrying different labels. A third [SensorRole] would break that
+     * silently, and this is what would say so.
+     */
+    @Test
+    fun `three paired units are never ready, whatever they are labelled`() {
+        val options = listOf(SensorRole.A, SensorRole.B, null)
+        val addresses = listOf(first, second, third)
+        options.forEach { one ->
+            options.forEach { two ->
+                options.forEach { three ->
+                    val roles =
+                        listOf(one, two, three)
+                            .mapIndexedNotNull { i, role -> role?.let { addresses[i] to it } }
+                            .toMap()
+                    val step = DualSensorSetup.step(addresses, roles)
+                    assertNotEquals(DualSetupStep.READY, step, "three units cannot be ready: $roles")
+                }
+            }
+        }
     }
 
     // ---- what the screens say ------------------------------------------------
