@@ -24,6 +24,7 @@ import kotlin.test.assertTrue
 class SensorCapturePolicyTest {
     private val a = "AA:AA:AA:AA:AA:AA"
     private val b = "BB:BB:BB:BB:BB:BB"
+    private val c = "CC:CC:CC:CC:CC:CC"
 
     // ---- the counts ----------------------------------------------------------
 
@@ -239,6 +240,66 @@ class SensorCapturePolicyTest {
             assertNull(roster.secondaryAddress, "$shortfall must leave the second link pointed at nothing")
             assertTrue(!roster.isDual)
         }
+    }
+
+    /**
+     * DIFFERENTIAL, issue #192. Fails against the rule shipped today.
+     *
+     * A third paired bar sensor has nowhere to go: there are two links and
+     * two labels. Today the second one is chosen positionally -- the first
+     * paired address that is not the analysed one -- so which of three units
+     * gets armed depends on the order `DeviceRegistry` happens to keep, and
+     * an unlabelled third unit sitting later in that list is silently skipped
+     * while the set arms dual.
+     *
+     * That is the positional default this file's own
+     * `an unlabelled second unit downgrades to one sensor rather than being
+     * labelled` refuses for the pair; it survived for the trio only because
+     * nobody had three paired. The rule stated instead: dual arms only from
+     * a READY setup, which `DualSensorSetup.step` defines and which three
+     * units can never be -- pinned exhaustively in DevicePairingPolicyTest.
+     * A third unit means the lifter is asked to sort the labels out and the
+     * set records one sensor, which is what a shortfall is for.
+     */
+    @Test
+    fun `a third paired unit is not silently skipped in favour of an armed pair`() {
+        val roster =
+            SensorCapturePolicy.roster(
+                pairedImuAddresses = listOf(a, b, c),
+                preferredAddress = a,
+                roleByAddress = mapOf(a to SensorRole.A, b to SensorRole.B),
+                requestedCount = 2,
+            )
+
+        assertEquals(DualShortfall.ROLES_UNASSIGNED, roster.shortfall, "the third unit carries no label")
+        assertNull(roster.secondaryAddress, "no second link is armed while a paired unit is unlabelled")
+        assertTrue(!roster.isDual)
+        assertEquals(listOf(c), roster.unassigned, "the screen is told which unit to label")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #192. Fails against the rule shipped today.
+     *
+     * Three paired units that all carry a label must collide, because there
+     * are two labels. Today the collision check only compares the two units
+     * the positional rule picked, so a third unit duplicating the second's
+     * label passes unnoticed and the set arms dual with two units the lifter
+     * cannot tell apart -- while the Devices screen, which reads
+     * `DualSensorSetup.step`, is telling them the labels collide. The screen
+     * and the capture disagreed about the same three units.
+     */
+    @Test
+    fun `three labelled units collide rather than arming the two that happen to differ`() {
+        val roster =
+            SensorCapturePolicy.roster(
+                pairedImuAddresses = listOf(a, b, c),
+                preferredAddress = a,
+                roleByAddress = mapOf(a to SensorRole.A, b to SensorRole.B, c to SensorRole.B),
+                requestedCount = 2,
+            )
+
+        assertEquals(DualShortfall.ROLES_COLLIDE, roster.shortfall)
+        assertNull(roster.secondaryAddress)
     }
 
     // ---- what gets recorded --------------------------------------------------

@@ -700,6 +700,40 @@ class DevicePairingPolicyTest {
         }
     }
 
+    /**
+     * DIFFERENTIAL, issue #192. Fails against the rule shipped today.
+     *
+     * The link half of the same decision: with three units paired, no second
+     * link comes up at all. Today `roster` names one positionally and this
+     * function returns it, so the Devices screen -- once it arms the link at
+     * all -- would bring a link up on whichever unit the registry happens to
+     * list first, and a set asking for two would file its stream under a
+     * label another paired unit also carries.
+     *
+     * Two links, two labels: a third paired unit is a setup to fix, not a
+     * candidate to choose between.
+     */
+    @Test
+    fun `a third paired unit arms no second link at all`() {
+        val unlabelledThird =
+            DevicePairingPolicy.imuLinkTargets(
+                pairedImuAddresses = listOf(first, second, third),
+                preferredImuAddress = first,
+                roleByAddress = mapOf(first to SensorRole.A, second to SensorRole.B),
+            )
+        val labelledThird =
+            DevicePairingPolicy.imuLinkTargets(
+                pairedImuAddresses = listOf(first, second, third),
+                preferredImuAddress = first,
+                roleByAddress = mapOf(first to SensorRole.A, second to SensorRole.B, third to SensorRole.B),
+            )
+
+        assertEquals(first, unlabelledThird.analysed, "the analysed link still holds the preferred unit")
+        assertNull(unlabelledThird.second)
+        assertEquals(first, labelledThird.analysed)
+        assertNull(labelledThird.second)
+    }
+
     // ---- how far the setup has got -------------------------------------------
 
     @Test
