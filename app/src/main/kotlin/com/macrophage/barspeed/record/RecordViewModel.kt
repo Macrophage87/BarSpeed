@@ -76,7 +76,16 @@ import java.time.ZoneId
  * end-set control — one tap finishes the set and logs the rating, rather than
  * ending the set and then asking on a separate screen.
  */
-data class SetRating(val rpe: Int?, val failed: Boolean, val warmup: Boolean)
+/**
+ * What the lifter said about a set: a rung of the effort scale, or the failure
+ * tile, and never both.
+ *
+ * No warm-up member since #187. Warm-up is a property of the set rather than a
+ * rating of it, declared by the plan and carried on the slot -- the tile that
+ * used to set it here stored `rpe = null` alongside it, which discarded the
+ * effort of every warm-up set by construction.
+ */
+data class SetRating(val rpe: Int?, val failed: Boolean)
 
 /** One planned set, flattened from the plan into an ordered queue. */
 data class PlannedSlot(
@@ -171,6 +180,22 @@ data class PlannedSlot(
      */
     val sensors: Int? = null,
     val isExerciseChange: Boolean = false,
+    /**
+     * The plan declared this set preparatory -- a ramp set, a warm-up (#187).
+     *
+     * Frozen from the plan at flatten time and never written back to: it is a
+     * declaration about what the set is FOR, and nothing the lifter does
+     * during the set changes that. It is not a rating and does not touch one;
+     * a warm-up set is rated on the same scale as any other set, which is the
+     * whole reason it stopped being a tile.
+     *
+     * False on an ad-hoc set and on a set the lifter appended, because
+     * neither has a plan to have declared it and the app offers no control
+     * that says so. That is a gap rather than a statement, and it is named in
+     * the commit body rather than papered over with a default that would
+     * claim the lifter said something.
+     */
+    val warmup: Boolean = false,
     /**
      * True when the LIFTER appended this slot to the exercise mid-session and
      * the plan did not prescribe it (#177).
@@ -390,7 +415,11 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
     secondary = p.secondary,
     rpe = p.rating?.rpe,
     failed = failed,
-    warmup = p.rating?.warmup == true,
+    // The plan's declaration, and nothing else can set it: #187 took warm-up
+    // off the effort scale, so there is no tile left to OR in. An ad-hoc or
+    // appended set is false because nothing declared it, which is a gap in
+    // what the app can express rather than a claim that the set was work.
+    warmup = p.slot?.warmup == true,
     // Off the FROZEN slot, never off live state: the queue has already moved on
     // by the time a retry runs, and the question this answers is about the set
     // that was performed. An ad-hoc set has no slot and is not appended to
@@ -1016,21 +1045,18 @@ private fun jumpedToExerciseState(s: RecordState, exerciseId: String): RecordSta
  * `SetRatingTracker` returned. Both are stored, because the correction grid has
  * to attribute the verdict and the OR cannot say whose it was. #140.
  */
-private fun ratedState(
-    s: RecordState,
-    rpe: Int?,
-    tappedFailed: Boolean,
-    effectiveFailed: Boolean,
-    warmup: Boolean,
-): RecordState = s.copy(
-    lastSetRpe = rpe,
-    lastSetFailed = effectiveFailed,
-    // SetRatingTracker overwrites its own tapped flag on every correction,
-    // so this mirrors it exactly: a correction away from the failed tile
-    // withdraws the tap and leaves the derived shortfall standing.
-    lastSetTappedFailed = tappedFailed,
-    lastSetWarmup = warmup,
-)
+private fun ratedState(s: RecordState, rpe: Int?, tappedFailed: Boolean, effectiveFailed: Boolean): RecordState =
+    s.copy(
+        lastSetRpe = rpe,
+        lastSetFailed = effectiveFailed,
+        // SetRatingTracker overwrites its own tapped flag on every correction,
+        // so this mirrors it exactly: a correction away from the failed tile
+        // withdraws the tap and leaves the derived shortfall standing.
+        lastSetTappedFailed = tappedFailed,
+        // lastSetWarmup is deliberately NOT written. It is the plan's
+        // declaration about the set, frozen when the set was recorded, and
+        // re-rating the effort says nothing about whether it was a ramp (#187).
+    )
 
 /**
  * The state a set that has just begun recording leaves behind. Free function
@@ -1242,7 +1268,7 @@ private fun restingState(
         // this point; [failed] above already carries the derived shortfall
         // OR-ed in, and that OR is what this field exists to see past.
         lastSetTappedFailed = p.rating?.failed == true,
-        lastSetWarmup = p.rating?.warmup ?: false,
+        lastSetWarmup = p.slot?.warmup == true,
         restRemainingS = restRemainingS,
         // Set from the frozen index rather than incremented, so a retry cannot
         // count the same set twice.
@@ -3007,13 +3033,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * how the set FELT, but it cannot erase the fact that the set ended short of
      * its target — that verdict comes from the rep count, not from an opinion.
      */
-    fun rateLastSet(rpe: Int?, failed: Boolean, warmup: Boolean) {
+    fun rateLastSet(rpe: Int?, failed: Boolean) {
         // appScope, as overrideLastSetReps: the rest screen is the only place a
         // set's effort can be corrected, and the pop that leaves it cancelled
         // the correction on the way out.
         container.appScope.launch(Dispatchers.Main.immediate) {
+            // The stored warm-up flag is handed back unchanged rather than
+            // taken from the correction: `updateRpe` writes the column on every
+            // correction, so passing anything else here would let re-rating a
+            // ramp set silently turn it into work (#187).
+            val warmup = stateFlow.value.lastSetWarmup
             val effectiveFailed = ratings.rate(rpe, failed, warmup) ?: return@launch
-            stateFlow.value = ratedState(stateFlow.value, rpe, failed, effectiveFailed, warmup)
+            stateFlow.value = ratedState(stateFlow.value, rpe, failed, effectiveFailed)
         }
     }
 

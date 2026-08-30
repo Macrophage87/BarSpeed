@@ -2079,7 +2079,7 @@ private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
         rpeOptions(timed = state.currentIsTimed, explosive = currentKind(state) == ExerciseKind.EXPLOSIVE)
             .last().description
     Button(
-        onClick = { viewModel.endSet(SetRating(null, failed = true, warmup = false)) },
+        onClick = { viewModel.endSet(SetRating(null, failed = true)) },
         modifier = Modifier.fillMaxWidth().height(64.dp),
         colors = ButtonDefaults.buttonColors(containerColor = BarColors.Red),
     ) {
@@ -2141,7 +2141,7 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
         ) {
             row.forEach { option ->
                 RpeTile(option, selected = false, modifier = Modifier.weight(1f)) {
-                    viewModel.endSet(SetRating(option.rpe, failed = option.failed, warmup = option.warmup))
+                    viewModel.endSet(SetRating(option.rpe, failed = option.failed))
                 }
             }
             if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -2422,7 +2422,6 @@ private fun UnclosedSessionNotice(viewModel: RecordViewModel) {
 /** One tile of the effort grid: what gets stored plus the gym-facing wording. */
 private data class RpeOption(
     val rpe: Int?,
-    val warmup: Boolean,
     val failed: Boolean,
     val description: String,
     val color: Color,
@@ -2463,9 +2462,11 @@ private fun rpeOptions(timed: Boolean, explosive: Boolean): List<RpeOption> {
             explosive -> "Missed the lift"
             else -> "Failed the set"
         }
-    return listOf(RpeOption(null, true, false, "Warm-up — barely work", BarColors.Blue)) +
-        effort.map { (rpe, text) -> RpeOption(rpe, false, false, text, rpeColor(rpe)) } +
-        RpeOption(null, false, true, failText, BarColors.Red)
+    // No warm-up tile since #187: it recorded `warmup = true` and `rpe = null`
+    // together, so tapping it threw the effort away. Warm-up is declared on the
+    // plan now and a warm-up set is rated on these same rungs.
+    return effort.map { (rpe, text) -> RpeOption(rpe, false, text, rpeColor(rpe)) } +
+        RpeOption(null, true, failText, BarColors.Red)
 }
 
 private fun rpeColor(rpe: Int): Color = when {
@@ -2498,7 +2499,6 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
     val selection =
         EffortCorrectionPolicy.selection(
             rpe = state.lastSetRpe,
-            warmup = state.lastSetWarmup,
             tappedFailed = state.lastSetTappedFailed,
             derivedFailed = state.lastSetFailed && !state.lastSetTappedFailed,
         )
@@ -2527,12 +2527,11 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
                 // two contradictory things about one set.
                 val selected =
                     when {
-                        option.warmup -> selection.warmup
                         option.failed -> selection.failed
                         else -> selection.rpe != null && option.rpe == selection.rpe
                     }
                 RpeTile(option, selected, modifier = Modifier.weight(1f)) {
-                    viewModel.rateLastSet(option.rpe, failed = option.failed, warmup = option.warmup)
+                    viewModel.rateLastSet(option.rpe, failed = option.failed)
                     onPicked()
                 }
             }
@@ -2573,10 +2572,10 @@ private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
     // and no reprocessing of the stream rebuilds how hard a hold felt.
     val options =
         rpeOptions(timed = feedback.actualDurationS != null, explosive = feedback.explosive)
-    val tapped =
-        options.firstOrNull {
-            if (state.lastSetWarmup) it.warmup else !it.warmup && !it.failed && it.rpe == state.lastSetRpe
-        }?.description
+    // The warm-up branch this used to open with is gone with the tile (#187).
+    // A warm-up set now carries an ordinary rating and reads as one; that it
+    // was a ramp is the plan's statement and is shown with the set, not here.
+    val tapped = options.firstOrNull { !it.failed && it.rpe == state.lastSetRpe }?.description
     // The wording is EffortCorrectionPolicy's, including the named absence for
     // a set with nothing logged; `:app` cannot test a composable, so the
     // decision lives one module over where every case is a literal in a test.

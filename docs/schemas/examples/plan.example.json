@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.8",
+  "schemaVersion": "1.9",
   "planName": "Hypertrophy Block W3",
   "notes": "Week 3 of 4. Keep eccentrics honest.",
   "bodyweight_kg": null,
@@ -18,7 +18,8 @@
               "load_kg": 100,
               "tempo": "4010",
               "rest_s": 180,
-              "sensors": 1
+              "sensors": 1,
+              "warmup": true
             },
             {
               "reps": 5,

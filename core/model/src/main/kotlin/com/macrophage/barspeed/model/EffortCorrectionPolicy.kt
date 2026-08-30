@@ -4,13 +4,15 @@ package com.macrophage.barspeed.model
  * What the rest screen's effort-correction grid pre-lights for the set that has
  * just been stored.
  *
- * At most one of [warmup], [failed] and a non-null [rpe] is ever set; the grid
- * draws one tile per fact and two lit tiles say two contradictory things about
- * one set.
+ * At most one of [failed] and a non-null [rpe] is ever set; the grid draws one
+ * tile per fact and two lit tiles say two contradictory things about one set.
+ *
+ * There is no warm-up member since #187. Warm-up left the effort scale to
+ * become a plan declaration, so no tile of this grid can set it and nothing
+ * here can pre-light it -- a warm-up set is now rated on the same rungs as
+ * every other set, which is what the parameter used to prevent.
  */
 data class EffortSelection(
-    /** The warm-up tile is pre-lit. */
-    val warmup: Boolean,
     /** The "failed the set" tile is pre-lit. */
     val failed: Boolean,
     /** The tile for this RPE is pre-lit; null pre-lights no effort tile. */
@@ -49,22 +51,19 @@ data class EffortSelection(
 object EffortCorrectionPolicy {
     /**
      * @param rpe the effort rating stored for the set, or null.
-     * @param warmup the lifter marked the set a warm-up.
      * @param tappedFailed the lifter tapped a failure tile in their own words.
      * @param derivedFailed the set was recorded short of its target.
      */
-    fun selection(rpe: Int?, warmup: Boolean, tappedFailed: Boolean, derivedFailed: Boolean): EffortSelection =
-        EffortSelection(
-            warmup = warmup,
-            // Only the lifter's own word lights this tile, and only where no
-            // rating stands beside it: tapping the failed tile stores rpe null,
-            // so a set carrying both has been re-rated since and the rating is
-            // the later statement. derivedFailed is absent from this line on
-            // purpose -- that is the whole of issue #140.
-            failed = !warmup && tappedFailed && rpe == null,
-            rpe = if (!warmup && !(tappedFailed && rpe == null)) rpe else null,
-            derivedShortfall = derivedFailed && !tappedFailed,
-        )
+    fun selection(rpe: Int?, tappedFailed: Boolean, derivedFailed: Boolean): EffortSelection = EffortSelection(
+        // Only the lifter's own word lights this tile, and only where no
+        // rating stands beside it: tapping the failed tile stores rpe null,
+        // so a set carrying both has been re-rated since and the rating is
+        // the later statement. derivedFailed is absent from this line on
+        // purpose -- that is the whole of issue #140.
+        failed = tappedFailed && rpe == null,
+        rpe = if (!(tappedFailed && rpe == null)) rpe else null,
+        derivedShortfall = derivedFailed && !tappedFailed,
+    )
 
     /**
      * What the rest screen's effort line reads for the set just stored.

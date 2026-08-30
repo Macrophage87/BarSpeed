@@ -23,9 +23,8 @@ class EffortCorrectionPolicyDerivedFailureTest {
         // END SET EARLY passes no rating at all, so tappedFailed is false and
         // autoFailed is true. There is no tap to draw, and drawing one claims
         // the lifter said a word they never said.
-        val s = EffortCorrectionPolicy.selection(rpe = null, warmup = false, tappedFailed = false, derivedFailed = true)
+        val s = EffortCorrectionPolicy.selection(rpe = null, tappedFailed = false, derivedFailed = true)
         assertFalse(s.failed, "the failed tile must not be pre-lit for a shortfall nobody declared")
-        assertFalse(s.warmup)
         assertNull(s.rpe)
         // And the grid must say why nothing is lit, or "nothing lit" reads as
         // the app having lost the rating.
@@ -39,7 +38,7 @@ class EffortCorrectionPolicyDerivedFailureTest {
         // "Hard - 2 reps left - short of target" while the grid beside it lit
         // "Failed the set" instead, contradicting it and overwriting the
         // lifter's own input with a verdict they did not give.
-        val s = EffortCorrectionPolicy.selection(rpe = 8, warmup = false, tappedFailed = false, derivedFailed = true)
+        val s = EffortCorrectionPolicy.selection(rpe = 8, tappedFailed = false, derivedFailed = true)
         assertEquals(8, s.rpe)
         assertFalse(s.failed)
         assertTrue(s.derivedShortfall)
@@ -47,15 +46,9 @@ class EffortCorrectionPolicyDerivedFailureTest {
 
     @Test
     fun `every rated set keeps its rating whatever the shortfall says`() {
-        (6..10).forEach { rpe ->
+        listOf(1, 4, 6, 7, 8, 9, 10).forEach { rpe ->
             listOf(false, true).forEach { derived ->
-                val s =
-                    EffortCorrectionPolicy.selection(
-                        rpe = rpe,
-                        warmup = false,
-                        tappedFailed = false,
-                        derivedFailed = derived,
-                    )
+                val s = EffortCorrectionPolicy.selection(rpe = rpe, tappedFailed = false, derivedFailed = derived)
                 assertEquals(rpe, s.rpe, "rpe=$rpe derivedFailed=$derived")
             }
         }
@@ -69,21 +62,23 @@ class EffortCorrectionPolicyDerivedFailureTest {
         // coexist in RecordState -- but the rule is total, and which of the two
         // wins is a decision, not an accident. It is pinned here because
         // nothing else in the suite distinguishes the ordering.
-        val s = EffortCorrectionPolicy.selection(rpe = 9, warmup = false, tappedFailed = true, derivedFailed = false)
+        val s = EffortCorrectionPolicy.selection(rpe = 9, tappedFailed = true, derivedFailed = false)
         assertEquals(9, s.rpe)
         assertFalse(s.failed)
     }
 
     @Test
     fun `no two tiles are ever pre-lit at once`() {
-        // The invariant the inline precedence chain existed to hold, now over
-        // the whole input space rather than the three cases it was written for:
-        // 6 ratings x warm-up x tapped x derived = 48.
+        // The invariant the inline precedence chain existed to hold, over the
+        // whole input space rather than the three cases it was written for:
+        // 8 rating states x tapped x derived = 32. It was 48 while a warm-up
+        // was a rating state of its own; the scale it belonged to is gone and
+        // the seven anchors plus unrated are what remains.
         val inputs = allInputs()
-        assertEquals(48, inputs.size)
+        assertEquals(32, inputs.size)
         inputs.forEach { i ->
             val s = i.select()
-            val lit = listOf(s.warmup, s.failed, s.rpe != null).count { it }
+            val lit = listOf(s.failed, s.rpe != null).count { it }
             assertTrue(lit <= 1, "$i lit $lit tiles")
         }
     }

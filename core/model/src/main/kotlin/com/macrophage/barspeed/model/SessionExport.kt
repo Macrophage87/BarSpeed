@@ -186,8 +186,25 @@ data class SessionExport(
          * has been false since the fifth; it is corrected here rather than
          * reworded around, because it undercounted the re-checks a reader owes
          * by two.
+         *
+         * 1.14 is a RELEASED boundary being crossed, not another change under
+         * an open number: 1.13 shipped in v0.1.44, read at the tag. Its first
+         * change (#187) is `warmup`. The key keeps its name, its type and its
+         * place, and BOTH what writes it and what it means to a reader change:
+         * it is a PLAN DECLARATION now, from the new plan-schema 1.9 key of the
+         * same name, where until now its only producer was an effort tile the
+         * lifter tapped. A warm-up set therefore carries a real [SetExport.rpe]
+         * from v0.1.45 on, where before the tile stored `warmup = true` and
+         * `rpe = null` together and threw the effort away. NOT additive: no key
+         * changes type or stops being written, but the published description
+         * stops telling a reader to exclude these sets from effort analysis,
+         * because that instruction is now false. Not retroactive: a set
+         * recorded before this version publishes exactly what it published
+         * before, and on those sessions a `warmup: true` set carrying no `rpe`
+         * means the app could not record both rather than that the lifter
+         * declined to rate it.
          */
-        const val SCHEMA_VERSION = "1.13"
+        const val SCHEMA_VERSION = "1.14"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -196,7 +213,7 @@ data class SessionExport(
         val SUPPORTED_SCHEMA_VERSIONS =
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
-                "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13",
+                "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14",
             )
 
         /**
@@ -298,7 +315,22 @@ data class SetExport(
      * Omitted when false.
      */
     val failed: Boolean = false,
-    /** True for warm-up sets (no RPE recorded). Omitted when false. */
+    /**
+     * True when the PLAN declared this set preparatory -- a ramp set, a
+     * warm-up. Omitted when false.
+     *
+     * A DECLARATION about what the set was for, not a rating of it, and since
+     * 1.14 it carries no claim at all about [rpe]: a warm-up set is rated on
+     * the same scale as any other set and usually will be. Until 1.14 the only
+     * producer was an effort tile, which stored this flag and a null [rpe]
+     * together -- so on a pre-1.14 session the pair is a limitation of the old
+     * scale rather than a statement that the lifter declined to rate the set.
+     *
+     * False on an ad-hoc set and on a set the lifter appended mid-session,
+     * because nothing declared those. That is the app having no way to say it
+     * rather than a statement that the set was working, and the two are not
+     * distinguishable here.
+     */
     val warmup: Boolean = false,
     /**
      * True when the LIFTER appended this set to the exercise mid-session, and

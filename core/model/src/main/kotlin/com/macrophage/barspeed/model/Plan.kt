@@ -364,8 +364,9 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.8"
-        val SUPPORTED_SCHEMA_VERSIONS = setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8")
+        const val SCHEMA_VERSION = "1.9"
+        val SUPPORTED_SCHEMA_VERSIONS =
+            setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9")
         val VALID_SIDES = setOf("left", "right")
 
         /** "top"/"bottom" name the start position; "down"/"up" the first movement. */
@@ -683,6 +684,29 @@ data class PlanSetDef(
      * precedence every other per-set key already has over its exercise block.
      */
     val sensors: Int? = null,
+    /**
+     * This set is preparatory: a ramp set, a warm-up, work that is not the
+     * training stimulus (#187).
+     *
+     * DECLARED, not rated. Warm-up-ness is what a set is FOR; how it went is a
+     * separate fact and the effort scale carries that one. Until schema 1.9
+     * the only producer was an effort TILE, which stored `warmup = true` and
+     * `rpe = null` together -- so the effort of every warm-up was discarded by
+     * construction, and a 500 lb squatter's empty-bar ramp set could not
+     * record that it felt like nothing. Now the coach who wrote the ramp
+     * declares it and the lifter still rates it.
+     *
+     * Per set rather than per exercise, because a block ramps: the warm-up
+     * singles and the working set are sets of the same exercise. An exercise
+     * whose every set is preparatory declares it on every set, which is
+     * verbose and unambiguous, and is preferred to a second inherited level
+     * that a set would then have to be able to override.
+     *
+     * Omitted means false. There is no way to say "not known": a plan that
+     * does not mark a set is a plan whose author considered it working, and
+     * every plan written before 1.9 is read exactly that way.
+     */
+    val warmup: Boolean = false,
 ) {
     /** Canonical load in kilograms regardless of which unit the plan used. */
     val resolvedLoadKg: Double?

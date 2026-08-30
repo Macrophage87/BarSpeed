@@ -93,6 +93,10 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     // which is a different fact from a declared 1 and is
                     // what lets the export publish both figures (#156).
                     sensors = set.sensors ?: exerciseDef.sensors,
+                    // Set level only, and there is no exercise-level fallback
+                    // to read: a block ramps, so its warm-up singles and its
+                    // working set are sets of the same exercise (#187).
+                    warmup = set.warmup,
                     isExerciseChange = setIdx == 0 && exerciseIdx > 0,
                 )
         }

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.13",
+  "schemaVersion": "1.14",
   "startedAt": "2026-07-18T17:04:00Z",
   "endedAt": "2026-07-18T18:11:00Z",
   "timeZone": { "id": "America/New_York", "utcOffsetMinutes": -240 },
@@ -91,6 +91,8 @@
           "load_kg": 45,
           "load_lb": 99.2,
           "reps": 10,
+          "warmup": true,
+          "rpe": 6,
           "repsManual": true,
           "plannedReps": 10,
           "rest_s": 90,
