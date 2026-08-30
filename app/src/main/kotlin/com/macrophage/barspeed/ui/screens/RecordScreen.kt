@@ -2271,8 +2271,18 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
         }
     RestHeader(state, viewModel)
     Spacer(Modifier.height(6.dp))
+    // Drawn HERE, above everything but the header, because the screen scrolls
+    // to 0 on entering RESTING and the reason row is the last thing on it. A
+    // question below the fold is a question the lifter starts the next set
+    // without seeing, and starting the next set clears the answer it was
+    // asking for. Drawing it here also keeps it from inserting itself between
+    // the lifter and a control they are already tapping, which is the
+    // stacked-target hazard #137 removed elsewhere on this screen: a rep
+    // correction crossing the planned count can flip the set to failed
+    // mid-rest, and eight tiles appearing directly above the +/- under the
+    // finger would store a reason nobody gave.
     if (placement == SetLimiterPagePlacement.PROMPT) {
-        LimiterPage(timed = timed, viewModel = viewModel, onSkip = { dismissed = true }) { changing = false }
+        LimiterPage(state, timed, viewModel, onSkip = { dismissed = true }) { changing = false }
         Spacer(Modifier.height(10.dp))
     }
     // Sets two onwards start from here, not from READY, and this is the screen
@@ -2744,11 +2754,12 @@ private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
  * a composable, so a rule written beside its caller here is a rule nothing
  * enforces; one module over, every case is a literal in a test.
  *
- * IT IS A PAGE OF TILES, NOT A FORM. The lifter is standing over a dropped
- * bar. One tap answers and closes it; one tap on SKIP leaves it, and skipping
- * writes nothing at all -- absence is already what the row carries. The free
- * text is reachable ONLY behind Other, so the ordinary answer never costs a
- * keyboard.
+ * WHERE IT IS DRAWN IS ALSO [SetLimiterPolicy]'S DECISION, and it is not one
+ * place. The page the app opens by ITSELF is drawn by [RestingStage] at the
+ * top of the rest screen; this function draws only the page the lifter opened
+ * from the row below, under that row. Both are the same composable and the
+ * same tiles -- see [SetLimiterPagePlacement] for why the two cases are an
+ * enum rather than a pair of booleans.
  *
  * THE ROW SURVIVES THE SKIP. Once the page has been offered it does not offer
  * itself again for the same set, but the row below stays, with SAY WHY on it,
@@ -2769,8 +2780,10 @@ private fun LimiterCorrection(
     if (state.lastFeedback == null) return
     if (!SetLimiterPolicy.offersCorrection(state.lastSetFailed, state.lastSetLimiter)) return
     LimiterLine(state, timed, onChange)
+    // Under the row that opened it. A page the lifter asked for belongs
+    // beside the finger that asked; only the automatic offer goes to the top.
     if (placement == SetLimiterPagePlacement.CORRECTION) {
-        LimiterPage(timed = timed, viewModel = viewModel, onSkip = onSkip, onDone = onDone)
+        LimiterPage(state, timed, viewModel, onSkip = onSkip, onDone = onDone)
     }
 }
 
@@ -2845,6 +2858,18 @@ private fun LimiterLine(state: RecordState, timed: Boolean, onChange: () -> Unit
  * The tiles themselves, grouped, with pain drawn apart from the performance
  * answers.
  *
+ * IT IS A PAGE OF TILES, NOT A FORM. The lifter is standing over a dropped
+ * bar. One tap answers and closes it. The free text is reachable ONLY behind
+ * Other, so the ordinary answer never costs a keyboard.
+ *
+ * THE FOOT DEPENDS ON WHETHER AN ANSWER STANDS, which is
+ * [SetLimiterPolicy.leavesPageAsSkip]'s decision. With none, leaving is a SKIP
+ * and writes nothing at all -- absence is already what the row carries. With
+ * one, leaving is a CLEAR and writes null, because a button captioned
+ * "records no reason" over a stored answer describes something the app does
+ * not do: the answer would stay in the row and stay in the export, and a
+ * lifter who tapped to retract a mark would have the mark survive them.
+ *
  * WHICH TILES EXIST AND WHICH GROUP EACH IS IN IS [SetLimiterScale]'S
  * DECISION. This function is the paint. The grouping is read off the tiles
  * rather than counted to by index, because an order counted to here is an
@@ -2852,9 +2877,20 @@ private fun LimiterLine(state: RecordState, timed: Boolean, onChange: () -> Unit
  * which is the exact trap [FailSetButton] already carries a comment about.
  */
 @Composable
-private fun LimiterPage(timed: Boolean, viewModel: RecordViewModel, onSkip: () -> Unit, onDone: () -> Unit) {
-    var typing by remember { mutableStateOf(false) }
-    var words by remember { mutableStateOf("") }
+private fun LimiterPage(
+    state: RecordState,
+    timed: Boolean,
+    viewModel: RecordViewModel,
+    onSkip: () -> Unit,
+    onDone: () -> Unit,
+) {
+    var typing by remember(state.setsCompleted) { mutableStateOf(false) }
+    // Seeded from what is STORED, not from "". Reopening this page over an
+    // answer the lifter is correcting must show them the words they are
+    // correcting: an empty box over a stored note is a note one SAVE away from
+    // being replaced with nothing, and it exists in no other artifact.
+    var words by
+        remember(state.setsCompleted) { mutableStateOf(state.lastSetLimiterNote ?: "") }
     SectionCaption("Why did that set end? · optional")
     Spacer(Modifier.height(6.dp))
     if (typing) {
@@ -2887,24 +2923,47 @@ private fun LimiterPage(timed: Boolean, viewModel: RecordViewModel, onSkip: () -
         }
     }
     Spacer(Modifier.height(2.dp))
-    OutlinedButton(
-        onClick = {
-            onSkip()
-            onDone()
-        },
-        modifier = Modifier.fillMaxWidth(),
-    ) { Text("SKIP", color = BarColors.Sub) }
-    Spacer(Modifier.height(6.dp))
-    SectionCaption("Skipping records no reason · you can still say why while you rest")
+    if (SetLimiterPolicy.leavesPageAsSkip(state.lastSetLimiter)) {
+        OutlinedButton(
+            onClick = {
+                onSkip()
+                onDone()
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("SKIP", color = BarColors.Sub) }
+        Spacer(Modifier.height(6.dp))
+        SectionCaption("Skipping records no reason · you can still say why while you rest")
+    } else {
+        // Dismissed as well as cleared. Without it the set is failed and
+        // unanswered again the instant the write lands, so the page the lifter
+        // just left would reopen at the top of the screen and ask again. The
+        // row stays, with SAY WHY on it, because offersCorrection never reads
+        // the dismissal.
+        OutlinedButton(
+            onClick = {
+                viewModel.limitLastSet(null)
+                onSkip()
+                onDone()
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("CLEAR", color = BarColors.Sub) }
+        Spacer(Modifier.height(6.dp))
+        SectionCaption("Clearing removes the reason from this set")
+    }
 }
 
 /**
  * The free-text box, reachable only behind Other.
  *
- * The field normalizes on every keystroke, so what the lifter watches
- * themselves type is exactly what is stored and exactly what is published. A
- * character dropped at save is a character they believe they recorded, and the
- * characters this drops are not cosmetic: the raw archive's set manifest is
+ * The field removes on every keystroke the characters the raw archive's set
+ * manifest cannot carry, so those are dropped in front of the lifter; the ends
+ * are trimmed once, when the note is saved. The two are different transforms
+ * for a reason that is not tidiness: this box is value-driven, so whatever it
+ * applies is applied to every PREFIX of the note in turn, and a rule that
+ * trims would delete each space at the moment it is typed.
+ *
+ * A character dropped at save is a character the lifter believes they
+ * recorded, and the characters this drops are not cosmetic: the manifest is
  * assembled as text and escapes nothing.
  */
 @Composable

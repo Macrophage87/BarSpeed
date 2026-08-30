@@ -107,16 +107,24 @@ enum class SetLimiter {
          * backslash, and every control character; runs of whitespace collapse
          * to one space and the result is trimmed.
          *
-         * THE LIFTER SEES THE RESULT AS THEY TYPE, because the text field
-         * applies this on every keystroke. A character silently dropped at
-         * save is a character the lifter believes they recorded.
+         * THE LIFTER SEES MOST OF THIS AS THEY TYPE, but not through this
+         * function. [sanitizeForTyping] is what the field applies, because a
+         * rule that is safe on a finished note is not safe on a PREFIX of one
+         * -- and a value-driven field applies its rule to every prefix in
+         * turn. The characters the manifest cannot carry are dropped there, in
+         * front of the lifter. What is left to this function is the ENDS,
+         * trimmed once, here, at the write. A character silently dropped at
+         * save is a character the lifter believes they recorded, and the split
+         * is what keeps that count at zero for everything but the leading and
+         * trailing space they cannot have meant.
          *
          * Blank comes back as null, not as `""`. An empty note is no note, and
          * absence is the state the skip already writes.
          *
-         * Idempotent by construction and pinned as such: it runs at the field
-         * and again at the write, and a second pass must not shorten a note
-         * that already fits.
+         * Idempotent by construction and pinned as such: it runs at the write
+         * and again at the publish boundary, over a note it may not have
+         * written itself, and a second pass must not shorten a note that
+         * already fits.
          */
         fun normalizeNote(raw: String?): String? {
             if (raw == null) return null
@@ -156,7 +164,28 @@ enum class SetLimiter {
          * string. Absence is [normalizeNote]'s answer to give, once, at the
          * write.
          */
-        fun sanitizeForTyping(raw: String): String = normalizeNote(raw) ?: ""
+        fun sanitizeForTyping(raw: String): String {
+            val stripped =
+                buildString(raw.length) {
+                    for (ch in raw) {
+                        when {
+                            ch == '"' || ch == '\\' -> Unit
+                            ch.isWhitespace() || ch.isISOControl() -> append(' ')
+                            else -> append(ch)
+                        }
+                    }
+                }
+            // A run of spaces collapses, a single trailing space does not: it
+            // is the word boundary the lifter is standing on.
+            val collapsed =
+                buildString(stripped.length) {
+                    for (ch in stripped) {
+                        if (ch == ' ' && endsWith(' ')) continue
+                        append(ch)
+                    }
+                }
+            return collapsed.take(NOTE_MAX_CHARS)
+        }
     }
 }
 
@@ -386,10 +415,10 @@ object SetLimiterPolicy {
         limiter: SetLimiter?,
         dismissed: Boolean,
         changing: Boolean,
-    ): SetLimiterPagePlacement = if (changing || prompts(failed, limiter, dismissed)) {
-        SetLimiterPagePlacement.CORRECTION
-    } else {
-        SetLimiterPagePlacement.NONE
+    ): SetLimiterPagePlacement = when {
+        changing -> SetLimiterPagePlacement.CORRECTION
+        prompts(failed, limiter, dismissed) -> SetLimiterPagePlacement.PROMPT
+        else -> SetLimiterPagePlacement.NONE
     }
 
     /**

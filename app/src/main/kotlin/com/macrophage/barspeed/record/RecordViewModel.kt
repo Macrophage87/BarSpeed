@@ -505,6 +505,20 @@ private fun applyPrepAdjustment(s: RecordState, deltaS: Int, appScope: Coroutine
  * a set unmarked here still remembers that the plan called it a ramp, and
  * nothing about the rating moves: `warmup: true` beside `rpe: 6` is the point
  * of the whole change.
+ *
+ * THE NEW MARK IS PUBLISHED BEFORE THE WRITE, not after it. `markWarmup`
+ * suspends into Room, and Dispatchers.Main.immediate runs a coroutine body
+ * only as far as its first suspension -- so a second tap arriving while the
+ * first is still writing used to read a state the first had not replaced yet,
+ * compute the same next mark, and be lost. Publishing first makes the second
+ * tap toggle from the first tap's answer, and flips the label on the tap
+ * rather than on the round trip, which is what the lifter is responding to
+ * when they tap again.
+ *
+ * The rollback is not a race of its own. `markWarmup` returns null only when
+ * there is no recorded set, and it decides that BEFORE it suspends, so the
+ * restore runs in the same frame as the tap and no other tap can interleave
+ * with it.
  */
 private fun applyWarmupMark(
     stateFlow: MutableStateFlow<RecordState>,
@@ -512,10 +526,13 @@ private fun applyWarmupMark(
     appScope: CoroutineScope,
 ) {
     val s = stateFlow.value
-    val mark = WarmupMarkPolicy.toggled(s.lastSetWarmup, s.lastSetWarmupMark)
+    val before = s.lastSetWarmupMark
+    val mark = WarmupMarkPolicy.toggled(s.lastSetWarmup, before)
+    stateFlow.value = s.copy(lastSetWarmupMark = mark)
     appScope.launch(Dispatchers.Main.immediate) {
-        ratings.markWarmup(mark) ?: return@launch
-        stateFlow.value = stateFlow.value.copy(lastSetWarmupMark = mark)
+        if (ratings.markWarmup(mark) == null) {
+            stateFlow.value = stateFlow.value.copy(lastSetWarmupMark = before)
+        }
     }
 }
 

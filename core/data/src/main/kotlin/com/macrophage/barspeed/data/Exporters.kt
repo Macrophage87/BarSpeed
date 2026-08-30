@@ -17,6 +17,7 @@ import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.SetExport
+import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetSensorsExport
 import com.macrophage.barspeed.model.SetSummaryExport
 import com.macrophage.barspeed.model.TempoComplianceExport
@@ -244,7 +245,7 @@ class SessionExporter(
             failed = record.failed,
             // Why it ended, and the words that go with `other` (#189). Both,
             // or the note is orphaned from the answer it belongs to.
-            limiter = record.limiter,
+            limiter = record.publishedLimiter,
             limiterNote = record.publishedLimiterNote,
             // The plan's declaration and the lifter's mark, composed (#194).
             // WarmupMarkPolicy owns which wins; reading either column raw here
@@ -470,9 +471,24 @@ class SessionExporter(
  * is a note with NO answer to attach to: that is free text a reader can
  * neither group nor attribute, and the published schema promises it is not
  * there.
+ *
+ * THE PUBLISH BOUNDARY IS THE LAST GATE, NOT A SECOND OPINION. Both the
+ * vocabulary and the note's shape are enforced where the value is PRODUCED,
+ * and this build cannot write a row that breaks either -- but the column is
+ * TEXT, and `SetLimiter.ofStored`'s own KDoc says a row written by a LATER
+ * build may carry a value this one has never heard of. So the answer is read
+ * back through the vocabulary and an unrecognised one publishes as NO answer
+ * rather than as a member of a closed enum the document promises, and the note
+ * is normalized again on the way out. The second matters more than the first:
+ * the manifest is assembled as text and escapes nothing, so one stored
+ * backslash does not corrupt one note, it makes meta.json unparseable for
+ * every set in the session.
  */
+private val SetRecordEntity.publishedLimiter: String?
+    get() = SetLimiter.ofStored(limiter)?.stored
+
 private val SetRecordEntity.publishedLimiterNote: String?
-    get() = limiterNote?.takeIf { limiter != null }
+    get() = SetLimiter.normalizeNote(limiterNote)?.takeIf { publishedLimiter != null }
 
 /**
  * Builds the raw-data zip: per-set CSVs (device-frame IMU + HRM), the FULL
@@ -665,11 +681,13 @@ class RawExporter(
         // [str] and not [bool]: absence must go on reading as "not asked" for
         // every archive already written. The note is the first FREE TEXT this
         // writer has ever carried -- every value before it was a machine token
-        // -- and it is safe here only because SetLimiter.normalizeNote has
-        // already removed the double quote and the backslash. Without that a
-        // backslash would not corrupt the note, it would make this whole
-        // manifest unparseable for every set in the session.
-        str("limiter", record.limiter)
+        // -- and it is safe here because it is normalized on the way OUT, in
+        // [publishedLimiterNote], and not only on the way in. Relying on the
+        // write path alone was an assumption about a writer held at a reader:
+        // a backslash arriving from a row this build did not write would not
+        // corrupt the note, it would make this whole manifest unparseable for
+        // every set in the session.
+        str("limiter", record.publishedLimiter)
         str("limiterNote", record.publishedLimiterNote)
         flag("warmup", WarmupMarkPolicy.effective(record.warmup, record.warmupMark))
         // Which of the two facts this document carries. Without it a

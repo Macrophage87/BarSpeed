@@ -331,8 +331,8 @@ abstract class AppDatabase : RoomDatabase() {
          * rather than where it is stored, so a row written by a later build
          * carrying a value this one does not know reads as an unrecognised
          * string instead of throwing inside a type converter on the lifter's
-         * phone. This commit adds the column and no producer; what may be
-         * written into it arrives with #189's own commit.
+         * phone. The producers are `SessionDao.updateLimiter` and
+         * `SessionDao.updateWarmupMark`; this migration adds only the columns.
          *
          * Nothing is backfilled and no UPDATE runs. Which past sets ended for
          * which reason, and which past sets the lifter would have called
