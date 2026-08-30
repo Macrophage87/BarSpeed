@@ -247,11 +247,14 @@ mutation killed, and that mapping is the whole content of a mutation table.
   `testDebugUnitTest`/`testReleaseUnitTest` report `NO-SOURCE`.
 - **`:app` has TWO test files**, both under
   `app/src/test/kotlin/com/macrophage/barspeed/record/`: `PlanQueueTest.kt`, **5** `@Test`
-  methods over one pure function, and `AppendedSlotTest.kt`, **12** over `appendedState` and the
-  field-by-field rule for a `PlannedSlot` the lifter appends. 17 executed per variant, **34**
+  methods over one pure function, and `AppendedSlotTest.kt`, **13** over `appendedState` and the
+  field-by-field rule for a `PlannedSlot` the lifter appends. 18 executed per variant, **36**
   across the two variants, 0 failures, measured at
-  `3f13cb4e750e6fff09c9e7199f9de8df3c5cde15` by
-  `./gradlew test --rerun-tasks --no-build-cache --console=plain`. **This entry said 12
+  `eba5aad8df2fcd2f01bf288c94a31a568f8c24e6` by
+  `./gradlew test --rerun-tasks --no-build-cache --console=plain`, whose whole-suite total is
+  1728 executions, 0 failures, all 141 tasks executed rather than restored. (It read **12** and
+  **17**/**34** at `3f13cb4e750e6fff09c9e7199f9de8df3c5cde15`, true there; #188 round 3 added a
+  fourth append sweep.) **This entry said 12
   over one file and both halves are now wrong**: `PlanQueueTest` had 12 `@Test` methods at
   `afd4392bf60adbca81acf03fcaf3a94af36e21da`; this branch's c0 added two more, and its c1 moved
   nine of the resulting fourteen into `:core:model`'s new `AddSetControlTest` when

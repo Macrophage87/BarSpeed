@@ -6,7 +6,8 @@ description: Run device-level verification on the local headless Android emulato
 # /bench-test
 
 `:core:ble` has no test source set at all, and `:app` has two files (`PlanQueueTest`, 5 tests over
-one pure function, and `AppendedSlotTest`, 9 over the appended-set rule) — so almost nothing in
+one pure function, and `AppendedSlotTest`, 13 over the appended-set rule, measured at
+`eba5aad8df2fcd2f01bf288c94a31a568f8c24e6`) — so almost nothing in
 `:app` has executable JVM coverage for behaviour, but
 that is not the end of the story: anything reachable by screenshot-driven navigation can be
 verified here, on a disposable database, before it meets the only real training history that
