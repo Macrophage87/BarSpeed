@@ -21,9 +21,10 @@ import kotlin.test.assertEquals
  * that whole class, including the `WeightUnit` branch. `:core:model` (and
  * `:core:dsp`, `:core:witmotion`, `:core:hrm`) build with
  * `kotlin { jvmToolchain(21) }` and emit class file version 65; `:app`
- * builds and runs its own unit tests on `jvmToolchain(17)`, whose JVM
- * class loader stops at 61 -- `UnsupportedClassVersionError` on the first
- * test, every time, before any assertion runs. `:core:data`'s own
+ * built its own sources on `jvmToolchain(17)` and RAN its unit tests on
+ * that launcher too, and that JVM's class loader stops at 61 --
+ * `UnsupportedClassVersionError` on the first test, every time, before any
+ * assertion ran. `:core:data`'s own
  * `build.gradle.kts` already found and fixed this same defect for itself
  * (`tasks.withType<Test>().configureEach { javaLauncher.set(...) }`,
  * pinning the test JVM to 21 without changing what the module compiles

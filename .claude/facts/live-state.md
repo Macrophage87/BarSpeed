@@ -201,7 +201,12 @@ left to check against. Three things travel together:
   PlanQueueTest.xml` in the primary checkout (`<testsuite name="…PlanQueueTest" tests="5"
   skipped="0" failures="0" errors="0" …>`); the file is from a stale build dated 2026-08-22, so
   its counts are not evidence for any particular SHA, but the emitted schema is Gradle's own
-  JUnit-XML writer and does not vary with the SHA that produced it.
+  JUnit-XML writer and does not vary with the SHA that produced it. **That `tests="5"` is not the
+  same 5 that §5 now states for `PlanQueueTest`, and the agreement is a coincidence** — this
+  example's 5 was already wrong when it was quoted here, and §5's 5 is what is left after #188
+  moved nine methods to `:core:model`. Reading either as corroborating the other is the mistake
+  §5 records having made once already. Quote this block for its ATTRIBUTE NAMES and take no
+  digit from it.
 
 Tail the console log only on failure — a green multi-module log is thousands of tokens carrying
 zero findings once the XML tuple and the task count both check out.
@@ -242,18 +247,19 @@ mutation killed, and that mapping is the whole content of a mutation table.
   `testDebugUnitTest`/`testReleaseUnitTest` report `NO-SOURCE`.
 - **`:app` has TWO test files**, both under
   `app/src/test/kotlin/com/macrophage/barspeed/record/`: `PlanQueueTest.kt`, **5** `@Test`
-  methods over one pure function, and `AppendedSlotTest.kt`, **9** over `appendedState` and the
-  field-by-field rule for a `PlannedSlot` the lifter appends. 14 executed per variant, **28**
+  methods over one pure function, and `AppendedSlotTest.kt`, **12** over `appendedState` and the
+  field-by-field rule for a `PlannedSlot` the lifter appends. 17 executed per variant, **34**
   across the two variants, 0 failures, measured at
-  `1b38d079caa3e81cfa52541a57c066253a7a2356` by
-  `./gradlew :app:test --rerun-tasks --no-build-cache --console=plain`. **This entry said 12
-  over one file and both halves are now wrong**: nine of `PlanQueueTest`'s twelve moved to
-  `:core:model`'s `AddSetControlTest` when `AddSetControl` was extracted (#188), leaving 5, and
-  a second file arrived on the same branch. This is a correction REVERSING a correction — the
-  entry said 5 before, and that 5 was wrong for its SHA (it was the count in the stale
-  2026-08-22 `TEST-…PlanQueueTest.xml` quoted as a schema example in §4, read as a test count
-  anyway). The digit agreeing with the old wrong one is a coincidence of the extraction, not a
-  vindication of it. Earlier definitions said `:app` had **zero** test source sets; false too,
+  `3f13cb4e750e6fff09c9e7199f9de8df3c5cde15` by
+  `./gradlew test --rerun-tasks --no-build-cache --console=plain`. **This entry said 12
+  over one file and both halves are now wrong**: `PlanQueueTest` had 12 `@Test` methods at
+  `afd4392bf60adbca81acf03fcaf3a94af36e21da`; this branch's c0 added two more, and its c1 moved
+  nine of the resulting fourteen into `:core:model`'s new `AddSetControlTest` when
+  `AddSetControl` was extracted (#188), leaving 5, and a second file arrived on the same
+  branch. This is a correction REVERSING a correction — the entry said 5 before, and that 5 was
+  wrong for its SHA (it was the count in the stale 2026-08-22 `TEST-…PlanQueueTest.xml` quoted
+  as a schema example in §4, read as a test count anyway). The digit agreeing with the old
+  wrong one is a coincidence of the extraction, not a vindication of it. Earlier definitions said `:app` had **zero** test source sets; false too,
   and it stays retracted.
 - **`:app`'s unit tests run on a JDK 21 launcher as of #188** —
   `app/build.gradle.kts`, `tasks.withType<Test>().configureEach { javaLauncher.set(…21…) }`, the
@@ -264,8 +270,8 @@ mutation killed, and that mapping is the whole content of a mutation table.
   `AppendedSlotTest` loads `ExerciseDef` and `SetGeometryPolicy` freely. It changes no produced
   bytecode.
 - **The consequence that mattered is unchanged, only narrowed.** Nothing in `:app` that draws,
-  connects or reaches Room is test-gated — 37 Kotlin files, `RecordScreen.kt` alone 2,318 lines
-  — so a green `./gradlew test` still **compiles** `:app` and asserts almost nothing about it.
+  connects or reaches Room is test-gated, so a green `./gradlew test` still **compiles** `:app`
+  and asserts almost nothing about it.
   Compiled is not tested. #193 tracks the wider sweep of sites that still assert a module has no
   test source set; these lines are among them and are fixed here rather than waiting for it.
 - **There is no `androidTest` directory anywhere in the tree.**
@@ -463,10 +469,10 @@ Two constraints belong with it:
 
 **Where the module has no tests, red-before-green is not available at all.** For a change confined
 to `:core:ble` — or to any part of `:app` outside `PlanQueue` and `appendedState` — either lift
-the decision into a
-pure function in `:core:model`/`:core:dsp` so c0–c2 can exist, or say plainly in the report and
-the commit body: *"no red was shown; this change is compile- and lint-gated only, not
-test-gated."* Never let the partition's presence in a definition imply it was performed.
+the decision into a pure function in `:core:model`/`:core:dsp` so c0–c2 can exist, or say
+plainly in the report and the commit body: *"no red was shown; this change is compile- and
+lint-gated only, not test-gated."* Never let the partition's presence in a definition imply it
+was performed.
 
 **The strongest pins are in `:core:model`.** `SchemaContractTest` does exact `assertEquals` on
 enum sets between the *published* `docs/schemas/*.json` and Kotlin constants, wired in by
