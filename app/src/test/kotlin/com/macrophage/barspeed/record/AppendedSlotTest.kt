@@ -60,19 +60,22 @@ private enum class Append {
  * sweeps below assert each recorded decision against what `appendedState`
  * actually does with that field, over two fixtures, so an entry moved to the
  * wrong group reds on the entry itself and not on some behaviour test that
- * happens to cover it. Round 2 of #188 raised this. THE THREE ENTRIES BELOW
- * MARKED `MISFILED ON PURPOSE` ARE WRONG IN THIS COMMIT AND ONLY THIS ONE:
- * they are the red this pin has to show before it is worth anything, one per
- * group, and the next commit restores them.
+ * happens to cover it. Round 2 of #188 raised this.
+ *
+ * SHOWN RED, NOT ASSERTED TO WORK. At `ab5a9c87265f4e2a11b1db0e69b6a864e3f294d7`
+ * three entries of this table were deliberately misfiled, one per group --
+ * `side` INHERITED -> RESET, `loadKg` CARRIED -> INHERITED, `warmup` RESET ->
+ * CARRIED -- and `:app:testDebugUnitTest` reported 17 tests completed, 3
+ * failed: exactly the three sweeps, no more and no fewer, with the key-set
+ * assertion passing throughout. That commit's CI run is the durable artifact.
+ * This commit restores the three entries and changes nothing else.
  */
 private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     // Identity and how the movement is performed: the appended set is one
     // more set of the anchor's exercise, so all of this follows it.
     "exercise" to Append.INHERITED,
     "geometry" to Append.INHERITED,
-    // MISFILED ON PURPOSE: `side` is inherited. RESET here so the reset sweep
-    // reds on a field the code copies unchanged.
-    "side" to Append.RESET,
+    "side" to Append.INHERITED,
     "implementCount" to Append.INHERITED,
     "exerciseNotes" to Append.INHERITED,
     "exerciseNotesBehindTap" to Append.INHERITED,
@@ -82,9 +85,7 @@ private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     "prepS" to Append.INHERITED,
     "sensors" to Append.INHERITED,
     // What the lifter is standing on for that exercise.
-    // MISFILED ON PURPOSE: `loadKg` is carried. INHERITED here so the
-    // inheritance sweep reds on a field the carry rewrites.
-    "loadKg" to Append.INHERITED,
+    "loadKg" to Append.CARRIED,
     "reps" to Append.CARRIED,
     "durationS" to Append.CARRIED,
     "tempo" to Append.CARRIED,
@@ -99,10 +100,7 @@ private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     "setsInExercise" to Append.RESET,
     "isExerciseChange" to Append.RESET,
     "isAddedSet" to Append.RESET,
-    // MISFILED ON PURPOSE: `warmup` is reset, and #188's whole defect was it
-    // being inherited. CARRIED here so the carry sweep reds on a field no
-    // statement of the lifter's reaches.
-    "warmup" to Append.CARRIED,
+    "warmup" to Append.RESET,
 )
 
 private val press = ExerciseDef("overhead_press", "Overhead Press")
