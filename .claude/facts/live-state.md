@@ -290,6 +290,30 @@ mutation killed, and that mapping is the whole content of a mutation table.
 - **So no test in this repo can verify Android, BLE or Room behaviour.** A comment may state what
   the code *calls*; it may not state what the GATT stack delivered, what thread a callback landed
   on, what Room migrated, or what the lifter saw.
+- **Room's version, its migrations and its committed schemas — the canonical copy, measured here
+  rather than relayed.** At `c44f1c531d6343d0071f82c062344e7f4eff950f`, by `git show
+  c44f1c5:core/data/src/main/kotlin/com/macrophage/barspeed/data/AppDatabase.kt`:
+  `const val DATABASE_VERSION = 13` at `AppDatabase.kt:53`, `exportSchema = true` at
+  `AppDatabase.kt:67`, and **twelve** hand-written migrations — `MIGRATION_1_2` through
+  `MIGRATION_12_13`, all declared in that one file and all twelve passed to `.addMigrations(…)`.
+  `git ls-tree -r --name-only c44f1c5 -- core/data/schemas` lists **four** tracked schemas under
+  `core/data/schemas/com.macrophage.barspeed.data.AppDatabase/`: `10.json` (landed at `7db7046`),
+  `11.json` (`47781c1`), `12.json` (`5ba69dd`) and `13.json` (`d190aea`), each added by
+  `git log --diff-filter=A` on that path. They are written by
+  `room { schemaDirectory("$projectDir/schemas") }`, `core/data/build.gradle.kts:58`.
+  **Schemas 1–9 do not exist**, so a migration test could validate 10→11, 11→12 and 12→13 and has
+  nothing to migrate from below 10. **There are still zero migration tests of any kind** — no
+  `room-testing` dependency, no `MigrationTestHelper`, no `androidTest` directory anywhere.
+  `DatabaseRescueTest` is the near neighbour and is NOT one: it drives `DatabaseRescue` against
+  real files in a temp directory, and its own KDoc says *"Nothing here executes Room's open path
+  -- no room-testing dependency, no MigrationTestHelper, no instrumented test."*
+  **Six agent definitions carry a stale copy of this paragraph** — `version = 10`, nine
+  migrations, no schema above `10.json`, and in `barspeed-implementer.md` an `exportSchema` line
+  number of `AppDatabase.kt:49` that is `:67`: `barspeed-implementer.md`,
+  `barspeed-implementer-sonnet.md`, `barspeed-orchestrator.md`, `barspeed-reviewer.md`,
+  `barspeed-reviewer-sonnet.md` and `barspeed-reviewer-fable.md`. This entry is the copy to
+  trust. Those six are the drift class §15 names and #162 was filed for, and they are not edited
+  from inside a code round.
 - **A task reported `UP-TO-DATE` or `FROM-CACHE` has not run.** `./gradlew -PjvmOnly test` can
   report `BUILD SUCCESSFUL` in seconds having executed no test at all. Use `--rerun-tasks`
   whenever a number matters, and read the task list rather than the last line.
@@ -448,10 +472,11 @@ written; the numerator still holds, the denominator has moved.)
 **Never `git add` a directory, `-A` or `.`** — name every file path explicitly. Issue #97 records
 six sweeps of `core/data/schemas`, then untracked, one of which reached a remote branch at 1,212
 insertions on an eight-line change (`.claude/skills/land/SKILL.md:33-36`).
-`core/data/schemas/com.macrophage.barspeed.data.AppDatabase/10.json` is **tracked now**
-(confirmed by `git ls-tree -r --name-only HEAD -- core/data/schemas`); only a `DATABASE_VERSION`
-bump writes an untracked sibling `<N>.json`, and that new file must ship in the same commit as
-the migration, never swept in separately.
+`core/data/schemas/com.macrophage.barspeed.data.AppDatabase/` is **tracked now** and holds
+**four** schemas, `10.json` through `13.json` — §5 measures them and names the commit each landed
+in, and is the canonical copy. Only a `DATABASE_VERSION` bump writes an untracked sibling
+`<N>.json`, and that new file must ship in the same commit as the migration, never swept in
+separately.
 
 ## 9. Red-before-green, and where it is not available
 
@@ -553,7 +578,7 @@ wrong is handled by rewriting forward and naming it.
 *original* is the operative word, and the README does not say the code has diverged. The evidence
 is the absences themselves. **Specced and absent:** Hilt DI (one grep hit repo-wide, in PROMPT.md
 itself), instrumented tests (no `androidTest` source set anywhere), committed Room schemas for
-versions 1–9, CSV replay mode, TalkBack semantics, haptics, the entire Claude API phase.
+versions 1–9 (10–13 are committed; §5), CSV replay mode, TalkBack semantics, haptics, the entire Claude API phase.
 **Present and unspecced:** cable geometry, RPE, warm-up/failed flags, HRV, drive power, voice cues,
 plate math.
 
