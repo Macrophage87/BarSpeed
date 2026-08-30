@@ -353,6 +353,41 @@ class DevicePairingPolicyTest {
         )
     }
 
+    /**
+     * DIFFERENTIAL: promoting the unit the SECOND link is already holding has
+     * to take that link down, or two GATT clients end up on one WT901.
+     *
+     * `preferenceControl(ANALYSED, SECOND)` returns `Offer`, so the second
+     * unit's row draws "Use this one for analysis" and this is one tap from
+     * the Devices screen. Today's rule drops the analysed client alone and
+     * leaves `secondaryImuAddress` naming the address the analysed link is
+     * being pointed at, so `maintain` brings both links up on the same remote.
+     *
+     * What that costs is not cosmetic. `WitmotionStreamDecoder` holds one
+     * `ArrayDeque` per client and the WT901's 20-byte frames carry no
+     * checksum, so the app has no way to notice; and if both links stream, the
+     * dual set's two raw archives are two recordings of ONE unit filed under
+     * two labels. A wrong pixel is recoverable and a wrongly attributed
+     * capture is not.
+     *
+     * `RecordViewModel.mirrorSensorSettings` re-derives the second address
+     * from `SensorCapturePolicy.roster` and would heal this -- but only while
+     * the Record back-stack entry is alive, and the tap happens on the Devices
+     * screen, where it is not. There is no heal on the screen that owns the
+     * control.
+     */
+    @Test
+    fun `preferring the unit the second link is holding takes the second link down`() {
+        assertEquals(
+            setOf(DeviceLinkRole.ANALYSED, DeviceLinkRole.SECOND),
+            DevicePairingPolicy.linksToDropOnPrefer(
+                ownedLink = DeviceLinkRole.ANALYSED,
+                newlyPreferred = second,
+                secondImu = second,
+            ),
+        )
+    }
+
     // ---- which row offers to move a preference -------------------------------
 
     /**
