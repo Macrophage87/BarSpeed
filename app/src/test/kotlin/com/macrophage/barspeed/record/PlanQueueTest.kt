@@ -162,6 +162,35 @@ class PlanQueueTest {
     }
 
     /**
+     * CHARACTERIZATION, and the defect #188 is about, stated as arithmetic.
+     *
+     * The caller passes `RecordState.upcomingIndex`, which during rest is the
+     * set the next START will run rather than the one just finished. So on the
+     * rest screen after the LAST squat set the argument is 3 -- the row's first
+     * slot -- and this rule, correctly for the argument it was given, walks the
+     * ROW block and answers 5. An added set the lifter asked for because the
+     * squat load was wrong is queued after the row block, as a row set.
+     *
+     * Nothing about [addedSetIndex] is wrong here and this pin holds after the
+     * fix too: what changes is which index the call site hands it.
+     */
+    @Test
+    fun `the upcoming index at a block boundary walks the NEXT block`() {
+        assertEquals(5, addedSetIndex(twoBlocks(), upcomingIndex = 3))
+    }
+
+    /**
+     * CHARACTERIZATION. One past the end -- the rest screen after the session's
+     * final set -- answers "at the end", and no caller reaches it: `appendedQueue`
+     * returns before this on a null `upcomingSlot`, so nothing is offered at the
+     * one moment "that last one was too light" is likeliest (#188 item 3).
+     */
+    @Test
+    fun `one past the end is a valid answer nothing asks for`() {
+        assertEquals(5, addedSetIndex(twoBlocks(), upcomingIndex = 5))
+    }
+
+    /**
      * RED before the fix. A session running one movement in two consecutive
      * blocks appends to the block the lifter is IN, not to the far end of both.
      *
