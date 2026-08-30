@@ -114,6 +114,9 @@ interface SessionDao {
     // under a note about a photo shoot. A new @Query changes no table, so
     // DATABASE_VERSION does not move for this one; the columns it writes
     // arrived at v13.
+    @Query("UPDATE set_records SET limiter = :limiter, limiterNote = :limiterNote WHERE id = :setId")
+    suspend fun updateLimiter(setId: Long, limiter: String?, limiterNote: String?)
+
     // The LIFTER'S own statement about whether the set was preparatory (#194).
     // Its own statement rather than a fourth argument of [updateRpe], which
     // writes the PLAN'S declaration in the `warmup` column beside it: one
@@ -123,9 +126,6 @@ interface SessionDao {
     // DATABASE_VERSION does not move for it; the column arrived at v13.
     @Query("UPDATE set_records SET warmupMark = :warmupMark WHERE id = :setId")
     suspend fun updateWarmupMark(setId: Long, warmupMark: Boolean?)
-
-    @Query("UPDATE set_records SET limiter = :limiter, limiterNote = :limiterNote WHERE id = :setId")
-    suspend fun updateLimiter(setId: Long, limiter: String?, limiterNote: String?)
 
     @Query("UPDATE set_records SET actualReps = :reps, repsManual = 1 WHERE id = :setId")
     suspend fun overrideReps(setId: Long, reps: Int)

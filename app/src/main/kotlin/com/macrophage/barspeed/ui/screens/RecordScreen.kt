@@ -92,6 +92,7 @@ import com.macrophage.barspeed.model.SetEndControl
 import com.macrophage.barspeed.model.SetEndControlPolicy
 import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLimiterGroup
+import com.macrophage.barspeed.model.SetLimiterPagePlacement
 import com.macrophage.barspeed.model.SetLimiterPolicy
 import com.macrophage.barspeed.model.SetLimiterScale
 import com.macrophage.barspeed.model.SetLimiterTile
@@ -2237,15 +2238,58 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  */
 @Composable
 private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
+    // Both keyed on setsCompleted, as `changingEffort` is: an open page must
+    // close when the next set ends rather than carrying a stale set's answer
+    // into the following rest.
+    //
+    // Hoisted to the STAGE rather than kept beside the row it used to sit in,
+    // because the page has two places it can be drawn -- see
+    // [SetLimiterPagePlacement] -- and a copy of `dismissed` in each would be
+    // two answers to one question.
+    //
+    // `dismissed` is not in RecordState, and the distinction is the one #189
+    // turns on: it is not a fact about the set, it is whether this screen has
+    // already offered the page. A skip stores nothing -- absence is already
+    // what the row carries -- so there is nothing for the record to remember,
+    // and the row stays reachable either way because
+    // [SetLimiterPolicy.offersCorrection] never reads it.
+    var dismissed by remember(state.setsCompleted) { mutableStateOf(false) }
+    var changing by remember(state.setsCompleted) { mutableStateOf(false) }
+    val timed = state.lastFeedback?.actualDurationS != null
+    val placement =
+        if (state.lastFeedback != null &&
+            SetLimiterPolicy.offersCorrection(state.lastSetFailed, state.lastSetLimiter)
+        ) {
+            SetLimiterPolicy.placement(
+                failed = state.lastSetFailed,
+                limiter = state.lastSetLimiter,
+                dismissed = dismissed,
+                changing = changing,
+            )
+        } else {
+            SetLimiterPagePlacement.NONE
+        }
     RestHeader(state, viewModel)
     Spacer(Modifier.height(6.dp))
+    if (placement == SetLimiterPagePlacement.PROMPT) {
+        LimiterPage(timed = timed, viewModel = viewModel, onSkip = { dismissed = true }) { changing = false }
+        Spacer(Modifier.height(10.dp))
+    }
     // Sets two onwards start from here, not from READY, and this is the screen
     // where the lifter has a rest period to spend fixing it.
     PermissionBanner(demoMode = state.demoMode)
     NextSetBlock(state, viewModel)
     SessionCloseControls(state, viewModel)
     Spacer(Modifier.height(16.dp))
-    LastSetDetail(state, viewModel)
+    LastSetDetail(
+        state = state,
+        viewModel = viewModel,
+        placement = placement,
+        timed = timed,
+        onChangeLimiter = { changing = !changing },
+        onSkipLimiter = { dismissed = true },
+        onLimiterDone = { changing = false },
+    )
 }
 
 /** What happens next: the prescription, the deviations, and the way into it. */
@@ -2314,7 +2358,15 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
  * rather than carrying a stale set's selection into the following rest.
  */
 @Composable
-private fun LastSetDetail(state: RecordState, viewModel: RecordViewModel) {
+private fun LastSetDetail(
+    state: RecordState,
+    viewModel: RecordViewModel,
+    placement: SetLimiterPagePlacement,
+    timed: Boolean,
+    onChangeLimiter: () -> Unit,
+    onSkipLimiter: () -> Unit,
+    onLimiterDone: () -> Unit,
+) {
     // The effort tile is tapped mid-workout to end the set, so give a mistap
     // somewhere to go rather than baking it into the record.
     var changingEffort by remember(state.setsCompleted) { mutableStateOf(false) }
@@ -2322,7 +2374,15 @@ private fun LastSetDetail(state: RecordState, viewModel: RecordViewModel) {
     if (changingEffort) {
         RpeSelector(state, viewModel) { changingEffort = false }
     }
-    LimiterSection(state, viewModel)
+    LimiterCorrection(
+        state = state,
+        viewModel = viewModel,
+        placement = placement,
+        timed = timed,
+        onChange = onChangeLimiter,
+        onSkip = onSkipLimiter,
+        onDone = onLimiterDone,
+    )
     WarmupMarkRow(state, viewModel)
     state.lastFeedback?.let { RepCorrectionRow(it, viewModel) }
     state.lastFeedback?.let { HoldCorrectionRow(it, viewModel) }
@@ -2697,31 +2757,20 @@ private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
  * seconds later.
  */
 @Composable
-private fun LimiterSection(state: RecordState, viewModel: RecordViewModel) {
-    val feedback = state.lastFeedback ?: return
+private fun LimiterCorrection(
+    state: RecordState,
+    viewModel: RecordViewModel,
+    placement: SetLimiterPagePlacement,
+    timed: Boolean,
+    onChange: () -> Unit,
+    onSkip: () -> Unit,
+    onDone: () -> Unit,
+) {
+    if (state.lastFeedback == null) return
     if (!SetLimiterPolicy.offersCorrection(state.lastSetFailed, state.lastSetLimiter)) return
-    // Both keyed on setsCompleted, as `changingEffort` is: an open page must
-    // close when the next set ends rather than carrying a stale set's answer
-    // into the following rest.
-    //
-    // `dismissed` lives HERE and not in RecordState, and the distinction is
-    // the one #189 turns on: it is not a fact about the set, it is whether
-    // this screen has already offered the page. A skip stores nothing --
-    // absence is already what the row carries -- so there is nothing for the
-    // record to remember, and the row stays reachable either way because
-    // [SetLimiterPolicy.offersCorrection] never reads it.
-    var dismissed by remember(state.setsCompleted) { mutableStateOf(false) }
-    var changing by remember(state.setsCompleted) { mutableStateOf(false) }
-    val prompting =
-        SetLimiterPolicy.prompts(
-            failed = state.lastSetFailed,
-            limiter = state.lastSetLimiter,
-            dismissed = dismissed,
-        )
-    val timed = feedback.actualDurationS != null
-    LimiterLine(state, timed) { changing = !changing }
-    if (prompting || changing) {
-        LimiterPage(timed = timed, viewModel = viewModel, onSkip = { dismissed = true }) { changing = false }
+    LimiterLine(state, timed, onChange)
+    if (placement == SetLimiterPagePlacement.CORRECTION) {
+        LimiterPage(timed = timed, viewModel = viewModel, onSkip = onSkip, onDone = onDone)
     }
 }
 
@@ -2862,7 +2911,7 @@ private fun LimiterPage(timed: Boolean, viewModel: RecordViewModel, onSkip: () -
 private fun LimiterWords(words: String, onWords: (String) -> Unit, onSave: () -> Unit, onBack: () -> Unit) {
     OutlinedTextField(
         value = words,
-        onValueChange = { onWords(SetLimiter.normalizeNote(it) ?: "") },
+        onValueChange = { onWords(SetLimiter.sanitizeForTyping(it)) },
         label = { Text("In your words") },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),

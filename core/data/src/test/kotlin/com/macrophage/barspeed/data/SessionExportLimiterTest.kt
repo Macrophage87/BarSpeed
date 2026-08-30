@@ -21,11 +21,16 @@ import kotlin.test.assertTrue
 /**
  * Differentials for publishing why a set ended (#189).
  *
- * NONE OF THESE PASSES WHEN IT IS WRITTEN, and that is the point of the commit
- * carrying them. The columns exist and a row carries them from the commit
- * before this one; nothing reads them. So the reason a lifter gave would be
+ * FOUR OF THESE SIX FAILED WHEN THEY WERE WRITTEN, at b5fdb50 (CI run
+ * 33313909287, conclusion failure), and that was the point of the commit
+ * carrying them: the columns existed and a row carried them from the commit
+ * before it, and nothing read them. So the reason a lifter gave would be
  * recorded and published nowhere, which is the whole of the defect -- the
  * export is the document a coach reads and the row is not.
+ *
+ * The two absence assertions passed there, because nothing wrote the keys at
+ * all. They are kept to fail LATER, if a fix ever gives a skipped question a
+ * default answer.
  *
  * BOTH WRITERS ARE COVERED HERE, DELIBERATELY. The session document is
  * serialised by kotlinx; the raw archive's `meta.json` is assembled as TEXT by

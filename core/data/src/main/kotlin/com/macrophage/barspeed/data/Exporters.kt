@@ -452,12 +452,6 @@ class SessionExporter(
 }
 
 /**
- * Builds the raw-data zip: per-set CSVs (device-frame IMU + HRM), the FULL
- * detailed session analysis (session.json — everything the JSON export has,
- * including per-rep velocity/power, tempo compliance, RPE, sides, durations,
- * and HRV), and a meta.json manifest describing every file (spec 4.3).
- */
-/**
  * The free-text note as it may be PUBLISHED: only where an answer stands
  * beside it (#189).
  *
@@ -480,6 +474,12 @@ class SessionExporter(
 private val SetRecordEntity.publishedLimiterNote: String?
     get() = limiterNote?.takeIf { limiter != null }
 
+/**
+ * Builds the raw-data zip: per-set CSVs (device-frame IMU + HRM), the FULL
+ * detailed session analysis (session.json — everything the JSON export has,
+ * including per-rep velocity/power, tempo compliance, RPE, sides, durations,
+ * and HRV), and a meta.json manifest describing every file (spec 4.3).
+ */
 class RawExporter(
     private val sessionRepository: SessionRepository,
     private val sessionExporter: SessionExporter,

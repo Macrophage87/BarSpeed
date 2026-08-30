@@ -134,6 +134,29 @@ enum class SetLimiter {
             val capped = collapsed.take(NOTE_MAX_CHARS).trim()
             return capped.ifEmpty { null }
         }
+
+        /**
+         * The note as the FIELD may hold it while the lifter is still typing.
+         *
+         * A separate transform from [normalizeNote] because the two run at
+         * different moments, and only one of them is looking at a finished
+         * note. A value-driven text field re-applies its transform to the
+         * WHOLE accumulated value on every keystroke, so a rule that is not
+         * safe on a PREFIX of the intended note deletes the lifter's
+         * keystrokes as they make them.
+         *
+         * What it does is what [normalizeNote] does MINUS the ends: the double
+         * quote, the backslash and every control character go, other
+         * whitespace becomes a space, a run of spaces collapses to one, and
+         * the cap is applied. The trim is left to the write, because a
+         * trailing space is not junk at the end of a finished note -- it is a
+         * word boundary the lifter is in the middle of typing.
+         *
+         * Returns a `String` and never null, because a field's value is a
+         * string. Absence is [normalizeNote]'s answer to give, once, at the
+         * write.
+         */
+        fun sanitizeForTyping(raw: String): String = normalizeNote(raw) ?: ""
     }
 }
 
@@ -255,11 +278,38 @@ object SetLimiterScale {
 }
 
 /**
- * When the reason page is offered, and what the rest screen says once it has
- * been answered or skipped.
+ * WHERE the reason page is drawn, which is not the same question as whether it
+ * is drawn at all.
+ *
+ * The rest screen has two places it can appear and they answer to different
+ * events. [PROMPT] is the page the app opened by itself, and it belongs at the
+ * top of the rest screen, because the screen scrolls to 0 on entering RESTING
+ * and a question below the fold is a question the lifter starts the next set
+ * without seeing. [CORRECTION] is the page the lifter opened by tapping the
+ * reason row, and it belongs immediately under that row -- adjacent to the
+ * finger that asked for it.
+ *
+ * An enum rather than two booleans, so that "both at once" is not a state the
+ * caller can construct. Two copies of the page on one screen is the failure
+ * this shape removes rather than guards against.
+ */
+enum class SetLimiterPagePlacement {
+    /** Not drawn. */
+    NONE,
+
+    /** Drawn high, where a lifter entering the rest period is already looking. */
+    PROMPT,
+
+    /** Drawn under the reason row, where the lifter tapped to open it. */
+    CORRECTION,
+}
+
+/**
+ * When the reason page is offered, where it is drawn, and what the rest screen
+ * says once it has been answered or skipped.
  *
  * In `:core:model` for the reason [EffortCorrectionPolicy] is: the rest screen
- * is a 3,200-line Compose file with no reachable test seam, so a rule written
+ * is a Compose file with no reachable test seam, so a rule written
  * beside its caller is a rule nothing enforces.
  */
 object SetLimiterPolicy {
@@ -317,6 +367,42 @@ object SetLimiterPolicy {
             SetLimiterScale.label(limiter, timed)
         }
     }
+
+    /**
+     * Where the reason page is drawn for the set just stored, if anywhere.
+     *
+     * [changing] is the lifter's own tap on the reason row and it WINS over an
+     * automatic offer, for two reasons that point the same way: the page they
+     * asked for must appear where they asked for it, and a page drawn in both
+     * places at once is two pages.
+     *
+     * Lifted out of the rest screen rather than written as an `if` beside the
+     * two call sites, which is the whole point: the placement is the defect
+     * this function exists because of, and `:app` has no composable test, so a
+     * placement rule written there is a rule nothing can fail.
+     */
+    fun placement(
+        failed: Boolean,
+        limiter: SetLimiter?,
+        dismissed: Boolean,
+        changing: Boolean,
+    ): SetLimiterPagePlacement = if (changing || prompts(failed, limiter, dismissed)) {
+        SetLimiterPagePlacement.CORRECTION
+    } else {
+        SetLimiterPagePlacement.NONE
+    }
+
+    /**
+     * Whether leaving the page is a SKIP -- true only where no answer stands.
+     *
+     * Skipping an answered set records nothing and clears nothing, so a foot
+     * captioned "records no reason" over a stored answer describes an action
+     * the app does not perform: the answer stays in the row and stays in the
+     * export. Where an answer stands the way out is a CLEAR, which is the
+     * caller `SessionRepository.setLimiter`'s null case has always been
+     * documented as having.
+     */
+    fun leavesPageAsSkip(limiter: SetLimiter?): Boolean = limiter == null
 
     /** The line's wording for a set carrying no reason at all. */
     const val NOT_GIVEN = "Not given"

@@ -30,7 +30,7 @@ import java.io.File
  * the migration chain and never enters the rescue at all, so an ordinary
  * upgrade sees none of it.
  *
- * The version has moved before -- twelve times, shipped in v0.1.5, v0.1.10,
+ * The version has moved before -- eleven times, shipped in v0.1.5, v0.1.10,
  * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, once in v0.1.42 and
  * twice in v0.1.44 -- the tagged ones read off the tags rather than
  * remembered. What was new at 11 was that a committed baseline existed for the

@@ -13,11 +13,12 @@ import kotlin.test.assertTrue
 /**
  * What the published session-export schema says about why a set ended (#189).
  *
- * NONE OF THESE PASSES WHEN IT IS WRITTEN. The published document declares no
- * such key yet, and `$defs.set` sets `additionalProperties: false` -- so the
- * moment the exporter writes one, every export carrying it is INVALID against
- * the contract its own reader was pointed at. That is why the schema half is
- * red-gated beside the exporter half rather than treated as documentation.
+ * THESE FAILED WHEN THEY WERE WRITTEN, at b5fdb50 (CI run 33313909287,
+ * conclusion failure): the published document declared no such key, and
+ * `$defs.set` sets `additionalProperties: false` -- so the moment the exporter
+ * wrote one, every export carrying it was INVALID against the contract its own
+ * reader was pointed at. That is why the schema half was red-gated beside the
+ * exporter half rather than treated as documentation.
  *
  * A file of its own rather than more assertions in [SchemaContractTest], for
  * [SchemaAddedSetContractTest]'s reason: that class is at detekt's `LargeClass`

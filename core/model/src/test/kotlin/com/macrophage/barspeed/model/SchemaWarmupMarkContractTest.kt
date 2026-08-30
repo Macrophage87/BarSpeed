@@ -13,12 +13,13 @@ import kotlin.test.assertTrue
  * What the published session-export schema says about a warm-up the LIFTER
  * marked (#194).
  *
- * NONE OF THESE PASSES WHEN IT IS WRITTEN. The published `warmup` description
- * currently opens "True when the PLAN declared this set PREPARATORY", which
- * #187 made true and #194 makes false: the plan stops being the only producer.
- * A description left standing would tell a reader the flag means something it
- * no longer means, which is the defect class this repository names as a claim
- * false at the SHA asserting it.
+ * NONE OF THESE PASSED WHEN THEY WERE WRITTEN, at 1264085 (CI run
+ * 33315140693, conclusion failure). The published `warmup` description opened
+ * "True when the PLAN declared this set PREPARATORY", which #187 made true and
+ * #194 makes false: the plan stops being the only producer. A description left
+ * standing would tell a reader the flag means something it no longer means,
+ * which is the defect class this repository names as a claim false at the SHA
+ * asserting it.
  *
  * A file of its own for [SchemaAddedSetContractTest]'s reason: [SchemaContractTest]
  * is at detekt's `LargeClass` threshold.

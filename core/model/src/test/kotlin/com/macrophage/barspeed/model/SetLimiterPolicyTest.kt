@@ -94,4 +94,75 @@ class SetLimiterPolicyTest {
         assertEquals("Other", SetLimiterPolicy.lineText(SetLimiter.OTHER, "   ", timed = false))
         assertEquals("Other", SetLimiterPolicy.lineText(SetLimiter.OTHER, null, timed = false))
     }
+
+    /** Nothing to ask and nothing tapped: the page is not drawn at all. */
+    @Test
+    fun `a set with nothing to ask draws the page nowhere`() {
+        assertEquals(
+            SetLimiterPagePlacement.NONE,
+            SetLimiterPolicy.placement(failed = false, limiter = null, dismissed = false, changing = false),
+        )
+    }
+
+    /** A skip leaves the page closed; the row is what stays reachable. */
+    @Test
+    fun `a dismissed page is drawn nowhere`() {
+        assertEquals(
+            SetLimiterPagePlacement.NONE,
+            SetLimiterPolicy.placement(failed = true, limiter = null, dismissed = true, changing = false),
+        )
+    }
+
+    /**
+     * A page the lifter opened is drawn where they opened it.
+     *
+     * The reason row is at the foot of the rest screen beside the effort line,
+     * and a page that answered a tap somewhere else is a page the tapping
+     * finger cannot see.
+     */
+    @Test
+    fun `the lifter's own tap draws the page under the row they tapped`() {
+        assertEquals(
+            SetLimiterPagePlacement.CORRECTION,
+            SetLimiterPolicy.placement(
+                failed = true,
+                limiter = SetLimiter.GRIP,
+                dismissed = true,
+                changing = true,
+            ),
+        )
+    }
+
+    /**
+     * The lifter's tap WINS over an automatic offer, and that is what stops
+     * the page being drawn twice on one screen.
+     */
+    @Test
+    fun `a tap on an unanswered set still draws the page under the row`() {
+        assertEquals(
+            SetLimiterPagePlacement.CORRECTION,
+            SetLimiterPolicy.placement(failed = true, limiter = null, dismissed = false, changing = true),
+        )
+    }
+
+    /** No answer stands, so the way out of the page is a skip. */
+    @Test
+    fun `a page with no answer behind it leaves as a skip`() {
+        assertTrue(SetLimiterPolicy.leavesPageAsSkip(null))
+    }
+
+    /**
+     * An answer stands, so the way out is not a skip.
+     *
+     * Skipping an answered set records nothing and clears nothing: the answer
+     * stays in the row and stays in the export. A foot captioned "records no
+     * reason" over a stored answer describes an action the app does not
+     * perform, and a lifter who tapped it to retract a mark has had the mark
+     * survive them.
+     */
+    @Test
+    fun `a page with an answer behind it does not leave as a skip`() {
+        assertFalse(SetLimiterPolicy.leavesPageAsSkip(SetLimiter.GRIP))
+        assertFalse(SetLimiterPolicy.leavesPageAsSkip(SetLimiter.OTHER))
+    }
 }

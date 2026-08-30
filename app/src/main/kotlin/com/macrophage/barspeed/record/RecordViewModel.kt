@@ -485,6 +485,13 @@ private suspend fun openSession(repository: SessionRepository, p: PendingSetWrit
  * clamp is applied here as well as in the store, so a tap at either end of the
  * range moves nothing rather than storing a value the store then corrects.
  */
+private fun applyPrepAdjustment(s: RecordState, deltaS: Int, appScope: CoroutineScope, settings: SettingsStore) {
+    val slot = s.upcomingSlot
+    val exerciseId = s.prepExerciseId(slot)
+    val seconds = LeadInPolicy.clamp(s.prepSecondsFor(slot) + deltaS)
+    appScope.launch { settings.setPrepS(exerciseId, seconds) }
+}
+
 /**
  * One tap of the rest screen's warm-up mark (#194). Free function for
  * [applyPrepAdjustment]'s reason.
@@ -542,13 +549,6 @@ private fun applyLimiter(
                 lastSetLimiterNote = normalized,
             )
     }
-}
-
-private fun applyPrepAdjustment(s: RecordState, deltaS: Int, appScope: CoroutineScope, settings: SettingsStore) {
-    val slot = s.upcomingSlot
-    val exerciseId = s.prepExerciseId(slot)
-    val seconds = LeadInPolicy.clamp(s.prepSecondsFor(slot) + deltaS)
-    appScope.launch { settings.setPrepS(exerciseId, seconds) }
 }
 
 /**
@@ -1832,8 +1832,9 @@ data class RecordState(
      * was asked about carries, and the two are deliberately not distinguished
      * on this screen: both mean there is no answer, and the row says so in
      * words either way. What IS distinguished is whether the page has already
-     * been offered for this set, which is [lastSetLimiterAsked] -- otherwise a
-     * skip would be undone by the next recomposition.
+     * been offered for this set, which is composable state in RecordScreen's
+     * RestingStage and is deliberately not a field here: a skip stores
+     * nothing, so the record has nothing to remember.
      */
     val lastSetLimiter: SetLimiter? = null,
     /** The lifter's own words, where [lastSetLimiter] is [SetLimiter.OTHER]. */

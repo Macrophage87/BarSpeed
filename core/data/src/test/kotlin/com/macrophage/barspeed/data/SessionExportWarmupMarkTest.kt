@@ -20,13 +20,14 @@ import kotlin.test.assertTrue
 /**
  * Differentials for the lifter's own warm-up mark reaching the export (#194).
  *
- * SEVEN OF THE EIGHT FAIL WHEN WRITTEN. The `warmupMark` column exists and a
- * row carries it from d190aea; both export writers still read `warmup` alone,
+ * SEVEN OF THE EIGHT FAILED WHEN THEY WERE WRITTEN, at 1264085 (CI run
+ * 33315140693, conclusion failure). The `warmupMark` column existed and a row
+ * carried it from d190aea; both export writers still read `warmup` alone,
  * which since #187 is the PLAN's declaration and nothing else. So a warm-up
- * added at the rack -- the #177 append, the case this issue exists for -- can
- * be marked and still exports as a working set.
+ * added at the rack -- the #177 append, the case this issue exists for --
+ * could be marked and still exported as a working set.
  *
- * The eighth passes here and is kept for what it will catch LATER: a
+ * The eighth passed there and is kept for what it will catch LATER: a
  * plan-declared warm-up nobody marked must go on publishing exactly what it
  * published before. That is the case #187 spent a change getting right, it is
  * every set on a declared plan, and a fix that composed the two facts the
@@ -157,9 +158,10 @@ class SessionExportWarmupMarkTest {
      * The case the issue exists for: a set no plan declared, that the lifter
      * marked at the rack.
      *
-     * Since #187 the plan is the only producer of `warmup`, so this set
-     * currently exports indistinguishable from a working set -- which corrupts
-     * volume and progression, the two readings the flag was kept for.
+     * Since #187 the plan is the only producer of `warmup`, so at 1264085 (CI
+     * run 33315140693, conclusion failure) this set exported indistinguishable
+     * from a working set -- which corrupts volume and progression, the two
+     * readings the flag was kept for.
      */
     @Test
     fun `a set the lifter marked publishes warmup though the plan declared nothing`() = runTest {

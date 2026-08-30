@@ -214,4 +214,43 @@ class SetLimiterTest {
             assertEquals(once, SetLimiter.normalizeNote(once))
         }
     }
+
+    /**
+     * The characters the manifest cannot carry are refused AS THEY ARE TYPED.
+     *
+     * This is the half of the field's job that must not move: a double quote
+     * or a backslash reaching the raw archive's manifest does not corrupt the
+     * note, it makes the whole manifest unparseable for every set in the
+     * session. Dropping them in front of the lifter is what makes "published
+     * verbatim" true of what they watched themselves type.
+     */
+    @Test
+    fun `the field drops a double quote and a backslash as they are typed`() {
+        assertEquals("it went ping", SetLimiter.sanitizeForTyping("it went \"ping\\\""))
+    }
+
+    /** An interior newline is a space in the field, as it is at the write. */
+    @Test
+    fun `a newline typed inside the note reads as a space`() {
+        assertEquals("cramp in calf", SetLimiter.sanitizeForTyping("cramp\nin\tcalf"))
+    }
+
+    /** The cap is the field's, not only the write's. */
+    @Test
+    fun `the field holds no more than the note cap`() {
+        val long = "z".repeat(SetLimiter.NOTE_MAX_CHARS + 40)
+        assertEquals(SetLimiter.NOTE_MAX_CHARS, SetLimiter.sanitizeForTyping(long).length)
+    }
+
+    /**
+     * An empty field is an empty string and never a null.
+     *
+     * Absence is [SetLimiter.normalizeNote]'s answer to give, once, at the
+     * write. A field cannot hold absence; it holds "".
+     */
+    @Test
+    fun `an empty field stays an empty string`() {
+        assertEquals("", SetLimiter.sanitizeForTyping(""))
+        assertEquals("", SetLimiter.sanitizeForTyping("   "))
+    }
 }
