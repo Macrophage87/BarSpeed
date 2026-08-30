@@ -251,7 +251,30 @@ class SetLimiterTest {
     @Test
     fun `an empty field stays an empty string`() {
         assertEquals("", SetLimiter.sanitizeForTyping(""))
-        assertEquals("", SetLimiter.sanitizeForTyping("   "))
+    }
+
+    /**
+     * A SPACE ON ITS OWN IS HELD. Second differential of the same defect.
+     *
+     * This assertion was the second half of `an empty field stays an empty
+     * string` until here, where it is corrected and moved out: that pin was
+     * mine, it was written to characterize the delegating stub, and it pinned
+     * the TRIM -- the one transform that is not safe on a prefix and the one
+     * this round exists to move to the write.
+     *
+     * A lone space is the first keystroke of "rack was taken" reaching a word
+     * boundary, and a field that answers it with "" is a field that cannot be
+     * typed a phrase into. What is still collapsed is the RUN: three spaces
+     * are one, because a lifter cannot have meant three.
+     *
+     * The note stored from a field holding only a space is still nothing --
+     * normalizeNote returns null for blank -- so this widens what the field
+     * may hold and not what the row may carry.
+     */
+    @Test
+    fun `a space typed on its own is held as the word boundary it is`() {
+        assertEquals(" ", SetLimiter.sanitizeForTyping("   "))
+        assertNull(SetLimiter.normalizeNote(SetLimiter.sanitizeForTyping("   ")))
     }
 
     /**
