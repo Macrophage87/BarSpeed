@@ -68,13 +68,16 @@ Use tempo and velocity targets deliberately on primary barbell lifts to enable a
 
 Two things the app does NOT accept, so don't invent them: there is no per-side shorthand (write one set object per side, with "side" — which also makes the real set count visible up front), and there is no way to mark prescribed work as skipped. A session that ends early simply has fewer sets in its export.
 
-When I share BarSpeed session exports, read the effort fields with this key. "rpe" is RIR-based, 6-10; the app shows me narrative tiles and stores these numbers:
-- Dynamic sets: 6 = easy (4+ reps in reserve), 7 = solid (~3 left), 8 = hard (~2 left), 9 = very hard (1 left), 10 = max (nothing left).
-- Timed sets (holds/carries): same 6-10 scale but for time in reserve (6 = plenty of time left ... 10 = held to my limit).
-- Explosive sets: rated on bar speed, not reps in reserve (6 = bar was flying, 8 = speed dropping, 10 = barely made the lift).
+When I share BarSpeed session exports, read the effort fields with this key. "rpe" is one 1-10 scale answering "how much did that set have left in it", and its rungs are anchored DIFFERENTLY along its length, because near failure I can count reps and far from it I cannot — the honest answer down there is how much more weight I could have put on. The app shows me narrative tiles and stores these numbers:
+- Dynamic sets, counted end: 7 = three reps left, 8 = two, 9 = one, 10 = nothing left.
+- Dynamic sets, headroom end: 6 = could have added one equipment increment (10-15 lb / 5 kg), 4 = two increments (20-30 lb / 10 kg), 1 = could have added much more. These are LOAD, not reps: below three reps left a rep count is a guess, so the app stops asking for one.
+- Timed sets (holds/carries): same seven rungs, with the headroom end asked in SECONDS (6 = could have gone 15-30 s longer, 4 = about a minute, 1 = much longer) and the counted end in that movement's words (7 = had more in me ... 10 = hit my limit).
+- Explosive sets: the counted end is bar speed (7 = fast and crisp, 8 = speed dropping, 10 = barely made it); the headroom end is load, as on any other lift.
+- 2, 3 and 5 are valid values that have no tile. The gaps exist so the rungs sort; a value there is real, not corrupt.
+- BEFORE v0.1.45 the grid ran 6-10 only and 6 was its FLOOR, "easy, 4+ reps left" — so an older 6 absorbs everything the new 1 and 4 now separate. 7-10 mean the same in both. Do not read an old 6 as specifically "one increment".
 - "warmup": true = a set the PLAN declared preparatory — a ramp set. It carries a real "rpe" like any other set now, so do not read it as unrated and do not exclude it from EFFORT analysis; excluding it from volume or progression is your call and the flag still supports that. On sessions exported before v0.1.45 a warm-up set has no "rpe" because the app could not record both, not because I declined to rate it.
 - "failed": true = failed set (missed reps, broke a hold early, or missed the lift) — treat as beyond RPE 10.
-- rpe null with neither flag = I skipped rating that set. There are no values below 6; easier-than-6 work is what the warm-up flag means.
+- rpe null with neither flag = I skipped rating that set, or the set ended before the app could ask.
 
 How to read the rest of a session export, so you don't over-trust it:
 - "reps" is authoritative — I counted it, or the voice guide did. The accelerometer is RECORD-ONLY on standard lifts.

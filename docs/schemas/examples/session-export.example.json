@@ -92,7 +92,7 @@
           "load_lb": 99.2,
           "reps": 10,
           "warmup": true,
-          "rpe": 6,
+          "rpe": 1,
           "repsManual": true,
           "plannedReps": 10,
           "rest_s": 90,

@@ -43,10 +43,11 @@ data class SessionExport(
      * How the whole session felt to the lifter, [SessionRpe.MIN] to
      * [SessionRpe.MAX], stated once when they finished it (#159).
      *
-     * NOT THE PER-SET SCALE. [SetExport.rpe] is reps-in-reserve on the app's
-     * 6-to-10 effort grid and is a statement about one set's proximity to
-     * failure; this is the whole workout on 1 to 10, and the two must never be
-     * averaged or compared as one quantity. [SessionRpe] states the difference
+     * NOT THE PER-SET SCALE. [SetExport.rpe] is one set's answer to "how much
+     * was left", anchored as reps in reserve at 7 to 10 and as load or time
+     * headroom below that; this is the whole workout on 1 to 10, and the two
+     * must never be averaged or compared as one quantity. Both now span the
+     * same published range, so only these descriptions tell them apart. [SessionRpe] states the difference
      * once and the published schema states it again in both descriptions,
      * because an archive reader has only the descriptions to tell two 1-to-10
      * integers apart.
@@ -203,6 +204,24 @@ data class SessionExport(
          * before, and on those sessions a `warmup: true` set carrying no `rpe`
          * means the app could not record both rather than that the lifter
          * declined to rate it.
+         *
+         * 1.14 carries a SECOND change, under the same number because 1.14 is
+         * unreleased and the two are one design (#187), and it is NOT additive
+         * either: [SetExport.rpe] is a 1-to-10 scale whose rungs are anchored
+         * DIFFERENTLY ALONG ITS LENGTH. 7 to 10 stay reps in reserve -- three,
+         * two, one, none -- and 6, 4 and 1 are load headroom, "could have
+         * added one increment / two increments / much more", asked in seconds
+         * instead on a hold. No key changes type or stops being written, and
+         * no stored value is rewritten; what changes is what a NEWLY written
+         * value means at the low end and which values the app can write at
+         * all. 6 is the value to read carefully: it was the FLOOR of the old
+         * 6-to-10 grid, meaning "easy, 4+ reps left", so it absorbed
+         * everything the new 1 and 4 now take, and 46% of this lifter's
+         * historical ratings sit on it. It is reused rather than moved to 5
+         * because the standard RPE-to-RIR chart puts 6 at 4 RIR, which is
+         * roughly the state "could have added one increment" describes, so the
+         * old values stay interpretable on the same ruler. 7 through 10 are
+         * unchanged in meaning across the boundary.
          */
         const val SCHEMA_VERSION = "1.14"
 
@@ -298,14 +317,31 @@ data class SetExport(
     /** Unilateral sets: "left" or "right". */
     val side: String? = null,
     /**
-     * PER-SET RPE, reps-in-reserve: how close this ONE set came to failure.
+     * PER-SET RPE, 1 to 10: how much this ONE set had left in it.
      *
-     * The app's effort grid offers 6 through 10 -- 6 is four or more reps
-     * left, 10 is nothing left -- and it is the only thing that writes this.
-     * The published schema's bound is 1 to 10, wider than the grid, and that
-     * width is why the scale is named here: [SessionExport.sessionRpe] is a
-     * different instrument over the same published range, and the two must
-     * never be averaged or compared as one quantity.
+     * ONE QUESTION, ANCHORED IN TWO UNITS, because the resolution a lifter can
+     * actually supply changes with the distance from failure ([EffortScale]).
+     * From 1.14 the app's grid offers exactly these rungs:
+     *
+     *  - 10 nothing left, 9 one rep left, 8 two reps left, 7 three reps left
+     *    -- reps in reserve, on a hold or an explosive lift the same rungs in
+     *    that movement's own words.
+     *  - 6 could have added one equipment increment, 4 could have added two,
+     *    1 could have added much more -- a LOAD figure on a rep set, a TIME
+     *    figure on a hold.
+     *
+     * 2, 3 and 5 are valid values with no tile: the gaps exist so the anchors
+     * SORT, and a reader meeting one from an older session is looking at a
+     * real value on the same ruler, not corrupt data.
+     *
+     * WHAT A PRE-1.14 VALUE MEANT. The old grid offered 6 to 10 only, where 6
+     * was "easy, 4+ reps left" -- the FLOOR of that scale, so it absorbed
+     * everything the new 1 and 4 now take. 7 through 10 are unchanged in
+     * meaning. Nothing rewrites stored data.
+     *
+     * [SessionExport.sessionRpe] is a different instrument over the same
+     * published range, and the two must never be averaged or compared as one
+     * quantity.
      */
     val rpe: Int? = null,
     /**

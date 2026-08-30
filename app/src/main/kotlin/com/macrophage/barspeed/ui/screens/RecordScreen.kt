@@ -66,7 +66,9 @@ import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.DualSensorSetup
+import com.macrophage.barspeed.model.EffortClaim
 import com.macrophage.barspeed.model.EffortCorrectionPolicy
+import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
 import com.macrophage.barspeed.model.ExitPrompt
@@ -2076,7 +2078,7 @@ private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
     // that replaces it after completion say the same word. A hold breaks
     // early; a snatch is missed.
     val label =
-        rpeOptions(timed = state.currentIsTimed, explosive = currentKind(state) == ExerciseKind.EXPLOSIVE)
+        rpeOptions(state.currentIsTimed, currentKind(state) == ExerciseKind.EXPLOSIVE, state.weightUnit)
             .last().description
     Button(
         onClick = { viewModel.endSet(SetRating(null, failed = true)) },
@@ -2130,7 +2132,7 @@ private fun EndSetEarlyButton(viewModel: RecordViewModel) {
 @Composable
 private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failedTile: Boolean) {
     val options =
-        rpeOptions(timed = state.currentIsTimed, explosive = currentKind(state) == ExerciseKind.EXPLOSIVE)
+        rpeOptions(state.currentIsTimed, currentKind(state) == ExerciseKind.EXPLOSIVE, state.weightUnit)
             .filter { failedTile || !it.failed }
     SectionCaption("Tap how that set felt to end it")
     Spacer(Modifier.height(6.dp))
@@ -2427,48 +2429,42 @@ private data class RpeOption(
     val color: Color,
 )
 
-/** Narrative wording per set type — "reps left" means nothing for a plank or a snatch. */
-private fun rpeOptions(timed: Boolean, explosive: Boolean): List<RpeOption> {
-    val effort =
-        when {
-            timed ->
-                listOf(
-                    6 to "Easy — plenty of time left",
-                    7 to "Solid — had more in me",
-                    8 to "Hard — a little left",
-                    9 to "Very hard — seconds left",
-                    10 to "Max — hit my limit",
-                )
-            explosive ->
-                listOf(
-                    6 to "Easy — bar was flying",
-                    7 to "Solid — fast and crisp",
-                    8 to "Hard — speed dropping",
-                    9 to "Very hard — grindy",
-                    10 to "Max — barely made it",
-                )
-            else ->
-                listOf(
-                    6 to "Easy — 4+ reps left",
-                    7 to "Solid — 3 reps left",
-                    8 to "Hard — 2 reps left",
-                    9 to "Very hard — 1 rep left",
-                    10 to "Max — nothing left",
-                )
-        }
-    val failText =
-        when {
-            timed -> "Broke early — failed"
-            explosive -> "Missed the lift"
-            else -> "Failed the set"
-        }
-    // No warm-up tile since #187: it recorded `warmup = true` and `rpe = null`
-    // together, so tapping it threw the effort away. Warm-up is declared on the
-    // plan now and a warm-up set is rated on these same rungs.
-    return effort.map { (rpe, text) -> RpeOption(rpe, false, text, rpeColor(rpe)) } +
-        RpeOption(null, true, failText, BarColors.Red)
-}
+/**
+ * The tiles of the effort grid, with the colour this screen paints them.
+ *
+ * WHAT IS DRAWN IS [EffortScale]'S DECISION, not this file's. Which rungs
+ * exist, what each says and which `rpe` it stores are pinned in `:core:model`
+ * where a test runs on them every push; `:app` has one test file and none of
+ * it reaches a composable. This function is the paint: an [EffortTile] carries
+ * no colour, because a colour is not a fact about effort.
+ *
+ * [unit] reaches the scale because the low rungs name a WEIGHT the lifter
+ * could have added, and that figure is authored per unit rather than
+ * converted -- "+10-15 lb" and "+5 kg", never "+4.5 kg".
+ */
+private fun rpeOptions(timed: Boolean, explosive: Boolean, unit: WeightUnit): List<RpeOption> =
+    EffortScale.tiles(timed = timed, explosive = explosive, unit = unit).map { tile ->
+        RpeOption(
+            rpe = tile.rpe,
+            failed = tile.claim == EffortClaim.FAILED,
+            description = tile.label,
+            color =
+            when (tile.claim) {
+                EffortClaim.FAILED -> BarColors.Red
+                EffortClaim.HEADROOM -> BarColors.Blue
+                EffortClaim.PROXIMITY -> rpeColor(tile.rpe!!)
+            },
+        )
+    }
 
+/**
+ * Colour for a proximity rung only.
+ *
+ * The headroom rungs take [BarColors.Blue] at the call site rather than an
+ * extension of this ramp: they are not a lighter shade of "close to failure",
+ * they are a different question, and the colour says so before the words are
+ * read.
+ */
 private fun rpeColor(rpe: Int): Color = when {
     rpe <= 7 -> BarColors.Volt
     rpe == 8 -> BarColors.VoltDim
@@ -2490,6 +2486,7 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
         rpeOptions(
             timed = feedback?.actualDurationS != null,
             explosive = feedback?.explosive == true,
+            unit = state.weightUnit,
         )
     // lastSetFailed is the OR of both facts, so the derived one is recovered by
     // subtracting the tap. Where BOTH are true this hands the policy false for
@@ -2571,7 +2568,7 @@ private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
     // and had nothing to tap to supply one. RPE is captured once, at set end,
     // and no reprocessing of the stream rebuilds how hard a hold felt.
     val options =
-        rpeOptions(timed = feedback.actualDurationS != null, explosive = feedback.explosive)
+        rpeOptions(feedback.actualDurationS != null, feedback.explosive, state.weightUnit)
     // The warm-up branch this used to open with is gone with the tile (#187).
     // A warm-up set now carries an ordinary rating and reads as one; that it
     // was a ramp is the plan's statement and is shown with the set, not here.

@@ -58,8 +58,9 @@ data class SessionEntity(
      * finish (#159). See [com.macrophage.barspeed.model.SessionRpe], which owns
      * the scale.
      *
-     * NOT [SetRecordEntity.rpe]. That column is reps-in-reserve for one set on
-     * the app's 6-to-10 grid; this is the whole workout on 1 to 10. Two columns
+     * NOT [SetRecordEntity.rpe]. That column is how much ONE set had left in
+     * it, on 1 to 10 anchored as reps in reserve at the top and as load or
+     * time headroom below; this is the whole workout on 1 to 10. Two columns
      * of the same type in the same database, both called RPE, so the difference
      * is written at both of them.
      *

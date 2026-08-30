@@ -9,9 +9,12 @@ package com.macrophage.barspeed.model
  * The app now carries two things called RPE and they answer different
  * questions over different ranges:
  *
- *  - A SET's rpe is reps-in-reserve. The effort grid offers 6 through 10 --
- *    "6 easy, 4+ reps left" to "10 max, nothing left" -- and it is a statement
- *    about one set's proximity to failure.
+ *  - A SET's rpe is how much that ONE set had left in it, on 1 to 10 with
+ *    rungs anchored differently along its length: reps in reserve at 7 to 10,
+ *    load or time headroom at 6, 4 and 1. [EffortScale] owns it. It used to be
+ *    reps-in-reserve throughout on a 6-to-10 grid, and that description is
+ *    retired rather than reworded: the low end never was a rep count anybody
+ *    could supply.
  *  - A SESSION's rating is the whole workout, [MIN] through [MAX], and it is
  *    the lifter's own answer to "how am I feeling at the end of the workout?"
  *    It is not reps-in-reserve; there are no reps left in a session.

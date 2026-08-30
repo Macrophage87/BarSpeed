@@ -952,45 +952,6 @@ class SchemaContractTest {
     }
 
     /**
-     * Both published descriptions name their own scale and deny the other's.
-     *
-     * The owner's ruling, and the whole reason this key needed a design round:
-     * the app now carries two things called RPE over overlapping published
-     * ranges -- a set's is reps-in-reserve on a 6-to-10 grid, a session's is
-     * 1-to-10 overall -- and a reader has nothing but these descriptions to
-     * tell two integers apart. A reader that averages them is the #139/#151
-     * defect class, pre-empted rather than filed later.
-     *
-     * Narrow, and said so: this cannot check either description is RIGHT. It
-     * checks that neither is silent about which instrument it is, and that
-     * each names the other, so a reader meeting one is sent to the other.
-     */
-    @Test
-    fun `both published rpe descriptions name their own scale and point at the other`() {
-        val root = schema("session-export.schema.json")
-        val session = root["properties"]!!.jsonObject["sessionRpe"]!!
-            .jsonObject["description"]!!.jsonPrimitive.content
-        val set = root["\$defs"]!!.jsonObject["set"]!!.jsonObject["properties"]!!.jsonObject["rpe"]!!
-            .jsonObject["description"]!!.jsonPrimitive.content
-
-        assertTrue("1-10" in session, "the session rating never states its own range: $session")
-        assertTrue("reps-in-reserve" in session, "the session rating never denies the set scale: $session")
-        assertTrue("`rpe`" in session, "the session rating never names the key it is confused with: $session")
-        assertTrue("reps-in-reserve" in set, "the per-set rpe never states which instrument it is: $set")
-        assertTrue("6 through 10" in set, "the per-set rpe never states the range the app offers: $set")
-        assertTrue("`sessionRpe`" in set, "the per-set rpe never names the key it is confused with: $set")
-        // Case-insensitive: the session description shouts the sentence and the
-        // set description does not, and which one is in capitals is a matter of
-        // where the reader most needs stopping, not of contract.
-        listOf(session, set).forEach { description ->
-            assertTrue(
-                "never be averaged or compared as one quantity" in description.lowercase(),
-                "a description omits the one instruction that keeps the two scales apart: $description",
-            )
-        }
-    }
-
-    /**
      * Absence is published as unrated, and the description says it is not a low
      * rating.
      *

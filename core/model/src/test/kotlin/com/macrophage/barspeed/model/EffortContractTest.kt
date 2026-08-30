@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.model
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -31,6 +32,12 @@ class EffortContractTest {
     private fun schema(name: String) = Json.parseToJsonElement(
         javaClass.getResourceAsStream("/$name")!!.readBytes().decodeToString(),
     ).jsonObject
+
+    private fun setProperty(name: String) = schema("session-export.schema.json")["\$defs"]!!
+        .jsonObject["set"]!!.jsonObject["properties"]!!.jsonObject[name]!!.jsonObject
+
+    private fun versionLog() = schema("session-export.schema.json")["properties"]!!
+        .jsonObject["schemaVersion"]!!.jsonObject["description"]!!.jsonPrimitive.content
 
     /**
      * The same pin one level DOWN, which did not exist until #187 added a set
@@ -201,5 +208,171 @@ class EffortContractTest {
             },
             "no set in the published example is both a warm-up and rated, so ajv never validates the pair",
         )
+    }
+
+    // ---- the scale itself, issue #187 ---------------------------------------
+
+    /**
+     * The published `rpe` description enumerates every rung the app can write,
+     * in the words the tile says them.
+     *
+     * Exact phrases rather than a looser check, because the ANCHORS are the
+     * contract: a stored 6 is only readable if the document says what tapping
+     * 6 claimed. Brittle to rewording is the correct sensitivity here --
+     * rewording an anchor is exactly the change that must not happen quietly,
+     * and a 2026 crossover trial found that redefining a scale's endpoint
+     * predictably shifts the ratings people give.
+     */
+    @Test
+    fun `the published rpe description names every rung the grid offers`() {
+        val description = setProperty("rpe")["description"]!!.jsonPrimitive.content
+        listOf(
+            "10 nothing left",
+            "9 one rep left",
+            "8 two reps left",
+            "7 three reps left",
+            "6 'could have added one equipment increment'",
+            "4 'two increments'",
+            "1 'much more'",
+        ).forEach { rung ->
+            assertTrue(rung in description, "the published rpe never names the rung \"$rung\": $description")
+        }
+        // And the anchors it names are the anchors the app can actually write.
+        assertEquals(
+            listOf(1, 4, 6, 7, 8, 9, 10),
+            EffortScale.tiles(timed = false, explosive = false, unit = WeightUnit.LB).mapNotNull { it.rpe },
+            "the app writes a set of anchors the published description does not describe",
+        )
+    }
+
+    /**
+     * The gaps are published as gaps, so a 5 from an older session reads as a
+     * value rather than as corruption.
+     */
+    @Test
+    fun `the published rpe description says the unanchored values are still valid`() {
+        val description = setProperty("rpe")["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "2, 3 and 5 are valid values carrying no tile" in description,
+            "the published rpe never says the gaps are real values: $description",
+        )
+        assertEquals(
+            setOf(2, 3, 5),
+            EffortScale.UNANCHORED_RPE,
+            "the code's unanchored set drifted from the three values the document names",
+        )
+    }
+
+    /**
+     * What a pre-v0.1.45 `6` meant is stated, at both the key and the version
+     * log.
+     *
+     * 46% of this lifter's historical ratings sit on 6, and it was the FLOOR
+     * of the old grid -- so it absorbed everything the new 1 and 4 now take.
+     * Reusing the value is a decision with a cost, and an archive reader who
+     * is not told carries the cost silently. Retiring it to 5 was the
+     * alternative and is named in the commit that made the choice.
+     */
+    @Test
+    fun `both documents say what a six meant before the scale changed`() {
+        val description = setProperty("rpe")["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "WHAT A PRE-1.14 VALUE MEANT" in description,
+            "the published rpe never says what an older value meant: $description",
+        )
+        assertTrue(
+            "'easy, 4+ reps left'" in description,
+            "the published rpe never says what the old floor claimed: $description",
+        )
+        val log = versionLog()
+        assertTrue("THE VALUE TO READ CAREFULLY IS 6" in log, "the 1.14 entry never singles out the reused value")
+        assertTrue(
+            "46% of this lifter's historical ratings sit on it" in log,
+            "the 1.14 entry never says how much history the reused value carries",
+        )
+    }
+
+    /**
+     * The version log says the second change is not additive, and why the low
+     * end stopped being a rep count.
+     *
+     * The reason is measured rather than stylistic, and a reader deciding
+     * whether to trust an old 6 against a new 4 needs it: mean error in
+     * calling one's own reps in reserve is 2.05 reps at 1 RIR and 5.15 at 5.
+     */
+    @Test
+    fun `the 1_14 entry flags the scale change as not additive and gives its evidence`() {
+        val log = versionLog()
+        assertTrue("1.14 carries a SECOND change" in log, "the 1.14 entry never mentions the scale change")
+        assertTrue("NOT additive" in log, "the 1.14 entry never flags the scale change as non-additive")
+        assertTrue("5.15 reps at 5 RIR" in log, "the 1.14 entry never gives the measurement the anchors rest on")
+    }
+
+    /**
+     * The published example's warm-up set records the lowest rung, which is
+     * the pair the old contract could not express at all: declared
+     * preparatory AND rated.
+     */
+    @Test
+    fun `the published example rates its warm-up set on the lowest rung`() {
+        val sets = schema("examples/session-export.example.json")["exercises"]!!
+            .jsonArray.flatMap { it.jsonObject["sets"]!!.jsonArray }
+        val warmup =
+            assertNotNull(
+                sets.firstOrNull { it.jsonObject["warmup"]?.jsonPrimitive?.content == "true" },
+                "the published example carries no warm-up set",
+            ).jsonObject
+        assertEquals(
+            HeadroomTier.MUCH_MORE.rpe,
+            warmup["rpe"]!!.jsonPrimitive.int,
+            "the example's ramp set is not rated on the rung a ramp set lands on",
+        )
+    }
+
+    /**
+     * Both published descriptions name their own scale and deny the other's.
+     *
+     * The owner's ruling, and the whole reason this key needed a design round:
+     * the app carries two things called RPE over the same published range --
+     * a set's is how much that set had left in it, a session's is 1-to-10
+     * overall -- and a reader has nothing but these descriptions to tell two
+     * integers apart. A reader that averages them is the #139/#151 defect
+     * class, pre-empted rather than filed later.
+     *
+     * The set-side assertion moved with #187. It used to require the literal
+     * "6 through 10", which was the whole range the grid offered; the grid now
+     * runs 1 to 10 with rungs anchored differently along its length, so that
+     * string is retired rather than reworded and the assertion asks instead
+     * that the description names where the counted band starts. Leaving the
+     * old one would have pinned a range the app no longer offers.
+     *
+     * Narrow, and said so: this cannot check either description is RIGHT. It
+     * checks that neither is silent about which instrument it is, and that
+     * each names the other, so a reader meeting one is sent to the other.
+     */
+    @Test
+    fun `both published rpe descriptions name their own scale and point at the other`() {
+        val root = schema("session-export.schema.json")
+        val session = root["properties"]!!.jsonObject["sessionRpe"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+        val set = root["\$defs"]!!.jsonObject["set"]!!.jsonObject["properties"]!!.jsonObject["rpe"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+
+        assertTrue("1-10" in session, "the session rating never states its own range: $session")
+        assertTrue("reps-in-reserve" in session, "the session rating never denies the set scale: $session")
+        assertTrue("`rpe`" in session, "the session rating never names the key it is confused with: $session")
+        assertTrue("reps-in-reserve" in set, "the per-set rpe never states which instrument it is: $set")
+        assertTrue("1-10 scale" in set, "the per-set rpe never states the range the app offers: $set")
+        assertTrue("three reps left" in set, "the per-set rpe never says where the counted band starts: $set")
+        assertTrue("`sessionRpe`" in set, "the per-set rpe never names the key it is confused with: $set")
+        // Case-insensitive: the session description shouts the sentence and the
+        // set description does not, and which one is in capitals is a matter of
+        // where the reader most needs stopping, not of contract.
+        listOf(session, set).forEach { description ->
+            assertTrue(
+                "never be averaged or compared as one quantity" in description.lowercase(),
+                "a description omits the one instruction that keeps the two scales apart: $description",
+            )
+        }
     }
 }
