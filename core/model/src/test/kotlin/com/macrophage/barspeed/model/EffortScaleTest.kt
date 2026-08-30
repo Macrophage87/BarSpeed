@@ -228,8 +228,12 @@ class EffortScaleTest {
 
     @Test
     fun `the failure tile stores no rpe and says what failing means for that kind`() {
+        // The hold's caption carries an EM DASH, as it did in v0.1.44. It is
+        // pinned as a character and not as a shape because the reword that
+        // reached round 1 changed exactly this one to a hyphen while three
+        // artifacts said the wording had not moved.
         assertEquals(EffortTile(null, EffortClaim.FAILED, "Failed the set"), repTiles().last())
-        assertEquals(EffortTile(null, EffortClaim.FAILED, "Broke early - failed"), timedTiles().last())
+        assertEquals(EffortTile(null, EffortClaim.FAILED, "Broke early — failed"), timedTiles().last())
         assertEquals(EffortTile(null, EffortClaim.FAILED, "Missed the lift"), explosiveTiles().last())
     }
 
@@ -243,16 +247,34 @@ class EffortScaleTest {
 
     @Test
     fun `the timed and explosive proximity wording is the wording that shipped`() {
-        // Characterization. Redefining an anchor predictably shifts the
-        // ratings people give, so these four rungs each are pinned as they
-        // are -- a reword becomes a visible diff on a test rather than a
-        // quiet change to what a stored 9 means.
+        // Characterization, and the strings are read from the release rather
+        // than from memory: these eight are what `rpeOptions` emitted at
+        // v0.1.44 (tag 7cf6e8c3cc546ab8d64c9fb2be86de2129250b43), intensity
+        // prefix and em dash included. #187 asked for the low end of the
+        // ladders and asked nothing about these rungs, and redefining an
+        // anchor predictably shifts the ratings people give -- so a reword
+        // here has to be a visible diff on a test rather than a quiet change
+        // to what a stored 9 means.
+        //
+        // The first version of this test asserted the eight strings WITHOUT
+        // their prefix, under this name. That is the failure mode the name
+        // exists to prevent, arriving through the pin itself.
         assertEquals(
-            listOf("Had more in me", "A little left", "Seconds left", "Hit my limit"),
+            listOf(
+                "Solid — had more in me",
+                "Hard — a little left",
+                "Very hard — seconds left",
+                "Max — hit my limit",
+            ),
             timedTiles().filter { it.claim == EffortClaim.PROXIMITY }.map { it.label },
         )
         assertEquals(
-            listOf("Fast and crisp", "Speed dropping", "Grindy", "Barely made it"),
+            listOf(
+                "Solid — fast and crisp",
+                "Hard — speed dropping",
+                "Very hard — grindy",
+                "Max — barely made it",
+            ),
             explosiveTiles().filter { it.claim == EffortClaim.PROXIMITY }.map { it.label },
         )
     }

@@ -7,24 +7,25 @@ import kotlin.test.assertNull
 /**
  * The predicate the effort grid is gated on.
  *
- * Characterization at this commit: every case here is the answer
- * `RecordState.setComplete` already gave inside the view model, asserted for
- * the first time. The value of writing them down is that
+ * Most of this file is characterization: the answers `RecordState.setComplete`
+ * already gave inside the view model, asserted for the first time because
  * `SetEndControlPolicy` was swept over all 24 of its inputs while nothing
- * pinned WHICH of those inputs the app hands it -- so deleting the
- * `targetReps == null` guard, or judging a hold by a plain `>=` instead of
- * [TimedSetEndPolicy.fellShort], reddened nothing at all.
+ * pinned WHICH of those inputs the app hands it.
  *
- * Two things are deliberately NOT asserted here.
+ * TWO OF THEM ARE DIFFERENTIALS, not characterization, and they are named
+ * here so a reader does not take the whole file for a description of what the
+ * code did. `a hold is not complete until its clock reaches the target` and
+ * `a hold prescribed no positive duration can never be judged` both FAIL at
+ * the commit that introduces them and pass at the one after it. What they
+ * change is which question a hold's clock is asked: not
+ * [TimedSetEndPolicy.fellShort], whose 90% tolerance is the right answer to
+ * "was this recorded hold short" and the wrong answer to "is the hold over",
+ * but [TimedSetEndPolicy.remainingS] and [TimedSetEndPolicy.endsNow] -- the
+ * same pair, on the same instant, that #168 ends the set on.
  *
- * The 90%-of-target window is left to the differential that changes it, so
- * that a pin written one commit and rewritten the next does not read as a
- * contract. What IS pinned here are the two ends a hold is unambiguous at
- * under either rule: the start of the clock and the target itself.
- *
- * And nothing here says what `:app` passes. These are six arguments; that
- * they are wired from the slot, the clock and the guide is compile-gated
- * only, because `:app` has one test file and none of it reaches a view model.
+ * Nothing here says what `:app` passes. These are six arguments; that they
+ * are wired from the slot, the clock and the guide is compile-gated only,
+ * because `:app` has one test file and none of it reaches a view model.
  */
 class SetCompletionPolicyTest {
     private fun hold(targetS: Int?, elapsedS: Int) = SetCompletionPolicy.complete(
@@ -63,6 +64,42 @@ class SetCompletionPolicyTest {
         // fine -- which is the whole reason this returns a nullable.
         assertNull(hold(targetS = null, elapsedS = 0))
         assertNull(hold(targetS = null, elapsedS = 300))
+    }
+
+    @Test
+    fun `a hold is not complete until its clock reaches the target`() {
+        // The owner: "it should only be shown when all the reps are finished
+        // or the hold is finished." Finished is the target, not nine tenths
+        // of it. `TimedSetEndPolicy.fellShort` answers "did this RECORDED
+        // hold fall short", and 90% is the right threshold for THAT question
+        // -- it is what keeps a scheduler losing a tick from writing a set as
+        // failed. It is the wrong threshold for "is the hold over", and this
+        // predicate asked it anyway: on a 20 s plank the grid opened at
+        // elapsed 18 while #168 ends the set at 20, so the whole window in
+        // which a hold could be rated in-set was its last two seconds, under
+        // load.
+        listOf(18, 19).forEach { elapsed ->
+            assertEquals(
+                false,
+                hold(targetS = 20, elapsedS = elapsed),
+                "a 20 s hold was judged finished at $elapsed s",
+            )
+        }
+        assertEquals(false, hold(targetS = 60, elapsedS = 54), "a 60 s hold was judged finished at 54 s")
+        // And the other side of the same instant, so the differential cannot
+        // be satisfied by never answering true.
+        assertEquals(true, hold(targetS = 60, elapsedS = 60))
+        assertEquals(true, hold(targetS = 60, elapsedS = 61), "a hold past its target is not finished")
+    }
+
+    @Test
+    fun `a hold prescribed no positive duration can never be judged`() {
+        // TimedSetEndPolicy.remainingS already treats a non-positive target as
+        // naming no instant a hold could reach, so such a set never auto-ends;
+        // fellShort does not, and answered "finished" on its first tick. The
+        // two now agree, because this reads remainingS.
+        assertNull(hold(targetS = 0, elapsedS = 0))
+        assertNull(hold(targetS = -5, elapsedS = 10))
     }
 
     @Test

@@ -360,6 +360,33 @@ class SetEndControlPolicyTest {
         )
 
     @Test
+    fun `a set whose lead-in is still running offers only the way out`() {
+        // The window the gate was never asked about: the 5 s prep before a
+        // hold and the identical lead-in before a guided cadence. The clock
+        // has not started, the guide has called no stroke, and `complete` is
+        // therefore false -- so the gate offered BROKE EARLY - FAILED and
+        // nothing else, and abandoning a set during its lead-in wrote a
+        // TAPPED failure of a set that never began. #189 is about to build
+        // failure-reason analysis on exactly that record.
+        //
+        // END_UNRATED and not the grid: how a set went is not a fact before
+        // it starts either, so asking is no more answerable here than
+        // mid-set. What the lifter needs is a way to leave, storing nothing.
+        //
+        // Every kind, because the rule is about the set and not about which
+        // completion signal it has. Only TEMPO_GUIDED and TIMED can reach
+        // this state in the app today, and a rule that reads the kind here
+        // would be a second thing to keep in step with `SetEndKind`.
+        everyCase().forEach { case ->
+            assertEquals(
+                setOf(SetEndControl.END_UNRATED),
+                SetEndControlPolicy.controls(case.first, case.second, case.third, started = false),
+                "$case during its lead-in",
+            )
+        }
+    }
+
+    @Test
     fun `every kind, target and completion combination has one stated answer`() {
         assertEquals(24, expectedWhileRunning.size, "the table does not carry one row per combination")
         assertEquals(
