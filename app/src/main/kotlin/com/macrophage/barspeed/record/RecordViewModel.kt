@@ -46,6 +46,7 @@ import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SensorRoster
 import com.macrophage.barspeed.model.SessionCloseState
 import com.macrophage.barspeed.model.SetClockPolicy
+import com.macrophage.barspeed.model.SetEndKind
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetRepsPolicy
@@ -1838,6 +1839,64 @@ data class RecordState(
             manualSet -> currentTargetReps?.let { manualReps >= it } ?: true
             else -> true
         }
+
+    /**
+     * Whether the app KNOWS the set in progress has delivered its
+     * prescription -- and null where it cannot know at all (#186).
+     *
+     * A different question from [setTargetMet], and the difference is the
+     * whole of why this exists. That one answers `true` wherever there is
+     * nothing to fall short of, because its job is to decide which way OUT
+     * sits beside the grid and a set with no target must not be pushed down
+     * the failure path. This one has to distinguish "not finished yet" from
+     * "nothing here can ever say it finished": the second is an ad-hoc hold
+     * with no target, or a guided set the plan gave no rep count, and
+     * `GuidedCadenceRunner` never calls `onFinished` on one of those at all.
+     * Rendering that absence as `false` would withhold the effort grid for the
+     * whole set and leave a tapped failure as the only exit.
+     *
+     * Timed sets read the same [TimedSetEndPolicy.fellShort] the write and
+     * [setTargetMet] read, so the clock cannot say one thing here and another
+     * there.
+     */
+    val setComplete: Boolean?
+        get() = when {
+            currentIsTimed -> currentTimedTargetS?.let { !TimedSetEndPolicy.fellShort(setElapsedS, it) }
+            guidedSet -> if (currentTargetReps == null) null else guidedFinished
+            else -> null
+        }
+
+    /**
+     * Which completion signal, if any, the set in progress has -- the decision
+     * [SetEndControlPolicy] gates on, made in `:core:model` where a test runs
+     * on it every push rather than inside a composable nothing can reach.
+     */
+    val setEndKind: SetEndKind
+        get() = SetEndKind.of(
+            timed = currentIsTimed,
+            explosive = currentExerciseKind == ExerciseKind.EXPLOSIVE,
+            guided = guidedSet,
+        )
+
+    /**
+     * What the movement in front of the lifter IS, for the set being set up or
+     * recorded.
+     *
+     * The queue's slot where there is one, the ad-hoc picker's selection
+     * otherwise, and DYNAMIC where neither has resolved yet. Read by
+     * [setEndKind] and by the screen, which used to carry its own copy of
+     * these three lines; two statements of "which exercise is this" can
+     * disagree, and the one in the screen was unreachable by any test.
+     *
+     * NOT [currentExercise], whose fallback is a seed lookup by id: that one
+     * answers a question about the exercise DEFINITION and invents an empty
+     * definition rather than returning nothing, which would call a custom
+     * timed exercise DYNAMIC.
+     */
+    val currentExerciseKind: ExerciseKind
+        get() = currentSlot?.exercise?.kind
+            ?: exerciseOptions.firstOrNull { it.id == selectedExerciseId }?.kind
+            ?: ExerciseKind.DYNAMIC
 }
 
 class RecordViewModel(app: Application) : AndroidViewModel(app) {

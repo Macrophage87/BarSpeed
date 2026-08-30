@@ -1463,9 +1463,14 @@ private fun AdHocForm(state: RecordState, viewModel: RecordViewModel) {
     }
 }
 
-private fun currentKind(state: RecordState): ExerciseKind = state.currentSlot?.exercise?.kind
-    ?: state.exerciseOptions.firstOrNull { it.id == state.selectedExerciseId }?.kind
-    ?: ExerciseKind.DYNAMIC
+/**
+ * What the movement in front of the lifter is.
+ *
+ * Delegates to [RecordState.currentExerciseKind] rather than restating its
+ * three lines: the same question was answered here and in the view model, and
+ * only one of the two copies is reachable by a test.
+ */
+private fun currentKind(state: RecordState): ExerciseKind = state.currentExerciseKind
 
 @Composable
 private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
@@ -1992,7 +1997,8 @@ private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
         SetWriteState.IN_FLIGHT -> SavingSetNotice()
         SetWriteState.FAILED -> UnsavedSetNotice(viewModel)
         SetWriteState.NONE -> {
-            val controls = SetEndControlPolicy.controls(state.setTargetMet)
+            val controls =
+                SetEndControlPolicy.controls(state.setEndKind, state.setTargetMet, state.setComplete)
             if (SetEndControl.EFFORT_GRID in controls) {
                 EndSetRpeGrid(state, viewModel, failedTile = SetEndControl.FAILED_TILE in controls)
             }

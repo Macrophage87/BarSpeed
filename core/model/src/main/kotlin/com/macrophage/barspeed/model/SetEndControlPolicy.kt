@@ -17,6 +17,63 @@ enum class SetEndControl {
 
     /** End the set now with no rating of any kind attached. Drawn as END SET EARLY. */
     END_UNRATED,
+
+    /**
+     * End the set now as a TAPPED failure, drawn on its own where the grid is
+     * withheld.
+     *
+     * The difference from [FAILED_TILE] is what DRAWS. That one is a tile
+     * inside the grid and puts nothing on the screen by itself; this one is a
+     * control of its own, and it is the only exit a guided or timed set has
+     * before it is complete (#186).
+     */
+    END_FAILED,
+}
+
+/**
+ * How the app knows -- or does not know -- that a set has delivered what it
+ * was asked for.
+ *
+ * The distinction is not about the movement. It is about whether there is an
+ * authoritative completion signal at all:
+ *
+ *  - [TEMPO_GUIDED]: the app is calling the tempo and counting the reps, so
+ *    the guide finishing IS the set being done.
+ *  - [TIMED]: the clock says so, and since #168 the clock also ends the set.
+ *  - [STRAIGHT_REPS]: the LIFTER decides. Nothing in the app knows the set is
+ *    over until they say so, and tapping an effort tile is how they say it.
+ *  - [EXPLOSIVE]: sensor-counted single drives; the owner's ruling is that
+ *    today's behaviour is fine here.
+ *
+ * [gatesOnCompletion] is that fact and nothing else. Withholding the grid on a
+ * kind that answers false would leave the lifter with no way to end the set
+ * except by logging a failure they did not have.
+ */
+enum class SetEndKind(val gatesOnCompletion: Boolean) {
+    TEMPO_GUIDED(gatesOnCompletion = true),
+    TIMED(gatesOnCompletion = true),
+    STRAIGHT_REPS(gatesOnCompletion = false),
+    EXPLOSIVE(gatesOnCompletion = false),
+    ;
+
+    companion object {
+        /**
+         * Which kind a set in progress is, from the three facts `:app` holds
+         * about it.
+         *
+         * The order is load-bearing. A hold is [TIMED] whatever kind of
+         * exercise it is, because it is measured on the clock; an explosive
+         * lift never carries a cadence, so it is tested before [TEMPO_GUIDED]
+         * rather than after; and [STRAIGHT_REPS] is what is left, which is the
+         * case with no completion signal.
+         */
+        fun of(timed: Boolean, explosive: Boolean, guided: Boolean): SetEndKind = when {
+            timed -> TIMED
+            explosive -> EXPLOSIVE
+            guided -> TEMPO_GUIDED
+            else -> STRAIGHT_REPS
+        }
+    }
 }
 
 /**
@@ -50,15 +107,31 @@ enum class SetEndControl {
  */
 object SetEndControlPolicy {
     /**
-     * The controls to draw for a set whose target has ([targetMet]) or has not
-     * been delivered.
+     * The controls to draw for a set of [kind] whose target has ([targetMet])
+     * or has not been delivered, and which the app does ([complete] true), does
+     * not ([complete] false) or CANNOT ([complete] null) know has finished.
+     *
+     * [complete] is nullable rather than defaulting to false because the two
+     * are different states and only one of them may withhold a control. False
+     * is "the set is not done yet"; null is "this set has no completion signal
+     * at all" -- an ad-hoc hold started with no target, or a guided set the
+     * plan gave no rep count, neither of which ever finishes on its own.
+     * Rendering that absence as false would leave those sets with no exit but
+     * a failure they did not have.
      *
      * A set rather than a boolean per control, so a control added later has to
      * be placed in every case rather than defaulting into all of them.
      */
-    fun controls(targetMet: Boolean): Set<SetEndControl> = if (targetMet) {
-        setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE)
-    } else {
-        setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED)
-    }
+    @Suppress("UNUSED_PARAMETER")
+    fun controls(kind: SetEndKind, targetMet: Boolean, complete: Boolean?): Set<SetEndControl> =
+        // [kind] and [complete] are not read yet: the gate itself lands in the
+        // commit whose red differentials were pushed for it. The signature
+        // exists first so those differentials can be written against the final
+        // one and fail on an assertion rather than on a compile error, which
+        // is not evidence of anything.
+        if (targetMet) {
+            setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE)
+        } else {
+            setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED)
+        }
 }
