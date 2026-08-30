@@ -224,6 +224,26 @@ object SensorCapturePolicy {
      * A shortfall never refuses the set. It downgrades to one sensor, records
      * [DualShortfall] for the screen to explain, and leaves [RecordedSensors]
      * to say afterwards that two were asked for.
+     *
+     * WHICH units are the pair is [DualSensorSetup.step]'s answer, since
+     * #192: dual arms only from [DualSetupStep.READY], which is exactly two
+     * paired units carrying different labels. A third paired unit therefore
+     * arms nothing, and that is a decision rather than a consequence. What it
+     * replaced chose the second unit positionally -- the first paired address
+     * that is not the analysed one -- so with three units paired, the one the
+     * second link held was whichever `DeviceRegistry` happened to list first:
+     * an unlabelled third unit was skipped while the set armed dual, and a
+     * third unit duplicating the second's label was never compared at all,
+     * which armed two units the lifter cannot tell apart while the Devices
+     * screen was telling them the labels collide. It is the same positional
+     * default the paragraph above refuses for a pair; it survived for a trio
+     * only because nobody had three paired.
+     *
+     * The shortfall a not-ready setup reports is that step's own reading:
+     * [DualSetupStep.LABEL_BOTH] is [DualShortfall.ROLES_UNASSIGNED] and
+     * [DualSetupStep.LABELS_COLLIDE] is [DualShortfall.ROLES_COLLIDE], so the
+     * sentence the Devices screen draws and the reason stored on the set are
+     * one reading of one state rather than two that can disagree.
      */
     fun roster(
         pairedImuAddresses: List<String>,
@@ -238,6 +258,20 @@ object SensorCapturePolicy {
         val secondaryAddress = paired.firstOrNull { it != analysedAddress }
         if (analysedAddress == null || secondaryAddress == null) {
             return SensorRoster(unassigned = unassigned, shortfall = DualShortfall.ONE_SENSOR_PAIRED)
+        }
+        when (DualSensorSetup.step(paired, roleByAddress)) {
+            // Unreachable from here: an empty paired list leaves
+            // analysedAddress null and a single paired unit leaves
+            // secondaryAddress null, so both were answered above. Named
+            // anyway because an exhaustive `when` is what stops a step added
+            // later from compiling into a silent dual arm.
+            DualSetupStep.NO_SENSOR, DualSetupStep.ONE_SENSOR ->
+                return SensorRoster(unassigned = unassigned, shortfall = DualShortfall.ONE_SENSOR_PAIRED)
+            DualSetupStep.LABEL_BOTH ->
+                return SensorRoster(unassigned = unassigned, shortfall = DualShortfall.ROLES_UNASSIGNED)
+            DualSetupStep.LABELS_COLLIDE ->
+                return SensorRoster(unassigned = unassigned, shortfall = DualShortfall.ROLES_COLLIDE)
+            DualSetupStep.READY -> Unit
         }
         val analysed = roleByAddress[analysedAddress]
         val secondary = roleByAddress[secondaryAddress]

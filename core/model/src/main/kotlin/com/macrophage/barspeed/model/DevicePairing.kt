@@ -262,11 +262,14 @@ object DevicePairingPolicy {
      * on the argument rather than on a state the screen can produce.
      *
      * What this does NOT do is re-point the second link at the unit the
-     * analysed link just left. `SensorCapturePolicy.roster` decides that and
-     * `RecordViewModel.mirrorSensorSettings` applies it, so the second link
-     * comes back when a set is next armed -- the Devices screen cannot arm one
-     * at all, which is #192 and not this rule's to answer. Until then the
-     * second unit reads "Not linked", which is what that state is for.
+     * analysed link just left. [imuLinkTargets] decides that and its two
+     * appliers -- `RecordViewModel.mirrorSensorSettings` and, since #192,
+     * `DevicesViewModel`'s own arming collector -- bring it back, each from
+     * the preference this call has already moved. The sentence here used to
+     * say the Devices screen could not arm a second link at all; #192 fixed
+     * that and it is deleted rather than reworded. Between the drop and the
+     * re-arm the second unit reads "Not linked", which is what that state is
+     * for.
      *
      * Here rather than in `:core:ble` for the reason [linksToDropOnForget] is
      * here: that module has no test source set, so which links a tap takes down

@@ -7,6 +7,7 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.ble.DeviceRole
 import com.macrophage.barspeed.ble.DiscoveredDevice
 import com.macrophage.barspeed.ble.KnownDevice
+import com.macrophage.barspeed.model.DevicePairingPolicy
 import com.macrophage.barspeed.model.DeviceScanListPolicy
 import com.macrophage.barspeed.model.DualSensorSetup
 import com.macrophage.barspeed.model.DualSetupStep
@@ -87,6 +88,75 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
         ) { imu, imuB, hrm ->
             LinkAddresses(imu = imu?.address, imuB = imuB, hrm = hrm?.address)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LinkAddresses())
+
+    /**
+     * Keep the second bar sensor's link pointed at whatever the pairing rules
+     * name, for as long as this screen's ViewModel lives (#192).
+     *
+     * The defect this closes: `AutoConnectManager.setSecondaryImuAddress` had
+     * exactly one caller, `RecordViewModel.mirrorSensorSettings`, so the
+     * second link came up only as a side effect of setting a session up on
+     * the Record screen. A second unit could be paired here, labelled here
+     * and drawn here, and no sequence of taps on this screen brought it to
+     * connected -- which made #184's own field criterion, both rows green on
+     * the Devices screen, impossible rather than merely awkward. It also
+     * reconciles the owner's two reports: both rows DO go green, once Record
+     * has armed the link.
+     *
+     * WHICH address is `DevicePairingPolicy.imuLinkTargets`' answer and
+     * nothing here re-decides it; that function is
+     * `SensorCapturePolicy.roster`'s secondary address, so this screen and
+     * the set the lifter records next cannot disagree about which physical
+     * unit the second one is.
+     *
+     * The link's CURRENT address is combined in rather than only its inputs,
+     * which is what makes this self-healing and is the half a mirror of
+     * `mirrorSensorSettings` would not have. `setPreferredAndConnect` and
+     * `forgetAndDrop` both call `setSecondaryImuAddress(null)` deliberately,
+     * AFTER writing the preference this collector reads; without the address
+     * itself as an input, a null landing after this collector's write would
+     * leave the link down until some unrelated preference changed. With it,
+     * the next emission re-derives the target from the state the drop left
+     * behind and arms it.
+     *
+     * Re-arming after a deliberate drop is safe because the target is
+     * recomputed from the NEW preference: `imuLinkTargets` never names the
+     * analysed unit as the second one, so this cannot point both clients at
+     * one WT901 -- the invariant `SensorCapture.kt:216-218` states, pinned
+     * exhaustively by `no arrangement points both links at the same unit`.
+     * It is also not a new race: `mirrorSensorSettings` already re-derives
+     * the same address off the same preference flow whenever the Record
+     * screen is open.
+     *
+     * An `init` block rather than a `stateIn` property, because this has no
+     * reader: `WhileSubscribed` would tie arming the link to whether
+     * something happened to be collecting a state, and a `val` holding the
+     * Job is a property nothing reads.
+     *
+     * What no test here can show: that the link comes UP. `:core:ble` has no
+     * test source set, nothing in this repository executes a ViewModel, and
+     * what the GATT stack does with the address is a [Field] question.
+     */
+    init {
+        viewModelScope.launch {
+            combine(
+                container.deviceRegistry.knownDevices,
+                container.settings.sensorRoles,
+                container.deviceRegistry.preferred(DeviceRole.IMU),
+                container.autoConnect.secondaryImuAddressNow,
+            ) { known, roles, preferred, held ->
+                val target =
+                    DevicePairingPolicy.imuLinkTargets(
+                        pairedImuAddresses = known.filter { it.role == DeviceRole.IMU }.map { it.address },
+                        preferredImuAddress = preferred?.address,
+                        roleByAddress = roles,
+                    ).second
+                target to held
+            }.collect { (target, held) ->
+                if (target != held) container.autoConnect.setSecondaryImuAddress(target)
+            }
+        }
+    }
 
     /** Which accelerometer the lifter has labelled which, by address. */
     val sensorRoles =
@@ -221,5 +291,10 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         scanJob?.cancel()
+        // The arming collector is deliberately not cancelled by hand --
+        // viewModelScope does that -- and the link is deliberately NOT taken
+        // down with it: leaving the Devices screen is not a reason to drop a
+        // sensor the lifter just brought up, and the address stands until
+        // something that owns it moves it.
     }
 }
