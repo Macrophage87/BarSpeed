@@ -58,6 +58,28 @@ class SetRatingTracker(private val repository: SessionRepository) {
         this.setId = setId
     }
 
+    /**
+     * Record, change or clear why the set ENDED (#189).
+     *
+     * Its own statement rather than an argument of [rate], and the separation
+     * is the point: the reason is asked on a page after the set is stored and
+     * is corrected on the rest screen independently of the effort. Folded into
+     * the rating write, every effort correction would carry a reason the
+     * lifter did not touch, and every reason would carry an effort they did
+     * not restate.
+     *
+     * Neither failure fact is read or written here. Why a set ended is not a
+     * verdict on whether it failed -- a lifter naming "stopped for an outside
+     * reason" is saying the set is not a training signal, not that it did not
+     * end short -- so the OR that decides [failed] is left exactly where it
+     * was. Returns null when there is no recorded set to mark.
+     */
+    suspend fun limit(limiter: String?, note: String?): Boolean? {
+        val id = setId ?: return null
+        repository.setLimiter(id, limiter, note)
+        return true
+    }
+
     /** Correct how the set FELT. The shortfall verdict survives the correction. */
     suspend fun rate(rpe: Int?, failed: Boolean, warmup: Boolean): Boolean? {
         val id = setId ?: return null

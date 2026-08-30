@@ -436,6 +436,20 @@ class SessionRepository(
     suspend fun rateSet(setId: Long, rpe: Int?, failed: Boolean, warmup: Boolean) =
         sessionDao.updateRpe(setId, rpe, failed, warmup)
 
+    /**
+     * Why the set ended, from the page offered after a failed set, and
+     * correctable on the rest screen (#189).
+     *
+     * Null clears it, which is what a lifter changing their mind back to no
+     * answer leaves behind. Absence is a state here and not a default, so
+     * there is nothing to fall back to.
+     *
+     * The note is normalized by the caller and again is stored exactly as
+     * published; this method does not second-guess it.
+     */
+    suspend fun setLimiter(setId: Long, limiter: String?, limiterNote: String?) =
+        sessionDao.updateLimiter(setId, limiter, limiterNote)
+
     /** Lifter correction of a miscounted (or uncounted) set's reps. */
     suspend fun overrideReps(setId: Long, reps: Int) = sessionDao.overrideReps(setId, reps)
 

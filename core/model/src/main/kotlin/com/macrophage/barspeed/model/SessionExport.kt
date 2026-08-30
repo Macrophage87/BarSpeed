@@ -222,6 +222,19 @@ data class SessionExport(
          * roughly the state "could have added one increment" describes, so the
          * old values stay interpretable on the same ruler. 7 through 10 are
          * unchanged in meaning across the boundary.
+         *
+         * 1.14 carries a THIRD change, additive, under the same number for the
+         * reason the first two share and it is worth restating because the
+         * issue asked for 1.15: 1.14 is UNRELEASED. v0.1.44 shipped 1.13, read
+         * at tag `7cf6e8c3cc546ab8d64c9fb2be86de2129250b43`, so no reader has
+         * ever shipped against 1.14 and minting 1.15 would publish a boundary
+         * that never existed -- the same rule seven changes rode under 1.13
+         * for. The change (#189): a set may carry [SetExport.limiter], why it
+         * ended, from a closed vocabulary, and [SetExport.limiterNote], the
+         * lifter's own words where that answer is `other`. No key from 1.13
+         * changes type or stops being written, and both are absent on every
+         * set nobody was asked about and on every set recorded before database
+         * v13.
          */
         const val SCHEMA_VERSION = "1.14"
 
@@ -364,6 +377,40 @@ data class SetExport(
      * Omitted when false.
      */
     val failed: Boolean = false,
+    /**
+     * Why the set ended, from a CLOSED vocabulary, or absent (#189).
+     *
+     * [SetLimiter]'s stored names, and nothing else may appear here. The
+     * whole reason it is a vocabulary rather than a sentence is that a coach
+     * groups by it; a free string in this key would make that impossible, so
+     * the lifter's own words go in [limiterNote] beside it and never inside
+     * this one.
+     *
+     * ABSENT IS NOT AN ANSWER. The page is skippable in one tap and only
+     * failed sets are asked at all, so a missing key covers a question
+     * skipped, a question never asked, and every set recorded before database
+     * v13. None of those is a set that ended for an unknown reason and none
+     * may be counted as one.
+     *
+     * The value a reader should treat differently from the rest is
+     * [SetLimiter.OUTSIDE]: the set was interrupted and is not a training
+     * signal at all. It exists so analysis can DISCARD such a set rather than
+     * read it as capacity, which is what keeps "every unfinished set is a
+     * fail" from silently depressing the record.
+     */
+    val limiter: String? = null,
+    /**
+     * The lifter's own words, present only where [limiter] is
+     * [SetLimiter.OTHER] (#189).
+     *
+     * Published verbatim, at most [SetLimiter.NOTE_MAX_CHARS] characters, and
+     * carrying neither a double quote nor a backslash -- see
+     * [SetLimiter.normalizeNote], which states why: the raw archive's set
+     * manifest is assembled as text and escapes nothing, so a note is stored
+     * already reduced to what both writers can carry rather than being
+     * escaped differently by each.
+     */
+    val limiterNote: String? = null,
     /**
      * True when the PLAN declared this set preparatory -- a ramp set, a
      * warm-up. Omitted when false.

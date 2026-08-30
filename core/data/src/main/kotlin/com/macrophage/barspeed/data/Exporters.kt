@@ -241,6 +241,10 @@ class SessionExporter(
             side = record.side,
             rpe = record.rpe,
             failed = record.failed,
+            // Why it ended, and the words that go with `other` (#189). Both,
+            // or the note is orphaned from the answer it belongs to.
+            limiter = record.limiter,
+            limiterNote = record.publishedLimiterNote,
             warmup = record.warmup,
             added = record.added,
             plannedPrepS = record.plannedPrepS,
@@ -447,6 +451,29 @@ class SessionExporter(
  * including per-rep velocity/power, tempo compliance, RPE, sides, durations,
  * and HRV), and a meta.json manifest describing every file (spec 4.3).
  */
+/**
+ * The free-text note as it may be PUBLISHED: only where an answer stands
+ * beside it (#189).
+ *
+ * One definition, read by both export writers, and that is the point rather
+ * than tidiness. The session document is serialised by kotlinx and the raw
+ * archive's manifest is assembled as text by a different function; a rule
+ * written twice is a rule that drifts, and the half that drifts is whichever
+ * writer the next change does not open.
+ *
+ * The gate is on the ANSWER being present rather than on it being `other`,
+ * which is the weaker of the two available rules and is chosen deliberately.
+ * Nothing this app writes puts a note beside any other answer -- the write
+ * path drops it -- so the stricter rule would fire only on a row this build
+ * did not produce, and would silently delete a lifter's words from the export
+ * rather than publish something a reader can see is odd. What it does refuse
+ * is a note with NO answer to attach to: that is free text a reader can
+ * neither group nor attribute, and the published schema promises it is not
+ * there.
+ */
+private val SetRecordEntity.publishedLimiterNote: String?
+    get() = limiterNote?.takeIf { limiter != null }
+
 class RawExporter(
     private val sessionRepository: SessionRepository,
     private val sessionExporter: SessionExporter,
@@ -624,6 +651,20 @@ class RawExporter(
         str("side", record.side)
         num("rpe", record.rpe)
         flag("failed", record.failed)
+        // The reason, in the archive's manifest as well as in the session
+        // document. Two writers, one fact: a change wired into only one of
+        // them publishes half a record, and which half depends on which file
+        // the coach opened.
+        //
+        // [str] and not [bool]: absence must go on reading as "not asked" for
+        // every archive already written. The note is the first FREE TEXT this
+        // writer has ever carried -- every value before it was a machine token
+        // -- and it is safe here only because SetLimiter.normalizeNote has
+        // already removed the double quote and the backslash. Without that a
+        // backslash would not corrupt the note, it would make this whole
+        // manifest unparseable for every set in the session.
+        str("limiter", record.limiter)
+        str("limiterNote", record.publishedLimiterNote)
         flag("warmup", record.warmup)
         // [flag], never [bool]: absence must go on reading as "prescribed"
         // for every archive already written, and a `false` here would change

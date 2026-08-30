@@ -103,6 +103,20 @@ interface SessionDao {
     @Query("UPDATE set_records SET rpe = :rpe, failed = :failed, warmup = :warmup WHERE id = :setId")
     suspend fun updateRpe(setId: Long, rpe: Int?, failed: Boolean, warmup: Boolean)
 
+    // Why the set ended, and the lifter's own words where the answer is
+    // `other` (#189). Written as its own statement rather than folded into
+    // [updateRpe]: the reason is asked on a page AFTER the set is stored and
+    // is corrected on the rest screen independently of the effort, and one
+    // query writing both would make every effort correction overwrite a reason
+    // the caller did not mean to touch. Both columns move together because the
+    // note belongs to the answer -- changing the answer away from `other` must
+    // clear the words that went with it, or a coach reads "grip gave out"
+    // under a note about a photo shoot. A new @Query changes no table, so
+    // DATABASE_VERSION does not move for this one; the columns it writes
+    // arrived at v13.
+    @Query("UPDATE set_records SET limiter = :limiter, limiterNote = :limiterNote WHERE id = :setId")
+    suspend fun updateLimiter(setId: Long, limiter: String?, limiterNote: String?)
+
     @Query("UPDATE set_records SET actualReps = :reps, repsManual = 1 WHERE id = :setId")
     suspend fun overrideReps(setId: Long, reps: Int)
 

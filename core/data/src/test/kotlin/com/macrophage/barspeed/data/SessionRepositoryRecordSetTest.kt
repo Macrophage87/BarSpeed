@@ -115,6 +115,10 @@ class SessionRepositoryRecordSetTest {
             calls += "updateRpe"
         }
 
+        override suspend fun updateLimiter(setId: Long, limiter: String?, limiterNote: String?) {
+            calls += "updateLimiter"
+        }
+
         override suspend fun overrideReps(setId: Long, reps: Int) {
             calls += "overrideReps"
         }

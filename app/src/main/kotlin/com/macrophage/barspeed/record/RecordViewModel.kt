@@ -51,6 +51,7 @@ import com.macrophage.barspeed.model.SetClockPolicy
 import com.macrophage.barspeed.model.SetCompletionPolicy
 import com.macrophage.barspeed.model.SetEndKind
 import com.macrophage.barspeed.model.SetGeometryPolicy
+import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetRepsPolicy
 import com.macrophage.barspeed.model.SetWriteState
@@ -483,6 +484,54 @@ private suspend fun openSession(repository: SessionRepository, p: PendingSetWrit
  * clamp is applied here as well as in the store, so a tap at either end of the
  * range moves nothing rather than storing a value the store then corrects.
  */
+/**
+ * The state a skipped reason page leaves behind (#189). Free function for
+ * [applyLimiter]'s reason.
+ *
+ * WRITES NOTHING TO THE DATABASE, and that is the whole content of it: absence
+ * is already the stored state, so a skip has nothing to store. What changes is
+ * only that the page stops offering itself for this set. The row on the rest
+ * screen stays reachable either way -- [SetLimiterPolicy.offersCorrection]
+ * decides that and does not read this flag -- so a skip is not a door that
+ * locks.
+ */
+private fun skippedLimiterState(stateFlow: MutableStateFlow<RecordState>) {
+    stateFlow.value = stateFlow.value.copy(lastSetLimiterAsked = true)
+}
+
+/**
+ * Record, change or clear why the just-finished set ended (#189). Free
+ * function for [applyPrepAdjustment]'s reason.
+ *
+ * A null [limiter] clears the answer, which is what a lifter changing their
+ * mind back to no answer leaves behind. The note is normalized here as well as
+ * at the field, and is DROPPED for any answer other than [SetLimiter.OTHER]:
+ * words kept beside "grip gave out" would be read as describing an answer they
+ * were never typed for, and the note's own published description promises they
+ * are not there.
+ *
+ * appScope, as `rateLastSet` uses: the rest screen is the only place this can
+ * be given, and the pop that leaves it must not cancel the write.
+ */
+private fun applyLimiter(
+    stateFlow: MutableStateFlow<RecordState>,
+    limiter: SetLimiter?,
+    note: String?,
+    ratings: SetRatingTracker,
+    appScope: CoroutineScope,
+) {
+    val normalized = if (limiter == SetLimiter.OTHER) SetLimiter.normalizeNote(note) else null
+    appScope.launch(Dispatchers.Main.immediate) {
+        ratings.limit(limiter?.stored, normalized) ?: return@launch
+        stateFlow.value =
+            stateFlow.value.copy(
+                lastSetLimiter = limiter,
+                lastSetLimiterNote = normalized,
+                lastSetLimiterAsked = true,
+            )
+    }
+}
+
 private fun applyPrepAdjustment(s: RecordState, deltaS: Int, appScope: CoroutineScope, settings: SettingsStore) {
     val slot = s.upcomingSlot
     val exerciseId = s.prepExerciseId(slot)
@@ -1401,6 +1450,14 @@ private fun restingState(
         // OR-ed in, and that OR is what this field exists to see past.
         lastSetTappedFailed = p.rating?.failed == true,
         lastSetWarmup = p.slot?.warmup == true,
+        // A new set arrives carrying no reason and having never been asked,
+        // whatever the last one carried. Written explicitly rather than left
+        // to a default, because this is a copy of the previous state and a
+        // field omitted here keeps the FINISHED SET BEFORE'S answer -- which
+        // is how a reason ends up published against the wrong set.
+        lastSetLimiter = null,
+        lastSetLimiterNote = null,
+        lastSetLimiterAsked = false,
         restRemainingS = restRemainingS,
         // Set from the frozen index rather than incremented, so a retry cannot
         // count the same set twice.
@@ -1753,6 +1810,28 @@ data class RecordState(
      */
     val lastSetTappedFailed: Boolean = false,
     val lastSetWarmup: Boolean = false,
+    /**
+     * Why the just-finished set ended, or null where nothing has been said
+     * (#189).
+     *
+     * Null is the state a skip leaves behind as well as the state a set nobody
+     * was asked about carries, and the two are deliberately not distinguished
+     * on this screen: both mean there is no answer, and the row says so in
+     * words either way. What IS distinguished is whether the page has already
+     * been offered for this set, which is [lastSetLimiterAsked] -- otherwise a
+     * skip would be undone by the next recomposition.
+     */
+    val lastSetLimiter: SetLimiter? = null,
+    /** The lifter's own words, where [lastSetLimiter] is [SetLimiter.OTHER]. */
+    val lastSetLimiterNote: String? = null,
+    /**
+     * True once the reason page has been offered for the set just finished.
+     *
+     * Not a fact about the set and never stored: it is what makes the skip
+     * hold. It is reset by every write that lands a new set on this screen,
+     * beside [lastSetLimiter] itself.
+     */
+    val lastSetLimiterAsked: Boolean = false,
     val audioCues: Boolean = true,
     val imuConnected: Boolean = false,
     val imuConnecting: Boolean = false,
@@ -3207,6 +3286,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             stateFlow.value = ratedState(stateFlow.value, rpe, failed, effectiveFailed)
         }
     }
+
+    /** Why the set ended (#189); the work is in the free [applyLimiter]. */
+    fun limitLastSet(limiter: SetLimiter?, note: String? = null) =
+        applyLimiter(stateFlow, limiter, note, ratings, container.appScope)
+
+    /** The lifter left the reason page unanswered (#189); see [skippedLimiterState]. */
+    fun skipLastSetLimiter() = skippedLimiterState(stateFlow)
 
     /** One tap of the prep control; the work is in the free [applyPrepAdjustment]. */
     fun adjustPrep(deltaS: Int) = applyPrepAdjustment(stateFlow.value, deltaS, container.appScope, container.settings)

@@ -90,6 +90,11 @@ import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.SetDeviationSummary
 import com.macrophage.barspeed.model.SetEndControl
 import com.macrophage.barspeed.model.SetEndControlPolicy
+import com.macrophage.barspeed.model.SetLimiter
+import com.macrophage.barspeed.model.SetLimiterGroup
+import com.macrophage.barspeed.model.SetLimiterPolicy
+import com.macrophage.barspeed.model.SetLimiterScale
+import com.macrophage.barspeed.model.SetLimiterTile
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetRepsPolicy
 import com.macrophage.barspeed.model.SetWriteState
@@ -2316,6 +2321,7 @@ private fun LastSetDetail(state: RecordState, viewModel: RecordViewModel) {
     if (changingEffort) {
         RpeSelector(state, viewModel) { changingEffort = false }
     }
+    LimiterSection(state, viewModel)
     state.lastFeedback?.let { RepCorrectionRow(it, viewModel) }
     state.lastFeedback?.let { HoldCorrectionRow(it, viewModel) }
     Spacer(Modifier.height(6.dp))
@@ -2660,6 +2666,182 @@ private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
         TextButton(onClick = onChange) { Text(if (unrated) "Rate" else "Change", color = BarColors.Sub) }
     }
     Spacer(Modifier.height(4.dp))
+}
+
+/**
+ * Why the set ended: the page after a fail, and the row that corrects it
+ * afterwards (#189).
+ *
+ * WHEN IT OPENS BY ITSELF IS [SetLimiterPolicy]'S DECISION, not this file's,
+ * and so is what the row reads. `:app` has two test files and neither reaches
+ * a composable, so a rule written beside its caller here is a rule nothing
+ * enforces; one module over, every case is a literal in a test.
+ *
+ * IT IS A PAGE OF TILES, NOT A FORM. The lifter is standing over a dropped
+ * bar. One tap answers and closes it; one tap on SKIP leaves it, and skipping
+ * writes nothing at all -- absence is already what the row carries. The free
+ * text is reachable ONLY behind Other, so the ordinary answer never costs a
+ * keyboard.
+ *
+ * THE ROW SURVIVES THE SKIP. Once the page has been offered it does not offer
+ * itself again for the same set, but the row below stays, with SAY WHY on it,
+ * for the whole rest period -- the same arrangement the effort line has for
+ * exactly the same reason: a mark given in the moment is what gets revised ten
+ * seconds later.
+ */
+@Composable
+private fun LimiterSection(state: RecordState, viewModel: RecordViewModel) {
+    val feedback = state.lastFeedback ?: return
+    if (!SetLimiterPolicy.offersCorrection(state.lastSetFailed, state.lastSetLimiter)) return
+    val prompting =
+        SetLimiterPolicy.prompts(
+            failed = state.lastSetFailed,
+            limiter = state.lastSetLimiter,
+            dismissed = state.lastSetLimiterAsked,
+        )
+    // Keyed on setsCompleted, as `changingEffort` is: an open page must close
+    // when the next set ends rather than carrying a stale set's answer into
+    // the following rest.
+    var changing by remember(state.setsCompleted) { mutableStateOf(false) }
+    val timed = feedback.actualDurationS != null
+    LimiterLine(state, timed) { changing = !changing }
+    if (prompting || changing) {
+        LimiterPage(timed = timed, viewModel = viewModel) { changing = false }
+    }
+}
+
+/** What the rest screen says the set ended for, and the way back into it. */
+@Composable
+private fun LimiterLine(state: RecordState, timed: Boolean, onChange: () -> Unit) {
+    // The wording is SetLimiterPolicy's, including the named absence: a blank
+    // here would read as the app having lost the answer rather than as a
+    // question nobody has answered.
+    val text = SetLimiterPolicy.lineText(state.lastSetLimiter, state.lastSetLimiterNote, timed)
+    val unanswered = state.lastSetLimiter == null
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        SectionCaption(
+            "Ended · $text",
+            // Amber for an unanswered failure, as the unrated effort line is:
+            // nothing is wrong, but there is something the lifter can do and
+            // the rest period is the only window it can be done in.
+            color = if (unanswered) BarColors.Amber else BarColors.Sub,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onChange) {
+            Text(if (unanswered) "Say why" else "Change", color = BarColors.Sub)
+        }
+    }
+    Spacer(Modifier.height(4.dp))
+}
+
+/**
+ * The tiles themselves, grouped, with pain drawn apart from the performance
+ * answers.
+ *
+ * WHICH TILES EXIST AND WHICH GROUP EACH IS IN IS [SetLimiterScale]'S
+ * DECISION. This function is the paint. The grouping is read off the tiles
+ * rather than counted to by index, because an order counted to here is an
+ * order that breaks silently when the scale is reordered one module over --
+ * which is the exact trap [FailSetButton] already carries a comment about.
+ */
+@Composable
+private fun LimiterPage(timed: Boolean, viewModel: RecordViewModel, onDone: () -> Unit) {
+    var typing by remember { mutableStateOf(false) }
+    var words by remember { mutableStateOf("") }
+    SectionCaption("Why did that set end? · optional")
+    Spacer(Modifier.height(6.dp))
+    if (typing) {
+        LimiterWords(
+            words = words,
+            onWords = { words = it },
+            onSave = {
+                viewModel.limitLastSet(SetLimiter.OTHER, words)
+                typing = false
+                onDone()
+            },
+            onBack = { typing = false },
+        )
+        return
+    }
+    var group: SetLimiterGroup? = null
+    for (tile in SetLimiterScale.tiles(timed)) {
+        // A gap between groups, so pain is drawn apart from the performance
+        // answers -- which #189 asks for in as many words, because a coach
+        // scanning an export must not have to read carefully to notice it.
+        if (group != null && tile.group != group) Spacer(Modifier.height(10.dp))
+        group = tile.group
+        LimiterTile(tile) {
+            if (tile.limiter == SetLimiter.OTHER) {
+                typing = true
+            } else {
+                viewModel.limitLastSet(tile.limiter)
+                onDone()
+            }
+        }
+    }
+    Spacer(Modifier.height(2.dp))
+    OutlinedButton(
+        onClick = {
+            viewModel.skipLastSetLimiter()
+            onDone()
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) { Text("SKIP", color = BarColors.Sub) }
+    Spacer(Modifier.height(6.dp))
+    SectionCaption("Skipping records no reason · you can still say why while you rest")
+}
+
+/**
+ * The free-text box, reachable only behind Other.
+ *
+ * The field normalizes on every keystroke, so what the lifter watches
+ * themselves type is exactly what is stored and exactly what is published. A
+ * character dropped at save is a character they believe they recorded, and the
+ * characters this drops are not cosmetic: the raw archive's set manifest is
+ * assembled as text and escapes nothing.
+ */
+@Composable
+private fun LimiterWords(words: String, onWords: (String) -> Unit, onSave: () -> Unit, onBack: () -> Unit) {
+    OutlinedTextField(
+        value = words,
+        onValueChange = { onWords(SetLimiter.normalizeNote(it) ?: "") },
+        label = { Text("In your words") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = onSave, modifier = Modifier.weight(1f)) { Text("SAVE") }
+        OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("BACK") }
+    }
+}
+
+/** One reason tile. Welfare answers are drawn in red; the rest are not. */
+@Composable
+private fun LimiterTile(tile: SetLimiterTile, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    // A colour is not a fact about a reason, so it is chosen here rather than
+    // carried on the tile -- but WHICH answers are set apart is carried, as
+    // [SetLimiterGroup], because that is a fact about the answer.
+    val color =
+        when (tile.group) {
+            SetLimiterGroup.WELFARE -> BarColors.Red
+            SetLimiterGroup.CONTEXT -> BarColors.Sub
+            else -> BarColors.Text
+        }
+    Row(
+        modifier =
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .clip(shape)
+            .background(BarColors.Surface, shape)
+            .border(1.dp, if (tile.group == SetLimiterGroup.WELFARE) BarColors.Red else BarColors.Track, shape)
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp, horizontal = 12.dp),
+    ) {
+        Text(tile.label, style = MaterialTheme.typography.titleSmall, color = color)
+    }
 }
 
 @Composable
