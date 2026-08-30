@@ -5,8 +5,9 @@ description: Run device-level verification on the local headless Android emulato
 
 # /bench-test
 
-`:core:ble` has no test source set at all, and `:app` has one file (`PlanQueueTest`, 5 tests over
-one pure function) — so almost nothing in `:app` has executable JVM coverage for behaviour, but
+`:core:ble` has no test source set at all, and `:app` has two files (`PlanQueueTest`, 5 tests over
+one pure function, and `AppendedSlotTest`, 9 over the appended-set rule) — so almost nothing in
+`:app` has executable JVM coverage for behaviour, but
 that is not the end of the story: anything reachable by screenshot-driven navigation can be
 verified here, on a disposable database, before it meets the only real training history that
 exists. This recipe executed `MIGRATION_9_10` under observation for the first time and produced

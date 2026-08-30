@@ -240,19 +240,34 @@ mutation killed, and that mapping is the whole content of a mutation table.
 
 - **`:core:ble` has no test source set at all** — `core/ble/src/` contains only `main`. Its
   `testDebugUnitTest`/`testReleaseUnitTest` report `NO-SOURCE`.
-- **`:app` has exactly one test file**: `app/src/test/kotlin/com/macrophage/barspeed/record/
-  PlanQueueTest.kt`, **12** `@Test` methods over one pure function — `grep -c '@Test'` on that
-  file, and 12 executed per variant in the JUnit XML, both measured at
-  `bea5d714532ee5cb458fa2ffa5f2503d1d532a00` by
-  `./gradlew test --rerun-tasks --no-build-cache --console=plain`. **This entry said 5 and that
-  was wrong**: 5 is the count in the stale 2026-08-22 `TEST-…PlanQueueTest.xml` quoted as a
-  schema example in §4, which that entry already warns is not evidence for any SHA — it was read
-  as a test count anyway. Earlier definitions said `:app` had **zero** test source sets; that is
-  false too and stays retracted. What remains true is the consequence: nothing that draws,
-  records or connects in `:app`'s other Kotlin source files is test-gated, so a green
-  `./gradlew test` **compiled** `:app` and asserted almost nothing about it. Compiled is not
-  tested. #193 tracks the wider sweep of sites that still assert a module has no test source
-  set; this line is one of them and is fixed here rather than waiting for it.
+- **`:app` has TWO test files**, both under
+  `app/src/test/kotlin/com/macrophage/barspeed/record/`: `PlanQueueTest.kt`, **5** `@Test`
+  methods over one pure function, and `AppendedSlotTest.kt`, **9** over `appendedState` and the
+  field-by-field rule for a `PlannedSlot` the lifter appends. 14 executed per variant, **28**
+  across the two variants, 0 failures, measured at
+  `1b38d079caa3e81cfa52541a57c066253a7a2356` by
+  `./gradlew :app:test --rerun-tasks --no-build-cache --console=plain`. **This entry said 12
+  over one file and both halves are now wrong**: nine of `PlanQueueTest`'s twelve moved to
+  `:core:model`'s `AddSetControlTest` when `AddSetControl` was extracted (#188), leaving 5, and
+  a second file arrived on the same branch. This is a correction REVERSING a correction — the
+  entry said 5 before, and that 5 was wrong for its SHA (it was the count in the stale
+  2026-08-22 `TEST-…PlanQueueTest.xml` quoted as a schema example in §4, read as a test count
+  anyway). The digit agreeing with the old wrong one is a coincidence of the extraction, not a
+  vindication of it. Earlier definitions said `:app` had **zero** test source sets; false too,
+  and it stays retracted.
+- **`:app`'s unit tests run on a JDK 21 launcher as of #188** —
+  `app/build.gradle.kts`, `tasks.withType<Test>().configureEach { javaLauncher.set(…21…) }`, the
+  block `:core:data` already carried. Before it, `:app` ran its tests on 17 while
+  `:core:{model,dsp,hrm,witmotion}` emit class file 65, so any `:app` test that LOADED one of
+  their types died with `UnsupportedClassVersionError` before asserting anything. That trap is
+  closed and four KDocs that described it in the present tense were corrected with it;
+  `AppendedSlotTest` loads `ExerciseDef` and `SetGeometryPolicy` freely. It changes no produced
+  bytecode.
+- **The consequence that mattered is unchanged, only narrowed.** Nothing in `:app` that draws,
+  connects or reaches Room is test-gated — 37 Kotlin files, `RecordScreen.kt` alone 2,318 lines
+  — so a green `./gradlew test` still **compiles** `:app` and asserts almost nothing about it.
+  Compiled is not tested. #193 tracks the wider sweep of sites that still assert a module has no
+  test source set; these lines are among them and are fixed here rather than waiting for it.
 - **There is no `androidTest` directory anywhere in the tree.**
 - **`./gradlew test` compiles both `:app:compileDebugKotlin` and `:app:compileReleaseKotlin`**, and
   the release variant additionally runs `isMinifyEnabled = true` with `proguard-rules.pro`
@@ -447,7 +462,8 @@ Two constraints belong with it:
   published schemas and `PlanFile`/`SessionExport`, not a subset one. e199119 did exactly that.
 
 **Where the module has no tests, red-before-green is not available at all.** For a change confined
-to `:core:ble` — or to any part of `:app` outside `PlanQueue` — either lift the decision into a
+to `:core:ble` — or to any part of `:app` outside `PlanQueue` and `appendedState` — either lift
+the decision into a
 pure function in `:core:model`/`:core:dsp` so c0–c2 can exist, or say plainly in the report and
 the commit body: *"no red was shown; this change is compile- and lint-gated only, not
 test-gated."* Never let the partition's presence in a definition imply it was performed.
