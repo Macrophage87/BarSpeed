@@ -84,11 +84,30 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
  * gate nothing can measure. This one shipped wrong and stayed wrong for every
  * session the app has recorded.
  *
- * The effort grid is offered either way, and that is issue #137. Gating it on
- * the target left the RPE record holding only the sets that hit their target,
- * so every failed set was absent from it by construction -- and the set the
- * lifter stopped is where the fatigue information is. The record read easier
- * the harder the session got.
+ * ## When the question is asked
+ *
+ * The owner: *"it should only be shown when all the reps are finished or the
+ * hold is finished. Earlier than that the only option available should be
+ * fail."* So on a set the app is counting -- a cadenced rep set, a hold on its
+ * clock -- the grid is withheld until the prescription is delivered, and the
+ * one control before that is [SetEndControl.END_FAILED]. Mid-set the question
+ * is not answerable: the set is not over, so how it went is not a fact yet.
+ *
+ * **This is not #137 coming back, and the difference is what makes it safe.**
+ * #137 gated the grid on the TARGET, which left the RPE record holding only
+ * the sets that hit their target -- every failed set absent by construction,
+ * and the set the lifter stopped is where the fatigue information is, so the
+ * record read easier the harder the session got. This gates on COMPLETION, and
+ * a set ended via Fail is still rateable: #140's correction grid sits on the
+ * rest screen, the unrated row reads EFFORT -- NOT RATED and carries a Rate
+ * action. The rating moves from the moment of ending to the rest period rather
+ * than disappearing. Two things must stay true or the defect IS back -- the
+ * rest-screen Rate path has to work on a Fail-ended set, which no test in this
+ * repository can check and which is verified on a device instead; and the
+ * gating must not spread to a kind with no completion signal, which is what
+ * [SetEndKind.gatesOnCompletion] is for.
+ *
+ * ## Which way out, once the grid is drawn
  *
  * What the target decides is the way OUT beside the grid, never whether rating
  * is possible:
@@ -100,10 +119,20 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
  *    tile would add one thing only: a TAPPED failure, which no later rep
  *    correction can clear. A miscounted rep total lands on exactly this path.
  *
- * Neither case nags. Both leave one tap that ends the set storing no RPE,
- * because a lifter walking away mid-set has to be able to leave, and because
- * absence has to stay a state the record can hold: an unrated set is not a
- * zero.
+ * Neither case nags. Every case leaves one tap that ends the set storing no
+ * RPE, because a lifter walking away mid-set has to be able to leave, and
+ * because absence has to stay a state the record can hold: an unrated set is
+ * not a zero.
+ *
+ * ## The cost, named rather than discovered
+ *
+ * On a guided or timed set, EVERY early exit is now recorded as a failure:
+ * a rack taken, a cramp, a dropped phone. Those sets are not failures and the
+ * record will call them one. That is the owner's instruction -- "the only
+ * option available should be fail" -- and the alternative, keeping END SET
+ * EARLY beside it, is what he ruled out. A TAPPED failure is also the one a
+ * later rep correction cannot clear; re-rating the set on the rest screen
+ * does overwrite it, which is the repair that fits.
  */
 object SetEndControlPolicy {
     /**
@@ -122,14 +151,15 @@ object SetEndControlPolicy {
      * A set rather than a boolean per control, so a control added later has to
      * be placed in every case rather than defaulting into all of them.
      */
-    @Suppress("UNUSED_PARAMETER")
     fun controls(kind: SetEndKind, targetMet: Boolean, complete: Boolean?): Set<SetEndControl> =
-        // [kind] and [complete] are not read yet: the gate itself lands in the
-        // commit whose red differentials were pushed for it. The signature
-        // exists first so those differentials can be written against the final
-        // one and fail on an assertion rather than on a compile error, which
-        // is not evidence of anything.
-        if (targetMet) {
+        // `complete == false` and not `complete != true`: null is a set whose
+        // completion the app cannot judge, and it falls through to the ungated
+        // rule below rather than into the gate. Written as an equality against
+        // false for exactly that reason -- the negation reads the same at a
+        // glance and gates every ad-hoc hold in the app.
+        if (kind.gatesOnCompletion && complete == false) {
+            setOf(SetEndControl.END_FAILED)
+        } else if (targetMet) {
             setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE)
         } else {
             setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED)

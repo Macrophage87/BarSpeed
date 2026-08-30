@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -2002,6 +2003,7 @@ private fun EndSetControl(state: RecordState, viewModel: RecordViewModel) {
             if (SetEndControl.EFFORT_GRID in controls) {
                 EndSetRpeGrid(state, viewModel, failedTile = SetEndControl.FAILED_TILE in controls)
             }
+            if (SetEndControl.END_FAILED in controls) FailSetButton(state, viewModel)
             if (SetEndControl.END_UNRATED in controls) EndSetEarlyButton(viewModel)
         }
     }
@@ -2046,6 +2048,45 @@ private fun UnsavedSetNotice(viewModel: RecordViewModel) {
     ) {
         Text("SAVE THIS SET AGAIN", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
     }
+}
+
+/**
+ * The one control a guided or timed set offers before it is complete (#186).
+ *
+ * The effort grid is not drawn yet, because how the set went is not a fact
+ * until the set is over -- the owner's "earlier than that the only option
+ * available should be fail". So this is the whole exit, and it stores the
+ * lifter's own TAPPED failure: [SetRating] with no RPE and `failed = true`,
+ * the same value the grid's failure tile writes.
+ *
+ * WHAT IT COSTS, and it is not hidden from the lifter: every early exit on
+ * these sets now records a failure, including the ones that are not -- a rack
+ * taken, a cramp. The caption says the set is rateable afterwards, because
+ * that is the half that keeps #137 from coming back: the rest screen's unrated
+ * row carries a Rate action, and re-rating overwrites the tapped verdict.
+ *
+ * Deliberately not the shape of [EndSetEarlyButton]. That one ends a set with
+ * no verdict at all and is the SKIP beside a grid; this one is the only way
+ * out and states a verdict, so it is a filled button rather than an outlined
+ * afterthought.
+ */
+@Composable
+private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
+    // The failure wording of the set's own ladder, so the button and the tile
+    // that replaces it after completion say the same word. A hold breaks
+    // early; a snatch is missed.
+    val label =
+        rpeOptions(timed = state.currentIsTimed, explosive = currentKind(state) == ExerciseKind.EXPLOSIVE)
+            .last().description
+    Button(
+        onClick = { viewModel.endSet(SetRating(null, failed = true, warmup = false)) },
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = BarColors.Red),
+    ) {
+        Text(label.uppercase(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    }
+    Spacer(Modifier.height(6.dp))
+    SectionCaption("How that set felt is asked once it is finished · you can still rate this one while you rest")
 }
 
 /**
