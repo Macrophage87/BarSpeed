@@ -179,8 +179,9 @@ class RecordExitPolicyTest {
      * A failed write is its own answer, not the in-progress one.
      *
      * The set is over by then, so the in-progress body would point the lifter
-     * at the effort grid and END SET EARLY -- controls that are no longer
-     * drawn. Naming a control that is not on screen is worse than naming none.
+     * at the set-end control at the bottom of the record screen -- a control
+     * that is no longer drawn. Naming a control that is not on screen is worse
+     * than naming none.
      */
     @Test
     fun `back names the set as unsaved after the write failed`() {

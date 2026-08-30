@@ -1887,10 +1887,6 @@ data class RecordState(
      * `GuidedCadenceRunner` never calls `onFinished` on one of those at all.
      * Rendering that absence as `false` would withhold the effort grid for the
      * whole set and leave a tapped failure as the only exit.
-     *
-     * Timed sets read the same [TimedSetEndPolicy.fellShort] the write and
-     * [setTargetMet] read, so the clock cannot say one thing here and another
-     * there.
      */
     val setComplete: Boolean?
         get() = SetCompletionPolicy.complete(
@@ -1903,7 +1899,11 @@ data class RecordState(
         )
 
     /**
-     * Whether the set's own clock or cadence has begun.
+     * Whether the thing the set is JUDGED on has begun -- a hold's clock, a
+     * guided set's cadence. On a guided set `setElapsedS` is already ticking
+     * here, because `beginSet` starts the tick loop before the cadence's
+     * lead-in; nothing records that figure on a guided set, and it is not what
+     * this asks about.
      *
      * False for the whole lead-in, which is a window in which the set is
      * recording, nothing has been measured, and the question of how it went

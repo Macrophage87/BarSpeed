@@ -24,8 +24,10 @@ enum class SetEndControl {
      *
      * The difference from [FAILED_TILE] is what DRAWS. That one is a tile
      * inside the grid and puts nothing on the screen by itself; this one is a
-     * control of its own, and it is the only exit a guided or timed set has
-     * before it is complete (#186).
+     * control of its own, and it is the only exit a guided or timed set that
+     * is UNDER WAY has before it is complete (#186). During the lead-in the
+     * exit is [END_UNRATED] instead: a set whose clock or cadence has not
+     * begun has not failed at anything.
      */
     END_FAILED,
 }
@@ -89,9 +91,11 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
  * The owner: *"it should only be shown when all the reps are finished or the
  * hold is finished. Earlier than that the only option available should be
  * fail."* So on a set the app is counting -- a cadenced rep set, a hold on its
- * clock -- the grid is withheld until the prescription is delivered, and the
- * one control before that is [SetEndControl.END_FAILED]. Mid-set the question
- * is not answerable: the set is not over, so how it went is not a fact yet.
+ * clock -- the grid is withheld until the prescription is delivered, and once
+ * the set is under way the one control before that is
+ * [SetEndControl.END_FAILED]; during the lead-in it is
+ * [SetEndControl.END_UNRATED]. Mid-set the question is not answerable: the
+ * set is not over, so how it went is not a fact yet.
  *
  * **This is not #137 coming back, and the difference is what makes it safe.**
  * #137 gated the grid on the TARGET, which left the RPE record holding only
@@ -105,11 +109,11 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
  * disappearing. (An auto-ended hold, which carries no verdict at all, is the
  * row that reads EFFORT -- NOT RATED with a Rate action instead; both routes
  * reach the same grid. `EffortCorrectionPolicy.lineText` decides which, and a
- * tapped failure is not an absence.) Two things must stay true or the defect IS back -- the
- * rest-screen Rate path has to work on a Fail-ended set, which no test in this
- * repository can check and which is verified on a device instead; and the
- * gating must not spread to a kind with no completion signal, which is what
- * [SetEndKind.gatesOnCompletion] is for.
+ * tapped failure is not an absence.) Two things must stay true or the defect
+ * IS back -- the rest-screen Rate path has to work on a Fail-ended set, which
+ * no test in this repository can check and which is verified on a device
+ * instead; and the gating must not spread to a kind with no completion
+ * signal, which is what [SetEndKind.gatesOnCompletion] is for.
  *
  * ## Which way out, once the grid is drawn
  *
@@ -146,9 +150,9 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
  * On a guided or timed set that is UNDER WAY, every early exit is now
  * recorded as a failure: a rack taken, a cramp, a dropped phone. Those sets
  * are not failures and the record will call them one. The lead-in is exempt
- * -- a set whose clock never started has not failed at anything -- and
- * leaving during it stores no tapped verdict, though the write still DERIVES
- * a shortfall from the near-zero count, so the row reads failed with
+ * -- a set whose clock or cadence had not begun has not failed at anything --
+ * and leaving during it stores no tapped verdict, though the write still
+ * DERIVES a shortfall from the near-zero count, so the row reads failed with
  * `tappedFailed` false. Whether such a set should be recorded at all is the
  * owner's call and is carried as a field question rather than answered here.
  *

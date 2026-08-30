@@ -43,8 +43,13 @@ package com.macrophage.barspeed.model
  */
 object TimedSetEndPolicy {
     /**
-     * Fraction of the prescription a timed set must reach to count as
-     * delivered.
+     * Fraction of the prescription a RECORDED hold must reach before the write
+     * grades it as short.
+     *
+     * It is NOT the threshold the effort grid opens at --
+     * [SetCompletionPolicy] asks [remainingS] and [endsNow] instead, so a hold
+     * is "delivered" to the grid only at the target itself. Two thresholds,
+     * two questions; do not read this one as "finished".
      *
      * The canonical copy. `TIMED_CLOSE_ENOUGH_FRACTION` in `:app` is declared
      * from this one, so there is a single number rather than two that agree

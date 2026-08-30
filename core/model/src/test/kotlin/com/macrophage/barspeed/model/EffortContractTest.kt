@@ -213,8 +213,11 @@ class EffortContractTest {
     // ---- the scale itself, issue #187 ---------------------------------------
 
     /**
-     * The published `rpe` description enumerates every rung the app can write,
-     * in the words the tile says them.
+     * The published `rpe` description names the four COUNTED rungs in the
+     * tile's own words, and the full anchor set the app can write. The three
+     * HEADROOM rungs' wording moved to `the published rpe description names
+     * the headroom figures the tiles offer`, which checks them against the
+     * caption table rather than against literals.
      *
      * Exact phrases rather than a looser check, because the ANCHORS are the
      * contract: a stored 6 is only readable if the document says what tapping
@@ -224,7 +227,7 @@ class EffortContractTest {
      * predictably shifts the ratings people give.
      */
     @Test
-    fun `the published rpe description names every rung the grid offers`() {
+    fun `the published rpe description names every counted rung, and every anchor the grid writes`() {
         val description = setProperty("rpe")["description"]!!.jsonPrimitive.content
         listOf(
             "10 nothing left",

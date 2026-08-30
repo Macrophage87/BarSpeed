@@ -321,10 +321,15 @@ private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
     // Names the save-and-end control that is already on this screen, below the
     // fold: without it the choice reads as "lose the set or stay", which is a
     // false pair while a control that ends the set properly sits underneath.
+    // It may NOT name the effort grid or END SET EARLY by name, because since
+    // #186 neither is drawn on a running tempo-guided or timed set, and
+    // RecordExitPolicyTest states the rule for the sibling prompt: naming a
+    // control that is not on screen is worse than naming none.
     ExitPrompt.SET_IN_PROGRESS ->
         "Nothing about this set has been saved — the reps, the sensor data and the effort rating all go. " +
-            "To keep it, tap Keep recording and end the set with the effort grid (or END SET EARLY) at the " +
-            "bottom of this screen."
+            "To keep it, tap Keep recording and end the set with the control at the bottom of this screen. " +
+            "On a tempo-guided or timed set that is under way that control ends the set as a failure, and " +
+            "you can still rate the set while you rest."
     // No word here may imply the session can be picked up again: nothing reads
     // an open session row back into this screen, and the next set would open a
     // second one.
@@ -1986,7 +1991,9 @@ private fun phaseLabel(phase: Phase): String = when (phase) {
  * tempo-guided or timed set the grid is withheld until the app can say the set
  * is over, and the one control before that is the standalone failure button
  * (#186). During either kind's lead-in, before its clock or its cadence has
- * started, the one control is END SET EARLY and no verdict is stored.
+ * started, the one control is END SET EARLY, which stores no TAPPED verdict;
+ * the write still derives a shortfall from the near-zero count, so a set with
+ * a prescription is recorded `failed` with `tappedFailed` false.
  *
  * Rating an abandoned set does not log it as a good one: the shortfall is
  * derived at the write from the rep or second count and lands as `failed`
@@ -2063,13 +2070,14 @@ private fun UnsavedSetNotice(viewModel: RecordViewModel) {
 }
 
 /**
- * The one control a guided or timed set offers before it is complete (#186).
+ * The one control a guided or timed set that is UNDER WAY offers before it is
+ * complete (#186).
  *
  * The effort grid is not drawn yet, because how the set went is not a fact
  * until the set is over -- the owner's "earlier than that the only option
- * available should be fail". So this is the whole exit, and it stores the
- * lifter's own TAPPED failure: [SetRating] with no RPE and `failed = true`,
- * the same value the grid's failure tile writes.
+ * available should be fail". So once the set is running this is the whole
+ * exit, and it stores the lifter's own TAPPED failure: [SetRating] with no
+ * RPE and `failed = true`, the same value the grid's failure tile writes.
  *
  * WHAT IT COSTS, and it is not hidden from the lifter: every early exit on a
  * set that is UNDER WAY now records a failure, including the ones that are not
@@ -2080,14 +2088,14 @@ private fun UnsavedSetNotice(viewModel: RecordViewModel) {
  * Rate action is the OTHER row, for a set carrying no verdict at all, such as
  * an auto-ended hold; both open the same grid.)
  *
- * This control is not drawn during the set's lead-in. A set whose clock never
- * started has not failed at anything, so that window offers
+ * This control is not drawn during the set's lead-in. A set whose clock or
+ * cadence had not begun has not failed at anything, so that window offers
  * [EndSetEarlyButton] instead (#186).
  *
  * Deliberately not the shape of [EndSetEarlyButton]. That one ends a set with
  * no verdict at all and is the SKIP beside a grid; this one is the only way
- * out and states a verdict, so it is a filled button rather than an outlined
- * afterthought.
+ * out of a set that is already running, and it states a verdict, so it is a
+ * filled button rather than an outlined afterthought.
  */
 @Composable
 private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
@@ -2115,13 +2123,16 @@ private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
 }
 
 /**
- * Ends the set with NO rating attached. It is the SKIP beside the effort grid
+ * Ends the set with NO rating attached. Beside the effort grid it is the SKIP
  * rather than the only way out: a lifter walking away mid-set must not be made
- * to rate the set before it will end, so absence stays one tap away.
+ * to rate the set before it will end, so absence stays one tap away. During a
+ * guided or timed set's lead-in it is drawn alone and IS the only way out
+ * (#186) -- a set that has not begun has not failed at anything.
  *
- * It does not tap the failure, and the grid above it withholds the "failed the
- * set" tile for the same reason. A shortfall is DERIVED at the write, so it can
- * be re-derived -- correcting a miscounted rep total on the rest screen clears
+ * It does not tap the failure, and where a grid is drawn above it that grid
+ * withholds the "failed the set" tile for the same reason. A shortfall is
+ * DERIVED at the write, so it can be re-derived -- correcting a miscounted
+ * rep total on the rest screen clears
  * it. A TAPPED failure is one no later REP CORRECTION can clear: `correctReps`
  * re-derives the derived half and leaves the tapped half standing. Re-rating
  * the set does overwrite it, so it is not permanent -- it is out of reach of
