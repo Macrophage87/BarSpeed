@@ -54,7 +54,8 @@ data class ScanRow(
 )
 
 /**
- * How the found-devices list is ordered and what each row claims, issue #183.
+ * How the found-devices list is ordered and what each row claims, issues #183
+ * and #197.
  *
  * A `:core:model` object because the alternative is a decision nothing can run
  * against: `:core:ble` has no test source set and `:app` has one test file over
@@ -140,6 +141,26 @@ object DeviceScanListPolicy {
      * lifter's own tap: [knownAddresses] changes when something is paired or
      * forgotten and at no other time, so a device leaves the offers the
      * instant it is paired rather than at the next scan.
+     *
+     * #197 adds a SECOND partition, on [ScanRow.classified], and the owner's
+     * own ask -- "make the sensors that look like HRMs and IMUs appear first"
+     * -- decides which split is OUTER. Paired-vs-on-offer stays outer and
+     * classified-vs-not is INNER, applied inside each half separately, so the
+     * final order is: on-offer/classified, on-offer/unclassified,
+     * paired/classified, paired/unclassified. Making classification the outer
+     * split instead would let a paired, classified row (shown only as a
+     * diagnostic, per the KDoc above) lead a pairable, unclassified one --
+     * exactly the "candidate buried under an already-saved device" defect
+     * #183's split exists to prevent. Nesting classification inside the
+     * existing split cannot do that: a paired row can never leave the bottom
+     * half regardless of how it classifies.
+     *
+     * [strengthOf]'s RSSI never enters either split -- classification is a
+     * property of the device (its advertised service UUIDs and name), not of
+     * one packet, so ordering on it does not reintroduce the jitter #183
+     * removed. Each partition is Kotlin's stable [List.partition], so
+     * first-seen order survives inside all four groups, not just the two
+     * #183 already held.
      */
     fun displayRows(sighted: List<Sighting>, knownAddresses: Set<String>): List<ScanRow> {
         val rows =
@@ -153,7 +174,13 @@ object DeviceScanListPolicy {
                 )
             }
         val (paired, onOffer) = rows.partition { it.alreadyPaired }
-        return onOffer + paired
+        return byClassification(onOffer) + byClassification(paired)
+    }
+
+    /** The INNER split #197 adds: classified rows first, first-seen order held within each half. */
+    private fun byClassification(rows: List<ScanRow>): List<ScanRow> {
+        val (classified, unclassified) = rows.partition { it.classified }
+        return classified + unclassified
     }
 
     /**
