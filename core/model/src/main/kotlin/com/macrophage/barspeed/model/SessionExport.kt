@@ -235,6 +235,21 @@ data class SessionExport(
          * changes type or stops being written, and both are absent on every
          * set nobody was asked about and on every set recorded before database
          * v13.
+         *
+         * 1.14 carries a FOURTH change (#194), under the same unreleased
+         * number and NOT additive: `warmup` gains a SECOND PRODUCER. Until now
+         * the plan declared it and nothing else could; the lifter may now mark
+         * or unmark the set on the rest screen, and where both exist the
+         * lifter's mark wins. No key changes type and no stored value is
+         * rewritten, but a 1.13 reader that treats `warmup: true` as "the plan
+         * said so" must be re-checked -- which is why this is flagged rather
+         * than filed beside the additive changes. The new key
+         * [SetExport.warmupByLifter] says which of the two a given set
+         * carries, and is absent on every set the lifter never marked, which
+         * is every set recorded before database v13. What it does NOT do is
+         * publish the plan's overridden declaration: where the mark disagrees,
+         * the document carries the answer and its author, and the row keeps
+         * both.
          */
         const val SCHEMA_VERSION = "1.14"
 
@@ -412,8 +427,8 @@ data class SetExport(
      */
     val limiterNote: String? = null,
     /**
-     * True when the PLAN declared this set preparatory -- a ramp set, a
-     * warm-up. Omitted when false.
+     * True when this set was preparatory -- a ramp set, a warm-up. Omitted
+     * when false.
      *
      * A DECLARATION about what the set was for, not a rating of it, and since
      * 1.14 it carries no claim at all about [rpe]: a warm-up set is rated on
@@ -422,12 +437,36 @@ data class SetExport(
      * together -- so on a pre-1.14 session the pair is a limitation of the old
      * scale rather than a statement that the lifter declined to rate the set.
      *
-     * False on an ad-hoc set and on a set the lifter appended mid-session,
-     * because nothing declared those. That is the app having no way to say it
-     * rather than a statement that the set was working, and the two are not
-     * distinguishable here.
+     * TWO PRODUCERS, AND [warmupByLifter] SAYS WHICH ONE THIS IS (#194). The
+     * plan declares it, and the lifter may mark or unmark the set afterwards;
+     * where both exist the LIFTER'S mark wins, because the declaration is a
+     * prediction written before the session and the mark is a statement by the
+     * person who did the set. [WarmupMarkPolicy] owns that composition.
+     *
+     * A PARAGRAPH THAT USED TO STAND HERE IS DELETED RATHER THAN REWORDED: it
+     * said this flag is false on an ad-hoc or appended set "because nothing
+     * declared those", and that "the app has no way to say it". Both were true
+     * until #194 and are false now -- the rack warm-up is exactly the case the
+     * mark exists for.
      */
     val warmup: Boolean = false,
+    /**
+     * True when the LIFTER stated this set's purpose themselves, rather than
+     * leaving the plan's declaration to stand (#194). Omitted when false.
+     *
+     * It says WHICH FACT [warmup] carries and does not change what [warmup]
+     * means. True with `warmup` absent is a set the lifter said was NOT a
+     * warm-up -- which is a real statement and the reason the mark is stored
+     * as three states rather than two.
+     *
+     * WHAT THIS DOCUMENT DOES NOT SAY, stated because the absence is easy to
+     * read past: where this is true, the plan's own declaration is not
+     * published and cannot be recovered from the export. The row keeps both
+     * facts; the document publishes the answer and its author. Nothing today
+     * needs the overridden declaration, and publishing a fourth key for it was
+     * refused rather than forgotten.
+     */
+    val warmupByLifter: Boolean = false,
     /**
      * True when the LIFTER appended this set to the exercise mid-session, and
      * the plan did not prescribe it. Omitted when false (#177).

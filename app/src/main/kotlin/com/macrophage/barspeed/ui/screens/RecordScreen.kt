@@ -103,6 +103,7 @@ import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TempoDigit
 import com.macrophage.barspeed.model.TimedSetEndPolicy
+import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.record.PlannedSlot
 import com.macrophage.barspeed.record.RecordState
@@ -2322,6 +2323,7 @@ private fun LastSetDetail(state: RecordState, viewModel: RecordViewModel) {
         RpeSelector(state, viewModel) { changingEffort = false }
     }
     LimiterSection(state, viewModel)
+    WarmupMarkRow(state, viewModel)
     state.lastFeedback?.let { RepCorrectionRow(it, viewModel) }
     state.lastFeedback?.let { HoldCorrectionRow(it, viewModel) }
     Spacer(Modifier.height(6.dp))
@@ -2619,7 +2621,10 @@ private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked
  * [RecordState.lastSetWarmup] is NOT one of those flags any more. There is no
  * warm-up tile since #187 -- `EffortScaleTest` pins its absence -- and the
  * flag is the plan's declaration about the set, frozen at the write, so it is
- * routinely true on a set carrying no rating at all.
+ * routinely true on a set carrying no rating at all. The lifter's own mark,
+ * added by #194, is not one of them either and for the same reason: it says
+ * what the set was FOR, this line says how it went, and [WarmupMarkRow] draws
+ * the first one row below.
  *
  * Issue #137 makes the declined case the common one and the tapped-tile case
  * rarer, because the failed tile is no longer drawn on a short set at all. This
@@ -2638,11 +2643,13 @@ private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
     val options =
         rpeOptions(feedback.actualDurationS != null, feedback.explosive, state.weightUnit)
     // The warm-up branch this used to open with is gone with the tile (#187).
-    // A warm-up set now carries an ordinary rating and reads as one; that it
-    // was a ramp is the plan's statement and appears on the stored set in the
-    // session history, not anywhere in the record flow. The lifter is not told
-    // mid-session that the current set was declared preparatory, which is the
-    // same gap the missing in-app toggle leaves.
+    // A warm-up set carries an ordinary rating and reads as one; that it was a
+    // ramp is a separate fact, and since #194 it is shown and editable one row
+    // down, in [WarmupMarkRow], rather than being absent from the record flow
+    // altogether. The sentence that stood here said the lifter is never told
+    // mid-session that the set was declared preparatory and called the in-app
+    // toggle missing; both were true until #194 and are deleted rather than
+    // reworded, because the row below now says it and can change it.
     val tapped = options.firstOrNull { !it.failed && it.rpe == state.lastSetRpe }?.description
     // The wording is EffortCorrectionPolicy's, including the named absence for
     // a set with nothing logged; `:app` cannot test a composable, so the
@@ -2693,21 +2700,72 @@ private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
 private fun LimiterSection(state: RecordState, viewModel: RecordViewModel) {
     val feedback = state.lastFeedback ?: return
     if (!SetLimiterPolicy.offersCorrection(state.lastSetFailed, state.lastSetLimiter)) return
+    // Both keyed on setsCompleted, as `changingEffort` is: an open page must
+    // close when the next set ends rather than carrying a stale set's answer
+    // into the following rest.
+    //
+    // `dismissed` lives HERE and not in RecordState, and the distinction is
+    // the one #189 turns on: it is not a fact about the set, it is whether
+    // this screen has already offered the page. A skip stores nothing --
+    // absence is already what the row carries -- so there is nothing for the
+    // record to remember, and the row stays reachable either way because
+    // [SetLimiterPolicy.offersCorrection] never reads it.
+    var dismissed by remember(state.setsCompleted) { mutableStateOf(false) }
+    var changing by remember(state.setsCompleted) { mutableStateOf(false) }
     val prompting =
         SetLimiterPolicy.prompts(
             failed = state.lastSetFailed,
             limiter = state.lastSetLimiter,
-            dismissed = state.lastSetLimiterAsked,
+            dismissed = dismissed,
         )
-    // Keyed on setsCompleted, as `changingEffort` is: an open page must close
-    // when the next set ends rather than carrying a stale set's answer into
-    // the following rest.
-    var changing by remember(state.setsCompleted) { mutableStateOf(false) }
     val timed = feedback.actualDurationS != null
     LimiterLine(state, timed) { changing = !changing }
     if (prompting || changing) {
-        LimiterPage(timed = timed, viewModel = viewModel) { changing = false }
+        LimiterPage(timed = timed, viewModel = viewModel, onSkip = { dismissed = true }) { changing = false }
     }
+}
+
+/**
+ * What the set was FOR, and the one tap that changes it (#194).
+ *
+ * WHY IT IS NOT A TILE. #187 removed the warm-up tile from the effort grid
+ * because a set's purpose and its effort are orthogonal, and the tile recorded
+ * `warmup = true` and `rpe = null` together -- discarding the effort by
+ * construction. A seventh tile here would rebuild that coupling in a new
+ * place. This is a row of its own and touches nothing about the rating.
+ *
+ * WHOSE ANSWER IS DRAWN IS [WarmupMarkPolicy]'S DECISION, not this file's. The
+ * plan declares, the lifter may mark, the lifter wins where both exist -- and
+ * the row says out loud when the two disagree, so a lifter who takes a set off
+ * the plan's ramp list can see that the app knows the plan said otherwise
+ * rather than finding the plan's word quietly gone.
+ */
+@Composable
+private fun WarmupMarkRow(state: RecordState, viewModel: RecordViewModel) {
+    if (state.lastFeedback == null) return
+    val declared = state.lastSetWarmup
+    val mark = state.lastSetWarmupMark
+    val warmup = WarmupMarkPolicy.effective(declared, mark)
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        SectionCaption(
+            if (warmup) "Purpose \u00b7 Warm-up" else "Purpose \u00b7 Working set",
+            color = if (warmup) BarColors.Sub else BarColors.Volt,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = viewModel::toggleLastSetWarmup) {
+            Text(if (warmup) "Not a warm-up" else "Warm-up", color = BarColors.Sub)
+        }
+    }
+    if (WarmupMarkPolicy.disagrees(declared, mark)) {
+        SectionCaption(
+            if (declared) {
+                "The plan called this a warm-up \u00b7 your mark stands"
+            } else {
+                "The plan did not call this a warm-up \u00b7 your mark stands"
+            },
+        )
+    }
+    Spacer(Modifier.height(4.dp))
 }
 
 /** What the rest screen says the set ended for, and the way back into it. */
@@ -2745,7 +2803,7 @@ private fun LimiterLine(state: RecordState, timed: Boolean, onChange: () -> Unit
  * which is the exact trap [FailSetButton] already carries a comment about.
  */
 @Composable
-private fun LimiterPage(timed: Boolean, viewModel: RecordViewModel, onDone: () -> Unit) {
+private fun LimiterPage(timed: Boolean, viewModel: RecordViewModel, onSkip: () -> Unit, onDone: () -> Unit) {
     var typing by remember { mutableStateOf(false) }
     var words by remember { mutableStateOf("") }
     SectionCaption("Why did that set end? · optional")
@@ -2782,7 +2840,7 @@ private fun LimiterPage(timed: Boolean, viewModel: RecordViewModel, onDone: () -
     Spacer(Modifier.height(2.dp))
     OutlinedButton(
         onClick = {
-            viewModel.skipLastSetLimiter()
+            onSkip()
             onDone()
         },
         modifier = Modifier.fillMaxWidth(),

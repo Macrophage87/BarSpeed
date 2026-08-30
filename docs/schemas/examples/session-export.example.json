@@ -109,6 +109,18 @@
       "exercise": "seated_leg_curl",
       "sets": [
         {
+          "load_kg": 20,
+          "load_lb": 44.1,
+          "reps": 10,
+          "warmup": true,
+          "warmupByLifter": true,
+          "rpe": 1,
+          "repsManual": true,
+          "plannedReps": 10,
+          "rest_s": 90,
+          "summary": { "meanConVel_mps": 0.62, "peakConVel_mps": 0.95, "meanEcc_s": 2.4, "meanCon_s": 0.8, "meanRom_m": 0.42, "romSpread_pct": 5.0 }
+        },
+        {
           "load_kg": 45,
           "load_lb": 99.2,
           "reps": 10,

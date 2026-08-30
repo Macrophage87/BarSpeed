@@ -7,10 +7,13 @@ package com.macrophage.barspeed.model
  * At most one of [failed] and a non-null [rpe] is ever set; the grid draws one
  * tile per fact and two lit tiles say two contradictory things about one set.
  *
- * There is no warm-up member since #187. Warm-up left the effort scale to
- * become a plan declaration, so no tile of this grid can set it and nothing
- * here can pre-light it -- a warm-up set is now rated on the same rungs as
- * every other set, which is what the parameter used to prevent.
+ * There is no warm-up member since #187, and #194 did not put one back. Warm-up
+ * left the effort scale to become a declaration about the set's purpose --
+ * the plan's, or since #194 the lifter's own mark on the rest screen -- so no
+ * tile of this grid can set it and nothing here can pre-light it. A warm-up
+ * set is rated on the same rungs as every other set, which is what the
+ * parameter used to prevent. The mark is drawn as its own row beside this
+ * grid, never as a rung in it.
  */
 data class EffortSelection(
     /** The "failed the set" tile is pre-lit. */

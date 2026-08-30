@@ -59,6 +59,23 @@ class SetRatingTracker(private val repository: SessionRepository) {
     }
 
     /**
+     * The lifter's own statement about whether the set was preparatory (#194).
+     *
+     * Its own statement, beside [limit] and for the same reason. It does not
+     * touch `warmup`, which is what the PLAN declared and is frozen at the
+     * write, and it does not touch either failure fact: what a set was FOR is
+     * orthogonal to how it went, which is the whole of #187 and the reason
+     * this is not a seventh effort tile.
+     *
+     * Returns null when there is no recorded set to mark.
+     */
+    suspend fun markWarmup(mark: Boolean?): Boolean? {
+        val id = setId ?: return null
+        repository.setWarmupMark(id, mark)
+        return true
+    }
+
+    /**
      * Record, change or clear why the set ENDED (#189).
      *
      * Its own statement rather than an argument of [rate], and the separation

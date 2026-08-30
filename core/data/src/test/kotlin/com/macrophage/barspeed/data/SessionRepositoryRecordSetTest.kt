@@ -119,6 +119,10 @@ class SessionRepositoryRecordSetTest {
             calls += "updateLimiter"
         }
 
+        override suspend fun updateWarmupMark(setId: Long, warmupMark: Boolean?) {
+            calls += "updateWarmupMark"
+        }
+
         override suspend fun overrideReps(setId: Long, reps: Int) {
             calls += "overrideReps"
         }

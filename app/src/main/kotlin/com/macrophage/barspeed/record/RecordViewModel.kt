@@ -61,6 +61,7 @@ import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.VoiceCue
+import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -485,18 +486,30 @@ private suspend fun openSession(repository: SessionRepository, p: PendingSetWrit
  * range moves nothing rather than storing a value the store then corrects.
  */
 /**
- * The state a skipped reason page leaves behind (#189). Free function for
- * [applyLimiter]'s reason.
+ * One tap of the rest screen's warm-up mark (#194). Free function for
+ * [applyPrepAdjustment]'s reason.
  *
- * WRITES NOTHING TO THE DATABASE, and that is the whole content of it: absence
- * is already the stored state, so a skip has nothing to store. What changes is
- * only that the page stops offering itself for this set. The row on the rest
- * screen stays reachable either way -- [SetLimiterPolicy.offersCorrection]
- * decides that and does not read this flag -- so a skip is not a door that
- * locks.
+ * The next mark is [WarmupMarkPolicy]'s decision, not this function's: it
+ * flips whatever currently stands and never returns to null, because a lifter
+ * who has tapped has said something and returning them to silence would hand
+ * the plan back a set they had just taken off it.
+ *
+ * Writes the MARK only. `warmup` -- the plan's declaration -- is untouched, so
+ * a set unmarked here still remembers that the plan called it a ramp, and
+ * nothing about the rating moves: `warmup: true` beside `rpe: 6` is the point
+ * of the whole change.
  */
-private fun skippedLimiterState(stateFlow: MutableStateFlow<RecordState>) {
-    stateFlow.value = stateFlow.value.copy(lastSetLimiterAsked = true)
+private fun applyWarmupMark(
+    stateFlow: MutableStateFlow<RecordState>,
+    ratings: SetRatingTracker,
+    appScope: CoroutineScope,
+) {
+    val s = stateFlow.value
+    val mark = WarmupMarkPolicy.toggled(s.lastSetWarmup, s.lastSetWarmupMark)
+    appScope.launch(Dispatchers.Main.immediate) {
+        ratings.markWarmup(mark) ?: return@launch
+        stateFlow.value = stateFlow.value.copy(lastSetWarmupMark = mark)
+    }
 }
 
 /**
@@ -527,7 +540,6 @@ private fun applyLimiter(
             stateFlow.value.copy(
                 lastSetLimiter = limiter,
                 lastSetLimiterNote = normalized,
-                lastSetLimiterAsked = true,
             )
     }
 }
@@ -1450,6 +1462,9 @@ private fun restingState(
         // OR-ed in, and that OR is what this field exists to see past.
         lastSetTappedFailed = p.rating?.failed == true,
         lastSetWarmup = p.slot?.warmup == true,
+        // A new set arrives unmarked, whatever the last one carried, for the
+        // reason stated at the reason fields below.
+        lastSetWarmupMark = null,
         // A new set arrives carrying no reason and having never been asked,
         // whatever the last one carried. Written explicitly rather than left
         // to a default, because this is a copy of the previous state and a
@@ -1457,7 +1472,6 @@ private fun restingState(
         // is how a reason ends up published against the wrong set.
         lastSetLimiter = null,
         lastSetLimiterNote = null,
-        lastSetLimiterAsked = false,
         restRemainingS = restRemainingS,
         // Set from the frozen index rather than incremented, so a retry cannot
         // count the same set twice.
@@ -1825,13 +1839,15 @@ data class RecordState(
     /** The lifter's own words, where [lastSetLimiter] is [SetLimiter.OTHER]. */
     val lastSetLimiterNote: String? = null,
     /**
-     * True once the reason page has been offered for the set just finished.
+     * The lifter's own statement about the just-finished set's purpose, or
+     * null where they have not made one (#194).
      *
-     * Not a fact about the set and never stored: it is what makes the skip
-     * hold. It is reset by every write that lands a new set on this screen,
-     * beside [lastSetLimiter] itself.
+     * Beside [lastSetWarmup] and never instead of it: that field is what the
+     * PLAN declared, frozen at the write, and `WarmupMarkPolicy` composes the
+     * two. Null is silence and is not a quiet false -- it is the ordinary
+     * state of every set on a declared plan.
      */
-    val lastSetLimiterAsked: Boolean = false,
+    val lastSetWarmupMark: Boolean? = null,
     val audioCues: Boolean = true,
     val imuConnected: Boolean = false,
     val imuConnecting: Boolean = false,
@@ -3287,12 +3303,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Why the set ended (#189); the work is in the free [applyLimiter]. */
+    fun toggleLastSetWarmup() = applyWarmupMark(stateFlow, ratings, container.appScope)
+
     fun limitLastSet(limiter: SetLimiter?, note: String? = null) =
         applyLimiter(stateFlow, limiter, note, ratings, container.appScope)
-
-    /** The lifter left the reason page unanswered (#189); see [skippedLimiterState]. */
-    fun skipLastSetLimiter() = skippedLimiterState(stateFlow)
 
     /** One tap of the prep control; the work is in the free [applyPrepAdjustment]. */
     fun adjustPrep(deltaS: Int) = applyPrepAdjustment(stateFlow.value, deltaS, container.appScope, container.settings)

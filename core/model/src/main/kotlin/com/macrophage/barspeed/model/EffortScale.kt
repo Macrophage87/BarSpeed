@@ -58,10 +58,12 @@ package com.macrophage.barspeed.model
  * A warm-up is what a set is FOR, not how it went, and the two are
  * orthogonal: a 500 lb squatter's empty-bar ramp set is a warm-up by purpose
  * and what it felt like is a separate, knowable fact. Warm-up is declared on
- * the plan and every set including a warm-up gets a rating from this scale --
- * the empty-bar ramp lands on [HeadroomTier.MUCH_MORE]. Before this scale the
- * tile recorded `warmup = true` AND `rpe = null`, discarding the effort by
- * construction.
+ * the plan, and since #194 the lifter may also mark a set themselves on the
+ * rest screen -- but by neither route is it a rung of THIS scale, and every
+ * set including a warm-up gets a rating from it; the empty-bar ramp lands on
+ * [HeadroomTier.MUCH_MORE]. Before this scale the tile recorded
+ * `warmup = true` AND `rpe = null`, discarding the effort by construction.
+ * [WarmupMarkPolicy] carries the mark, deliberately nowhere near here.
  */
 enum class EffortClaim {
     /** "How much more load, or time, would this set have taken?" */

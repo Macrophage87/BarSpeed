@@ -69,6 +69,8 @@ class SessionExportWarmupMarkTest {
 
         override suspend fun updateLimiter(setId: Long, limiter: String?, limiterNote: String?) = Unit
 
+        override suspend fun updateWarmupMark(setId: Long, warmupMark: Boolean?) = Unit
+
         override suspend fun overrideReps(setId: Long, reps: Int) = Unit
 
         override suspend fun overrideDuration(setId: Long, seconds: Int) = Unit

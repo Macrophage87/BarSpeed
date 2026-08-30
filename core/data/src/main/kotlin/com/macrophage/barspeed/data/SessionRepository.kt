@@ -437,6 +437,17 @@ class SessionRepository(
         sessionDao.updateRpe(setId, rpe, failed, warmup)
 
     /**
+     * The lifter's own statement that the just-recorded set was, or was not,
+     * preparatory (#194).
+     *
+     * Never touches `warmup`, which is what the PLAN declared and is frozen at
+     * the write. The two are composed at the read by
+     * [com.macrophage.barspeed.model.WarmupMarkPolicy], so that unmarking a
+     * plan-declared warm-up does not delete the plan's word from the row.
+     */
+    suspend fun setWarmupMark(setId: Long, warmupMark: Boolean?) = sessionDao.updateWarmupMark(setId, warmupMark)
+
+    /**
      * Why the set ended, from the page offered after a failed set, and
      * correctable on the rest screen (#189).
      *

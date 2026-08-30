@@ -38,6 +38,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
@@ -255,7 +256,14 @@ private fun SetCardHeader(record: SetRecordEntity, unit: WeightUnit) {
 private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (record.failed) VerdictChip("FAILED", ChipTone.BAD)
-        if (record.warmup) VerdictChip("WARM-UP", ChipTone.NEUTRAL)
+        // The plan's declaration composed with the lifter's own mark (#194),
+        // never the raw column. This screen is the LAST consumer of the pair,
+        // and reading `record.warmup` alone here would draw the plan's word on
+        // a set the lifter had unmarked -- the near-neighbour failure of
+        // wiring the export and leaving the screen beside it.
+        if (WarmupMarkPolicy.effective(record.warmup, record.warmupMark)) {
+            VerdictChip("WARM-UP", ChipTone.NEUTRAL)
+        }
         // Beside WARM-UP because it answers the same kind of question about the
         // set -- what KIND of set was this -- and because an appended set
         // carries no plannedReps, so without the chip it reads on this screen

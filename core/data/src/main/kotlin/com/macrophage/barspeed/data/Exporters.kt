@@ -20,6 +20,7 @@ import com.macrophage.barspeed.model.SetExport
 import com.macrophage.barspeed.model.SetSensorsExport
 import com.macrophage.barspeed.model.SetSummaryExport
 import com.macrophage.barspeed.model.TempoComplianceExport
+import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -245,7 +246,12 @@ class SessionExporter(
             // or the note is orphaned from the answer it belongs to.
             limiter = record.limiter,
             limiterNote = record.publishedLimiterNote,
-            warmup = record.warmup,
+            // The plan's declaration and the lifter's mark, composed (#194).
+            // WarmupMarkPolicy owns which wins; reading either column raw here
+            // would put that rule in a second place and let the two writers
+            // disagree about the same set.
+            warmup = WarmupMarkPolicy.effective(record.warmup, record.warmupMark),
+            warmupByLifter = WarmupMarkPolicy.markedByLifter(record.warmupMark),
             added = record.added,
             plannedPrepS = record.plannedPrepS,
             prepS = record.prepS,
@@ -665,7 +671,12 @@ class RawExporter(
         // manifest unparseable for every set in the session.
         str("limiter", record.limiter)
         str("limiterNote", record.publishedLimiterNote)
-        flag("warmup", record.warmup)
+        flag("warmup", WarmupMarkPolicy.effective(record.warmup, record.warmupMark))
+        // Which of the two facts this document carries. Without it a
+        // plan-declared ramp and one the lifter marked at the rack read
+        // identically, and the plan's own word -- overridden in the value
+        // above -- would vanish with nothing saying it had.
+        flag("warmupByLifter", WarmupMarkPolicy.markedByLifter(record.warmupMark))
         // [flag], never [bool]: absence must go on reading as "prescribed"
         // for every archive already written, and a `false` here would change
         // the bytes of every past session's manifest for no gain (#177).
