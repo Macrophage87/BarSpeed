@@ -881,6 +881,30 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * makes `PlanValueCaption` draw nothing rather than claiming a prescription
  * (#175).
  *
+ * EVERY FIELD, AND WHICH SLOT IT COMES FROM. Moving the anchor from the
+ * upcoming slot to the finished one changed the source of every field the
+ * copy does not reset, so all twenty-four are stated here rather than the one
+ * a reviewer happened to name. `AppendedSlotTest.APPEND_DECISIONS` holds the
+ * same table and is asserted against the class, so a new field cannot be
+ * added without an answer.
+ *
+ *  - From the anchor, because the appended set IS one more set of that
+ *    exercise: `exercise`, `geometry`, `side`, `implementCount`,
+ *    `exerciseNotes`, `exerciseNotesBehindTap`, `targetMeanConVelMps`,
+ *    `velocityLossStopPct`, `restS`, `prepS`, `sensors`. `side` follows the
+ *    set just DONE, so a unilateral block appends another set on the side
+ *    whose load was wrong rather than the side coming up.
+ *  - From what is standing for that exercise, via [carriedValues]:
+ *    `loadKg`, `reps`, `durationS`, `tempo`.
+ *  - Cleared or recomputed: `plannedLoadKg`, `plannedReps`,
+ *    `plannedDurationS`, `plannedTempo`, `setIndexInExercise`,
+ *    `setsInExercise`, `isExerciseChange`, `isAddedSet`, and `warmup`.
+ *
+ * `warmup` is the one that describes the ANCHOR SET'S PURPOSE rather than
+ * the exercise, which is why it is the one that had to move groups. The
+ * other ten inherited fields all answer "how is this exercise performed",
+ * and the appended set performs it the same way.
+ *
  * A CONSEQUENCE, STATED RATHER THAN HIDDEN. Because the appended slot
  * declares nothing, `SetLoadPolicy.standingStatedAddedKg` and its three
  * neighbours compare a declaration against a null and stop the carry AT it
@@ -996,6 +1020,14 @@ internal fun appendedState(s: RecordState): RecordState? {
             plannedDurationS = null,
             plannedTempo = null,
             isAddedSet = true,
+            // Never inherited. The anchor may be a plan-declared warm-up --
+            // the 60 lb pulldown opener this KDoc names -- and an appended
+            // set has no plan to have declared it. PlannedSlot.warmup and
+            // completedSetOf both say so in as many words; without this line
+            // they were false, and the set added BECAUSE the load was wrong
+            // was written to set_records as a warm-up, which PLAN_PROMPT
+            // tells the coach to drop from volume and progression.
+            warmup = false,
             isExerciseChange = false,
             setIndexInExercise = previous.setIndexInExercise + 1,
             setsInExercise = previous.setIndexInExercise + 2,
