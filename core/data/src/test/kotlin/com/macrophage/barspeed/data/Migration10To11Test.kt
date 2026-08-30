@@ -121,9 +121,12 @@ class Migration10To11Test {
      *
      * The exact-11 assertions below are untouched. An entity changed with this
      * migration left behind still ships a build whose schema the chain cannot
-     * produce, and Room throws on the lifter's phone; that is what
-     * [Migration11To12Test] asserts for the newest hop, including the
-     * `DATABASE_VERSION` equality this test can no longer carry.
+     * produce, and Room throws on the lifter's phone; that is what the NEWEST
+     * hop asserts, including the `DATABASE_VERSION` equality this test can no
+     * longer carry. That hop was [Migration11To12Test] when this was written
+     * and is [Migration12To13Test] now -- named here as "the newest hop"
+     * rather than by file, because the file changes on every bump and the
+     * sentence naming it goes stale the moment one lands.
      */
     @Test
     fun `the committed baseline and the migration agree on eleven, within a chain that reaches the compiled version`() {

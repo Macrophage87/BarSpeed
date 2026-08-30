@@ -21,29 +21,36 @@ import java.io.File
  * until 10 no stock install could produce a `rescued/` directory, and the
  * rescued-database card -- three tiers, their titles, the discard dialog and
  * the share path -- had never been reachable outside a test. Ten was the first
- * value that could make that card appear; eleven and twelve are simply the next
- * such values, and the first-time claim that used to stand here is history
- * rather than something these bumps repeat.
+ * value that could make that card appear; eleven, twelve and thirteen are
+ * simply the next such values, and the first-time claim that used to stand here
+ * is history rather than something these bumps repeat.
  *
- * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 12 writes the
- * file, then any build carrying 11 or less opens it. A forward install runs
+ * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 13 writes the
+ * file, then any build carrying 12 or less opens it. A forward install runs
  * the migration chain and never enters the rescue at all, so an ordinary
  * upgrade sees none of it.
  *
- * The version has moved before -- ten times, shipped in v0.1.5, v0.1.10,
- * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, once in v0.1.42, and
- * once more at 11 in the v0.1.44 cluster -- the tagged ones read off the tags
- * rather than remembered. What was new at 11 was that
- * `core/data/schemas/…/10.json` is committed, so for the first time in this
- * repository a migration had a baseline to be read against; 12 is the second
- * such bump and `11.json` is its baseline.
+ * The version has moved before -- twelve times, shipped in v0.1.5, v0.1.10,
+ * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, once in v0.1.42 and
+ * twice in v0.1.44 -- the tagged ones read off the tags rather than
+ * remembered. What was new at 11 was that a committed baseline existed for the
+ * version below it, so for the first time in this repository a migration had a
+ * document to be read against; 12 was the second such bump and 13 is the
+ * third, with `12.json` as its baseline.
  *
- * BOTH bumps of this cluster reach the emulator in the SAME exercise. v0.1.44
- * has not been cut, so no stock install carries 11 either: a phone upgrading
- * to this build runs 10 -> 11 -> 12 back to back, and the two-way exercise has
- * to cover the pair rather than the last hop.
+ * A CORRECTION TO WHAT STOOD HERE, named rather than reworded around. This
+ * paragraph read "BOTH bumps of this cluster reach the emulator in the SAME
+ * exercise. v0.1.44 has not been cut, so no stock install carries 11 either".
+ * Both halves are false now, and the second is what made the first worth
+ * saying: v0.1.44 WAS cut, at tag
+ * `7cf6e8c3cc546ab8d64c9fb2be86de2129250b43`, whose `AppDatabase.kt` reads
+ * `DATABASE_VERSION = 12`. A stock install therefore carries 12, the
+ * 10 -> 11 -> 12 pair has shipped, and the only hop a phone upgrading to this
+ * build runs is 12 -> 13. That also settles which release the two-way bench
+ * exercise installs first: v0.1.44, the last tag carrying the old version --
+ * not v0.1.43, which carries 10.
  */
-const val DATABASE_VERSION = 12
+const val DATABASE_VERSION = 13
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -295,6 +302,54 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
+         * v13: three nullable columns on set_records -- `limiter` and
+         * `limiterNote`, why a set ended (#189), and `warmupMark`, the
+         * lifter's own statement about whether a set was preparatory (#194).
+         *
+         * ALL THREE NULLABLE WITH NO DEFAULT, which is [MIGRATION_10_11]'s
+         * shape and deliberately not [MIGRATION_11_12]'s. Each has a real
+         * absent state no value can stand for, so a default would publish an
+         * answer nobody gave: a set whose reason was never asked for is not a
+         * set that ended for an unknown reason, and a set the lifter never
+         * marked is not a set they marked as not-a-warm-up. `warmupMark` is a
+         * `Boolean?` for exactly that reason -- the two-state flag beside it,
+         * `warmup`, is what the PLAN declared, and null here is the third
+         * state that keeps "the lifter has said nothing" apart from "the
+         * lifter disagreed".
+         *
+         * WHY ONE HOP CARRIES TWO ISSUES' COLUMNS. #189 and #194 land in the
+         * same unreleased window, so a second bump would mint a version
+         * boundary no build ever carried and oblige a second two-way bench
+         * exercise for a hop no phone will ever run. It is the rule the export
+         * schema already follows for an unreleased number, applied to the
+         * database: extend the open hop, never mint a boundary nothing
+         * crossed. Said here because the alternative -- 12 -> 13 -> 14 inside
+         * one release -- reads as the more careful choice and is not.
+         *
+         * `limiter` is TEXT rather than an enum column, following `side`. The
+         * vocabulary is closed and is enforced where the value is PRODUCED
+         * rather than where it is stored, so a row written by a later build
+         * carrying a value this one does not know reads as an unrecognised
+         * string instead of throwing inside a type converter on the lifter's
+         * phone. This commit adds the column and no producer; what may be
+         * written into it arrives with #189's own commit.
+         *
+         * Nothing is backfilled and no UPDATE runs. Which past sets ended for
+         * which reason, and which past sets the lifter would have called
+         * warm-ups, is recorded in no artifact this app has ever written --
+         * the refusal every migration since v8 has written down.
+         * [Migration12To13Test] pins all of it.
+         */
+        internal val MIGRATION_12_13 =
+            object : Migration(12, 13) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN limiter TEXT")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN limiterNote TEXT")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN warmupMark INTEGER")
+                }
+            }
+
+        /**
          * Open the database, having first made sure opening it cannot destroy
          * it. Issue #101.
          *
@@ -317,8 +372,8 @@ abstract class AppDatabase : RoomDatabase() {
          * was deleted there rather than reworded. A crash with the data
          * recoverable beats a clean start with it gone.
          *
-         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 12
-         * here, so a rollback from this build to any build carrying 11 or less
+         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 13
+         * here, so a rollback from this build to any build carrying 12 or less
          * enters the rescue; the first version at which that was true of a
          * stock install was 10, and what it exposes on screen is stated at the
          * constant, with issue #118. An ordinary forward install runs the
@@ -347,6 +402,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_9_10,
                     MIGRATION_10_11,
                     MIGRATION_11_12,
+                    MIGRATION_12_13,
                 )
                 .build()
         }

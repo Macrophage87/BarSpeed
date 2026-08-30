@@ -145,6 +145,32 @@ data class SetRecordEntity(
      */
     val warmup: Boolean = false,
     /**
+     * The LIFTER'S own statement that this set was, or was not, preparatory
+     * (#194). Null means they have never said.
+     *
+     * Three states and not two, which is the whole reason it sits beside
+     * [warmup] rather than inside it. [warmup] is what the PLAN declared,
+     * frozen when the set was recorded, and #187 spent a whole change making
+     * it mean only that; overwriting it with a lifter's tap would take the
+     * declaration back out of the row. So the two facts are kept apart, the
+     * way `tappedFailed` and the derived shortfall are kept apart one flag
+     * over, and the effective answer is composed from them by
+     * [com.macrophage.barspeed.model.WarmupMarkPolicy] rather than by whoever
+     * happens to be reading.
+     *
+     * WHOSE ANSWER WINS IS DECIDED AND IS THE LIFTER'S. The plan's
+     * declaration is a prediction written before the session; the mark is a
+     * statement by the person who did the set, made after it. That is the
+     * same ordering by which a re-rating on the rest screen overwrites a
+     * tapped failure. Null is not a quiet "false": it is the ordinary state
+     * of every set on a declared plan, and it is what lets the record say
+     * that a lifter unmarked a plan warm-up rather than silently reading as
+     * though the plan never declared one.
+     *
+     * Null on every row written before v13, and nothing backfills it.
+     */
+    val warmupMark: Boolean? = null,
+    /**
      * True when the lifter APPENDED this set to the exercise mid-session
      * rather than the plan prescribing it (#177).
      *
@@ -164,6 +190,46 @@ data class SetRecordEntity(
      * a plausible backfill reads exactly like a measured one.
      */
     val added: Boolean = false,
+    /**
+     * Why the set ended, from a closed vocabulary, or null (#189).
+     *
+     * A NULLABLE COLUMN ON EVERY SET ROW, deliberately not a field keyed off
+     * [failed]. Only a failed set is asked today, so in practice every
+     * non-null value sits on one; #191 widens the question to completed sets,
+     * and storing it per-failure would have made that a migration instead of
+     * a screen change. The column is therefore named for what it holds -- the
+     * thing that limited the set -- and not `failure_reason`, so a released
+     * field never has to be renamed.
+     *
+     * NULL IS A STATE AND NOT A DEFAULT ANSWER. The page is skippable in one
+     * tap, and a set nobody was asked about, a set the lifter declined to
+     * explain and a set recorded before v13 all read null: none of them is a
+     * set that ended for an unknown reason, and none of them may be counted
+     * as one.
+     *
+     * TEXT, holding the lowercased name of one
+     * [com.macrophage.barspeed.model.SetLimiter], validated where the value
+     * is produced rather than by a type converter -- so a value written by a
+     * later build reads back as an unrecognised string here instead of
+     * throwing while the lifter is mid-session. `side` is stored the same way
+     * for the same reason.
+     */
+    val limiter: String? = null,
+    /**
+     * The lifter's own words, when [limiter] is `other` and only then (#189).
+     *
+     * A SEPARATE COLUMN BESIDE THE ENUM, never a value inside it. The whole
+     * point of the closed vocabulary is that a coach can group by it, and a
+     * free string stored in the same column destroys exactly that.
+     *
+     * Capped and single-line at capture by
+     * [com.macrophage.barspeed.model.SetLimiter.normalizeNote], which is also
+     * what makes "exported verbatim" true rather than aspirational: the raw
+     * archive's manifest is assembled as text, so a newline or a backslash
+     * arriving here would make that whole document unparseable. What is
+     * stored is what was shown to the lifter and what is published.
+     */
+    val limiterNote: String? = null,
     val tempo: String? = null,
     val targetMeanConVelMps: Double? = null,
     val velocityLossStopPct: Double? = null,

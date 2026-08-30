@@ -51,10 +51,16 @@ import kotlin.test.assertTrue
  * about Room's comparison read off this repository's own shipped history, not a
  * claim that this migration has been executed: it has not.
  *
- * The two-way emulator exercise for the v0.1.44 cluster covers BOTH bumps
- * together. v0.1.44 has not been cut, so no stock install carries 11 either --
- * a phone upgrading to this build runs 10 -> 11 -> 12 back to back. This commit
- * does not discharge that exercise and does not claim to.
+ * A CORRECTION, named rather than reworded around. This KDoc read "The two-way
+ * emulator exercise for the v0.1.44 cluster covers BOTH bumps together. v0.1.44
+ * has not been cut, so no stock install carries 11 either -- a phone upgrading
+ * to this build runs 10 -> 11 -> 12 back to back." It was true when written and
+ * is false now: v0.1.44 WAS cut, at tag
+ * `7cf6e8c3cc546ab8d64c9fb2be86de2129250b43`, whose `AppDatabase.kt` reads
+ * `DATABASE_VERSION = 12`. This hop has therefore SHIPPED. The exercise it was
+ * waiting for was run for the v0.1.44 cut; what is owed now is the exercise for
+ * 12 -> 13, which is [Migration12To13Test]'s to name and no commit before that
+ * one discharges.
  */
 class Migration11To12Test {
     private val json = Json { ignoreUnknownKeys = true }
@@ -105,16 +111,29 @@ class Migration11To12Test {
     }
 
     /**
-     * The compiled version, the committed baseline and the migration's own
-     * endpoints are one number.
+     * The committed baseline and the migration's own endpoints are one number,
+     * and the compiled version is at or beyond it.
      *
-     * The v10 -> v11 file asserts the identical thing about eleven, and both
-     * must hold: a constant left behind at 11 ships a build whose schema the
-     * chain cannot reach, and Room throws on the lifter's phone.
+     * THE MIDDLE ASSERTION USED TO READ `assertEquals(12, DATABASE_VERSION)`,
+     * and it is corrected here exactly as [Migration10To11Test]'s was one hop
+     * earlier, for the same reason and by the same rule: it was true while 12
+     * was the newest hop and went false the moment #189 added a thirteenth. An
+     * intermediate hop's end version is not the compiled version and never
+     * was, and asserting they are equal reds this file on every future bump
+     * for no defect. What the hop genuinely owes the constant is that the
+     * chain still reaches it. The equality itself is not dropped -- it moves
+     * to the newest hop, in [Migration12To13Test].
+     *
+     * The exact-12 assertions below are untouched. An entity changed with this
+     * migration left behind still ships a build whose schema the chain cannot
+     * produce, and Room throws on the lifter's phone.
      */
     @Test
-    fun `the compiled version, the committed baseline and the migration agree on twelve`() {
-        assertEquals(12, DATABASE_VERSION, "DATABASE_VERSION is not the version this migration ends at")
+    fun `the committed baseline and the migration agree on twelve, within a chain that reaches the compiled version`() {
+        assertTrue(
+            AppDatabase.MIGRATION_11_12.endVersion <= DATABASE_VERSION,
+            "this migration ends beyond DATABASE_VERSION, so the chain overshoots the schema this build compiles",
+        )
         assertEquals(12, declaredVersion(12), "12.json does not describe version 12")
         assertEquals(11, declaredVersion(11), "11.json does not describe version 11")
         assertEquals(11, AppDatabase.MIGRATION_11_12.startVersion)
