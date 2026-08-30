@@ -334,6 +334,45 @@ class DevicePairingPolicyTest {
         )
     }
 
+    /**
+     * DIFFERENTIAL, round 3 finding 20: forgetting the analysed unit promotes
+     * the unit the SECOND link is already holding, and that link has to come
+     * down with the promotion.
+     *
+     * The forget-button twin of `preferring the unit the second link is
+     * holding takes the second link down`, and the same two-clients-on-one-
+     * WT901 state by a different tap. `DeviceRegistry.forget` writes the
+     * survivor into `preferred_imu`; today's rule returns `{ANALYSED}` alone,
+     * so `AutoConnectManager` drops `imuClient`, `maintain` wakes and re-reads
+     * the promoted address, and `secondaryImuAddress` still names it -- both
+     * links come up on one bar sensor.
+     *
+     * What that costs is not cosmetic. `WitmotionStreamDecoder` holds one
+     * `ArrayDeque` per client and the WT901's 20-byte frames carry no
+     * checksum, so nothing in the app can notice; if both links stream, the
+     * next dual set's two raw archives are two recordings of ONE unit filed
+     * under two labels. A wrong pixel is recoverable and a wrongly attributed
+     * capture is not.
+     *
+     * Reachable in one tap: the Forget button is drawn on every paired row
+     * (`DevicesScreen`), and `RecordViewModel.mirrorSensorSettings` -- the only
+     * thing that re-derives the second address -- lives on the Record
+     * back-stack entry, not the screen the tap happens on.
+     */
+    @Test
+    fun `forgetting the analysed unit promotes the unit the second link is holding and takes that link down`() {
+        assertEquals(
+            setOf(DeviceLinkRole.ANALYSED, DeviceLinkRole.SECOND),
+            DevicePairingPolicy.linksToDropOnForget(
+                forgotten = first,
+                preferredImu = first,
+                preferredHrm = strap,
+                secondImu = second,
+                remainingImu = listOf(second),
+            ),
+        )
+    }
+
     // ---- what preferring a unit takes down -----------------------------------
 
     /**
