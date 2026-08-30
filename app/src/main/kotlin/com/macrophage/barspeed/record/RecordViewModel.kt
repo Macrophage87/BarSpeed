@@ -901,6 +901,15 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * after the session's final set it made the control refuse outright, since the
  * upcoming index is one past the end (#188).
  *
+ * `internal` RATHER THAN `private`, and that is the whole of the test seam
+ * this function has. `AddSetControl.placement` decides WHERE the slot goes and
+ * is pinned in `:core:model`; which slot each FIELD of the appended
+ * [PlannedSlot] is copied from is decided here, on a type that lives in `:app`
+ * and cannot be moved without dragging `ExerciseDef`, `ResolvedGeometry` and
+ * the whole queue with it. Widening the visibility is what lets
+ * `AppendedSlotTest` ask this function directly. It is called from one place,
+ * [RecordViewModel.addSetOfCurrentExercise], and nothing else may call it.
+ *
  * A FREE FUNCTION taking what it needs, for [jumpedState]'s reason:
  * [RecordViewModel] is a class detekt measures as being AT its size limit, and
  * this method's body took it over -- measured, not guessed, by running detekt
@@ -961,7 +970,7 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * still unexecuted, and the cluster's two-way exercise still owes 10 -> 11 -> 12
  * against real rows.
  */
-private fun appendedState(s: RecordState): RecordState? {
+internal fun appendedState(s: RecordState): RecordState? {
     if (s.adHoc) return null
     val placement =
         AddSetControl.placement(

@@ -67,6 +67,34 @@ kotlin {
     jvmToolchain(17)
 }
 
+// :core:data's block, copied here for the same reason and with the same
+// effect. This module is jvmToolchain(17) and would otherwise run its unit
+// tests on a JVM whose class loader stops at class file version 61, while
+// :core:model, :core:dsp, :core:hrm and :core:witmotion are jvmToolchain(21)
+// and emit 65. Compilation is unaffected -- that is why the seven-module
+// build has always been green -- but the test JVM's loader is strict, and
+// any :app test that causes a :core:model type to be LOADED dies before its
+// first assertion:
+//
+//   com/macrophage/barspeed/model/ExerciseDef has been compiled by a more
+//   recent version of the Java Runtime (class file version 65.0), this
+//   version of the Java Runtime only recognizes class file versions up to
+//   61.0
+//
+// That is not a hypothesis: it is the exact failure observed here by running
+// a throwaway test that read PlannedSlot's declared fields, on the tree this
+// commit's parent produced. PlanQueueTest survived only by never touching
+// such a type, and its own KDoc says so.
+//
+// This changes no produced bytecode: the APK's classes stay at major version
+// 61. It sets only which JVM runs the tests. CI installs Temurin 21 and does
+// not disable toolchain auto-detection, so the launcher resolves there too.
+tasks.withType<Test>().configureEach {
+    javaLauncher.set(
+        javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) },
+    )
+}
+
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:dsp"))
