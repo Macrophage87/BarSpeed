@@ -193,4 +193,83 @@ class AddSetControlTest {
             AddSetControl.label("Back squat", null),
         )
     }
+
+    // ---- #188: which set the control refers to -----------------------------
+
+    /**
+     * RED before the fix. During rest the anchor is the set just FINISHED.
+     *
+     * The control exists because a set showed the load was wrong, which is a
+     * statement about a set that has happened. `RecordState.upcomingIndex` is
+     * the set the next START will run, and taking the anchor from it makes the
+     * control refer to a set the lifter has not done yet.
+     *
+     * Mid-block both indices sit in the same block, so the SET the control
+     * refers to is wrong here while the insertion point happens to agree.
+     */
+    @Test
+    fun `mid-block during rest the anchor is the set just finished`() {
+        val p = assertNotNull(AddSetControl.placement(twoBlocks(), queueIndex = 0, upcomingIndex = 1))
+        assertEquals(0, p.anchorIndex)
+        assertEquals(3, p.insertAt)
+    }
+
+    /**
+     * RED before the fix, and the defect the owner reported. At a block
+     * boundary the two indices name different EXERCISES.
+     *
+     * Finish the last squat set with the row coming up and the anchor must
+     * still be the squat: the appended set is a squat set, and it goes
+     * immediately after the block it belongs to, which is before the row.
+     * Anchored on the upcoming slot instead, the rule walks the ROW block and
+     * answers 5 -- the added set is a row set, queued after the row.
+     */
+    @Test
+    fun `at a block boundary the anchor is the finished block, not the next one`() {
+        val p = assertNotNull(AddSetControl.placement(twoBlocks(), queueIndex = 2, upcomingIndex = 3))
+        assertEquals(2, p.anchorIndex)
+        assertEquals(3, p.insertAt)
+    }
+
+    /**
+     * RED before the fix. The block the appended set joins has no sets left,
+     * so "after the block's remaining sets" IS "next" -- and the caller has to
+     * know, because the boxes on the rest screen were seeded for the exercise
+     * that is no longer coming up.
+     */
+    @Test
+    fun `a set added at a block boundary is the next set run`() {
+        val p = assertNotNull(AddSetControl.placement(twoBlocks(), queueIndex = 2, upcomingIndex = 3))
+        assertTrue(p.becomesNextSet)
+    }
+
+    /**
+     * RED before the fix. After the session's final set there is a set to add
+     * one of, and it is the one just finished (#188 item 3).
+     *
+     * `upcomingIndex` is one past the end here, which is why the rule used to
+     * refuse: the anchor it was reading did not exist. The anchor that matters
+     * does.
+     */
+    @Test
+    fun `a set can be added after the session's final set`() {
+        val p = assertNotNull(AddSetControl.placement(twoBlocks(), queueIndex = 4, upcomingIndex = 5))
+        assertEquals(4, p.anchorIndex)
+        assertEquals(5, p.insertAt)
+        assertTrue(p.becomesNextSet)
+        assertFalse(p.carriesStandingStatements)
+    }
+
+    /**
+     * RED before the fix. Where the two slots are different exercises the
+     * label names the one being added AND where it lands, because that is
+     * precisely the moment the lifter cannot tell them apart.
+     */
+    @Test
+    fun `the label names the finished exercise at a block boundary`() {
+        assertEquals(
+            "Load was wrong? Add another Overhead press set before Lat pulldown",
+            AddSetControl.label("Overhead press", "Lat pulldown"),
+        )
+    }
 }
