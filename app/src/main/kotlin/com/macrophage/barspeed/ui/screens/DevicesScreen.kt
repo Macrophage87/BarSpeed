@@ -30,7 +30,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.ble.DeviceRole
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.DeviceLinkRole
 import com.macrophage.barspeed.model.DevicePairingPolicy
+import com.macrophage.barspeed.model.DualSensorSetup
+import com.macrophage.barspeed.model.DualSetupStep
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ConnectionChip
@@ -45,13 +48,22 @@ import com.macrophage.barspeed.ui.components.PermissionBanner
  *
  * Assignment is by ADDRESS and survives power cycles and reconnection order,
  * which is the whole point -- a positional default would change meaning the
- * next time either unit was re-paired, since pairing makes a device its role's
- * preferred one. Two units may advertise identical names, so telling the rows
- * apart takes a ritual -- and only the PREFERRED unit's row can go green
- * before labelling. The second link is pointed at no address until both units
- * carry distinct labels, and it is pointed there by the Record screen, not
- * this one. So switch both units on, note which single row is green, and label
- * the OTHER row by elimination.
+ * next time either unit was re-paired.
+ *
+ * Two units may advertise identical names. The ritual that used to live here
+ * -- switch both on, note which single row is green, label the OTHER by
+ * elimination -- is gone in both senses: it was in a KDoc, where the person
+ * holding two identical sensors cannot read it, and since #184 it is also
+ * wrong, because pairing no longer moves the preference and there is no longer
+ * a moment when exactly one row is green. What replaces it is on the screen:
+ * every row carries its address tail as a tag, and a row sighted by a running
+ * scan shows its live signal, so holding one unit against the phone names it.
+ * `DualSensorSetup.identifyHint` says so where it is needed.
+ *
+ * The second link is still pointed at an address by the Record screen and not
+ * by this one, so a labelled second unit reads "Not linked" here until a set
+ * arms it. That is now said as absence rather than drawn as a failed
+ * connection.
  *
  * Clearing a label is offered because a wrong one is worse than none: an
  * unlabelled pair records one stream and says so, a mislabelled pair records
@@ -76,11 +88,64 @@ private fun SensorRoleRow(assigned: SensorRole?, onAssign: (SensorRole?) -> Unit
     }
 }
 
+/**
+ * What to do next about a two-accelerometer setup, issue #184.
+ *
+ * The lifter doing the pairing is on THIS screen, and until now the only
+ * sentence saying that labelling is a required step drew on the Record screen,
+ * and only when a plan declared two sensors. The wording is
+ * `DualSensorSetup`'s, shared with that screen rather than written twice.
+ *
+ * Draws nothing at the two steps with nothing to fix -- one sensor is the
+ * ordinary setup and a line that is always there is a line nobody reads.
+ */
+@Composable
+private fun DualSetupCard(step: DualSetupStep) {
+    val line = DualSensorSetup.devicesLine(step) ?: return
+    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Column(Modifier.padding(12.dp)) {
+            Text(
+                line,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (step == DualSetupStep.READY) BarColors.Sub else BarColors.Amber,
+            )
+            DualSensorSetup.identifyHint(step)?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+            }
+        }
+    }
+}
+
+/**
+ * Which bar sensor the app analyses, and how to move it.
+ *
+ * Pairing used to move this silently, which is what made the flow read as one
+ * sensor knocking the other off (#184). It is now an act with its own control
+ * and its own words. The second unit's stream is still recorded when both are
+ * labelled; what "analysed" decides is which one the figures come from.
+ */
+@Composable
+private fun AnalysedRow(linkRole: DeviceLinkRole, onUseForAnalysis: () -> Unit) {
+    Spacer(Modifier.height(4.dp))
+    if (linkRole == DeviceLinkRole.ANALYSED) {
+        Text(
+            "Analysed · the set's numbers come from this unit",
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+    } else {
+        TextButton(onClick = onUseForAnalysis) { Text("Use this one for analysis") }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = viewModel()) {
     val known by viewModel.knownDevices.collectAsState()
     val found by viewModel.foundDevices.collectAsState()
+    val setupStep by viewModel.dualSetupStep.collectAsState()
+    val rssi by viewModel.sightedRssi.collectAsState()
     val scanning by viewModel.scanning.collectAsState()
     val scanError by viewModel.scanError.collectAsState()
     val imuState by viewModel.imuState.collectAsState()
@@ -117,29 +182,39 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                         "the app auto-connects from then on.",
                 )
             }
+            DualSetupCard(setupStep)
             known.forEach { device ->
                 // Keyed on ADDRESS, not on role. Keyed on role, two saved
                 // devices of one role showed the same link on both rows --
                 // latent while nobody paired two IMUs, and real the moment #156
-                // asks them to. `links.imu` and `links.hrm` are the addresses
-                // their links are maintaining; `links.imuB` is not -- it is the
-                // first non-preferred paired IMU, and the second link is
-                // pointed at no address until both units carry distinct labels,
-                // so that row shows a link maintaining nothing and reads
-                // Disconnected for a healthy unit. See `LinkAddresses`.
+                // asks them to. All three addresses in `links` are addresses a
+                // link is actually maintaining, since #184; a row matching none
+                // of them is NOT_LINKED, which is a different fact from a link
+                // that tried and failed and is drawn differently below.
+                val linkRole =
+                    DevicePairingPolicy.linkRoleFor(device.address, links.imu, links.imuB, links.hrm)
                 val state =
-                    when (device.address) {
-                        links.imu -> imuState
-                        links.imuB -> imuStateB
-                        links.hrm -> hrmState
-                        else -> ConnectionState.Disconnected
+                    when (linkRole) {
+                        DeviceLinkRole.ANALYSED -> imuState
+                        DeviceLinkRole.SECOND -> imuStateB
+                        DeviceLinkRole.HEART_RATE -> hrmState
+                        DeviceLinkRole.NOT_LINKED -> null
                     }
                 Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Column(Modifier.padding(12.dp)) {
                         Row(horizontalArrangement = Arrangement.SpaceBetween) {
                             Column(Modifier.weight(1f)) {
-                                Text(device.name, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    "${device.name} · ${DevicePairingPolicy.unitTag(device.address)}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
                                 Text("${device.role} · ${device.address}", style = MaterialTheme.typography.bodySmall)
+                                DevicePairingPolicy.signalLine(rssi[device.address])?.let {
+                                    // Only while a scan is running and only for
+                                    // a unit that is advertising. Absent rather
+                                    // than weak when there is no reading.
+                                    Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+                                }
                                 if (state is ConnectionState.Failed) {
                                     // This screen is the only surface that shows the reason string.
                                     Text(
@@ -149,10 +224,26 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                                     )
                                 }
                             }
-                            ConnectionChip(device.role.name, state)
+                            if (state == null) {
+                                // NOT a Disconnected chip. No link is pointed
+                                // at this unit, so there is no connection to
+                                // report the state of, and the chip would be
+                                // reporting a failure that never happened.
+                                Text(
+                                    "Not linked",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = BarColors.Sub,
+                                )
+                            } else {
+                                ConnectionChip(device.role.name, state)
+                            }
                             TextButton(onClick = { viewModel.forget(device) }) { Text("Forget") }
                         }
                         if (device.role == DeviceRole.IMU) {
+                            AnalysedRow(
+                                linkRole = linkRole,
+                                onUseForAnalysis = { viewModel.setPreferred(device) },
+                            )
                             SensorRoleRow(
                                 assigned = roles[device.address],
                                 onAssign = { viewModel.setSensorRole(device.address, it) },

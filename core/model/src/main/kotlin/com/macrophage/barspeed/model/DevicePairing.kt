@@ -41,34 +41,54 @@ enum class DualSetupStep {
  * What pairing, forgetting and preferring do, issue #184.
  *
  * Lifted out of `:core:ble` for the usual reason -- that module has no test
- * source set, so a rule left there is a rule nothing can run against. These
- * are introduced reproducing TODAY's behaviour so the differentials can be
- * shown red first.
+ * source set, so a rule left there is a rule nothing can run against.
  */
 object DevicePairingPolicy {
     /**
-     * Which address is a role's preferred one after [justPaired] is paired.
+     * Which address is a role's preferred one after [justPaired] is paired:
+     * the one it already had, if that device is still paired.
      *
-     * TODAY's rule, from `DeviceRegistry.pair`: the newly paired device always
-     * becomes preferred. [currentPreferred] and [pairedOfRole] are the state
-     * before the pairing.
+     * [currentPreferred] and [pairedOfRole] are the state BEFORE the pairing.
+     *
+     * The rule this replaced made every newly paired device its role's
+     * preferred one, and preferred is not a display flag: `AutoConnectManager`
+     * maintains the analysed link to it and `SensorCapturePolicy.roster` reads
+     * it to decide which role's stream the DSP is pointed at. So pairing a
+     * second bar sensor re-pointed a data path as a side effect of a UI act
+     * performed for an unrelated reason, and because A/B labels are
+     * per-address it silently changed which label the analysed figures came
+     * from. A wrong pixel is recoverable and a wrongly-attributed stream is
+     * not.
+     *
+     * It is also the clunk the owner reported: mid-sequence the first row went
+     * dark and the second lit up, which reads as one sensor knocking the other
+     * off. Which unit is analysed stays changeable -- by asking, through a
+     * control that says what it does.
+     *
+     * A preference naming a device that is NOT in [pairedOfRole] gives way,
+     * because it is not a preference: `DeviceRegistry` can hold a
+     * `preferred_imu` for a forgotten address, and keeping it would leave the
+     * analysed link idling on an address nothing is paired to.
      */
-    fun preferredAfterPairing(currentPreferred: String?, pairedOfRole: Set<String>, justPaired: String): String {
-        currentPreferred?.let { pairedOfRole.contains(it) }
-        return justPaired
-    }
+    fun preferredAfterPairing(currentPreferred: String?, pairedOfRole: Set<String>, justPaired: String): String =
+        if (currentPreferred != null && currentPreferred in pairedOfRole) currentPreferred else justPaired
 
     /**
-     * Which address is a role's preferred one after [forgotten] is forgotten.
+     * Which address is a role's preferred one after [forgotten] is forgotten:
+     * whatever is left, when the forgotten device was holding it.
      *
-     * TODAY's rule, from `DeviceRegistry.forget`: the preference is dropped
-     * when the device holding it goes, and nothing takes its place.
      * [remainingOfRole] is what is still paired for that role afterwards.
+     *
+     * The near neighbour of [preferredAfterPairing] and it had to move with
+     * it. While pairing re-pointed the preference, losing it was self-healing
+     * -- the lifter paired something and it came back. Now that pairing leaves
+     * it alone, forgetting the analysed unit while another is still paired
+     * would leave the role with no preferred device at all, the analysed link
+     * idling on a null address, and no way back short of forgetting the
+     * survivor too.
      */
-    fun preferredAfterForget(currentPreferred: String?, forgotten: String, remainingOfRole: List<String>): String? {
-        remainingOfRole.size
-        return if (currentPreferred == forgotten) null else currentPreferred
-    }
+    fun preferredAfterForget(currentPreferred: String?, forgotten: String, remainingOfRole: List<String>): String? =
+        if (currentPreferred != forgotten) currentPreferred else remainingOfRole.firstOrNull()
 
     /**
      * Which link, if any, is maintaining [address].
@@ -175,24 +195,45 @@ object DualSensorSetup {
     /**
      * What the Devices screen says about the setup, or null for nothing.
      *
-     * TODAY's answer, for every step: nothing. The Devices screen has never
-     * said a word about labelling, which is #184's second symptom.
+     * The same facts as [recordLine] in this screen's own voice -- "under
+     * Devices" is not a useful locator when you are already there -- rather
+     * than a second wording of them. The Record screen's copy was the ONLY
+     * place the app said labelling is required, and it draws on a different
+     * screen and only when a plan declares two sensors, so the lifter doing
+     * the pairing had never been told.
+     *
+     * Silent where there is nothing to fix. One sensor is the ordinary setup,
+     * for every exercise, and nagging it about a unit it does not have would
+     * turn this line into something the eye learns to skip.
      */
-    fun devicesLine(step: DualSetupStep): String? {
-        step.ordinal
-        return null
+    fun devicesLine(step: DualSetupStep): String? = when (step) {
+        DualSetupStep.NO_SENSOR, DualSetupStep.ONE_SENSOR -> null
+        DualSetupStep.LABEL_BOTH ->
+            "Label both sensors A and B - a set asking for two records only one until they carry " +
+                "different labels."
+        DualSetupStep.LABELS_COLLIDE -> "Both sensors are labelled the same - give one of them the other label."
+        DualSetupStep.READY -> "Both sensors are labelled. A set asking for two will record both streams."
     }
 
     /**
      * How to tell two identically-named units apart, or null when the lifter
      * does not need to.
      *
-     * TODAY's answer, for every step: nothing on the screen. The ritual is in
-     * `DevicesScreen`'s KDoc, where the person holding two identical sensors
-     * cannot read it.
+     * This is `DevicesScreen`'s KDoc ritual moved onto the screen, where the
+     * person holding two identical sensors can read it -- and restated,
+     * because the old one no longer describes the app. It said to note which
+     * single row is green and label the OTHER by elimination; with the
+     * preference no longer moving on pairing there is no longer a moment when
+     * exactly one row is green, so the reference point it turned on is gone.
+     *
+     * The live signal replaces it. It claims nothing about a unit that is not
+     * advertising: a row with no reading shows no signal line at all, and the
+     * lifter compares the rows that do.
      */
-    fun identifyHint(step: DualSetupStep): String? {
-        step.ordinal
-        return null
+    fun identifyHint(step: DualSetupStep): String? = when (step) {
+        DualSetupStep.LABEL_BOTH, DualSetupStep.LABELS_COLLIDE ->
+            "Two units can advertise the same name. Scan below and hold one against the phone: " +
+                "the row whose signal reads strong is that unit."
+        DualSetupStep.NO_SENSOR, DualSetupStep.ONE_SENSOR, DualSetupStep.READY -> null
     }
 }

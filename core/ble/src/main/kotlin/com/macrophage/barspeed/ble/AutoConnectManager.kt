@@ -74,6 +74,20 @@ class AutoConnectManager(
     private val secondaryImuAddress = MutableStateFlow<String?>(null)
 
     /**
+     * The address the second link is actually pointed at, or null when it is
+     * pointed at nothing.
+     *
+     * Published because the Devices screen was GUESSING it -- "the first
+     * paired IMU that is not the preferred one" -- and then rendering that
+     * guess's connection state as if a link were maintaining it. Under every
+     * `DualShortfall` there is no such link, so a healthy unlabelled unit drew
+     * a Disconnected chip: a link failure reported where there is no link
+     * (#184). The screen now asks rather than guesses, and draws a distinct
+     * state when the answer is null.
+     */
+    val secondaryImuAddressNow: StateFlow<String?> = secondaryImuAddress
+
+    /**
      * Point the second link at a device, or take it down.
      *
      * Disconnecting on null is done HERE rather than inside the reconnect
@@ -121,10 +135,42 @@ class AutoConnectManager(
         hrmClient.disconnect()
     }
 
-    /** Pair (remember + prefer) a device and connect to it immediately. */
+    /**
+     * Pair a device, and connect this role's link to it only if it became the
+     * preferred one.
+     *
+     * [DeviceRegistry.pair] no longer prefers whatever was paired last (#184),
+     * so this can no longer assume the newly paired device owns the role's
+     * link. Grabbing [imuClient] for a second bar sensor while `preferred_imu`
+     * still names the first would point the ANALYSED client at one unit and
+     * the reconnect loop's address provider at another, and the loop's
+     * Connected branch waits for the link to drop before looking again -- so
+     * the disagreement would survive for the rest of the session.
+     *
+     * The registry is asked rather than the policy re-run here: one answer,
+     * read back from where it was written.
+     */
     suspend fun pairAndConnect(device: KnownDevice) {
         registry.pair(device)
-        clientFor(device.role).connect(device.address)
+        if (registry.preferredNow(device.role)?.address == device.address) {
+            clientFor(device.role).connect(device.address)
+        }
+    }
+
+    /**
+     * Make an already-paired device this role's preferred one and move the
+     * link to it.
+     *
+     * The link is dropped rather than redirected: `maintain`'s Connected
+     * branch is parked on `connectionState.first { it !is Connected }`, so a
+     * client already holding the old device would sit there indefinitely and
+     * the new address would never be read. Dropping it wakes that branch, and
+     * the next pass reads the new preferred address -- the same reasoning
+     * [setSecondaryImuAddress] already uses.
+     */
+    suspend fun setPreferredAndConnect(device: KnownDevice) {
+        registry.setPreferred(device.address, device.role)
+        clientFor(device.role).disconnect()
     }
 
     /**
