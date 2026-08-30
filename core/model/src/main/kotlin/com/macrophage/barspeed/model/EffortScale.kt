@@ -223,10 +223,21 @@ object EffortScale {
      * fourth rung of the same felt scale, and that the warm-up tile is gone.
      *
      * The proximity wording of the timed and explosive ladders is UNCHANGED
-     * from what shipped: those four rungs sit where the lifter's own report is
-     * accurate, they were not what #187 was about, and redefining an anchor
-     * predictably shifts the ratings people give (Okhamafe et al., 2026) -- so
-     * they are left alone deliberately rather than by omission.
+     * from what shipped in v0.1.44, character for character, intensity prefix
+     * and em dash included: those four rungs each sit where the lifter's own
+     * report is accurate, they were not what #187 was about, and redefining an
+     * anchor predictably shifts the ratings people give (Okhamafe et al.,
+     * 2026) -- so they are left alone deliberately rather than by omission.
+     * `EffortScaleTest` reads the eight strings off the release tag, so a
+     * reword becomes a visible diff on a test rather than a quiet change to
+     * what a stored 9 means.
+     *
+     * The REP ladder's four counted rungs DID move, from "Solid — 3 reps
+     * left" to "3 reps left" and so on: they are the strings the owner's own
+     * settled table on #187 names, and that ladder is the one whose low end
+     * this scale replaces. The intensity prefix goes with the rung it
+     * qualified rather than being kept beside three headroom captions that
+     * have no counterpart for it.
      */
     fun tiles(timed: Boolean, explosive: Boolean, unit: WeightUnit): List<EffortTile> {
         val ask = if (timed) EffortAsk.TIME else EffortAsk.LOAD
@@ -237,17 +248,17 @@ object EffortScale {
             when {
                 timed ->
                     listOf(
-                        7 to "Had more in me",
-                        8 to "A little left",
-                        9 to "Seconds left",
-                        10 to "Hit my limit",
+                        7 to "Solid — had more in me",
+                        8 to "Hard — a little left",
+                        9 to "Very hard — seconds left",
+                        10 to "Max — hit my limit",
                     )
                 explosive ->
                     listOf(
-                        7 to "Fast and crisp",
-                        8 to "Speed dropping",
-                        9 to "Grindy",
-                        10 to "Barely made it",
+                        7 to "Solid — fast and crisp",
+                        8 to "Hard — speed dropping",
+                        9 to "Very hard — grindy",
+                        10 to "Max — barely made it",
                     )
                 else ->
                     listOf(
@@ -259,7 +270,7 @@ object EffortScale {
             }.map { (rpe, text) -> EffortTile(rpe, EffortClaim.PROXIMITY, text) }
         val failText =
             when {
-                timed -> "Broke early - failed"
+                timed -> "Broke early — failed"
                 explosive -> "Missed the lift"
                 else -> "Failed the set"
             }

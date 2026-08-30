@@ -54,9 +54,15 @@ object SetCompletionPolicy {
         targetReps: Int?,
         guidedFinished: Boolean,
     ): Boolean? = when {
-        // Read through TimedSetEndPolicy rather than compared here, so the
-        // clock cannot say one thing to the gate and another to the write.
-        timed -> timedTargetS?.let { !TimedSetEndPolicy.fellShort(elapsedS, it) }
+        // The SAME pair #168 ends the set on, asked of the same instant:
+        // `remainingS` then `endsNow`. Deliberately not
+        // [TimedSetEndPolicy.fellShort], whose 90% tolerance answers "was
+        // this recorded hold short" -- the right question at the write, where
+        // a scheduler losing a tick must not turn a completed hold into a
+        // failed one, and the wrong one here, where it opened the grid two
+        // seconds before a 20 s plank ended. Null where `remainingS` names no
+        // instant: no prescription, or one of zero or less.
+        timed -> TimedSetEndPolicy.remainingS(elapsedS, timedTargetS)?.let { TimedSetEndPolicy.endsNow(it) }
         // The guide finishing IS the set being done. Its rep count lands one
         // stroke early, before the closing cue is spoken, so `guidedFinished`
         // and not a rep comparison.

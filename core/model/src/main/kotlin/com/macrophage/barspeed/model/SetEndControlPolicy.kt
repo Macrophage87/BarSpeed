@@ -120,19 +120,39 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
  *    correction can clear. A miscounted rep total lands on exactly this path.
  *
  * Neither case nags. Every case leaves one tap that ends the set storing no
- * RPE, because a lifter walking away mid-set has to be able to leave, and
- * because absence has to stay a state the record can hold: an unrated set is
- * not a zero.
+ * RPE, because a lifter walking away mid-set has to be able to leave.
+ *
+ * WHAT THAT TAP STORES IS NOT THE SAME EVERYWHERE, and the summary above is
+ * the sentence a reader checks the design against, so it is qualified here
+ * rather than left to be discovered. On a hand-counted or explosive set the
+ * tap stores NOTHING and absence stays a state the record can hold: an
+ * unrated set is not a zero. On a tempo-guided or timed set that is true only
+ * during the lead-in. Once such a set is running, [SetEndControl.END_UNRATED]
+ * is unreachable in practice, because `RecordState` answers `complete = true`
+ * and `complete = null` only in states where [targetMet] is also true -- so
+ * the three states a running guided or timed set can be in are the grid with
+ * the failure tile, the grid with the failure tile, and the standalone
+ * failure control. The exit from an unfinished one therefore always writes a
+ * verdict. That is the owner's instruction applied honestly rather than an
+ * oversight, and the repair is the rest screen: re-rating overwrites the
+ * tapped verdict.
  *
  * ## The cost, named rather than discovered
  *
- * On a guided or timed set, EVERY early exit is now recorded as a failure:
- * a rack taken, a cramp, a dropped phone. Those sets are not failures and the
- * record will call them one. That is the owner's instruction -- "the only
- * option available should be fail" -- and the alternative, keeping END SET
- * EARLY beside it, is what he ruled out. A TAPPED failure is also the one a
- * later rep correction cannot clear; re-rating the set on the rest screen
- * does overwrite it, which is the repair that fits.
+ * On a guided or timed set that is UNDER WAY, every early exit is now
+ * recorded as a failure: a rack taken, a cramp, a dropped phone. Those sets
+ * are not failures and the record will call them one. The lead-in is exempt
+ * -- a set whose clock never started has not failed at anything -- and
+ * leaving during it stores no tapped verdict, though the write still DERIVES
+ * a shortfall from the near-zero count, so the row reads failed with
+ * `tappedFailed` false. Whether such a set should be recorded at all is the
+ * owner's call and is carried as a field question rather than answered here.
+ *
+ * The running case is the owner's instruction -- "the only option available
+ * should be fail" -- and the alternative, keeping END SET EARLY beside it, is
+ * what he ruled out. A TAPPED failure is also the one a later rep correction
+ * cannot clear; re-rating the set on the rest screen does overwrite it, which
+ * is the repair that fits.
  */
 object SetEndControlPolicy {
     /**
@@ -148,27 +168,33 @@ object SetEndControlPolicy {
      * Rendering that absence as false would leave those sets with no exit but
      * a failure they did not have.
      *
-     * [started] is whether the set's own clock or cadence has begun. IT IS NOT
-     * READ AT THIS COMMIT. The parameter lands first and inert so the
-     * differential for the lead-in window can be written against the final
-     * signature and fail on an assertion rather than on a compile error, which
-     * is not evidence of anything; the commit after next reads it.
+     * [started] is whether the set's own clock or cadence has begun. False is
+     * the lead-in -- the seconds before a hold's clock starts, and the
+     * identical seconds before a guided cadence calls its first stroke. It is
+     * separate from [complete] because "has not finished" and "has not begun"
+     * are different states and the honest exit from them differs: an
+     * unfinished set that the lifter stops IS a failure, and a set that never
+     * started is not.
      *
      * A set rather than a boolean per control, so a control added later has to
      * be placed in every case rather than defaulting into all of them.
      */
-    @Suppress("UNUSED_PARAMETER")
     fun controls(kind: SetEndKind, targetMet: Boolean, complete: Boolean?, started: Boolean): Set<SetEndControl> =
-        // `complete == false` and not `complete != true`: null is a set whose
-        // completion the app cannot judge, and it falls through to the ungated
-        // rule below rather than into the gate. Written as an equality against
-        // false for exactly that reason -- the negation reads the same at a
-        // glance and gates every ad-hoc hold in the app.
-        if (kind.gatesOnCompletion && complete == false) {
-            setOf(SetEndControl.END_FAILED)
-        } else if (targetMet) {
-            setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE)
-        } else {
-            setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED)
+        when {
+            // First, because a set that has not begun cannot have delivered
+            // its prescription and cannot have failed to. Ahead of the kind
+            // test on purpose: the rule is about the SET, not about which
+            // completion signal it has, so nothing here has to be kept in
+            // step with [SetEndKind].
+            !started -> setOf(SetEndControl.END_UNRATED)
+            // `complete == false` and not `complete != true`: null is a set
+            // whose completion the app cannot judge, and it falls through to
+            // the ungated rules below rather than into the gate. Written as
+            // an equality against false for exactly that reason -- the
+            // negation reads the same at a glance and gates every ad-hoc hold
+            // in the app.
+            kind.gatesOnCompletion && complete == false -> setOf(SetEndControl.END_FAILED)
+            targetMet -> setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE)
+            else -> setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED)
         }
 }
