@@ -253,4 +253,45 @@ class SetLimiterTest {
         assertEquals("", SetLimiter.sanitizeForTyping(""))
         assertEquals("", SetLimiter.sanitizeForTyping("   "))
     }
+
+    /**
+     * A SPACE CAN BE TYPED. This is the differential.
+     *
+     * The note field is a value-driven OutlinedTextField: it re-applies its
+     * transform to the WHOLE accumulated value on every keystroke and shows
+     * the result back. So the transform never sees the finished note -- it is
+     * applied to every PREFIX of it, in turn, and the field can hold only what
+     * that loop converges to.
+     *
+     * `normalizeNote` ends by collapsing and trimming, so the keystroke that
+     * adds a trailing space produces a value identical to the one already on
+     * screen and the space is deleted the instant it is typed. "rack was
+     * taken" becomes "rackwastaken", and #189's one free-text answer can hold
+     * only a single run-on token.
+     *
+     * The fold here is the field's own contract rather than an approximation
+     * of it, and the expected value is `normalizeNote` of the finished phrase
+     * rather than a literal, because what the lifter watches themselves type
+     * has to be what the write stores.
+     */
+    @Test
+    fun `a phrase typed one character at a time keeps its spaces`() {
+        val phrase = "rack was taken"
+        val typed = phrase.fold("") { held, ch -> SetLimiter.sanitizeForTyping(held + ch) }
+        assertEquals(SetLimiter.normalizeNote(phrase), typed)
+    }
+
+    /**
+     * The same loop over the note this branch publishes in its own example.
+     *
+     * docs/schemas/examples/session-export.example.json carries this string as
+     * a limiterNote. A published example the app cannot emit is a contract
+     * nothing holds, and ajv passes it either way.
+     */
+    @Test
+    fun `the published example's note is a note the field can hold`() {
+        val phrase = "lost count and stopped, not sure how many I had done"
+        val typed = phrase.fold("") { held, ch -> SetLimiter.sanitizeForTyping(held + ch) }
+        assertEquals(phrase, SetLimiter.normalizeNote(typed))
+    }
 }

@@ -165,4 +165,26 @@ class SetLimiterPolicyTest {
         assertFalse(SetLimiterPolicy.leavesPageAsSkip(SetLimiter.GRIP))
         assertFalse(SetLimiterPolicy.leavesPageAsSkip(SetLimiter.OTHER))
     }
+
+    /**
+     * A page the app opened by ITSELF goes where the lifter is looking. This
+     * is the differential.
+     *
+     * The rest screen scrolls to 0 on entering RESTING and the reason row is
+     * the last thing on it -- after the header, the permission banner, the
+     * whole next-set block and the session-close controls. A question drawn
+     * there is a question the lifter starts the next set without ever seeing,
+     * and starting the next set resets the stored answer to null, so it is not
+     * merely unasked: it becomes unaskable.
+     *
+     * PROMPT and CORRECTION are two places for one page, which is why this is
+     * a placement and not a boolean.
+     */
+    @Test
+    fun `a page the app opened by itself is drawn where the lifter is looking`() {
+        assertEquals(
+            SetLimiterPagePlacement.PROMPT,
+            SetLimiterPolicy.placement(failed = true, limiter = null, dismissed = false, changing = false),
+        )
+    }
 }
