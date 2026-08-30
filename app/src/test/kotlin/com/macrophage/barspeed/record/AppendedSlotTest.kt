@@ -133,6 +133,10 @@ private fun resting(queue: List<PlannedSlot>, queueIndex: Int, statedLoadKg: Dou
     statedLoadKg = statedLoadKg,
 )
 
+/** On READY for the slot at [queueIndex]: `upcomingIndex` is that same slot. */
+private fun ready(queue: List<PlannedSlot>, queueIndex: Int) =
+    RecordState(stage = Stage.READY, queue = queue, queueIndex = queueIndex, adHoc = false)
+
 private fun appendedSlot(state: RecordState, at: Int): PlannedSlot {
     val next = assertNotNull(appendedState(state), "appendedState returned null")
     return next.queue[at]
@@ -214,5 +218,33 @@ class AppendedSlotTest {
         val added = appendedSlot(resting(queue, 0, statedLoadKg = 30.0), at = 1)
         assertEquals(press, added.exercise)
         assertEquals(20.0, added.loadKg)
+    }
+
+    // The lat pulldown block appendedState's own KDoc names: a 60 lb opener
+    // the plan marks warm-up, and a working weight found only after it.
+    private fun rampedPulldown() = listOf(
+        slot(pulldown, 0, 3, warmup = true, loadKg = 27.2),
+        slot(pulldown, 1, 3, loadKg = 34.0),
+        slot(pulldown, 2, 3, loadKg = 34.0),
+    )
+
+    @Test
+    fun `a set appended after a plan-declared warm-up is not a warm-up`() {
+        val added = appendedSlot(resting(rampedPulldown(), 0, statedLoadKg = 34.0), at = 3)
+        assertEquals(false, added.warmup)
+    }
+
+    @Test
+    fun `a set appended from READY on a warm-up slot is not a warm-up`() {
+        val added = appendedSlot(ready(rampedPulldown(), 0), at = 3)
+        assertEquals(false, added.warmup)
+    }
+
+    @Test
+    fun `appending twice after a warm-up marks neither set a warm-up`() {
+        val once = assertNotNull(appendedState(resting(rampedPulldown(), 0)))
+        val twice = assertNotNull(appendedState(once))
+        assertEquals(false, twice.queue[3].warmup)
+        assertEquals(false, twice.queue[4].warmup)
     }
 }
