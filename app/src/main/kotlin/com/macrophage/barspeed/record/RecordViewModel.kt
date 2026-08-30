@@ -853,8 +853,8 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
     )
 
 /**
- * Add one more set of the exercise the lifter is on, at the values they are
- * standing on right now (#177).
+ * Add one more set of the exercise just finished, at the values standing for
+ * it (#177, #188).
  *
  * The owner's case is in his own session's capture twice. Sets 4 and 5 of
  * field-33 are a seated overhead press prescribed 8 at 40 lb, recorded 7 and
@@ -891,6 +891,15 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * shows, which is the property #45 and #124 are about. Making the carry
  * reach it would mean teaching four policies that an appended set prescribes
  * no change, and that is a wider change than this issue.
+ *
+ * WHICH EXERCISE, AND WHEN THE TWO DIFFER. The anchor is the slot at
+ * `queueIndex` -- the set just finished during rest, the set being set up on
+ * READY -- and not `upcomingSlot`, which is the set that has not happened.
+ * "The load was wrong" is a statement about a set already done. At a block
+ * boundary the two are different exercises, and reading the upcoming one made
+ * this build a slot of the NEXT exercise and queue it after the next block;
+ * after the session's final set it made the control refuse outright, since the
+ * upcoming index is one past the end (#188).
  *
  * A FREE FUNCTION taking what it needs, for [jumpedState]'s reason:
  * [RecordViewModel] is a class detekt measures as being AT its size limit, and
@@ -930,6 +939,20 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * `docs/schemas/session-export.schema.json` under the same ajv invocation
  * `ci.yml` runs.
  *
+ * RUN ON A DEVICE AGAIN FOR #188, at the boundary #177's run never reached.
+ * On `barspeed-api35`, a two-set overhead press block followed by a one-set lat
+ * pulldown block: after the LAST press set the control read "Load was wrong?
+ * Add another Overhead Press set before Lat pulldown", and the appended set
+ * drew as "Set 3 · you added this one · Overhead Press — 2 reps · 44.1 lb",
+ * ahead of the pulldown, with the move-the-sensor card gone. `sqlite3` read
+ * five `set_records` for that session: three `overhead_press` at 20.0 kg
+ * (orderIdx 0, 1, 2) with the third carrying `plannedLoadKg` NULL and `added`
+ * 1, then `lat_pulldown` at 30.0 kg prescribed, then a second `lat_pulldown`
+ * with `added` 1 -- added from the "That was the last planned set" screen,
+ * which had no control at all before #188. The appended press row carries the
+ * PRESS load, not the pulldown's: what the defect used to write there was a
+ * `lat_pulldown` row at 30.0 kg queued after the pulldown block.
+ *
  * That last line is what matters most here, because it covers the hop no JVM
  * test can: `completedSetOf`'s `added = p.slot?.isAddedSet == true` survived
  * mutation with the whole suite green, and the exported document is the
@@ -938,9 +961,8 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * still unexecuted, and the cluster's two-way exercise still owes 10 -> 11 -> 12
  * against real rows.
  */
-private fun appendedQueue(s: RecordState): List<PlannedSlot>? {
+private fun appendedState(s: RecordState): RecordState? {
     if (s.adHoc) return null
-    val upcoming = s.upcomingSlot ?: return null
     val placement =
         AddSetControl.placement(
             s.queue.map { AddSetSlotKey(it.exercise.id, it.setIndexInExercise) },
@@ -948,9 +970,18 @@ private fun appendedQueue(s: RecordState): List<PlannedSlot>? {
             upcomingIndex = s.upcomingIndex,
         ) ?: return null
     val at = placement.insertAt
+    val anchor = s.queue[placement.anchorIndex]
     val previous = s.queue[at - 1]
+    // The anchor as it stands is what that exercise last RAN with: the bake
+    // wrote the lifter's statements into it before the set started. So the
+    // carry adds something only while those statements are still about this
+    // exercise, and across a block boundary it must not run at all -- a load
+    // typed for the exercise the lifter is about to do is not a statement
+    // about the one they just finished, which is [jumpedState]'s rule one
+    // control over.
+    val base = if (placement.carriesStandingStatements) carriedValues(anchor, s) else anchor
     val appended =
-        carriedValues(upcoming, s).copy(
+        base.copy(
             plannedLoadKg = null,
             plannedReps = null,
             plannedDurationS = null,
@@ -960,7 +991,34 @@ private fun appendedQueue(s: RecordState): List<PlannedSlot>? {
             setIndexInExercise = previous.setIndexInExercise + 1,
             setsInExercise = previous.setIndexInExercise + 2,
         )
-    return s.queue.toMutableList().apply { add(at, appended) }
+    val queue = s.queue.toMutableList().apply { add(at, appended) }
+    if (!placement.becomesNextSet) return s.copy(queue = queue)
+    // The appended set has displaced the one the rest screen was set up for,
+    // and every editable box on that screen was seeded from the displaced
+    // slot. Re-seeded here rather than left to drift, [jumpedState]'s
+    // arrangement for the same event: the box and what the set would record
+    // cannot be allowed to disagree, which is what #45 and #124 are about.
+    // Unreachable from READY -- there the block always has the set being set
+    // up still to run, so the appended set never lands next -- so #177's
+    // behaviour on that screen is untouched.
+    val seedKg =
+        SetLoadPolicy.seedAddedKg(
+            hasPlannedNext = true,
+            nextDeclaredAddedKg = appended.loadKg,
+            lastAddedKg = null,
+        )
+    return s.copy(
+        queue = queue,
+        loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
+        // Cleared for [jumpedState]'s reason: these were statements about the
+        // exercise that is no longer coming up.
+        statedLoadKg = null,
+        statedTempo = null,
+        statedReps = null,
+        statedDurationS = null,
+        repsInput = appended.reps?.toString() ?: s.repsInput,
+        durationInput = appended.durationS?.toString() ?: s.durationInput,
+    )
 }
 
 /**
@@ -2230,9 +2288,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = jumpedToExerciseState(stateFlow.value, exerciseId) ?: return
     }
 
-    /** One more set of the current exercise (#177); every decision is [appendedQueue]'s. */
+    /** One more set of the exercise just finished (#177, #188); every decision is [appendedState]'s. */
     fun addSetOfCurrentExercise() {
-        stateFlow.value = stateFlow.value.copy(queue = appendedQueue(stateFlow.value) ?: return)
+        stateFlow.value = appendedState(stateFlow.value) ?: return
     }
 
     fun startAdHocSession() {

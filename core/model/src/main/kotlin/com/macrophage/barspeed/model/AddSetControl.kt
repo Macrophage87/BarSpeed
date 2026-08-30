@@ -70,6 +70,20 @@ object AddSetControl {
      * same on READY and differ by one during rest, where [upcomingIndex] is
      * legitimately one past the last slot.
      *
+     * THE ANCHOR IS [queueIndex] AND NOT [upcomingIndex] (#188). "The load was
+     * wrong" is a statement about a set that has HAPPENED, so the exercise
+     * being added to is the one just finished -- which during rest is
+     * [queueIndex], and on READY is the same slot as the coming one. Anchoring
+     * on the upcoming slot made the control name, and build its new slot from,
+     * the exercise the lifter has not done yet: at a block boundary a set
+     * added because the squat load was wrong became a row set queued after the
+     * rows. It also refused outright after the session's final set, where the
+     * upcoming index is one past the end and the anchor is not.
+     *
+     * [upcomingIndex] still decides the two facts about the CALLER's screen:
+     * whether the appended set displaces the coming one, and whether what the
+     * lifter is standing on belongs to the anchor's exercise.
+     *
      * THE BLOCK ENDS WHERE THE NEXT ONE STARTS, and a block start is
      * `setIndexInExercise == 0` -- [SetLoadPolicy.sameExerciseBlock]'s rule,
      * read from here rather than restated. The exercise id alone cannot end a
@@ -79,8 +93,8 @@ object AddSetControl {
      * and neither is sufficient.
      */
     fun placement(blocks: List<AddSetSlotKey>, queueIndex: Int, upcomingIndex: Int): AddSetPlacement? {
-        if (upcomingIndex !in blocks.indices) return null
-        val anchorIndex = upcomingIndex
+        if (queueIndex !in blocks.indices) return null
+        val anchorIndex = queueIndex
         val anchor = blocks[anchorIndex]
         var i = anchorIndex + 1
         while (i < blocks.size && blocks[i].exerciseId == anchor.exerciseId && blocks[i].setIndexInExercise > 0) {
@@ -106,7 +120,26 @@ object AddSetControl {
      * [anchorExercise] is the display name of the exercise the appended set is
      * a set of; [upcomingExercise] is the display name of the set the next
      * START would run, null when the session has no set left.
+     *
+     * It names the ANCHOR, which is the exercise just finished (#188): the
+     * button said "another Lat pulldown set" at the moment the lifter wanted
+     * another press set, which is both the wrong name and, before this, the
+     * wrong set.
+     *
+     * WHERE IT LANDS is said only when the two names differ, which is the one
+     * moment there is doubt to remove -- and it is true rather than
+     * decorative: the anchor's block has no sets left there, so the appended
+     * set runs next, ahead of the exercise named. Where the names agree there
+     * is nothing to disambiguate, and the appended set goes after the block's
+     * remaining sets rather than next, so a "before" clause would be false.
+     * Two consecutive blocks of one exercise take the shorter form for the
+     * same reason: naming the same words on both sides of "before" tells the
+     * lifter nothing.
      */
     fun label(anchorExercise: String, upcomingExercise: String?): String =
-        "Load was wrong? Add another ${upcomingExercise ?: anchorExercise} set"
+        if (upcomingExercise == null || upcomingExercise == anchorExercise) {
+            "Load was wrong? Add another $anchorExercise set"
+        } else {
+            "Load was wrong? Add another $anchorExercise set before $upcomingExercise"
+        }
 }

@@ -1153,8 +1153,19 @@ private fun ChangeSetDialog(
 }
 
 /**
- * "Add another set" — one more set of the exercise the lifter is ON, at the
- * values they are standing on (#177).
+ * "Add another set" — one more set of the exercise just FINISHED, at the
+ * values standing for it (#177, #188).
+ *
+ * The exercise named is `currentSlot`'s, which during rest is the set that has
+ * happened and on READY is the set about to. It used to be `upcomingSlot`'s,
+ * so after the last set of an exercise the button offered another set of the
+ * exercise coming up -- the wrong name, and the wrong set -- at the exact
+ * moment the lifter is thinking about the one they just did. Where the two
+ * differ [AddSetControl.label] says where the added set lands, and that is the
+ * only case where it says so.
+ *
+ * Drawn on the last-set branch of [NextSetBlock] as well, so the session's
+ * final set has the control too.
  *
  * BESIDE "Equipment busy? Switch exercise" and in the same form, on BOTH
  * surfaces, which is #152's consolidated change surface: the rest screen and
@@ -1183,7 +1194,6 @@ private fun ChangeSetDialog(
 @Composable
 private fun AddSetSection(state: RecordState, viewModel: RecordViewModel) {
     if (state.adHoc) return
-    state.upcomingSlot ?: return
     val anchor = state.currentSlot ?: return
     TextButton(onClick = viewModel::addSetOfCurrentExercise) {
         Text(
@@ -2272,6 +2282,13 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
                 color = BarColors.Volt,
             )
         }
+        // The session's last set is when "that one was too light, give me one
+        // more" is likeliest, and until #188 this branch offered nothing: the
+        // control sat inside the `next != null` arm only. The appended set
+        // becomes the session's next set, so the START button already on this
+        // screen finally has a slot to run. It was drawn here before too, with
+        // nothing to advance to -- raised separately, not fixed here.
+        AddSetSection(state, viewModel)
     }
 }
 
