@@ -289,17 +289,16 @@ class SetLimiterTest {
      * that loop converges to.
      *
      * `normalizeNote` ends by collapsing and trimming, so while the FIELD
-     * applied it -- at 6b8d7f2 (CI run 33320046206, conclusion failure) and
-     * every commit before it -- the keystroke that added a trailing space
-     * produced a value identical to the one already on screen and the space
-     * was deleted the instant it was typed. "rack was taken" became
-     * "rackwastaken", and #189's one free-text answer could hold only a single
-     * run-on token. The field now applies [SetLimiter.sanitizeForTyping].
+     * applied it -- at 6b8d7f2 (CI run 33320046206, conclusion failure) --
+     * the keystroke that added a trailing space produced a value identical
+     * to the one already on screen and the space was deleted the instant it
+     * was typed. "rack was taken" became "rackwastaken", and #189's one
+     * free-text answer could hold only a single run-on token. The field now
+     * applies [SetLimiter.sanitizeForTyping].
      *
      * The fold here is the field's own contract rather than an approximation
      * of it, and the expected value is `normalizeNote` of the finished phrase
-     * rather than a literal, because what the lifter watches themselves type
-     * has to be what the write stores.
+     * rather than a literal.
      */
     @Test
     fun `a phrase typed one character at a time keeps its spaces`() {

@@ -548,8 +548,8 @@ private fun applyWarmupMark(
  * function for [applyPrepAdjustment]'s reason.
  *
  * A null [limiter] clears the answer, which is what a lifter changing their
- * mind back to no answer leaves behind. The note is normalized here as well as
- * at the field, and is DROPPED for any answer other than [SetLimiter.OTHER]:
+ * mind back to no answer leaves behind. The note is normalized here, and is
+ * DROPPED for any answer other than [SetLimiter.OTHER]:
  * words kept beside "grip gave out" would be read as describing an answer they
  * were never typed for, and the note's own published description promises they
  * are not there.

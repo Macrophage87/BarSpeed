@@ -108,14 +108,13 @@ enum class SetLimiter {
          * runs of spaces collapse to one, and the result is trimmed.
          *
          * THE LIFTER SEES MOST OF THIS AS THEY TYPE, but not through this
-         * function. [sanitizeForTyping] is what the field applies, because a
-         * rule that is safe on a finished note is not safe on a PREFIX of one
-         * -- and a value-driven field applies its rule to every prefix in
-         * turn. The characters the manifest cannot carry are dropped there, in
-         * front of the lifter. What is left to this function is the ENDS,
-         * trimmed once, here, at the write. A character silently dropped at
-         * save is a character the lifter believes they recorded, and the split
-         * is what keeps that count at zero for everything but the leading and
+         * function. [sanitizeForTyping] is what the field applies, because
+         * a rule that is safe on a finished note is not safe on a PREFIX of
+         * one -- and a value-driven field applies its rule to every prefix
+         * in turn. What is left to this function is the ENDS, trimmed once,
+         * here, at the write. A character silently dropped at save is a
+         * character the lifter believes they recorded, and the split is
+         * what keeps that count at zero for everything but the leading and
          * trailing space they cannot have meant.
          *
          * Blank comes back as null, not as `""`. An empty note is no note, and

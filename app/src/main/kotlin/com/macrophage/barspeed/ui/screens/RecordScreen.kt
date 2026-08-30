@@ -2275,16 +2275,16 @@ private fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
         }
     RestHeader(state, viewModel)
     Spacer(Modifier.height(6.dp))
-    // Drawn HERE, above everything but the header, because the screen scrolls
-    // to 0 on entering RESTING and the reason row is the last thing on it. A
-    // question below the fold is a question the lifter starts the next set
-    // without seeing, and starting the next set clears the answer it was
-    // asking for. Drawing it here also keeps it from inserting itself between
-    // the lifter and a control they are already tapping, which is the
-    // stacked-target hazard #137 removed elsewhere on this screen: a rep
-    // correction crossing the planned count can flip the set to failed
-    // mid-rest, and eight tiles appearing directly above the +/- under the
-    // finger would store a reason nobody gave.
+    // Drawn HERE, above everything but the header, because the screen
+    // scrolls to 0 on entering RESTING. A question below the fold is a
+    // question the lifter starts the next set without seeing, and starting
+    // the next set clears the answer it was asking for. Drawing it here
+    // also keeps it from inserting itself between the lifter and a control
+    // they are already tapping, which is the stacked-target hazard #137
+    // removed elsewhere on this screen: a rep correction crossing the
+    // planned count can flip the set to failed mid-rest, and eight tiles
+    // appearing directly above the +/- under the finger would store a
+    // reason nobody gave.
     //
     // What it does NOT do is stop the insertion reflowing the column: this is
     // one verticalScroll Column, so a page opening above the fold still moves
@@ -2968,11 +2968,11 @@ private fun LimiterPage(
  * The free-text box, reachable only behind Other.
  *
  * The field removes on every keystroke the characters the raw archive's set
- * manifest cannot carry, so those are dropped in front of the lifter; the ends
- * are trimmed once, when the note is saved. The two are different transforms
- * for a reason that is not tidiness: this box is value-driven, so whatever it
- * applies is applied to every PREFIX of the note in turn, and a rule that
- * trims would delete each space at the moment it is typed.
+ * manifest cannot carry; the ends are trimmed once, when the note is saved.
+ * The two are different transforms for a reason that is not tidiness: this
+ * box is value-driven, so whatever it applies is applied to every PREFIX of
+ * the note in turn, and a rule that trims would delete each space at the
+ * moment it is typed.
  *
  * A character dropped at save is a character the lifter believes they
  * recorded, and the characters this drops are not cosmetic: the manifest is

@@ -162,8 +162,8 @@ class SchemaLimiterContractTest {
     }
 
     /**
-     * Every note the published example carries is a note the app's own field
-     * can hold.
+     * Every `limiterNote` the published example carries is a note the app's
+     * own field can hold.
      *
      * THE DOCUMENT, NOT A COPY OF IT. This reads the real file off the test
      * resource path, which `core/model/build.gradle.kts` puts there so a
@@ -174,16 +174,15 @@ class SchemaLimiterContractTest {
      * was false.
      *
      * A published example carrying a note the field cannot produce is a
-     * contract nothing holds, and ajv passes it either way -- it validates
-     * shape, and every string is a string.
+     * contract nothing holds.
      */
     @Test
-    fun `every note in the published example is a note the field can hold`() {
+    fun `every limiterNote in the published example is a note the field can hold`() {
         val notes =
             schema("examples/session-export.example.json")["exercises"]!!.jsonArray
                 .flatMap { it.jsonObject["sets"]!!.jsonArray }
                 .mapNotNull { it.jsonObject["limiterNote"]?.jsonPrimitive?.content }
-        assertTrue(notes.isNotEmpty(), "the published example shows no set carrying a note")
+        assertTrue(notes.isNotEmpty(), "the published example shows no set carrying a limiterNote")
         for (note in notes) {
             val typed = note.fold("") { held, ch -> SetLimiter.sanitizeForTyping(held + ch) }
             assertEquals(

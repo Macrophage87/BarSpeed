@@ -116,13 +116,10 @@ class SchemaWarmupMarkContractTest {
     /**
      * The published example shows the DISAGREEMENT, not only the agreement.
      *
-     * `warmupByLifter` true with `warmup` ABSENT is the shape #194 exists for:
-     * the plan called the set a ramp and the lifter took it off. Three
-     * descriptions -- this schema's `warmup`, its `warmupByLifter`, and
-     * plan.schema.json's own -- spend sentences insisting that combination is
-     * a real statement rather than a contradiction, and until now no example
-     * carried it. ajv is the only automated check the examples get and an
-     * absent case is exactly what it cannot notice.
+     * `warmupByLifter` true with `warmup` ABSENT is the shape #194 exists
+     * for, and until now no example carried it. ajv is the only automated
+     * check the examples get and an absent case is exactly what it cannot
+     * notice.
      *
      * The device produces it: the round-2 bench session's one set published
      * `warmupByLifter` true with no `warmup` key.
