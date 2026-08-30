@@ -886,8 +886,13 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * copy does not reset, so all twenty-four are stated here rather than the one
  * a reviewer happened to name. `AppendedSlotTest.APPEND_DECISIONS` holds the
  * same table and is asserted against the class BOTH ways: a new field cannot
- * be added without an answer, and an answer that does not match what this
- * function does with that field reds on the entry itself.
+ * be added without an answer, and a wrongly-grouped answer reds on the entry
+ * itself in each of the six directions an entry can be moved between the
+ * three groups. Six directions, six mutations, one build each -- the list and
+ * the failing test per direction are in that file's header. An earlier
+ * version of this sentence claimed the same thing with three of the six run,
+ * and one of the unrun three, CARRIED mislabelled RESET, passed until a
+ * fourth sweep was added for it (#188 round 3).
  *
  *  - From the anchor, because the appended set IS one more set of that
  *    exercise: `exercise`, `geometry`, `side`, `implementCount`,

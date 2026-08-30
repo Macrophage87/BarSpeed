@@ -57,19 +57,43 @@ private enum class Append {
  * THE KEY SET IS HALF THE PIN AND THE VALUES ARE THE OTHER HALF. Asserting
  * only that these keys equal [PlannedSlot]'s fields catches a field with NO
  * stated decision and passes a field whose stated decision is WRONG -- which
- * is the same shape of hole `warmup` fell through, one level up. The three
+ * is the same shape of hole `warmup` fell through, one level up. The four
  * sweeps below assert each recorded decision against what `appendedState`
- * actually does with that field, over two fixtures, so an entry moved to the
- * wrong group reds on the entry itself and not on some behaviour test that
- * happens to cover it. Round 2 of #188 raised this.
+ * actually does with that field, over two fixtures. Round 2 of #188 raised
+ * this and round 3 measured how far it reaches.
  *
- * SHOWN RED, NOT ASSERTED TO WORK. At `ab5a9c87265f4e2a11b1db0e69b6a864e3f294d7`
- * three entries of this table were deliberately misfiled, one per group --
- * `side` INHERITED -> RESET, `loadKg` CARRIED -> INHERITED, `warmup` RESET ->
- * CARRIED -- and `:app:testDebugUnitTest` reported 17 tests completed, 3
- * failed: exactly the three sweeps, no more and no fewer, with the key-set
- * assertion passing throughout. That commit's CI run is the durable artifact.
- * This commit restores the three entries and changes nothing else.
+ * WHICH MISFILINGS RED, ENUMERATED BECAUSE THIS WAS CLAIMED WRONG ONCE. Three
+ * groups give six ordered directions an entry can be moved in, and an earlier
+ * version of this header said flatly that a wrongly-grouped entry reds -- with
+ * three of the six actually run. The fourth sweep was added because one of the
+ * other three did not: CARRIED mislabelled RESET passed, since the RESET sweep
+ * asked only that the value DIFFER from the anchor and a carried value differs
+ * from the anchor in every fixture here by construction. All six are now run
+ * against THIS commit's tree, one build each, one mutation each,
+ * `./gradlew :app:testDebugUnitTest --rerun-tasks`:
+ *
+ *  - `side` INHERITED -> RESET reds `every field recorded RESET differs...`
+ *  - `side` INHERITED -> CARRIED reds `every field recorded CARRIED takes...`
+ *  - `loadKg` CARRIED -> INHERITED reds `every field recorded INHERITED...`
+ *  - `loadKg` CARRIED -> RESET reds `no field recorded RESET takes...`
+ *  - `warmup` RESET -> CARRIED reds `every field recorded CARRIED takes...`
+ *  - `warmup` RESET -> INHERITED reds `every field recorded INHERITED...`
+ *
+ * Each is 13 tests in this class, 1 failure, exactly the sweep named and no
+ * other test, read from the class's JUnit XML rather than the console. The
+ * fourth sweep was checked against all four CARRIED fields, not just the one:
+ * `reps`, `tempo` and `durationS` mislabelled RESET each red it too. What is
+ * claimed is those ten runs and nothing wider; a field whose value no fixture
+ * makes distinctive is still outside every sweep here.
+ *
+ * SHOWN RED, NOT ASSERTED TO WORK, TWICE. At
+ * `ab5a9c87265f4e2a11b1db0e69b6a864e3f294d7` three entries were deliberately
+ * misfiled, one per group, and `:app:testDebugUnitTest` reported 17 tests, 3
+ * failed. The fourth sweep has its own red at
+ * `7ae82a766c3af6e81fca95ed3ed22dd2e67c6726`, where `loadKg` is misfiled
+ * CARRIED -> RESET alone: CI run 33310983019, 18 tests completed, 1 failed.
+ * Both CI runs are the durable artifacts; this commit restores the entry and
+ * changes nothing else in the table.
  */
 private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     // Identity and how the movement is performed: the appended set is one
@@ -86,7 +110,7 @@ private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     "prepS" to Append.INHERITED,
     "sensors" to Append.INHERITED,
     // What the lifter is standing on for that exercise.
-    "loadKg" to Append.RESET,
+    "loadKg" to Append.CARRIED,
     "reps" to Append.CARRIED,
     "durationS" to Append.CARRIED,
     "tempo" to Append.CARRIED,
@@ -444,9 +468,13 @@ class AppendedSlotTest {
         // that a RESET field DIFFERS from the anchor in some fixture, and a
         // genuinely carried field satisfies that too, because every fixture
         // here deliberately states a carried value different from the
-        // anchor's. Measured, not argued: at the parent of this commit,
-        // relabelling `loadKg` CARRIED -> RESET left `:app:testDebugUnitTest`
-        // green at 12 tests, 0 failures.
+        // anchor's. Measured, not argued: at
+        // `becaca430b6cb1de65f9bebf98378959fba5b345`, before this sweep
+        // existed, relabelling `loadKg` CARRIED -> RESET left
+        // `:app:testDebugUnitTest` green at 12 tests, 0 failures. With this
+        // sweep it reds -- CI run 33310983019 on
+        // `7ae82a766c3af6e81fca95ed3ed22dd2e67c6726`, 18 tests completed, 1
+        // failed, this one.
         //
         // Vacuous for every field genuinely RESET today -- none of the nine
         // has a `standing` entry, because `standing` is authored per CARRIED
