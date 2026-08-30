@@ -309,11 +309,11 @@ class SetLimiterTest {
     }
 
     /**
-     * The same loop over the note this branch publishes in its own example.
+     * The same loop over the string the published example happens to carry
+     * today, kept here as a unit case beside its siblings.
      *
-     * docs/schemas/examples/session-export.example.json carries this string as
-     * a limiterNote. A published example the app cannot emit is a contract
-     * nothing holds, and ajv passes it either way.
+     * The DOCUMENT is pinned in [SchemaLimiterContractTest], which reads the
+     * real file; this test would not notice the example changing.
      */
     @Test
     fun `the published example's note is a note the field can hold`() {

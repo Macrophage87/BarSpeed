@@ -124,6 +124,17 @@
           "load_kg": 45,
           "load_lb": 99.2,
           "reps": 10,
+          "warmupByLifter": true,
+          "rpe": 6,
+          "repsManual": true,
+          "plannedReps": 10,
+          "rest_s": 90,
+          "summary": { "meanConVel_mps": 0.44, "peakConVel_mps": 0.71, "meanEcc_s": 2.7, "meanCon_s": 1.0, "meanRom_m": 0.35, "romSpread_pct": 9.4 }
+        },
+        {
+          "load_kg": 45,
+          "load_lb": 99.2,
+          "reps": 10,
           "warmup": true,
           "rpe": 1,
           "repsManual": true,

@@ -2,6 +2,7 @@ package com.macrophage.barspeed.model
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
@@ -109,6 +110,36 @@ class SchemaWarmupMarkContractTest {
         assertTrue(
             "NOT additive" in log,
             "the version log does not warn a 1.13 reader that warmup gained a second producer",
+        )
+    }
+
+    /**
+     * The published example shows the DISAGREEMENT, not only the agreement.
+     *
+     * `warmupByLifter` true with `warmup` ABSENT is the shape #194 exists for:
+     * the plan called the set a ramp and the lifter took it off. Three
+     * descriptions -- this schema's `warmup`, its `warmupByLifter`, and
+     * plan.schema.json's own -- spend sentences insisting that combination is
+     * a real statement rather than a contradiction, and until now no example
+     * carried it. ajv is the only automated check the examples get and an
+     * absent case is exactly what it cannot notice.
+     *
+     * The device produces it: the round-2 bench session's one set published
+     * `warmupByLifter` true with no `warmup` key.
+     */
+    @Test
+    fun `the published example shows a warm-up the lifter took off the plan`() {
+        val sets =
+            schema("examples/session-export.example.json")["exercises"]!!.jsonArray
+                .flatMap { it.jsonObject["sets"]!!.jsonArray }
+                .map { it.jsonObject }
+        assertTrue(
+            sets.any { "warmupByLifter" in it && "warmup" !in it },
+            "the published example never shows a set the lifter took off the plan's warm-up",
+        )
+        assertTrue(
+            sets.any { "warmupByLifter" in it && "warmup" in it },
+            "the published example no longer shows the agreeing case either",
         )
     }
 }

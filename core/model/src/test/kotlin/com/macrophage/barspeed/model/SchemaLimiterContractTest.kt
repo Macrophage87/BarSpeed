@@ -160,4 +160,37 @@ class SchemaLimiterContractTest {
             )
         }
     }
+
+    /**
+     * Every note the published example carries is a note the app's own field
+     * can hold.
+     *
+     * THE DOCUMENT, NOT A COPY OF IT. This reads the real file off the test
+     * resource path, which `core/model/build.gradle.kts` puts there so a
+     * published document can be pinned rather than transcribed.
+     * [SetLimiterTest] folds the same loop over a hard-coded literal, and a
+     * literal cannot notice the example changing: 522356c's body claimed that
+     * pin stopped the document and the build drifting apart, and that claim
+     * was false.
+     *
+     * A published example carrying a note the field cannot produce is a
+     * contract nothing holds, and ajv passes it either way -- it validates
+     * shape, and every string is a string.
+     */
+    @Test
+    fun `every note in the published example is a note the field can hold`() {
+        val notes =
+            schema("examples/session-export.example.json")["exercises"]!!.jsonArray
+                .flatMap { it.jsonObject["sets"]!!.jsonArray }
+                .mapNotNull { it.jsonObject["limiterNote"]?.jsonPrimitive?.content }
+        assertTrue(notes.isNotEmpty(), "the published example shows no set carrying a note")
+        for (note in notes) {
+            val typed = note.fold("") { held, ch -> SetLimiter.sanitizeForTyping(held + ch) }
+            assertEquals(
+                note,
+                SetLimiter.normalizeNote(typed),
+                "the published example carries a note the app's own field cannot hold",
+            )
+        }
+    }
 }
