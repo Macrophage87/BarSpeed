@@ -17,11 +17,15 @@ import kotlin.test.assertTrue
  * the lifter's five hardest sets as warm-ups, two pages after its own ledger
  * called the same five failed.
  *
- * Every case here names a [SetEndKind] and a completion state. Both arguments
- * are inert in this commit -- the policy reads only `targetMet` -- so what is
- * pinned is that the ungated rule is unchanged for every combination of them.
- * The differentials that make the two arguments matter are pushed separately,
- * red, before the gate exists.
+ * Every case here names a [SetEndKind] and a completion state. #186 gates the
+ * grid on completion for the two kinds that HAVE a completion signal, and the
+ * expectations under "the completion gate" are that change's differentials:
+ * they fail against the ungated policy this file was written for and pass once
+ * it reads its own arguments. #137 is not reversed by them -- a guided set
+ * ended via Fail is rated on the rest screen, where the unrated row carries a
+ * Rate action -- and the sweep asserting the grid survives on a hand-counted
+ * set is what keeps the reversal from spreading to the kinds that have no
+ * completion signal at all.
  */
 class SetEndControlPolicyTest {
     private fun everyCase(): List<Triple<SetEndKind, Boolean, Boolean?>> = SetEndKind.entries.flatMap { kind ->
@@ -146,6 +150,103 @@ class SetEndControlPolicyTest {
                     SetEndControl.END_UNRATED in controls ||
                     SetEndControl.END_FAILED in controls,
                 "$case draws no way to end the set",
+            )
+        }
+    }
+
+    // ---- the completion gate, issue #186 ------------------------------------
+
+    @Test
+    fun `a tempo-guided set draws only the failure control until the guide finishes`() {
+        // "It should only be shown when all the reps are finished or the hold
+        // is finished. Earlier than that the only option available should be
+        // fail." The app is counting, so the question is not answerable yet --
+        // and asking it mid-set is what the owner asked to stop.
+        listOf(true, false).forEach { targetMet ->
+            assertEquals(
+                setOf(SetEndControl.END_FAILED),
+                SetEndControlPolicy.controls(SetEndKind.TEMPO_GUIDED, targetMet, complete = false),
+                "an unfinished guided set offers something other than Fail (targetMet=$targetMet)",
+            )
+        }
+    }
+
+    @Test
+    fun `a hold draws only the failure control until its clock reaches the target`() {
+        listOf(true, false).forEach { targetMet ->
+            assertEquals(
+                setOf(SetEndControl.END_FAILED),
+                SetEndControlPolicy.controls(SetEndKind.TIMED, targetMet, complete = false),
+                "an unfinished hold offers something other than Fail (targetMet=$targetMet)",
+            )
+        }
+    }
+
+    @Test
+    fun `a set the app cannot judge is not gated, so it keeps the grid`() {
+        // complete = null is an ad-hoc hold with no target, or a guided set the
+        // plan gave no rep count. Neither ever finishes on its own, so gating
+        // them would leave a tapped failure as the only way out of a set that
+        // went fine. This is the case that makes the argument nullable.
+        listOf(SetEndKind.TEMPO_GUIDED, SetEndKind.TIMED).forEach { kind ->
+            listOf(true, false).forEach { targetMet ->
+                assertTrue(
+                    SetEndControl.EFFORT_GRID in SetEndControlPolicy.controls(kind, targetMet, complete = null),
+                    "$kind with no completion signal cannot rate the set (targetMet=$targetMet)",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `a completed guided or timed set gets the grid it always got`() {
+        listOf(SetEndKind.TEMPO_GUIDED, SetEndKind.TIMED).forEach { kind ->
+            assertEquals(
+                setOf(SetEndControl.EFFORT_GRID, SetEndControl.FAILED_TILE),
+                SetEndControlPolicy.controls(kind, targetMet = true, complete = true),
+                "$kind loses the grid after completing",
+            )
+            assertEquals(
+                setOf(SetEndControl.EFFORT_GRID, SetEndControl.END_UNRATED),
+                SetEndControlPolicy.controls(kind, targetMet = false, complete = true),
+                "$kind that completed short of target loses the grid",
+            )
+        }
+    }
+
+    @Test
+    fun `hand-counted and explosive sets are never gated on completion`() {
+        // The owner's third message narrowed the scope to tempo and timed
+        // work. On a manual-count set the app has no completion signal and the
+        // effort tile IS how the lifter says the set is over: gating it there
+        // would leave no exit at all.
+        listOf(SetEndKind.STRAIGHT_REPS, SetEndKind.EXPLOSIVE).forEach { kind ->
+            listOf(true, false).forEach { targetMet ->
+                listOf(true, false, null).forEach { complete ->
+                    assertEquals(
+                        SetEndControlPolicy.controls(kind, targetMet, complete = null),
+                        SetEndControlPolicy.controls(kind, targetMet, complete),
+                        "$kind changed with complete=$complete, which it must not read",
+                    )
+                    assertTrue(
+                        SetEndControl.EFFORT_GRID in SetEndControlPolicy.controls(kind, targetMet, complete),
+                        "$kind lost the grid at targetMet=$targetMet complete=$complete",
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `the grid never shares the screen with the standalone failure control`() {
+        // END_FAILED exists because FAILED_TILE draws nothing by itself. The
+        // two together would put the lifter's own failure verdict on screen
+        // twice, in two controls that store the same fact.
+        everyCase().forEach { case ->
+            val controls = controls(case)
+            assertFalse(
+                SetEndControl.EFFORT_GRID in controls && SetEndControl.END_FAILED in controls,
+                "$case draws the grid and the standalone failure control at once",
             )
         }
     }
