@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Where each field of an appended [PlannedSlot] comes from.
@@ -48,18 +49,30 @@ private enum class Append {
 /**
  * One stated decision per [PlannedSlot] field, checked against the class.
  *
- * The point is the check below, not the table: a field added to
- * [PlannedSlot] with no entry here reds `:app:testDebugUnitTest`, so the
- * next field cannot be inherited by accident the way `warmup` was. What the
- * table cannot do is verify a WRONG entry -- that is what the assertions
- * further down are for, and they cover one field per group.
+ * A field added to [PlannedSlot] with no entry here reds
+ * `:app:testDebugUnitTest`, so the next field cannot be inherited by accident
+ * the way `warmup` was.
+ *
+ * THE KEY SET IS HALF THE PIN AND THE VALUES ARE THE OTHER HALF. Asserting
+ * only that these keys equal [PlannedSlot]'s fields catches a field with NO
+ * stated decision and passes a field whose stated decision is WRONG -- which
+ * is the same shape of hole `warmup` fell through, one level up. The three
+ * sweeps below assert each recorded decision against what `appendedState`
+ * actually does with that field, over two fixtures, so an entry moved to the
+ * wrong group reds on the entry itself and not on some behaviour test that
+ * happens to cover it. Round 2 of #188 raised this. THE THREE ENTRIES BELOW
+ * MARKED `MISFILED ON PURPOSE` ARE WRONG IN THIS COMMIT AND ONLY THIS ONE:
+ * they are the red this pin has to show before it is worth anything, one per
+ * group, and the next commit restores them.
  */
 private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     // Identity and how the movement is performed: the appended set is one
     // more set of the anchor's exercise, so all of this follows it.
     "exercise" to Append.INHERITED,
     "geometry" to Append.INHERITED,
-    "side" to Append.INHERITED,
+    // MISFILED ON PURPOSE: `side` is inherited. RESET here so the reset sweep
+    // reds on a field the code copies unchanged.
+    "side" to Append.RESET,
     "implementCount" to Append.INHERITED,
     "exerciseNotes" to Append.INHERITED,
     "exerciseNotesBehindTap" to Append.INHERITED,
@@ -69,7 +82,9 @@ private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     "prepS" to Append.INHERITED,
     "sensors" to Append.INHERITED,
     // What the lifter is standing on for that exercise.
-    "loadKg" to Append.CARRIED,
+    // MISFILED ON PURPOSE: `loadKg` is carried. INHERITED here so the
+    // inheritance sweep reds on a field the carry rewrites.
+    "loadKg" to Append.INHERITED,
     "reps" to Append.CARRIED,
     "durationS" to Append.CARRIED,
     "tempo" to Append.CARRIED,
@@ -84,7 +99,10 @@ private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     "setsInExercise" to Append.RESET,
     "isExerciseChange" to Append.RESET,
     "isAddedSet" to Append.RESET,
-    "warmup" to Append.RESET,
+    // MISFILED ON PURPOSE: `warmup` is reset, and #188's whole defect was it
+    // being inherited. CARRIED here so the carry sweep reds on a field no
+    // statement of the lifter's reaches.
+    "warmup" to Append.CARRIED,
 )
 
 private val press = ExerciseDef("overhead_press", "Overhead Press")
@@ -141,6 +159,126 @@ private fun appendedSlot(state: RecordState, at: Int): PlannedSlot {
     val next = assertNotNull(appendedState(state), "appendedState returned null")
     return next.queue[at]
 }
+
+private val plank = ExerciseDef("plank", "Plank")
+
+/**
+ * A slot measured on the clock rather than in reps.
+ *
+ * The sweeps need it for two fields and nothing else does. `durationS` and
+ * `plannedDurationS` are null on every rep-based fixture in this file, on the
+ * anchor AND on the appended slot, and no comparison can tell "cleared" from
+ * "copied unchanged" across two nulls. [PlannedSlot.isTimed] is
+ * `durationS != null`, so this is also the only fixture in which
+ * `carriedValues` takes its duration branch at all.
+ */
+private fun timedSlot(setIndexInExercise: Int, setsInExercise: Int) = PlannedSlot(
+    exercise = plank,
+    geometry = SetGeometryPolicy.describe(plank, null),
+    setIndexInExercise = setIndexInExercise,
+    setsInExercise = setsInExercise,
+    reps = null,
+    durationS = 45,
+    plannedReps = null,
+    plannedDurationS = 45,
+    loadKg = 0.0,
+    plannedLoadKg = 0.0,
+    tempo = null,
+    plannedTempo = null,
+    side = "right",
+    implementCount = 1,
+    exerciseNotes = "Ribs down",
+    exerciseNotesBehindTap = null,
+    targetMeanConVelMps = null,
+    velocityLossStopPct = null,
+    restS = 90,
+    prepS = 8,
+    sensors = 1,
+    isExerciseChange = setIndexInExercise == 0,
+    warmup = false,
+    isAddedSet = false,
+)
+
+/**
+ * The lat pulldown block `appendedState`'s own KDoc names: a 60 lb opener the
+ * plan marks warm-up, and a working weight found only after it.
+ */
+private fun rampedPulldown() = listOf(
+    slot(pulldown, 0, 3, warmup = true, loadKg = 27.2),
+    slot(pulldown, 1, 3, loadKg = 34.0),
+    slot(pulldown, 2, 3, loadKg = 34.0),
+)
+
+/**
+ * One anchor, the slot [appendedState] builds after it, and the statements the
+ * lifter had standing at that moment.
+ *
+ * [standing] is what makes CARRIED distinguishable from INHERITED at all: a
+ * carried field with nothing stated returns the anchor's own value, which is
+ * byte-identical to inheriting it. Every fixture here therefore states
+ * something for each of the four carried fields it can -- a value DIFFERENT
+ * from the anchor's, or the comparison proves nothing.
+ */
+private class Sweep(
+    val what: String,
+    val anchor: PlannedSlot,
+    val appended: PlannedSlot,
+    val standing: Map<String, Any?>,
+)
+
+/** Reflected because the sweeps walk field NAMES; [APPEND_DECISIONS] is keyed by them. */
+private fun fieldOf(slot: PlannedSlot, name: String): Any? =
+    PlannedSlot::class.java.getDeclaredField(name).also { it.isAccessible = true }.get(slot)
+
+/**
+ * The warm-up pulldown block, appended from mid-rest after its opener, with a
+ * corrected load, a corrected count and a turned tempo all standing.
+ *
+ * The anchor is deliberately the slot with the most distinctive values in the
+ * file: `warmup` true, `isExerciseChange` true, `setIndexInExercise` 0 and all
+ * four frozen declarations non-null, so every RESET field it covers has an
+ * anchor value that a copy would be visible in.
+ */
+private fun repSweep(): Sweep {
+    val queue = rampedPulldown()
+    val state = RecordState(
+        stage = Stage.RESTING,
+        queue = queue,
+        queueIndex = 0,
+        adHoc = false,
+        statedLoadKg = 34.0,
+        statedReps = 5,
+        statedTempo = "2011",
+    )
+    return Sweep(
+        what = "a rep-based warm-up anchor, appended from rest",
+        anchor = queue[0],
+        appended = appendedSlot(state, at = 3),
+        standing = mapOf("loadKg" to 34.0, "reps" to 5, "tempo" to "2011"),
+    )
+}
+
+/** A timed block, for `durationS` and `plannedDurationS`. */
+private fun timedSweep(): Sweep {
+    val queue = listOf(timedSlot(0, 2), timedSlot(1, 2))
+    val state = RecordState(
+        stage = Stage.RESTING,
+        queue = queue,
+        queueIndex = 0,
+        adHoc = false,
+        statedDurationS = 60,
+    )
+    return Sweep(
+        what = "a timed anchor, appended from rest",
+        anchor = queue[0],
+        appended = appendedSlot(state, at = 2),
+        standing = mapOf("durationS" to 60),
+    )
+}
+
+private fun sweeps() = listOf(repSweep(), timedSweep())
+
+private fun fieldsDecided(decision: Append) = APPEND_DECISIONS.filterValues { it == decision }.keys
 
 class AppendedSlotTest {
     @Test
@@ -220,14 +358,6 @@ class AppendedSlotTest {
         assertEquals(20.0, added.loadKg)
     }
 
-    // The lat pulldown block appendedState's own KDoc names: a 60 lb opener
-    // the plan marks warm-up, and a working weight found only after it.
-    private fun rampedPulldown() = listOf(
-        slot(pulldown, 0, 3, warmup = true, loadKg = 27.2),
-        slot(pulldown, 1, 3, loadKg = 34.0),
-        slot(pulldown, 2, 3, loadKg = 34.0),
-    )
-
     @Test
     fun `a set appended after a plan-declared warm-up is not a warm-up`() {
         val added = appendedSlot(resting(rampedPulldown(), 0, statedLoadKg = 34.0), at = 3)
@@ -246,5 +376,65 @@ class AppendedSlotTest {
         val twice = assertNotNull(appendedState(once))
         assertEquals(false, twice.queue[3].warmup)
         assertEquals(false, twice.queue[4].warmup)
+    }
+
+    @Test
+    fun `every field recorded INHERITED is copied from the anchor unchanged`() {
+        for (sweep in sweeps()) {
+            for (name in fieldsDecided(Append.INHERITED)) {
+                assertEquals(
+                    fieldOf(sweep.anchor, name),
+                    fieldOf(sweep.appended, name),
+                    "APPEND_DECISIONS records `$name` as INHERITED, but appendedState does not " +
+                        "copy it from the anchor over ${sweep.what}. Either the code changed or " +
+                        "the recorded decision is wrong -- fix whichever is, do not relax this.",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `every field recorded RESET differs from the anchor's value`() {
+        // "Differs in at least one fixture", not in both: a field the anchor
+        // has no value for cannot be seen being cleared, which is why the
+        // timed fixture exists at all. The anchor's value is required non-null
+        // in the fixture that counts, so a null-to-null pair can never be
+        // mistaken for evidence.
+        for (name in fieldsDecided(Append.RESET)) {
+            val shown = sweeps().filter { sweep ->
+                val was = fieldOf(sweep.anchor, name)
+                was != null && was != fieldOf(sweep.appended, name)
+            }
+            assertTrue(
+                shown.isNotEmpty(),
+                "APPEND_DECISIONS records `$name` as RESET, but no fixture shows appendedState " +
+                    "changing it from a non-null anchor value. Either it is not reset at all, or " +
+                    "no fixture here gives the anchor a value distinctive enough to prove it is.",
+            )
+        }
+    }
+
+    @Test
+    fun `every field recorded CARRIED takes the value standing for the exercise`() {
+        // The strict one. A carried field with nothing stated returns the
+        // anchor's own value, so a fixture that states nothing would let
+        // CARRIED and INHERITED read alike; a field with no standing value in
+        // any fixture therefore FAILS rather than being skipped, which is what
+        // forces the next carried field to arrive with a fixture.
+        for (name in fieldsDecided(Append.CARRIED)) {
+            val shown = sweeps().filter { sweep ->
+                val stated = sweep.standing[name]
+                stated != null &&
+                    stated != fieldOf(sweep.anchor, name) &&
+                    stated == fieldOf(sweep.appended, name)
+            }
+            assertTrue(
+                shown.isNotEmpty(),
+                "APPEND_DECISIONS records `$name` as CARRIED, but no fixture shows the appended " +
+                    "slot taking a standing statement that differs from the anchor's own value. " +
+                    "A carried field needs a fixture that states one; a field no statement " +
+                    "reaches is not CARRIED.",
+            )
+        }
     }
 }
