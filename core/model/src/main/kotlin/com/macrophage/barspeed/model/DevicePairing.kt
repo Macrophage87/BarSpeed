@@ -48,7 +48,7 @@ enum class DualSetupStep {
     /** Every paired unit is labelled and two of them share a label. */
     LABELS_COLLIDE,
 
-    /** Two are paired and carry different labels: a set asking for two can arm both. */
+    /** Two are paired and carry different labels: every set arms both. */
     READY,
 }
 
@@ -415,21 +415,26 @@ object DevicePairingPolicy {
  * One copy of these sentences, read by both screens. They were a single copy
  * on the Record screen and none at all on Devices, which is why the lifter
  * doing the pairing was never told that labelling is a required step: the one
- * sentence explaining it drew on a different screen, and only when a plan
- * declared two sensors.
+ * sentence explaining it drew on a different screen.
+ *
+ * Labelling is still required after #198 even though counting is not, and the
+ * reason is the frame format rather than a preference: two 20-byte WitMotion
+ * frames carry no checksum, so two streams the app cannot tell apart do not
+ * interleave into something that fails -- they interleave into plausible
+ * samples of a bar that moved twice.
  */
 object DualSensorSetup {
     /**
-     * The Record screen's sensor-count line for a shortfall.
+     * The Record screen's line for two connected units the app cannot tell
+     * apart.
      *
-     * Byte-identical to the strings `RecordScreen.sensorCountDetail` carried
-     * before this lift; nothing the lifter reads there changes.
+     * Two sentences since #198, not three. The third was "Fewer than two
+     * sensors are paired - this set will record one.", drawn for
+     * ONE_SENSOR_PAIRED, and it is gone with that member: it reported a gap to
+     * every lifter who owns one bar sensor, which is the ordinary setup rather
+     * than a degraded pair. The two that remain are unchanged word for word.
      */
     fun recordLine(shortfall: DualShortfall): String = when (shortfall) {
-        // `roster` returns this whenever it cannot name two distinct
-        // addresses, which includes NONE paired as well as one. The enum's
-        // name is narrower than the states it covers; the sentence is not.
-        DualShortfall.ONE_SENSOR_PAIRED -> "Fewer than two sensors are paired - this set will record one."
         DualShortfall.ROLES_UNASSIGNED -> "Label both sensors A and B under Devices - this set will record one."
         DualShortfall.ROLES_COLLIDE -> "Both sensors are labelled the same - fix it under Devices."
     }
@@ -440,8 +445,10 @@ object DualSensorSetup {
      * Deliberately does NOT take the preferred address, unlike
      * `SensorCapturePolicy.roster`. Which unit is analysed is a separate
      * question from whether the pair can be told apart, and folding the two
-     * together is what makes the Record screen's `ONE_SENSOR_PAIRED` cover a
-     * stale preference as well as a missing unit.
+     * together is what let the Record screen's old `ONE_SENSOR_PAIRED` cover a
+     * stale preference as well as a missing unit. Since #198 the roster asks
+     * this FIRST, so a stale preference reports no gap at all and a missing
+     * unit is not a gap to report.
      *
      * Every paired unit is considered, not just two: three IMUs carrying two
      * labels is a collision, and saying so is more useful than picking two of
@@ -464,8 +471,12 @@ object DualSensorSetup {
      * Devices" is not a useful locator when you are already there -- rather
      * than a second wording of them. The Record screen's copy was the ONLY
      * place the app said labelling is required, and it draws on a different
-     * screen and only when a plan declares two sensors, so the lifter doing
-     * the pairing had never been told.
+     * screen, so the lifter doing the pairing had never been told.
+     *
+     * Both sentences stopped mentioning a set that ASKS for two at #198.
+     * Nothing asks: two labelled units record two streams on every set, and a
+     * line promising something conditional on a declaration would describe an
+     * app that no longer exists.
      *
      * Silent where there is nothing to fix. One sensor is the ordinary setup,
      * for every exercise, and nagging it about a unit it does not have would
@@ -474,10 +485,10 @@ object DualSensorSetup {
     fun devicesLine(step: DualSetupStep): String? = when (step) {
         DualSetupStep.NO_SENSOR, DualSetupStep.ONE_SENSOR -> null
         DualSetupStep.LABEL_BOTH ->
-            "Label both sensors A and B - a set asking for two records only one until they carry " +
-                "different labels."
+            "Label both sensors A and B - until they carry different labels only one stream is " +
+                "recorded."
         DualSetupStep.LABELS_COLLIDE -> "Both sensors are labelled the same - give one of them the other label."
-        DualSetupStep.READY -> "Both sensors are labelled. A set asking for two will record both streams."
+        DualSetupStep.READY -> "Both sensors are labelled. Every set records both streams."
     }
 
     /**

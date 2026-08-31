@@ -1,6 +1,5 @@
 package com.macrophage.barspeed.model
 
-import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 /**
@@ -39,17 +38,18 @@ enum class SensorRole { A, B }
  * permanently -- the gap-that-cannot-be-represented class, which is the reason
  * this type exists at all rather than the role column alone.
  *
- * [plannedCount] and [count] are the pair, designed in from the start rather
- * than retrofitted (#151's lesson, applied at #156's first commit): the plan
- * declares a count, the lifter may change it in the app, and both halves are
- * recorded. They are equal when nothing was adjusted, which is the common case.
+ * A `plannedCount` stood beside [count] until #198 and is gone with the
+ * declaration it read. Nothing in a plan decides how many accelerometers a set
+ * records: one connected bar sensor records one stream, two connected and
+ * labelled record two, and a figure written for what a coach intended would be
+ * a default dressed as an intention.
  *
  * [count] is DECLARED and is not [expected]`.size`. The two differ in exactly
- * one reachable case and it is the interesting one: a set that asked for two
- * sensors and could not arm them -- one unit paired, or the pair carrying no
- * role assignment -- records `count = 1` with an EMPTY [expected], because its
- * single stream carries no role and must not be given one. Reading the count
- * off the list would publish 0 sensors for a set that recorded with one.
+ * one reachable case and it is the interesting one: a set that met two
+ * connected units it could not tell apart records `count = 1` with an EMPTY
+ * [expected], because its single stream carries no role and must not be given
+ * one. Reading the count off the list would publish 0 sensors for a set that
+ * recorded with one, and [shortfall] is what says why.
  *
  * [analysed] is which role the DSP was pointed at, not which role produced
  * data. It is a fact about wiring, true at the moment the set began, and it
@@ -59,27 +59,14 @@ enum class SensorRole { A, B }
  */
 @Serializable
 data class RecordedSensors(
-    /**
-     * What the plan declared for this set, or the app's default when it
-     * declared nothing.
-     *
-     * Being retired by #198, which takes the plan out of the capture decision
-     * entirely. The default and the ALWAYS are transitional and exist for one
-     * commit only: they let the pins on the key be retired before the field
-     * is, so the commit that removes it touches no test file. `encodeDefaults`
-     * is false on both writers, so without the annotation a stored 1 would
-     * stop being written and the column's bytes would change under a commit
-     * claiming to change nothing.
-     */
-    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val plannedCount: Int = 1,
     /** How many sensors this set was actually armed with. */
     val count: Int,
     /**
      * The roles this set was armed for, in order.
      *
-     * Empty means the streams carry no role: either a single-sensor set whose
-     * plan asked for two, or a dual request that could not be armed. An empty
-     * list is never written alongside a role on a raw stream.
+     * Empty means the stream carries no role, which is every set that did not
+     * arm two: one connected unit, or two the app could not tell apart. An
+     * empty list is never written alongside a role on a raw stream.
      */
     val expected: List<SensorRole> = emptyList(),
     /** Which role's stream every figure in this set was computed from. */
@@ -89,10 +76,12 @@ data class RecordedSensors(
      * when there was nothing in the way.
      *
      * Null on a dual set and null on the ordinary single-sensor set, so it is
-     * never the difference between them. What it exists to carry is the third
-     * state: two units connected that the app could not tell apart, which
-     * records one stream and is otherwise indistinguishable from having owned
-     * one sensor. Not written by anything yet -- #198's fix is what sets it.
+     * never the difference between them. What it carries is the third state:
+     * two units connected that the app could not tell apart, which records one
+     * stream and would otherwise be indistinguishable from having owned one
+     * sensor. Before #198 that fact rode on a `plannedCount` of 2 beside a
+     * `count` of 1; with nothing declared there is no such pair, so the reason
+     * is stored outright or it is unsayable.
      */
     val shortfall: DualShortfall? = null,
 ) {
@@ -117,8 +106,9 @@ data class RecordedSensors(
  */
 data class SensorRoster(
     /**
-     * The roles this set will capture, in order. Empty in single-sensor mode
-     * and whenever a dual request could not be armed -- see [shortfall].
+     * The roles this set will capture, in order. Empty whenever one stream is
+     * what will be recorded -- one unit connected, or two that cannot be told
+     * apart, which [shortfall] names.
      */
     val expected: List<SensorRole> = emptyList(),
     /** Which role's stream feeds the DSP; null when no role is in play. */
@@ -133,7 +123,7 @@ data class SensorRoster(
      * at.
      */
     val unassigned: List<String> = emptyList(),
-    /** Why two sensors were asked for and one is what will be captured. */
+    /** Why two units are connected and one stream is what will be captured. */
     val shortfall: DualShortfall? = null,
 ) {
     /** True when this set will run two collectors. */
@@ -141,21 +131,27 @@ data class SensorRoster(
 }
 
 /**
- * Why a request for two sensors could not be armed.
+ * Why two connected units recorded one stream between them.
  *
- * Each is a configuration gap the lifter can close before the set, which is why
- * they are named separately rather than collapsed into a boolean: the screen
- * has to say which thing to go and do. None of them refuses the set -- a
- * missing sensor is not a reason not to lift.
+ * NOT a request that went unmet, since #198: nothing asks for two sensors, so
+ * there is nothing to fall short of. Both members say the same thing about the
+ * hardware -- two units are connected and the app cannot tell them apart -- and
+ * differ in what the lifter has to go and do about it, which is why they are
+ * named separately rather than collapsed into a boolean.
+ *
+ * `ONE_SENSOR_PAIRED` was a third member and is dissolved rather than renamed.
+ * One connected sensor is the ordinary case for every exercise, not a degraded
+ * two; reporting it as a gap put a permanent complaint in front of every
+ * single-sensor lifter about a unit they do not own.
+ *
+ * Neither refuses the set. A sensor the app cannot label is not a reason not
+ * to lift.
  */
 enum class DualShortfall {
-    /** Only one IMU is paired, so there is no second unit to capture from. */
-    ONE_SENSOR_PAIRED,
-
-    /** Two are paired and at least one carries no role, so a stream would be unlabelled. */
+    /** Two are connected and at least one carries no role, so a stream would be unlabelled. */
     ROLES_UNASSIGNED,
 
-    /** Both paired units are labelled with the SAME role, so neither stream could be told from the other. */
+    /** Both connected units are labelled with the SAME role, so neither stream could be told from the other. */
     ROLES_COLLIDE,
 }
 
@@ -170,9 +166,17 @@ enum class DualShortfall {
  * before the first defect rather than after the third.
  */
 object SensorCapturePolicy {
-    /** One sensor: the default everywhere, for every exercise, forever. */
+    /** One sensor: what a set records unless a second one is connected and labelled. */
     const val DEFAULT_COUNT = 1
 
+    /**
+     * The floor the plan's now-inert `sensors` key is still validated against.
+     *
+     * It decides no capture -- see [roster] -- but a document declaring 0 or
+     * -1 is still refused with the path named, because loosening a published
+     * bound is a contract change nobody asked for and a nonsense figure says
+     * its author misunderstood something worth telling them about.
+     */
     const val MIN_COUNT = 1
 
     /**
@@ -183,28 +187,21 @@ object SensorCapturePolicy {
      */
     const val MAX_COUNT = 2
 
-    fun clamp(count: Int): Int = count.coerceIn(MIN_COUNT, MAX_COUNT)
-
-    /**
-     * What the PLAN prescribed for a set: its declaration, or the default.
-     *
-     * The planned half of the pair [resolve] answers the actual half of. Both
-     * exist from the first commit rather than one being retrofitted, which is
-     * #151's lesson: a figure worth recording is worth pairing with what was
-     * asked for, and the pair cannot be reconstructed afterwards.
-     */
-    fun planned(declared: Int?): Int = clamp(declared ?: DEFAULT_COUNT)
-
-    /**
-     * The count a set will run with: the lifter's in-app adjustment, else the
-     * plan's declaration, else the default. [LeadInPolicy.resolve]'s precedence
-     * exactly, because it is the same kind of decision and two orderings would
-     * be two rules.
-     */
-    fun resolve(declared: Int?, override: Int?): Int = clamp(override ?: declared ?: DEFAULT_COUNT)
-
     /** The wire spelling of a role: the lowercased name, as the published schemas state. */
     fun wireOf(role: SensorRole): String = role.name.lowercase()
+
+    /**
+     * The wire spelling of a gap: lowerCamel, as `velocityLossBasis`' values
+     * already are.
+     *
+     * A separate name rather than a [wireOf] overload, because `wireOf` is
+     * passed as a method reference in three places and an overload would make
+     * every one of them ambiguous.
+     */
+    fun shortfallToWire(shortfall: DualShortfall): String = when (shortfall) {
+        DualShortfall.ROLES_UNASSIGNED -> "rolesUnassigned"
+        DualShortfall.ROLES_COLLIDE -> "rolesCollide"
+    }
 
     /**
      * A role read back off the wire, or null for anything this build does not
@@ -220,33 +217,57 @@ object SensorCapturePolicy {
         wire?.let { w -> SensorRole.entries.firstOrNull { it.name.equals(w, ignoreCase = true) } }
 
     /**
-     * What a set about to begin is armed with.
+     * What a set about to begin is armed with, decided by the connected
+     * hardware and nothing else.
+     *
+     * The rule, in the owner's words (#198): *"If you've got one use one, if
+     * you've got two, use both."* No count is passed, because no count
+     * decides. What the plan declared and what the lifter picked in the app
+     * both used to gate this and both are gone: recording is cheap and
+     * irreversible, not recording is free and unrecoverable, and a second
+     * stream nobody wanted is ignored in analysis while a second stream never
+     * captured is gone.
+     *
+     * PAIRED IS NOT CONNECTED, and the distinction is what makes the missing
+     * control unnecessary. This function reads the paired set because that is
+     * what the app can enumerate before a set begins; a paired unit that is
+     * powered off or out of range brings no link up and puts no samples in the
+     * buffer, so leaving the second sensor in the bag needs no setting. That
+     * makes one requirement load-bearing downstream rather than here: the
+     * ARCHIVE must record what streamed, not what was armed. It does --
+     * `SessionRepository.recordSet` writes the second stream's row only when
+     * that buffer holds samples, and the export's `present` is the roles that
+     * reached the archive rather than the roles armed.
      *
      * The single-sensor path returns an empty roster, and that is what keeps a
      * one-sensor set byte-identical to what this app has always written: no
      * role reaches a raw stream, no declaration reaches the row, and no key
      * reaches either export document.
      *
-     * Dual is armed only when TWO paired addresses carry two DIFFERENT assigned
-     * roles. A positional default -- "the preferred one is A" -- was considered
-     * and refused: the preferred address is movable at any time, by "Use this
-     * one for analysis" (`DeviceRegistry.setPreferred`) and by forgetting the
-     * analysed unit, so the meaning of A would change under the lifter and
-     * every capture before and after that moment would be labelled
+     * Dual is armed only when TWO paired addresses carry two DIFFERENT
+     * assigned roles. A positional default -- "the preferred one is A" -- was
+     * considered and refused: the preferred address is movable at any time, by
+     * "Use this one for analysis" (`DeviceRegistry.setPreferred`) and by
+     * forgetting the analysed unit, so the meaning of A would change under the
+     * lifter and every capture before and after that moment would be labelled
      * consistently and wrongly. The label has to be a property of the MAC or
-     * it is not a label. An earlier draft rested this on `DeviceRegistry.pair`
-     * making every newly paired device its role's preferred address; it stopped
-     * doing that in the same branch, and the premise is deleted rather than
-     * reworded. The conclusion is untouched.
+     * it is not a label. Two 20-byte WitMotion frames carry no checksum, so
+     * interleaved unlabelled streams do not fail loudly -- they fabricate
+     * plausible samples, which is why labelling stays required even though
+     * counting does not.
      *
      * [preferredAddress] decides which role is [SensorRoster.analysed], and
      * nothing else does. The analysed stream is whichever unit the existing
      * client is maintaining; declaring some other preference would state that
-     * the DSP looked at a stream it did not look at.
+     * the DSP looked at a stream it did not look at. Where the preference
+     * names no paired unit the set arms one stream and reports NO shortfall:
+     * that state is a stale registry entry rather than a pair the app cannot
+     * tell apart, and it used to draw "Fewer than two sensors are paired" on a
+     * setup with two.
      *
-     * A shortfall never refuses the set. It downgrades to one sensor, records
+     * A shortfall never refuses the set. It records one stream, names
      * [DualShortfall] for the screen to explain, and leaves [RecordedSensors]
-     * to say afterwards that two were asked for.
+     * to say afterwards that two units were connected and one was unusable.
      *
      * WHICH units are the pair is [DualSensorSetup.step]'s answer, since
      * #192: dual arms only from [DualSetupStep.READY], which is exactly two
@@ -266,36 +287,36 @@ object SensorCapturePolicy {
      * [DualSetupStep.LABEL_BOTH] is [DualShortfall.ROLES_UNASSIGNED] and
      * [DualSetupStep.LABELS_COLLIDE] is [DualShortfall.ROLES_COLLIDE], so the
      * sentence the Devices screen draws and the reason stored on the set are
-     * one reading of one state rather than two that can disagree.
+     * one reading of one state rather than two that can disagree. The step is
+     * consulted FIRST now, ahead of the addresses: it is the only reading that
+     * can tell one connected unit from two unlabelled ones, and reading the
+     * addresses first is what made a single sensor report a gap.
      */
     fun roster(
         pairedImuAddresses: List<String>,
         preferredAddress: String?,
         roleByAddress: Map<String, SensorRole>,
-        requestedCount: Int?,
     ): SensorRoster {
         val paired = pairedImuAddresses.distinct()
         val unassigned = paired.filter { it !in roleByAddress }
-        if (clamp(requestedCount ?: DEFAULT_COUNT) < MAX_COUNT) return SensorRoster(unassigned = unassigned)
-        val analysedAddress = preferredAddress?.takeIf { it in paired }
-        val secondaryAddress = paired.firstOrNull { it != analysedAddress }
-        if (analysedAddress == null || secondaryAddress == null) {
-            return SensorRoster(unassigned = unassigned, shortfall = DualShortfall.ONE_SENSOR_PAIRED)
-        }
         when (DualSensorSetup.step(paired, roleByAddress)) {
-            // Unreachable from here: an empty paired list leaves
-            // analysedAddress null and a single paired unit leaves
-            // secondaryAddress null, so both were answered above. Named
-            // anyway because an exhaustive `when` is what stops a step added
-            // later from compiling into a silent dual arm.
+            // Nothing to tell apart. One connected unit is the ordinary case
+            // for every exercise and none at all is a manual set; neither is a
+            // gap in a setup, and saying so was #198's first correction.
             DualSetupStep.NO_SENSOR, DualSetupStep.ONE_SENSOR ->
-                return SensorRoster(unassigned = unassigned, shortfall = DualShortfall.ONE_SENSOR_PAIRED)
+                return SensorRoster(unassigned = unassigned)
             DualSetupStep.LABEL_BOTH ->
                 return SensorRoster(unassigned = unassigned, shortfall = DualShortfall.ROLES_UNASSIGNED)
             DualSetupStep.LABELS_COLLIDE ->
                 return SensorRoster(unassigned = unassigned, shortfall = DualShortfall.ROLES_COLLIDE)
             DualSetupStep.READY -> Unit
         }
+        // READY is exactly two paired units carrying different labels, so the
+        // only way past here without a pair of addresses is a preference
+        // naming neither of them.
+        val analysedAddress = preferredAddress?.takeIf { it in paired }
+        val secondaryAddress = paired.firstOrNull { it != analysedAddress }
+        if (analysedAddress == null || secondaryAddress == null) return SensorRoster(unassigned = unassigned)
         val analysed = roleByAddress[analysedAddress]
         val secondary = roleByAddress[secondaryAddress]
         if (analysed == null || secondary == null) {
@@ -314,73 +335,32 @@ object SensorCapturePolicy {
     }
 
     /**
-     * What a set about to begin is armed with, decided by the hardware alone.
-     *
-     * The form #198 is moving the app to: no count is passed, because no count
-     * decides. One connected and labelled pair arms two streams; anything else
-     * arms one. Introduced here alongside the counted form and pinned, so the
-     * commit that deletes the count has no new decision in it.
-     *
-     * Behaviour-preserving as written: it is exactly [roster] asked for
-     * [MAX_COUNT], which is what both of the app's own always-on callers --
-     * `mirrorSensorSettings` and [DualSensorSetup.imuLinkTargets] -- already
-     * passed. The rules those two ran under are unchanged and stated once,
-     * over on [roster].
-     */
-    fun roster(
-        pairedImuAddresses: List<String>,
-        preferredAddress: String?,
-        roleByAddress: Map<String, SensorRole>,
-    ): SensorRoster = roster(pairedImuAddresses, preferredAddress, roleByAddress, MAX_COUNT)
-
-    /**
      * What to store on a set the record flow has just finished arming, or null
      * when there is nothing to say.
      *
-     * Null on the ordinary set: one sensor asked for, one armed. Everything
-     * else is written, INCLUDING a set that asked for two and armed one --
-     * that is the case a reader could never otherwise recover, and leaving it
-     * null would make a shortfall indistinguishable from a plain single-sensor
-     * set for the whole life of the corpus.
-     */
-    fun recorded(plannedCount: Int, roster: SensorRoster): RecordedSensors? {
-        val planned = clamp(plannedCount)
-        val count = if (roster.isDual) MAX_COUNT else DEFAULT_COUNT
-        if (planned == DEFAULT_COUNT && count == DEFAULT_COUNT) return null
-        return RecordedSensors(
-            plannedCount = planned,
-            count = count,
-            expected = roster.expected,
-            analysed = roster.analysed,
-        )
-    }
-
-    /**
-     * What to store on a set armed by the hardware alone, or null when there is
-     * nothing to say.
+     * Null on the ordinary set: one connected sensor, one stream, no roles.
+     * That is what keeps such a set's row and both export documents exactly
+     * what this app has always written, and it is the common case.
      *
-     * The form #198 is moving the app to, introduced beside the counted one so
-     * the commit that deletes the count adds no decision. As written it
-     * reproduces what [recorded] answers for a plan that declared nothing --
-     * the overwhelmingly common case, and the only one left once the
-     * declaration stops being read: a declaration on a dual set, and null on
-     * everything else.
-     *
-     * That "everything else" is the half #198 still has to change, and it is
-     * deliberately not changed here: a set where two units are connected and
-     * the app cannot tell them apart records one stream and, today, stores
-     * nothing to say so. Nothing calls this yet.
+     * Written in the two states that are not ordinary. A dual set records both
+     * roles and which one the DSP was pointed at. A set that met two connected
+     * units it could not tell apart records `count = 1`, no roles, and WHY --
+     * and that second case is the one a reader could never otherwise recover.
+     * Before #198 it rode on a plan's declaration of 2 sitting beside an armed
+     * count of 1; with nothing declared, a null here would make two connected
+     * units the app could not label indistinguishable from a one-sensor set
+     * for the whole life of the corpus.
      */
     fun recorded(roster: SensorRoster): RecordedSensors? {
-        if (!roster.isDual) return null
-        // plannedCount is not passed and is not defaulted here on purpose: it
-        // is the field being retired, nothing reads this overload's output
-        // yet, and a figure written for it would have to be unwritten again.
-        return RecordedSensors(
-            count = MAX_COUNT,
-            expected = roster.expected,
-            analysed = roster.analysed,
-        )
+        if (roster.isDual) {
+            return RecordedSensors(
+                count = MAX_COUNT,
+                expected = roster.expected,
+                analysed = roster.analysed,
+            )
+        }
+        val shortfall = roster.shortfall ?: return null
+        return RecordedSensors(count = DEFAULT_COUNT, shortfall = shortfall)
     }
 
     /**

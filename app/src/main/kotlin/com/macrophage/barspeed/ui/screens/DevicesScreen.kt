@@ -98,10 +98,10 @@ private fun SensorRoleRow(assigned: SensorRole?, onAssign: (SensorRole?) -> Unit
 /**
  * What to do next about a two-accelerometer setup, issue #184.
  *
- * The lifter doing the pairing is on THIS screen, and until now the only
- * sentence saying that labelling is a required step drew on the Record screen,
- * and only when a plan declared two sensors. The wording is
- * `DualSensorSetup`'s, shared with that screen rather than written twice.
+ * The lifter doing the pairing is on THIS screen, and until #184 the only
+ * sentence saying that labelling is a required step drew on the Record screen.
+ * The wording is `DualSensorSetup`'s, shared with that screen rather than
+ * written twice.
  *
  * Draws nothing at the two steps with nothing to fix -- one sensor is the
  * ordinary setup and a line that is always there is a line nobody reads.

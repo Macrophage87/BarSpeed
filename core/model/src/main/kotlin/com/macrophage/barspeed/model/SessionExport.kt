@@ -251,7 +251,7 @@ data class SessionExport(
          * the document carries the answer and its author, and the row keeps
          * both.
          */
-        const val SCHEMA_VERSION = "1.14"
+        const val SCHEMA_VERSION = "1.15"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -260,7 +260,7 @@ data class SessionExport(
         val SUPPORTED_SCHEMA_VERSIONS =
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
-                "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14",
+                "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
             )
 
         /**
@@ -643,31 +643,19 @@ data class SetExport(
 @Serializable
 data class SetSensorsExport(
     /**
-     * How many sensors the PLAN prescribed for this set, or the app's default
-     * of 1 where it prescribed nothing.
-     *
-     * Paired with [count] so an adjustment the lifter made in the app is
-     * visible in the document rather than lost, the same shape
-     * [SetExport.plannedPrepS] and [SetExport.prepS] carry. They are equal
-     * whenever nothing was adjusted.
-     *
-     * Being retired by #198, which takes the plan out of the capture decision
-     * entirely. The default and the ALWAYS are transitional and exist for one
-     * commit only: they let the pins on the key be retired before the key is,
-     * so the commit that removes it touches no test file. The exporter writes
-     * with `encodeDefaults = false`, so without the annotation a planned count
-     * of 1 would stop being written and this document's bytes would change
-     * under a commit claiming to change nothing.
-     */
-    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val plannedCount: Int = 1,
-    /**
      * How many sensors the set was actually armed with.
      *
+     * A `plannedCount` stood in front of this key until #198 and is gone with
+     * the declaration it read. No plan decides how many accelerometers a set
+     * records, so there is no planned half of a pair left to publish, and a
+     * key that kept emitting the old default would tell a reader a coach
+     * intended something.
+     *
      * Not [expected]`.size`, and the difference is load-bearing: a set that
-     * asked for two and could not arm them -- one unit paired, or a pair
-     * carrying no role assignment -- records `count: 1` with an EMPTY
-     * `expected`, because its single stream carries no role and inventing one
-     * would label a capture nobody labelled.
+     * met two connected units it could not tell apart records `count: 1` with
+     * an EMPTY `expected`, because its single stream carries no role and
+     * inventing one would label a capture nobody labelled. [shortfall] says
+     * which case that is.
      */
     val count: Int,
     /**
@@ -697,6 +685,23 @@ data class SetSensorsExport(
      * play.
      */
     val analysedRole: String? = null,
+    /**
+     * Why two connected units produced one stream, or absent when nothing was
+     * in the way.
+     *
+     * `rolesUnassigned` -- two units were connected and at least one carried
+     * no A/B label. `rolesCollide` -- both carried the SAME label. In either
+     * case the app recorded ONE stream, because two 20-byte WitMotion frames
+     * carry no checksum and interleaving two streams it cannot tell apart
+     * fabricates plausible samples rather than failing.
+     *
+     * Absent on a dual set and absent on the ordinary one-sensor set, where
+     * the whole object is absent too. What it exists for is the distinction
+     * between "there was one sensor" and "there were two and one was
+     * unusable", which are different facts about a session and which nothing
+     * else in this document can separate since #198 retired `plannedCount`.
+     */
+    val shortfall: String? = null,
 )
 
 /**

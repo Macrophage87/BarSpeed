@@ -127,11 +127,11 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      * `no arrangement points both links at the same unit`.
      *
      * It is not the same write `mirrorSensorSettings` makes, and the
-     * difference is the point of this collector. That mirror combines four
-     * flows -- `sensorRoles`, `sensorCounts`, `knownDevices` and
-     * `preferred(IMU)` -- and NOT the held address, so it re-derives only
-     * when one of those four re-emits and cannot re-arm after a drop that
-     * changed none of them. This one can, which makes it a new write that
+     * difference is the point of this collector. That mirror combines three
+     * flows -- `sensorRoles`, `knownDevices` and `preferred(IMU)`; it was four
+     * until #198 retired `sensorCounts` -- and NOT the held address, so it
+     * re-derives only when one of those re-emits and cannot re-arm after a
+     * drop that changed none of them. This one can, which makes it a new write that
      * can interleave with the two deliberate nulls above. An earlier draft
      * of this paragraph said it was "not a new race" because the mirror
      * already re-derived the same address off the same preference flow;

@@ -409,11 +409,11 @@ class SessionExporter(
             streams.filter { it.kind == RawStreamEntity.KIND_IMU }
                 .mapNotNull { SensorCapturePolicy.roleFromWire(it.role) }
         return SetSensorsExport(
-            plannedCount = declared.plannedCount,
             count = declared.count,
             expected = declared.expected.map(SensorCapturePolicy::wireOf),
             present = SensorCapturePolicy.present(declared.expected, captured).map(SensorCapturePolicy::wireOf),
             analysedRole = declared.analysed?.let(SensorCapturePolicy::wireOf),
+            shortfall = declared.shortfall?.let(SensorCapturePolicy::shortfallToWire),
         )
     }
 
@@ -749,8 +749,14 @@ class RawExporter(
         val declared = sessionRepository.decodeSensors(record)
         val analysedRole = declared?.analysed?.let(SensorCapturePolicy::wireOf)
         declared?.let { d ->
-            num("sensorsPlanned", d.plannedCount)
             num("sensorsArmed", d.count)
+            // Absent when nothing was in the way, which is a dual set and the
+            // ordinary one-sensor set both -- and the ordinary one does not
+            // reach here at all, the whole declaration being null. Present
+            // only for two connected units the app could not tell apart, which
+            // is the state session.json also publishes and which neither
+            // document can otherwise express.
+            str("sensorsShortfall", d.shortfall?.let(SensorCapturePolicy::shortfallToWire))
             // Written even when empty. An empty list is a set that asked for
             // two and could arm neither by role, which is a statement; an
             // absent key would read as this version not stating it.

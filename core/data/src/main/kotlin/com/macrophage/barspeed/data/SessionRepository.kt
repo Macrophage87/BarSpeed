@@ -129,10 +129,10 @@ data class CompletedSet(
      * How many accelerometers this set was armed with and which stream was
      * analysed, or null on the ordinary one-sensor set (#156).
      *
-     * Null covers both "one sensor, one asked for" and "recorded by a build
-     * that could not capture two". It does NOT cover a set that asked for two
-     * and armed one -- that carries a declaration, because the ask is
-     * recoverable from nothing else.
+     * Null covers both "one connected sensor" and "recorded by a build that
+     * could not capture two". It does NOT cover a set that met two connected
+     * units it could not tell apart -- that carries a declaration naming the
+     * gap, because the gap is recoverable from nothing else.
      */
     val sensors: RecordedSensors? = null,
     /**
@@ -346,11 +346,12 @@ class SessionRepository(
                 geometryJson =
                 set.geometry?.let { json.encodeToString(ResolvedGeometry.serializer(), it) },
                 // Written whenever the caller states one, which is every set
-                // that is not the plain one-sensor default -- including a set
-                // that asked for two and armed one. What arrived is observable
-                // from the streams; what was ASKED FOR is observable from
-                // nothing, so leaving this null on a shortfall would make it
-                // indistinguishable from an ordinary one-sensor set forever.
+                // that is not the plain one-sensor case -- including a set
+                // that met two connected units it could not tell apart. What
+                // arrived is observable from the streams; what was IN THE WAY
+                // is observable from nothing, so leaving this null on a
+                // shortfall would make it indistinguishable from an ordinary
+                // one-sensor set forever.
                 sensorsJson =
                 set.sensors?.let { json.encodeToString(RecordedSensors.serializer(), it) },
                 hrEndOfSetBpm = hr.endOfSetBpm,

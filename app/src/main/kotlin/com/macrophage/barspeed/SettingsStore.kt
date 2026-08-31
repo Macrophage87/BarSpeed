@@ -141,41 +141,11 @@ class SettingsStore(private val context: Context) {
                 .toMap()
         }
 
-    /**
-     * How many accelerometers the lifter has chosen for an exercise, where
-     * they have chosen anything.
-     *
-     * The plan DECLARES the count and this is the adjustment on top of it, the
-     * same two-layer shape prep uses; [SensorCapturePolicy.resolve] is where
-     * the precedence lives and this map is only its second argument. Absent
-     * means no adjustment, which is a different fact from a stored 1 -- a
-     * stored 1 on an exercise a plan declares as 2 is the lifter turning dual
-     * off, and the export publishes both figures.
-     *
-     * Keyed by exercise id, so an ad-hoc set of a planned exercise picks up the
-     * same choice for free, exactly as [prepOverrides] does.
-     */
-    val sensorCounts: Flow<Map<String, Int>> =
-        context.settingsDataStore.data.map { prefs ->
-            prefs.asMap()
-                .mapNotNull { (key, value) ->
-                    val id = key.name.removePrefix(SENSOR_COUNT_KEY_PREFIX)
-                    if (id == key.name || value !is Int) null else id to SensorCapturePolicy.clamp(value)
-                }
-                .toMap()
-        }
-
     /** Label a device, or clear its label when [role] is null. */
     suspend fun setSensorRole(address: String, role: SensorRole?) {
         val key = stringPreferencesKey("$SENSOR_ROLE_KEY_PREFIX$address")
         context.settingsDataStore.edit { prefs ->
             if (role == null) prefs.remove(key) else prefs[key] = SensorCapturePolicy.wireOf(role)
-        }
-    }
-
-    suspend fun setSensorCount(exerciseId: String, count: Int) {
-        context.settingsDataStore.edit {
-            it[intPreferencesKey("$SENSOR_COUNT_KEY_PREFIX$exerciseId")] = SensorCapturePolicy.clamp(count)
         }
     }
 
@@ -219,13 +189,17 @@ class SettingsStore(private val context: Context) {
         const val PREP_KEY_PREFIX = "prep_s_"
 
         /**
-         * Neither of these is a prefix of the other, nor of [PREP_KEY_PREFIX],
-         * nor of any scalar key in this store -- which is what the two
-         * prefix-scanning flows above rely on. `sensor_role_` holds a role per
-         * device ADDRESS and `sensors_` a count per EXERCISE ID; a shared
-         * prefix would have each flow reading the other's rows.
+         * Not a prefix of [PREP_KEY_PREFIX] nor of any scalar key in this
+         * store, which is what the prefix-scanning flow above relies on.
+         *
+         * `SENSOR_COUNT_KEY_PREFIX = "sensors_"` sat beside it and is gone
+         * with the per-exercise count (#198): capture is decided by the
+         * connected hardware, so there is nothing for a lifter to choose and
+         * nothing to store. Any `sensors_<id>` rows an installed build already
+         * wrote stay in the DataStore file unread -- harmless, and deliberately
+         * not swept, because deleting preference rows on upgrade is a write
+         * that can fail halfway and buys nothing.
          */
         const val SENSOR_ROLE_KEY_PREFIX = "sensor_role_"
-        const val SENSOR_COUNT_KEY_PREFIX = "sensors_"
     }
 }

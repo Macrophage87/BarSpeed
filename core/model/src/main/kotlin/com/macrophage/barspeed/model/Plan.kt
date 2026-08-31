@@ -101,12 +101,15 @@ data class PlanFile(
                             "${LeadInPolicy.MIN_S} and ${LeadInPolicy.MAX_S} seconds"
                     }
                 }
-                // Refused rather than clamped, and with an upper bound unlike
-                // [PlanExerciseDef.implementCount]. The bound here is not a
-                // taste: the app runs one collector per stream and knows two
-                // roles, so a 3 has no client, no journal file and no column
-                // value, and silently recording it as 2 would tell the author
-                // their declaration was honoured.
+                // Still refused rather than clamped, though the key is inert
+                // since 1.10 (#198). The bound is not a taste: the app runs
+                // one collector per stream and knows two roles, so a 3 has no
+                // client, no journal file and no column value. Keeping the
+                // error means a document that failed before still fails, and
+                // the author of a 3 is told they misunderstood something --
+                // which is more useful than accepting a figure into a key that
+                // does nothing. What the declaration no longer does is said at
+                // the gate by `sensorsInert`, not here.
                 exercise.sensors?.let {
                     if (it < SensorCapturePolicy.MIN_COUNT || it > SensorCapturePolicy.MAX_COUNT) {
                         errors += "sessions[$si].exercises[$ei].sensors must be " +
@@ -158,6 +161,7 @@ data class PlanFile(
         eachExercise(::kindVsInference) +
         eachExercise(::prepVsGuide) +
         eachExercise(::prepVsPhrase) +
+        eachExercise(::sensorsInert) +
         eachExercise(::cueSplit) +
         eachExercise(::cueBehindTapOnly)
 
@@ -321,6 +325,26 @@ data class PlanFile(
     }
 
     /**
+     * A `sensors` declaration, saying it no longer decides anything (#198).
+     *
+     * Sits with the inert-declaration warnings because that is what it is: the
+     * same shape as [prepVsGuide], which reports a `prep_s` on an exercise
+     * that plays no prep. The plan looks like it said something and the app
+     * does something else -- here, records from whatever is connected.
+     *
+     * ONE warning per exercise however many places declare it. The key can be
+     * written on the exercise and on every set, and a plan carrying it on six
+     * sets of one lift would otherwise produce six identical lines, which is
+     * how a gate becomes something the eye skips.
+     */
+    private fun sensorsInert(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        if (exercise.sensors == null && exercise.sets.none { it.sensors != null }) return null
+        return "sessions[$si].exercises[$ei]: \"sensors\" is declared on ${exercise.exercise}, " +
+            "but the app records from whatever sensors are connected -- one stream from one, two " +
+            "from two that are labelled A and B -- so the declaration is ignored and has no effect."
+    }
+
+    /**
      * Both coaching keys on one exercise, saying which of them the lifter reads
      * without touching the phone.
      *
@@ -364,9 +388,14 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.9"
+        const val SCHEMA_VERSION = "1.10"
+
+        /**
+         * `"1.10"` is not the number 1.1 -- a reader parsing this as a float
+         * collides them, and they are different contracts.
+         */
         val SUPPORTED_SCHEMA_VERSIONS =
-            setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9")
+            setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "1.10")
         val VALID_SIDES = setOf("left", "right")
 
         /** "top"/"bottom" name the start position; "down"/"up" the first movement. */
@@ -571,27 +600,32 @@ data class PlanExerciseDef(
      */
     @SerialName("prep_s") val prepS: Int? = null,
     /**
-     * How many accelerometers each set of this exercise is recorded with: 1
-     * (the default) or 2, issue #156.
+     * ACCEPTED AND INERT since schema 1.10. Declared here so a plan written
+     * against 1.8 or 1.9 still imports; it decides nothing (#198).
      *
-     * Declared in the plan because the choice belongs to the SETUP, not to a
-     * build: a cable machine wants one sensor on the stack, a barbell may want
-     * one on each sleeve, and the same lifter does both in one session. Both
-     * counts are permanent supported modes; neither is a legacy path.
+     * The app records from whatever accelerometers are connected: one
+     * connected bar sensor writes one stream, two connected and labelled A and
+     * B write two, on every set of every exercise. The owner's ruling that
+     * retired it: *"If you've got one use one, if you've got two, use both."*
+     * The count was the wrong way round for a capture decision -- recording is
+     * cheap and irreversible, not recording is free and unrecoverable -- and
+     * on machine work both units go on the same stack, where the second stream
+     * is a second measurement of one motion rather than idle data.
      *
-     * A set may override it -- see [PlanSetDef.sensors] -- exactly as load and
-     * tempo are declared per set inside an exercise block.
+     * KEPT rather than removed from the contract, and that is a trade rather
+     * than tidiness: a plan is a document a coach writes by hand, and failing
+     * an import over a key that used to be correct costs more than an accepted
+     * key that does nothing. What pays for it is [PlanFile.warnings], which
+     * says at the import gate that the declaration has no effect -- an
+     * accepted key nobody is told about is the lie this arrangement would
+     * otherwise be.
      *
-     * `Int?` and never `Int = 1`: omitted and 1 are the same OUTCOME but not
-     * the same statement, and a plan authored back from an export should be
-     * able to see which of the two the last one made. The lifter can change it
-     * in the app, and the change comes back in the export as `count` beside
-     * `plannedCount`.
+     * Still validated to 1 or 2 by [PlanFile.validate]: loosening a published
+     * bound is a change nobody asked for, and a 3 says its author believed
+     * something worth correcting.
      *
-     * Two sensors are captured only when two are paired and each carries a
-     * role assigned in the app against its MAC address. Where that is not so
-     * the set records with one, and the export says two were asked for --
-     * [SensorCapturePolicy.roster] is where that decision is made and pinned.
+     * [SensorCapturePolicy.roster] is where capture is decided and pinned, and
+     * it takes no count at all.
      */
     val sensors: Int? = null,
     val sets: List<PlanSetDef>,
@@ -675,13 +709,12 @@ data class PlanSetDef(
     @SerialName("velocityLossStop_pct") val velocityLossStopPct: Double? = null,
     @SerialName("rest_s") val restS: Int? = null,
     /**
-     * How many accelerometers THIS set is recorded with, overriding the
-     * exercise's [PlanExerciseDef.sensors] when both are declared.
+     * ACCEPTED AND INERT since schema 1.10, exactly as
+     * [PlanExerciseDef.sensors] is, and for the reasons stated there (#198).
      *
-     * Per set as well as per exercise because a working set and its warm-up
-     * are not always mounted the same way, and because the owner's ruling puts
-     * the declaration "at set or exercise level". The set wins, which is the
-     * precedence every other per-set key already has over its exercise block.
+     * It used to override the exercise's declaration for one set. There is no
+     * declaration left to override: capture is decided by the connected
+     * hardware on every set.
      */
     val sensors: Int? = null,
     /**

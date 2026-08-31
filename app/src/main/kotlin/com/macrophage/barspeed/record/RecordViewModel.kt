@@ -584,13 +584,12 @@ private fun applyLimiter(
 }
 
 /**
- * The four facts [mirrorSensorSettings] combines, carried out of the combine
+ * The three facts [mirrorSensorSettings] combines, carried out of the combine
  * transform so that the state read and the state write are one statement in
  * the collector.
  */
 private data class SensorSettings(
     val roles: Map<String, SensorRole>,
-    val counts: Map<String, Int>,
     val paired: List<String>,
     val preferred: String?,
 )
@@ -620,27 +619,24 @@ private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: M
  * Mirror everything that decides which accelerometer is which onto the state,
  * and keep the second link pointed at the right device (#156).
  *
- * Four sources in one collector rather than four collectors, because the
+ * Three sources in one collector rather than three collectors, because the
  * roster is a function of all of them together: a role assigned to a device
  * that has since been forgotten arms nothing, and a second device paired
- * without a label arms nothing either. Emitting a state that is right about
+ * without a label arms nothing either. It was four until #198 retired the
+ * per-exercise count. Emitting a state that is right about
  * three of the four and then correcting it is a window in which the READY
  * screen shows a dot for a sensor that will not be captured.
  *
  * [onSecondaryAddress] is called with the address the second link should
- * maintain, and it deliberately ignores the per-exercise COUNT: the link is
- * kept warm whenever two labelled units are paired, so arming dual for one
- * exercise does not have to wait out a BLE connect at the moment the lifter
- * taps START. What the count decides is whether the set CAPTURES from it,
- * which `beginSet` answers from the roster for its own slot.
+ * maintain. It reads no count, because since #198 nothing does: two connected
+ * and labelled units record two streams on every set, so the link the roster
+ * names is the link every set captures from.
  *
- * For a lifter with two labelled units that makes
- * up to three concurrent GATT links the steady state of EVERY set,
- * including one recorded at count 1, and the
- * second client still unlocks, sets 100 Hz and subscribes. Whether that costs
- * the analysed stream is unmeasured -- field item F1b -- and if it does, the
- * link has to be kept warm only when some exercise is armed for two rather
- * than whenever two units are labelled.
+ * For a lifter with two labelled units that makes up to three concurrent GATT
+ * links the steady state of every set, and the second client unlocks, sets
+ * 100 Hz and subscribes. That was field item F1b and it is DISCHARGED:
+ * field-34's dual-sensor session measured the second sensor at a cost of
+ * 0.000 Hz on the analysed stream. It is not a reason to keep a count.
  *
  * The transform returns a [SensorSettings] and the state is read and written
  * in one statement inside `collect`, as `mirrorPrepOverrides` and all three
@@ -665,13 +661,11 @@ private fun CoroutineScope.mirrorSensorSettings(
 ) = launch {
     combine(
         settings.sensorRoles,
-        settings.sensorCounts,
         registry.knownDevices,
         registry.preferred(DeviceRole.IMU),
-    ) { roles, counts, known, preferred ->
+    ) { roles, known, preferred ->
         SensorSettings(
             roles = roles,
-            counts = counts,
             paired = known.filter { it.role == DeviceRole.IMU }.map { it.address },
             preferred = preferred?.address,
         )
@@ -679,7 +673,6 @@ private fun CoroutineScope.mirrorSensorSettings(
         state.value =
             state.value.copy(
                 sensorRoles = next.roles,
-                sensorCountOverrides = next.counts,
                 pairedImuAddresses = next.paired,
                 preferredImuAddress = next.preferred,
             )
@@ -691,26 +684,6 @@ private fun CoroutineScope.mirrorSensorSettings(
             ).secondaryAddress,
         )
     }
-}
-
-/**
- * Apply one tap of the sensor-count control: work out which exercise it
- * changes and write the new value.
- *
- * [applyPrepAdjustment]'s shape exactly, and for its reasons -- the value is
- * written to the store and read back through its flow rather than copied onto
- * the state.
- *
- * On [appScope] rather than the ViewModel's own scope, for
- * [applyPrepAdjustment]'s reason -- a pop that leaves the record screen
- * cancels anything still running on the ViewModel's scope, and a DataStore
- * write must not be lost to it. Unlike the prep control this one is drawn on
- * READY only, not on the rest screen, so `upcomingSlot` and `currentSlot` are
- * the same slot at every point it can be tapped.
- */
-private fun applySensorCount(s: RecordState, count: Int, appScope: CoroutineScope, settings: SettingsStore) {
-    val slot = s.upcomingSlot
-    appScope.launch { settings.setSensorCount(s.sensorExerciseId(slot), SensorCapturePolicy.clamp(count)) }
 }
 
 /**
@@ -1968,8 +1941,6 @@ data class RecordState(
     val imuConnectedB: Boolean = false,
     /** Device address to role, as the lifter labelled them; see `SettingsStore.sensorRoles`. */
     val sensorRoles: Map<String, SensorRole> = emptyMap(),
-    /** Exercise id to the count the lifter chose, where they chose one. */
-    val sensorCountOverrides: Map<String, Int> = emptyMap(),
     /** Every paired IMU address, and which of them the analysed link maintains. */
     val pairedImuAddresses: List<String> = emptyList(),
     val preferredImuAddress: String? = null,
@@ -2026,38 +1997,25 @@ data class RecordState(
     /** What the plan prescribed for [slot]: its declaration, or the default. */
     fun plannedPrepSecondsFor(slot: PlannedSlot?): Int = LeadInPolicy.planned(slot?.prepS)
 
-    /** Which exercise's sensor count a control on screen is editing. */
-    fun sensorExerciseId(slot: PlannedSlot?): String = slot?.exercise?.id ?: currentExercise.id
-
     /**
-     * How many accelerometers a set of [slot] will run with: the lifter's
-     * stored choice, else the plan's declaration, else one.
+     * What a set beginning right now would be armed with.
      *
-     * A function taking the slot rather than a property, for
-     * [prepSecondsFor]'s reason -- the screen and [RecordViewModel.beginSet]
-     * ask about different slots. The RULE is stated once, in
-     * [SensorCapturePolicy.resolve].
-     */
-    fun sensorCountFor(slot: PlannedSlot?): Int =
-        SensorCapturePolicy.resolve(slot?.sensors, sensorCountOverrides[sensorExerciseId(slot)])
-
-    /** What the PLAN prescribed for [slot], which is what the export pairs the actual against. */
-    fun plannedSensorCountFor(slot: PlannedSlot?): Int = SensorCapturePolicy.planned(slot?.sensors)
-
-    /**
-     * What a set of [slot] would be armed with right now.
+     * A property rather than a function taking a slot, since #198: the roster
+     * is a fact about the connected hardware and the labels on it, and no slot
+     * enters into it. `sensorCountFor`, `plannedSensorCountFor` and
+     * `sensorExerciseId` stood beside a `rosterFor(slot)` here and are gone
+     * with the count they resolved.
      *
      * Everything about which physical unit is which is decided by
      * [SensorCapturePolicy.roster] in `:core:model`, where a test runs on it.
      * This only hands it what it needs; the screen reads the answer to draw
-     * the count chip and the second dot, and `beginSet` reads it again at the
-     * moment the set starts, which is the only moment it is true.
+     * the capture line and the second dot, and `beginSet` reads it again at
+     * the moment the set starts, which is the only moment it is true.
      */
-    fun rosterFor(slot: PlannedSlot?): SensorRoster = SensorCapturePolicy.roster(
+    val roster: SensorRoster get() = SensorCapturePolicy.roster(
         pairedImuAddresses = pairedImuAddresses,
         preferredAddress = preferredImuAddress,
         roleByAddress = sensorRoles,
-        requestedCount = sensorCountFor(slot),
     )
 
     /**
@@ -2559,8 +2517,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // settings say when it ends. `recorded` returns null on the ordinary
         // one-sensor set, which is what keeps that set's row and both export
         // documents exactly what they were.
-        val roster = s.rosterFor(s.currentSlot)
-        armedSensors = SensorCapturePolicy.recorded(s.plannedSensorCountFor(s.currentSlot), roster)
+        val roster = s.roster
+        armedSensors = SensorCapturePolicy.recorded(roster)
         armedSecondaryRole = roster.secondary
         endingSet = false
         lastCountedPhase = Phase.IDLE
@@ -3342,9 +3300,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     /** One tap of the prep control; the work is in the free [applyPrepAdjustment]. */
     fun adjustPrep(deltaS: Int) = applyPrepAdjustment(stateFlow.value, deltaS, container.appScope, container.settings)
-
-    /** One tap of the sensor-count control; the work is in the free [applySensorCount]. */
-    fun setSensorCount(count: Int) = applySensorCount(stateFlow.value, count, container.appScope, container.settings)
 
     /** Advance to the next planned set, applying any in-rest load/rep edits. */
     fun startNextSet() {

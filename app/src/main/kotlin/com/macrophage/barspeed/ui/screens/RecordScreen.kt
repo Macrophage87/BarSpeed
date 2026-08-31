@@ -217,7 +217,7 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
                         // rather than "IMU"/"IMU B" so the dot that goes amber
                         // names the unit to go and look at -- and the analysed
                         // one is not always A (#156).
-                        val roster = state.rosterFor(state.currentSlot)
+                        val roster = state.roster
                         SensorDot(roster.analysed?.name ?: "IMU", state.imuState, demoActive = state.demoMode)
                         roster.secondary?.let { SensorDot(it.name, state.imuStateB) }
                         SensorDot("HRM", state.hrmState)
@@ -636,7 +636,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         // its inline form, so it keeps its inline prep too.
         PrepAdjuster(state, viewModel)
     }
-    SensorCountChooser(state, viewModel)
+    SensorCaptureLine(state)
     Spacer(Modifier.height(12.dp))
     // The bar sensor is record-only for standard lifts: the lifter (or the
     // voice guide) counts; explosive lifts stay sensor-counted.
@@ -702,31 +702,28 @@ private const val PREP_STEP_S = 5
  * declaration where it made one, the app's default otherwise.
  */
 /**
- * How many accelerometers the next set records with, issue #156.
+ * What the next set will record from, issue #198.
  *
- * The CHIPS are drawn only when a second IMU is paired: with one sensor there
- * is nothing to choose, and a control offering a 2 that cannot be armed is
- * worse than no control. The line underneath is drawn whenever two sensors are
- * asked for, paired or not, because a shortfall the lifter can still fix has to
- * be visible before the set and not only in the export afterwards.
+ * A LINE rather than a control. It offered 1 and 2 as chips until #198, stored
+ * against the exercise the way the prep adjustment is; capture is now decided
+ * by the connected hardware alone -- *"If you've got one use one, if you've got
+ * two, use both."* -- so there is nothing left to choose and a control that
+ * changed nothing would be worse than none.
  *
- * That line names what the plan declared whenever the two differ, so an
- * adjustment is visible as an adjustment; and when 2 is chosen but cannot be
- * armed it says WHICH gap -- the shortfall this arrangement refuses to paper
- * over by labelling a unit nobody labelled.
+ * Drawn only when a second IMU is paired. One sensor is the ordinary setup for
+ * every exercise, and a permanent line about it in front of a lifter who owns
+ * one unit is the same complaint the dissolved `ONE_SENSOR_PAIRED` sentence
+ * used to make.
  *
- * The count is stored against the exercise, so it holds for the rest of that
- * exercise's sets and for the same exercise next week -- `PrepAdjuster`
- * exactly, and for the same reason.
+ * When two are paired but cannot be told apart it says WHICH gap, in
+ * [DualSensorSetup]'s words, before the set rather than only in the export
+ * afterwards -- the one thing here the lifter can still act on.
  */
 @Composable
-private fun SensorCountChooser(state: RecordState, viewModel: RecordViewModel) {
-    val slot = state.upcomingSlot
-    val chosen = state.sensorCountFor(slot)
-    val planned = state.plannedSensorCountFor(slot)
-    val chipsDrawn = state.pairedImuAddresses.size >= SensorCapturePolicy.MAX_COUNT
-    if (!chipsDrawn && chosen <= 1 && planned <= 1) return
-    val roster = state.rosterFor(slot)
+private fun SensorCaptureLine(state: RecordState) {
+    if (state.pairedImuAddresses.size < SensorCapturePolicy.MAX_COUNT) return
+    val roster = state.roster
+    val detail = sensorCaptureDetail(roster) ?: return
     Spacer(Modifier.height(8.dp))
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -734,53 +731,38 @@ private fun SensorCountChooser(state: RecordState, viewModel: RecordViewModel) {
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                if (chosen == 1) "One sensor" else "Two sensors",
+                if (roster.isDual) "Two sensors" else "One sensor",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                sensorCountDetail(chosen, planned, roster),
+                detail,
                 style = MaterialTheme.typography.bodySmall,
                 color = if (roster.shortfall == null) BarColors.Sub else BarColors.Amber,
-            )
-        }
-        if (chipsDrawn) {
-            FilterChip(
-                selected = chosen == 1,
-                onClick = { viewModel.setSensorCount(1) },
-                label = { Text("1") },
-            )
-            FilterChip(
-                selected = chosen == SensorCapturePolicy.MAX_COUNT,
-                onClick = { viewModel.setSensorCount(SensorCapturePolicy.MAX_COUNT) },
-                label = { Text("2") },
             )
         }
     }
 }
 
 /**
- * What the sensor-count line says, as a pure function of the three facts it
- * has.
+ * What that line says, as a pure function of the roster, or null for nothing
+ * to say.
  *
- * The three shortfall sentences moved to [DualSensorSetup.recordLine] in
- * `:core:model`, unchanged, so the Devices screen can read the SAME copy
- * rather than write a second phrasing of the same gap (#184). The exhaustive
- * `when` that made a fourth `DualShortfall` a compile error moved with them --
- * it is still exhaustive, one module over, and pinned by a test there instead
- * of by nothing here.
+ * The shortfall sentences live in [DualSensorSetup.recordLine] in
+ * `:core:model`, so the Devices screen reads the SAME copy rather than a
+ * second phrasing of the same gap (#184), and the exhaustive `when` that makes
+ * a new `DualShortfall` a compile error is over there with them and pinned by
+ * a test.
  *
- * What stays is the no-shortfall arm, which is about THIS screen's own
- * adjustment and has no equivalent on Devices.
+ * Null is the third answer and it is reachable: two units paired and labelled
+ * apart while the registry's preferred address names neither of them arms one
+ * stream with no gap to report. That state is a stale registry entry rather
+ * than something the lifter can fix from here, and it used to draw "Fewer than
+ * two sensors are paired" over a setup with two.
  */
-private fun sensorCountDetail(chosen: Int, planned: Int, roster: SensorRoster): String {
+private fun sensorCaptureDetail(roster: SensorRoster): String? {
     roster.shortfall?.let { return DualSensorSetup.recordLine(it) }
-    return when {
-        chosen != planned && planned == 1 -> "Plan says one - your change is recorded in the export"
-        chosen != planned -> "Plan says $planned - your change is recorded in the export"
-        chosen == 1 -> "One stream, as always"
-        else -> "Both streams are recorded; nothing is derived from the second one yet"
-    }
+    return if (roster.isDual) "Both streams are recorded; nothing is derived from the second one yet" else null
 }
 
 @Composable

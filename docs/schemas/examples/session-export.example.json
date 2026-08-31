@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.14",
+  "schemaVersion": "1.15",
   "startedAt": "2026-07-18T17:04:00Z",
   "endedAt": "2026-07-18T18:11:00Z",
   "timeZone": { "id": "America/New_York", "utcOffsetMinutes": -240 },
@@ -41,7 +41,6 @@
             }
           },
           "sensors": {
-            "plannedCount": 2,
             "count": 2,
             "expected": ["a", "b"],
             "present": ["a", "b"],
