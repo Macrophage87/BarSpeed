@@ -137,12 +137,40 @@ class SessionRepositorySensorsTest {
      * a column written by a build this one does not understand. All three mean
      * the same thing to a reader -- one stream, no role -- and a plausible
      * default here would be a claim that the set declared something.
+     *
+     * The unparseable case used to be `{"plannedCount":"two","count":1}` and
+     * is `{"count":"two"}` now. Not a weakening: #198 retires plannedCount, so
+     * the old fixture stopped being unparseable at all -- an unknown key with
+     * a nonsense value is skipped rather than refused, which is the next case
+     * down. The type error has to sit on a key this build still reads or the
+     * test asserts nothing about parsing.
      */
     @Test
     fun `an absent or unreadable declaration reads as absent, never as a default`() {
         assertNull(repo.decodeSensors(row(null)))
         assertNull(repo.decodeSensors(row("{")))
-        assertNull(repo.decodeSensors(row("""{"plannedCount":"two","count":1}""")))
+        assertNull(repo.decodeSensors(row("""{"count":"two"}""")))
+    }
+
+    /**
+     * DIFFERENTIAL, issue #198. A row whose RETIRED key holds garbage still
+     * decodes, rather than losing the declaration beside it.
+     *
+     * The upgrade case, and the reason it is worth a test of its own: an
+     * installed build wrote `plannedCount` on every dual set, and after this
+     * change the decoder does not know the key. `ignoreUnknownKeys` skips it
+     * whatever it holds, so the count, roles and analysed role beside it
+     * survive; today the same document is refused outright by the type error
+     * and `decodeSensors` answers null, which would read as an ordinary
+     * one-sensor set for the life of that row.
+     */
+    @Test
+    fun `a row whose retired key holds garbage keeps the declaration beside it`() {
+        val decoded =
+            repo.decodeSensors(row("""{"plannedCount":"two","count":2,"expected":["A","B"],"analysed":"A"}"""))
+
+        assertEquals(2, decoded?.count, "a garbage value in a retired key sank the whole declaration")
+        assertEquals(listOf(SensorRole.A, SensorRole.B), decoded?.expected)
     }
 
     /**
