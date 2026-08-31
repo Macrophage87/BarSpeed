@@ -90,12 +90,12 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     velocityLossStopPct = set.velocityLossStopPct,
                     restS = set.restS,
                     prepS = exerciseDef.prepS,
-                    // The set's own declaration beats the exercise block's,
-                    // the precedence every other per-set key already has --
-                    // a warm-up and its working set are not always mounted
-                    // the same way. Null when neither declared anything,
-                    // which is a different fact from a declared 1 and is
-                    // what lets the export publish both figures (#156).
+                    // Carried from the plan and UNREAD since #198: the
+                    // export publishes one figure now, not two, and nothing
+                    // resolves this one against anything. The set's own
+                    // declaration still beats the exercise block's, which is
+                    // the precedence every other per-set key has, so what the
+                    // slot states is what the plan said about this set.
                     sensors = set.sensors ?: exerciseDef.sensors,
                     // Set level only, and there is no exercise-level fallback
                     // to read: a block ramps, so its warm-up singles and its

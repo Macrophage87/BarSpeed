@@ -174,14 +174,25 @@ data class PlannedSlot(
      */
     val prepS: Int? = null,
     /**
-     * How many accelerometers the plan declared for this set: the set's own
-     * `sensors` where it has one, else the exercise block's, else null when
-     * neither declared anything (#156).
+     * What the plan declared for this set: the set's own `sensors` where it has
+     * one, else the exercise block's, else null when neither declared anything
+     * (#156).
      *
-     * Resolved at flatten time because both levels are in hand there and only
-     * one of them can be right for a given set; resolved against the lifter's
-     * adjustment and the default by [SensorCapturePolicy], never read raw --
-     * the same arrangement [prepS] has.
+     * SINCE #198 NOTHING READS IT. Capture is decided by the hardware -- see
+     * [SensorCapturePolicy.roster], which takes no count -- and there is no
+     * lifter adjustment and no resolution left: `SettingsStore.sensorCounts`,
+     * `setSensorCount` and `SENSOR_COUNT_KEY_PREFIX` are gone, and
+     * `SensorCapturePolicy` no longer declares `resolve`, `planned` or `clamp`.
+     * It is carried here only so a slot still states what its plan said, and it
+     * decides nothing; a reader must not take its presence as evidence that a
+     * count reaches the record flow.
+     *
+     * KEPT rather than deleted, and the reason is a pin rather than sentiment:
+     * `AppendedSlotTest` asserts field by field which values an appended set
+     * inherits, and `sensors` is one of them. Deleting the field deletes that
+     * coverage of the append rule in a round whose whole subject is prose, so
+     * the false KDoc is deleted instead and the field is labelled dead.
+     * Retiring it is #198's remainder, not its fix.
      */
     val sensors: Int? = null,
     val isExerciseChange: Boolean = false,
@@ -628,15 +639,20 @@ private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: M
  * screen shows a dot for a sensor that will not be captured.
  *
  * [onSecondaryAddress] is called with the address the second link should
- * maintain. It reads no count, because since #198 nothing does: two connected
- * and labelled units record two streams on every set, so the link the roster
- * names is the link every set captures from.
+ * maintain. It reads no count, because since #198 nothing does: two PAIRED and
+ * labelled units arm two streams on every set, so the link the roster names is
+ * the link every set captures from. Paired, not connected -- what the roster
+ * names is a link to bring up, and whether it comes up is the link's answer.
  *
  * For a lifter with two labelled units that makes up to three concurrent GATT
  * links the steady state of every set, and the second client unlocks, sets
- * 100 Hz and subscribes. That was field item F1b and it is DISCHARGED:
- * field-34's dual-sensor session measured the second sensor at a cost of
- * 0.000 Hz on the analysed stream. It is not a reason to keep a count.
+ * 100 Hz and subscribes. That was field item F1b and the owner has MEASURED
+ * it: on field-34's dual-sensor session the second sensor cost 0.000 Hz on the
+ * analysed stream. The capture is not in this repository -- there is no
+ * `field-34` fixture among `core/dsp/src/test/resources/field-*.csv` -- so
+ * nothing here re-checks the figure, and the session was two sets rather than
+ * a whole one. It is not a reason to keep a count; it is not a discharge
+ * either, and calling it one was this branch's own overstatement.
  *
  * The transform returns a [SensorSettings] and the state is read and written
  * in one statement inside `collect`, as `mirrorPrepOverrides` and all three
@@ -2001,8 +2017,12 @@ data class RecordState(
      * What a set beginning right now would be armed with.
      *
      * A property rather than a function taking a slot, since #198: the roster
-     * is a fact about the connected hardware and the labels on it, and no slot
-     * enters into it. `sensorCountFor`, `plannedSensorCountFor` and
+     * is a fact about which units are PAIRED, how the lifter has labelled
+     * them and which address is preferred -- it is handed those three and no
+     * link state -- and no slot enters into it. Whether an armed link then
+     * produces a stream is a
+     * separate question this property does not answer.
+     * `sensorCountFor`, `plannedSensorCountFor` and
      * `sensorExerciseId` stood beside a `rosterFor(slot)` here and are gone
      * with the count they resolved.
      *

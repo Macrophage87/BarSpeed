@@ -705,8 +705,8 @@ private const val PREP_STEP_S = 5
  * What the next set will record from, issue #198.
  *
  * A LINE rather than a control. It offered 1 and 2 as chips until #198, stored
- * against the exercise the way the prep adjustment is; capture is now decided
- * by the connected hardware alone -- *"If you've got one use one, if you've got
+ * against the exercise the way the prep adjustment is; the hardware now
+ * decides rather than the plan -- *"If you've got one use one, if you've got
  * two, use both."* -- so there is nothing left to choose and a control that
  * changed nothing would be worse than none.
  *
@@ -762,7 +762,11 @@ private fun SensorCaptureLine(state: RecordState) {
  */
 private fun sensorCaptureDetail(roster: SensorRoster): String? {
     roster.shortfall?.let { return DualSensorSetup.recordLine(it) }
-    return if (roster.isDual) "Both streams are recorded; nothing is derived from the second one yet" else null
+    return if (roster.isDual) {
+        "Both streams are recorded when both units are connected; nothing is derived from the second one yet"
+    } else {
+        null
+    }
 }
 
 @Composable

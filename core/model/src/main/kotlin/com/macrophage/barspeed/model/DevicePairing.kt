@@ -48,7 +48,15 @@ enum class DualSetupStep {
     /** Every paired unit is labelled and two of them share a label. */
     LABELS_COLLIDE,
 
-    /** Two are paired and carry different labels: every set arms both. */
+    /**
+     * Two are paired and carry different labels: a set arms both, unless the
+     * preferred address names neither of them.
+     *
+     * Says nothing about whether either unit is switched on. This step is read
+     * off the paired list and the labels alone -- see [DualSensorSetup.step] --
+     * so READY is reachable with one unit flat in a bag, and what that set then
+     * RECORDS is one stream.
+     */
     READY,
 }
 
@@ -425,18 +433,29 @@ object DevicePairingPolicy {
  */
 object DualSensorSetup {
     /**
-     * The Record screen's line for two connected units the app cannot tell
-     * apart.
+     * The Record screen's line for two or more PAIRED units the app cannot
+     * tell apart.
      *
      * Two sentences since #198, not three. The third was "Fewer than two
      * sensors are paired - this set will record one.", drawn for
      * ONE_SENSOR_PAIRED, and it is gone with that member: it reported a gap to
      * every lifter who owns one bar sensor, which is the ordinary setup rather
-     * than a degraded pair. The two that remain are unchanged word for word.
+     * than a degraded pair.
+     *
+     * Neither survivor says "both" any more, and that is round 1's correction
+     * rather than tidying. [DualSensorSetup.step] considers EVERY paired unit,
+     * and since #198 [SensorCapturePolicy.roster] consults it first and
+     * unconditionally -- so a lifter running two labelled sensors with one old
+     * unit still paired reads this line on every set. "Label both sensors A
+     * and B" was then a false instruction twice over: they HAVE labelled both
+     * of the two they use, and labelling the third produces a collision rather
+     * than a fix. What actually clears it is leaving two paired, so that is
+     * what the sentence says.
      */
     fun recordLine(shortfall: DualShortfall): String = when (shortfall) {
-        DualShortfall.ROLES_UNASSIGNED -> "Label both sensors A and B under Devices - this set will record one."
-        DualShortfall.ROLES_COLLIDE -> "Both sensors are labelled the same - fix it under Devices."
+        DualShortfall.ROLES_UNASSIGNED ->
+            "Leave two sensors paired and label them A and B under Devices - this set will record one."
+        DualShortfall.ROLES_COLLIDE -> "Two sensors carry the same label - fix it under Devices."
     }
 
     /**
@@ -473,10 +492,28 @@ object DualSensorSetup {
      * place the app said labelling is required, and it draws on a different
      * screen, so the lifter doing the pairing had never been told.
      *
-     * Both sentences stopped mentioning a set that ASKS for two at #198.
-     * Nothing asks: two labelled units record two streams on every set, and a
-     * line promising something conditional on a declaration would describe an
-     * app that no longer exists.
+     * Both gap sentences stopped mentioning a set that ASKS for two at #198.
+     * Nothing asks: two labelled units arm two streams on every set, and a line
+     * promising something conditional on a declaration would describe an app
+     * that no longer exists.
+     *
+     * Round 1 moved all three of the non-null sentences again, for two reasons.
+     *
+     * The two gap sentences said "both", and [step] considers EVERY paired unit
+     * -- three IMUs carrying two labels is a collision, three with one
+     * unlabelled asks for labels -- so "both" is false for a lifter with an old
+     * sensor still paired, which is the ordinary way to accumulate units. The
+     * action changes with the count: for three, the fix is to stop pairing one.
+     *
+     * READY said "Every set records both streams", which is a promise about
+     * hardware nothing here has looked at. PAIRED IS NOT CONNECTED: [step]
+     * takes the paired list and the labels only, so a unit switched off in the
+     * bag is paired, is READY, brings no link up and puts no samples in the
+     * buffer. No set is lost -- `SessionRepository.recordSet` writes no row for
+     * an empty second stream and the declaration still names the role -- but
+     * the sentence was a claim about a sensor nobody had checked, which is the
+     * class this repository keeps re-learning. It is now conditional in the
+     * words rather than in the reader's head.
      *
      * Silent where there is nothing to fix. One sensor is the ordinary setup,
      * for every exercise, and nagging it about a unit it does not have would
@@ -485,10 +522,14 @@ object DualSensorSetup {
     fun devicesLine(step: DualSetupStep): String? = when (step) {
         DualSetupStep.NO_SENSOR, DualSetupStep.ONE_SENSOR -> null
         DualSetupStep.LABEL_BOTH ->
-            "Label both sensors A and B - until they carry different labels only one stream is " +
-                "recorded."
-        DualSetupStep.LABELS_COLLIDE -> "Both sensors are labelled the same - give one of them the other label."
-        DualSetupStep.READY -> "Both sensors are labelled. Every set records both streams."
+            "Leave two sensors paired and label them A and B - until exactly two carry different " +
+                "labels, only one stream is recorded."
+        DualSetupStep.LABELS_COLLIDE ->
+            "Two sensors carry the same label - give them different labels, and leave only those " +
+                "two paired."
+        DualSetupStep.READY ->
+            "Both sensors are labelled. Every set records both streams when both are switched on " +
+                "and in range."
     }
 
     /**

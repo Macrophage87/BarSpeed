@@ -64,6 +64,12 @@
           "failed": true,
           "limiter": "grip",
           "rest_s": 180,
+          "sensors": {
+            "count": 1,
+            "expected": [],
+            "present": [],
+            "shortfall": "rolesUnassigned"
+          },
           "summary": { "meanConVel_mps": 0.41, "peakConVel_mps": 0.7, "meanEcc_s": 3.9, "meanCon_s": 1.2, "meanRom_m": 0.59, "romSpread_pct": 3.1 }
         },
         {

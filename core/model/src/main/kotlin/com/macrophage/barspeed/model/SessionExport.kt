@@ -224,20 +224,23 @@ data class SessionExport(
          * unchanged in meaning across the boundary.
          *
          * 1.14 carries a THIRD change, additive, under the same number for the
-         * reason the first two share and it is worth restating because the
-         * issue asked for 1.15: 1.14 is UNRELEASED. v0.1.44 shipped 1.13, read
-         * at tag `7cf6e8c3cc546ab8d64c9fb2be86de2129250b43`, so no reader has
-         * ever shipped against 1.14 and minting 1.15 would publish a boundary
-         * that never existed -- the same rule seven changes rode under 1.13
-         * for. The change (#189): a set may carry [SetExport.limiter], why it
+         * reason the first two share, and it is worth restating because it was
+         * asked for as 1.15: 1.14 was UNRELEASED WHEN THAT WAS WRITTEN and is
+         * not now. v0.1.44 shipped 1.13, read at tag
+         * `7cf6e8c3cc546ab8d64c9fb2be86de2129250b43`, and v0.1.45 shipped 1.14,
+         * read at tag `c44f1c531d6343d0071f82c062344e7f4eff950f` and unchanged
+         * at v0.1.46. The changes below rode under one number on the strength
+         * of a sentence that was true when written; that window is closed --
+         * the same rule seven changes rode under 1.13 for. The change (#189):
+         * a set may carry [SetExport.limiter], why it
          * ended, from a closed vocabulary, and [SetExport.limiterNote], the
          * lifter's own words where that answer is `other`. No key from 1.13
          * changes type or stops being written, and both are absent on every
          * set nobody was asked about and on every set recorded before database
          * v13.
          *
-         * 1.14 carries a FOURTH change (#194), under the same unreleased
-         * number and NOT additive: `warmup` gains a SECOND PRODUCER. Until now
+         * 1.14 carries a FOURTH change (#194), under the same number and NOT
+         * additive: `warmup` gains a SECOND PRODUCER. Until now
          * the plan declared it and nothing else could; the lifter may now mark
          * or unmark the set on the rest screen, and where both exist the
          * lifter's mark wins. No key changes type and no stored value is
@@ -250,6 +253,32 @@ data class SessionExport(
          * publish the plan's overridden declaration: where the mark disagrees,
          * the document carries the answer and its author, and the row keeps
          * both.
+         *
+         * 1.15: `plannedCount` is REMOVED from a set's `sensors` block and
+         * [SetSensorsExport.shortfall] is added to it (#198). NOT additive:
+         * a reader that requires `plannedCount` must be changed. The key
+         * said how many accelerometers the PLAN prescribed, and no plan
+         * prescribes any -- the app records from whatever is connected, one
+         * bar sensor writing one stream and two paired units labelled A and
+         * B arming two, on every set of every exercise. A key that kept
+         * emitting the old default of 1 would tell a reader a coach
+         * intended something. `shortfall` carries what the pair used to
+         * carry between `plannedCount` and `count`, and the published copy
+         * of this entry in `docs/schemas/session-export.schema.json` is the
+         * one to read for what it means and which older exports carry the
+         * retired key.
+         *
+         * A NEW NUMBER rather than a fifth change under 1.14, and this
+         * paragraph is a correction of the one above it rather than an
+         * addition beside it: that paragraph argued 1.14 was unreleased and
+         * that minting 1.15 would publish a boundary that never existed.
+         * True when written, false by the time this branch read it --
+         * v0.1.45 shipped 1.14. The published JSON copy of this log was
+         * corrected in the same round the constant moved to "1.15" and this
+         * Kotlin copy was not, so the two disagreed for a commit and this
+         * paragraph closes it. Nothing detects that:
+         * `SchemaSensorContractTest` reads the JSON only, and no test in
+         * this repository can guard a KDoc.
          */
         const val SCHEMA_VERSION = "1.15"
 
@@ -617,10 +646,10 @@ data class SetExport(
 )
 
 /**
- * A set's accelerometer configuration: what was asked for, what was armed,
- * what arrived, and which of it the numbers came from.
+ * A set's accelerometer configuration: what was armed, what arrived, which of
+ * it the numbers came from, and what stopped a second stream.
  *
- * Four statements rather than one because each answers a question the others
+ * Five statements rather than one because each answers a question the others
  * cannot, and every one of them is a declaration made when the set began --
  * except [present], which is the one observation here and is stated rather
  * than left to be inferred from filenames this document does not contain.
@@ -637,8 +666,8 @@ data class SetExport(
  * would be DROPPED from the wire exactly when it is empty, and its absence
  * would read as "not stated" when it meant "no role was armed" or "nothing
  * arrived". Those are the two most informative states this object has: a set
- * that asked for two sensors and armed none of them by role, and one whose
- * every unit went silent. Both are written out.
+ * that met two paired units it could not tell apart and armed neither by role,
+ * and one whose every unit went silent. Both are written out.
  */
 @Serializable
 data class SetSensorsExport(
@@ -652,7 +681,7 @@ data class SetSensorsExport(
      * intended something.
      *
      * Not [expected]`.size`, and the difference is load-bearing: a set that
-     * met two connected units it could not tell apart records `count: 1` with
+     * met two PAIRED units it could not tell apart records `count: 1` with
      * an EMPTY `expected`, because its single stream carries no role and
      * inventing one would label a capture nobody labelled. [shortfall] says
      * which case that is.
@@ -686,20 +715,36 @@ data class SetSensorsExport(
      */
     val analysedRole: String? = null,
     /**
-     * Why two connected units produced one stream, or absent when nothing was
-     * in the way.
+     * Why two or more PAIRED units produced one stream, or absent when
+     * nothing was in the way.
      *
-     * `rolesUnassigned` -- two units were connected and at least one carried
-     * no A/B label. `rolesCollide` -- both carried the SAME label. In either
-     * case the app recorded ONE stream, because two 20-byte WitMotion frames
-     * carry no checksum and interleaving two streams it cannot tell apart
-     * fabricates plausible samples rather than failing.
+     * `rolesUnassigned` -- at least one paired unit carried no A/B label.
+     * `rolesCollide` -- every paired unit is labelled and two of them share
+     * a label. In either case the app recorded ONE stream, because two
+     * 20-byte WitMotion frames carry no checksum and interleaving two
+     * streams it cannot tell apart fabricates plausible samples rather than
+     * failing.
+     *
+     * PAIRED IS NOT CONNECTED and this key says the weaker thing: the app
+     * never opened a link to a second unit in this state, so it means two
+     * units are paired and cannot be told apart -- not that both were
+     * switched on or in range.
      *
      * Absent on a dual set and absent on the ordinary one-sensor set, where
      * the whole object is absent too. What it exists for is the distinction
      * between "there was one sensor" and "there were two and one was
      * unusable", which are different facts about a session and which nothing
      * else in this document can separate since #198 retired `plannedCount`.
+     *
+     * IT DESCRIBES THE DEVICE ROSTER RATHER THAN THE SET, so it appears on
+     * EVERY set of a session rather than on the ones something went wrong
+     * on. It is published per set anyway: the alternative makes a session
+     * recorded entirely under an unusable pair indistinguishable from a
+     * one-sensor session. One historical exception -- a row written before
+     * this version carried its reason as a `plannedCount` this build does
+     * not read, and re-exports with no shortfall at all -- is stated in full
+     * in the published `shortfall` description, which is the copy a reader
+     * of the document has.
      */
     val shortfall: String? = null,
 )

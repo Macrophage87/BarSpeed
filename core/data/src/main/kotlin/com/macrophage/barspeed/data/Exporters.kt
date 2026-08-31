@@ -753,13 +753,15 @@ class RawExporter(
             // Absent when nothing was in the way, which is a dual set and the
             // ordinary one-sensor set both -- and the ordinary one does not
             // reach here at all, the whole declaration being null. Present
-            // only for two connected units the app could not tell apart, which
-            // is the state session.json also publishes and which neither
-            // document can otherwise express.
+            // only for two PAIRED units the app could not tell apart, which is
+            // the state session.json also publishes and which neither document
+            // can otherwise express. Paired, not connected: nothing here has
+            // looked at a link, so it does not say the second unit was on.
             str("sensorsShortfall", d.shortfall?.let(SensorCapturePolicy::shortfallToWire))
-            // Written even when empty. An empty list is a set that asked for
-            // two and could arm neither by role, which is a statement; an
-            // absent key would read as this version not stating it.
+            // Written even when empty. An empty list is a set that met two
+            // paired units it could not tell apart and armed neither by role,
+            // which is a statement; an absent key would read as this version
+            // not stating it.
             fields += "\"sensorRolesExpected\": " +
                 "[${d.expected.joinToString(", ") { "\"${SensorCapturePolicy.wireOf(it)}\"" }}]"
             str("analysedRole", analysedRole)

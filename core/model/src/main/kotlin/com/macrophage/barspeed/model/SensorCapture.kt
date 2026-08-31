@@ -40,16 +40,16 @@ enum class SensorRole { A, B }
  *
  * A `plannedCount` stood beside [count] until #198 and is gone with the
  * declaration it read. Nothing in a plan decides how many accelerometers a set
- * records: one connected bar sensor records one stream, two connected and
- * labelled record two, and a figure written for what a coach intended would be
- * a default dressed as an intention.
+ * records: one bar sensor records one stream, two units PAIRED and labelled
+ * arm two, and a figure written for what a coach intended would be a default
+ * dressed as an intention.
  *
  * [count] is DECLARED and is not [expected]`.size`. The two differ in exactly
- * one reachable case and it is the interesting one: a set that met two
- * connected units it could not tell apart records `count = 1` with an EMPTY
- * [expected], because its single stream carries no role and must not be given
- * one. Reading the count off the list would publish 0 sensors for a set that
- * recorded with one, and [shortfall] is what says why.
+ * one reachable case and it is the interesting one: a set that met two PAIRED
+ * units it could not tell apart records `count = 1` with an EMPTY [expected],
+ * because its single stream carries no role and must not be given one. Reading
+ * the count off the list would publish 0 sensors for a set that recorded with
+ * one, and [shortfall] is what says why.
  *
  * [analysed] is which role the DSP was pointed at, not which role produced
  * data. It is a fact about wiring, true at the moment the set began, and it
@@ -65,23 +65,47 @@ data class RecordedSensors(
      * The roles this set was armed for, in order.
      *
      * Empty means the stream carries no role, which is every set that did not
-     * arm two: one connected unit, or two the app could not tell apart. An
-     * empty list is never written alongside a role on a raw stream.
+     * arm two: one paired unit, or two the app could not tell apart. An empty
+     * list is never written alongside a role on a raw stream.
      */
     val expected: List<SensorRole> = emptyList(),
     /** Which role's stream every figure in this set was computed from. */
     val analysed: SensorRole? = null,
     /**
-     * Why this set recorded one stream when two units were connected, or null
-     * when there was nothing in the way.
+     * Why this set recorded one stream when two units were PAIRED, or null when
+     * there was nothing in the way.
+     *
+     * PAIRED IS NOT CONNECTED, and this field says the weaker thing.
+     * [SensorCapturePolicy.roster] reads a persisted list of units the app
+     * REMEMBERS and no link state at all, so a shortfall says two units are
+     * paired and cannot be told apart -- not that both were switched on or in
+     * range. Whether the second one was ever powered is a question this field
+     * does not answer and `present` does.
      *
      * Null on a dual set and null on the ordinary single-sensor set, so it is
      * never the difference between them. What it carries is the third state:
-     * two units connected that the app could not tell apart, which records one
-     * stream and would otherwise be indistinguishable from having owned one
-     * sensor. Before #198 that fact rode on a `plannedCount` of 2 beside a
-     * `count` of 1; with nothing declared there is no such pair, so the reason
-     * is stored outright or it is unsayable.
+     * two paired units the app could not tell apart, which records one stream
+     * and would otherwise be indistinguishable from having owned one sensor.
+     * Before #198 that fact rode on a `plannedCount` of 2 beside a `count` of
+     * 1; with nothing declared there is no such pair, so the reason is stored
+     * outright or it is unsayable.
+     *
+     * IT DESCRIBES THE DEVICE ROSTER RATHER THAN THE SET, so it lands on every
+     * set of a session rather than on the ones something went wrong on -- one
+     * stale paired unit is enough, and that is now the ordinary way to see it.
+     * Written per set anyway: writing it once would make a session recorded
+     * entirely under an unusable pair indistinguishable from a one-sensor
+     * session, which is the distinction it exists for.
+     *
+     * ONE HISTORICAL GAP, and it is not fixed here. A row an older build wrote
+     * for the same situation stored a `plannedCount` of 2 beside a `count` of
+     * 1 and no word; this build does not read that key, so such a row decodes
+     * with `shortfall` null and re-exports as though nothing was in the way.
+     * Synthesising a reason from the count would publish something this build
+     * never observed, so the published contract states the exception instead --
+     * see the `shortfall` description in `docs/schemas/session-export.schema.json`
+     * and `SessionExportSensorsTest.a row written under the retired planned
+     * count re-exports with no reason`.
      */
     val shortfall: DualShortfall? = null,
 ) {
@@ -107,7 +131,7 @@ data class RecordedSensors(
 data class SensorRoster(
     /**
      * The roles this set will capture, in order. Empty whenever one stream is
-     * what will be recorded -- one unit connected, or two that cannot be told
+     * what will be recorded -- one unit paired, or two that cannot be told
      * apart, which [shortfall] names.
      */
     val expected: List<SensorRole> = emptyList(),
@@ -123,7 +147,7 @@ data class SensorRoster(
      * at.
      */
     val unassigned: List<String> = emptyList(),
-    /** Why two units are connected and one stream is what will be captured. */
+    /** Why two paired units cannot be told apart and one stream is what will be captured. */
     val shortfall: DualShortfall? = null,
 ) {
     /** True when this set will run two collectors. */
@@ -131,27 +155,38 @@ data class SensorRoster(
 }
 
 /**
- * Why two connected units recorded one stream between them.
+ * Why two or more PAIRED units recorded one stream between them.
+ *
+ * PAIRED, not connected, and the difference is the pin #198 asked for. This is
+ * decided from [DualSensorSetup.step], which reads the paired list and the
+ * labels on it and no link state whatsoever, so both members say something
+ * about what the app REMEMBERS rather than about what was switched on. A unit
+ * left in a bag all session is still paired and still produces one of these.
  *
  * NOT a request that went unmet, since #198: nothing asks for two sensors, so
  * there is nothing to fall short of. Both members say the same thing about the
- * hardware -- two units are connected and the app cannot tell them apart -- and
- * differ in what the lifter has to go and do about it, which is why they are
- * named separately rather than collapsed into a boolean.
+ * roster -- two or more units are paired and the app cannot tell them apart --
+ * and differ in what the lifter has to go and do about it, which is why they
+ * are named separately rather than collapsed into a boolean.
  *
  * `ONE_SENSOR_PAIRED` was a third member and is dissolved rather than renamed.
- * One connected sensor is the ordinary case for every exercise, not a degraded
- * two; reporting it as a gap put a permanent complaint in front of every
+ * One bar sensor is the ordinary case for every exercise, not a degraded two;
+ * reporting it as a gap put a permanent complaint in front of every
  * single-sensor lifter about a unit they do not own.
+ *
+ * BOTH MEMBERS DESCRIBE THE ROSTER RATHER THAN THE SET, so once one is
+ * reachable it is reachable on every set of the session until the lifter
+ * changes what is paired. That is deliberate and it is stored per set anyway;
+ * [RecordedSensors.shortfall] states why.
  *
  * Neither refuses the set. A sensor the app cannot label is not a reason not
  * to lift.
  */
 enum class DualShortfall {
-    /** Two are connected and at least one carries no role, so a stream would be unlabelled. */
+    /** Two or more are paired and at least one carries no role, so a stream would be unlabelled. */
     ROLES_UNASSIGNED,
 
-    /** Both connected units are labelled with the SAME role, so neither stream could be told from the other. */
+    /** Every paired unit is labelled and two of them share a role, so neither stream could be told from the other. */
     ROLES_COLLIDE,
 }
 
@@ -195,8 +230,11 @@ object SensorCapturePolicy {
      * already are.
      *
      * A separate name rather than a [wireOf] overload, because `wireOf` is
-     * passed as a method reference in three places and an overload would make
-     * every one of them ambiguous.
+     * passed as a method reference in FIVE places -- `Exporters.kt` at four
+     * call sites and `SessionRepository.kt` at one, counted by
+     * `git grep -o 'SensorCapturePolicy::wireOf'` -- and an overload would make
+     * every one of them ambiguous. An earlier version of this sentence said
+     * three, which was never measured.
      */
     fun shortfallToWire(shortfall: DualShortfall): String = when (shortfall) {
         DualShortfall.ROLES_UNASSIGNED -> "rolesUnassigned"
@@ -217,8 +255,8 @@ object SensorCapturePolicy {
         wire?.let { w -> SensorRole.entries.firstOrNull { it.name.equals(w, ignoreCase = true) } }
 
     /**
-     * What a set about to begin is armed with, decided by the connected
-     * hardware and nothing else.
+     * What a set about to begin is armed with, decided by the hardware and
+     * nothing else -- which units are PAIRED, and how they are labelled.
      *
      * The rule, in the owner's words (#198): *"If you've got one use one, if
      * you've got two, use both."* No count is passed, because no count
@@ -267,7 +305,7 @@ object SensorCapturePolicy {
      *
      * A shortfall never refuses the set. It records one stream, names
      * [DualShortfall] for the screen to explain, and leaves [RecordedSensors]
-     * to say afterwards that two units were connected and one was unusable.
+     * to say afterwards that two units were paired and the pair was unusable.
      *
      * WHICH units are the pair is [DualSensorSetup.step]'s answer, since
      * #192: dual arms only from [DualSetupStep.READY], which is exactly two
@@ -289,8 +327,19 @@ object SensorCapturePolicy {
      * sentence the Devices screen draws and the reason stored on the set are
      * one reading of one state rather than two that can disagree. The step is
      * consulted FIRST now, ahead of the addresses: it is the only reading that
-     * can tell one connected unit from two unlabelled ones, and reading the
+     * can tell one paired unit from two unlabelled ones, and reading the
      * addresses first is what made a single sensor report a gap.
+     *
+     * One consequence of consulting it first and unconditionally, named
+     * because it is the owner's ordinary state rather than an edge case: a
+     * third paired unit puts a shortfall on EVERY set. Two correctly labelled
+     * sensors plus one stale paired unit answers [DualSetupStep.LABEL_BOTH],
+     * so the row stores `ROLES_UNASSIGNED` for as long as that unit stays
+     * paired. Before #198 the count gate returned before `step` was consulted
+     * on every plan that did not declare 2, so the same setup stored nothing.
+     * The ARMING is unchanged and deliberate; what is new is that the reason is
+     * written down every time, and the screens and the published description
+     * are worded for it rather than for exactly two units.
      */
     fun roster(
         pairedImuAddresses: List<String>,
@@ -300,7 +349,7 @@ object SensorCapturePolicy {
         val paired = pairedImuAddresses.distinct()
         val unassigned = paired.filter { it !in roleByAddress }
         when (DualSensorSetup.step(paired, roleByAddress)) {
-            // Nothing to tell apart. One connected unit is the ordinary case
+            // Nothing to tell apart. One paired unit is the ordinary case
             // for every exercise and none at all is a manual set; neither is a
             // gap in a setup, and saying so was #198's first correction.
             DualSetupStep.NO_SENSOR, DualSetupStep.ONE_SENSOR ->
@@ -338,16 +387,16 @@ object SensorCapturePolicy {
      * What to store on a set the record flow has just finished arming, or null
      * when there is nothing to say.
      *
-     * Null on the ordinary set: one connected sensor, one stream, no roles.
-     * That is what keeps such a set's row and both export documents exactly
-     * what this app has always written, and it is the common case.
+     * Null on the ordinary set: one bar sensor, one stream, no roles. That is
+     * what keeps such a set's row and both export documents exactly what this
+     * app has always written, and it is the common case.
      *
      * Written in the two states that are not ordinary. A dual set records both
-     * roles and which one the DSP was pointed at. A set that met two connected
+     * roles and which one the DSP was pointed at. A set that met two PAIRED
      * units it could not tell apart records `count = 1`, no roles, and WHY --
      * and that second case is the one a reader could never otherwise recover.
      * Before #198 it rode on a plan's declaration of 2 sitting beside an armed
-     * count of 1; with nothing declared, a null here would make two connected
+     * count of 1; with nothing declared, a null here would make two paired
      * units the app could not label indistinguishable from a one-sensor set
      * for the whole life of the corpus.
      */

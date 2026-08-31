@@ -11,14 +11,12 @@
           "exercise": "back_squat",
           "description": "Brace before you unrack, then break at the hips and knees together. Stop the eccentric where your ribs stay down.",
           "additional_notes": "Set the safeties one hole below your bottom position before the first work set. If the last rep of a set turns into a grind, stop the set there and log it: this block is about bar speed at five reps, not about making the sixth.",
-          "sensors": 2,
           "sets": [
             {
               "reps": 5,
               "load_kg": 100,
               "tempo": "4010",
               "rest_s": 180,
-              "sensors": 1,
               "warmup": true
             },
             {

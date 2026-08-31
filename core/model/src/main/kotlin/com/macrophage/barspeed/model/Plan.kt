@@ -713,8 +713,8 @@ data class PlanSetDef(
      * [PlanExerciseDef.sensors] is, and for the reasons stated there (#198).
      *
      * It used to override the exercise's declaration for one set. There is no
-     * declaration left to override: capture is decided by the connected
-     * hardware on every set.
+     * declaration left to override: on every set the hardware decides
+     * rather than the plan.
      */
     val sensors: Int? = null,
     /**

@@ -285,10 +285,12 @@ data class SetRecordEntity(
      * Null on the ordinary one-sensor set and on every row written before v11,
      * and those two are deliberately not distinguished -- both mean the same
      * thing to a reader, which is that this set has one unroled stream. What is
-     * NOT folded into that null is a set that met two connected units it could
+     * NOT folded into that null is a set that met two PAIRED units it could
      * not tell apart and recorded one: that row carries a declaration naming
      * the gap, because what arrived is observable from the streams and what
-     * was IN THE WAY is observable from nothing at all.
+     * was IN THE WAY is observable from nothing at all. Paired, not connected
+     * -- the declaration is written from the persisted list of units the app
+     * remembers, so it says nothing about whether the second one was on.
      */
     val sensorsJson: String? = null,
     val hrEndOfSetBpm: Int? = null,

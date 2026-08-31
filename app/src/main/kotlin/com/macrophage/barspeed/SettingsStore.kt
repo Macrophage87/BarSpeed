@@ -193,8 +193,8 @@ class SettingsStore(private val context: Context) {
          * store, which is what the prefix-scanning flow above relies on.
          *
          * `SENSOR_COUNT_KEY_PREFIX = "sensors_"` sat beside it and is gone
-         * with the per-exercise count (#198): capture is decided by the
-         * connected hardware, so there is nothing for a lifter to choose and
+         * with the per-exercise count (#198): the hardware decides rather
+         * than the plan, so there is nothing for a lifter to choose and
          * nothing to store. Any `sensors_<id>` rows an installed build already
          * wrote stay in the DataStore file unread -- harmless, and deliberately
          * not swept, because deleting preference rows on upgrade is a write
