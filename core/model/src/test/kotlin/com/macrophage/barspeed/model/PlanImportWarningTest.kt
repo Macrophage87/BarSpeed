@@ -291,6 +291,70 @@ class PlanImportWarningTest {
         assertEquals(emptyList(), result.warnings)
     }
 
+    /**
+     * DIFFERENTIAL, issue #198. A plan declaring `sensors` is told at the gate
+     * that the key no longer decides anything.
+     *
+     * The key is KEPT and accepted rather than removed from the contract, and
+     * this warning is the price of that choice. A plan is a document a coach
+     * writes by hand and a document that used to be correct should not fail an
+     * import over tidiness -- but an accepted key that silently does nothing
+     * is its own kind of lie, and the import gate is the only surface that can
+     * say so to the person who wrote it.
+     *
+     * The wording follows `prep_s`'s inert-declaration warning, which is the
+     * house form for exactly this: name the path, name the key, say what the
+     * app does instead, and say the declaration has no effect.
+     */
+    @Test
+    fun `a declared sensor count is flagged as no longer deciding anything`() {
+        val result = parse("""{"exercise":"back_squat","sensors":2,"sets":[{"reps":5}]}""")
+
+        assertEquals(emptyList(), result.errors, "a key that used to be correct is not a reason to refuse")
+        assertEquals(
+            listOf(
+                "sessions[0].exercises[0]: \"sensors\" is declared on back_squat, but the app " +
+                    "records from whatever sensors are connected -- one stream from one, two from " +
+                    "two that are labelled A and B -- so the declaration is ignored and has no " +
+                    "effect.",
+            ),
+            result.warnings,
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #198. A `sensors` declared on a SET alone is flagged
+     * too, and the exercise is named once rather than per set.
+     *
+     * The set-level key is the same inert key at the other level it can be
+     * written at, and a warning that covered only the exercise block would
+     * leave the commoner half of the declaration silent.
+     */
+    @Test
+    fun `a set-level sensor count is flagged once for the exercise`() {
+        val result = parse("""{"exercise":"back_squat","sets":[{"reps":5,"sensors":2},{"reps":5,"sensors":1}]}""")
+
+        assertEquals(1, result.warnings.size, "one exercise, one warning: ${result.warnings}")
+        assertTrue(
+            "\"sensors\"" in result.warnings.single() && "back_squat" in result.warnings.single(),
+            result.warnings.single(),
+        )
+    }
+
+    /**
+     * A plan declaring no sensor count draws no warning, which is what keeps
+     * the new one from becoming a line the eye learns to skip.
+     */
+    @Test
+    fun `a plan that declares no sensor count is not warned about one`() {
+        val result = parse("""{"exercise":"back_squat","sets":[{"reps":5}]}""")
+
+        assertTrue(
+            result.warnings.none { "sensors" in it },
+            "a plan declaring nothing was warned anyway: ${result.warnings}",
+        )
+    }
+
     @Test
     fun `a declaration the app cannot read is an error, not a warning`() {
         // Unlike an extra key, this is not extraneous: the plan asked for

@@ -2,6 +2,7 @@ package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.DualShortfall
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.SensorRole
@@ -131,7 +132,6 @@ class SessionRepositoryDualSensorTest {
 
     private val dualDeclaration =
         RecordedSensors(
-            plannedCount = 2,
             count = 2,
             expected = listOf(SensorRole.A, SensorRole.B),
             analysed = SensorRole.A,
@@ -223,13 +223,17 @@ class SessionRepositoryDualSensorTest {
      * `a` would state which physical unit the capture came from.
      */
     @Test
-    fun `a shortfall records the ask and leaves its one stream unlabelled`() = runTest {
-        val dao = record(RecordedSensors(plannedCount = 2, count = 1), secondary = null)
+    fun `a shortfall records the reason and leaves its one stream unlabelled`() = runTest {
+        val dao =
+            record(
+                RecordedSensors(count = 1, shortfall = DualShortfall.ROLES_COLLIDE),
+                secondary = null,
+            )
 
         assertEquals(1, dao.imuRows.size)
         assertNull(dao.imuRows.single().role, "a stream nobody labelled was labelled")
         val stored = json.decodeFromString(RecordedSensors.serializer(), dao.sets.single().sensorsJson!!)
-        assertEquals(2, stored.plannedCount)
+        assertEquals(DualShortfall.ROLES_COLLIDE, stored.shortfall)
         assertEquals(1, stored.count)
         assertEquals(emptyList(), stored.expected)
     }

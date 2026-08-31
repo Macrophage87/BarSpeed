@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityEstimator
+import com.macrophage.barspeed.model.DualShortfall
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.SensorRole
@@ -157,7 +158,6 @@ class RawExporterDualSensorTest {
 
     private val dual =
         RecordedSensors(
-            plannedCount = 2,
             count = 2,
             expected = listOf(SensorRole.A, SensorRole.B),
             analysed = SensorRole.A,
@@ -253,7 +253,14 @@ class RawExporterDualSensorTest {
     }
 
     /**
-     * The manifest states the counts and which role was analysed.
+     * DIFFERENTIAL, issue #198. The manifest states the armed count and which
+     * role was analysed, and no longer states a planned one.
+     *
+     * `the manifest declares the planned count, the armed count and the
+     * analysed role` stood here. `sensorsPlanned` had exactly one source, the
+     * plan's declaration, and that declaration no longer decides anything, so
+     * the key would have to keep publishing a default that reads as a coach's
+     * intention. It goes.
      *
      * Flat keys here and a nested object in `session.json`, which is what the
      * two documents already do with geometry and with the time zone; the names
@@ -261,13 +268,35 @@ class RawExporterDualSensorTest {
      * object in the other.
      */
     @Test
-    fun `the manifest declares the planned count, the armed count and the analysed role`() = runTest {
+    fun `the manifest declares the armed count and the analysed role, and no planned one`() = runTest {
         val set = descriptor(dual, dualStreams())
 
-        assertEquals(2.0, set.num("sensorsPlanned"))
+        assertNull(set["sensorsPlanned"], "the manifest still publishes a planned count nobody planned")
         assertEquals(2.0, set.num("sensorsArmed"))
         assertEquals(listOf("a", "b"), set.getValue("sensorRolesExpected").jsonArray.map { it.jsonPrimitive.content })
         assertEquals("a", set.text("analysedRole"))
+        assertNull(set["sensorsShortfall"], "nothing was in the way of a set that armed both")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #198. A set that recorded one stream because two
+     * connected units could not be told apart says so in the manifest too.
+     *
+     * The raw archive and `session.json` are read by different consumers and
+     * one saying less than the other about the same set is how a reader comes
+     * to believe the archive is complete. The word is the export's, not a
+     * second spelling of it.
+     */
+    @Test
+    fun `the manifest names the gap when two units could not be told apart`() = runTest {
+        val set =
+            descriptor(
+                RecordedSensors(count = 1, shortfall = DualShortfall.ROLES_COLLIDE),
+                listOf(imuStream(1L, null, analysedSamples, storedRate = 98.5)),
+            )
+
+        assertEquals("rolesCollide", set.text("sensorsShortfall"))
+        assertEquals(1.0, set.num("sensorsArmed"))
     }
 
     /**

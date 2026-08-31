@@ -2,6 +2,7 @@ package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.DualShortfall
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.SensorRole
@@ -137,7 +138,6 @@ class SessionExportSensorsTest {
 
     private val dual =
         RecordedSensors(
-            plannedCount = 2,
             count = 2,
             expected = listOf(SensorRole.A, SensorRole.B),
             analysed = SensorRole.A,
@@ -162,11 +162,15 @@ class SessionExportSensorsTest {
             setObject(dual, listOf(imuStream(1L, "a", count = 100), imuStream(2L, "b", count = 100)))
 
         val sensors = set.getValue("sensors").jsonObject
-        assertEquals(2, sensors.getValue("plannedCount").jsonPrimitive.int)
         assertEquals(2, sensors.getValue("count").jsonPrimitive.int)
         assertEquals(listOf("a", "b"), sensors.roles("expected"))
         assertEquals(listOf("a", "b"), sensors.roles("present"))
         assertEquals("a", sensors.getValue("analysedRole").jsonPrimitive.content)
+        assertNull(sensors["shortfall"], "nothing was in the way of a set that armed both")
+        assertNull(
+            sensors["plannedCount"],
+            "the export still publishes a planned count nobody planned",
+        )
     }
 
     /**
@@ -206,18 +210,30 @@ class SessionExportSensorsTest {
     }
 
     /**
-     * A set that asked for two and armed one publishes the ask, with no roles.
+     * DIFFERENTIAL, issue #198. A set that recorded one stream because two
+     * connected units could not be told apart publishes WHICH gap it was.
      *
-     * `count` is 1 and `expected` is empty, and the two disagreeing is the
-     * information: reading the count off the list would publish a set that
+     * `a shortfall publishes the ask with an empty role list` stood here and
+     * published `plannedCount: 2, count: 1`, which is the ask. There is no ask
+     * left. A reader has to be able to separate two facts about a session --
+     * there was one sensor, and there were two and one was unusable -- and
+     * with the pair gone the reason is the only thing that can carry the
+     * second.
+     *
+     * `count` is 1 and `expected` is empty, and the two disagreeing is still
+     * the information: reading the count off the list would publish a set that
      * armed nothing.
      */
     @Test
-    fun `a shortfall publishes the ask with an empty role list`() = runTest {
-        val set = setObject(RecordedSensors(plannedCount = 2, count = 1), listOf(imuStream(1L, null, count = 100)))
+    fun `a set that could not tell two units apart publishes which gap it was`() = runTest {
+        val set =
+            setObject(
+                RecordedSensors(count = 1, shortfall = DualShortfall.ROLES_UNASSIGNED),
+                listOf(imuStream(1L, null, count = 100)),
+            )
 
         val sensors = set.getValue("sensors").jsonObject
-        assertEquals(2, sensors.getValue("plannedCount").jsonPrimitive.int)
+        assertEquals("rolesUnassigned", sensors.getValue("shortfall").jsonPrimitive.content)
         assertEquals(1, sensors.getValue("count").jsonPrimitive.int)
         assertEquals(emptyList(), sensors.roles("expected"))
         assertEquals(emptyList(), sensors.roles("present"))
@@ -225,22 +241,25 @@ class SessionExportSensorsTest {
     }
 
     /**
-     * The lifter's in-app adjustment is visible against what the plan asked
-     * for.
+     * DIFFERENTIAL, issue #198. The two surviving gaps publish as two
+     * different words.
      *
-     * The #151 pair, designed in from the start: a plan declaring one sensor
-     * and a lifter arming two is a real and common case on a barbell day, and
-     * a document publishing only the outcome cannot be used to author the next
-     * plan.
+     * Collapsing them would lose what the coach is supposed to go and do:
+     * label a unit, or fix two units carrying one label. They are separate
+     * sentences on both screens and they stay separate here.
      */
     @Test
-    fun `an adjustment away from the plan is visible as the pair`() = runTest {
-        val adjusted = dual.copy(plannedCount = 1)
-        val set = setObject(adjusted, listOf(imuStream(1L, "a", count = 100), imuStream(2L, "b", count = 100)))
+    fun `a collision publishes as its own word rather than as the other gap`() = runTest {
+        val set =
+            setObject(
+                RecordedSensors(count = 1, shortfall = DualShortfall.ROLES_COLLIDE),
+                listOf(imuStream(1L, null, count = 100)),
+            )
 
-        val sensors = set.getValue("sensors").jsonObject
-        assertEquals(1, sensors.getValue("plannedCount").jsonPrimitive.int)
-        assertEquals(2, sensors.getValue("count").jsonPrimitive.int)
+        assertEquals(
+            "rolesCollide",
+            set.getValue("sensors").jsonObject.getValue("shortfall").jsonPrimitive.content,
+        )
     }
 
     // ---- what must not move --------------------------------------------------

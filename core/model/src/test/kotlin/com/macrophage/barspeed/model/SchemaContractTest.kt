@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -512,12 +513,12 @@ class SchemaContractTest {
             "the sensors block accepts undeclared keys, so a typo would validate",
         )
         assertEquals(
-            setOf("plannedCount", "count", "expected", "present", "analysedRole"),
+            setOf("count", "expected", "present", "analysedRole", "shortfall"),
             sensors["properties"]!!.jsonObject.keys,
             "SetSensorsExport and the published sensors block disagree on keys",
         )
         assertEquals(
-            listOf("plannedCount", "count", "expected", "present"),
+            listOf("count", "expected", "present"),
             sensors["required"]!!.jsonArray.map { it.jsonPrimitive.content },
             "the counts and both role lists must be required; only the analysed role may be absent",
         )
@@ -555,7 +556,7 @@ class SchemaContractTest {
         val text =
             wire.encodeToString(
                 SetSensorsExport.serializer(),
-                SetSensorsExport(plannedCount = 2, count = 1, expected = emptyList(), present = emptyList()),
+                SetSensorsExport(count = 1, expected = emptyList(), present = emptyList()),
             )
 
         assertTrue("\"expected\"" in text, "an empty expected list was dropped from the wire: $text")
@@ -667,6 +668,10 @@ class SchemaContractTest {
             listOf("a", "b"),
             sensors["expected"]!!.jsonArray.map { it.jsonPrimitive.content },
             "the example does not exercise both roles",
+        )
+        assertNull(
+            sensors["plannedCount"],
+            "the published example still carries a planned count, so ajv validates a key #198 retired",
         )
     }
 

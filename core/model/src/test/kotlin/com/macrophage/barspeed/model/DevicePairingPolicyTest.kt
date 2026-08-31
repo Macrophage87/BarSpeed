@@ -830,16 +830,26 @@ class DevicePairingPolicyTest {
     // ---- what the screens say ------------------------------------------------
 
     /**
-     * The Record screen's three sentences, moved here unchanged. Asserted
-     * against [DualShortfall.entries] so a fourth reason cannot be added
-     * without a sentence being written for it.
+     * DIFFERENTIAL, issue #198. The Record screen has TWO shortfall sentences,
+     * because there are two things left that can be in the way.
+     *
+     * "Fewer than two sensors are paired - this set will record one." was the
+     * third and is gone with ONE_SENSOR_PAIRED. It was a sentence about a
+     * request, and there is no request: owning one bar sensor is the ordinary
+     * setup, not a degraded two, and telling a one-sensor lifter about it
+     * before every set was the app reporting a gap where there is none.
+     *
+     * The two that survive are not dissolved with it and their meaning shifts
+     * rather than going: they no longer say "you asked for two and cannot have
+     * it", they say two units are connected and the app cannot tell them
+     * apart, so it recorded one. A coach has to be able to tell that from
+     * having owned one sensor.
+     *
+     * Still asserted against [DualShortfall.entries] so a third reason cannot
+     * be added without a sentence being written for it.
      */
     @Test
     fun `the record screen's shortfall sentences are unchanged by the lift`() {
-        assertEquals(
-            "Fewer than two sensors are paired - this set will record one.",
-            DualSensorSetup.recordLine(DualShortfall.ONE_SENSOR_PAIRED),
-        )
         assertEquals(
             "Label both sensors A and B under Devices - this set will record one.",
             DualSensorSetup.recordLine(DualShortfall.ROLES_UNASSIGNED),
@@ -848,7 +858,7 @@ class DevicePairingPolicyTest {
             "Both sensors are labelled the same - fix it under Devices.",
             DualSensorSetup.recordLine(DualShortfall.ROLES_COLLIDE),
         )
-        assertEquals(3, DualShortfall.entries.size, "a new shortfall needs a sentence here")
+        assertEquals(2, DualShortfall.entries.size, "a new shortfall needs a sentence here")
     }
 
     /**

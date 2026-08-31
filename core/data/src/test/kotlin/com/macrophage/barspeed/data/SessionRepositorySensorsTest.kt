@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.DualShortfall
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.SensorRole
 import kotlinx.coroutines.flow.Flow
@@ -90,7 +91,6 @@ class SessionRepositorySensorsTest {
     fun `a stored declaration decodes back to what was written`() {
         val declared =
             RecordedSensors(
-                plannedCount = 2,
                 count = 2,
                 expected = listOf(SensorRole.B, SensorRole.A),
                 analysed = SensorRole.B,
@@ -103,19 +103,26 @@ class SessionRepositorySensorsTest {
     }
 
     /**
-     * A set that asked for two and armed one keeps the ask.
+     * DIFFERENTIAL, issue #198. A set that recorded one stream because two
+     * units could not be told apart keeps the REASON, which is what the ask
+     * used to stand in for.
      *
-     * The one case where `count` and `expected.size` legitimately differ, and
-     * the reason the count is stored rather than read off the list: without
-     * it, a shortfall would decode as a set that armed nothing.
+     * `a shortfall decodes as one sensor with no role and the ask intact` is
+     * the same case with plannedCount as its carrier. There is no ask left, so
+     * either the reason is stored or the row becomes an ordinary single-sensor
+     * set forever -- the gap-that-cannot-be-represented class, applied to the
+     * one distinction a coach reading the corpus needs here.
+     *
+     * `count` and `expected.size` still legitimately differ, and that is still
+     * why the count is stored rather than read off the list.
      */
     @Test
-    fun `a shortfall decodes as one sensor with no role and the ask intact`() {
-        val declared = RecordedSensors(plannedCount = 2, count = 1)
+    fun `a shortfall decodes as one sensor with no role and the reason intact`() {
+        val declared = RecordedSensors(count = 1, shortfall = DualShortfall.ROLES_UNASSIGNED)
 
         val decoded = repo.decodeSensors(row(json.encodeToString(RecordedSensors.serializer(), declared)))
 
-        assertEquals(2, decoded?.plannedCount)
+        assertEquals(DualShortfall.ROLES_UNASSIGNED, decoded?.shortfall)
         assertEquals(1, decoded?.count)
         assertEquals(emptyList(), decoded?.expected)
         assertNull(decoded?.analysed)

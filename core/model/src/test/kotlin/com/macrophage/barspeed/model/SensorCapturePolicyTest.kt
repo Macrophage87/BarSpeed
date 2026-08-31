@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.model
 
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -28,43 +29,20 @@ class SensorCapturePolicyTest {
 
     // ---- the counts ----------------------------------------------------------
 
+    /**
+     * One stream is what a set records unless the hardware says otherwise, and
+     * two is the ceiling.
+     *
+     * The clamp, the plan-versus-adjustment precedence and the planned half of
+     * the pair used to be asserted here and are gone with the pins that named
+     * them: #198 takes every count out of the capture decision, so there is no
+     * requested figure left to clamp or to resolve. What survives is the pair
+     * of constants the roster and the record flow still read.
+     */
     @Test
     fun `the default is one sensor and the ceiling is two`() {
         assertEquals(1, SensorCapturePolicy.DEFAULT_COUNT)
-        assertEquals(1, SensorCapturePolicy.clamp(0))
-        assertEquals(1, SensorCapturePolicy.clamp(1))
-        assertEquals(2, SensorCapturePolicy.clamp(2))
-        assertEquals(2, SensorCapturePolicy.clamp(3))
-        assertEquals(1, SensorCapturePolicy.clamp(-4))
-    }
-
-    /**
-     * The lifter's adjustment beats the plan's declaration, and both beat the
-     * default. [LeadInPolicy.resolve]'s precedence, because it is the same kind
-     * of decision and a second ordering would be a second rule.
-     */
-    @Test
-    fun `the adjustment wins over the declaration and the declaration over the default`() {
-        assertEquals(1, SensorCapturePolicy.resolve(declared = null, override = null))
-        assertEquals(2, SensorCapturePolicy.resolve(declared = 2, override = null))
-        assertEquals(1, SensorCapturePolicy.resolve(declared = 2, override = 1))
-        assertEquals(2, SensorCapturePolicy.resolve(declared = null, override = 2))
-        assertEquals(2, SensorCapturePolicy.resolve(declared = 1, override = 9))
-    }
-
-    /**
-     * The planned half of the pair reads the plan alone.
-     *
-     * If it read the override too, the two halves would be equal by
-     * construction and the export could never show that the lifter changed
-     * anything -- the retrofit #151 had to undo, avoided here by writing the
-     * pair on the first commit.
-     */
-    @Test
-    fun `the planned count is the plan's declaration and never the adjustment`() {
-        assertEquals(1, SensorCapturePolicy.planned(null))
-        assertEquals(2, SensorCapturePolicy.planned(2))
-        assertEquals(2, SensorCapturePolicy.planned(7))
+        assertEquals(2, SensorCapturePolicy.MAX_COUNT)
     }
 
     // ---- the wire vocabulary -------------------------------------------------
@@ -94,21 +72,32 @@ class SensorCapturePolicyTest {
 
     // ---- the roster ----------------------------------------------------------
 
+    /**
+     * DIFFERENTIAL, issue #198. One sensor is the ordinary case, not a
+     * degraded two.
+     *
+     * `a single-sensor request arms no role at all` stood here and is gone
+     * with the request it was about. What replaces it is the other half of the
+     * same fact: owning one bar sensor, or none, is not a shortfall against
+     * anything, because nothing was asked for. Today both states answer
+     * ONE_SENSOR_PAIRED -- a name that was already wrong for a lifter who owns
+     * one unit and is drawn on the Record screen as "Fewer than two sensors
+     * are paired", a sentence about a gap that is not one.
+     */
     @Test
-    fun `a single-sensor request arms no role at all`() {
-        val roster =
-            SensorCapturePolicy.roster(
-                pairedImuAddresses = listOf(a, b),
-                preferredAddress = a,
-                roleByAddress = mapOf(a to SensorRole.A, b to SensorRole.B),
-                requestedCount = 1,
-            )
+    fun `one paired unit is the ordinary case rather than a shortfall`() {
+        val one = SensorCapturePolicy.roster(listOf(a), a, mapOf(a to SensorRole.A))
 
-        assertEquals(emptyList(), roster.expected, "a one-sensor set must put no role on its stream")
-        assertNull(roster.analysed)
-        assertNull(roster.secondary)
-        assertNull(roster.shortfall, "one sensor asked for and one armed is not a shortfall")
-        assertTrue(!roster.isDual)
+        assertNull(one.shortfall, "owning one sensor is not a gap in a setup")
+        assertEquals(emptyList(), one.expected, "a single stream carries no role")
+        assertNull(one.analysed)
+        assertNull(one.secondary)
+        assertTrue(!one.isDual)
+
+        val none = SensorCapturePolicy.roster(emptyList(), null, emptyMap())
+
+        assertNull(none.shortfall, "no sensor at all is not a gap either")
+        assertTrue(!none.isDual)
     }
 
     @Test
@@ -118,7 +107,6 @@ class SensorCapturePolicyTest {
                 pairedImuAddresses = listOf(a, b),
                 preferredAddress = b,
                 roleByAddress = mapOf(a to SensorRole.A, b to SensorRole.B),
-                requestedCount = 2,
             )
 
         assertTrue(roster.isDual)
@@ -152,7 +140,6 @@ class SensorCapturePolicyTest {
                 pairedImuAddresses = listOf(a, b),
                 preferredAddress = a,
                 roleByAddress = mapOf(a to SensorRole.A),
-                requestedCount = 2,
             )
 
         assertTrue(!roster.isDual)
@@ -168,24 +155,9 @@ class SensorCapturePolicyTest {
                 pairedImuAddresses = listOf(a, b),
                 preferredAddress = a,
                 roleByAddress = mapOf(a to SensorRole.A, b to SensorRole.A),
-                requestedCount = 2,
             )
 
         assertEquals(DualShortfall.ROLES_COLLIDE, roster.shortfall)
-        assertEquals(emptyList(), roster.expected)
-    }
-
-    @Test
-    fun `one paired unit cannot arm two, and says which gap it is`() {
-        val roster =
-            SensorCapturePolicy.roster(
-                pairedImuAddresses = listOf(a),
-                preferredAddress = a,
-                roleByAddress = mapOf(a to SensorRole.A),
-                requestedCount = 2,
-            )
-
-        assertEquals(DualShortfall.ONE_SENSOR_PAIRED, roster.shortfall)
         assertEquals(emptyList(), roster.expected)
     }
 
@@ -204,10 +176,14 @@ class SensorCapturePolicyTest {
                 pairedImuAddresses = listOf(b),
                 preferredAddress = a,
                 roleByAddress = mapOf(a to SensorRole.A, b to SensorRole.B),
-                requestedCount = 2,
             )
 
-        assertEquals(DualShortfall.ONE_SENSOR_PAIRED, roster.shortfall)
+        assertNull(roster.secondary, "a forgotten unit is not the second half of a pair")
+        assertTrue(!roster.isDual)
+        assertNull(
+            roster.shortfall,
+            "one unit paired is one unit paired, whatever a stale preference says about another",
+        )
     }
 
     /**
@@ -226,12 +202,10 @@ class SensorCapturePolicyTest {
     fun `no shortfall ever names a second address for the second link to hold`() {
         val cases =
             mapOf(
-                DualShortfall.ONE_SENSOR_PAIRED to
-                    SensorCapturePolicy.roster(listOf(a), a, mapOf(a to SensorRole.A), 2),
                 DualShortfall.ROLES_UNASSIGNED to
-                    SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A), 2),
+                    SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A)),
                 DualShortfall.ROLES_COLLIDE to
-                    SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.A), 2),
+                    SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.A)),
             )
 
         assertEquals(DualShortfall.entries.toSet(), cases.keys, "every shortfall has to be exercised here")
@@ -271,7 +245,6 @@ class SensorCapturePolicyTest {
                 pairedImuAddresses = listOf(a, b, c),
                 preferredAddress = a,
                 roleByAddress = mapOf(a to SensorRole.A, b to SensorRole.B),
-                requestedCount = 2,
             )
 
         assertEquals(DualShortfall.ROLES_UNASSIGNED, roster.shortfall, "the third unit carries no label")
@@ -300,7 +273,6 @@ class SensorCapturePolicyTest {
                 pairedImuAddresses = listOf(a, b, c),
                 preferredAddress = a,
                 roleByAddress = mapOf(a to SensorRole.A, b to SensorRole.B, c to SensorRole.B),
-                requestedCount = 2,
             )
 
         assertEquals(DualShortfall.ROLES_COLLIDE, roster.shortfall)
@@ -311,33 +283,65 @@ class SensorCapturePolicyTest {
 
     @Test
     fun `an ordinary one-sensor set records no declaration at all`() {
-        val roster = SensorCapturePolicy.roster(listOf(a), a, mapOf(a to SensorRole.A), requestedCount = 1)
+        val roster = SensorCapturePolicy.roster(listOf(a), a, mapOf(a to SensorRole.A))
 
         assertNull(
-            SensorCapturePolicy.recorded(plannedCount = 1, roster = roster),
+            SensorCapturePolicy.recorded(roster),
             "a plain one-sensor set must stay byte-identical to what the app has always written",
         )
     }
 
     /**
-     * A set that asked for two and armed one records the ask.
+     * DIFFERENTIAL, issue #198. Two units the app cannot tell apart record one
+     * stream, and the set says so.
      *
-     * This is the whole reason a declaration is stored beside the role column:
-     * what arrived is observable from the streams, what was EXPECTED is
-     * observable from nothing, and without this a dual-armed set that captured
-     * one stream is indistinguishable from a single-sensor set forever.
+     * This replaces `a shortfall is recorded, with an empty role list and the
+     * count that ran`, which recorded the same state and read it off the plan:
+     * the declaration existed because plannedCount was 2 and count was 1. With
+     * nothing declared there is no such pair, and without a stored reason the
+     * two facts a coach has to be able to tell apart -- "there was one sensor"
+     * and "there were two and one was unusable" -- collapse into one row that
+     * says neither.
+     *
+     * What arrived is observable from the streams; what was in the way is
+     * observable from nothing, which is why it is stored rather than derived.
      */
     @Test
-    fun `a shortfall is recorded, with an empty role list and the count that ran`() {
-        val roster = SensorCapturePolicy.roster(listOf(a), a, mapOf(a to SensorRole.A), requestedCount = 2)
+    fun `a pair the app cannot tell apart is recorded as one stream and a named gap`() {
+        val unlabelled = SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A))
 
-        val recorded = SensorCapturePolicy.recorded(plannedCount = 2, roster = roster)
+        val recorded = SensorCapturePolicy.recorded(unlabelled)
 
-        assertEquals(2, recorded?.plannedCount)
+        assertEquals(
+            DualShortfall.ROLES_UNASSIGNED,
+            recorded?.shortfall,
+            "two connected units the app cannot label are not a one-sensor set",
+        )
         assertEquals(1, recorded?.count, "one sensor ran, and the count says so rather than the role list")
         assertEquals(emptyList(), recorded?.expected)
         assertNull(recorded?.analysed)
         assertNull(recorded?.secondaryRole)
+    }
+
+    /**
+     * DIFFERENTIAL, issue #198. The other surviving gap is recorded the same
+     * way and is not folded into the first.
+     *
+     * Two units carrying one label and two units carrying no label are
+     * different things to go and fix, which is why the enum has kept them
+     * apart on screen since #184. A stored reason collapsing them would be the
+     * screen and the archive disagreeing about one set.
+     */
+    @Test
+    fun `two units labelled the same are recorded as a collision, not as one sensor`() {
+        val collide =
+            SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.A))
+
+        val recorded = SensorCapturePolicy.recorded(collide)
+
+        assertEquals(DualShortfall.ROLES_COLLIDE, recorded?.shortfall)
+        assertEquals(1, recorded?.count)
+        assertEquals(emptyList(), recorded?.expected)
     }
 
     @Test
@@ -347,38 +351,40 @@ class SensorCapturePolicyTest {
                 listOf(a, b),
                 a,
                 mapOf(a to SensorRole.A, b to SensorRole.B),
-                requestedCount = 2,
             )
 
-        val recorded = SensorCapturePolicy.recorded(plannedCount = 2, roster = roster)
+        val recorded = SensorCapturePolicy.recorded(roster)
 
-        assertEquals(2, recorded?.plannedCount)
         assertEquals(2, recorded?.count)
         assertEquals(listOf(SensorRole.A, SensorRole.B), recorded?.expected)
         assertEquals(SensorRole.A, recorded?.analysed)
         assertEquals(SensorRole.B, recorded?.secondaryRole)
+        assertNull(recorded?.shortfall, "nothing was in the way of a set that armed both")
     }
 
     /**
-     * A plan that asked for one and a lifter who armed two is recorded too.
+     * DIFFERENTIAL, issue #198. Nothing in the stored declaration says what a
+     * plan asked for, because no plan asks any more.
      *
-     * The pair runs in both directions, which is what makes it a pair rather
-     * than a note about the plan.
+     * Asserted against the serialized column rather than against the data
+     * class, because absence is the whole claim: a Kotlin field cannot be
+     * checked for not existing, and what a reader of an old phone's database
+     * meets is the JSON. `an upward adjustment is recorded with the plan's own
+     * figure beside it` stood here and is gone with the figure.
      */
     @Test
-    fun `an upward adjustment is recorded with the plan's own figure beside it`() {
+    fun `the stored declaration carries no planned count`() {
         val roster =
-            SensorCapturePolicy.roster(
-                listOf(a, b),
-                a,
-                mapOf(a to SensorRole.A, b to SensorRole.B),
-                requestedCount = 2,
-            )
+            SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.B))
+        val recorded = SensorCapturePolicy.recorded(roster)!!
 
-        val recorded = SensorCapturePolicy.recorded(plannedCount = 1, roster = roster)
+        val stored = Json.encodeToString(RecordedSensors.serializer(), recorded)
 
-        assertEquals(1, recorded?.plannedCount)
-        assertEquals(2, recorded?.count)
+        assertTrue(
+            "plannedCount" !in stored,
+            "the set row still publishes a planned count nobody planned: $stored",
+        )
+        assertTrue("count" in stored, "the armed count is still written: $stored")
     }
 
     // ---- what arrived --------------------------------------------------------
@@ -430,82 +436,23 @@ class SensorCapturePolicyTest {
         val produced =
             listOf(
                 // Nothing paired at all.
-                SensorCapturePolicy.roster(emptyList(), null, emptyMap(), 2),
+                SensorCapturePolicy.roster(emptyList(), null, emptyMap()),
                 // One unit, labelled.
-                SensorCapturePolicy.roster(listOf(a), a, mapOf(a to SensorRole.A), 2),
+                SensorCapturePolicy.roster(listOf(a), a, mapOf(a to SensorRole.A)),
                 // Two units, one carrying no label.
-                SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A), 2),
+                SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A)),
                 // Two units carrying the same label.
-                SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.A), 2),
+                SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.A)),
                 // Two units, labelled apart: the state that arms.
-                SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.B), 2),
+                SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.B)),
+                // Three units, so a label is missing or duplicated whatever the lifter did.
+                SensorCapturePolicy.roster(listOf(a, b, c), a, mapOf(a to SensorRole.A, b to SensorRole.B)),
             ).mapNotNull { it.shortfall }.toSet()
 
         assertEquals(
             DualShortfall.entries.toSet(),
             produced,
             "a shortfall the enum declares that no hardware state produces, or the reverse",
-        )
-    }
-
-    // ---- the hardware-only form ----------------------------------------------
-
-    /**
-     * The countless [SensorCapturePolicy.roster] answers what the counted one
-     * answers when asked for two.
-     *
-     * A green pin on a new symbol, and no pretence that it is a differential:
-     * the overload delegates, so it cannot disagree today. What it is for is
-     * the commit after next, which deletes the counted form -- at that point
-     * this case is the record of what the survivor is supposed to answer for
-     * each of the five hardware states, and it was written while both forms
-     * existed and could be compared.
-     */
-    @Test
-    fun `the roster taking no count answers what the counted one answers for two`() {
-        val states =
-            listOf(
-                Triple(emptyList<String>(), null, emptyMap<String, SensorRole>()),
-                Triple(listOf(a), a, mapOf(a to SensorRole.A)),
-                Triple(listOf(a, b), a, mapOf(a to SensorRole.A)),
-                Triple(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.A)),
-                Triple(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.B)),
-                Triple(listOf(a, b, c), a, mapOf(a to SensorRole.A, b to SensorRole.B)),
-            )
-
-        for ((paired, preferred, roles) in states) {
-            assertEquals(
-                SensorCapturePolicy.roster(paired, preferred, roles, SensorCapturePolicy.MAX_COUNT),
-                SensorCapturePolicy.roster(paired, preferred, roles),
-                "the two forms disagree for paired=$paired preferred=$preferred roles=$roles",
-            )
-        }
-    }
-
-    /**
-     * [SensorCapturePolicy.recorded] taking a roster alone writes a
-     * declaration for a dual set and nothing for a set that armed one.
-     *
-     * Green, and only half of where #198 is going: the "nothing" arm is
-     * correct for a lifter who owns one sensor and wrong for one whose two
-     * units cannot be told apart, which is the differential the next commit
-     * reddens. Pinned now so that change is visible as a change rather than as
-     * a new function appearing with its answer already in it.
-     */
-    @Test
-    fun `the recorded declaration taking a roster alone writes on a dual set`() {
-        val dual =
-            SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.B))
-        val recorded = SensorCapturePolicy.recorded(dual)
-
-        assertEquals(2, recorded?.count)
-        assertEquals(listOf(SensorRole.A, SensorRole.B), recorded?.expected)
-        assertEquals(SensorRole.A, recorded?.analysed)
-        assertNull(recorded?.shortfall, "nothing was in the way of a set that armed both")
-
-        assertNull(
-            SensorCapturePolicy.recorded(SensorCapturePolicy.roster(listOf(a), a, mapOf(a to SensorRole.A))),
-            "one sensor is the ordinary case and declares nothing",
         )
     }
 }
