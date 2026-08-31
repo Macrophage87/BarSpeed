@@ -38,6 +38,8 @@ import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PrepCase
+import com.macrophage.barspeed.model.PrepWindow
+import com.macrophage.barspeed.model.PrepWindowPolicy
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
@@ -343,6 +345,17 @@ private data class PendingSetWrite(
     /** The prep prescribed and the prep that played, frozen too. */
     val plannedPrepS: Int?,
     val prepS: Int?,
+    /**
+     * Where the prep was, or null where this set has no window to state
+     * (#185).
+     *
+     * Built by `PrepWindowPolicy` and frozen here with everything else. The
+     * seconds are already carried by [prepS]; this is the INTERVAL, on the
+     * clock the raw samples are stamped with, which is what an analysis needs
+     * to know which rows precede the set rather than how many of them there
+     * were.
+     */
+    val prepWindow: PrepWindow?,
     val startedAtMs: Long,
     val endedAtMs: Long,
     val orderIdx: Int,
@@ -418,6 +431,7 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
     plannedRestS = p.slot?.restS,
     plannedPrepS = p.plannedPrepS,
     prepS = p.prepS,
+    prepWindow = p.prepWindow,
     startedAtMs = p.startedAtMs,
     endedAtMs = p.endedAtMs,
     analysis = analysis,
@@ -2251,6 +2265,24 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      */
     private var clockStartedAtMs: Long? = null
 
+    /**
+     * When this set's WORK began -- the instant its prep ended -- or null
+     * where the set has none (#185).
+     *
+     * A second field beside [clockStartedAtMs] rather than a reuse of it,
+     * because the two are the same instant on a TIMED set and different ones
+     * everywhere else: a cued set starts its clock at the tap and begins its
+     * work when the cadence's first stroke is called. Folding them would make
+     * "the set was ended while its prep was still running" unrepresentable on a
+     * cued set -- the clock instant would equal the tap, and a zero-length
+     * window would be published for a prep that in fact never finished.
+     *
+     * Reset per set in [beginSet]. `PrepWindowPolicy` refuses a value earlier
+     * than the tap as well, so a stale one cannot become a window; that rule is
+     * in `:core:model` where a test reaches it, and this reset is not it.
+     */
+    private var workStartedAtMs: Long? = null
+
     /** Which prep the set in progress played; frozen at [beginSet] for [endSet]. */
     private var prepCaseForSet: PrepCase = PrepCase.NONE
 
@@ -2416,15 +2448,15 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun toggleAudioCues() {
-        viewModelScope.launch { container.settings.setAudioCues(!stateFlow.value.audioCues) }
-    }
+    // Expression bodies, and that is a gate rather than a preference: this
+    // class measures one line under detekt's LargeClass threshold, so the prep
+    // window below could not be wired in without making room. Both were a
+    // `viewModelScope.launch` whose Job nobody read, and both still are; what
+    // changed is the declared return type, which no caller uses.
+    fun toggleAudioCues() = viewModelScope.launch { container.settings.setAudioCues(!stateFlow.value.audioCues) }
 
-    fun toggleWeightUnit() {
-        viewModelScope.launch {
-            container.settings.setWeightUnit(stateFlow.value.weightUnit.other())
-        }
-    }
+    fun toggleWeightUnit() =
+        viewModelScope.launch { container.settings.setWeightUnit(stateFlow.value.weightUnit.other()) }
 
     fun toggleDemoMode() {
         stateFlow.value = stateFlow.value.copy(demoMode = !stateFlow.value.demoMode)
@@ -2601,6 +2633,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         prepSForSet = prepS.takeIf { prepCase != PrepCase.NONE }
         prepCaseForSet = prepCase
         clockStartedAtMs = null
+        workStartedAtMs = null
         autoEndedSet = false
         setStartedAtMs = System.currentTimeMillis()
         if (sessionStartedAtMs == 0L) sessionStartedAtMs = setStartedAtMs
@@ -2705,6 +2738,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun startSetTimer(timedTargetS: Int?) {
         clockStartedAtMs = System.currentTimeMillis()
+        // On a TIMED set this function is reached only from the prep's own
+        // callback -- beginSet skips it while a timed start word exists -- so
+        // the instant the clock starts is the instant the prep ended, which is
+        // what #168 moved the clock here for. One read of the wall clock rather
+        // than a second one a statement later, because two reads are two facts
+        // that can disagree. On any other case the work start is not this
+        // instant and is not written here.
+        if (prepCaseForSet == PrepCase.TIMED) workStartedAtMs = clockStartedAtMs
         stateFlow.value = stateFlow.value.copy(leadInRunning = false)
         tickJob =
             viewModelScope.launch {
@@ -2767,7 +2808,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     /** See [GuidedCadenceRunner]; the runner speaks and counts, the VM just mirrors state. */
     private fun startGuidedCadence(schedule: TempoSchedule, plannedReps: Int?, prepS: Int) {
-        guidedCadence = newVoiceRunner().also { it.start(schedule, plannedReps, prepS) }
+        // The runner says when its lead-in ends, which on a cued set is where
+        // the work begins: the set's own clock started at the tap and says
+        // nothing about it, and the cue track cannot answer it either, because
+        // LeadInPlan fixes the launch phrase a prescribed distance from the
+        // first stroke call whatever the prep was (#185).
+        val onWorkStarted = { workStartedAtMs = System.currentTimeMillis() }
+        guidedCadence = newVoiceRunner().also { it.start(schedule, plannedReps, prepS, onWorkStarted) }
     }
 
     /**
@@ -3051,6 +3098,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 actualDurationS = actualDurationS,
                 plannedPrepS = plannedPrepSForSet,
                 prepS = prepSForSet,
+                // The rule is PrepWindowPolicy's, in a module with tests; this
+                // hands it the case and both instants. It refuses rather than
+                // inventing a window -- no prep, a prep the set was ended
+                // during, and an inverted pair each state nothing.
+                prepWindow = PrepWindowPolicy.of(prepCaseForSet, setStartedAtMs, workStartedAtMs),
                 startedAtMs = setStartedAtMs,
                 endedAtMs = endedAtMs,
                 orderIdx = s.setsCompleted,

@@ -90,11 +90,23 @@ class GuidedCadenceRunner(
      * of the same constant at the write site are two facts that can disagree,
      * and the way they disagree is one of them changing -- at which point every
      * capture claims a prep the lifter never heard.
+     *
+     * [onWorkStarted] runs when the lead-in ends and before the first stroke is
+     * called, which is where the set stops being prep (#185). Called from
+     * inside this coroutine after the lead-in's last sleep rather than launched
+     * beside it -- a sequence point rather than an ordering between two
+     * coroutines, which is the shape [startPrep] already uses for its own
+     * `onStarted` and the shape of the dispatcher race this repository has
+     * fixed once.
+     *
+     * No default. One caller passes it, and a default would let the next one
+     * record a set whose window nothing ever closed.
      */
-    fun start(schedule: TempoSchedule, plannedReps: Int?, prepS: Int) {
+    fun start(schedule: TempoSchedule, plannedReps: Int?, prepS: Int, onWorkStarted: () -> Unit) {
         job =
             scope.launch {
                 playLeadIn(LeadInPlan.of(prepS))
+                onWorkStarted()
                 val plan = CadencePlan.of(schedule)
                 var rep = 1
                 var pending: String? = null
@@ -143,7 +155,10 @@ class GuidedCadenceRunner(
      * [speaks] false runs the same seconds and pushes the same ring, saying
      * nothing and writing nothing to the cue track. The clock still starts when
      * the prep ends, so no figure the set records changes; what is lost is the
-     * cue-track row marking the instant the set began. Who decides it is
+     * cue-track row marking the instant the set began. The INSTANT is no longer
+     * lost with that row: since #185 a set that runs a prep records the
+     * boundary as a prep window, spoken or silent, and the archive publishes
+     * it beside the raw streams. Who decides whether the prep speaks is
      * `LeadInPolicy.speaks`, not this class.
      */
     fun startPrep(prepS: Int, startWord: String, speaks: Boolean, onStarted: () -> Unit) {

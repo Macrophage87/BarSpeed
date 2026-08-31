@@ -327,6 +327,24 @@ class SessionRepository(
                     ),
                 )
             }
+            // Where the prep was, for the sets that had one (#185). Written
+            // only when the set stated a window: no prep, or a prep the set
+            // was ended during, leaves no row, and an empty file would be a
+            // bracket a reader would look for a stationary period inside.
+            //
+            // No sampleRateHz and no role. One interval has no cadence to
+            // state, and it came from no sensor -- the rate column means the
+            // rate the DSP analysed a stream at, and a figure here would label
+            // this row with another stream's.
+            set.prepWindow?.let { window ->
+                add(
+                    RawStreamEntity(
+                        setId = 0L,
+                        kind = RawStreamEntity.KIND_PREP,
+                        csvGzip = Gzip.compress(PrepWindowCsv.encode(window)),
+                    ),
+                )
+            }
         }
         return sessionDao.insertSetWithStreams(
             SetRecordEntity(

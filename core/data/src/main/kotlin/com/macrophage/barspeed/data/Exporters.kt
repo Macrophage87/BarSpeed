@@ -11,6 +11,7 @@ import com.macrophage.barspeed.model.GeometrySourceExport
 import com.macrophage.barspeed.model.HrSessionSummary
 import com.macrophage.barspeed.model.HrSetSummary
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RepMetricsExport
 import com.macrophage.barspeed.model.ResolvedGeometry
@@ -565,6 +566,11 @@ class RawExporter(
         // but a column layout stated nowhere is one a reader has to guess at,
         // and this manifest has no published schema to guess from.
         meta.append("  \"csvHeaderReps\": \"${RepMarkCsv.HEADER}\",\n")
+        // A fifth format, and the same reasoning: the prep window is stored as
+        // a stream and so is written into the archive as a file by the same
+        // loop, and a file whose column layout is stated nowhere is one a
+        // reader has to guess at.
+        meta.append("  \"csvHeaderPrep\": \"${PrepWindowCsv.HEADER}\",\n")
         meta.append("  \"sets\": [\n")
 
         // zipCompressionLevel is documented on the constructor parameter, not
@@ -588,6 +594,9 @@ class RawExporter(
                 // what the unchanged single-sensor path reads back.
                 val imuTextByRole = LinkedHashMap<String?, String>()
                 val imuFileByRole = LinkedHashMap<String?, String>()
+                // Parsed from the text this loop already inflated, like every
+                // other figure the descriptor reads out of a stream.
+                var prepWindow: PrepWindow? = null
                 for (stream in streams) {
                     val name = entryName(idx, record, stream)
                     val text = Gzip.decompress(stream.csvGzip)
@@ -601,6 +610,7 @@ class RawExporter(
                             imuFileByRole[stream.role] = name
                         }
                         RawStreamEntity.KIND_HRM -> minBpmBySet[record.id] = minBpmFrom(text)
+                        RawStreamEntity.KIND_PREP -> prepWindow = PrepWindowCsv.decode(text)
                     }
                 }
                 if (record.id !in minBpmBySet) minBpmBySet[record.id] = null
@@ -608,7 +618,8 @@ class RawExporter(
                 // only the CSVs must still be able to tell left from right, a
                 // warm-up from a working set, and which sets were rotating
                 // enough for attitude error to matter.
-                setLines += buildSetDescriptor(idx, record, streams, files, imuTextByRole, imuFileByRole)
+                setLines +=
+                    buildSetDescriptor(idx, record, streams, files, imuTextByRole, imuFileByRole, prepWindow)
             }
             meta.append(setLines.joinToString(",\n")).append("\n  ]\n}\n")
             zip.putNextEntry(ZipEntry("meta.json"))
@@ -654,6 +665,7 @@ class RawExporter(
         files: List<String>,
         imuTextByRole: Map<String?, String>,
         imuFileByRole: Map<String?, String>,
+        prepWindow: PrepWindow?,
     ): String {
         val fields = mutableListOf<String>()
         fun num(key: String, value: Any?) = value?.let { fields += "\"$key\": $it" }
@@ -768,6 +780,35 @@ class RawExporter(
         }
         num("startedAt_ms", record.startedAtMs)
         num("endedAt_ms", record.endedAtMs)
+        // Where the prep was, on the clock ImuCsv's timestamp_ms column is
+        // stamped with, so a reader who opens this archive and no other
+        // document can select the rows that fall before the set began (#185).
+        //
+        // Epoch milliseconds and not offsets. The keys either side of these
+        // are already epoch milliseconds, and an offset would need a base --
+        // the only top-level instant this manifest carries is the SESSION's
+        // start, which is not this set's.
+        //
+        // BOTH halves, though the first equals startedAt_ms on every set this
+        // build records. The window is one fact, and half of it living under a
+        // key that means the row's own tap instant is how a reader ends up
+        // bracketing a set with two instants that were never a pair.
+        //
+        // Omitted together when the set stored no window, which is every set
+        // recorded before this version, every set that ran no prep, and every
+        // set ended while its prep was still running. The absence is not a
+        // claim that the lifter was never stationary, and no zero substitutes
+        // for it: a zero here would be an instant in 1970.
+        //
+        // What is NOT here is anything derived from the samples inside the
+        // window -- no stillness score, no gravity vector, no transform. Those
+        // are the analysis's, which has the whole set, can filter without phase
+        // lag and can re-run when a method turns out wrong; every derived
+        // quantity published here is one it could not revise.
+        prepWindow?.let { window ->
+            num("prepStartedAt_ms", window.startedAtMs)
+            num("workStartedAt_ms", window.workStartedAtMs)
+        }
         // Parsed from the text buildZip's own loop already inflated -- not
         // re-inflated here, and shared with sampleRate_hz and
         // rollExcursion_deg below besides: decoding a whole IMU capture even
