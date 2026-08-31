@@ -107,6 +107,49 @@ class ShippedPlanExampleTest {
     }
 
     /**
+     * DIFFERENTIAL, issue #198 round 1. The canonical 1.10 template declares
+     * none of the key its own 1.10 contract tells authors to omit, and the
+     * import gate is quiet about it.
+     *
+     * The third pin of the same shape as the two above, and the one that was
+     * missing when 1.10 was minted. `back_squat` declared `"sensors": 2` and
+     * its first set `"sensors": 1`, while `plan.schema.json`'s own description
+     * of that key says "Leave it out of new plans" and `PLAN_PROMPT`, the copy
+     * shipped to users, says "Leave the key out of new plans". Importing the
+     * shipped example therefore fired `PlanFile.sensorsInert`: the canonical
+     * template was a plan that warns at the app's own import gate, and the ajv
+     * step -- already the weaker half of this contract -- was validating a
+     * payload the app's own instructions tell an author not to write.
+     *
+     * The key stays ACCEPTED, so this is a statement about the example rather
+     * than about the schema: a plan a coach wrote last month still imports, and
+     * still draws the warning. What must not model it is the document an LLM is
+     * pointed at.
+     */
+    @Test
+    fun `the shipped example declares no sensor count, and the gate is quiet about it`() {
+        val plan = shippedExample()
+        val exercises = plan.sessions.flatMap { it.exercises }
+
+        exercises.forEach { exercise ->
+            assertNull(
+                exercise.sensors,
+                "${exercise.exercise} declares a sensor count the 1.10 contract tells authors to omit",
+            )
+            exercise.sets.forEachIndexed { i, set ->
+                assertNull(
+                    set.sensors,
+                    "${exercise.exercise} set ${i + 1} declares a sensor count the contract tells authors to omit",
+                )
+            }
+        }
+        assertTrue(
+            plan.warnings().none { "\"sensors\"" in it },
+            "the shipped example warns about its own sensor count: ${plan.warnings()}",
+        )
+    }
+
+    /**
      * The shipped example uses the split, and the gate is quiet about it.
      *
      * Same reasoning as the prep-on-a-hold pin above: a capability nothing in

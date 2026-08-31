@@ -2,6 +2,7 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 
@@ -830,71 +831,96 @@ class DevicePairingPolicyTest {
     // ---- what the screens say ------------------------------------------------
 
     /**
-     * DIFFERENTIAL, issue #198. The Record screen has TWO shortfall sentences,
-     * because there are two things left that can be in the way.
+     * DIFFERENTIAL, issue #198 round 1. The Record screen's two shortfall
+     * sentences have to be true of a lifter with THREE units paired, because
+     * that is now the state that draws them most often.
      *
-     * "Fewer than two sensors are paired - this set will record one." was the
-     * third and is gone with ONE_SENSOR_PAIRED. It was a sentence about a
-     * request, and there is no request: owning one bar sensor is the ordinary
-     * setup, not a degraded two, and telling a one-sensor lifter about it
-     * before every set was the app reporting a gap where there is none.
+     * "Fewer than two sensors are paired - this set will record one." was a
+     * third sentence and is gone with ONE_SENSOR_PAIRED. It was a sentence
+     * about a request, and there is no request: owning one bar sensor is the
+     * ordinary setup, not a degraded two.
      *
-     * The two that survive are not dissolved with it and their meaning shifts
-     * rather than going: they no longer say "you asked for two and cannot have
-     * it", they say two units are connected and the app cannot tell them
-     * apart, so it recorded one. A coach has to be able to tell that from
-     * having owned one sensor.
+     * What round 1 found is the other end of the same removal. With the count
+     * gate gone, [SensorCapturePolicy.roster] consults [DualSensorSetup.step]
+     * FIRST and unconditionally, and `step` considers EVERY paired unit -- so
+     * two correctly labelled units plus one stale paired unit answers
+     * LABEL_BOTH on every set of every session. "Label both sensors A and B"
+     * is then a false instruction: the lifter HAS labelled both of the two
+     * they are using, and labelling the third produces a collision rather
+     * than a fix. The arming decision itself is #192's and is deliberate; the
+     * sentence was not written for it.
+     *
+     * Both sentences now name the state rather than an action that only works
+     * for exactly two paired units, and neither says "both sensors".
      *
      * Still asserted against [DualShortfall.entries] so a third reason cannot
      * be added without a sentence being written for it.
      */
     @Test
-    fun `the record screen's shortfall sentences are unchanged by the lift`() {
+    fun `the record screen's shortfall sentences are true of three paired units too`() {
         assertEquals(
-            "Label both sensors A and B under Devices - this set will record one.",
+            "Leave two sensors paired and label them A and B under Devices - this set will record one.",
             DualSensorSetup.recordLine(DualShortfall.ROLES_UNASSIGNED),
         )
         assertEquals(
-            "Both sensors are labelled the same - fix it under Devices.",
+            "Two sensors carry the same label - fix it under Devices.",
             DualSensorSetup.recordLine(DualShortfall.ROLES_COLLIDE),
         )
         assertEquals(2, DualShortfall.entries.size, "a new shortfall needs a sentence here")
+        DualShortfall.entries.forEach {
+            assertFalse(
+                "both sensors" in DualSensorSetup.recordLine(it),
+                "$it still says both sensors to a lifter who may have three units paired",
+            )
+        }
     }
 
     /**
-     * DIFFERENTIAL, issue #198. The Devices screen stops promising something
-     * conditional on a declaration no plan makes any more.
+     * DIFFERENTIAL, issue #198 round 1. Three of the four sentences move, and
+     * for two different reasons.
      *
-     * Two of its four sentences describe a set that ASKS for two sensors --
-     * "a set asking for two records only one until they carry different
-     * labels" and "A set asking for two will record both streams". Nothing
-     * asks. Two labelled units record two streams on EVERY set, and a lifter
-     * who has just labelled a pair and is told the benefit arrives when some
-     * future plan requests it has been told something false about the app in
-     * front of them.
+     * 5008de6 already took the retired "a set asking for two" framing off the
+     * two that carried it. Nothing asks; two labelled units record two streams
+     * on every set. What round 1 found is that the replacements are still
+     * wrong in two ways, on the screen where a lifter meets exactly these
+     * states.
      *
-     * The two silent steps stay silent and the collision sentence is
-     * untouched: neither mentions a request.
+     * LABEL_BOTH and LABELS_COLLIDE said "both", and [DualSensorSetup.step]
+     * considers EVERY paired unit -- three IMUs carrying two labels is a
+     * collision, and three with one unlabelled asks for labels -- so "both" is
+     * false for a lifter with an old sensor still paired. The action changes
+     * with it: for three units the fix is to stop pairing one, not to label
+     * it.
      *
-     * These are the same facts as [DualSensorSetup.recordLine] in this
-     * screen's own voice -- "under Devices" is not a useful locator when you
-     * are already there -- rather than a second wording of them.
+     * READY promised "Every set records both streams" from a merely PAIRED
+     * state. Paired is not connected. `step` takes only the paired list and
+     * the labels; a unit switched off in the bag is paired, is READY, brings
+     * no link up and puts no samples in the buffer -- the app then writes no
+     * row for it, and the sentence on screen was a promise about hardware
+     * nobody had checked.
+     *
+     * The two silent steps stay silent. These are the same facts as
+     * [DualSensorSetup.recordLine] in this screen's own voice -- "under
+     * Devices" is not a useful locator when you are already there -- rather
+     * than a second wording of them.
      */
     @Test
-    fun `the devices screen names the step and the next action`() {
+    fun `the devices screen names the step and an action that works for three units`() {
         assertNull(DualSensorSetup.devicesLine(DualSetupStep.NO_SENSOR))
         assertNull(DualSensorSetup.devicesLine(DualSetupStep.ONE_SENSOR), "one sensor is the ordinary setup")
         assertEquals(
-            "Label both sensors A and B - until they carry different labels only one stream is " +
-                "recorded.",
+            "Leave two sensors paired and label them A and B - until exactly two carry different " +
+                "labels, only one stream is recorded.",
             DualSensorSetup.devicesLine(DualSetupStep.LABEL_BOTH),
         )
         assertEquals(
-            "Both sensors are labelled the same - give one of them the other label.",
+            "Two sensors carry the same label - give them different labels, and leave only those " +
+                "two paired.",
             DualSensorSetup.devicesLine(DualSetupStep.LABELS_COLLIDE),
         )
         assertEquals(
-            "Both sensors are labelled. Every set records both streams.",
+            "Both sensors are labelled. Every set records both streams when both are switched on " +
+                "and in range.",
             DualSensorSetup.devicesLine(DualSetupStep.READY),
         )
     }
