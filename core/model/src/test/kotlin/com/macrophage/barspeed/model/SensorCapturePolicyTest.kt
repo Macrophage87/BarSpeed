@@ -407,4 +407,44 @@ class SensorCapturePolicyTest {
             SensorCapturePolicy.present(listOf(SensorRole.A), setOf(SensorRole.A, SensorRole.B)),
         )
     }
+
+    // ---- the shortfall vocabulary --------------------------------------------
+
+    /**
+     * Every shortfall this app can name is one [SensorCapturePolicy.roster]
+     * actually produces.
+     *
+     * A characterization pin taken before #198 dissolves one of the three, and
+     * it is the invariant rather than the membership: a value nothing produces
+     * is a sentence the Devices and Record screens can draw for a state that
+     * cannot occur, and a value produced but not in the enum cannot exist. The
+     * assertion is a SET equality against [DualShortfall.entries], so it holds
+     * whatever the membership becomes and reddens the moment the two drift.
+     *
+     * Each input is named for the hardware state it stands for, not for the
+     * answer it expects, so the case survives a change to what that state
+     * means.
+     */
+    @Test
+    fun `every shortfall the app can name is one the roster produces`() {
+        val produced =
+            listOf(
+                // Nothing paired at all.
+                SensorCapturePolicy.roster(emptyList(), null, emptyMap(), 2),
+                // One unit, labelled.
+                SensorCapturePolicy.roster(listOf(a), a, mapOf(a to SensorRole.A), 2),
+                // Two units, one carrying no label.
+                SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A), 2),
+                // Two units carrying the same label.
+                SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.A), 2),
+                // Two units, labelled apart: the state that arms.
+                SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.B), 2),
+            ).mapNotNull { it.shortfall }.toSet()
+
+        assertEquals(
+            DualShortfall.entries.toSet(),
+            produced,
+            "a shortfall the enum declares that no hardware state produces, or the reverse",
+        )
+    }
 }

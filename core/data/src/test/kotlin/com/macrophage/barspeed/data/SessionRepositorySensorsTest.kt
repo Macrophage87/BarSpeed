@@ -145,6 +145,39 @@ class SessionRepositorySensorsTest {
      * otherwise decode here as whichever enum entry happened to be first, and
      * relabel somebody's capture.
      */
+    /**
+     * A stored declaration carrying a key this build does not know still
+     * decodes, rather than reading as absent.
+     *
+     * The backward-compatibility half of the case above, and the one nothing
+     * pinned. `decodeSensors` catches every exception and answers null, so a
+     * strict decoder here would turn every row written by a build with one
+     * more key into "this set declared nothing" -- silent, permanent, and
+     * indistinguishable from an ordinary single-sensor set. What keeps that
+     * from happening is `ignoreUnknownKeys` on the repository's own `Json`,
+     * which is a configuration line nothing asserts.
+     *
+     * Taken as a characterization before #198 retires a key from this object:
+     * every row already on a phone carries it, and they have to keep decoding
+     * after it stops being a field.
+     *
+     * The roles are spelled `A` and `B` here, uppercase, because this column
+     * is `RecordedSensors`' own serializer output and not the export wire form
+     * -- `SensorCapturePolicy.wireOf` lowercases, and that vocabulary belongs
+     * to the two published documents rather than to this row.
+     */
+    @Test
+    fun `a stored declaration carrying a key this build does not know still decodes`() {
+        val decoded =
+            repo.decodeSensors(
+                row("""{"plannedCount":2,"count":2,"expected":["A","B"],"analysed":"A","futureKey":7}"""),
+            )
+
+        assertEquals(2, decoded?.count, "an unknown key made the whole declaration unreadable")
+        assertEquals(listOf(SensorRole.A, SensorRole.B), decoded?.expected)
+        assertEquals(SensorRole.A, decoded?.analysed)
+    }
+
     @Test
     fun `a declaration naming an unknown role is refused rather than mapped onto a known one`() {
         val decoded =
