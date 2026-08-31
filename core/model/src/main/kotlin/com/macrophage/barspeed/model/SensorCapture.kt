@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.model
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 /**
@@ -58,8 +59,19 @@ enum class SensorRole { A, B }
  */
 @Serializable
 data class RecordedSensors(
-    /** What the plan declared for this set, or the app's default when it declared nothing. */
-    val plannedCount: Int,
+    /**
+     * What the plan declared for this set, or the app's default when it
+     * declared nothing.
+     *
+     * Being retired by #198, which takes the plan out of the capture decision
+     * entirely. The default and the ALWAYS are transitional and exist for one
+     * commit only: they let the pins on the key be retired before the field
+     * is, so the commit that removes it touches no test file. `encodeDefaults`
+     * is false on both writers, so without the annotation a stored 1 would
+     * stop being written and the column's bytes would change under a commit
+     * claiming to change nothing.
+     */
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val plannedCount: Int = 1,
     /** How many sensors this set was actually armed with. */
     val count: Int,
     /**
@@ -72,6 +84,17 @@ data class RecordedSensors(
     val expected: List<SensorRole> = emptyList(),
     /** Which role's stream every figure in this set was computed from. */
     val analysed: SensorRole? = null,
+    /**
+     * Why this set recorded one stream when two units were connected, or null
+     * when there was nothing in the way.
+     *
+     * Null on a dual set and null on the ordinary single-sensor set, so it is
+     * never the difference between them. What it exists to carry is the third
+     * state: two units connected that the app could not tell apart, which
+     * records one stream and is otherwise indistinguishable from having owned
+     * one sensor. Not written by anything yet -- #198's fix is what sets it.
+     */
+    val shortfall: DualShortfall? = null,
 ) {
     /**
      * The role of the stream that is NOT analysed, or null when there is none.
@@ -291,6 +314,26 @@ object SensorCapturePolicy {
     }
 
     /**
+     * What a set about to begin is armed with, decided by the hardware alone.
+     *
+     * The form #198 is moving the app to: no count is passed, because no count
+     * decides. One connected and labelled pair arms two streams; anything else
+     * arms one. Introduced here alongside the counted form and pinned, so the
+     * commit that deletes the count has no new decision in it.
+     *
+     * Behaviour-preserving as written: it is exactly [roster] asked for
+     * [MAX_COUNT], which is what both of the app's own always-on callers --
+     * `mirrorSensorSettings` and [DualSensorSetup.imuLinkTargets] -- already
+     * passed. The rules those two ran under are unchanged and stated once,
+     * over on [roster].
+     */
+    fun roster(
+        pairedImuAddresses: List<String>,
+        preferredAddress: String?,
+        roleByAddress: Map<String, SensorRole>,
+    ): SensorRoster = roster(pairedImuAddresses, preferredAddress, roleByAddress, MAX_COUNT)
+
+    /**
      * What to store on a set the record flow has just finished arming, or null
      * when there is nothing to say.
      *
@@ -307,6 +350,34 @@ object SensorCapturePolicy {
         return RecordedSensors(
             plannedCount = planned,
             count = count,
+            expected = roster.expected,
+            analysed = roster.analysed,
+        )
+    }
+
+    /**
+     * What to store on a set armed by the hardware alone, or null when there is
+     * nothing to say.
+     *
+     * The form #198 is moving the app to, introduced beside the counted one so
+     * the commit that deletes the count adds no decision. As written it
+     * reproduces what [recorded] answers for a plan that declared nothing --
+     * the overwhelmingly common case, and the only one left once the
+     * declaration stops being read: a declaration on a dual set, and null on
+     * everything else.
+     *
+     * That "everything else" is the half #198 still has to change, and it is
+     * deliberately not changed here: a set where two units are connected and
+     * the app cannot tell them apart records one stream and, today, stores
+     * nothing to say so. Nothing calls this yet.
+     */
+    fun recorded(roster: SensorRoster): RecordedSensors? {
+        if (!roster.isDual) return null
+        // plannedCount is not passed and is not defaulted here on purpose: it
+        // is the field being retired, nothing reads this overload's output
+        // yet, and a figure written for it would have to be unwritten again.
+        return RecordedSensors(
+            count = MAX_COUNT,
             expected = roster.expected,
             analysed = roster.analysed,
         )

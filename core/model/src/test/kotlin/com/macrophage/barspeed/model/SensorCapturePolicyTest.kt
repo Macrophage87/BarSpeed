@@ -447,4 +447,65 @@ class SensorCapturePolicyTest {
             "a shortfall the enum declares that no hardware state produces, or the reverse",
         )
     }
+
+    // ---- the hardware-only form ----------------------------------------------
+
+    /**
+     * The countless [SensorCapturePolicy.roster] answers what the counted one
+     * answers when asked for two.
+     *
+     * A green pin on a new symbol, and no pretence that it is a differential:
+     * the overload delegates, so it cannot disagree today. What it is for is
+     * the commit after next, which deletes the counted form -- at that point
+     * this case is the record of what the survivor is supposed to answer for
+     * each of the five hardware states, and it was written while both forms
+     * existed and could be compared.
+     */
+    @Test
+    fun `the roster taking no count answers what the counted one answers for two`() {
+        val states =
+            listOf(
+                Triple(emptyList<String>(), null, emptyMap<String, SensorRole>()),
+                Triple(listOf(a), a, mapOf(a to SensorRole.A)),
+                Triple(listOf(a, b), a, mapOf(a to SensorRole.A)),
+                Triple(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.A)),
+                Triple(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.B)),
+                Triple(listOf(a, b, c), a, mapOf(a to SensorRole.A, b to SensorRole.B)),
+            )
+
+        for ((paired, preferred, roles) in states) {
+            assertEquals(
+                SensorCapturePolicy.roster(paired, preferred, roles, SensorCapturePolicy.MAX_COUNT),
+                SensorCapturePolicy.roster(paired, preferred, roles),
+                "the two forms disagree for paired=$paired preferred=$preferred roles=$roles",
+            )
+        }
+    }
+
+    /**
+     * [SensorCapturePolicy.recorded] taking a roster alone writes a
+     * declaration for a dual set and nothing for a set that armed one.
+     *
+     * Green, and only half of where #198 is going: the "nothing" arm is
+     * correct for a lifter who owns one sensor and wrong for one whose two
+     * units cannot be told apart, which is the differential the next commit
+     * reddens. Pinned now so that change is visible as a change rather than as
+     * a new function appearing with its answer already in it.
+     */
+    @Test
+    fun `the recorded declaration taking a roster alone writes on a dual set`() {
+        val dual =
+            SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.B))
+        val recorded = SensorCapturePolicy.recorded(dual)
+
+        assertEquals(2, recorded?.count)
+        assertEquals(listOf(SensorRole.A, SensorRole.B), recorded?.expected)
+        assertEquals(SensorRole.A, recorded?.analysed)
+        assertNull(recorded?.shortfall, "nothing was in the way of a set that armed both")
+
+        assertNull(
+            SensorCapturePolicy.recorded(SensorCapturePolicy.roster(listOf(a), a, mapOf(a to SensorRole.A))),
+            "one sensor is the ordinary case and declares nothing",
+        )
+    }
 }

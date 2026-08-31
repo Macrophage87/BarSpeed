@@ -355,11 +355,9 @@ object DevicePairingPolicy {
      * and the disagreement would be invisible until the export attributed one
      * unit's samples to the other's label.
      *
-     * Deliberately ignores the per-exercise sensor COUNT, as
-     * `mirrorSensorSettings` already did: the link is kept warm whenever the
-     * pair is ready, so arming dual for one exercise does not have to wait
-     * out a BLE connect at the moment the lifter taps START. What the count
-     * decides is whether the set CAPTURES from it.
+     * Reads no count, as `mirrorSensorSettings` does not either: the link is
+     * kept warm whenever the pair is ready, so a set does not have to wait out
+     * a BLE connect at the moment the lifter taps START.
      */
     fun imuLinkTargets(
         pairedImuAddresses: List<String>,
@@ -373,7 +371,6 @@ object DevicePairingPolicy {
                 pairedImuAddresses = paired,
                 preferredAddress = analysed,
                 roleByAddress = roleByAddress,
-                requestedCount = SensorCapturePolicy.MAX_COUNT,
             )
         return ImuLinkTargets(analysed = analysed, second = roster.secondaryAddress)
     }

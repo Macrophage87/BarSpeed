@@ -650,8 +650,16 @@ data class SetSensorsExport(
      * visible in the document rather than lost, the same shape
      * [SetExport.plannedPrepS] and [SetExport.prepS] carry. They are equal
      * whenever nothing was adjusted.
+     *
+     * Being retired by #198, which takes the plan out of the capture decision
+     * entirely. The default and the ALWAYS are transitional and exist for one
+     * commit only: they let the pins on the key be retired before the key is,
+     * so the commit that removes it touches no test file. The exporter writes
+     * with `encodeDefaults = false`, so without the annotation a planned count
+     * of 1 would stop being written and this document's bytes would change
+     * under a commit claiming to change nothing.
      */
-    val plannedCount: Int,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val plannedCount: Int = 1,
     /**
      * How many sensors the set was actually armed with.
      *

@@ -688,7 +688,6 @@ private fun CoroutineScope.mirrorSensorSettings(
                 pairedImuAddresses = next.paired,
                 preferredAddress = next.preferred,
                 roleByAddress = next.roles,
-                requestedCount = SensorCapturePolicy.MAX_COUNT,
             ).secondaryAddress,
         )
     }
