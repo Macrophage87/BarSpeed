@@ -412,6 +412,7 @@ class RawExporterTest {
                 "csvHeaderHrm",
                 "csvHeaderCues",
                 "csvHeaderReps",
+                "csvHeaderPrep",
                 "sets",
             ),
             manifest.keys,

@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.PrepWindow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -137,6 +138,15 @@ class RawExporterPrepWindowTest {
 
     private fun JsonObject.num(key: String): Double? = get(key)?.jsonPrimitive?.content?.toDouble()
 
+    private fun JsonObject.text(key: String): String? = get(key)?.jsonPrimitive?.content
+
+    private fun prepStream(setId: Long, window: PrepWindow) = RawStreamEntity(
+        id = 9L,
+        setId = setId,
+        kind = RawStreamEntity.KIND_PREP,
+        csvGzip = Gzip.compress(PrepWindowCsv.encode(window)),
+    )
+
     // ---- characterization --------------------------------------------------
 
     /**
@@ -172,5 +182,81 @@ class RawExporterPrepWindowTest {
         val set = meta(listOf(row()), emptyMap()).set(0)
         assertTrue("workStartedAt_ms" !in set, "a set with no stored prep window published a work-start instant")
         assertTrue("prepStartedAt_ms" !in set, "a set with no stored prep window published a prep-start instant")
+    }
+
+    // ---- differentials -----------------------------------------------------
+
+    /**
+     * The manifest brackets the set's prep, on the clock the IMU rows carry.
+     *
+     * Epoch milliseconds and not offsets, because that is what `timestamp_ms`
+     * in the CSV is and what `startedAt_ms` beside it already is: an offset
+     * would need a base instant, and the manifest's only top-level one is the
+     * SESSION's start, not this set's. A reader who opens the zip and no other
+     * document can select the rows of `imu.csv` that fall in the window and
+     * read a gravity vector out of them.
+     *
+     * Both halves, and unequal to `startedAt_ms`'s neighbour keys, so a
+     * descriptor that published one instant twice cannot pass.
+     */
+    @Test
+    fun `the manifest brackets the prep window in epoch milliseconds`() = runTest {
+        val window = PrepWindow(startedAtMs = 1_000L, workStartedAtMs = 6_000L)
+        val set = meta(listOf(row()), mapOf(5L to listOf(prepStream(5L, window)))).set(0)
+        assertEquals(1_000.0, set.num("prepStartedAt_ms"), "the manifest lost where the prep began")
+        assertEquals(6_000.0, set.num("workStartedAt_ms"), "the manifest lost where the set's work began")
+    }
+
+    /**
+     * The window is in the archive as a file too, and the manifest says how to
+     * read it.
+     *
+     * The zip half needs no exporter change -- every stream is written as
+     * `set%02d_<exercise>_<kind>.csv` -- but the manifest publishes a header
+     * per format it can contain, and a file whose column layout is stated
+     * nowhere is a file a reader has to guess at. A fifth format arriving
+     * without a `csvHeader*` key is the near neighbour this pins.
+     */
+    @Test
+    fun `the archive carries the window as a file the manifest describes`() = runTest {
+        val window = PrepWindow(startedAtMs = 1_000L, workStartedAtMs = 6_000L)
+        val entries = zipOf(listOf(row()), mapOf(5L to listOf(prepStream(5L, window))))
+        assertEquals(window, PrepWindowCsv.decode(entries.getValue("set01_back_squat_prep.csv")))
+        val manifest = Json.parseToJsonElement(entries.getValue("meta.json")).jsonObject
+        assertEquals(PrepWindowCsv.HEADER, manifest.text("csvHeaderPrep"))
+        assertEquals(
+            listOf("set01_back_squat_prep.csv"),
+            manifest.set(0).getValue("files").jsonArray.map { it.jsonPrimitive.content },
+        )
+    }
+
+    /**
+     * A prep file that will not read publishes no window rather than half of
+     * one.
+     *
+     * The archive is assembled from whatever survived, and a truncated row is
+     * exactly what a process killed mid-write leaves. The set's other keys must
+     * still be there: a manifest is not worth failing an export over, which is
+     * the shape every other figure read from a stream in this document uses.
+     */
+    @Test
+    fun `a prep stream that will not parse publishes no window`() = runTest {
+        val broken =
+            RawStreamEntity(
+                id = 9L,
+                setId = 5L,
+                kind = RawStreamEntity.KIND_PREP,
+                csvGzip =
+                Gzip.compress(
+                    """
+                    prep_started_ms,work_started_ms
+                    1000
+                    """.trimIndent(),
+                ),
+            )
+        val set = meta(listOf(row()), mapOf(5L to listOf(broken))).set(0)
+        assertTrue("prepStartedAt_ms" !in set, "a half-written window was published anyway")
+        assertTrue("workStartedAt_ms" !in set, "a half-written window was published anyway")
+        assertEquals(1_000.0, set.num("startedAt_ms"), "an unreadable prep file cost the set its other keys")
     }
 }
