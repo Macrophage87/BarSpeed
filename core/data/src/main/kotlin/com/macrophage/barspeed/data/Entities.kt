@@ -313,9 +313,12 @@ data class SetRecordEntity(
 data class RawStreamEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val setId: Long,
-    /** One of: imu, hrm, rest_before_hrm, cues, reps. */
+    /** One of: imu, hrm, rest_before_hrm, cues, reps, prep. */
     val kind: String,
-    /** Gzipped CSV in the canonical format (see ImuCsv / HrCsv / CueCsv / RepMarkCsv). */
+    /**
+     * Gzipped CSV in the canonical format (see ImuCsv / HrCsv / CueCsv /
+     * RepMarkCsv / PrepWindowCsv).
+     */
     val csvGzip: ByteArray,
     val sampleRateHz: Double? = null,
     /**
@@ -384,6 +387,28 @@ data class RawStreamEntity(
          * and its absence is not a statement that no rep was performed.
          */
         const val KIND_REPS = "reps"
+
+        /**
+         * Where this set's prep was: the interval between the lifter starting
+         * the set and the set's work beginning (#185).
+         *
+         * A row rather than a column on [SetRecordEntity], and that is a
+         * ruling taken under a constraint rather than a preference. A column
+         * costs a `DATABASE_VERSION` bump and a migration, which #185's app
+         * half was scoped without; a row costs neither, because `kind` is a
+         * string and every selector in this package matches it by equality.
+         * The cost is stated rather than hidden: an interval is not a stream,
+         * so this is the first kind here that holds exactly one row.
+         *
+         * A DIFFERENT POPULATION FROM [KIND_CUES] AND [KIND_REPS], the same
+         * way those two are different from each other. A cue is what the app
+         * SAID, a mark is what was COUNTED, and this is where the set stopped
+         * being prep -- a boundary the app knows exactly and an analysis
+         * reading the samples alone can only estimate. It is written only for
+         * a set that ran a prep and closed it; its absence is not a claim that
+         * the lifter was never stationary.
+         */
+        const val KIND_PREP = "prep"
     }
 }
 

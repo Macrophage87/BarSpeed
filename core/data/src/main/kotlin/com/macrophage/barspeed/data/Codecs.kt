@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.model.HrSample
+import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.VoiceCue
 import java.io.ByteArrayOutputStream
 import java.util.Locale
@@ -103,6 +104,56 @@ object RepMarkCsv {
         val text = line.trim()
         if (text.isEmpty() || text.startsWith("#") || text.startsWith(HEADER)) return emptyList()
         return listOf(text.toLong())
+    }
+}
+
+/**
+ * Canonical CSV for the prep window: one interval, on the same epoch-ms clock
+ * as ImuCsv, HrCsv, CueCsv and RepMarkCsv (#185).
+ *
+ * Two columns and exactly one data row, which is the whole of the format. It is
+ * a CSV rather than another shape because it is stored as a raw stream beside
+ * the streams it brackets, and every raw stream in this archive is a CSV a
+ * person can open; a reader who has already opened `imu.csv` needs no second
+ * parser to find out which of its rows fall before the set began.
+ *
+ * WHAT IT SAYS is where the prep was, and nothing about what happened in it.
+ * No stillness score, no gravity vector, no transform -- see [PrepWindow],
+ * where the reasoning is stated once.
+ */
+object PrepWindowCsv {
+    const val HEADER = "prep_started_ms,work_started_ms"
+
+    fun encode(window: PrepWindow): String = "$HEADER\n${window.startedAtMs},${window.workStartedAtMs}\n"
+
+    /**
+     * The window this text states, or null when it states none it can stand
+     * behind.
+     *
+     * Null rather than a throw and null rather than a partial answer: a header
+     * with no row, a row with one field, a field that is not a whole number,
+     * and a pair in the wrong order all mean the same thing to a reader, which
+     * is that this capture cannot say where its prep was. A half-read pair
+     * would be a bracket around samples nobody measured.
+     *
+     * The ORDER is re-checked here and not only at the write. The rule lives in
+     * `PrepWindowPolicy`, which every writer goes through, but a reader that
+     * trusts a writer it cannot see is the shape this repository has already
+     * been bitten by once -- the raw archive's manifest re-normalizes the
+     * lifter's note on the way out for exactly that reason.
+     */
+    fun decode(text: String): PrepWindow? {
+        val row =
+            text.lineSequence()
+                .map { it.trim() }
+                .firstOrNull { it.isNotEmpty() && !it.startsWith("#") && !it.startsWith(HEADER) }
+                ?: return null
+        val fields = row.split(',')
+        if (fields.size != 2) return null
+        val started = fields[0].toLongOrNull() ?: return null
+        val workStarted = fields[1].toLongOrNull() ?: return null
+        if (workStarted < started) return null
+        return PrepWindow(startedAtMs = started, workStartedAtMs = workStarted)
     }
 }
 
