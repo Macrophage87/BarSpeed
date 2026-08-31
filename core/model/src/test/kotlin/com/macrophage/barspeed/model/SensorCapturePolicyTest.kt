@@ -315,7 +315,7 @@ class SensorCapturePolicyTest {
         assertEquals(
             DualShortfall.ROLES_UNASSIGNED,
             recorded?.shortfall,
-            "two connected units the app cannot label are not a one-sensor set",
+            "two paired units the app cannot label are not a one-sensor set",
         )
         assertEquals(1, recorded?.count, "one sensor ran, and the count says so rather than the role list")
         assertEquals(emptyList(), recorded?.expected)

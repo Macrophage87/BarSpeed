@@ -211,16 +211,20 @@ class SessionRepositoryDualSensorTest {
         assertEquals(1, dao.imuRows.size, "an empty capture was written as a row")
         assertEquals(listOf("a"), dao.imuRows.map { it.role })
         val stored = json.decodeFromString(RecordedSensors.serializer(), dao.sets.single().sensorsJson!!)
-        assertEquals(listOf(SensorRole.A, SensorRole.B), stored.expected, "the missing role was dropped from the ask")
+        assertEquals(
+            listOf(SensorRole.A, SensorRole.B),
+            stored.expected,
+            "the missing role was dropped from the declaration",
+        )
     }
 
     /**
-     * A set that asked for two and armed one records the ask, and its single
-     * stream stays unlabelled.
+     * A set that met two paired units it could not tell apart records the
+     * reason, and its single stream stays unlabelled.
      *
-     * Both halves matter. The ask is unrecoverable from anything else, so it is
-     * stored; the role is absent because nobody assigned one, and inventing an
-     * `a` would state which physical unit the capture came from.
+     * Both halves matter. The reason is unrecoverable from anything else, so it
+     * is stored; the role is absent because nobody assigned one, and inventing
+     * an `a` would state which physical unit the capture came from.
      */
     @Test
     fun `a shortfall records the reason and leaves its one stream unlabelled`() = runTest {

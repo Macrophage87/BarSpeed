@@ -280,7 +280,7 @@ class RawExporterDualSensorTest {
 
     /**
      * DIFFERENTIAL, issue #198. A set that recorded one stream because two
-     * connected units could not be told apart says so in the manifest too.
+     * paired units could not be told apart says so in the manifest too.
      *
      * The raw archive and `session.json` are read by different consumers and
      * one saying less than the other about the same set is how a reader comes

@@ -14,13 +14,22 @@ import kotlin.test.assertTrue
  * What issue #198 moved in the two published contracts, pinned against the
  * REAL documents in `docs/schemas/` exactly as [SchemaContractTest] is.
  *
- * A second file rather than three more cases in that one, and the reason is
- * mechanical rather than editorial: detekt's LargeClass rule reds
- * [SchemaContractTest] at its current size, and LargeClass is not among the
- * rules this repo disables. The sensor contract is therefore pinned in two
- * places; everything about the BLOCK -- its keys, its closure, its role
- * vocabulary, its example -- stays there, and what is here is only what #198
- * changed.
+ * A second file rather than more cases in that one. RETRACTION, round 1: this
+ * KDoc said detekt's LargeClass rule REDS [SchemaContractTest] at its current
+ * size, and this branch's own green run falsifies it -- CI 33346525695 step 5,
+ * ktlint + detekt, is success at 68c7db55159336509c518bad189410769233150f with
+ * that file at 1079 lines. What is true, and all that was ever measured, is
+ * that LargeClass appears nowhere in `config/detekt/detekt.yml` and every
+ * module sets `buildUponDefaultConfig = true`, so the rule runs at detekt's
+ * default and [SchemaContractTest] is already 1079 lines; the cases went in
+ * their own file rather than push a file of that size further. Why the rule
+ * does not fire on a 1079-line test class was NOT established -- detekt's
+ * default excludes for test source paths are the likely mechanism and no
+ * detekt run here confirmed it.
+ *
+ * The sensor contract is therefore pinned in two places; everything about the
+ * BLOCK -- its keys, its closure, its role vocabulary, its example -- stays
+ * there, and what is here is only what #198 changed.
  */
 class SchemaSensorContractTest {
     private fun schema(name: String) = Json.parseToJsonElement(

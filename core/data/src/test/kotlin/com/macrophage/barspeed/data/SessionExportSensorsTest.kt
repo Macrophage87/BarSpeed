@@ -106,6 +106,22 @@ class SessionExportSensorsTest {
         role = role,
     )
 
+    private fun rowWithSensorsJson(sensorsJson: String?) = SetRecordEntity(
+        id = 5L,
+        sessionId = 1L,
+        orderIdx = 0,
+        exerciseId = "bench_press",
+        exerciseName = "Bench Press",
+        loadKg = 80.0,
+        actualReps = 5,
+        repsManual = true,
+        plannedReps = 5,
+        startedAtMs = 1_000L,
+        endedAtMs = 61_000L,
+        analysisJson = json.encodeToString(SetAnalysis.serializer(), noReps),
+        sensorsJson = sensorsJson,
+    )
+
     private fun row(sensors: RecordedSensors?) = SetRecordEntity(
         id = 5L,
         sessionId = 1L,
@@ -131,6 +147,24 @@ class SessionExportSensorsTest {
         val exporter =
             SessionExporter(SessionRepository(dao, FakeExerciseDao()), dispatcher = Dispatchers.Default)
         val text = exporter.exportJson(1L, includeRepDetail)!!
+        return Json.parseToJsonElement(text)
+            .jsonObject.getValue("exercises").jsonArray.single()
+            .jsonObject.getValue("sets").jsonArray.single().jsonObject
+    }
+
+    /**
+     * The same export path fed a stored `sensorsJson` VERBATIM rather than a
+     * [RecordedSensors] this build can construct.
+     *
+     * The only way to stand a row an OLDER build wrote in front of the current
+     * decoder: `plannedCount` is not a field of this build's data class, so it
+     * cannot be encoded from Kotlin at all and has to be handed over as text.
+     */
+    private suspend fun setObjectFromStoredJson(sensorsJson: String, streams: List<RawStreamEntity>): JsonObject {
+        val dao = FakeSessionDao(listOf(rowWithSensorsJson(sensorsJson)), mapOf(5L to streams))
+        val exporter =
+            SessionExporter(SessionRepository(dao, FakeExerciseDao()), dispatcher = Dispatchers.Default)
+        val text = exporter.exportJson(1L, includeRepDetail = true)!!
         return Json.parseToJsonElement(text)
             .jsonObject.getValue("exercises").jsonArray.single()
             .jsonObject.getValue("sets").jsonArray.single().jsonObject
@@ -177,7 +211,7 @@ class SessionExportSensorsTest {
      * An armed role whose unit captured nothing is in `expected` and not in
      * `present`.
      *
-     * The whole point of storing the ask. Without both lists this set is
+     * The whole point of storing both lists. Without them this set is
      * indistinguishable from one that was only ever armed for a single sensor,
      * and the second unit's failure disappears from the corpus.
      */
@@ -211,7 +245,7 @@ class SessionExportSensorsTest {
 
     /**
      * DIFFERENTIAL, issue #198. A set that recorded one stream because two
-     * connected units could not be told apart publishes WHICH gap it was.
+     * PAIRED units could not be told apart publishes WHICH gap it was.
      *
      * `a shortfall publishes the ask with an empty role list` stood here and
      * published `plannedCount: 2, count: 1`, which is the ask. There is no ask
@@ -260,6 +294,44 @@ class SessionExportSensorsTest {
             "rolesCollide",
             set.getValue("sensors").jsonObject.getValue("shortfall").jsonPrimitive.content,
         )
+    }
+
+    /**
+     * CHARACTERIZATION, not a differential: this is what the build ALREADY
+     * does with a row a released build wrote, and it is pinned here because
+     * nothing on this branch said so.
+     *
+     * Until #198, `SensorCapturePolicy.recorded(plannedCount, roster)` wrote
+     * `plannedCount = 2, count = 1, expected = []` for every non-dual set under
+     * a plan -- or a lifter adjustment -- declaring two sensors. Those rows are
+     * on installed phones from v0.1.44 onward. `plannedCount` is an unknown key
+     * to this build and `SessionRepository`'s `Json { ignoreUnknownKeys = true }`
+     * skips it, so the row now decodes to `count = 1`, an empty `expected` and
+     * NO shortfall, and re-exports as a block the published contract reads as
+     * "nothing was in the way".
+     *
+     * The reason such a set recorded one stream is therefore NOT recoverable
+     * from a 1.15 export of it. The row's own JSON on the device is untouched
+     * and still carries the key; only the document drops it. That is stated in
+     * the published `shortfall` description rather than fixed, because
+     * synthesising a shortfall from a count nobody wrote would publish a reason
+     * this build did not observe -- see the same file's `a one-sensor set
+     * publishes no sensors key` for the shape the reader is left with.
+     */
+    @Test
+    fun `a row written under the retired planned count re-exports with no reason`() = runTest {
+        val set =
+            setObjectFromStoredJson(
+                """{"plannedCount":2,"count":1,"expected":[]}""",
+                listOf(imuStream(1L, null, count = 100)),
+            )
+
+        val sensors = set.getValue("sensors").jsonObject
+        assertEquals(1, sensors.getValue("count").jsonPrimitive.int)
+        assertEquals(emptyList(), sensors.roles("expected"))
+        assertEquals(emptyList(), sensors.roles("present"))
+        assertNull(sensors["shortfall"], "a reason was invented for a row that stored none")
+        assertNull(sensors["plannedCount"], "the retired key survived into a 1.15 document")
     }
 
     // ---- what must not move --------------------------------------------------
