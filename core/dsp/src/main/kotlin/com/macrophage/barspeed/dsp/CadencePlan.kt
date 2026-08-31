@@ -20,9 +20,9 @@ data class CadenceBeat(
 /**
  * The beats a guided rep is played as, derived from a [TempoSchedule].
  *
- * This arithmetic used to live inside GuidedCadenceRunner in `:app`, which has
- * no test source set, so nothing could assert that the cycle the metronome
- * plays is the cycle the plan prescribes. It was not, on every set the app has
+ * This arithmetic used to live inside GuidedCadenceRunner in `:app`, where no
+ * test on the CI path reaches it, so nothing could assert that the cycle the
+ * metronome plays is the cycle the plan prescribes. It was not, on every set the app has
  * ever paced -- issue 106.
  *
  * ## Whole seconds
@@ -174,7 +174,7 @@ data class CadenceBeat(
  * - **Replace a mid-stroke tempo count with the call** instead of merging it
  *   into the stroke's opening word. [CadenceBeat] cannot express "say this at
  *   second k", so it would put a timing decision back inside
- *   `GuidedCadenceRunner` in `:app`, whose test source set is one file deep --
+ *   `GuidedCadenceRunner` in `:app`, which no test on the CI path reaches --
  *   the shape of issue 106. It would also write a `Rep N` row into the middle
  *   of a stroke, where cue-track consumers measure phase boundaries.
  * - **Suppress the NEXT beat's label** rather than a tempo count, widening the

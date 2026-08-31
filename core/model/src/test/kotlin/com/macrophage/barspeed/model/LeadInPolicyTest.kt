@@ -10,9 +10,10 @@ import kotlin.test.assertTrue
 /**
  * What decides the prep before a guided set.
  *
- * The precedence and the clamp are here, in a module with a test source set,
- * rather than in `:app` where the record flow reads them. `:app` has no test
- * source set at all, and the last time per-second lead-in arithmetic lived there
+ * The precedence and the clamp are here, where a test runs on them every push,
+ * rather than in `:app` where the record flow reads them. No test on the CI
+ * path reaches that flow, and the last time per-second lead-in arithmetic
+ * lived there
  * it added a beat the prescription never asked for, on every set the app had
  * ever paced, with nothing able to assert otherwise -- that is issue 106.
  *

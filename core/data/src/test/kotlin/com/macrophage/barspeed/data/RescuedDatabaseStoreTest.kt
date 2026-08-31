@@ -111,7 +111,7 @@ class RescuedDatabaseStoreTest {
      * this one split -- the title, whether to list the files, what the discard
      * dialog warns about, and whether SEND is worth offering -- and the gate
      * MEASURED that permuting those branches inside HomeScreen.kt reds
-     * nothing, because :app has no test source set at all. The split is
+     * nothing, because no test on the CI path renders that card. The split is
      * computed in [RescuedDatabase.completeness] now, and this is the test
      * that makes a permutation of it cost something.
      *

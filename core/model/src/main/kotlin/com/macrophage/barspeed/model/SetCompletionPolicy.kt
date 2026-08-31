@@ -5,9 +5,9 @@ package com.macrophage.barspeed.model
  * and null where it cannot know at all (#186).
  *
  * This is the predicate [SetEndControlPolicy] gates on. It lived in
- * `RecordState` as a `when` over six fields of a Compose-screen view model,
- * which is a module with one test file over one pure function: the gate was
- * pinned exhaustively and the thing feeding it was not, so deleting the
+ * `RecordState` as a `when` over six fields of a Compose-screen view model no
+ * test on the CI path can construct: the gate was pinned exhaustively and the
+ * thing feeding it was not, so deleting the
  * `targetReps == null` guard or swapping [TimedSetEndPolicy.fellShort] for a
  * plain `>=` reddened nothing. Lifted here, every branch is a literal in a
  * test that runs on every push.

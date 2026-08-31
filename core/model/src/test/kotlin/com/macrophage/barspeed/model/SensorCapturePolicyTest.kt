@@ -17,9 +17,9 @@ import kotlin.test.assertTrue
  * measured totals.
  *
  * The seam itself is why this file can exist at all. `:core:ble` has no test
- * source set and `:app` has one file over one pure function, so every decision
- * about which stream is which would otherwise live where nothing can run
- * against it. This is the "extract a pure seam and pin it" move made before
+ * source set at all, and no test on the CI path reaches `:app`'s Android
+ * classes, so every decision about which stream is which would otherwise live
+ * where nothing can run against it. This is the "extract a pure seam and pin it" move made before
  * the first defect rather than after the third.
  */
 class SensorCapturePolicyTest {

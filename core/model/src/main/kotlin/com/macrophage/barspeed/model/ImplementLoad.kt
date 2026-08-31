@@ -19,8 +19,8 @@ package com.macrophage.barspeed.model
  * which may be negative on assisted body-weight work. It is NEVER the
  * body-weight-inclusive figure [SetLoadPolicy.totalKg] returns: halving that
  * would print "2 × 50 kg" for a 20 kg weighted dip at 80 kg body weight.
- * `:app` has no test source set, so WHICH value a call site passes is held by
- * this KDoc, by the parameter name and by review — not by any test that can
+ * No test on the CI path reaches those call sites, so WHICH value a call site
+ * passes is held by this KDoc, by the parameter name and by review — not by any test that can
  * run in this repository.
  *
  * Beside [SetLoadPolicy] rather than inside it, deliberately. SetLoadPolicy's

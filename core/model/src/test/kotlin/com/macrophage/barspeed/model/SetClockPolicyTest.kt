@@ -6,8 +6,9 @@ import kotlin.test.assertEquals
 /**
  * Which instant a set's measured seconds are counted from.
  *
- * The rule is here because `:app` has no test source set and the figure it
- * produces is the whole of what a hold reports. What this file cannot check is
+ * The rule is here because no test on the CI path can construct the view model
+ * that produces it, and the figure it produces is the whole of what a hold
+ * reports. What this file cannot check is
  * that `RecordViewModel` hands in the right instants; that half is compile- and
  * lint-gated only.
  */

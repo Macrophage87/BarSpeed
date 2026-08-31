@@ -37,8 +37,8 @@ package com.macrophage.barspeed.model
  * ## What this cannot check
  *
  * That `:app` calls it once per second, from the set's own clock, and ends
- * the set when it says so. `:app` has one test file and none of it reaches a
- * coroutine or a composable, so that half is compile- and lint-gated only,
+ * the set when it says so. No test on the CI path reaches a coroutine or a
+ * composable, so that half is compile- and lint-gated only,
  * and is verified on the bench instead.
  */
 object TimedSetEndPolicy {

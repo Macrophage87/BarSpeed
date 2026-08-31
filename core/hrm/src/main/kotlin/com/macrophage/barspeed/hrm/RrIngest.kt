@@ -5,10 +5,11 @@ import com.macrophage.barspeed.model.HrSample
 /**
  * Which beats a heart-rate notification brought.
  *
- * This exists because the decision has to be somewhere a test can reach. Its
- * only caller is `RecordViewModel`, in `:app`, which has no test source set at
- * all -- a rule written there is verified by reading it and by nothing else, and
- * inverting it would red nothing in CI. Here it is pure, and the batch form is a
+ * This exists because the decision has to be somewhere a test can reach. It is
+ * called by `RecordViewModel` in `:app` and by [HrTrust.accountedFraction]
+ * here in `:core:hrm`. No test on the CI path can construct that
+ * `AndroidViewModel`, so a rule written there is verified by reading it and by
+ * nothing else, and inverting it would red nothing in CI. Here it is pure, and the batch form is a
  * fold of the per-notification form rather than a second implementation, so a
  * fixture-driven test exercises the code the app runs.
  *
@@ -152,7 +153,8 @@ object RrIngest {
      *
      * This lives here rather than at each call site because there are two call
      * sites -- the fold below and the streaming collector in `RecordViewModel`
-     * -- and `:app` has no test source set. Written out twice, the copy in
+     * -- and no test on the CI path can construct that `AndroidViewModel`.
+     * Written out twice, the copy in
      * `:app` would be unpinned and the seam would be doing half its job. One
      * function, so one test kills both.
      */

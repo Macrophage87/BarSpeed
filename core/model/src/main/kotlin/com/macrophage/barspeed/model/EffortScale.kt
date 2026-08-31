@@ -129,9 +129,9 @@ data class EffortTile(
  * The tiles, in order, for a set of a given kind, and the authored caption
  * table they are built from.
  *
- * Here rather than in `:app` for the reason [SetEndControlPolicy] is here:
- * `:app` has one test file over one pure function and nothing that can reach
- * a composable, so a scale written inside one is a scale nothing can measure.
+ * Here rather than in `:app` for the reason [SetEndControlPolicy] is here: no
+ * test on the CI path can reach a composable, so a scale written inside one is
+ * a scale nothing can measure.
  */
 object EffortScale {
     /** The lowest `rpe` a proximity-to-failure claim is made at. */

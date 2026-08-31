@@ -2379,7 +2379,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      *
      * Advanced through [RrIngest.nextPrevious] rather than assigned here, so
      * the one rule about when the reference moves has one implementation. This
-     * file has no test source set behind it; that function does.
+     * one is reached by no test on the CI path; that function is.
      */
     private var lastHrSample: HrSample? = null
     private var voice: VoiceCounter? = null

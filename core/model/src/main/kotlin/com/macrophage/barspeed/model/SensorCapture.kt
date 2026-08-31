@@ -195,8 +195,9 @@ enum class DualShortfall {
  * which.
  *
  * A `:core:model` object rather than logic in `:app` on purpose. `:core:ble`
- * has no test source set at all and `:app` has one file over one pure function,
- * so a decision left in either is a decision nothing can run against; lifted
+ * has no test source set at all, and no test on the CI path reaches `:app`'s
+ * Android classes, so a decision left in either is a decision nothing can run
+ * against; lifted
  * here it is pinned on every push. This is the "extract a pure seam" move made
  * before the first defect rather than after the third.
  */

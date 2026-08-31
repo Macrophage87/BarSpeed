@@ -35,8 +35,8 @@ internal const val LEAD_IN_LABEL = "GET READY"
  * beats, sleeps a second at a time, pushes the label and countdown, and speaks.
  * It decides no timing of its own.
  *
- * That split is the point. This file has no test source set, so the arithmetic
- * that used to live here could not be asserted — and for every set the app ever
+ * That split is the point. No test on the CI path reaches this file, so the
+ * arithmetic that used to live here could not be asserted — and for every set the app ever
  * paced it added a second the prescription did not ask for, which is issue 106.
  * An earlier version allotted a flat 3 s to everything after the first stroke,
  * which made every tempo unachievable and scored the surplus as the athlete's

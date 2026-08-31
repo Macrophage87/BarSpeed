@@ -10,8 +10,8 @@ package com.macrophage.barspeed.dsp
  * ## Why it is here rather than in the tick loop it came from
  *
  * This rule was four lines of `when` inside the coroutine `RecordViewModel`
- * launches to drive `setElapsedS`. `:app` has no test source set, so nothing
- * asserted any of it; the same arrangement in the same file already added a
+ * launches to drive `setElapsedS`. No test on the CI path can construct that
+ * `AndroidViewModel`, so nothing asserted any of it; the same arrangement in the same file already added a
  * beat no prescription asked for, which is issue 106. Moved here unchanged,
  * every case is a literal in `TimedSetVoiceTest`.
  *

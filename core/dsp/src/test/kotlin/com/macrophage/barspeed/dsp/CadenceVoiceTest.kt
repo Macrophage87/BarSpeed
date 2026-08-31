@@ -10,7 +10,7 @@ import kotlin.test.assertNull
  * What a guided set says, and which of it reaches the cue track.
  *
  * These decisions used to live inside `GuidedCadenceRunner.play` in `:app`,
- * beside the sleeps, where the module's one test file could not reach them.
+ * beside the sleeps, where no test on the CI path could reach them.
  * Everything asserted here was previously unassertable -- which is why the app
  * could speak all eleven rep calls of a twelve-rep set and write none of them
  * down for as long as it did (issue 176).

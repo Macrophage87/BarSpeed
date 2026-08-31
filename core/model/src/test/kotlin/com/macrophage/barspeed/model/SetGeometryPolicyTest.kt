@@ -10,9 +10,10 @@ import kotlin.test.assertTrue
  * The precedence that decides which way a lift moves, and where each answer
  * came from.
  *
- * This is the code that used to live in `app/.../PlanQueue.kt`, a module with
- * no test source set — so a mistake here reached the DSP, the voice guide and
- * every recorded set with nothing to catch it. [SetGeometryPolicy.resolve] is
+ * This is the code that used to live in `app/.../PlanQueue.kt`, inside a
+ * suspend extension on `SessionRepository` that no test on the CI path calls
+ * — so a mistake here reached the DSP, the voice guide and every recorded set
+ * with nothing to catch it. [SetGeometryPolicy.resolve] is
  * that code moved without change and is pinned branch by branch below.
  *
  * [SetGeometryPolicy.describe] is the new half. It reads its values off the

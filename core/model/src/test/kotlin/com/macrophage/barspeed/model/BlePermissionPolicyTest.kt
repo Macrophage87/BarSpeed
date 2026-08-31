@@ -7,8 +7,8 @@ import kotlin.test.assertTrue
 
 /**
  * The permission decisions the BLE and recording paths make, pinned here
- * because the two modules that consume them have no test source set of their
- * own. Every case below is a decision that used to be a bare `SDK_INT`
+ * because `:core:ble` has no test source set at all and no test on the CI path
+ * can construct `:app`'s Android classes. Every case below is a decision that used to be a bare `SDK_INT`
  * literal buried in an Android class no test could construct.
  */
 class BlePermissionPolicyTest {

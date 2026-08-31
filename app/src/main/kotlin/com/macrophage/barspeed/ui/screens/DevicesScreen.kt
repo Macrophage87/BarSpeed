@@ -134,8 +134,8 @@ private fun DualSetupCard(step: DualSetupStep) {
  * figures come from.
  *
  * The words are `DevicePairingPolicy.preferenceControl`'s, not this file's,
- * because `:app` has one test file over one pure function and which rows offer
- * to move a preference is a rule `:core:model` can hold.
+ * because no test on the CI path can render a `@Composable`, and which rows
+ * offer to move a preference is a rule `:core:model` can hold.
  */
 @Composable
 private fun PreferenceRow(control: PreferenceControl, onUse: () -> Unit) {

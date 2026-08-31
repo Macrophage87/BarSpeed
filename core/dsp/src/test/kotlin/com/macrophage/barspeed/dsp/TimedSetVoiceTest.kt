@@ -8,8 +8,8 @@ import kotlin.test.assertNull
  * What a hold or a carry says while its clock runs down.
  *
  * These assertions are new, not moved: the rule they cover spent its whole life
- * as four lines of `when` inside the coroutine `RecordViewModel` launches, in a
- * module with no test source set, where nothing could state any of it. It is
+ * as four lines of `when` inside the coroutine `RecordViewModel` launches,
+ * where no test on the CI path could state any of it. It is
  * unchanged by the commit that brought it here; what changed is that it can now
  * be asserted.
  *

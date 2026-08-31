@@ -301,8 +301,8 @@ object DevicePairingPolicy {
      * [DeviceLinkRole.HEART_RATE] for a strap. [currentLink] is what
      * [linkRoleFor] answered for this row's address.
      *
-     * Here rather than as an `if` on the screen for the usual reason: `:app`
-     * has one test file over one pure function, so which rows offer to move a
+     * Here rather than as an `if` on the screen for the usual reason: no test
+     * on the CI path can render a `@Composable`, so which rows offer to move a
      * preference is a rule that can be held in `:core:model` and cannot be
      * held there.
      *
@@ -345,9 +345,9 @@ object DevicePairingPolicy {
      * made #184's own field criterion -- reach both rows green on the Devices
      * screen -- impossible rather than merely awkward.
      *
-     * Here rather than in the ViewModel for [linksToDropOnForget]'s reason:
-     * `:app` has two test files over two pure functions, so which unit a link
-     * names is a decision nothing could run against while it lives there.
+     * Here rather than in the ViewModel for [linksToDropOnForget]'s reason: no
+     * test on the CI path can construct an `AndroidViewModel`, so which unit a
+     * link names is a decision nothing could run against while it lives there.
      *
      * [analysed] is `AutoConnectManager`'s own rule restated in one place a
      * test can reach -- `registry.preferredNow(IMU)`, which

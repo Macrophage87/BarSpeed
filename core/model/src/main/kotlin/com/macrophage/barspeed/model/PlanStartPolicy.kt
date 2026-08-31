@@ -65,8 +65,8 @@ sealed interface PlanStartDecision {
  * Whether a plan can be started, and what starting it costs.
  *
  * Pure, and in `:core:model` for the reason [RecordingServicePolicy] is here:
- * `:app` has one test file over one pure function, so a rule written beside its
- * Compose caller is a rule nothing runs. What is decided here is which control
+ * no test on the CI path can render a Compose caller, so a rule written beside
+ * one is a rule nothing runs. What is decided here is which control
  * is drawn and what its dialog says; whether the lifter reads that dialog
  * before tapping through it is a [Field] question and no test in this
  * repository can answer it.

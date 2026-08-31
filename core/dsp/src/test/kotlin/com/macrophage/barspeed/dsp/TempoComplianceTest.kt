@@ -124,8 +124,10 @@ class TempoComplianceTest {
     @Test
     fun `scoredPhases is the reachable proxy for what the exporter publishes`() {
         // Exporters.kt evaluates exactly this expression to fill the export's
-        // scoredPhases; :core:data has no test source set, so this is where it
-        // can be pinned. Fixture A measured three eccentrics and must keep both
+        // scoredPhases. :core:data has its own tests and SessionExporterTest
+        // pins the exporter's copy; this pins the same rule one module
+        // upstream, against the DSP result the exporter is handed. Fixture A
+        // measured three eccentrics and must keep both
         // phases. Case B measured none, so it may advertise only the drive.
         assertEquals(listOf("eccentric", "concentric"), scoredPhases(assertNotNull(fixtureA().tempoCompliance)))
         assertEquals(listOf("concentric"), scoredPhases(assertNotNull(caseB().tempoCompliance)))

@@ -25,7 +25,7 @@ import kotlin.test.assertNull
  *
  * Nothing here says what `:app` passes. These are six arguments; that they
  * are wired from the slot, the clock and the guide is compile-gated only,
- * because `:app` has one test file and none of it reaches a view model.
+ * because no test on the CI path reaches a view model.
  */
 class SetCompletionPolicyTest {
     private fun hold(targetS: Int?, elapsedS: Int) = SetCompletionPolicy.complete(

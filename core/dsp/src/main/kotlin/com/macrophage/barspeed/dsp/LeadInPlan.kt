@@ -19,8 +19,8 @@ data class LeadInBeat(val spoken: String?, val cue: String?)
  *
  * ## Why this is a type and not a loop in `:app`
  *
- * `GuidedCadenceRunner` lives in `:app`, which has no test source set. The last
- * time per-second arithmetic lived there it added a beat the prescription did
+ * `GuidedCadenceRunner` lives in `:app`, where no test on the CI path reaches
+ * it. The last time per-second arithmetic lived there it added a beat the prescription did
  * not ask for, on every set the app had ever paced, and nothing could assert
  * otherwise -- that is issue 106. So the arithmetic lives here and the runner
  * only walks it.

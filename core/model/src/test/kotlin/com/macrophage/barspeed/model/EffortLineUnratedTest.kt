@@ -23,8 +23,8 @@ import kotlin.test.assertEquals
  * timed set carries.
  *
  * The wording rule lives here rather than in the composable for the reason
- * every other decision in this package does: `:app` has one test file and none
- * of it reaches a Compose screen.
+ * every other decision in this package does: no test on the CI path reaches a
+ * Compose screen.
  */
 class EffortLineUnratedTest {
     /**

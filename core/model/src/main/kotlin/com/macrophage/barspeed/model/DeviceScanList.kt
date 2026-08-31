@@ -58,8 +58,8 @@ data class ScanRow(
  * and #197.
  *
  * A `:core:model` object because the alternative is a decision nothing can run
- * against: `:core:ble` has no test source set and `:app` has one test file over
- * one pure function. "The order does not change when a packet arrives" is
+ * against: `:core:ble` has no test source set at all, and no test on the CI
+ * path can render `:app`'s Compose rows. "The order does not change when a packet arrives" is
  * exactly the kind of property a JVM test can hold and a screenshot cannot.
  */
 object DeviceScanListPolicy {

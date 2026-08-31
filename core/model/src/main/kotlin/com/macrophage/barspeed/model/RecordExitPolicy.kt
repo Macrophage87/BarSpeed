@@ -202,9 +202,9 @@ enum class SetWriteState {
 /**
  * What pressing Back on the record screen must do.
  *
- * Pure, and here rather than in `:app`, for the reason [Stage] is here: `:app`
- * has no test source set, so a decision written beside its callers cannot be
- * tested at all. Nothing in this file touches Android or navigation. The screen
+ * Pure, and here rather than in `:app`, for the reason [Stage] is here: no
+ * test on the CI path can render its Compose callers, so a decision written
+ * beside them cannot be tested at all. Nothing in this file touches Android or navigation. The screen
  * asks, and renders the answer.
  */
 object RecordExitPolicy {

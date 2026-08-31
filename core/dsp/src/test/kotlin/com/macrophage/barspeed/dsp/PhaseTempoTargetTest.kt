@@ -23,8 +23,8 @@ import kotlin.test.assertTrue
  * pushdown the drive pulls DOWN, and then digit 1 is the CONCENTRIC and digit 3
  * is the eccentric. [TempoSchedule] has always resolved this correctly and
  * [SetAnalyzer] has always graded through it. Three sites in `:app` -- two of
- * them in RecordScreen -- read `tempo.downS` instead, and `:app` has no test
- * source set, so none of the three could be run against.
+ * them in RecordScreen -- read `tempo.downS` instead, and no test on the CI
+ * path reaches a Compose screen, so none of the three could be run against.
  *
  * Two of those three render the number: the rest-screen chart and the history
  * chart. The third, the in-set ring, cannot -- `RecordScreen.InSetStage` sends

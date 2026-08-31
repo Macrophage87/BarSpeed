@@ -44,9 +44,9 @@ package com.macrophage.barspeed.model
  *
  * ## What this cannot check
  *
- * That `:app` hands in the right instants. `:app` has no test source set, so the
- * rule is pinned here and the wiring that obeys it is compile- and lint-gated
- * only.
+ * That `:app` hands in the right instants. No test on the CI path can construct
+ * the view model that takes them, so the rule is pinned here and the wiring
+ * that obeys it is compile- and lint-gated only.
  */
 object SetClockPolicy {
     /**

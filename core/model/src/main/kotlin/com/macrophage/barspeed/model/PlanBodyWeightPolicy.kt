@@ -5,8 +5,8 @@ package com.macrophage.barspeed.model
  * (issue #161).
  *
  * Here rather than beside the write for [SetLoadPolicy]'s reason: the write
- * itself is a DataStore edit in `:app`, which has one test file over one pure
- * function, so a rule left there is a rule nothing can run against. The
+ * itself is a DataStore edit in `:app` that no test on the CI path can
+ * execute, so a rule left there is a rule nothing can run against. The
  * decision is a pure function of two nullable numbers and is executed on every
  * push; `:app` is left with the edit and nothing else.
  *

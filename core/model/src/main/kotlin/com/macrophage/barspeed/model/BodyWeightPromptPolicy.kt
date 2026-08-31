@@ -9,9 +9,9 @@ package com.macrophage.barspeed.model
  * not a standing task on the home screen.
  *
  * Here rather than in the Composable that draws the dialog, for
- * [SetLoadPolicy]'s reason: `:app` has one test file over one pure function,
- * so a threshold written into a `@Composable` is a threshold nothing can run
- * against. Everything below is a pure function of a plan session, two nullable
+ * [SetLoadPolicy]'s reason: no test on the CI path can render a `@Composable`,
+ * so a threshold written into one is a threshold nothing can run against.
+ * Everything below is a pure function of a plan session, two nullable
  * numbers and a clock reading; `:app` is left with the dialog and the write.
  *
  * Nothing here decides whether a session may START. The prompt is always

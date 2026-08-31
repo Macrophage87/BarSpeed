@@ -34,8 +34,8 @@ data class EffortSelection(
  * Which effort tile the correction grid pre-lights, given the two independent
  * failure facts the app keeps apart everywhere else.
  *
- * Here rather than in `:app` because `:app` is not test-gated: the one file
- * that can express this decision is a 2,300-line Compose screen whose only
+ * Here rather than in `:app` because the one file that can express this
+ * decision is a Compose screen no test on the CI path can render, whose only
  * gate is that it compiles. Lifted out, the rule is pinned on every push.
  *
  * The two facts are the lifter's own tap and the objective shortfall derived

@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
  * What the guided metronome plays, against what the plan prescribed.
  *
  * The arithmetic these assert used to live in GuidedCadenceRunner in `:app`,
- * which has no test source set, so none of it could be checked. Issue 106 is
+ * where no test on the CI path reaches it, so none of it could be checked. Issue 106 is
  * the consequence: on every set the app has ever paced the delivered cycle
  * exceeded the prescription by exactly one second.
  *

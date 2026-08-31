@@ -4,8 +4,9 @@ package com.macrophage.barspeed.model
  * A sensor link's state, as `:core:ble`'s `GattClient` reports it.
  *
  * Lives here rather than in `:core:ble` for the same reason [BlePermissionPolicy]
- * does: `:core:ble` and `:app` have no test source set, so a decision that
- * consumes this type cannot be tested from either. This type has no Android
+ * does: `:core:ble` has no test source set at all, and no test on the CI path
+ * can construct `:app`'s Android classes, so a decision that consumes this
+ * type cannot be tested from either. This type has no Android
  * dependency of its own -- it never did -- so moving it costs nothing.
  */
 sealed interface ConnectionState {

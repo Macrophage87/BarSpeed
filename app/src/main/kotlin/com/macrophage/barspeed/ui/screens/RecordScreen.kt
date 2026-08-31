@@ -269,8 +269,9 @@ private fun titleFor(state: RecordState): String = when (state.stage) {
  *
  * `onDismissRequest` — the scrim tap and the back press that dismisses the
  * dialog itself — maps to [ExitAction.STAY] in both shapes. Nothing here is
- * covered by a test at any commit: `:app` has no test source set, so this
- * mapping was verified by reading it, and by nothing else.
+ * covered by a test at any commit: no test on the CI path can render a
+ * `@Composable`, so this mapping was verified by reading it, and by nothing
+ * else.
  */
 @Composable
 private fun ExitDialog(prompt: ExitPrompt, onAction: (ExitAction) -> Unit) {
@@ -1259,8 +1260,8 @@ private fun MoveSensorCard(exerciseName: String) {
  * The box goes on taking the TOTAL at every site, unchanged. That is the whole
  * reason this feature performs no multiplication anywhere: if the field's
  * meaning flipped to per-implement, every read and every re-seed of
- * `loadInput` would carry a divide-or-multiply obligation forever, in the one
- * module with no test source set.
+ * `loadInput` would carry a divide-or-multiply obligation forever, in code no
+ * test on the CI path can reach.
  *
  * DUMB. The wording is [BodyweightLoadDisplay.fieldLabel]'s, which is in a
  * module where a test can read it; this reads the slot and asks.
@@ -2431,8 +2432,8 @@ private fun StartNextSetButton(state: RecordState, viewModel: RecordViewModel) {
  * says may be operated while the close is where it is.
  *
  * Asked of the policy rather than written as an `if` here, for the reason the
- * exit gate is: `:app` has no test source set, so a condition written beside its
- * caller cannot be tested at all. This is the same surface the gate covers, one
+ * exit gate is: no test on the CI path can render a `@Composable`, so a
+ * condition written beside its caller cannot be tested at all. This is the same surface the gate covers, one
  * layer in — guarding the way out while leaving these live is not a guard.
  */
 @Composable
@@ -2568,8 +2569,8 @@ private data class RpeOption(
  *
  * WHAT IS DRAWN IS [EffortScale]'S DECISION, not this file's. Which rungs
  * exist, what each says and which `rpe` it stores are pinned in `:core:model`
- * where a test runs on them every push; `:app` has one test file and none of
- * it reaches a composable. This function is the paint: an [EffortTile] carries
+ * where a test runs on them every push; no test on the CI path reaches a
+ * composable. This function is the paint: an [EffortTile] carries
  * no colour, because a colour is not a fact about effort.
  *
  * [unit] reaches the scale because the low rungs name a WEIGHT the lifter
@@ -2610,8 +2611,8 @@ private fun rpeColor(rpe: Int): Color = when {
  *
  * What is pre-lit is [EffortCorrectionPolicy]'s decision, not this file's. The
  * rule is a decision about attribution -- whose verdict a lit tile claims to be
- * -- and it lives in `:core:model` where a test runs on it every push; `:app`
- * has one test file and none of it reaches a Compose screen.
+ * -- and it lives in `:core:model` where a test runs on it every push; no test
+ * on the CI path reaches a Compose screen.
  */
 @Composable
 private fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked: () -> Unit) {
@@ -2748,9 +2749,9 @@ private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
  * afterwards (#189).
  *
  * WHEN IT OPENS BY ITSELF IS [SetLimiterPolicy]'S DECISION, not this file's,
- * and so is what the row reads. `:app` has two test files and neither reaches
- * a composable, so a rule written beside its caller here is a rule nothing
- * enforces; one module over, every case is a literal in a test.
+ * and so is what the row reads. No test on the CI path reaches a composable,
+ * so a rule written beside its caller here is a rule nothing enforces; one
+ * module over, every case is a literal in a test.
  *
  * WHERE IT IS DRAWN IS ALSO [SetLimiterPolicy]'S DECISION, and it is not one
  * place. The page the app opens by ITSELF is drawn by [RestingStage] at the
@@ -3359,7 +3360,7 @@ private fun EccTempoChart(analysis: SetAnalysis, targetEccS: Double) {
     Spacer(Modifier.height(6.dp))
     PowerLine(analysis)
     // The wording lives in :core:dsp beside the verdicts rendered below it, so
-    // that it is reachable by a test. This module has no test source set.
+    // that it is reachable by a test. No test on the CI path reaches this file.
     val insight = CoachingRules.eccentricTempoInsight(analysis.reps, targetEccS, TEMPO_TOLERANCE_S)
     Text(insight, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     analysis.verdicts.take(2).forEach {

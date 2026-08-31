@@ -33,8 +33,9 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
         // Plan-declared direction beats seed defaults and name inference: the
         // same movement pattern starts at the top on one machine and the
         // bottom on another, and no signal processing can tell which. The
-        // precedence itself now lives in SetGeometryPolicy, in a module that
-        // has tests; this file had none and could not be run against.
+        // precedence itself now lives in SetGeometryPolicy, where a test runs
+        // on it every push. This function is a suspend extension on
+        // SessionRepository, so no test on the CI path calls it.
         val exercise = SetGeometryPolicy.resolve(base, exerciseDef)
         // Described from the definition that was resolved, not from the plan,
         // so what the export publishes is what the DSP was handed.

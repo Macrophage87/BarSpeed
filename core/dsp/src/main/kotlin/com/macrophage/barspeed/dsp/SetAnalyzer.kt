@@ -532,8 +532,8 @@ object CoachingRules {
      * under the same chart on the session detail screen.
      *
      * Lifted verbatim out of `RecordScreen.EccTempoChart` so that it can be
-     * tested at all: `:app` has no test source set, so while this decision
-     * lived there nothing could execute it. It sits beside [verdicts] because
+     * tested at all: no test on the CI path renders a Compose chart, so while
+     * this decision lived there nothing could execute it. It sits beside [verdicts] because
      * the same card renders both, two lines apart.
      *
      * The rep is named by its own [RepAnalysis.index], not by its position

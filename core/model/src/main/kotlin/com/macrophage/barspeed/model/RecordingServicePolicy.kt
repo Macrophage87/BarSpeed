@@ -96,8 +96,8 @@ data class HoldTransition(val held: Set<RecordingHold>, val command: FgsCommand)
  * When the recording foreground service runs.
  *
  * Pure, and here rather than in `:app`, for the reason [RecordExitPolicy] is
- * here: `:app` has no test source set, so a decision written beside its callers
- * cannot be tested at all. Nothing in this file touches Android. The holder in
+ * here: no test on the CI path can construct its Android callers, so a
+ * decision written beside them cannot be tested at all. Nothing in this file touches Android. The holder in
  * `:app` keeps the set, calls this, and turns the command into a `startService`
  * or a `stopService`.
  *

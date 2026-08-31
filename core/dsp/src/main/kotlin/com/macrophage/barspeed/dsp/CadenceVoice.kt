@@ -31,8 +31,8 @@ data class ScriptedCall(
  * What a guided set SAYS, second by second, and what of it reaches the record.
  *
  * `GuidedCadenceRunner` in `:app` used to decide both, inline, in the same
- * function that sleeps -- and `:app` has one test file over one pure function,
- * so nothing could assert either. The arithmetic of the BEATS was lifted into
+ * function that sleeps -- and no test on the CI path reaches that class, so
+ * nothing could assert either. The arithmetic of the BEATS was lifted into
  * [CadencePlan] for that reason (issue 106); this is the same move for the
  * WORDS (issue 176). The runner keeps the sleeping and the callbacks and
  * decides nothing.

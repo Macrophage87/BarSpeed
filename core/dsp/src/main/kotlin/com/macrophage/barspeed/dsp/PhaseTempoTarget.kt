@@ -6,8 +6,9 @@ import com.macrophage.barspeed.model.Tempo
 /**
  * How many seconds the phase a lift is currently in was prescribed.
  *
- * This is `RecordScreen.phaseTargetS` lifted out of `:app`, which has no test
- * source set, so nothing there could ever be run against it. It lives here so
+ * This is `RecordScreen.phaseTargetS` lifted out of `:app`, where no test on
+ * the CI path can render a `@Composable`, so nothing there could ever be run
+ * against it. It lives here so
  * one thing can be true of the whole app: the mapping from a phase to a digit
  * is stated once.
  *
@@ -31,8 +32,8 @@ import com.macrophage.barspeed.model.Tempo
  * reached -- `beginSet` derives `guidedSet` from the same expression the ring
  * parses its tempo from -- so the ring's target is null in every reachable
  * state, before this change and after it. The ring calls through here
- * regardless, because a third copy of this decision in a module with no test
- * source set is the thing that had to stop existing.
+ * regardless, because a third copy of this decision inside a Compose screen no
+ * test can render is the thing that had to stop existing.
  *
  * THE TWO PAUSE PHASES ARE NOT RESOLVED, and must not be. Digit 2 is the pause
  * at the bottom and digit 4 the pause at the top, which is exactly what

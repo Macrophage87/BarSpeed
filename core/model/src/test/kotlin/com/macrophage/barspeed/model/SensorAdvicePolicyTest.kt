@@ -6,7 +6,7 @@ import kotlin.test.assertNotEquals
 
 /**
  * What Record's SETUP card tells the lifter about a disconnected bar
- * sensor, pinned here because :app has no test source set of its own.
+ * sensor, pinned here because no test on the CI path renders that card.
  *
  * All four [ConnectionState] variants are exercised, not just [ConnectionState.Failed]:
  * the gate this feeds is `!imuConnected`, so Connecting and Disconnected

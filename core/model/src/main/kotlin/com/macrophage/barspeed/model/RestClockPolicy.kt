@@ -36,9 +36,9 @@ package com.macrophage.barspeed.model
  *
  * ## What this cannot check
  *
- * That `:app` hands in the right instants, or calls this at all. `:app` has one
- * test file and none of it reaches a coroutine or a composable, so that half is
- * compile- and lint-gated only.
+ * That `:app` hands in the right instants, or calls this at all. No test on the
+ * CI path reaches a coroutine or a composable, so that half is compile- and
+ * lint-gated only.
  */
 object RestClockPolicy {
     /**

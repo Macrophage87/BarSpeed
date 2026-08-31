@@ -12,9 +12,10 @@ import kotlin.test.assertTrue
  *
  * `PlanQueue.flattenPlan` builds the one [ExerciseDef] every set of an exercise
  * is recorded and analysed against, by copying the built-in definition and
- * overlaying eight declarations. That file lives in `:app`, which has no test
- * source set, so the precedence it relies on is pinned here on the properties
- * it reads -- before any of it moves.
+ * overlaying eight declarations. It is a suspend extension on
+ * `SessionRepository` in `:app` that no test on the CI path calls, so the
+ * precedence it relies on is pinned here on the properties it reads -- before
+ * any of it moves.
  *
  * The last test is the awkward one and the reason this file exists: three of
  * the eight declarations cannot express omission at all, so no amount of care

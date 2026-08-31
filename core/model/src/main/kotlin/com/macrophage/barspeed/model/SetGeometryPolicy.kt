@@ -86,8 +86,9 @@ data class ResolvedGeometry(
  * the one [ExerciseDef] a set is recorded against, and how to describe the
  * result afterwards.
  *
- * This lived in `app/.../PlanQueue.kt`, which is in a module with no test
- * source set, so nothing could run against it. [resolve] is that code moved
+ * This lived in `app/.../PlanQueue.kt`, inside a suspend extension on
+ * `SessionRepository` that no test on the CI path calls, so nothing could run
+ * against it. [resolve] is that code moved
  * without change; [describe] is new and reads its values off the definition
  * that was actually used, never recomputing them -- so what gets published
  * cannot drift from what the DSP was handed, whatever else changes upstream.

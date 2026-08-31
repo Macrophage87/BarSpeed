@@ -21,8 +21,8 @@ import kotlin.test.assertTrue
  *
  * ## What cannot be pinned here
  *
- * That admitting these runs would put bad velocity on the screen. `:app` has no
- * test source set and nothing here renders anything. What is pinned is the
+ * That admitting these runs would put bad velocity on the screen. No test on
+ * the CI path renders anything, here or in `:app`. What is pinned is the
  * input to that consequence: the runs exist, they clear every other gate, and
  * their displacement is a small fraction of the same set's batch ROM.
  */

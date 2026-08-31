@@ -9,8 +9,9 @@ import kotlin.test.assertTrue
 /**
  * The prep before a guided set, as [LeadInPlan] lays it out second by second.
  *
- * This arithmetic is here rather than in `GuidedCadenceRunner` because `:app`
- * has no test source set. The last per-second lead-in arithmetic that lived
+ * This arithmetic is here rather than in `GuidedCadenceRunner` because no test
+ * on the CI path reaches that class. The last per-second lead-in arithmetic
+ * that lived
  * there was wrong on every set the app had ever paced -- issue 106 -- and
  * nothing could say so.
  *

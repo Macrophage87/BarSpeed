@@ -65,7 +65,8 @@ import kotlin.test.assertTrue
  * counter, which speaks its own `"Last rep"` at the instant a rep is counted
  * rather than on a metronome schedule -- there the whole final rep is still
  * ahead. It is a different code path with a different clock and is out of
- * scope; `:app` has no test source set that could pin it either way.
+ * scope; no test on the CI path can construct the view model that owns it, so
+ * nothing could pin it either way.
  */
 class LastRepWarningTest {
     private val benchPress = LiftDirection(startsWith = StartPhase.ECCENTRIC, concentricUp = true)

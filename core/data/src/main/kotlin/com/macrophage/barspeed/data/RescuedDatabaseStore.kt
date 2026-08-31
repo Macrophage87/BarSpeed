@@ -15,7 +15,8 @@ import java.util.zip.ZipOutputStream
  * WHY IT IS A VALUE IN :core:data RATHER THAN A `when` IN :app. The card for
  * issue #111 makes four decisions off this split -- the title, whether to
  * list the files, what the discard dialog warns about, and whether SEND is
- * worth offering -- and made all four in a module with no test source set.
+ * worth offering -- and made all four inside a Compose card no test on the CI
+ * path can render.
  * That was measured, not assumed: this issue's own gate permuted those
  * branches in :app and the whole suite stayed green. Computed here, the split
  * is pinned by `RescuedDatabaseStoreTest` on every push, and :app is left
