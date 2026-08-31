@@ -709,8 +709,8 @@ class DevicePairingPolicyTest {
      * link comes up at all. At d334880 `roster` named one positionally and
      * this function returned it, so the Devices screen -- once it armed the
      * link at all -- would have brought a link up on whichever unit the
-     * registry happened to list first, and a set asking for two would have
-     * filed its stream under a label another paired unit also carried.
+     * registry happened to list first, and the set would have filed its
+     * stream under a label another paired unit also carried.
      *
      * Two links, two labels: a third paired unit is a setup to fix, not a
      * candidate to choose between.
@@ -862,26 +862,31 @@ class DevicePairingPolicyTest {
     }
 
     /**
-     * The Devices screen names the state and the next action, at the steps
-     * where there is one.
+     * DIFFERENTIAL, issue #198. The Devices screen stops promising something
+     * conditional on a declaration no plan makes any more.
      *
-     * The one sentence explaining that labelling is required lives on the
-     * RECORD screen and draws only when a plan declares two sensors, so the
-     * lifter doing the pairing has never been told. These are the same facts
-     * in this screen's own voice -- "under Devices" is not a useful locator
-     * when you are already there.
+     * Two of its four sentences describe a set that ASKS for two sensors --
+     * "a set asking for two records only one until they carry different
+     * labels" and "A set asking for two will record both streams". Nothing
+     * asks. Two labelled units record two streams on EVERY set, and a lifter
+     * who has just labelled a pair and is told the benefit arrives when some
+     * future plan requests it has been told something false about the app in
+     * front of them.
      *
-     * Silent at the two steps with nothing to fix. A single-sensor setup is
-     * the ordinary one, for every exercise, and nagging it about a second unit
-     * it does not have would make the line noise.
+     * The two silent steps stay silent and the collision sentence is
+     * untouched: neither mentions a request.
+     *
+     * These are the same facts as [DualSensorSetup.recordLine] in this
+     * screen's own voice -- "under Devices" is not a useful locator when you
+     * are already there -- rather than a second wording of them.
      */
     @Test
     fun `the devices screen names the step and the next action`() {
         assertNull(DualSensorSetup.devicesLine(DualSetupStep.NO_SENSOR))
         assertNull(DualSensorSetup.devicesLine(DualSetupStep.ONE_SENSOR), "one sensor is the ordinary setup")
         assertEquals(
-            "Label both sensors A and B - a set asking for two records only one until they carry " +
-                "different labels.",
+            "Label both sensors A and B - until they carry different labels only one stream is " +
+                "recorded.",
             DualSensorSetup.devicesLine(DualSetupStep.LABEL_BOTH),
         )
         assertEquals(
@@ -889,7 +894,7 @@ class DevicePairingPolicyTest {
             DualSensorSetup.devicesLine(DualSetupStep.LABELS_COLLIDE),
         )
         assertEquals(
-            "Both sensors are labelled. A set asking for two will record both streams.",
+            "Both sensors are labelled. Every set records both streams.",
             DualSensorSetup.devicesLine(DualSetupStep.READY),
         )
     }
