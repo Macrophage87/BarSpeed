@@ -855,8 +855,8 @@ private const val STEPPER_STEP = 1
  * Not drawn on READY, so the first set of a session cannot be adjusted -- the
  * same gap the load field had before READY got one of its own. Reaching it
  * needs `beginSet`, `endSet`, the in-set ring and `upcomingPlaysPrep` to read
- * the stated tempo as well as the slot's, which is four more reads in a module
- * whose one test file cannot run a composable, for a case the ask did not name.
+ * the stated tempo as well as the slot's, which is four more reads in code no
+ * test on the CI path can render, for a case the ask did not name.
  * Every other set of a
  * session is reachable, because the rest screen is drawn before each of them.
  */

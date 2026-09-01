@@ -108,11 +108,11 @@ enum class BlePermissionStep {
 /**
  * Pure decisions about Android's runtime Bluetooth permissions.
  *
- * These live here rather than in `:core:ble` or `:app` for one reason: neither
- * of those modules has a test source set, so a decision written there cannot
- * be tested at all. Nothing in this file calls Android. Callers pass
- * `Build.VERSION.SDK_INT` and the result of `checkSelfPermission`, and get a
- * decision back.
+ * These live here rather than in `:core:ble` or `:app` for one reason: `:core:ble`
+ * has no test source set at all, and no test on the CI path can construct the Android
+ * classes in `:app`, so a decision written there cannot be tested at all. Nothing in
+ * this file calls Android. Callers pass `Build.VERSION.SDK_INT` and the result of
+ * `checkSelfPermission`, and get a decision back.
  */
 object BlePermissionPolicy {
     /** First SDK level on which `BLUETOOTH_CONNECT` exists as a runtime permission. */
