@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.PlanEntity
 import com.macrophage.barspeed.data.PlanImportResult
+import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.PlanLifecycle
 import com.macrophage.barspeed.model.PlanStartDecision
 import com.macrophage.barspeed.model.PlanStartPolicy
@@ -17,6 +18,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -34,6 +37,14 @@ import kotlinx.coroutines.withContext
  * when the list does.
  */
 data class PlanRow(val entity: PlanEntity, val start: PlanStartDecision)
+
+/**
+ * What the "change body weight" control on this screen needs to draw itself
+ * (issue #199): the stored value, for the dialog's prefill only -- the button
+ * itself never shows it -- and the colour role the owner's four-state mapping
+ * assigns to what is currently stored.
+ */
+data class BodyWeightControl(val kg: Double?, val colorRole: BodyWeightPromptPolicy.BarColorRole)
 
 class PlansViewModel(app: Application) : AndroidViewModel(app) {
     private val container = (app as LiftingApp).container
@@ -112,6 +123,36 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
     val weightUnit =
         container.settings.weightUnit
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WeightUnit.KG)
+
+    /**
+     * The change-body-weight control's stored value and colour, issue #199.
+     *
+     * `System.currentTimeMillis()` is read fresh inside the `combine` rather
+     * than once at ViewModel construction: this screen is reached from a
+     * navigation stack the lifter can leave open for a long session, and a
+     * frozen "now" would let a value read as fresh for the rest of that
+     * session even after it crossed [BodyWeightPromptPolicy.STALE_AFTER_DAYS].
+     * The default before the first DataStore emission -- `RED`, matching
+     * [BodyWeightPromptPolicy.StoredBodyWeight.ABSENT] -- is deliberate: this
+     * app reads an unset body weight as absent everywhere else, and a stale
+     * momentary VOLT default would say "fresh" about a value nobody has
+     * checked yet.
+     */
+    val bodyWeight: StateFlow<BodyWeightControl> =
+        container.settings.bodyWeightKg
+            .combine(container.settings.bodyWeightSetAtMs) { kg, setAtMs ->
+                val stored = BodyWeightPromptPolicy.stateOf(kg, setAtMs, System.currentTimeMillis())
+                BodyWeightControl(kg = kg, colorRole = BodyWeightPromptPolicy.colorRoleFor(stored))
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                BodyWeightControl(kg = null, colorRole = BodyWeightPromptPolicy.BarColorRole.RED),
+            )
+
+    fun setBodyWeight(kg: Double) {
+        viewModelScope.launch { container.settings.setBodyWeightKg(kg) }
+    }
 
     fun import(text: String) {
         viewModelScope.launch { stage(text) }

@@ -18,7 +18,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,39 +55,6 @@ import java.util.Locale
 
 private const val KG_PER_TONNE = 1000.0
 
-/**
- * Body weight is the base load for pull-ups, dips and other bodyweight work,
- * where the plan prescribes only what was ADDED (or assisted away).
- */
-@Composable
-private fun BodyWeightDialog(current: Double?, unit: WeightUnit, onDismiss: () -> Unit, onSet: (Double) -> Unit) {
-    var text by remember { mutableStateOf(current?.let { unit.inputValue(it) } ?: "") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Body weight") },
-        text = {
-            Column {
-                Text(
-                    "Used as the base load for pull-ups, dips and other bodyweight work — " +
-                        "those plans prescribe only the weight you add or take off.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = BarColors.Sub,
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    label = { Text("Weight (${unit.suffix})") },
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { unit.parseToKg(text)?.takeIf { it > 0 }?.let(onSet) }) { Text("Save") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewModel()) {
@@ -106,18 +72,6 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
     LaunchedEffect(Unit) {
         viewModel.refreshInterrupted()
         viewModel.refreshRescued()
-    }
-    var showBodyWeight by remember { mutableStateOf(false) }
-    if (showBodyWeight) {
-        BodyWeightDialog(
-            current = state.bodyWeightKg,
-            unit = state.weightUnit,
-            onDismiss = { showBodyWeight = false },
-            onSet = {
-                viewModel.setBodyWeight(it)
-                showBodyWeight = false
-            },
-        )
     }
 
     Scaffold(
@@ -180,22 +134,6 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                 }
                 TextButton(onClick = { navController.navigate("guide") }, modifier = Modifier.weight(1f)) {
                     Text("Guide", color = BarColors.Sub)
-                }
-                // Demoted out of the top bar (#181). It used to sit beside the
-                // sensor dots reading an AMBER "Set BW" -- amber is this app's
-                // attention colour, so an unset body weight nagged from the
-                // first screen of every cold launch, including the great
-                // majority of sessions that put no bodyweight exercise on the
-                // bar. It is a setting, so it now sits in the settings row and
-                // is drawn in the subdued colour in both states. Nothing is
-                // lost by the demotion: a session that actually needs the
-                // number asks for it at the moment it needs it, in
-                // RecordScreen, gated by BodyWeightPromptPolicy.
-                TextButton(onClick = { showBodyWeight = true }, modifier = Modifier.weight(1f)) {
-                    Text(
-                        state.bodyWeightKg?.let { "BW ${state.weightUnit.inputValue(it)}" } ?: "Body wt",
-                        color = BarColors.Sub,
-                    )
                 }
             }
             Spacer(Modifier.height(6.dp))

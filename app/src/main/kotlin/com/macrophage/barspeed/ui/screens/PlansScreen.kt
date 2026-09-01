@@ -16,6 +16,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -41,9 +43,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.data.PlanEntity
 import com.macrophage.barspeed.data.PlanImportResult
+import com.macrophage.barspeed.model.BodyWeightPromptPolicy.BarColorRole
 import com.macrophage.barspeed.model.PlanBodyWeightPolicy
 import com.macrophage.barspeed.model.PlanStartDecision
 import com.macrophage.barspeed.ui.BarColors
+import com.macrophage.barspeed.ui.components.BodyWeightDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,8 +55,10 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
     val plans by viewModel.planRows.collectAsState(emptyList())
     val importResult by viewModel.importResult.collectAsState()
     val weightUnit by viewModel.weightUnit.collectAsState()
+    val bodyWeight by viewModel.bodyWeight.collectAsState()
     var showImportDialog by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
+    var showBodyWeightDialog by remember { mutableStateOf(false) }
     // The id survives a rotation; the prompt is re-derived from the list, so a
     // plan deleted underneath the dialog takes the dialog with it rather than
     // leaving a confirm button pointed at a row that no longer exists.
@@ -98,6 +104,28 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(12.dp))
+            // Below the imports and their explanatory line, per the owner's own
+            // placement instruction on #199: importing a plan is why a lifter
+            // opens this screen, not changing their body weight. The button
+            // shows ONE FIXED LABEL in every state and never the stored value
+            // -- the owner's rule is that the number does not need to be in
+            // front of him. The colour is the only signal, from the same
+            // four-state mapping BodyWeightPromptPolicy already used to decide
+            // whether RecordScreen should ask: red means nothing usable is
+            // stored, amber means what is stored cannot be trusted (either no
+            // recorded date, or dated 14+ days ago), volt means it is dated and
+            // recent. This is NOT a reversal of #181 -- #181 demoted body
+            // weight because an amber chip nagged from the HOME screen on
+            // every cold launch; the colour is acceptable here because a
+            // lifter reaches Plans deliberately, not on every cold launch.
+            Button(
+                onClick = { showBodyWeightDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = bodyWeightButtonColors(bodyWeight.colorRole),
+            ) {
+                Text("Change body weight")
+            }
+            Spacer(Modifier.height(12.dp))
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(plans) { row ->
                     PlanCard(
@@ -114,6 +142,18 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
     confirmingPlanId
         ?.let { id -> plans.firstOrNull { it.entity.id == id } }
         ?.let { row -> ConfirmSwitchDialog(row, viewModel) { confirmingPlanId = null } }
+
+    if (showBodyWeightDialog) {
+        BodyWeightDialog(
+            current = bodyWeight.kg,
+            unit = weightUnit,
+            onDismiss = { showBodyWeightDialog = false },
+            onSet = {
+                viewModel.setBodyWeight(it)
+                showBodyWeightDialog = false
+            },
+        )
+    }
 
     if (showImportDialog) {
         AlertDialog(
@@ -230,6 +270,35 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
         }
         null -> {}
     }
+}
+
+/**
+ * The owner's four-state colour mapping (issue #199), read off the theme's
+ * own colour scheme rather than [BarColors] directly: `error`/`onError` are
+ * already [BarColors.Red]/[BarColors.Bg] and `tertiary`/`onTertiary` are
+ * already [BarColors.Amber]/[BarColors.Bg] (see [com.macrophage.barspeed.ui.LiftingTheme]'s
+ * `DarkColors`), so this only has to choose a role rather than hand-pick a
+ * contrasting text colour a second time. VOLT needs no override at all --
+ * [ButtonDefaults.buttonColors]'s default IS `primary`/`onPrimary`, which the
+ * same colour scheme already maps to [BarColors.Volt]/[BarColors.Bg].
+ *
+ * Exhaustive with no `else`, matching [com.macrophage.barspeed.ui.components.SensorDot]'s
+ * own construction: a fifth [BarColorRole] must fail this file to compile
+ * rather than silently drawing the wrong colour.
+ */
+@Composable
+private fun bodyWeightButtonColors(role: BarColorRole): ButtonColors = when (role) {
+    BarColorRole.RED ->
+        ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.error,
+            contentColor = MaterialTheme.colorScheme.onError,
+        )
+    BarColorRole.AMBER ->
+        ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.tertiary,
+            contentColor = MaterialTheme.colorScheme.onTertiary,
+        )
+    BarColorRole.VOLT -> ButtonDefaults.buttonColors()
 }
 
 /**
