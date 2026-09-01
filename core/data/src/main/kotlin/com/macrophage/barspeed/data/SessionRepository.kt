@@ -157,9 +157,11 @@ data class CompletedSet(
      *
      * Built by `PrepWindowPolicy` in `:core:model` and by nothing else. Null on
      * a set that ran no prep, on one ended while its prep was still running,
-     * and on every set recorded by a build that could not state one -- three
-     * different reasons for the same silence, and none of them is a claim that
-     * the lifter was never stationary.
+     * on every set recorded by a build that could not state one, and on a set
+     * whose only durable copy is its `SetJournal` zip, which holds the prep's
+     * samples and has no prep concept at all -- four different reasons for
+     * the same silence, and none of them is a claim that the lifter was never
+     * stationary.
      *
      * Defaulted last, so a positional constructor call in a test or a screen
      * keeps compiling and keeps meaning what it meant.

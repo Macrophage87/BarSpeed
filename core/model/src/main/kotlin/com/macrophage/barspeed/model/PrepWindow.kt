@@ -31,8 +31,8 @@ package com.macrophage.barspeed.model
  */
 data class PrepWindow(
     /**
-     * When recording began -- the lifter's tap, taken in `beginSet` on the
-     * statement before the set journal is opened.
+     * When recording began -- the lifter's tap, taken in `beginSet` before
+     * the set journal is opened.
      *
      * Equal to `SetRecordEntity.startedAtMs` for every set this build records.
      * Carried here anyway rather than left to be joined from the row, because

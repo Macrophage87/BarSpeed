@@ -467,10 +467,9 @@ class RawExporterTest {
      * The zip half needs no exporter change -- every stream is named
      * `set%02d_<exercise>_<kind>.csv` and the loop writes all of them -- but
      * the manifest publishes a header per format, and a file whose column
-     * layout is stated nowhere is a file a reader has to guess at. The three
-     * existing `csvHeader*` keys are the whole of that statement; a fourth
-     * format arriving without one is the near neighbour this test exists to
-     * catch.
+     * layout is stated nowhere is a file a reader has to guess at. The
+     * `csvHeader*` keys are the whole of that statement, and a format
+     * arriving without one is the near neighbour this test exists to catch.
      *
      * The instants are asserted through the archive's own bytes, so what is
      * checked is what a coach opening the zip gets rather than what the

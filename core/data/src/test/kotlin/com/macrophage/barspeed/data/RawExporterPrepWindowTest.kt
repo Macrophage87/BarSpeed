@@ -154,10 +154,10 @@ class RawExporterPrepWindowTest {
      * the still window.
      *
      * Pinned before anything reads it that way. `beginSet` takes this instant
-     * and opens the set journal on the next statement, so the prep -- and the
-     * stationary period inside it -- begins here; a change that made this key
-     * mean the set's clock instead would move the window's start without
-     * moving the key, and every reader would go on believing it.
+     * before it opens the set journal, so the prep -- and the stationary
+     * period inside it -- begins here; a change that made this key mean the
+     * set's clock instead would move the window's start without moving the
+     * key, and every reader would go on believing it.
      */
     @Test
     fun `the descriptor's startedAt_ms is the instant the set began recording`() = runTest {
