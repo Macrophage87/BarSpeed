@@ -184,4 +184,37 @@ object BodyWeightPromptPolicy {
         ageDays == 1L -> "set 1 day ago"
         else -> "set $ageDays days ago"
     }
+
+    /**
+     * The colour role a "change body weight" control should draw in, one of
+     * the owner's four states (issue #199).
+     *
+     * Two members share a colour deliberately -- [StoredBodyWeight.UNKNOWN_AGE]
+     * and [StoredBodyWeight.DATED_STALE] are both [AMBER][BarColorRole.AMBER] --
+     * but each is its OWN arm rather than a grouped one. A `when` with no
+     * `else` is what makes a fifth [StoredBodyWeight] member fail this compile
+     * instead of silently defaulting; grouping the two amber arms into one
+     * `StoredBodyWeight.UNKNOWN_AGE, StoredBodyWeight.DATED_STALE ->` branch
+     * would still be exhaustive today but reads as an invitation to add a
+     * later `else` the day a fifth state arrives.
+     *
+     * This is NOT a reversal of #181. #181 demoted body weight specifically
+     * because an amber chip nagged from the HOME screen on every cold launch,
+     * including the majority of sessions with no bodyweight exercise in them.
+     * The colour is acceptable here because the control that carries it no
+     * longer lives there -- issue #199 moves it to the Plans screen, which a
+     * lifter reaches deliberately, so a red or amber control there is
+     * information offered at a moment it is wanted rather than a demand at a
+     * moment it is not.
+     */
+    enum class BarColorRole { RED, AMBER, VOLT }
+
+    fun colorRoleFor(state: StoredBodyWeight): BarColorRole = when (state) {
+        // Deliberately wrong: c2 of #199/#200, proving BodyWeightColorRoleTest
+        // fails before the real mapping lands in the next commit.
+        StoredBodyWeight.ABSENT -> BarColorRole.VOLT
+        StoredBodyWeight.UNKNOWN_AGE -> BarColorRole.VOLT
+        StoredBodyWeight.DATED_STALE -> BarColorRole.VOLT
+        StoredBodyWeight.DATED_FRESH -> BarColorRole.VOLT
+    }
 }
