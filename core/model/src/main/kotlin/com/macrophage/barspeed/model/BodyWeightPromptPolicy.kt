@@ -210,11 +210,9 @@ object BodyWeightPromptPolicy {
     enum class BarColorRole { RED, AMBER, VOLT }
 
     fun colorRoleFor(state: StoredBodyWeight): BarColorRole = when (state) {
-        // Deliberately wrong: c2 of #199/#200, proving BodyWeightColorRoleTest
-        // fails before the real mapping lands in the next commit.
-        StoredBodyWeight.ABSENT -> BarColorRole.VOLT
-        StoredBodyWeight.UNKNOWN_AGE -> BarColorRole.VOLT
-        StoredBodyWeight.DATED_STALE -> BarColorRole.VOLT
+        StoredBodyWeight.ABSENT -> BarColorRole.RED
+        StoredBodyWeight.UNKNOWN_AGE -> BarColorRole.AMBER
+        StoredBodyWeight.DATED_STALE -> BarColorRole.AMBER
         StoredBodyWeight.DATED_FRESH -> BarColorRole.VOLT
     }
 }
