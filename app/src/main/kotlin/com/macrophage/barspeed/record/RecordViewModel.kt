@@ -47,6 +47,8 @@ import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.RestClockPolicy
+import com.macrophage.barspeed.model.RestControl
+import com.macrophage.barspeed.model.RestControlPolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SensorRoster
@@ -1726,9 +1728,50 @@ private fun adHocSessionState(s: RecordState): RecordState = s.copy(
  * function over [RecordState], and `LastPlannedSetTest` is the only thing on
  * the CI path that can reach what tapping START does to the queue.
  */
+/**
+ * The state starting another set leaves behind, or null where starting one is
+ * not a thing that may be done (#195).
+ *
+ * A free function for [advancedState]'s reason, and this one is not a
+ * preference -- `RecordViewModel` measures 599 against detekt's `LargeClass`
+ * threshold of 600, which reports at 600 and not above it. The guard written
+ * inline reds `:app:detekt`, CI's first step, at 601/600; written as a `val`
+ * and an `if` it reds at 600/600. Returning null rather than a boolean is
+ * what keeps the call site the three lines it already was, and it is
+ * [appendedState]'s and [jumpedToExerciseState]'s idiom besides.
+ *
+ * THE CANCEL NOW FOLLOWS THE WRITE at the call site, which it did not before.
+ * Safe because both run on the main dispatcher inside one non-suspending
+ * function, so the countdown cannot resume between them; and harmless even if
+ * it could, because each tick copies whatever `stateFlow.value` holds at that
+ * moment and changes only `restRemainingS`, so a tick landing after the write
+ * cannot put the stage back.
+ *
+ * The SAME projection `RecordScreen`'s `restControls` makes, so the button
+ * and the tap cannot disagree about the state they are looking at.
+ * `hasNextSlot` is `nextSlot != null` -- the slot START would run, null after
+ * the last planned set and non-null again the moment the lifter appends one.
+ *
+ * Withheld means withheld: after the last planned set `startNextSet` returns
+ * without cancelling the rest clock or touching the queue, and the lifter
+ * either appends a set or finishes. The other case this refuses -- a close in
+ * flight -- is one the screen already stopped drawing, so the guard closes a
+ * tap nothing can currently deliver rather than removing a control.
+ */
+internal fun startedNextSetState(s: RecordState): RecordState? {
+    val screen =
+        RestControlPolicy.restScreen(
+            close = s.sessionClose,
+            askedToFinish = s.askingSessionRpe,
+            hasNextSlot = s.nextSlot != null,
+            adHoc = s.adHoc,
+        )
+    if (RestControl.START_NEXT_SET !in screen.controls) return null
+    return advancedState(s)
+}
+
 internal fun advancedState(s: RecordState): RecordState {
-    val next = s.nextSlot
-    if (s.adHoc || next == null) {
+    if (s.adHoc) {
         return s.copy(
             stage = Stage.READY,
             statedLoadKg = null,
@@ -1737,6 +1780,21 @@ internal fun advancedState(s: RecordState): RecordState {
             statedDurationS = null,
         )
     }
+    // Nothing to advance to, so advancing does nothing (#195). This branch
+    // used to share the ad-hoc one: it wrote READY and left `queueIndex`
+    // where it was, so the slot just recorded became the current slot again
+    // and `startNextSet` -- which calls `beginSet` in the same frame -- ran
+    // the finished set a second time. The row it wrote carried the plan's
+    // prescription with `added` false, so nothing in the export could tell it
+    // from the planned set it duplicated.
+    //
+    // The state is returned UNTOUCHED rather than moved to a close state: the
+    // lifter is on the rest screen and finishing is a decision they take, not
+    // one taken for them while the phone is on the floor. The screen no
+    // longer offers a control that reaches here -- `RestControlPolicy
+    // .restScreen` withholds START with no next slot -- so this is the
+    // second half of one rule rather than the only guard.
+    val next = s.nextSlot ?: return s
     return bakedState(s, next, s.queueIndex + 1)
 }
 
@@ -3551,10 +3609,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     /** One tap of the prep control; the work is in the free [applyPrepAdjustment]. */
     fun adjustPrep(deltaS: Int) = applyPrepAdjustment(stateFlow.value, deltaS, container.appScope, container.settings)
 
-    /** Advance to the next planned set, applying any in-rest load/rep edits. */
+    /** Advance to the next planned set; [startedNextSetState] says whether there is one (#195). */
     fun startNextSet() {
+        stateFlow.value = startedNextSetState(stateFlow.value) ?: return
         restJob?.cancel()
-        stateFlow.value = advancedState(stateFlow.value)
         beginSet()
     }
 

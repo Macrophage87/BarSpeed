@@ -131,27 +131,40 @@ object RestControlPolicy {
      * where every set after the first is started from this screen and there
      * is never a next slot to have.
      *
-     * Both are accepted and DELIBERATELY NOT READ in this commit. The
-     * function is the same answer the two existing forms give, wired in so
-     * that this branch's next commit is a difference in behaviour rather than
-     * a compile error -- see #195.
+     * WITH NO SET TO START, START NEXT SET IS WITHHELD (#195). It was drawn
+     * on the terminal rest screen and it was live: `advancedState` re-armed
+     * the slot just recorded, so the tap ran the finished set again and wrote
+     * a second `set_records` row with its own gzipped streams, the plan's
+     * prescription copied onto it and nothing an export could use to tell it
+     * from the planned set it duplicates. What the screen offers instead is
+     * the decision -- the finish, as the one filled control.
+     *
+     * THIS IS A GATE ON THE QUEUE, NOT ON THE LAST SET, which is what keeps
+     * #188's sequence working: the lifter appends a set through the explicit
+     * add control, the queue has a next slot again, and START comes back on
+     * the same screen with something real to run. Nothing here hides a
+     * control that would have worked.
+     *
+     * [adHoc] KEEPS START WITH NO QUEUE AT ALL, and that is the one place the
+     * re-arm survives on purpose. An ad-hoc session has no plan, so there is
+     * no prescribed slot for a re-armed set to be confused with, and coming
+     * back to READY is how it runs its second and every later set. Gating it
+     * on `hasNextSlot` would end an ad-hoc session after one set.
      *
      * [askedToFinish] is passed straight through to the two-argument form, so
      * the rating panel still replaces the finish control and cannot resurrect
-     * one an earlier state withheld.
+     * one an earlier state withheld. Withholding START is applied after that
+     * layering, so it cannot resurrect one either -- an in-flight close still
+     * draws nothing.
      */
-    // Both new inputs are accepted and not yet read, which detekt's
-    // UnusedParameter is right about and which is the point: this commit is
-    // the seam, and the commit after next is the only thing that changes what
-    // the screen draws. The suppression goes with it.
-    @Suppress("UnusedParameter")
     fun restScreen(
         close: SessionCloseState,
         askedToFinish: Boolean,
         hasNextSlot: Boolean,
         adHoc: Boolean,
     ): RestControls {
-        val drawn = controls(close, askedToFinish)
+        val base = controls(close, askedToFinish)
+        val drawn = if (adHoc || hasNextSlot) base else base - RestControl.START_NEXT_SET
         return RestControls(drawn, primaryOf(drawn))
     }
 
