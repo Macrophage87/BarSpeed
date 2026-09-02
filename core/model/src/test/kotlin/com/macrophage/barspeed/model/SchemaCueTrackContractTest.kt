@@ -112,4 +112,58 @@ class SchemaCueTrackContractTest {
             "nothing tells a reader whether a track with no Last rep row is by design or is the defect 176 fixed",
         )
     }
+
+    /**
+     * The published vocabulary names the word an abandoned set now ends on.
+     *
+     * `voiceCues` is the one place a reader is told what a cue row can say. A
+     * terminal word the app speaks and the document does not name is the same
+     * defect #176 fixed, in a new word: a reader looking for the end of a set
+     * finds `Done` documented, does not find it in the track, and concludes
+     * the set was never called over -- which is exactly what was true before
+     * this change and exactly what is no longer true after it.
+     *
+     * Narrow, and said so: this checks the word is NAMED. What emits it is
+     * `SetEnd.terminalCall` in `:core:dsp`, pinned there.
+     */
+    @Test
+    fun `the published export documents the cue an abandoned set ends on`() {
+        val voiceCues = schema("session-export.schema.json")["\$defs"]!!.jsonObject["set"]!!
+            .jsonObject["properties"]!!.jsonObject["voiceCues"]!!.jsonObject
+        val description = voiceCues["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "Set ended" in description,
+            "the cue vocabulary does not name the word a set the lifter stopped now ends on",
+        )
+        assertTrue(
+            "prescription" in description,
+            "nothing tells a reader that Done and Set ended mean different endings",
+        )
+    }
+
+    /**
+     * The version log says what an ABSENT boundary means, not only what a
+     * present one does.
+     *
+     * The half a reader skips at their peril, and the half that costs them.
+     * Every set recorded before this version that the lifter ended early
+     * carries no terminal row at all, and after it every guided set carries
+     * one. Without the sentence, a track with no terminal row is
+     * uninterpretable: it could be a set from an older release, an unguided
+     * set, or the defect. With it, the reader knows which question to ask.
+     */
+    @Test
+    fun `the version log says what a track with no terminal cue means`() {
+        val description =
+            schema("session-export.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
+                .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "Set ended" in description,
+            "the version log never mentions the terminal cue, so the change to voiceCues is unexplained",
+        )
+        assertTrue(
+            "no terminal cue" in description,
+            "nothing tells a reader how to read a guided set whose track ends on a stroke",
+        )
+    }
 }

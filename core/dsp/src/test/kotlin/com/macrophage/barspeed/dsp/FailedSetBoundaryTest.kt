@@ -215,4 +215,125 @@ class FailedSetBoundaryTest {
         assertEquals(SetEnd.STOPPED, call.utterance, "what the lifter hears")
         assertEquals(listOf(SetEnd.STOPPED), call.recorded, "what the archive keeps")
     }
+
+    // ------------------------------------------------------------------
+    // The differential: what changes for session 32 set 9, and what does not.
+    // ------------------------------------------------------------------
+
+    /**
+     * The instant the fix would have written, and where it comes from.
+     *
+     * NOT a measurement of the tap. v0.1.41 wrote no terminal row, so this
+     * archive does not hold the instant the lifter tapped the failure, and no
+     * amount of reading it will produce one. What it holds is the last raw IMU
+     * sample of the set, 1787341226905 -- and `endSet` cancels the sample
+     * collectors before anything else, so that sample is a LOWER bound on the
+     * tap and the tightest one the capture carries. Used here as the boundary a
+     * fixed app would have stamped, and labelled as a bound rather than as the
+     * tap, because the difference is the BLE delivery gap and nothing here
+     * measures it.
+     */
+    private val tapLowerBoundMs = 1_787_341_226_905L
+
+    /** The set's cue track as the fixed app would have written it. */
+    private fun boundedTrack() = track(fixture) + VoiceCue(tapLowerBoundMs, SetEnd.STOPPED)
+
+    /**
+     * The fix, stated as the rule's answer: the set is bounded.
+     *
+     * This is the whole of #141 at the level the rule works on. `NotCued` says
+     * nothing on the record ends this set; `Cued` says the set was called over
+     * at a named instant, and every consumer of [SetEnd] -- the rep-list
+     * boundary, `detectionsAfter`, and `RestClockPolicy`'s seed instant
+     * through `setOverCueAtMs` -- gets an answer where it had an absence.
+     */
+    @Test
+    fun `the boundary row bounds the set session 32 could not bound`() {
+        assertEquals(
+            SetEnd.Cued(tapLowerBoundMs),
+            SetEnd.of(boundedTrack()),
+            "a guided set the lifter ended is bounded at the word that ended it",
+        )
+    }
+
+    /**
+     * Null becomes zero, and zero is the true answer.
+     *
+     * The distinction this repository keeps re-learning, running the other
+     * way for once. Today set 9 reports null -- "nothing said when this set
+     * ended" -- and an analysis has to exclude it, which is what #141's field
+     * comment on field-33 records happening. Bounded, it reports 0: the set
+     * was called over and no detection began after that. That zero is
+     * measured, not defaulted.
+     *
+     * ZERO IS WHAT IT WILL ALWAYS REPORT, and this pin says so rather than
+     * leaving a reader to hope otherwise. The tap that ends the set is the tap
+     * that stops the recording, so no sample and therefore no drive start can
+     * lie beyond the boundary. The rule still runs, and a detection stamped
+     * after the boundary is still excluded -- asserted here on invented
+     * instants so the rule is pinned rather than assumed dead.
+     */
+    @Test
+    fun `set 9 reports a measured zero where it used to report an absence`() {
+        val everyDriveStartWithinTheSet = listOf(
+            1_787_341_216_000L,
+            1_787_341_220_000L,
+            1_787_341_224_000L,
+            tapLowerBoundMs,
+        )
+        assertEquals(
+            0,
+            SetEnd.of(boundedTrack()).detectionsAfter(everyDriveStartWithinTheSet),
+            "every drive of a tap-ended set began before the tap",
+        )
+        assertNull(
+            SetEnd.of(track(fixture)).detectionsAfter(everyDriveStartWithinTheSet),
+            "and the unbounded track still refuses to answer, which is the state being replaced",
+        )
+        assertEquals(
+            1,
+            SetEnd.of(boundedTrack()).detectionsAfter(everyDriveStartWithinTheSet + (tapLowerBoundMs + 1)),
+            "the rule is bounding, not merely reporting zero",
+        )
+    }
+
+    /**
+     * The earliest terminal instant wins, whichever word carries it.
+     *
+     * A set cannot be told to stop twice, and the second telling cannot un-tell
+     * the first -- the reasoning [SetEnd] already records for taking the first
+     * `Done`. The pair can only arise from a defect (the guide calling the
+     * prescription through while the tap is in flight), and the answer has to
+     * be total rather than depending on which word happens to sort first.
+     */
+    @Test
+    fun `the earliest terminal cue bounds the set whichever word it is`() {
+        assertEquals(
+            SetEnd.Cued(2_000L),
+            SetEnd.of(listOf(VoiceCue(1_000L, "Up"), VoiceCue(2_000L, SetEnd.STOPPED), VoiceCue(3_000L, SetEnd.DONE))),
+            "the abandoned-set word came first",
+        )
+        assertEquals(
+            SetEnd.Cued(2_000L),
+            SetEnd.of(listOf(VoiceCue(1_000L, "Up"), VoiceCue(2_000L, SetEnd.DONE), VoiceCue(3_000L, SetEnd.STOPPED))),
+            "and Done came first here",
+        )
+    }
+
+    /**
+     * A set already carrying the boundary is not given a second one.
+     *
+     * The near neighbour of the fix rather than a hypothetical: `endSet` is
+     * re-entrant-guarded but the write path is not the only caller of the
+     * voice, and a duplicate row would sit one instant later than the real
+     * boundary, where [SetEnd] would ignore it and a reader counting terminal
+     * rows would not.
+     */
+    @Test
+    fun `a set already carrying the boundary does not ask for another`() {
+        assertNull(
+            SetEnd.terminalCall(guided = true, spoken = boundedTrack()),
+            "the record already says when this set ended",
+        )
+    }
 }
