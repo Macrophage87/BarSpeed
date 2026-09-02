@@ -313,22 +313,29 @@ object SetLoadPolicy {
      * conservative; it is the feature switched off where it is used most.
      *
      * So the question is asked of whichever thing decides the coming set. With
-     * a planned slot ([hasPlannedNext]) that is the plan, and the answer is
-     * [plannedSameBlock] unchanged. Without one it is the exercise the lifter
-     * has selected on the rest screen -- the chips are right there and a tap on
-     * one is a decision about a different movement, which is the same boundary
-     * a block edge is.
+     * a planned slot -- which is exactly when [nextExerciseId] is non-null --
+     * that is the plan. Without one it is the exercise the lifter has selected
+     * on the rest screen: the chips are right there and a tap on one is a
+     * decision about a different movement, which is the same boundary a block
+     * edge is.
+     *
+     * THE COMING SLOT'S OWN IDENTITY IS TAKEN HERE, never an answer computed
+     * for it earlier. The rest screen can replace the slot coming up -- switch
+     * exercise, or append a set -- so a block answer frozen at the rest
+     * transition is about a slot that is no longer next. The comparison itself
+     * arrives with the commit that removes the suppression below.
      *
      * A null on either id means there is nothing to compare and nothing
      * carries.
      */
+    @Suppress("UnusedParameter")
     fun correctionCarryBlock(
-        hasPlannedNext: Boolean,
-        plannedSameBlock: Boolean,
         lastExerciseId: String?,
+        nextExerciseId: String?,
+        nextSetIndexInExercise: Int?,
         comingExerciseId: String?,
-    ): Boolean = if (hasPlannedNext) {
-        plannedSameBlock
+    ): Boolean = if (nextExerciseId != null) {
+        lastExerciseId != null
     } else {
         lastExerciseId != null && lastExerciseId == comingExerciseId
     }
@@ -365,9 +372,7 @@ object SetLoadPolicy {
      * of a block the standing statement is gone and the box has already been
      * seeded from the next slot's declaration, so equality alone would fire the
      * carry across the exercise change -- guaranteed on two consecutive
-     * body-weight blocks, where both sides are nothing added. A correction to
-     * the past can move the load of the set coming up; it can never move the
-     * load of a different movement.
+     * body-weight blocks, where both sides are nothing added.
      *
      * COMPARED AT THE BOX'S OWN RESOLUTION, not on the Double. The load box
      * quantises to 0.1 of the display unit, which is the whole of #45, so what

@@ -127,9 +127,9 @@ class SetLoadCorrectionTest {
         // from a declaration.
         assertTrue(
             SetLoadPolicy.correctionCarryBlock(
-                hasPlannedNext = false,
-                plannedSameBlock = false,
                 lastExerciseId = "back_squat",
+                nextExerciseId = null,
+                nextSetIndexInExercise = null,
                 comingExerciseId = "back_squat",
             ),
         )
@@ -139,17 +139,17 @@ class SetLoadCorrectionTest {
     fun `an ad-hoc set does not carry into a different movement`() {
         assertFalse(
             SetLoadPolicy.correctionCarryBlock(
-                hasPlannedNext = false,
-                plannedSameBlock = false,
                 lastExerciseId = "back_squat",
+                nextExerciseId = null,
+                nextSetIndexInExercise = null,
                 comingExerciseId = "bench_press",
             ),
         )
         assertFalse(
             SetLoadPolicy.correctionCarryBlock(
-                hasPlannedNext = false,
-                plannedSameBlock = false,
                 lastExerciseId = null,
+                nextExerciseId = null,
+                nextSetIndexInExercise = null,
                 comingExerciseId = null,
             ),
         )
@@ -158,20 +158,42 @@ class SetLoadCorrectionTest {
     @Test
     fun `a planned next set is decided by the plan, not by the selection`() {
         // The chips can hold a movement the plan is not about to run, so where
-        // there IS a declaration it is the declaration that decides.
+        // there IS a slot coming up it is that slot that decides.
         assertTrue(
             SetLoadPolicy.correctionCarryBlock(
-                hasPlannedNext = true,
-                plannedSameBlock = true,
                 lastExerciseId = "back_squat",
+                nextExerciseId = "back_squat",
+                nextSetIndexInExercise = 1,
                 comingExerciseId = "bench_press",
             ),
         )
+    }
+
+    @Test
+    fun `a next slot switched during the rest is a different block`() {
+        // Equipment busy? Switch exercise replaces the slot coming up while
+        // the rest screen is drawn, and the load correction is tapped after
+        // that. The block answer has to be read from the slot that is next
+        // NOW, because a correction to the past may move the load of the set
+        // coming up and may never move the load of a different movement --
+        // and where the two declarations render equal, two body-weight blocks
+        // being the guaranteed pair, the carry writes both the box and the
+        // standing statement, so the next set is RECORDED at that load.
         assertFalse(
             SetLoadPolicy.correctionCarryBlock(
-                hasPlannedNext = true,
-                plannedSameBlock = false,
                 lastExerciseId = "back_squat",
+                nextExerciseId = "bench_press",
+                nextSetIndexInExercise = 1,
+                comingExerciseId = "bench_press",
+            ),
+        )
+        // The chips still holding the finished movement does not rescue it:
+        // where there is a slot, the slot decides.
+        assertFalse(
+            SetLoadPolicy.correctionCarryBlock(
+                lastExerciseId = "back_squat",
+                nextExerciseId = "bench_press",
+                nextSetIndexInExercise = 1,
                 comingExerciseId = "back_squat",
             ),
         )
