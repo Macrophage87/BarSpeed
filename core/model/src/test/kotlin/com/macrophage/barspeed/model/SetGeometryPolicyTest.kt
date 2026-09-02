@@ -297,6 +297,54 @@ class SetGeometryPolicyTest {
         assertEquals(g, json.decodeFromString(ResolvedGeometry.serializer(), text))
     }
 
+    // ---- decoding a row stored before #223 (round 1) -------------------------
+
+    /**
+     * A row stored by any build up to and including v0.1.48 wrote a five-key
+     * `sources` object -- `sensorOnStack` did not exist in [GeometrySources]
+     * yet. [GeometrySources.sensorOnStack] must decode that row rather than
+     * throwing, because `SessionRepository.decodeGeometry` runs this exact
+     * deserializer against every stored `geometryJson`, on every read of a
+     * lifter's own history.
+     *
+     * Hand-written rather than produced by `encode()`: every fixture the
+     * current serializer writes already carries the sixth key, so none of
+     * them can exercise the absence this pins. RED before
+     * [GeometrySources.sensorOnStack] carries a default -- a
+     * `MissingFieldException` today, not merely a wrong value.
+     */
+    @Test
+    fun `a legacy five-key sources object decodes with the stack default`() {
+        val legacy =
+            """
+            {
+              "startsWith": "CONCENTRIC",
+              "concentricUp": true,
+              "horizontal": false,
+              "sensorOnStack": true,
+              "sensorInverted": false,
+              "travelRatio": 1.0,
+              "kind": "DYNAMIC",
+              "bodyweight": false,
+              "sources": {
+                "startsWith": "DECLARED",
+                "concentric": "DECLARED",
+                "plane": "SEEDED",
+                "kind": "SEEDED",
+                "travelRatio": "DEFAULT"
+              }
+            }
+            """.trimIndent()
+        val g = json.decodeFromString(ResolvedGeometry.serializer(), legacy)
+        // The measured VALUE is exactly what the row stored; decode does not
+        // touch it.
+        assertEquals(true, g.sensorOnStack)
+        // The row never tracked where that value came from -- #223 did not
+        // exist yet -- so the provenance cannot be recovered and reads as
+        // though nothing decided it.
+        assertEquals(GeometrySource.DEFAULT, g.sources.sensorOnStack)
+    }
+
     // ---- the field-37 shape, as it behaves today (#223) ---------------------
 
     /**
