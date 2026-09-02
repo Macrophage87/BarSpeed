@@ -662,11 +662,19 @@ class SessionRepository(
      * Seeded + user-defined exercises, id → definition. Unknown ids infer a kind from the name.
      *
      * `sensorOnStack` comes from [ExerciseDef.ridesStack] on both non-seed
-     * branches, so a set recorded on one of those machines carries the app's
-     * built-in mount whether it came from a plan or from the picker (#223). A
-     * plan that declares the key still overrides this in
-     * [SetGeometryPolicy.resolve]; an ad-hoc set has nothing to override it,
-     * which is exactly the case this covers.
+     * branches (#223), but this is the PLAN path only: its only caller is
+     * `PlanQueue.kt`'s `flattenPlan`. A set started from the exercise
+     * picker with no plan at all does not reach this method --
+     * `RecordState.currentExercise` resolves it instead, falling back to
+     * `ExerciseDef.seedById(…) ?: ExerciseDef(selectedExerciseId,
+     * selectedExerciseId)`, a bare constructor call whose `sensorOnStack` is
+     * the plain `false` default, never [ExerciseDef.ridesStack]. So an
+     * ad-hoc set on a stack machine still records bar-mounted today. This is
+     * unreachable in practice rather than merely uncovered:
+     * `RecordState.exerciseOptions` is `ExerciseDef.SEED`, and no id in
+     * [ExerciseDef.STACK_MOUNTED_IDS] is a seed entry, so the picker offers
+     * no machine this method's stack default would ever apply to.
+     * Reconciling the two paths is not done in this change.
      */
     suspend fun exerciseById(id: String): ExerciseDef {
         ExerciseDef.seedById(id)?.let { return it }

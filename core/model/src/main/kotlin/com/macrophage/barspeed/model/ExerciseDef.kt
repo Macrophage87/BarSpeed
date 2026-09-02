@@ -158,12 +158,19 @@ data class ExerciseDef(
          *   selectorised machines whose stack is the only place a sensor can
          *   ride the load.
          *
-         * Leg press and hack squat sleds are deliberately ABSENT although
-         * #223 names them. Their sled is the load itself and travels along an
-         * inclined rail, so it is not a stack riding the other end of a cable
-         * -- and `sensorOnStack` forces the measured axis to vertical
-         * (`LiftDirection.measuredPlane`), which on a 45-degree sled would be
-         * a claim about the axis nothing here has measured.
+         * Leg press and hack squat sleds are deliberately ABSENT here, though
+         * this disagrees with what the app itself now tells the model that
+         * writes a plan: `PLAN_PROMPT` in `GuideScreen.kt`, shipped to every
+         * user, names "leg press and hack squat sleds" beside the other
+         * families that must declare `sensorOnStack: true`. A declared
+         * `true` still wins in [SetGeometryPolicy.resolve] whether or not an
+         * id is in this table -- this table only supplies the default for an
+         * OMITTED key -- and either way, `sensorOnStack` forces the measured
+         * axis to vertical (`LiftDirection.measuredPlane`), which on a
+         * 45-degree sled is a claim about an axis nothing here has measured.
+         * Reconciling the two halves of #223 -- what this table seeds by
+         * default and what the shipped prompt tells the model to declare --
+         * is remaining work, not done in this change.
          */
         val STACK_MOUNTED_IDS: Set<String> =
             setOf(
