@@ -46,6 +46,8 @@ import com.macrophage.barspeed.model.PreviewSet
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
+import com.macrophage.barspeed.model.RemoveSetControl
+import com.macrophage.barspeed.model.RemoveSetTarget
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.RestClockPolicy
 import com.macrophage.barspeed.model.RestControl
@@ -1362,7 +1364,7 @@ internal fun appendedState(s: RecordState): RecordState? {
     if (s.adHoc) return null
     val placement =
         AddSetControl.placement(
-            s.queue.map { AddSetSlotKey(it.exercise.id, it.setIndexInExercise) },
+            s.queue.map { AddSetSlotKey(it.exercise.id, it.setIndexInExercise, it.isAddedSet) },
             queueIndex = s.queueIndex,
             upcomingIndex = s.upcomingIndex,
         ) ?: return null
@@ -1424,6 +1426,29 @@ internal fun appendedState(s: RecordState): RecordState? {
         repsInput = appended.reps?.toString() ?: s.repsInput,
         durationInput = appended.durationS?.toString() ?: s.durationInput,
     )
+}
+
+/**
+ * The state taking back an appended set leaves behind, or null when there is
+ * none to take (#206).
+ *
+ * The mirror of [appendedState], and the same division of labour:
+ * [RemoveSetControl.target] decides WHICH slot goes and whether the boxes have
+ * to follow, on a projection of the queue that a `:core:model` test can build;
+ * this function does the removal and the re-seed, on a type that lives in
+ * `:app`.
+ *
+ * `internal` for [appendedState]'s reason, and called from one place,
+ * [RecordViewModel.removeAddedSetOfCurrentExercise].
+ *
+ * c1 DECLARES THIS SEAM AND DOES NOT IMPLEMENT IT, for
+ * `RemoveSetControl.target`'s reason: c2's differentials have to fail because
+ * the rule is absent rather than because a placeholder rule disagreed.
+ */
+internal fun removedState(s: RecordState): RecordState? {
+    if (s.adHoc) return null
+    val target = s.removeSetTarget ?: return null
+    TODO("#206 c3: drop the slot at ${target.removeAt} and re-seed when ${target.wasUpcoming}")
 }
 
 /**
@@ -2298,6 +2323,30 @@ data class RecordState(
     val upcomingSlot: PlannedSlot? get() = queue.getOrNull(upcomingIndex)
 
     /**
+     * The appended set "Remove the set you added" would take, or null when
+     * there is none (#206).
+     *
+     * On the state rather than in [RecordViewModel] because the SCREEN needs
+     * it too: the control is drawn only when there is something to remove, and
+     * it names the set it will take. Two statements of which set that is would
+     * be one more than can be kept in agreement -- a button naming set 5 while
+     * the tap removes set 4 is the same class of defect as #45.
+     *
+     * `isAddedSet` is projected explicitly here, and [AddSetSlotKey] takes it
+     * without a default so this line cannot be forgotten.
+     */
+    val removeSetTarget: RemoveSetTarget?
+        get() = if (adHoc) {
+            null
+        } else {
+            RemoveSetControl.target(
+                queue.map { AddSetSlotKey(it.exercise.id, it.setIndexInExercise, it.isAddedSet) },
+                queueIndex = queueIndex,
+                upcomingIndex = upcomingIndex,
+            )
+        }
+
+    /**
      * The slot AFTER the one being set up, and null at the end of the queue.
      *
      * Read by the change-set dialog's captions and by nothing else: whether a
@@ -2820,6 +2869,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     /** One more set of the exercise just finished (#177, #188); every decision is [appendedState]'s. */
     fun addSetOfCurrentExercise() {
         stateFlow.value = appendedState(stateFlow.value) ?: return
+    }
+
+    /**
+     * Take back a set the lifter appended (#206); every decision is
+     * [removedState]'s.
+     *
+     * Nothing is written to Room here and nothing needs to be: the slot being
+     * removed has not run, so no row, no raw stream and no export entry exists
+     * for it. A set that HAS run is not reachable from this control at all --
+     * `RemoveSetControl.target` refuses every index below `upcomingIndex`.
+     */
+    fun removeAddedSetOfCurrentExercise() {
+        stateFlow.value = removedState(stateFlow.value) ?: return
     }
 
     fun startAdHocSession() {

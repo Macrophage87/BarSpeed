@@ -19,8 +19,15 @@ package com.macrophage.barspeed.model
  * the first; index 0 marks exactly the first set of a block. That is
  * [SetLoadPolicy.sameExerciseBlock]'s rule, read from here rather than
  * restated.
+ *
+ * [isAddedSet] is carried for #206, which needs to find the appended sets
+ * inside a block in order to take one back out. [AddSetControl] itself never
+ * reads it -- where a set came from says nothing about where the next one
+ * goes -- and it is deliberately WITHOUT a default so that a projection of
+ * the queue has to answer the question rather than inherit `false` and make
+ * every appended set silently unremovable.
  */
-data class AddSetSlotKey(val exerciseId: String, val setIndexInExercise: Int)
+data class AddSetSlotKey(val exerciseId: String, val setIndexInExercise: Int, val isAddedSet: Boolean)
 
 /**
  * Everything the app needs to know to append one more set of an exercise.
@@ -63,6 +70,46 @@ data class AddSetPlacement(
  */
 object AddSetControl {
     /**
+     * The queue indices of the block the slot at [anchorIndex] belongs to,
+     * inclusive at both ends, or null when [anchorIndex] is not a slot.
+     *
+     * Extracted from [placement] by #206 rather than restated there: removing
+     * an appended set has to search the same block the add extends, and "what
+     * is a block" written in two places is two rules that can disagree about
+     * a session running one movement in two consecutive blocks.
+     *
+     * THE FORWARD HALF IS [placement]'s SCAN, MOVED UNCHANGED, and it is the
+     * only half [placement] reads -- it takes `last + 1` and nothing else, so
+     * the backward scan added here cannot move its answer.
+     *
+     * THE BACKWARD HALF IS NEW and is the mirror of the same rule: a block
+     * starts at `setIndexInExercise == 0`, so the walk back stops on that
+     * slot, and it stops one earlier still if the slot before it is a
+     * different exercise. Both conditions are needed for the reason
+     * [placement] gives: the exercise id alone cannot end a block, and the
+     * index alone cannot say which exercise the block is of.
+     */
+    fun blockRange(blocks: List<AddSetSlotKey>, anchorIndex: Int): IntRange? {
+        if (anchorIndex !in blocks.indices) return null
+        val anchor = blocks[anchorIndex]
+        var first = anchorIndex
+        while (first > 0 &&
+            blocks[first].setIndexInExercise > 0 &&
+            blocks[first - 1].exerciseId == anchor.exerciseId
+        ) {
+            first--
+        }
+        var afterLast = anchorIndex + 1
+        while (afterLast < blocks.size &&
+            blocks[afterLast].exerciseId == anchor.exerciseId &&
+            blocks[afterLast].setIndexInExercise > 0
+        ) {
+            afterLast++
+        }
+        return first..afterLast - 1
+    }
+
+    /**
      * Where a set the lifter appends goes, and what it is a set OF.
      *
      * [blocks] is the whole queue projected through [AddSetSlotKey], including
@@ -95,13 +142,10 @@ object AddSetControl {
      * and neither is sufficient.
      */
     fun placement(blocks: List<AddSetSlotKey>, queueIndex: Int, upcomingIndex: Int): AddSetPlacement? {
-        if (queueIndex !in blocks.indices) return null
+        val block = blockRange(blocks, queueIndex) ?: return null
         val anchorIndex = queueIndex
         val anchor = blocks[anchorIndex]
-        var i = anchorIndex + 1
-        while (i < blocks.size && blocks[i].exerciseId == anchor.exerciseId && blocks[i].setIndexInExercise > 0) {
-            i++
-        }
+        val i = block.last + 1
         val upcoming = blocks.getOrNull(upcomingIndex)
         return AddSetPlacement(
             anchorIndex = anchorIndex,

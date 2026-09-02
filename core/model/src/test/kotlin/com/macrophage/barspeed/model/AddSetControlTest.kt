@@ -25,11 +25,11 @@ import kotlin.test.assertTrue
 class AddSetControlTest {
     /** Three sets of one exercise, then two of another. */
     private fun twoBlocks() = listOf(
-        AddSetSlotKey("back_squat", 0),
-        AddSetSlotKey("back_squat", 1),
-        AddSetSlotKey("back_squat", 2),
-        AddSetSlotKey("seated_row", 0),
-        AddSetSlotKey("seated_row", 1),
+        AddSetSlotKey("back_squat", 0, isAddedSet = false),
+        AddSetSlotKey("back_squat", 1, isAddedSet = false),
+        AddSetSlotKey("back_squat", 2, isAddedSet = false),
+        AddSetSlotKey("seated_row", 0, isAddedSet = false),
+        AddSetSlotKey("seated_row", 1, isAddedSet = false),
     )
 
     /**
@@ -37,17 +37,22 @@ class AddSetControlTest {
      * block.
      *
      * An appended slot carries the next index in the block, which is what
-     * makes the scan run THROUGH it -- indices 3 and 4 here are appended, and
-     * the block still ends where the row's index 0 starts. Added by #206 as
-     * characterization: removal has to find the same block, and the scan that
-     * finds it is about to be extracted out of `placement`.
+     * makes the scan run THROUGH it -- QUEUE indices 2 and 3 are the appended
+     * ones, and the block still ends where the row's index 0 starts. Added by
+     * #206 as characterization: removal has to find the same block, and the
+     * scan that finds it is about to be extracted out of `placement`.
+     *
+     * c0's copy of this comment said "indices 3 and 4 here are appended",
+     * which is wrong -- the list is five long and the squats occupy 0 through
+     * 3. Corrected here rather than reworded, and the flags below now say
+     * which two they are instead of leaving it to prose.
      */
     private fun blockWithTwoAppended() = listOf(
-        AddSetSlotKey("back_squat", 0),
-        AddSetSlotKey("back_squat", 1),
-        AddSetSlotKey("back_squat", 2),
-        AddSetSlotKey("back_squat", 3),
-        AddSetSlotKey("seated_row", 0),
+        AddSetSlotKey("back_squat", 0, isAddedSet = false),
+        AddSetSlotKey("back_squat", 1, isAddedSet = false),
+        AddSetSlotKey("back_squat", 2, isAddedSet = true),
+        AddSetSlotKey("back_squat", 3, isAddedSet = true),
+        AddSetSlotKey("seated_row", 0, isAddedSet = false),
     )
 
     private fun at(blocks: List<AddSetSlotKey>, index: Int) =
@@ -77,6 +82,67 @@ class AddSetControlTest {
     @Test
     fun `the block after an appended-to block starts where its own index zero is`() {
         assertEquals(5, assertNotNull(at(blockWithTwoAppended(), 4)).insertAt)
+    }
+
+    // ---- #206 c1: the block scan, extracted -------------------------------
+
+    /**
+     * Green pins on the extraction, not differentials. `blockRange`'s forward
+     * half IS `placement`'s scan moved unchanged; the backward half is new and
+     * `placement` does not read it, so these are the only thing that says the
+     * new half is right.
+     *
+     * Every anchor in a block must answer the SAME range, which is what makes
+     * "the block" a property of the block rather than of where the lifter
+     * happens to be standing in it.
+     */
+    @Test
+    fun `every anchor in a block reports the same block range`() {
+        val blocks = blockWithTwoAppended()
+        assertEquals(listOf(0..3, 0..3, 0..3, 0..3), (0..3).map { AddSetControl.blockRange(blocks, it) })
+        assertEquals(4..4, AddSetControl.blockRange(blocks, 4))
+    }
+
+    /**
+     * The backward half stops at a repeat of the same exercise, exactly as the
+     * forward half does. Anchored on the SECOND block's index 1, walking back
+     * on the exercise id alone would swallow the first block whole.
+     */
+    @Test
+    fun `the block range stops at the start of a repeated exercise block`() {
+        val twice =
+            listOf(
+                AddSetSlotKey("back_squat", 0, isAddedSet = false),
+                AddSetSlotKey("back_squat", 1, isAddedSet = false),
+                AddSetSlotKey("back_squat", 0, isAddedSet = false),
+                AddSetSlotKey("back_squat", 1, isAddedSet = false),
+            )
+        assertEquals(0..1, AddSetControl.blockRange(twice, 1))
+        assertEquals(2..3, AddSetControl.blockRange(twice, 3))
+    }
+
+    /**
+     * The backward half also stops where the PREVIOUS slot is a different
+     * exercise, which is the case `setIndexInExercise == 0` cannot cover:
+     * `jumpToExercise` pulls a block forward keeping the indices the plan gave
+     * it, so a block can legitimately open at index 1.
+     */
+    @Test
+    fun `the block range stops where the exercise changes even with no index zero`() {
+        val pulledForward =
+            listOf(
+                AddSetSlotKey("back_squat", 0, isAddedSet = false),
+                AddSetSlotKey("seated_row", 1, isAddedSet = false),
+                AddSetSlotKey("seated_row", 2, isAddedSet = false),
+            )
+        assertEquals(1..2, AddSetControl.blockRange(pulledForward, 2))
+    }
+
+    /** No slot, no block: the same refusal `placement` makes, and its source. */
+    @Test
+    fun `an index outside the queue has no block range`() {
+        assertNull(AddSetControl.blockRange(twoBlocks(), 5))
+        assertNull(AddSetControl.blockRange(emptyList(), 0))
     }
 
     /**
@@ -135,9 +201,11 @@ class AddSetControlTest {
      */
     @Test
     fun `appending twice puts the second set after the first`() {
-        val afterOneAppend = twoBlocks().toMutableList().apply { add(3, AddSetSlotKey("back_squat", 3)) }
+        val afterOneAppend =
+            twoBlocks().toMutableList().apply { add(3, AddSetSlotKey("back_squat", 3, isAddedSet = true)) }
         assertEquals(4, assertNotNull(at(afterOneAppend, 0)).insertAt)
-        val afterTwoAppends = afterOneAppend.toMutableList().apply { add(4, AddSetSlotKey("back_squat", 4)) }
+        val afterTwoAppends =
+            afterOneAppend.toMutableList().apply { add(4, AddSetSlotKey("back_squat", 4, isAddedSet = true)) }
         assertEquals(5, assertNotNull(at(afterTwoAppends, 0)).insertAt)
     }
 
@@ -149,10 +217,10 @@ class AddSetControlTest {
     fun `two consecutive blocks of one exercise are two blocks`() {
         val twice =
             listOf(
-                AddSetSlotKey("back_squat", 0),
-                AddSetSlotKey("back_squat", 1),
-                AddSetSlotKey("back_squat", 0),
-                AddSetSlotKey("back_squat", 1),
+                AddSetSlotKey("back_squat", 0, isAddedSet = false),
+                AddSetSlotKey("back_squat", 1, isAddedSet = false),
+                AddSetSlotKey("back_squat", 0, isAddedSet = false),
+                AddSetSlotKey("back_squat", 1, isAddedSet = false),
             )
         assertEquals(2, assertNotNull(at(twice, 0)).insertAt)
         assertEquals(4, assertNotNull(at(twice, 2)).insertAt)
@@ -178,10 +246,10 @@ class AddSetControlTest {
     fun `a block whose first slot survived a switch still ends the walk`() {
         val afterSwitch =
             listOf(
-                AddSetSlotKey("back_squat", 0),
-                AddSetSlotKey("back_squat", 1),
-                AddSetSlotKey("seated_row", 1),
-                AddSetSlotKey("seated_row", 2),
+                AddSetSlotKey("back_squat", 0, isAddedSet = false),
+                AddSetSlotKey("back_squat", 1, isAddedSet = false),
+                AddSetSlotKey("seated_row", 1, isAddedSet = false),
+                AddSetSlotKey("seated_row", 2, isAddedSet = false),
             )
         assertEquals(2, assertNotNull(at(afterSwitch, 0)).insertAt)
         assertEquals(4, assertNotNull(at(afterSwitch, 2)).insertAt)
