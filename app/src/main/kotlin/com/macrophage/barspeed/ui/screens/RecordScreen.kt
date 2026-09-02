@@ -1452,8 +1452,10 @@ private fun ChangeSetDialog(
  * filled place (#195) -- and this line sits beside one that already looks
  * like this. A mis-tap here used to be survivable only because the plan's
  * remaining sets are dropped whenever a session is finished early; since #206
- * it is survivable directly, because [RemoveSetSection] -- drawn immediately
- * below this on all three surfaces -- takes the set back out again.
+ * it is survivable directly, because [RemoveSetSection] -- called immediately
+ * below this at all three of the sites that call it, and drawn on the two
+ * where an appended set of the block can still be queued -- takes the set
+ * back out again.
  *
  * Repeatable: every tap appends one more, and nothing here or in
  * [RecordViewModel.addSetOfCurrentExercise] assumes at most one.
