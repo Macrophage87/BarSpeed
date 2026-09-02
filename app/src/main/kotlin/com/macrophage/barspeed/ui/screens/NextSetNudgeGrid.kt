@@ -66,8 +66,11 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  *
  * One tap is one decision. Left open, a second tap would compound onto the
  * first -- +10 then +5 is +15 -- and nothing on screen would say which of the
- * two readings had happened. What the change WAS stays visible: the Up next
- * card above strikes the plan's figure through and shows the new one, because
+ * two readings had happened. That holds only because the `done` flag is
+ * remembered ABOVE every early return in this function; see the comment at
+ * its declaration for what happens when it is not. What the change WAS stays
+ * visible: the Up next card above strikes the plan's figure through and shows
+ * the new one, because
  * `cardValues` reads the same `statedLoadKg` / `statedReps` / `statedDurationS`
  * the tap just wrote. Anything further goes through CHANGE NEXT SET, which is
  * also where CUSTOM leads.
@@ -83,9 +86,16 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  * `lastSetRpe` and `lastSetFailed`; `applyRepCorrection` and
  * `durationCorrectedState` each write `lastSetFailed`;
  * `addSetOfCurrentExercise` writes, through `appendedState`, the queue that
- * `setsLeftInExercise` is counted off. Every one of those is a rest-screen
- * control drawn BELOW this row, so acting on one can move the next target
- * under the finger that acted.
+ * `setsLeftInExercise` is counted off.
+ *
+ * THREE of those controls are drawn BELOW this row, inside `LastSetDetail`:
+ * the warm-up toggle (`WarmupMarkRow`), the effort re-rating (`RpeSelector`,
+ * opened from `LoggedEffortLine`) and the rep and duration corrections
+ * (`RepCorrectionRow`, `HoldCorrectionRow`). Acting on one of those can move
+ * the next target under the finger that acted. The FOURTH, `AddSetSection`,
+ * is drawn ABOVE: it sits inside `NextSetBlock`, which `RestingStage` calls
+ * before this row. So appending a set reflows what is UNDER this row rather
+ * than moving the control that was tapped.
  *
  * Whether that reaches the stacked-target hazard #137 removed elsewhere on
  * this screen is UNMEASURED and is a [Field] question, not a property claimed
@@ -94,6 +104,19 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  */
 @Composable
 internal fun NextSetNudgeSection(state: RecordState, viewModel: RecordViewModel) {
+    // HOISTED ABOVE EVERY EARLY RETURN IN THIS FUNCTION, and that placement is
+    // the whole of what makes the paragraph above true. A `remember` reached
+    // only on some compositions leaves no slot on the ones that return before
+    // it, so `done` re-initialises to false the next time the row draws --
+    // and the four rest-screen controls named under ## Placement can each
+    // empty `options` and refill it inside one rest. Below the returns, taking
+    // +10, marking the set a warm-up and unmarking it would put the row back
+    // with its answer forgotten, and a second tile would compound.
+    //
+    // Keyed on setsCompleted, as every other per-set page on this screen is:
+    // an answer given about one set must not survive into the next one's rest.
+    var done by remember(state.setsCompleted) { mutableStateOf(false) }
+    var changing by remember(state.setsCompleted) { mutableStateOf(false) }
     if (state.adHoc) return
     // The slot that just FINISHED. During RESTING `currentSlot` is that set,
     // not the one coming up -- `queueIndex` does not advance until START --
@@ -120,10 +143,6 @@ internal fun NextSetNudgeSection(state: RecordState, viewModel: RecordViewModel)
         )
     if (options.isEmpty()) return
 
-    // Keyed on setsCompleted, as every other per-set page on this screen is:
-    // an answer given about one set must not survive into the next one's rest.
-    var done by remember(state.setsCompleted) { mutableStateOf(false) }
-    var changing by remember(state.setsCompleted) { mutableStateOf(false) }
     if (changing) {
         ChangeSetDialog(state, viewModel, next, next = true) { changing = false }
     }

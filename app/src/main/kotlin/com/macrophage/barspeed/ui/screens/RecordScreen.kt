@@ -2642,12 +2642,15 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     NextSetBlock(state, viewModel)
     // Directly after the card it changes, and above SessionCloseControls,
     // which keeps its distance from START for #137's reason. Four of its
-    // inputs are written by rest-screen controls drawn BELOW it -- the warm-up
-    // mark, the effort re-rating, the rep and duration corrections, and the
-    // appended set -- so this row can appear or vanish part-way through a rest
-    // and shift what is under it. Whether that reaches #137's stacked-target
-    // hazard is unmeasured and is a [Field] question. Decides nothing itself;
-    // see [NextSetNudgeSection].
+    // inputs are written by rest-screen controls, and they are not all on the
+    // same side of it: three are BELOW, inside LastSetDetail -- the warm-up
+    // toggle, the effort re-rating, and the rep and duration corrections --
+    // while the fourth, AddSetSection, is ABOVE, inside the NextSetBlock call
+    // on the line before this one. So this row can appear or vanish part-way
+    // through a rest and shift what is under it, and an append reflows what
+    // is under the row rather than moving the control that was tapped.
+    // Whether that reaches #137's stacked-target hazard is unmeasured and is
+    // a [Field] question. Decides nothing itself; see [NextSetNudgeSection].
     NextSetNudgeSection(state, viewModel)
     SessionCloseControls(state, viewModel)
     Spacer(Modifier.height(16.dp))

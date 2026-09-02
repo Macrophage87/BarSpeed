@@ -106,9 +106,9 @@ data class NextSetNudge(
  * The effort scale asks how much more the lifter could have taken, in the
  * coarse notch a gym's equipment moves in; this grid is the finer control
  * offered afterwards, once the coarse claim has been made, and 2.5 kg is a
- * real pair of 1.25 kg plates. THE ROW IS AUTHORED HERE, NOT QUOTED. #214
- * carries no kilogram figures from the owner anywhere -- the only verbatim
- * row in it is *"basically 5-30 lbs"*, which is [LB_STEPS] -- and its
+ * real pair of 1.25 kg plates. THE ROW IS AUTHORED HERE, NOT QUOTED. The
+ * owner stated no kilogram ROW -- the only verbatim row in #214 is
+ * *"basically 5-30 lbs"*, which is [LB_STEPS] -- and #214's
  * requirement 2 asks that every kilogram figure be a whole multiple of the
  * effort scale's authoring rule, which 2.5, 7.5 and 12.5 are not. That is a
  * departure from the written requirement, taken on the plate argument above
