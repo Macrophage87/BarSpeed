@@ -317,15 +317,25 @@ object SetLoadPolicy {
      * unconditionally would let a correction to the past silently displace a
      * decision about the future.
      *
-     * So the two cases are separated by what is standing. [standingAddedKg] is
-     * the added load the coming set would currently be recorded at -- the
-     * lifter's standing statement where [standingStatedAddedKg] let one
-     * through, otherwise whatever the load box was seeded with. Where that is
-     * the number being corrected AWAY from, the app is about to repeat the
-     * mistake and the carry follows. Where it is anything else -- a plan
-     * prescribing 80 next, a load already retyped during the rest -- it is a
-     * separate statement about a different set and is left exactly as it is.
-     * Null is not a number being repeated and never follows.
+     * So the two cases are separated by what is standing, WITHIN THE BLOCK.
+     * [standingAddedKg] is the added load the coming set would currently be
+     * recorded at -- the lifter's standing statement where
+     * [standingStatedAddedKg] let one through, otherwise whatever the load box
+     * was seeded with. Where that is the number being corrected AWAY from and
+     * [sameExerciseBlock] holds, the app is about to repeat the mistake and the
+     * carry follows. Where it is anything else -- a plan prescribing 80 next, a
+     * load already retyped during the rest -- it is a separate statement about
+     * a different set and is left exactly as it is. Null is not a number being
+     * repeated and never follows.
+     *
+     * [sameExerciseBlock] IS THE SAME BOUND THE OTHER CARRIES TAKE, and for the
+     * same reason: #124 leaked one exercise's load into the next. Past the end
+     * of a block the standing statement is gone and the box has already been
+     * seeded from the next slot's declaration, so equality alone would fire the
+     * carry across the exercise change -- guaranteed on two consecutive
+     * body-weight blocks, where both sides are nothing added. A correction to
+     * the past can move the load of the set coming up; it can never move the
+     * load of a different movement.
      *
      * COMPARED AT THE BOX'S OWN RESOLUTION, not on the Double. The load box
      * quantises to 0.1 of the display unit, which is the whole of #45, so what
@@ -337,20 +347,15 @@ object SetLoadPolicy {
      * THE CAPTION SAYS WHEN THIS IS TRUE. A control that quietly changes a
      * second thing is worse than one that changes nothing, so the answer here
      * is what [correctionCaption] renders.
-     *
-     * [sameExerciseBlock] IS ACCEPTED HERE AND NOT YET READ. The bound it
-     * carries is the fix; this commit only puts it in the path, so the pin
-     * `the carry does not follow across an exercise change` is red by
-     * construction and the commit that reads the parameter is what makes it
-     * green.
      */
-    @Suppress("UnusedParameter")
     fun carryFollowsCorrection(
         standingAddedKg: Double?,
         recordedAddedKg: Double,
         unit: WeightUnit,
         sameExerciseBlock: Boolean,
-    ): Boolean = standingAddedKg != null && unit.inputValue(standingAddedKg) == unit.inputValue(recordedAddedKg)
+    ): Boolean = standingAddedKg != null &&
+        sameExerciseBlock &&
+        unit.inputValue(standingAddedKg) == unit.inputValue(recordedAddedKg)
 
     /**
      * What the correction says it changes, drawn under the row.
