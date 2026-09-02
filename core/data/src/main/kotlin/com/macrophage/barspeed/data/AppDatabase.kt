@@ -389,6 +389,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
+         * DECLARED EMPTY AND NOT REGISTERED, on purpose and only for one
+         * commit (#216).
+         *
+         * [Migration14To15Test] is written against this symbol before the hop
+         * exists, so that its failure is a real artifact rather than an
+         * assertion about one. With an empty body, no committed `15.json` and
+         * [DATABASE_VERSION] still 14, every one of its tests fails; the
+         * commit that fills this body registers it in the chain below and
+         * bumps the constant.
+         *
+         * A migration that is declared and NOT registered cannot run, so this
+         * intermediate state carries no risk to a database: Room sees the same
+         * chain, ending at 14, that the commit before it saw.
+         */
+        internal val MIGRATION_14_15 =
+            object : Migration(14, 15) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // Filled by the commit that bumps DATABASE_VERSION to 15.
+                }
+            }
+
+        /**
          * Open the database, having first made sure opening it cannot destroy
          * it. Issue #101.
          *
