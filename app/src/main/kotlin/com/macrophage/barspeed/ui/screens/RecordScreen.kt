@@ -86,6 +86,7 @@ import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PlanValueCaption
 import com.macrophage.barspeed.model.PlateMath
+import com.macrophage.barspeed.model.PreviewBlock
 import com.macrophage.barspeed.model.RecordExitPolicy
 import com.macrophage.barspeed.model.RestControl
 import com.macrophage.barspeed.model.RestControlPolicy
@@ -94,6 +95,8 @@ import com.macrophage.barspeed.model.SensorAdvice
 import com.macrophage.barspeed.model.SensorAdvicePolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRoster
+import com.macrophage.barspeed.model.SessionPreview
+import com.macrophage.barspeed.model.SessionPreviewPolicy
 import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.SetCardValue
 import com.macrophage.barspeed.model.SetCardValues
@@ -119,6 +122,7 @@ import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
 import com.macrophage.barspeed.record.SetRating
+import com.macrophage.barspeed.record.previewSet
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
 import com.macrophage.barspeed.ui.components.ExpandableNote
@@ -262,6 +266,7 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
         ) {
             when (state.stage) {
                 Stage.SETUP -> SetupStage(state, viewModel)
+                Stage.PREVIEW -> PreviewStage(state, viewModel)
                 Stage.READY -> ReadyStage(state, viewModel)
                 Stage.IN_SET -> InSetStage(state, viewModel)
                 Stage.RESTING -> RestingStage(state, viewModel)
@@ -273,6 +278,7 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
 
 private fun titleFor(state: RecordState): String = when (state.stage) {
     Stage.SETUP -> "New session"
+    Stage.PREVIEW -> state.previewSession?.name ?: "Session"
     Stage.READY -> state.planSessionName ?: "Ad-hoc session"
     Stage.IN_SET -> ""
     Stage.RESTING -> "Rest"
@@ -499,8 +505,35 @@ private fun BodyWeightPromptDialog(
     )
 }
 
+/**
+ * The whole of the upcoming session, read before anything starts (#202).
+ *
+ * WHAT IT DRAWS IS THE QUEUE. `state.queue` is the list the record flow walks,
+ * built once by `flattenPlan` when the session card was tapped and handed
+ * straight to the Start press; this composable projects each slot with
+ * `previewSet()` and phrases it with `SessionPreviewPolicy.setLine`, the same
+ * function `SlotCard` uses for "Up next" on the first set. Nothing here reads
+ * `PlanSessionDef`, so there is no second rendering of the plan to disagree
+ * with the set the lifter lands on.
+ *
+ * NOTHING IS STARTED WHILE THIS IS ON SCREEN. `RecordExitPolicy.promptFor`
+ * answers `NONE` for this stage, and it can, because `previewState` writes a
+ * stage, a name and a queue and nothing else -- see its own KDoc for the list
+ * of things that deliberately do not happen until START.
+ *
+ * The load, count and tempo shown are the slot's STANDING values, which before
+ * the first set are the plan's own; if a correction were ever standing when
+ * this drew, it would show what the flow will run rather than what the plan
+ * asked for, because that is the question the lifter is answering.
+ */
 @Composable
-private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
+private fun PreviewStage(state: RecordState, viewModel: RecordViewModel) {
+    // Drawn HERE and no longer on SETUP, because the prompt is raised by
+    // `requestPlanSession` and the only tap that reaches it is this screen's
+    // START. Left on SETUP it would have been a dialog nothing could open --
+    // the body-weight question would simply have stopped being asked, and the
+    // load recorded for every pull-up and dip of the session would have been
+    // whatever weight was last stored, with nothing on screen to say so.
     state.pendingBodyWeightSession?.let { pending ->
         BodyWeightPromptDialog(
             session = pending,
@@ -509,6 +542,96 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
             onSet = { viewModel.answerBodyWeightPrompt(it) },
         )
     }
+    val preview = SessionPreviewPolicy.of(state.queue.map { it.previewSet() })
+    SectionCaption("Before you start", color = BarColors.Volt)
+    Spacer(Modifier.height(4.dp))
+    Text(state.previewSession?.name ?: "Session", style = MaterialTheme.typography.headlineSmall)
+    Text(
+        previewSummary(preview),
+        style = MaterialTheme.typography.bodySmall,
+        color = BarColors.Sub,
+    )
+    Spacer(Modifier.height(12.dp))
+    preview.blocks.forEach { block ->
+        PreviewBlockCard(block, state.weightUnit)
+        Spacer(Modifier.height(8.dp))
+    }
+    Spacer(Modifier.height(4.dp))
+    // Disabled rather than hidden on an empty session: a plan session with no
+    // sets is a plan defect, and a START that silently vanished would read as
+    // the app being broken rather than the plan being empty.
+    // START is the SAME call the session picker card used to make. The preview
+    // did not add a second way into a session; it moved the one that exists
+    // behind a screen the lifter has read.
+    Button(
+        onClick = { state.previewSession?.let(viewModel::requestPlanSession) },
+        enabled = !preview.isEmpty && state.previewSession != null,
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+    ) {
+        Text("START", fontWeight = FontWeight.Bold)
+    }
+    Spacer(Modifier.height(8.dp))
+    OutlinedButton(onClick = viewModel::abandonSetup, modifier = Modifier.fillMaxWidth()) {
+        Text("Choose another session")
+    }
+}
+
+/**
+ * The one line under the session name.
+ *
+ * Warm-ups are named rather than netted out. "8 sets, 3 of them warm-ups" and
+ * "5 sets" describe different afternoons, and the lifter deciding whether they
+ * have time for this is reading for the first.
+ */
+private fun previewSummary(preview: SessionPreview): String {
+    if (preview.isEmpty) return "This session has no sets in it."
+    val parts =
+        listOfNotNull(
+            "${preview.blockCount} exercises",
+            "${preview.totalSets} sets",
+            preview.warmupSets.takeIf { it > 0 }?.let { "$it warm-up" },
+        )
+    return parts.joinToString(" · ")
+}
+
+/** One exercise block of the preview: its name, then every set of it in order. */
+@Composable
+private fun PreviewBlockCard(block: PreviewBlock, unit: WeightUnit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text(block.exerciseName, style = MaterialTheme.typography.titleSmall)
+            block.sets.forEach { set ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                ) {
+                    Text(
+                        // The same numbering the record flow shows on the set
+                        // itself, so a lifter can find the line they are on.
+                        "Set ${set.setIndexInExercise + 1}/${set.setsInExercise}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BarColors.Sub,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    Text(
+                        SessionPreviewPolicy.setLine(set, unit),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                if (set.warmup) {
+                    Text(
+                        "warm-up",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BarColors.Amber,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
     if (!state.imuConnected) {
         // The permission banner replaces this card's advice rather than sitting
         // beside it. The demo chip below is a sibling in this Column and stays
@@ -574,7 +697,7 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
         Spacer(Modifier.height(8.dp))
         state.planSessions.forEach { planSession ->
             Card(
-                onClick = { viewModel.requestPlanSession(planSession) },
+                onClick = { viewModel.openPreview(planSession) },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             ) {
                 Column(Modifier.padding(12.dp)) {
@@ -3293,13 +3416,21 @@ private fun SlotCard(
         Column(Modifier.padding(14.dp)) {
             SectionCaption(heading, color = if (highlight) BarColors.Volt else BarColors.Sub)
             // The values, and the plan's figures struck through wherever
-            // the lifter has changed them. What each figure SAYS is
+            // the lifter has changed them (#204). What each figure SAYS is
             // [SetCardValues.of]'s -- including the body-weight notation it
             // keeps on both sides of a strike, and including the stated zero
             // that a truthiness guard would drop on the floor -- and this
             // draws it. The line wraps rather than truncating: a struck pair
             // is roughly twice the width of the figure alone, and at 360dp
             // with font scale 2 there is not room for both on one line.
+            //
+            // #202 needs the PREVIEW to say this same set the same way, and
+            // two copies of one vocabulary drift. So the base text -- the
+            // words and figures with nothing struck -- has ONE source, and
+            // [SessionPreviewPolicy.setLine] is that source rendered plain;
+            // see its KDoc for which way the delegation runs. The strike is
+            // drawn on top of that base, here and only here, because the
+            // preview draws sets no lifter has deviated from yet.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(vertical = 4.dp),

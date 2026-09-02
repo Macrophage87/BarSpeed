@@ -20,6 +20,21 @@ import kotlin.test.assertTrue
  * the same reason the first pair are.
  */
 class RecordExitPolicyTest {
+    /**
+     * Reading the workout before it starts is not a session (#202). The queue
+     * has been built and written into the screen's state; no session row
+     * exists, no clock is running, no service has been asked for. A prompt here
+     * would be a gate over nothing, and a gate over nothing is how the prompt
+     * that matters loses its credibility.
+     */
+    @Test
+    fun `back leaves at once from the preview`() {
+        assertEquals(
+            ExitPrompt.NONE,
+            RecordExitPolicy.promptFor(Stage.PREVIEW, SetWriteState.NONE, SessionCloseState.NONE),
+        )
+    }
+
     @Test
     fun `back leaves at once from setup`() {
         assertEquals(

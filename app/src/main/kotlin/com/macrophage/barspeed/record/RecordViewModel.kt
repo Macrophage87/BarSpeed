@@ -42,6 +42,7 @@ import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PrepCase
 import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.PrepWindowPolicy
+import com.macrophage.barspeed.model.PreviewSet
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
@@ -248,6 +249,35 @@ data class PlannedSlot(
      */
     val isTimed: Boolean get() = durationS != null
 }
+
+/**
+ * This slot as the session preview reads it (#202).
+ *
+ * A PROJECTION, not a re-reading of the plan: every field is copied straight
+ * off the slot the record flow is going to run, with no arithmetic and no
+ * second consultation of `PlanSessionDef`. That is what stops the preview and
+ * the first set's "Up next" card ever disagreeing -- they are the same queue,
+ * rendered by the same `SessionPreviewPolicy.setLine`.
+ *
+ * It takes [loadKg], [reps], [durationS] and [tempo] -- the STANDING values --
+ * rather than their frozen `planned*` twins, because the preview answers "what
+ * am I about to lift", which is the question the record flow answers too.
+ */
+fun PlannedSlot.previewSet(): PreviewSet = PreviewSet(
+    exerciseName = exercise.displayName,
+    kind = exercise.kind,
+    bodyweight = exercise.bodyweight,
+    setIndexInExercise = setIndexInExercise,
+    setsInExercise = setsInExercise,
+    reps = reps,
+    durationS = durationS,
+    loadKg = loadKg,
+    tempo = tempo,
+    side = side,
+    implementCount = implementCount,
+    restS = restS,
+    warmup = warmup,
+)
 
 data class SetFeedback(
     val exerciseName: String,
@@ -1081,12 +1111,57 @@ private fun CoroutineScope.answerBodyWeight(
 }
 
 /**
+ * What starting a session resets, stated once for both starts, and the one
+ * thing it deliberately leaves alone: a new session does not inherit the last
+ * one's trailing rest window -- the previous session's close wrote it onto
+ * that session's last set where there was one and the write landed (#109),
+ * and it belongs to neither set here.
+ *
+ * Returns the start instant rather than writing it, because the field it
+ * belongs in is the ViewModel's and a free function has no business owning it.
+ */
+private fun openedSessionClocks(rr: MutableList<Double>, restHr: MutableList<HrSample>): Long {
+    rr.clear()
+    restHr.clear()
+    return System.currentTimeMillis()
+}
+
+/**
+ * The state a tap on a plan session card leaves behind: the queue BUILT and
+ * being read, and nothing started (#202).
+ *
+ * The whole of the guarantee "looking starts nothing" is the shortness of this
+ * function. It writes a stage, the session being read, and the queue. It does
+ * not stamp [RecordViewModel.sessionStartedAtMs], clear the R-R or rest-HR
+ * buffers, create a session row -- nothing does that until the first set is
+ * recorded -- or start the foreground service, which `beginSet` starts. Every
+ * one of those happens in `startPlanSession` and `beginSet` instead, on the far
+ * side of the Start press.
+ */
+private fun previewState(s: RecordState, planSession: PlanSessionDef, queue: List<PlannedSlot>): RecordState =
+    s.copy(stage = Stage.PREVIEW, previewSession = planSession, queue = queue, queueIndex = 0)
+
+/**
+ * Back to the session picker, dropping the queue. `RecordViewModel.abandonSetup`
+ * is the only caller and the preview's "Choose another session" is one of its
+ * two ways in (#202), which is why [RecordState.previewSession] is cleared
+ * here. The queue goes with it rather than being kept, so a second look
+ * re-flattens rather than redrawing a list the plan may no longer say.
+ */
+private fun previewCancelledState(s: RecordState): RecordState =
+    s.copy(stage = Stage.SETUP, previewSession = null, queue = emptyList(), queueIndex = 0)
+
+/**
  * The state opening a plan session leaves behind. Free function for
  * [openSession]'s reason.
  */
 private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue: List<PlannedSlot>): RecordState =
     s.copy(
         stage = Stage.READY,
+        // Cleared as the session starts: from here on it is running, not being
+        // read, and leaving the name behind would leave a second answer to
+        // "which session is this" that nothing keeps up to date.
+        previewSession = null,
         planSessionName = planSession.name,
         queue = queue,
         queueIndex = 0,
@@ -2126,6 +2201,18 @@ data class RecordState(
      */
     val bodyWeightSetAtMs: Long? = null,
     /**
+     * The plan session being READ on [Stage.PREVIEW], before anything has been
+     * started (#202). Null in every other stage.
+     *
+     * Held separately from [planSessionName], which is written by
+     * `planSessionState` at the Start press and is what the record screen's
+     * title and the stored session row read. Keeping the two apart is what
+     * makes "a session is being looked at" and "a session is running"
+     * different facts: nothing downstream of the preview can mistake a
+     * previewed session for a started one by reading the name.
+     */
+    val previewSession: PlanSessionDef? = null,
+    /**
      * The plan session waiting on the body-weight prompt, or null when nothing
      * is being asked.
      *
@@ -2699,27 +2786,26 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = stateFlow.value.copy(demoMode = !stateFlow.value.demoMode)
     }
 
-    /** The tap on a plan session in the picker; [askOrStartSession] decides. */
+    /** The START on the preview (#202); [askOrStartSession] decides. */
     fun requestPlanSession(planSession: PlanSessionDef) =
         askOrStartSession(stateFlow, planSession, System.currentTimeMillis(), ::startPlanSession)
+
+    /** A tap on a plan session card: build the queue and SHOW it; [previewState] starts nothing (#202). */
+    fun openPreview(planSession: PlanSessionDef) = viewModelScope.launch {
+        stateFlow.value = previewState(stateFlow.value, planSession, sessionRepository.flattenPlan(planSession))
+    }
 
     /** The body-weight prompt's answer, null meaning skip; [answerBodyWeight] decides. */
     fun answerBodyWeightPrompt(kg: Double?) =
         viewModelScope.answerBodyWeight(stateFlow, container.settings, kg, ::startPlanSession)
 
-    /** Start a session following the given plan session. */
+    /**
+     * Start on the queue the lifter has just READ -- the same list `openPreview`
+     * built, never a second flatten of the same plan (#202).
+     */
     private fun startPlanSession(planSession: PlanSessionDef) {
-        viewModelScope.launch {
-            sessionRrMs.clear()
-            // A new session does not inherit the last one's trailing rest
-            // window: the previous session's close wrote it onto that
-            // session's last set where there was one and the write landed
-            // (#109), and it belongs to neither set here.
-            restHrBuffer.clear()
-            sessionStartedAtMs = System.currentTimeMillis()
-            val queue = sessionRepository.flattenPlan(planSession)
-            stateFlow.value = planSessionState(stateFlow.value, planSession, queue)
-        }
+        sessionStartedAtMs = openedSessionClocks(sessionRrMs, restHrBuffer)
+        stateFlow.value = planSessionState(stateFlow.value, planSession, stateFlow.value.queue)
     }
 
     /** Equipment busy: every decision is [jumpedToExerciseState]'s; this is the tap. */
@@ -2733,9 +2819,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startAdHocSession() {
-        sessionRrMs.clear()
-        restHrBuffer.clear()
-        sessionStartedAtMs = System.currentTimeMillis()
+        sessionStartedAtMs = openedSessionClocks(sessionRrMs, restHrBuffer)
         stateFlow.value = adHocSessionState(stateFlow.value)
     }
 
@@ -3733,8 +3817,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             )
     }
 
+    /** Back to the session picker; every decision is [previewCancelledState]'s. */
     fun abandonSetup() {
-        stateFlow.value = stateFlow.value.copy(stage = Stage.SETUP, queue = emptyList(), queueIndex = 0)
+        stateFlow.value = previewCancelledState(stateFlow.value)
     }
 
     /** Demo/replay mode (spec 5): synthesizes a realistic set through the full pipeline. */

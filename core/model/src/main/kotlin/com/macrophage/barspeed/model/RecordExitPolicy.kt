@@ -212,8 +212,15 @@ object RecordExitPolicy {
      * The prompt to raise before leaving [stage], or [ExitPrompt.NONE] to leave
      * at once.
      *
-     * Three stages leave at once, and that is a decision rather than an
-     * omission. SETUP has started nothing. READY holds a chosen plan session
+     * Four stages leave at once, and that is a decision rather than an
+     * omission. SETUP has started nothing. PREVIEW has started nothing either,
+     * and that is the load-bearing claim of #202 rather than a convenience:
+     * reaching it builds the queue and writes it into the screen's state, and
+     * does not create a session row, start the foreground service, clear the
+     * R-R or rest-HR buffers, or stamp a session start time -- every one of
+     * which happens at the Start press that LEAVES this stage. A lifter who
+     * reads the workout and changes their mind has nothing to undo, so a
+     * prompt here would be a gate over nothing. READY holds a chosen plan session
      * and nothing else: the session row is not created until the first set is
      * recorded, no set is in flight, and the foreground service has not been
      * started — and it cannot be reached with sets already behind it, because
@@ -261,7 +268,7 @@ object RecordExitPolicy {
      * and its own prompt points at the retry instead.
      */
     fun promptFor(stage: Stage, write: SetWriteState, close: SessionCloseState): ExitPrompt = when (stage) {
-        Stage.SETUP, Stage.READY, Stage.FINISHED -> ExitPrompt.NONE
+        Stage.SETUP, Stage.PREVIEW, Stage.READY, Stage.FINISHED -> ExitPrompt.NONE
         Stage.IN_SET ->
             when (write) {
                 SetWriteState.NONE -> ExitPrompt.SET_IN_PROGRESS
