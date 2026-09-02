@@ -17,9 +17,24 @@ data class RepAnalysis(
      * counted on the drive alone). Never report an unmeasured phase as 0.
      */
     val eccS: Double?,
-    val bottomPauseS: Double,
+    /**
+     * Seconds the bar was still at the BOTTOM turnaround of this rep, between
+     * the rep's own two movement phases -- and null when this rep has no
+     * bottom turnaround inside it to measure.
+     *
+     * On a lift that starts at the top, the bottom is between the two phases
+     * and this carries it. On a lift that starts at the bottom, the bottom is
+     * the rep's own BOUNDARY: the stillness there runs on until the next drive
+     * begins and holds the lifter's rest, so there is no in-rep figure and this
+     * is null rather than a number measured over the wrong interval. It is also
+     * null on a rep counted from the drive alone, which resolved one phase and
+     * so has no turnaround at all. Issue #93: it used to carry the interval to
+     * the next drive, which reached 22.73 s on a leg press.
+     */
+    val bottomPauseS: Double?,
     val conS: Double,
-    val topPauseS: Double,
+    /** Seconds still at the TOP turnaround, on the same rule as [bottomPauseS]. */
+    val topPauseS: Double?,
     /** Mean drive velocity, positive in the direction the drive moves. */
     val meanConVelMps: Double,
     val peakConVelMps: Double,
@@ -36,7 +51,13 @@ data class RepAnalysis(
 data class PhaseComplianceResult(
     val phase: String,
     val prescribedS: Double?,
-    val actualMeanS: Double,
+    /**
+     * Mean of the reps that RESOLVED this phase, or null when none did -- which
+     * is every rep of the set for the pause at the end the rep boundary falls
+     * on (see [RepAnalysis.bottomPauseS]). A zero here would read as a phase
+     * the lifter passed through instantly.
+     */
+    val actualMeanS: Double?,
     val worstDeviationS: Double,
     val repsWithinTolerance: Int,
     val repsEvaluated: Int,
@@ -303,16 +324,22 @@ object SetAnalyzer {
         }
         val peakPower = conPower?.max()
         val meanConPower = conPower?.average()
-        // The pause after the DOWN stroke is the bottom pause, whichever phase
-        // that stroke happens to be.
-        val bottomPause = if (direction.startsAtTop) span.turnaroundPauseS else span.toNextMovementS
-        val topPause = if (direction.startsAtTop) span.toNextMovementS else span.turnaroundPauseS
+        // A pause is the stillness the rep's own phase boundaries CONTAIN, so
+        // there is exactly one per rep: the turnaround between its two phases.
+        // It sits at the bottom when the rep opened with the down stroke and at
+        // the top when it opened with the up stroke, and the OTHER end is the
+        // rep's boundary rather than an interval inside it -- what happens
+        // there belongs to the next rep's approach and to rest, and the
+        // segmenter cannot separate the two. Publishing it as a pause is what
+        // issue #93 measured at 22.73 s.
+        val bottomPause = if (direction.startsAtTop) span.turnaroundPauseS else null
+        val topPause = if (direction.startsAtTop) null else span.turnaroundPauseS
         return RepAnalysis(
             index = index,
             eccS = eccDur?.let { round2(it) },
-            bottomPauseS = round2(bottomPause),
+            bottomPauseS = bottomPause?.let { round2(it) },
             conS = round2(conDur),
-            topPauseS = round2(topPause),
+            topPauseS = topPause?.let { round2(it) },
             meanConVelMps = round3(meanCon),
             peakConVelMps = round3(peakCon),
             meanEccVelMps = meanEcc?.let { round3(it) },
@@ -368,7 +395,7 @@ object SetAnalyzer {
                 PhaseComplianceResult(
                     phase = def.name,
                     prescribedS = def.prescribed,
-                    actualMeanS = if (actuals.isEmpty()) 0.0 else round2(actuals.average()),
+                    actualMeanS = if (actuals.isEmpty()) null else round2(actuals.average()),
                     worstDeviationS = round2(deviations.maxByOrNull { abs(it) } ?: 0.0),
                     repsWithinTolerance =
                     if (scorable) actuals.count { abs(it - def.prescribed!!) <= toleranceS } else 0,
