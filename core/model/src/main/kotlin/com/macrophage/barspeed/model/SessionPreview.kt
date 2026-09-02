@@ -1,8 +1,9 @@
 package com.macrophage.barspeed.model
 
 /**
- * One planned set as any surface that LISTS a set reads it, projected out of
- * the queue slot the record flow is going to run (#202).
+ * One planned set as the session preview and the record flow's set card read
+ * it, projected out of the queue slot the record flow is going to run
+ * (#202).
  *
  * A projection, not a second model of the plan. Every field here is copied
  * one-for-one off the flattened queue slot with no arithmetic and no
@@ -130,7 +131,9 @@ object SessionPreviewPolicy {
      * The one line that states what a set is: side, count or hold, load and
      * tempo, in that order, separated by " · ".
      *
-     * ONE SOURCE FOR THE BASE TEXT OF A SET, WHICH IS THE WHOLE POINT.
+     * ONE SOURCE FOR THE BASE TEXT OF A SET ON THESE TWO SURFACES.
+     * PlanDetailScreen's SetGroupRow still builds its own line from the same
+     * vocabulary and is not unified here.
      * `SlotCard` in `:app` built this string inline until #202. It now draws
      * [SetCardValues.of]'s pairs, so that the plan's figure can be STRUCK
      * THROUGH and the figure the set will actually record put beside it

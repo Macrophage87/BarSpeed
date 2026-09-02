@@ -217,8 +217,10 @@ object RecordExitPolicy {
      * and that is the load-bearing claim of #202 rather than a convenience:
      * reaching it builds the queue and writes it into the screen's state, and
      * does not create a session row, start the foreground service, clear the
-     * R-R or rest-HR buffers, or stamp a session start time -- every one of
-     * which happens at the Start press that LEAVES this stage. A lifter who
+     * R-R or rest-HR buffers, or stamp a session start time -- the last two of
+     * which happen at the Start press that LEAVES this stage, while the
+     * session row waits for the first recorded set and the foreground service
+     * for beginSet. A lifter who
      * reads the workout and changes their mind has nothing to undo, so a
      * prompt here would be a gate over nothing. READY holds a chosen plan session
      * and nothing else: the session row is not created until the first set is
@@ -226,7 +228,7 @@ object RecordExitPolicy {
      * started — and it cannot be reached with sets already behind it, because
      * `startNextSet` writes READY and calls `beginSet` in the same frame.
      * FINISHED has already written everything and stopped the service.
-     * Prompting at any of the three would cost the prompt that matters its
+     * Prompting at any of the four would cost the prompt that matters its
      * credibility: a gate that fires where nothing is at risk teaches the
      * lifter to dismiss it without reading.
      *
