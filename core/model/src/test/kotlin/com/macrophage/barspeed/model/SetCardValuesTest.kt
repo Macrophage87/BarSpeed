@@ -3,6 +3,7 @@ package com.macrophage.barspeed.model
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * What the set card states, and which of its figures carry the plan's struck
@@ -239,6 +240,49 @@ class SetCardValuesTest {
                 plannedTempo = null,
                 tempo = null,
             ),
+        )
+    }
+
+    @Test
+    fun `the card states the load SetLoadPolicy will record`() {
+        // SetCardValues restates resolve's planned-set rule rather than
+        // calling it, because the card deals in strings and the policy in a
+        // Double. RecordViewModel hands both the same two facts -- resolve
+        // gets plannedAddedKg = slot.loadKg and statedAddedKg =
+        // state.statedLoadKg, which reach the card as declaredLoadKg and
+        // statedLoadKg -- so the two agree today. Nothing enforced it. A card
+        // stating a load the set will not record is the failure #204 exists
+        // to remove, so a later change to either rule reds here.
+        fun recorded(declared: Double?, stated: Double?) = SetLoadPolicy.resolve(
+            adHoc = false,
+            plannedAddedKg = declared,
+            typedAddedKg = 999.0,
+            statedAddedKg = stated,
+        )
+        // A statement displaces the declaration, a declaration stands alone,
+        // a stated zero is a statement, and the typed field -- one string
+        // reused across the session -- is not evidence on a planned set.
+        assertEquals(
+            WeightUnit.KG.format(recorded(declared = 90.0, stated = 100.0)),
+            load(values(declaredLoadKg = 90.0, statedLoadKg = 100.0)).stated,
+        )
+        assertEquals(
+            WeightUnit.KG.format(recorded(declared = 90.0, stated = null)),
+            load(values(declaredLoadKg = 90.0, statedLoadKg = null)).stated,
+        )
+        assertEquals(
+            WeightUnit.KG.format(recorded(declared = 90.0, stated = 0.0)),
+            load(values(declaredLoadKg = 90.0, statedLoadKg = 0.0)).stated,
+        )
+        // The one case where the two deliberately do not share a string:
+        // nothing declared and nothing stated records 0 added, and the card
+        // names no load at all rather than drawing a "0 kg" the plan never
+        // asked for. Absence stays absence on the screen.
+        assertEquals(0.0, recorded(declared = null, stated = null))
+        assertTrue(
+            values(plannedLoadKg = null, declaredLoadKg = null).none {
+                it.prefix.isEmpty() && it.suffix.isEmpty()
+            },
         )
     }
 
