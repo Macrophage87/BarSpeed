@@ -365,17 +365,16 @@ data class SessionExport(
          * minting 1.18, under the rule the 1.16 entry above applies to its
          * own second change: a number takes further entries until it ships,
          * and a new one is minted only once the previous number has shipped.
-         * 1.17 was minted on `main` by #207 and is unreleased -- the newest
-         * tag is v0.1.48 and `git show
-         * v0.1.48:core/model/.../SessionExport.kt` declares "1.16", while
-         * `git show origin/main:core/model/.../SessionExport.kt | grep
-         * SCHEMA_VERSION` declares "1.17". The published copy of this log in
-         * `docs/schemas/session-export.schema.json` says the same.
+         * 1.17 was minted on `main` by #207. 1.17 was UNRELEASED WHEN THAT WAS
+         * WRITTEN and is not now -- v0.1.49 shipped it, read by `git show
+         * v0.1.49:core/model/.../SessionExport.kt`. The published copy of
+         * this log in `docs/schemas/session-export.schema.json` says the
+         * same.
          *
          * 1.17 carries a THIRD change, under the same number and for the same
-         * reason the paragraph above gives: 1.17 is UNRELEASED, and the newest
-         * tag v0.1.48 ships 1.16, read by `git show
-         * v0.1.48:core/model/.../SessionExport.kt` rather than assumed. The
+         * reason the paragraph above gives: 1.17 was UNRELEASED WHEN THAT WAS
+         * WRITTEN and is not now -- v0.1.49 shipped it, read by `git show
+         * v0.1.49:core/model/.../SessionExport.kt` rather than assumed. The
          * change (#213): a set's `sensors` block may carry `silent`, an object
          * keyed by role naming each ARMED unit that put nothing in a buffer
          * for the whole set, and what the app could see of that unit's link
@@ -428,9 +427,9 @@ data class SessionExport(
          * rows recorded from this version on carry it. (#223)
          *
          * 1.17 carries a FIFTH change, under the same number and for the
-         * reason the paragraphs above give: 1.17 is UNRELEASED, and the
-         * newest tag v0.1.48 ships 1.16, read by `git show
-         * v0.1.48:core/model/.../SessionExport.kt` rather than assumed. The
+         * reason the paragraphs above give: 1.17 was UNRELEASED WHEN THAT WAS
+         * WRITTEN and is not now -- v0.1.49 shipped it, read by `git show
+         * v0.1.49:core/model/.../SessionExport.kt` rather than assumed. The
          * change (#224): a set's `sensors` block may carry `soleSilent`, a
          * single word for what the app could see of the ONE armed link on a
          * set whose stream carries no role. The third change keyed its word by
@@ -464,8 +463,9 @@ data class SessionExport(
          * whatever.
          *
          * 1.17 carries a SIXTH change (#215), under the same number and for
-         * the reason the paragraphs above give: 1.17 is UNRELEASED and the
-         * newest tag v0.1.48 ships 1.16. The ordinal counts against this file
+         * the reason the paragraphs above give: 1.17 was UNRELEASED WHEN THAT
+         * WAS WRITTEN and is not now -- v0.1.49 shipped it, read by `git show
+         * v0.1.49:core/model/.../SessionExport.kt`. The ordinal counts against this file
          * as rebased onto `main`: #223's is the fourth and #224's `soleSilent`
          * is the fifth. The change: `side` is the arm the set WORKED, and
          * `plannedSide` beside it is the arm the plan prescribed. NOT purely
@@ -491,8 +491,9 @@ data class SessionExport(
          * with it, as it did for `analysedFellBack` and `sensorsSilent`.
          *
          * 1.17 carries a SEVENTH change (#225), under the same number and for
-         * the reason the entries above give: 1.17 is UNRELEASED and the
-         * newest tag v0.1.48 ships 1.16. The ordinal counts against this file
+         * the reason the entries above give: 1.17 was UNRELEASED WHEN THAT WAS
+         * WRITTEN and is not now -- v0.1.49 shipped it, read by `git show
+         * v0.1.49:core/model/.../SessionExport.kt`. The ordinal counts against this file
          * as landed: #223's is the fourth, #224's `soleSilent` is the fifth
          * and #215's `plannedSide` is the sixth. The change: the grace floor
          * behind `tooSoon` in `silent` and `soleSilent` is the instant the

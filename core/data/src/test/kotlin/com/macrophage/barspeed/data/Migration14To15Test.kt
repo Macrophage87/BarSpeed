@@ -34,8 +34,9 @@ import kotlin.test.assertTrue
  * classpath and no `androidTest` source set anywhere -- so this cannot say
  * that SQLite accepts the statements, that a real file survives them, that
  * Room's own `TableInfo` check passes afterwards, or that the hop was
- * REGISTERED at all. The emulator exercise that says those things is recorded
- * in the body of the commit that fills the migration.
+ * REGISTERED at all. No emulator exercise has been run for this hop; nothing
+ * has opened a real database at this version, and the commit that fills the
+ * migration says so plainly rather than promising a run that did not happen.
  *
  * ## Why two columns and not one
  *

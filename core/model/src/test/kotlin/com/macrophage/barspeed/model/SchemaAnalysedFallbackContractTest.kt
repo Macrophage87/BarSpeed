@@ -162,9 +162,7 @@ class SchemaAnalysedFallbackContractTest {
         // owes is that ITS OWN change rode under 1.17 and that 1.17 is still
         // accepted; an equality against the newest constant belongs to
         // whichever change is newest and moves every time one lands, which is
-        // the rule the migration tests already apply to DATABASE_VERSION. The
-        // companion `assertFalse("1.18" in SUPPORTED_SCHEMA_VERSIONS)` goes
-        // with it for the same reason: 1.18 is minted now.
+        // the rule the migration tests already apply to DATABASE_VERSION.
         assertTrue("1.17" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
         assertTrue("1.17" in exportVersionEnum(), "the published enum does not accept the version written")
 
