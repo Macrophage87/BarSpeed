@@ -14,8 +14,9 @@ import kotlin.test.assertTrue
  * What tapping START NEXT SET does to the queue, and what it does when there
  * is nothing left in it (#195).
  *
- * RED IN THIS COMMIT. `the last planned set is not re-armed` fails here and
- * passes at c3. The two pins this file carried describing the re-arm as
+ * `the last planned set is not re-armed` was c2's red differential: it
+ * failed at 85f3abc8 and passes from the fix commit on. The two pins this
+ * file carried describing the re-arm as
  * correct -- `the last planned set is re-armed on the slot it just recorded`
  * and `the re-armed slot still carries the plan's prescription and is not
  * marked added` -- are deleted rather than reworded: they were c0

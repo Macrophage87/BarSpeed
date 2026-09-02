@@ -2485,10 +2485,10 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
         }
         // The session's last set is when "that one was too light, give me one
         // more" is likeliest, and until #188 this branch offered nothing: the
-        // control sat inside the `next != null` arm only. The appended set
-        // becomes the session's next set, so the START button already on this
-        // screen finally has a slot to run. It was drawn here before too, with
-        // nothing to advance to -- raised separately, not fixed here.
+        // control sat inside the `next != null` arm only. START is withheld
+        // on this screen until a set is appended (#195), and the append is
+        // what gives it a slot to run: the queue has a next slot again and
+        // START comes back on the same pass.
         AddSetSection(state, viewModel)
     }
 }

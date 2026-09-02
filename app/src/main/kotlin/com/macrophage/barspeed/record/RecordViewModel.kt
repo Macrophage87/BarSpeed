@@ -1761,12 +1761,11 @@ internal fun advancedState(s: RecordState): RecordState {
  * not a thing that may be done (#195).
  *
  * A free function for [advancedState]'s reason, and this one is not a
- * preference -- `RecordViewModel` measures 599 against detekt's `LargeClass`
- * threshold of 600, which reports at 600 and not above it. The guard written
- * inline reds `:app:detekt`, CI's first step, at 601/600; written as a `val`
- * and an `if` it reds at 600/600. Returning null rather than a boolean is
- * what keeps the call site the three lines it already was, and it is
- * [appendedState]'s and [jumpedToExerciseState]'s idiom besides.
+ * preference -- `RecordViewModel` sits hard against detekt's `LargeClass`
+ * threshold, so the guard cannot be written as a member. Returning null
+ * rather than a boolean is what keeps the call site the three lines it
+ * already was, and it is [appendedState]'s and [jumpedToExerciseState]'s
+ * idiom besides.
  *
  * THE CANCEL NOW FOLLOWS THE WRITE at the call site, which it did not before.
  * Safe because both run on the main dispatcher inside one non-suspending
