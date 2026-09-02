@@ -80,6 +80,16 @@ class AutoConnectManager(
      * carried across a re-point would read as DELIVERING on evidence from a
      * sensor this link is no longer holding.
      *
+     * Between this write and the [rearm] disconnect() call that follows it, a
+     * frame the previous device had already emitted can still be collected
+     * and re-stamp the instant, so this is a fact about the link's current
+     * device except for at most one such frame: `samples` is a buffered
+     * `MutableSharedFlow` (`GattClients.kt`, `extraBufferCapacity = 512`)
+     * drained by a separate coroutine, so a frame already sitting in that
+     * buffer when [rearm] nulls this instant is collected afterwards and
+     * writes it again before the disconnect completes. Nothing here has been
+     * watched running.
+     *
      * The JUDGEMENT is deliberately not here. `ArmedSilencePolicy` in
      * `:core:model` turns this instant and a [ConnectionState] into a word,
      * because that module has tests and this one has no test source set at

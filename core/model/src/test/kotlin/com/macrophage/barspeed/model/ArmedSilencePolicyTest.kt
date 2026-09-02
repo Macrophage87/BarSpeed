@@ -954,18 +954,22 @@ class ArmedSilencePolicyTest {
     }
 
     /**
-     * PIN, review round 1 of #225. [ArmedSilencePolicy.storedSoleSilence]
-     * reads the analysed link out of [links] and none of the second link's
-     * fields.
+     * PIN, review round 1 of #225, strengthened round 4 (finding 2).
+     * [ArmedSilencePolicy.storedSoleSilence] reads the analysed link out of
+     * [links] and none of the second link's fields -- including its arming.
      *
-     * The second link here is given a different state and a frame instant
-     * at the set's end -- delivering, on the wrong link's evidence -- so a
-     * reimplementation that read `secondaryState` and `secondaryFrameAtMs`
-     * instead of the analysed ones would answer [ArmedDelivery.DELIVERING]
-     * and this function's own filter would turn that into null, not
-     * [ArmedDelivery.LINKED_SILENT]. The analysed link is Connected with no
-     * frame, armed an hour before the set, so the correct answer is
-     * [ArmedDelivery.LINKED_SILENT].
+     * The second link here is given a different state, a frame instant at
+     * the set's end -- delivering, on the wrong link's evidence -- AND an
+     * arming half a second before the set starts, distinct from the analysed
+     * link's arming an hour before it. Before this pin both fixtures left
+     * `analysedArmedAtMs` and `secondaryArmedAtMs` equal, so a
+     * reimplementation reading `links.secondaryArmedAtMs` instead of
+     * `links.analysedArmedAtMs` answered the same word and this test could
+     * not catch it. With the arming instants distinct, that swap floors the
+     * reading at `setStart - 500L` -- 2,500 ms of age at set end, under
+     * [ArmedSilencePolicy.SILENT_AFTER_MS] -- and answers
+     * [ArmedDelivery.TOO_SOON] instead of the correct
+     * [ArmedDelivery.LINKED_SILENT], redding this test.
      */
     @Test
     fun `storedSoleSilence reads only the analysed link, never the second one`() {
@@ -977,11 +981,15 @@ class ArmedSilencePolicyTest {
             ArmedSilencePolicy.storedSoleSilence(
                 roster = soloRoster(),
                 pairedImuAddresses = listOf(soloAddress),
-                links = links(secondaryState = ConnectionState.Disconnected, secondaryFrameAtMs = setEnd),
+                links = links(
+                    secondaryState = ConnectionState.Disconnected,
+                    secondaryFrameAtMs = setEnd,
+                    secondaryArmedAtMs = setStart - 500L,
+                ),
                 setStartedAtMs = setStart,
                 setEndedAtMs = setEnd,
             ),
-            "the roleless reading came from the second link's state or frame instead of the analysed link's",
+            "the roleless reading came from the second link's state, frame or arming instead of the analysed link's",
         )
     }
 }
