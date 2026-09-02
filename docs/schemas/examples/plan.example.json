@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.10",
+  "schemaVersion": "1.11",
   "planName": "Hypertrophy Block W3",
   "notes": "Week 3 of 4. Keep eccentrics honest.",
   "bodyweight_kg": null,
@@ -72,7 +72,8 @@
         },
         {
           "exercise": "plank",
-          "notes": "Bodyweight; brace hard.",
+          "notes": "Bodyweight; brace hard. Progression is time: the post-set grid offers +5/+10/+15 s on a set I say had more in it.",
+          "progression": "time",
           "prep_s": 10,
           "sets": [
             {
@@ -108,6 +109,7 @@
           "kind": "dynamic",
           "start": "bottom",
           "notes": "Declared: the id contains \"hang\", so without this the app would track it as an isometric hold and never count a rep.",
+          "progression": "reps",
           "sets": [
             {
               "reps": 12,
@@ -188,6 +190,7 @@
           "bodyweight": true,
           "start": "bottom",
           "notes": "Band assist; negative load_kg is the band's help subtracted from body weight, not an added plate.",
+          "progression": "none",
           "sets": [
             {
               "reps": 6,

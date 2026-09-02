@@ -177,7 +177,7 @@ class PlanDecodeCharacterizationTest {
             setOf(
                 "exercise", "notes", "description", "additional_notes", "start", "concentric",
                 "sensorInverted", "sensorOnStack", "travelRatio", "plane", "bodyweight",
-                "implementCount", "optional", "kind", "prep_s", "sensors", "sets",
+                "implementCount", "optional", "progression", "kind", "prep_s", "sensors", "sets",
             ),
             PlanExerciseDef.serializer().descriptor.elementNames.toSet(),
         )

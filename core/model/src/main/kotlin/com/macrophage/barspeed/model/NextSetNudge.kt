@@ -170,13 +170,12 @@ object NextSetNudgePolicy {
      * two answers to one question, and the case this grid would get wrong
      * quietly is the one where it draws with nothing in it.
      *
-     * NOT IMPLEMENTED YET -- this is the declared seam, and it returns nothing
-     * on purpose so that nothing in `:app` can start depending on it before the
-     * pins exist. `NextSetNudgeOptionsTest` pins what it must return and reds
-     * against this body; the implementation lands with the schema 1.11 mint
-     * that supplies its `progression` input.
+     * [tier] is [HeadroomTier.ofRpe] of the rating stored for the set that just
+     * finished. [warmup] is [WarmupMarkPolicy.effective] of the plan's
+     * declaration and the lifter's own mark, never the declaration alone.
+     * [setsLeftInExercise] is [setsLeftInExercise]'s answer. [progression] is
+     * [ProgressionKind.ofPlan] of the exercise's declaration.
      */
-    @Suppress("UNUSED_PARAMETER")
     fun options(
         tier: HeadroomTier?,
         failed: Boolean,
@@ -184,7 +183,48 @@ object NextSetNudgePolicy {
         setsLeftInExercise: Int,
         progression: ProgressionKind,
         unit: WeightUnit,
-    ): List<NextSetNudge> = emptyList()
+    ): List<NextSetNudge> {
+        // Two statements rather than one four-term condition, each carrying the
+        // pair that belongs together: first whether the lifter claimed more was
+        // possible on a set they actually completed, then whether there is
+        // anything of theirs to raise it on.
+        if (tier == null || failed) return emptyList()
+        if (warmup || setsLeftInExercise <= 0) return emptyList()
+        return when (progression) {
+            ProgressionKind.NONE -> emptyList()
+            ProgressionKind.WEIGHT ->
+                weightSteps(unit).map {
+                    NextSetNudge(ProgressionKind.WEIGHT, it, "+${plainFigure(it)} ${unit.suffix}")
+                }
+            ProgressionKind.REPS ->
+                REP_STEPS.map {
+                    NextSetNudge(ProgressionKind.REPS, it.toDouble(), if (it == 1) "+1 rep" else "+$it reps")
+                }
+            ProgressionKind.TIME ->
+                TIME_STEPS_S.map { NextSetNudge(ProgressionKind.TIME, it.toDouble(), "+$it s") }
+        }
+    }
+
+    /**
+     * The authored row for a unit, PICKED and never computed.
+     *
+     * The whole of "authored, never converted" is that this is a lookup with
+     * two arms rather than one row plus [WeightUnit.fromKg].
+     */
+    private fun weightSteps(unit: WeightUnit): List<Double> = when (unit) {
+        WeightUnit.KG -> KG_STEPS
+        WeightUnit.LB -> LB_STEPS
+    }
+
+    /**
+     * A step as the tile says it: "5", not "5.0", and "2.5" kept.
+     *
+     * Deliberately not [WeightUnit.format] or [WeightUnit.inputValue]: both
+     * convert, and a tile that went through either would print the pound row
+     * in kilograms the moment the display unit changed under it.
+     */
+    private fun plainFigure(value: Double): String =
+        if (value == Math.floor(value)) value.toLong().toString() else value.toString()
 
     /**
      * The next set's added load after a weight tile, in kilograms.

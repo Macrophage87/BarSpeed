@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.model.ExerciseDef
+import com.macrophage.barspeed.model.ProgressionKind
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.Stage
 import java.lang.reflect.Modifier
@@ -109,6 +110,10 @@ private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     "restS" to Append.INHERITED,
     "prepS" to Append.INHERITED,
     "sensors" to Append.INHERITED,
+    // Which dimension the post-set grid raises (#214). One more set of an
+    // exercise progresses the way that exercise progresses, so it follows
+    // the anchor like everything else about how the movement is performed.
+    "progression" to Append.INHERITED,
     // What the lifter is standing on for that exercise.
     "loadKg" to Append.CARRIED,
     "reps" to Append.CARRIED,
@@ -160,6 +165,9 @@ private fun slot(
     restS = 150,
     prepS = 12,
     sensors = 2,
+    // Deliberately NOT the ProgressionKind default: an inheritance pin
+    // comparing two copies of a default value cannot fail.
+    progression = ProgressionKind.REPS,
     isExerciseChange = setIndexInExercise == 0,
     warmup = warmup,
     isAddedSet = false,
@@ -217,6 +225,7 @@ private fun timedSlot(setIndexInExercise: Int, setsInExercise: Int) = PlannedSlo
     restS = 90,
     prepS = 8,
     sensors = 1,
+    progression = ProgressionKind.TIME,
     isExerciseChange = setIndexInExercise == 0,
     warmup = false,
     isAddedSet = false,

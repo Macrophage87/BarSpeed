@@ -3,6 +3,7 @@ package com.macrophage.barspeed.record
 import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.model.PlanNoteDisplay
 import com.macrophage.barspeed.model.PlanSessionDef
+import com.macrophage.barspeed.model.ProgressionKind
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
 
@@ -102,6 +103,14 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     // to read: a block ramps, so its warm-up singles and its
                     // working set are sets of the same exercise (#187).
                     warmup = set.warmup,
+                    // Which dimension the post-set grid raises on this
+                    // exercise (#214). Exercise level only: what an
+                    // exercise progresses on is a property of the
+                    // movement, not of one of its sets, so there is no
+                    // per-set override to resolve. An omitted key reads
+                    // as WEIGHT in ProgressionKind.ofPlan, which is what
+                    // every plan written before schema 1.11 means.
+                    progression = ProgressionKind.ofPlan(exerciseDef.progression),
                     isExerciseChange = setIdx == 0 && exerciseIdx > 0,
                 )
         }

@@ -43,6 +43,7 @@ import com.macrophage.barspeed.model.PrepCase
 import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.PrepWindowPolicy
 import com.macrophage.barspeed.model.PreviewSet
+import com.macrophage.barspeed.model.ProgressionKind
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
@@ -238,6 +239,23 @@ data class PlannedSlot(
      * adherence a coach reads.
      */
     val isAddedSet: Boolean = false,
+    /**
+     * Which dimension the post-set grid raises on this exercise, read from the
+     * plan's `progression` key at flatten time (#214, schema 1.11).
+     *
+     * [ProgressionKind.WEIGHT] on a slot the plan said nothing about, which is
+     * exactly what an omitted key means, so no session recorded before 1.11
+     * behaves differently. It is carried on the SLOT rather than looked up
+     * again at the rest screen because the exercise the grid is about is the
+     * one that just finished, and by the time that screen draws
+     * `currentExercise` is already the movement coming up -- the same reason
+     * [SetFeedback] freezes its own copy of the exercise.
+     *
+     * An appended slot inherits it through the `copy` in `appendedState`: one
+     * more set of an exercise progresses the way that exercise progresses.
+     * An ad-hoc set has no slot at all and so is never offered the grid.
+     */
+    val progression: ProgressionKind = ProgressionKind.WEIGHT,
 ) {
     /**
      * Whether this slot is measured on the clock, which is a question about the

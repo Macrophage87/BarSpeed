@@ -1368,7 +1368,7 @@ private fun ChangeSetButton(state: RecordState, viewModel: RecordViewModel, slot
  * a different problem, and the owner's report is about the plan path.
  */
 @Composable
-private fun ChangeSetDialog(
+internal fun ChangeSetDialog(
     state: RecordState,
     viewModel: RecordViewModel,
     slot: PlannedSlot,
@@ -2640,6 +2640,13 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // lifter nothing.
     ArmedSilenceCard(state)
     NextSetBlock(state, viewModel)
+    // Directly after the card it changes, and above SessionCloseControls,
+    // which keeps its distance from START for #137's reason. Every input it
+    // reads is frozen at the IN_SET to RESTING transition, so it is present
+    // when this screen first draws or not at all -- it cannot appear under a
+    // finger part-way through a rest. Decides nothing itself; see
+    // [NextSetNudgeSection].
+    NextSetNudgeSection(state, viewModel)
     SessionCloseControls(state, viewModel)
     Spacer(Modifier.height(16.dp))
     LastSetDetail(

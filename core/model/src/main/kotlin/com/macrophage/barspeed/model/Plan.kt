@@ -95,6 +95,15 @@ data class PlanFile(
                 if (exercise.kind != null && exercise.kind !in VALID_KINDS) {
                     errors += "sessions[$si].exercises[$ei].kind must be one of ${VALID_KINDS.joinToString()}"
                 }
+                // Refused rather than read as the default. `progression`
+                // decides what the post-set grid offers, and silently reading
+                // an unrecognised word as "weight" would leave a plan's author
+                // believing they had turned the grid off, or moved it onto
+                // reps, on every exercise carrying their typo.
+                if (exercise.progression != null && exercise.progression !in VALID_PROGRESSIONS) {
+                    errors += "sessions[$si].exercises[$ei].progression must be one of " +
+                        VALID_PROGRESSIONS.joinToString()
+                }
                 exercise.prepS?.let {
                     if (it < LeadInPolicy.MIN_S || it > LeadInPolicy.MAX_S) {
                         errors += "sessions[$si].exercises[$ei].prep_s must be between " +
@@ -163,6 +172,7 @@ data class PlanFile(
         eachExercise(::prepVsPhrase) +
         eachExercise(::sensorsInert) +
         eachExercise(::stackSeeded) +
+        eachExercise(::progressionVsSets) +
         eachExercise(::cueSplit) +
         eachExercise(::cueBehindTapOnly)
 
@@ -369,6 +379,43 @@ data class PlanFile(
     }
 
     /**
+     * A `progression` naming a dimension this exercise's sets do not have
+     * (#214).
+     *
+     * Sits with the inert-declaration warnings because that is what it is: the
+     * plan looks like it said something and the post-set grid draws nothing.
+     * `"reps"` on a block of holds has no rep count to raise, and `"time"` on a
+     * block prescribed in reps has no hold to extend.
+     *
+     * ONE warning per exercise, for [sensorsInert]'s reason: a block of six
+     * sets would otherwise produce six identical lines, which is how a gate
+     * becomes something the eye skips.
+     *
+     * Judged against the sets the exercise ACTUALLY declares rather than
+     * against [PlanExerciseDef.effectiveKind], because a plan may prescribe
+     * reps of a built-in hold and the two disagree there. What the grid can
+     * offer follows from the set's shape, so that is what this reads.
+     *
+     * `"weight"` and `"none"` are never warned about: every set has a load,
+     * even if it is the lifter's own body, and "hold everything" is meaningful
+     * on either shape of set.
+     */
+    private fun progressionVsSets(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        val declared = exercise.progression?.lowercase() ?: return null
+        val lead = "sessions[$si].exercises[$ei]: \"progression\": \"$declared\" is declared on " +
+            "${exercise.exercise}, "
+        return when {
+            declared == "reps" && exercise.sets.none { it.reps != null } ->
+                lead + "whose sets are all timed -- there is no rep count to raise, so the post-set " +
+                    "grid offers nothing. Declare \"time\" to step the hold up, or \"none\" to hold it."
+            declared == "time" && exercise.sets.none { it.isTimed } ->
+                lead + "whose sets are all prescribed in reps -- there is no hold to extend, so the " +
+                    "post-set grid offers nothing. Declare \"reps\" or \"weight\", or \"none\" to hold it."
+            else -> null
+        }
+    }
+
+    /**
      * Both coaching keys on one exercise, saying which of them the lifter reads
      * without touching the phone.
      *
@@ -412,14 +459,18 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.10"
+        const val SCHEMA_VERSION = "1.11"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader parsing this as a float
-         * collides them, and they are different contracts.
+         * collides them, and they are different contracts. The same trap
+         * applies to `"1.11"`, which is not 1.11 read as a decimal either.
          */
         val SUPPORTED_SCHEMA_VERSIONS =
-            setOf("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "1.10")
+            setOf(
+                "1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9",
+                "1.10", "1.11",
+            )
         val VALID_SIDES = setOf("left", "right")
 
         /** "top"/"bottom" name the start position; "down"/"up" the first movement. */
@@ -434,6 +485,16 @@ data class PlanFile(
          * against the published schema.
          */
         val VALID_KINDS = setOf("dynamic", "hold", "carry", "explosive")
+
+        /**
+         * The declarable progression dimensions, lowercased [ProgressionKind]
+         * names, pinned to that enum in both directions by
+         * `SchemaProgressionContractTest`.
+         *
+         * `"none"` is a value and not an omission; see
+         * [PlanExerciseDef.progression] for why the contract needs both.
+         */
+        val VALID_PROGRESSIONS = setOf("weight", "reps", "time", "none")
 
         /**
          * How many characters of [PlanExerciseDef.description] the rest screen
@@ -594,6 +655,29 @@ data class PlanExerciseDef(
     val implementCount: Int? = null,
     /** Accessory work that may be dropped when a session runs long. */
     val optional: Boolean = false,
+    /**
+     * Which dimension of this exercise moves when the lifter rates a set as
+     * having had more in it: `"weight"`, `"reps"`, `"time"` or `"none"`
+     * (schema 1.11, issue #214).
+     *
+     * Read by [ProgressionKind.ofPlan], and OMITTED MEANS `"weight"` -- so
+     * every plan written against 1.10 or earlier behaves exactly as it did
+     * before this key existed. Absence and `"none"` are different statements
+     * and must not be collapsed: absence is a plan with no opinion, on which
+     * load moves; `"none"` is a plan whose opinion is that this exercise holds
+     * its load and its reps across its sets, and the post-set grid does not
+     * appear for it however the set was rated.
+     *
+     * It decides only what the grid OFFERS. The lifter can still change load,
+     * reps, hold and tempo from the change-next-set dialog on any exercise,
+     * whatever this says.
+     *
+     * A `"reps"` on an exercise whose sets are all timed, or a `"time"` on one
+     * whose sets are all prescribed in reps, is accepted and warned about once
+     * per exercise at the import gate: there is nothing of that kind to raise,
+     * so the grid would draw empty.
+     */
+    val progression: String? = null,
     /**
      * How the movement is performed: `"dynamic"`, `"hold"`, `"carry"` or
      * `"explosive"`. Omitted → the built-in definition if there is one, then a
