@@ -79,6 +79,31 @@ enum class ArmedDelivery {
 }
 
 /**
+ * The two bar-sensor links as [ArmedSilencePolicy] needs them: what each one's
+ * state is, when each one last delivered a frame, and when each one was armed.
+ *
+ * One parameter rather than six, so a caller cannot pair the analysed link's
+ * state with the second link's frame instant -- the mistake this shape exists
+ * to make impossible rather than merely unlikely. It moved here from `:app`
+ * with [ArmedSilencePolicy.liveDeliveryByRole] (#225): the pairing of a role
+ * with the link that holds it was the last part of #213's decision sitting in
+ * a module where nothing on the CI path could run it.
+ *
+ * The ARMED INSTANTS are the grace floors, one per link, and they are per-link
+ * for the reason the states and the frame instants are: a link may only be
+ * excused by its own arming. What `AutoConnectManager` actually puts in them
+ * is stated there and is not a claim this module can make.
+ */
+data class ArmedLinks(
+    val analysedState: ConnectionState,
+    val analysedFrameAtMs: Long?,
+    val analysedArmedAtMs: Long,
+    val secondaryState: ConnectionState,
+    val secondaryFrameAtMs: Long?,
+    val secondaryArmedAtMs: Long,
+)
+
+/**
  * Whether an ARMED unit is delivering, and what to say when it is not -- issue
  * #213.
  *
@@ -185,6 +210,113 @@ object ArmedSilencePolicy {
             is ConnectionState.Failed ->
                 if (state.linkEstablished) ArmedDelivery.LINK_WITHOUT_SENSOR else ArmedDelivery.NOT_LINKED
             is ConnectionState.Connecting, is ConnectionState.Disconnected -> ArmedDelivery.NOT_LINKED
+        }
+    }
+
+    /**
+     * What each ARMED role's link is doing AT [nowMs], for the LIVE reading --
+     * the card on READY, the rest screen, the dots.
+     *
+     * Moved here from `:app` (#225). The judgement was already
+     * [deliveryOf]'s; what moved is the PAIRING of a role with the link that
+     * holds it, written as a lookup so nothing on this path can read the
+     * second link's state for the first link's role.
+     *
+     * A null [analysed] role is the ordinary one-sensor set and the set that
+     * met two paired units it could not tell apart. Neither has a role to
+     * report against and neither may be reported: this returns an empty map
+     * for both, and [soleSilence] is what covers them.
+     *
+     * C1 OF #225 KEEPS TODAY'S ANSWER, which is that BOTH links are floored by
+     * the LATER of the two arming instants. That is `RecordState.armedDelivery`'s
+     * `maxOf`, lifted unchanged so the move can be shown to have changed
+     * nothing; item 8's differential is what makes each link answer to its own.
+     */
+    fun liveDeliveryByRole(
+        analysed: SensorRole?,
+        secondary: SensorRole?,
+        links: ArmedLinks,
+        nowMs: Long,
+    ): Map<SensorRole, ArmedDelivery> {
+        val floor = maxOf(links.analysedArmedAtMs, links.secondaryArmedAtMs)
+        return byRole(analysed, secondary, links, floor, floor, nowMs)
+    }
+
+    /**
+     * The same question at the instant a set ENDED, with the floor a stored
+     * reading gets -- [storedGraceFloor]'s, per link.
+     *
+     * A separate function from [liveDeliveryByRole] rather than a boolean on
+     * it, because the two readings differ in exactly one thing and it is worth
+     * naming: GRACE IS A LIVE-WARNING CONCEPT. Before a set it stops the app
+     * accusing a link two seconds into its connect, which is how a warning
+     * becomes something the lifter learns to ignore. On a row that has already
+     * been written there is nothing to act on, and the archive wants the most
+     * informative word the app can honestly give.
+     *
+     * The DECISION per link is still [deliveryOf]'s and the frame window is
+     * still the fixed [SILENT_AFTER_MS] ending at [setEndedAtMs] -- it does not
+     * narrow to the set.
+     */
+    fun storedDeliveryByRole(
+        analysed: SensorRole?,
+        secondary: SensorRole?,
+        links: ArmedLinks,
+        setStartedAtMs: Long,
+        setEndedAtMs: Long,
+    ): Map<SensorRole, ArmedDelivery> = byRole(
+        analysed,
+        secondary,
+        links,
+        // C1 OF #225 KEEPS TODAY'S ANSWER: the set's own start floors both
+        // links, which is what `captureAt` passed before this function
+        // existed. Item 8's differential is what makes each link's own arming
+        // instant count, and it is pushed red before it is made green.
+        setStartedAtMs,
+        setStartedAtMs,
+        setEndedAtMs,
+    )
+
+    /**
+     * [soleSilence] at the instant a set ENDED, with the floor a stored
+     * reading gets -- the sibling of [storedDeliveryByRole] for a set whose
+     * single stream carries no role (#224).
+     *
+     * It reads the ANALYSED link out of [links] and no other: that is the only
+     * bar-sensor client still holding a device when the roster names no second
+     * address. Taking the whole bundle rather than three loose arguments is
+     * what stops a caller handing this the second link's frame instant.
+     *
+     * C1 OF #225 KEEPS TODAY'S ANSWER here too -- the set's own start is the
+     * floor, exactly as `captureAt` passed it.
+     */
+    fun storedSoleSilence(
+        roster: SensorRoster,
+        pairedImuAddresses: List<String>,
+        links: ArmedLinks,
+        setStartedAtMs: Long,
+        setEndedAtMs: Long,
+    ): ArmedDelivery? = soleSilence(
+        roster = roster,
+        pairedImuAddresses = pairedImuAddresses,
+        state = links.analysedState,
+        lastFrameAtMs = links.analysedFrameAtMs,
+        armedAtMs = setStartedAtMs,
+        nowMs = setEndedAtMs,
+    )
+
+    /** The lookup both readings share, so they cannot pair a role differently. */
+    private fun byRole(
+        analysed: SensorRole?,
+        secondary: SensorRole?,
+        links: ArmedLinks,
+        analysedFloorMs: Long,
+        secondaryFloorMs: Long,
+        nowMs: Long,
+    ): Map<SensorRole, ArmedDelivery> = buildMap {
+        analysed?.let { put(it, deliveryOf(links.analysedState, links.analysedFrameAtMs, analysedFloorMs, nowMs)) }
+        secondary?.let {
+            put(it, deliveryOf(links.secondaryState, links.secondaryFrameAtMs, secondaryFloorMs, nowMs))
         }
     }
 
@@ -319,8 +451,17 @@ object ArmedSilencePolicy {
      * an unroled link armed no roles -- but a defaulted null is exactly how the
      * caller that forgot it draws a blank card on the configuration the owner
      * trains most, which is the failure this issue is.
+     *
+     * [demoMode] takes no default either, and for the same reason (#225 item
+     * 7). C1 OF #225 CARRIES IT WITHOUT CONSULTING IT, so this refactor
+     * changes no sentence; the differential that silences the card in demo
+     * mode is pushed red before it is made green. The suppression goes with
+     * it: `UnusedParameter` is on in this repository, and a parameter declared
+     * one commit before it is honoured is the price of pushing the red at its
+     * own SHA.
      */
-    fun message(silent: Map<SensorRole, ArmedDelivery>, sole: ArmedDelivery?): String? {
+    @Suppress("UnusedParameter")
+    fun message(silent: Map<SensorRole, ArmedDelivery>, sole: ArmedDelivery?, demoMode: Boolean): String? {
         val sentences =
             silent.entries.mapNotNull { (role, delivery) -> advice(delivery, role) } +
                 listOfNotNull(sole?.let { advice(it, null) })

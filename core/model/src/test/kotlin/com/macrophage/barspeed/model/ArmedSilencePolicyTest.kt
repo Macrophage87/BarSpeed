@@ -238,7 +238,7 @@ class ArmedSilencePolicyTest {
         assertEquals(
             "Sensor B is connected but has sent no data. It will record nothing this set unless you " +
                 "power-cycle it.",
-            ArmedSilencePolicy.message(silent, sole = null),
+            ArmedSilencePolicy.message(silent, sole = null, demoMode = false),
             "the sentence the SETUP window would have shown on every set of field-37",
         )
     }
@@ -256,7 +256,7 @@ class ArmedSilencePolicyTest {
             )
 
         assertEquals(listOf(SensorRole.B, SensorRole.A), silent.keys.toList(), "the armed order was not kept")
-        val message = assertNotNull(ArmedSilencePolicy.message(silent, sole = null))
+        val message = assertNotNull(ArmedSilencePolicy.message(silent, sole = null, demoMode = false))
         assertTrue(
             message.indexOf("Sensor B") < message.indexOf("Sensor A"),
             "the message reordered the units the lifter has to go and find: $message",
@@ -279,7 +279,7 @@ class ArmedSilencePolicyTest {
             )
 
         assertEquals(emptyMap(), silent)
-        assertNull(ArmedSilencePolicy.message(silent, sole = null))
+        assertNull(ArmedSilencePolicy.message(silent, sole = null, demoMode = false))
     }
 
     /**
@@ -295,7 +295,10 @@ class ArmedSilencePolicyTest {
             ArmedSilencePolicy.silent(listOf(SensorRole.B), mapOf(SensorRole.B to ArmedDelivery.TOO_SOON))
 
         assertEquals(mapOf(SensorRole.B to ArmedDelivery.TOO_SOON), silent, "a fact the export needs was dropped")
-        assertNull(ArmedSilencePolicy.message(silent, sole = null), "the app told the lifter something it did not know")
+        assertNull(
+            ArmedSilencePolicy.message(silent, sole = null, demoMode = false),
+            "the app told the lifter something it did not know",
+        )
     }
 
     /**
@@ -556,7 +559,7 @@ class ArmedSilencePolicyTest {
 
         assertEquals(ArmedDelivery.TOO_SOON, sole, "a fact a short set needs to store was dropped")
         assertNull(
-            ArmedSilencePolicy.message(emptyMap(), sole),
+            ArmedSilencePolicy.message(emptyMap(), sole, demoMode = false),
             "the app accused a link one second into its connect",
         )
     }
@@ -603,9 +606,124 @@ class ArmedSilencePolicyTest {
         assertEquals(
             "The bar sensor is connected but has sent no data. It will record nothing this set unless you " +
                 "power-cycle it.",
-            ArmedSilencePolicy.message(emptyMap(), ArmedDelivery.LINKED_SILENT),
+            ArmedSilencePolicy.message(emptyMap(), ArmedDelivery.LINKED_SILENT, demoMode = false),
             "the sentence a single-sensor lifter reads before the set starts",
         )
-        assertNull(ArmedSilencePolicy.message(emptyMap(), null), "the card drew for a set with nothing to say")
+        assertNull(
+            ArmedSilencePolicy.message(emptyMap(), null, demoMode = false),
+            "the card drew for a set with nothing to say",
+        )
+    }
+
+    // ---- pairing a role with the link that holds it (#225) --------------------
+
+    private val connected = ConnectionState.Connected("WT901BLE")
+
+    private fun links(
+        analysedState: ConnectionState = connected,
+        analysedFrameAtMs: Long? = null,
+        analysedArmedAtMs: Long = armedAt,
+        secondaryState: ConnectionState = connected,
+        secondaryFrameAtMs: Long? = null,
+        secondaryArmedAtMs: Long = armedAt,
+    ) = ArmedLinks(
+        analysedState,
+        analysedFrameAtMs,
+        analysedArmedAtMs,
+        secondaryState,
+        secondaryFrameAtMs,
+        secondaryArmedAtMs,
+    )
+
+    /**
+     * Each role is judged by ITS OWN link, and the wrong-pair mistake is what
+     * [ArmedLinks] exists to make impossible.
+     *
+     * Moved here from `:app`'s `ArmedDeliveryOfTest` with the function it
+     * pins (#225 c1). The analysed link is delivering and the second link is
+     * silent; the two readings must not be swapped and must not be merged.
+     */
+    @Test
+    fun `each role is read from the link that holds it`() {
+        val now = after(10_000L)
+
+        assertEquals(
+            mapOf(SensorRole.A to ArmedDelivery.DELIVERING, SensorRole.B to ArmedDelivery.LINKED_SILENT),
+            ArmedSilencePolicy.liveDeliveryByRole(
+                analysed = SensorRole.A,
+                secondary = SensorRole.B,
+                links = links(analysedFrameAtMs = now - 100L),
+                nowMs = now,
+            ),
+            "a role was judged against the other link's frames",
+        )
+    }
+
+    /**
+     * A set that armed no role reports nothing rather than inventing a key.
+     *
+     * The ordinary one-sensor set and the set that met two paired units it
+     * could not tell apart both arrive with a null analysed role; [soleSilence]
+     * is what covers them, and this map staying empty is what keeps a set from
+     * carrying both answers.
+     */
+    @Test
+    fun `no armed role produces no reading at all`() {
+        assertTrue(
+            ArmedSilencePolicy.liveDeliveryByRole(null, null, links(), after(10_000L)).isEmpty(),
+            "a set that armed no role was given a role-keyed word",
+        )
+        assertTrue(
+            ArmedSilencePolicy.storedDeliveryByRole(null, null, links(), armedAt, after(10_000L)).isEmpty(),
+            "a set that armed no role stored a role-keyed word",
+        )
+    }
+
+    /**
+     * Frames beat the link state THROUGH THE PAIRING, not only inside
+     * [ArmedSilencePolicy.deliveryOf]. The state flag is a report; the frames
+     * are the fact.
+     */
+    @Test
+    fun `arriving frames beat the state flag through the pairing`() {
+        val now = after(10_000L)
+
+        assertEquals(
+            mapOf(SensorRole.A to ArmedDelivery.DELIVERING),
+            ArmedSilencePolicy.liveDeliveryByRole(
+                analysed = SensorRole.A,
+                secondary = null,
+                links = links(analysedState = ConnectionState.Disconnected, analysedFrameAtMs = now - 10L),
+                nowMs = now,
+            ),
+        )
+    }
+
+    /**
+     * A genuinely short set on a genuinely fresh link still reads too soon,
+     * under either floor.
+     *
+     * The BOUNDARY item 8 must not move: a two-second set on a link armed one
+     * second before it began has had less than the window either way, and
+     * `tooSoon` there is the honest answer rather than an accusation. Pinned
+     * green in c1 so the differential that follows is visible as a change to
+     * the OTHER case and not to this one.
+     */
+    @Test
+    fun `a short set on a link armed just before it still reads too soon`() {
+        val setStart = after(1_000L)
+        val setEnd = setStart + 2_000L
+
+        assertEquals(
+            mapOf(SensorRole.A to ArmedDelivery.TOO_SOON),
+            ArmedSilencePolicy.storedDeliveryByRole(
+                analysed = SensorRole.A,
+                secondary = null,
+                links = links(),
+                setStartedAtMs = setStart,
+                setEndedAtMs = setEnd,
+            ),
+            "a link that has had less than the window either way was accused",
+        )
     }
 }

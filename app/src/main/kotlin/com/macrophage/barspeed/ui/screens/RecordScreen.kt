@@ -1003,6 +1003,7 @@ private fun ArmedSilenceCard(state: RecordState) {
         ArmedSilencePolicy.message(
             state.armedDelivery(nowMs.longValue),
             state.soleSilenceOver(state.imuArmedAtMs, nowMs.longValue),
+            state.demoMode,
         ) ?: return
     Spacer(Modifier.height(8.dp))
     Card(Modifier.fillMaxWidth()) {

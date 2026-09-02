@@ -29,6 +29,7 @@ import com.macrophage.barspeed.hrm.RrIngest
 import com.macrophage.barspeed.model.AddSetControl
 import com.macrophage.barspeed.model.AddSetSlotKey
 import com.macrophage.barspeed.model.ArmedDelivery
+import com.macrophage.barspeed.model.ArmedLinks
 import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.ConnectionState
@@ -602,45 +603,6 @@ internal fun armedCaptureOf(
 }
 
 /**
- * What each ARMED role's link is doing at one instant (#213).
- *
- * A free function taking what it needs, for [armedCaptureOf]'s reason:
- * [RecordViewModel] sits at detekt's LargeClass limit. The DECISION is
- * [ArmedSilencePolicy.deliveryOf]'s, in `:core:model` where a test runs on it;
- * what is left here is the pairing of a role with the link that holds it, and
- * it is written as a lookup so nothing on this path can read the second link's
- * state for the first link's role.
- *
- * Called twice at different instants and that is the point. Before a set,
- * [nowMs] is the moment the screen is drawn, [sinceMs] is when the link was
- * armed, and the answer drives the card on READY and the rest screen; at the
- * end of a set, [nowMs] is when the set ended, [sinceMs] is when it began, and
- * the answer is frozen onto the row. [sinceMs] is the TOO_SOON grace floor
- * only -- the frame lookback is always the fixed
- * `ArmedSilencePolicy.SILENT_AFTER_MS` ending at [nowMs] and does not narrow
- * to it. One function means the sentence the lifter read and the word the
- * archive carries cannot disagree about one unit.
- *
- * A null [analysed] role is the ordinary one-sensor set and the set that met
- * two paired units it could not tell apart. Neither has a role to report
- * against, and neither may be reported: this returns an empty map for both.
- */
-internal fun armedDeliveryOf(
-    analysed: SensorRole?,
-    secondary: SensorRole?,
-    links: ArmedLinks,
-    sinceMs: Long,
-    nowMs: Long,
-): Map<SensorRole, ArmedDelivery> = buildMap {
-    analysed?.let {
-        put(it, ArmedSilencePolicy.deliveryOf(links.analysedState, links.analysedFrameAtMs, sinceMs, nowMs))
-    }
-    secondary?.let {
-        put(it, ArmedSilencePolicy.deliveryOf(links.secondaryState, links.secondaryFrameAtMs, sinceMs, nowMs))
-    }
-}
-
-/**
  * Everything frozen onto a set that is ending: which buffer the DSP is pointed
  * at, what the row says about that choice (#207), and which armed links were
  * silent across the whole set with what the app could see of each (#213).
@@ -672,41 +634,42 @@ internal fun RecordState.captureAt(
     secondaryRole,
     analysedBuffer.toList(),
     secondaryBuffer.toList(),
-    armedDeliveryOver(armed?.analysed, secondaryRole, startedAtMs, endedAtMs),
-    soleSilenceOver(startedAtMs, endedAtMs),
+    ArmedSilencePolicy.storedDeliveryByRole(
+        analysed = armed?.analysed,
+        secondary = secondaryRole,
+        links = armedLinks(),
+        setStartedAtMs = startedAtMs,
+        setEndedAtMs = endedAtMs,
+    ),
+    ArmedSilencePolicy.storedSoleSilence(
+        roster = roster,
+        pairedImuAddresses = pairedImuAddresses,
+        links = armedLinks(),
+        setStartedAtMs = startedAtMs,
+        setEndedAtMs = endedAtMs,
+    ),
 )
 
 /**
- * [armedDeliveryOf] over the two links THIS STATE is holding.
+ * The four link fields THIS STATE is holding, as `:core:model` wants them.
  *
- * The one place the screen state's four link fields are turned into
- * [ArmedLinks], so the two callers -- the card on READY and the rest screen,
- * asked at the moment it draws, and `endSet`, asked at the moment the set
- * ended -- cannot pair one link's state with the other's frame instant in
- * different ways. An extension rather than a member
- * of [RecordViewModel] for [armedCaptureOf]'s reason: that class is at
- * detekt's LargeClass limit and this addition put it over.
+ * The one place they are bundled, so the two readings -- the card on READY and
+ * the rest screen, asked at the moment they draw, and `endSet`, asked at the
+ * moment the set ended -- cannot pair one link's state with the other's frame
+ * instant in different ways. An extension rather than a member of
+ * [RecordViewModel] for [armedCaptureOf]'s reason: that class is at detekt's
+ * LargeClass limit.
  */
-internal fun RecordState.armedDeliveryOver(
-    analysed: SensorRole?,
-    secondary: SensorRole?,
-    sinceMs: Long,
-    nowMs: Long,
-): Map<SensorRole, ArmedDelivery> = armedDeliveryOf(
-    analysed = analysed,
-    secondary = secondary,
-    links = ArmedLinks(imuState, imuFrameAtMs, imuStateB, imuFrameAtMsB),
-    sinceMs = sinceMs,
-    nowMs = nowMs,
-)
+internal fun RecordState.armedLinks(): ArmedLinks =
+    ArmedLinks(imuState, imuFrameAtMs, imuArmedAtMs, imuStateB, imuFrameAtMsB, imuArmedAtMsB)
 
 /**
  * What the ONE armed link is doing on a set whose stream carries no role
  * (#224), or null when this set arms roles, arms nothing, or that link is
  * delivering.
  *
- * [armedDeliveryOver]'s sibling for the configuration this app is used in most,
- * and an extension rather than a member of [RecordViewModel] for
+ * The role-keyed LIVE reading's sibling for the configuration this app is used
+ * in most, and an extension rather than a member of [RecordViewModel] for
  * [armedCaptureOf]'s reason. The DECISION is
  * [ArmedSilencePolicy.soleSilence]'s, in `:core:model` where a test runs on it,
  * including which sets it applies to; what is left here is handing it the one
@@ -716,9 +679,10 @@ internal fun RecordState.armedDeliveryOver(
  * disconnects the second one and its loop then idles on the no-address
  * branch.
  *
- * Called at the same two instants [armedDeliveryOver] is: the card passes
- * `RecordState.imuArmedAtMs` while it is drawing, and `endSet` passes the set's
- * own start once the set has ended.
+ * THE CARD'S READING ONLY. `endSet` asks the same question through
+ * `ArmedSilencePolicy.storedSoleSilence`, which takes the whole [armedLinks]
+ * bundle and the set's two instants; this one is passed
+ * `RecordState.imuArmedAtMs` while the card is drawing.
  *
  * THE FIRST IS NOT WHEN THIS LINK WAS ARMED. `AutoConnectManager` writes the
  * analysed link's instant once at construction and never again -- `imuArmedAt`
@@ -726,11 +690,11 @@ internal fun RecordState.armedDeliveryOver(
  * `setSecondaryImuAddress` -- so it is the PROCESS's start instant. On the
  * one-sensor configuration the [ArmedDelivery.TOO_SOON] grace floor is
  * therefore spent seconds into the process, and a unit paired later is accused
- * while it is still connecting. `RecordViewModel.armedDelivery` softens this
- * for the role-keyed reading with `maxOf(imuArmedAtMs, imuArmedAtMsB)`; there
- * is no second instant here to take the later of. What the lifter sees is a
+ * while it is still connecting. `ArmedSilencePolicy.liveDeliveryByRole` softens
+ * this for the role-keyed reading with `maxOf` over the two arming instants;
+ * there is no second instant here to take the later of. What the lifter sees is a
  * card naming a unit that is about to come up, on the card only -- the stored
- * reading takes the set's own start and is not affected.
+ * reading has its own floor and is not affected.
  *
  * IT READS THE LIVE ROSTER. Pairing a second unit MID-SET does NOT silence
  * this: `SensorRoster.isDual` is `secondary != null`, so an unlabelled second
@@ -748,21 +712,6 @@ internal fun RecordState.soleSilenceOver(sinceMs: Long, nowMs: Long): ArmedDeliv
         armedAtMs = sinceMs,
         nowMs = nowMs,
     )
-
-/**
- * The two bar-sensor links as [armedDeliveryOf] needs them: what each one's
- * state is, and when each one last delivered a frame.
- *
- * One parameter rather than four, so a caller cannot pass the analysed link's
- * state beside the second link's frame instant -- which is the mistake this
- * shape exists to make impossible rather than merely unlikely.
- */
-internal data class ArmedLinks(
-    val analysedState: ConnectionState,
-    val analysedFrameAtMs: Long?,
-    val secondaryState: ConnectionState,
-    val secondaryFrameAtMs: Long?,
-)
 
 /** [armedCaptureOf]'s three answers, which have to be decided together. */
 internal data class ArmedCapture(
@@ -2509,7 +2458,8 @@ data class RecordState(
      * a claim that a link was up at them.
      *
      * Read together with [imuStateB] and [imuFrameAtMsB] by
-     * [armedDeliveryOf], and never one without the others.
+     * `ArmedSilencePolicy`'s two readings through [armedLinks], and never one
+     * without the others.
      */
     val imuFrameAtMs: Long? = null,
     val imuFrameAtMsB: Long? = null,
@@ -2632,19 +2582,10 @@ data class RecordState(
      * same question about the one link, without a role (#224), and the card
      * draws from both.
      */
-    fun armedDelivery(nowMs: Long): Map<SensorRole, ArmedDelivery> = armedDeliveryOver(
+    fun armedDelivery(nowMs: Long): Map<SensorRole, ArmedDelivery> = ArmedSilencePolicy.liveDeliveryByRole(
         analysed = roster.analysed,
         secondary = roster.secondary,
-        // The LATER of the two arming instants, so a link that has just been
-        // re-pointed hands BOTH a fresh grace window rather than the one that
-        // did not move being accused meanwhile. The conservative direction: it
-        // delays a true warning by three seconds instead of raising a false
-        // one. In practice only the SECOND link's instant ever moves --
-        // AutoConnectManager writes the analysed link's once at construction
-        // and never again, which its own KDoc now says -- so mid-session this
-        // maxOf is the second link's instant whenever that link has been
-        // re-pointed, and the process's start time otherwise.
-        sinceMs = maxOf(imuArmedAtMs, imuArmedAtMsB),
+        links = armedLinks(),
         nowMs = nowMs,
     )
 
