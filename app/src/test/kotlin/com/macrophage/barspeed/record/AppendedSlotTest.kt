@@ -233,6 +233,21 @@ private fun rampedPulldown() = listOf(
 )
 
 /**
+ * A one-set lat pulldown block followed by a two-set press block (#206).
+ *
+ * The shape in which an appended set BECOMES the coming one: the pulldown
+ * block has nothing left to run, so `AddSetControl.placement` puts the
+ * appended set immediately next and the rest screen's boxes are re-seeded
+ * from it. Taking it back has to move them again, and no other fixture in
+ * this file reaches that branch.
+ */
+private fun pulldownThenPress() = listOf(
+    slot(pulldown, 0, 1, loadKg = 27.2),
+    slot(press, 0, 2, loadKg = 20.0),
+    slot(press, 1, 2, loadKg = 20.0),
+)
+
+/**
  * One anchor, the slot [appendedState] builds after it, and the statements the
  * lifter had standing at that moment.
  *
@@ -303,6 +318,18 @@ private fun sweeps() = listOf(repSweep(), timedSweep())
 
 private fun fieldsDecided(decision: Append) = APPEND_DECISIONS.filterValues { it == decision }.keys
 
+/**
+ * What an appended set is made of, and -- since #206 -- what taking one back
+ * out leaves behind.
+ *
+ * The removal cases live here rather than in a file of their own because they
+ * need these fixtures and this queue: a slot removed has to be checked against
+ * the slot that was appended, field for field, and duplicating `slot`,
+ * `resting` and `ready` beside a second class is how two fixtures start
+ * disagreeing about what a plan looks like. `APPEND_DECISIONS` is untouched by
+ * #206 -- removal adds no field to [PlannedSlot] and changes no field's
+ * source, so the table still names every one of them.
+ */
 class AppendedSlotTest {
     @Test
     fun `every PlannedSlot field has a stated append decision`() {
@@ -417,6 +444,113 @@ class AppendedSlotTest {
         assertEquals(5, twice.queue.size)
         assertEquals(listOf(false, false, false, true, true), twice.queue.map { it.isAddedSet })
         assertEquals(listOf(0, 1, 2, 3, 4), twice.queue.map { it.setIndexInExercise })
+    }
+
+    // ---- #206: taking an appended set back out --------------------------
+
+    /**
+     * RED before c3. The plain undo: append one set, remove it, and the queue
+     * is the plan's again.
+     */
+    @Test
+    fun `an appended set can be taken back out again`() {
+        val once = assertNotNull(appendedState(resting(rampedPulldown(), 0)))
+        val back = assertNotNull(removedState(once), "removedState returned null")
+        assertEquals(3, back.queue.size)
+        assertEquals(listOf(false, false, false), back.queue.map { it.isAddedSet })
+        assertEquals(listOf(0, 1, 2), back.queue.map { it.setIndexInExercise })
+    }
+
+    /**
+     * RED before c3. #206 requirement 2: removing one appended set disturbs no
+     * other. The survivor keeps the place AND the carried load it was built
+     * with, which is what "the others are undisturbed" has to mean for a set
+     * that is going to be recorded.
+     */
+    @Test
+    fun `removing one appended set leaves the other standing unchanged`() {
+        val once = assertNotNull(appendedState(resting(rampedPulldown(), 0, statedLoadKg = 40.0)))
+        val twice = assertNotNull(appendedState(once))
+        val survivor = twice.queue[3]
+        val back = assertNotNull(removedState(twice))
+        assertEquals(4, back.queue.size)
+        assertEquals(listOf(false, false, false, true), back.queue.map { it.isAddedSet })
+        assertEquals(survivor, back.queue[3])
+    }
+
+    /**
+     * RED before c3. Repeatable to exhaustion: two appends and two removals
+     * leave the plan's own queue, and a third removal has nothing to take.
+     */
+    @Test
+    fun `two appends and two removals leave the plan's queue`() {
+        val twice = assertNotNull(appendedState(assertNotNull(appendedState(resting(rampedPulldown(), 0)))))
+        val back = assertNotNull(removedState(assertNotNull(removedState(twice))))
+        assertEquals(3, back.queue.size)
+        assertEquals(listOf(false, false, false), back.queue.map { it.isAddedSet })
+        assertNull(removedState(back))
+    }
+
+    /**
+     * RED before c3. #206 requirement 4, the case it is actually about: the
+     * removed set was NOT the coming one, so the load and reps the lifter is
+     * standing on for that exercise are left exactly where they are. Reverting
+     * them would silently undo a correction made for the EXERCISE rather than
+     * for the set.
+     */
+    @Test
+    fun `removing a set that was not the coming one leaves the standing load alone`() {
+        val once = assertNotNull(appendedState(resting(rampedPulldown(), 0, statedLoadKg = 40.0)))
+        val back = assertNotNull(removedState(once))
+        assertEquals(40.0, back.statedLoadKg)
+        assertEquals(once.loadInput, back.loadInput)
+        assertEquals(once.repsInput, back.repsInput)
+    }
+
+    /**
+     * RED before c3. The one case where the boxes MUST move: the removed set
+     * had displaced the set the next START would run, and every editable box
+     * was seeded from it. Leaving them would show the pulldown's load on a
+     * press set -- the box disagreeing with what the set would record, which
+     * is what #45 and #124 are about.
+     *
+     * This is not a reversion of requirement 4. Nothing about the pulldown's
+     * standing values is rolled back; the boxes follow the set that is now
+     * coming up, exactly as `jumpedState` and `appendedState` already make
+     * them.
+     */
+    @Test
+    fun `removing the set that had become the coming one re-seeds the boxes`() {
+        val once = assertNotNull(appendedState(resting(pulldownThenPress(), 0)))
+        assertEquals(4, once.queue.size)
+        assertTrue(once.queue[1].isAddedSet)
+        val back = assertNotNull(removedState(once))
+        assertEquals(3, back.queue.size)
+        assertEquals(press.id, back.upcomingSlot?.exercise?.id)
+        assertEquals(back.weightUnit.inputValue(20.0), back.loadInput)
+        assertNotEquals(back.weightUnit.inputValue(27.2), back.loadInput)
+        assertNull(back.statedLoadKg)
+        assertNull(back.statedReps)
+    }
+
+    /**
+     * RED before c3. THE BOUNDARY, in :app. Once the appended set has RUN it
+     * is a recorded set, and no state this function produces removes one.
+     *
+     * Mid-rest after the appended set itself: `queueIndex` is that slot and
+     * `upcomingIndex` is one past it.
+     */
+    @Test
+    fun `an appended set that has already run is not removable`() {
+        val once = assertNotNull(appendedState(resting(rampedPulldown(), 0)))
+        assertNull(removedState(resting(once.queue, 3)))
+    }
+
+    /** RED before c3. Nothing appended, nothing removable. */
+    @Test
+    fun `a plan queue with no appended set has nothing to remove`() {
+        assertNull(removedState(resting(rampedPulldown(), 0)))
+        assertNull(removedState(ready(rampedPulldown(), 0)))
     }
 
     @Test
