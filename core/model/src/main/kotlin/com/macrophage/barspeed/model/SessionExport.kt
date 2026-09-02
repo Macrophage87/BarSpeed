@@ -288,7 +288,8 @@ data class SessionExport(
          * built at export time, but from the analysis frozen into the set's
          * row when the set was RECORDED, so a document declaring 1.16 still
          * carries both keys, with the old quantities, on every rep it
-         * publishes from a set recorded before this version. The published copy of this entry in
+         * publishes from a set recorded before this version. The published
+         * copy of this entry in
          * `docs/schemas/session-export.schema.json` is the one to read for
          * which key a given lift writes, why the other is absent rather than
          * zero, and the segmentation limit that survives.
