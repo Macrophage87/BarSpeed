@@ -81,6 +81,13 @@
           "limiter": "other",
           "limiterNote": "lost count and stopped, not sure how many I had done",
           "rest_s": 180,
+          "sensors": {
+            "count": 2,
+            "expected": ["b", "a"],
+            "present": ["a"],
+            "analysedRole": "a",
+            "analysedFellBack": true
+          },
           "summary": { "meanConVel_mps": 0.39, "peakConVel_mps": 0.66, "meanEcc_s": 4.0, "meanCon_s": 1.3, "meanRom_m": 0.58, "romSpread_pct": 0 }
         },
         {
