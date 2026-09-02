@@ -4,6 +4,7 @@ import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * What `bottomPause_s` and `topPause_s` are measured between (issue #93).
@@ -54,15 +55,21 @@ import kotlin.test.assertEquals
  * merged rep drags its own turnaround out to cover the reps it swallowed, and
  * that error is #72's, not this issue's.
  *
- * ## What this file pins TODAY (pre-fix characterization)
+ * ## What this file pins
  *
- * `bottomPauseS` here is `RepSpan.toNextMovementS`: the interval from the end of the
- * rep's LAST detected phase to the start of the next detected movement, or to
- * the end of the stream on the last rep. It is outside the rep's own phase
- * boundaries, so it is not a pause of this rep at all. `topPauseS` here is
- * `RepSpan.turnaroundPauseS`, the turnaround, which IS inside them -- except on a rep
- * counted from the drive alone, where the segmenter has no second phase and
- * writes a literal 0.0.
+ * A rep publishes ONE pause: the turnaround between its own two detected
+ * phases. On this lift that is the TOP, and it is what the metronome held for
+ * a second. The BOTTOM is where each rep begins and ends, so the stillness
+ * there runs from the end of one rep's lowering to the start of the next
+ * rep's drive and holds the lifter's rest -- it is not an interval inside the
+ * rep and is no longer published as one.
+ *
+ * Before the fix, `bottomPauseS` carried exactly that outside interval and
+ * read 0.02 / 0.10 / 1.57 / 0.33 / 1.29 / 0.06 / 0.08 / 0.01 s against a
+ * prescribed bottom pause of ZERO, and `topPauseS` read a literal 0.0 on the
+ * two reps that resolved no eccentric at all. Both figures are named in the
+ * assertions below beside what replaces them, so the diff that made them
+ * change is readable from the test.
  */
 class RepPauseBoundaryTest {
     private val fixture = "field-legpress-single-2011-8rep-s36-set07"
@@ -127,34 +134,65 @@ class RepPauseBoundaryTest {
     }
 
     @Test
-    fun `bottomPause_s is the interval to the next drive, measured outside this rep (pre-fix)`() {
+    fun `bottomPause_s is not published, because the bottom is where this rep begins and ends`() {
         val analysis = analyze()
-        // Prescribed bottom pause on "2011" is the second digit: 0 s. These
-        // are not zero, and rep 3's 1.57 s is longer than the metronome's
-        // whole top hold -- because the quantity is the gap between reps, not
-        // a pause the lifter took.
-        assertSeconds(
-            listOf(0.02, 0.1, 1.57, 0.33, 1.29, 0.06, 0.08, 0.01),
-            analysis.reps.map { it.bottomPauseS },
-            "bottomPause_s",
-        )
+        // It used to read 0.02 / 0.10 / 1.57 / 0.33 / 1.29 / 0.06 / 0.08 /
+        // 0.01 s against a prescribed bottom pause of ZERO -- the gap from the
+        // end of each rep's lowering to the start of the next drive. Rep 3's
+        // 1.57 s was longer than the metronome's entire top hold. Absent, not
+        // zero: the lifter may well have paused at the bottom and nothing in
+        // this pipeline can say how long for.
+        val bottoms: List<Double?> = analysis.reps.map { it.bottomPauseS }
+        assertEquals(List<Double?>(8) { null }, bottoms, "bottomPause_s")
     }
 
     @Test
-    fun `topPause_s is the turnaround, and reads a literal zero on a drive-only rep (pre-fix)`() {
+    fun `topPause_s is the turnaround the metronome held, and is absent where there is none`() {
         val analysis = analyze()
-        // Reps 2 and 3 resolved no eccentric at all -- eccS is null, which the
-        // repo already treats as "unmeasured, never zero" -- yet the pause
-        // beside it is published as 0.0 rather than as unmeasured.
+        // Reps 2 and 3 resolved no eccentric -- eccS is null, which this repo
+        // already treats as "unmeasured, never zero". A rep with one phase has
+        // no interval between two of them, so the pause is null on the same
+        // rule. It read a literal 0.0 before.
         assertSeconds(
             listOf(2.01, null, null, 1.13, 0.66, 1.83, 1.68, 3.34),
             analysis.reps.map { it.eccS },
             "ecc_s",
         )
         assertSeconds(
-            listOf(0.97, 0.0, 0.0, 1.25, 1.71, 1.1, 2.14, 0.04),
+            listOf(0.97, null, null, 1.25, 1.71, 1.1, 2.14, 0.04),
             analysis.reps.map { it.topPauseS },
             "topPause_s",
+        )
+    }
+
+    @Test
+    fun `the published pause tracks the metronome's second, where the older field did not`() {
+        // The point of the fixture: a known 1 s to check the published figure
+        // against, from the cue track rather than from the tempo digit.
+        //
+        // This asserts the MEASURED median against the metronome's own 1.001 s,
+        // and asserts that the interval once published beside it as this rep's
+        // other pause is now absent. It is not a comparison of two live
+        // populations: only the turnaround is still computed.
+        val analysis = analyze()
+        val turnarounds = analysis.reps.mapNotNull { it.topPauseS }.sorted()
+        assertEquals(6, turnarounds.size, "reps that resolved both phases, and so have a turnaround")
+        val median = (turnarounds[2] + turnarounds[3]) / 2.0
+        assertEquals(1.175, median, 1e-3, "median turnaround, seconds")
+        // The metronome's own figure, from the cue track, asserted above: 1.001 s.
+        // Bound to the measured value, never to the literal above it: an
+        // assertion over two compile-time constants cannot fail.
+        assertTrue(
+            kotlin.math.abs(median - 1.001) < 0.25,
+            "the published pause lands within a quarter second of the second the lifter was held for",
+        )
+        // What the same reps published as their other pause before #93: the
+        // intervals between reps, whose median is 0.09 s -- an order out from
+        // the hold, on a set where nothing was prescribed at that end.
+        assertEquals(
+            List<Double?>(8) { null },
+            analysis.reps.map { it.bottomPauseS },
+            "and the interval that produced 0.09 s is no longer published as a pause at all",
         )
     }
 }

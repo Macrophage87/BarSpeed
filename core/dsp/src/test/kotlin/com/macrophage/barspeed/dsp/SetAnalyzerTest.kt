@@ -7,6 +7,7 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SetAnalyzerTest {
@@ -22,7 +23,12 @@ class SetAnalyzerTest {
         for (rep in analysis.reps) {
             assertTrue(abs((rep.eccS ?: 0.0) - 4.0) < 0.5, "eccentric ${rep.eccS}s should be ~4s")
             assertTrue(abs(rep.conS - 1.0) < 0.35, "concentric ${rep.conS}s should be ~1s")
-            assertTrue(rep.bottomPauseS in 0.5..1.6, "bottom pause ${rep.bottomPauseS}s should be ~1s")
+            // Ecc-first, so the turnaround is at the BOTTOM and the top is
+            // the rep boundary, which publishes nothing at all (#93).
+            val bottomPause: Double? = rep.bottomPauseS
+            assertNotNull(bottomPause, "an ecc-first rep publishes its bottom turnaround")
+            assertTrue(bottomPause in 0.5..1.6, "bottom pause ${rep.bottomPauseS}s should be ~1s")
+            assertNull(rep.topPauseS, "the top is this rep's boundary, not an interval inside it")
             assertTrue(rep.romM in 0.45..0.75, "ROM ${rep.romM}m should be ~0.6m")
             assertNotNull(rep.peakPowerW)
         }

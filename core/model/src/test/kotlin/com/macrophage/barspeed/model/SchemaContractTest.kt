@@ -896,6 +896,38 @@ class SchemaContractTest {
         )
     }
 
+    /**
+     * The opposite direction to the geometry pin above, and for the same
+     * reason: schema 1.16 makes `bottomPause_s` and `topPause_s` OPTIONAL
+     * because exactly one of them is published per rep, so a reader that
+     * requires either is reading a document the app cannot produce. Nothing
+     * else guards this. `SchemaContractTest` pins the top-level required set,
+     * the sensors block and every geometry key, and pinned nothing under
+     * `repMetrics` until #93; re-adding either key to `required` would
+     * otherwise go undetected while the app emits neither on some lifts.
+     *
+     * The four that STAY required are the four every counted rep has: a rep
+     * the segmenter counted from the drive alone still resolves a concentric
+     * and a displacement, so `con_s`, both drive velocities and `rom_m` are
+     * never absent. `ecc_s`, the two eccentric velocities and both power
+     * figures are optional for reasons that predate this version.
+     */
+    @Test
+    fun `neither pause key is required, because a rep publishes exactly one of them`() {
+        val repMetrics = schema("session-export.schema.json")["\$defs"]!!.jsonObject["repMetrics"]!!.jsonObject
+        val required = repMetrics["required"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
+        assertEquals(
+            setOf("con_s", "meanConVel_mps", "peakConVel_mps", "rom_m"),
+            required,
+            "the repMetrics required set drifted; a pause key that becomes required is unpublishable",
+        )
+        assertTrue(
+            "bottomPause_s" in repMetrics["properties"]!!.jsonObject.keys &&
+                "topPause_s" in repMetrics["properties"]!!.jsonObject.keys,
+            "both pause keys must still be DECLARED -- optional is not the same as removed",
+        )
+    }
+
     // ---- what the session level says today, ahead of issue #159 -------------
 
     /**
