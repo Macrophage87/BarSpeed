@@ -723,7 +723,8 @@ data class SetExport(
 
 /**
  * A set's accelerometer configuration: what was armed, what arrived, which of
- * it the numbers came from, and what stopped a second stream.
+ * it the numbers came from, whether that was the unit the set armed, and what
+ * stopped a second stream.
  *
  * Six statements rather than one because each answers a question the others
  * cannot. [count], [expected] and [shortfall] are declarations made when the

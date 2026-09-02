@@ -298,7 +298,7 @@ class SetJournalTest {
         journal.sync()
 
         val found = store.orphans().single()
-        assertEquals(1, found.imuSamples.size, "the analysed stream picked up the other one's rows")
+        assertEquals(1, found.imuSamples.size, "the armed stream picked up the other one's rows")
         assertEquals(2, found.secondaryImuSamples.size)
         assertEquals(listOf(SensorRole.A, SensorRole.B), found.header.sensorRoles)
         assertEquals(SensorRole.A, found.header.analysedRole)

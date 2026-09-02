@@ -66,8 +66,8 @@ data class SetJournalHeader(
      * [SetJournalStore.JOURNAL_VERSION] is deliberately NOT bumped for this.
      * Its own contract is that it moves when the on-disk layout stops being
      * readable by older code, and the version gate refuses only a FUTURE
-     * format; the analysed stream keeps the filename `imu.csv`, so an older
-     * build still recovers the header, the analysed capture, heart rate, cues
+     * format; the armed stream keeps the filename `imu.csv`, so an older
+     * build still recovers the header, the armed capture, heart rate, cues
      * and rep marks, and simply ignores one file it has never heard of.
      * Bumping would make that build return null for the whole directory and
      * DISCARD an orphaned set it could otherwise have offered back, which is
@@ -121,10 +121,11 @@ data class OrphanedSet(
      * The second accelerometer's capture, empty on every set that had one
      * sensor and on every capture written before the app could have two.
      *
-     * [imuSamples] keeps its meaning -- the ANALYSED stream -- so nothing that
-     * already reads this type sees a different number. Defaulted last for the
-     * same reason: a positional constructor call in a test or a screen keeps
-     * compiling and keeps meaning what it meant.
+     * [imuSamples] keeps its meaning -- the ARMED unit's stream, whatever it
+     * turned out to hold -- so nothing that already reads this type sees a
+     * different number. Defaulted last for the same reason: a positional
+     * constructor call in a test or a screen keeps compiling and keeps meaning
+     * what it meant.
      */
     val secondaryImuSamples: List<ImuSample> = emptyList(),
 )
@@ -182,11 +183,11 @@ class SetJournal internal constructor(
     }
 
     /**
-     * A sample from the accelerometer that is NOT analysed, into its own file
-     * (#156).
+     * A sample from the accelerometer that is not the ARMED one, into its own
+     * file (#156).
      *
      * `imu-a.csv` or `imu-b.csv` beside `imu.csv`, never instead of it. The
-     * analysed stream keeps the name every earlier build knows, which is what
+     * armed stream keeps the name every earlier build knows, which is what
      * lets [SetJournalStore.JOURNAL_VERSION] stay where it is -- see
      * [SetJournalHeader.sensorRoles].
      *
@@ -196,7 +197,7 @@ class SetJournal internal constructor(
      * either break that format or be a second format wearing its name. Two
      * files also mean a half-written line in one costs nothing in the other.
      *
-     * Its own row counter, not a continuation of the analysed stream's.
+     * Its own row counter, not a continuation of the armed stream's.
      * `ImuCsv`'s own contract for `sample_idx` is "THIS loop's own index,
      * 0..n-1 by construction", and the decoder that reads this file back reads
      * one file: a shared counter would publish a stream whose indices start at
@@ -338,7 +339,8 @@ class SetJournal internal constructor(
         const val IMU_PREFIX = "imu"
 
         /**
-         * Where the capture from the accelerometer that is NOT analysed goes.
+         * Where the capture from the accelerometer that is not the ARMED one
+         * goes.
          *
          * Derived from the role rather than fixed, so the file says which unit
          * it came from without the header having to be read first -- the same
