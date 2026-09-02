@@ -244,6 +244,45 @@ class SessionExportSensorsTest {
     }
 
     /**
+     * DIFFERENTIAL, issue #207. A set whose figures came from a unit it was
+     * not pointed at publishes that fact, and an ordinary one publishes
+     * nothing.
+     *
+     * The key a reader cannot derive. Before the fallback, an analysed role
+     * missing from `present` was the marker; after it, the analysed role is
+     * present in both cases and the comparison separates nothing. What is left
+     * to say -- "these figures came from the unit the app was pointed at", so
+     * they are comparable with the rest of a corpus recorded the same way --
+     * has to be said outright.
+     *
+     * Absence rather than a written false on the ordinary set, which is the
+     * rule `failed` and `warmup` already follow: the exporter drops a default,
+     * and omission reads correctly where false is the unremarkable normal.
+     */
+    @Test
+    fun `a set analysed from a unit it was not pointed at publishes that it moved`() = runTest {
+        val fellBack =
+            setObject(
+                dual.copy(analysed = SensorRole.B, analysedFellBack = true),
+                listOf(imuStream(2L, "b", count = 100)),
+            ).getValue("sensors").jsonObject
+
+        assertEquals("b", fellBack.getValue("analysedRole").jsonPrimitive.content)
+        assertEquals(listOf("b"), fellBack.roles("present"))
+        assertTrue(
+            fellBack.getValue("analysedFellBack").jsonPrimitive.content.toBoolean(),
+            "the export never says the analysed role is not the one the set armed",
+        )
+
+        val ordinary =
+            setObject(dual, listOf(imuStream(1L, "a", count = 100))).getValue("sensors").jsonObject
+        assertTrue(
+            "analysedFellBack" !in ordinary,
+            "an ordinary dual set published the key anyway: $ordinary",
+        )
+    }
+
+    /**
      * DIFFERENTIAL, issue #198. A set that recorded one stream because two
      * PAIRED units could not be told apart publishes WHICH gap it was.
      *

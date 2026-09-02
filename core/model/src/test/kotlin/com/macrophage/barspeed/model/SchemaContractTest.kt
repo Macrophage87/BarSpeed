@@ -493,7 +493,7 @@ class SchemaContractTest {
     // ---- the sensor declaration, issue #156 ---------------------------------
 
     /**
-     * The published `sensors` block declares the four things it declares, each
+     * The published `sensors` block declares every key it declares, each
      * described, and refuses anything else.
      *
      * `$defs.set` is `additionalProperties: false`, so an undeclared key would
@@ -513,7 +513,7 @@ class SchemaContractTest {
             "the sensors block accepts undeclared keys, so a typo would validate",
         )
         assertEquals(
-            setOf("count", "expected", "present", "analysedRole", "shortfall"),
+            setOf("count", "expected", "present", "analysedRole", "analysedFellBack", "shortfall"),
             sensors["properties"]!!.jsonObject.keys,
             "SetSensorsExport and the published sensors block disagree on keys",
         )

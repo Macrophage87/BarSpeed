@@ -417,32 +417,53 @@ class SensorCapturePolicyTest {
     // ---- which stream the DSP is pointed at ----------------------------------
 
     /**
-     * CHARACTERIZATION, issue #207. Today the analysed role is the armed one
-     * whatever streamed, and this states it at the seam that will change.
+     * DIFFERENTIAL, issue #207. The analysed role is a role that STREAMED, and
+     * the document says when that is not the role the set armed.
      *
-     * [SensorCapturePolicy.analysedStream] is a new symbol with nothing
-     * deciding inside it yet: it returns the armed role and `fellBack` false,
-     * which is what [SensorCapturePolicy.roster] already means by *"the
-     * preferred address decides which role is analysed, and nothing else
-     * does"*. The middle case is field-36 set 02 -- armed for b, only a
-     * streamed -- and it is the one the fix reverses.
+     * Field-36 is the second case: two units paired and labelled, the
+     * preference on b, b in a bag, and 13 of 14 sets published `summary: {}`
+     * over complete role-a streams. The preference decides which unit the
+     * existing link is maintained for and it is a fact about wiring; it cannot
+     * decide which stream the figures come from, because by the time there are
+     * figures it is known which unit produced any.
+     *
+     * `fellBack` is asserted in BOTH directions on every case rather than only
+     * where it is true. It is the only thing separating "analysed the
+     * preferred unit" from "analysed the only unit that turned up" once both
+     * name a role that is present, and a flag that is only ever checked when
+     * set is a flag nothing stops being written.
+     *
+     * NOTHING STREAMED is deliberately not a fallback. There is no other
+     * stream to move onto, so the honest answer is the role the set armed and
+     * a set of figures that are empty because there was nothing to compute
+     * them from -- moving the name in that case would say a unit was analysed
+     * when nothing was.
+     *
+     * This replaces `today the analysed role is the one that was armed,
+     * whatever streamed`, which stated the pre-fix rule at c1 and was true
+     * there.
      */
     @Test
-    fun `today the analysed role is the one that was armed, whatever streamed`() {
+    fun `the analysed role is one that streamed, and says so when it moved`() {
         assertEquals(
             AnalysedStream(SensorRole.B, fellBack = false),
             SensorCapturePolicy.analysedStream(SensorRole.B, listOf(SensorRole.B, SensorRole.A)),
-            "both units streamed",
+            "both units streamed: the armed role stands and nothing moved",
         )
         assertEquals(
             AnalysedStream(SensorRole.B, fellBack = false),
+            SensorCapturePolicy.analysedStream(SensorRole.B, listOf(SensorRole.B)),
+            "the armed unit streamed and the other did not",
+        )
+        assertEquals(
+            AnalysedStream(SensorRole.A, fellBack = true),
             SensorCapturePolicy.analysedStream(SensorRole.B, listOf(SensorRole.A)),
             "field-36 set 02: armed for b, only a streamed",
         )
         assertEquals(
             AnalysedStream(SensorRole.B, fellBack = false),
             SensorCapturePolicy.analysedStream(SensorRole.B, emptyList()),
-            "nothing streamed at all",
+            "nothing streamed at all, so there is nothing to fall back to",
         )
     }
 

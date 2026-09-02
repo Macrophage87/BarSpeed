@@ -7,6 +7,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedSensors
+import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
@@ -69,6 +70,19 @@ import kotlin.test.assertTrue
  * capture resolves four detections against the metronome's six calls, and that
  * under-count is #94/#138's subject. Restoring a summary here restores *a*
  * summary, not a trustworthy one.
+ *
+ * ## What this file adds at c2
+ *
+ * DIFFERENTIALS: the same capture recorded through the fallback, publishing a
+ * summary from the role that streamed and saying that it moved. They fail at
+ * the commit that introduces them.
+ *
+ * `as shipped, ...` stays and stops being a statement about what this build
+ * records: the exporter re-decides nothing, so a row an earlier build already
+ * wrote keeps publishing exactly what it says, and that is what that case now
+ * pins. Nothing here repairs field-36 -- its analyses are frozen in its rows,
+ * and re-pointing an export at another stream would publish figures under a
+ * role that did not produce them.
  *
  * Nothing here executes Room, SQLite or Android. The DAO is an interface and
  * these fakes stand in for it, so what is verified is the repository's and the
@@ -268,6 +282,31 @@ class AnalysedRoleFallbackTest {
         assertEquals("Not enough samples (0)", thrown.message, "what the analyzer says about an absent stream")
     }
 
+    /**
+     * The record path's own composition, mirrored rather than executed.
+     *
+     * `armedCaptureOf` in `RecordViewModel.kt` builds exactly this: the armed
+     * roles keyed to their buffers, the streamed roles by
+     * [SensorCapturePolicy.present], the decision by
+     * [SensorCapturePolicy.analysedStream], and the partner derived from the
+     * corrected declaration. It lives in `:app`, which no test on the CI path
+     * can reach, so what is verified here is the composition and not that
+     * `:app` performs it -- that half is compile-gated only.
+     */
+    private fun asRecorded(byRole: Map<SensorRole, List<ImuSample>>): CompletedSet {
+        val streamed = SensorCapturePolicy.present(armedRoles, byRole.filterValues { it.isNotEmpty() }.keys)
+        val decision = SensorCapturePolicy.analysedStream(armed.analysed, streamed)
+        val sensors = armed.copy(analysed = decision.role, analysedFellBack = decision.fellBack)
+        return completedSet(
+            analysed = decision.role?.let { byRole[it] }.orEmpty(),
+            sensors = sensors,
+            secondary = SecondaryCapture(
+                checkNotNull(sensors.secondaryRole) { "a dual declaration with no partner role" },
+                byRole[sensors.secondaryRole].orEmpty(),
+            ),
+        )
+    }
+
     @Test
     fun `as shipped, the analysed role is one that never streamed and the summary is empty`() = runTest {
         val set = publishedAsShipped()
@@ -281,5 +320,66 @@ class AnalysedRoleFallbackTest {
             set.getValue("summary").jsonObject,
             "field-36 published summary {} on 13 of 14 sets; this is that document",
         )
+    }
+
+    @Test
+    fun `a set whose armed role never streamed is analysed from the role that did`() = runTest {
+        val set = publish(asRecorded(mapOf(SensorRole.B to emptyList(), SensorRole.A to roleA())))
+        val sensors = set.getValue("sensors").jsonObject
+
+        assertEquals("a", sensors.getValue("analysedRole").jsonPrimitive.content, "the role the figures came from")
+        assertEquals(listOf("b", "a"), sensors.roles("expected"), "the roles the set armed are unchanged")
+        assertEquals(listOf("a"), sensors.roles("present"), "the roles whose stream reached the archive")
+        assertTrue(
+            sensors.getValue("analysedFellBack").jsonPrimitive.content.toBoolean(),
+            "the document never says the analysed role is not the one the set armed",
+        )
+    }
+
+    @Test
+    fun `the set field-36 published as empty publishes its summary`() = runTest {
+        val set = publish(asRecorded(mapOf(SensorRole.B to emptyList(), SensorRole.A to roleA())))
+        val summary = set.getValue("summary").jsonObject
+
+        // Presence, not values. This capture under-counts -- four detections
+        // against six called reps -- so the figures are #94/#138's problem and
+        // pinning them here would read as a claim that they are trustworthy.
+        assertTrue(summary.isNotEmpty(), "the summary is still empty, which is what field-36 published")
+        listOf("meanConVel_mps", "peakConVel_mps", "meanRom_m", "peakPower_w").forEach { key ->
+            assertTrue(key in summary, "the restored summary has no $key: ${summary.keys}")
+        }
+        assertEquals(4, set.getValue("repMetrics").jsonArray.size, "detections; the metronome called 6 (#94/#138)")
+    }
+
+    @Test
+    fun `a set whose armed role did stream says it did not move`() = runTest {
+        // The other half of the flag, and the reason it is a key rather than a
+        // comparison: with the fallback in place the analysed role is present
+        // in both cases, so `analysedRole in present` no longer separates
+        // "analysed the preferred unit" from "analysed the only one there".
+        val set = publish(asRecorded(mapOf(SensorRole.B to roleA(), SensorRole.A to emptyList())))
+        val sensors = set.getValue("sensors").jsonObject
+
+        assertEquals("b", sensors.getValue("analysedRole").jsonPrimitive.content, "the armed role streamed")
+        assertEquals(listOf("b"), sensors.roles("present"))
+        assertTrue(
+            "analysedFellBack" !in sensors,
+            "a set that did not fall back published the key anyway: $sensors",
+        )
+    }
+
+    @Test
+    fun `a set where nothing streamed keeps naming the role it armed`() = runTest {
+        // No fallback, because there is nothing to fall back TO. Moving the
+        // name here would say a unit was analysed when none was, and the
+        // summary is empty because there was no stream rather than because the
+        // app looked at the wrong one.
+        val set = publish(asRecorded(mapOf(SensorRole.B to emptyList(), SensorRole.A to emptyList())))
+        val sensors = set.getValue("sensors").jsonObject
+
+        assertEquals("b", sensors.getValue("analysedRole").jsonPrimitive.content, "the role the set armed")
+        assertEquals(emptyList(), sensors.roles("present"), "nothing reached the archive")
+        assertTrue("analysedFellBack" !in sensors, "nothing streamed, so nothing was fallen back to: $sensors")
+        assertEquals(emptyMap(), set.getValue("summary").jsonObject, "a summary from no stream at all")
     }
 }
