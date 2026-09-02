@@ -73,8 +73,9 @@ import com.macrophage.barspeed.model.VoiceCue
  * ## Which cue, and on which clock
  *
  * [TERMINAL_CUES] is the whole of the vocabulary that means the set is over --
- * [DONE] when the prescription was called through, [STOPPED] when the lifter
- * ended it before that. Every other cue calls a stroke or counts one. `Time`
+ * [DONE] when the prescription was called through, [STOPPED] when it was not
+ * -- see [STOPPED] for the two populations that covers. Every other cue calls
+ * a stroke or counts one. `Time`
  * ends a TIMED set, and a timed set publishes no rep list at all, so widening
  * the vocabulary to it would add a case with nothing in it.
  *
@@ -83,8 +84,9 @@ import com.macrophage.barspeed.model.VoiceCue
  * telling cannot un-tell them. Every capture held here carries at most one, and
  * cue tracks are written in the order they are spoken, so on every one of them
  * the earliest and the first are the same row; taking the earliest makes the
- * rule total without depending on either. The known cost is on a sensor-counted set whose count runs ahead: the
- * app calls `Done` early, and reps performed after it are then excluded from the
+ * rule total without depending on either. The known cost is on a
+ * sensor-counted set whose count runs ahead: the app calls `Done` early,
+ * and reps performed after it are then excluded from the
  * figures as well as from the count. That set already published a wrong rep
  * count; this rule propagates that error into the velocities rather than
  * creating it, and bounding at the LAST `Done` instead would be worse on the
@@ -142,8 +144,20 @@ sealed interface SetEnd {
         const val DONE = CadenceVoice.DONE
 
         /**
-         * The cue the app speaks when the LIFTER ends a guided set before the
-         * prescription has been called through.
+         * The cue the app speaks when a guided set ends without the guide
+         * having called [DONE].
+         *
+         * TWO populations, not one, and the second is an ordinary completion.
+         * [terminalCall] asks whether the set is already bounded, never how it
+         * ended, so this word goes on any guided set whose track carries no
+         * terminal cue. That is the lifter stopping early -- the failure tile,
+         * or the early exit offered during the lead-in (#186) -- and ALSO a
+         * guided set the plan or the ad-hoc form gave no rep count at all
+         * (`PlannedSlot.reps` is nullable; the ad-hoc field may be left blank).
+         * `GuidedCadenceRunner` speaks [DONE] only where `plannedReps != null`,
+         * and `RecordViewModel.setTargetMet` offers such a set the effort grid
+         * from the start, so it finishes normally and carries this word. Read
+         * `failed` for whether a set was failed; this cue does not say.
          *
          * A different word from [DONE] on purpose, and the choice is argued
          * rather than incidental. `Done` means the prescription was delivered;

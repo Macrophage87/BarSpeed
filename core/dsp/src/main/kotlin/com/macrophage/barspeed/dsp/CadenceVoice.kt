@@ -55,8 +55,8 @@ object CadenceVoice {
      * The cue the guide speaks when the prescription has been called through.
      *
      * One of TWO words that mean a set is over, not the only one: a guided set
-     * the LIFTER ends early speaks `SetEnd.STOPPED` instead, at the tap rather
-     * than from this script (#141). `SetEnd.TERMINAL_CUES` is the whole
+     * that never reaches this call speaks `SetEnd.STOPPED` instead, at the tap
+     * rather than from this script (#141). `SetEnd.TERMINAL_CUES` is the whole
      * vocabulary and the one thing to read for it. Nothing on the guide's own
      * schedule ever says the other word, which is why only this one is here.
      */

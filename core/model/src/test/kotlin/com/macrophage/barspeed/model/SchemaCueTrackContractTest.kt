@@ -124,7 +124,9 @@ class SchemaCueTrackContractTest {
      * this change and exactly what is no longer true after it.
      *
      * Narrow, and said so: this checks the word is NAMED. What emits it is
-     * `SetEnd.terminalCall` in `:core:dsp`, pinned there.
+     * `SetEnd.terminalCall` in `:core:dsp`, pinned there. The word is not
+     * evidence of abandonment; `SetEnd.STOPPED` names the two populations it
+     * covers.
      */
     @Test
     fun `the published export documents the cue an abandoned set ends on`() {
@@ -133,7 +135,7 @@ class SchemaCueTrackContractTest {
         val description = voiceCues["description"]!!.jsonPrimitive.content
         assertTrue(
             "Set ended" in description,
-            "the cue vocabulary does not name the word a set the lifter stopped now ends on",
+            "the cue vocabulary does not name the word a guided set with no Done now ends on",
         )
         assertTrue(
             "prescription" in description,

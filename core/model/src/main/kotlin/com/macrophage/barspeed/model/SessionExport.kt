@@ -297,11 +297,15 @@ data class SessionExport(
          * 1.16 carries a SECOND change, under the same number because 1.16
          * is UNRELEASED -- the rule the 1.13 entry states at length and the
          * 1.14 entry applied twice more, for its third and fourth changes
-         * (#198). 1.15 is RELEASED and 1.16 is not: v0.1.47 ships 1.15,
-         * read by `git show v0.1.47:core/model/.../SessionExport.kt` rather
-         * than assumed, and no tag carries 1.16. The change (#141): a
-         * guided set the LIFTER ends early speaks and records a terminal
-         * cue, `Set ended`. NOT additive, for the reason the 1.13
+         * (#189 and #194). 1.15 is RELEASED and 1.16 is not: v0.1.47 ships
+         * 1.15, read by `git show v0.1.47:core/model/.../SessionExport.kt`
+         * rather than assumed, and no tag carries 1.16. The change (#141):
+         * a guided set that ends without the guide having called `Done`
+         * speaks and records a terminal cue, `Set ended`. That is a set
+         * the lifter ended early AND a guided set given no rep target,
+         * which the guide never finishes on its own and which therefore
+         * completes normally carrying this word. NOT additive, for the
+         * reason the 1.13
          * `voiceCues` change was not: no key changes type or stops being
          * written, but an existing array gains a row, and a reader matching
          * only `Done` to find the end of a set now misses that ending. It

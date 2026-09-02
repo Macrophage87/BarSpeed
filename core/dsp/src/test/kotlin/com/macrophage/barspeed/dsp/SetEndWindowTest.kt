@@ -134,13 +134,15 @@ class SetEndWindowTest {
     }
 
     /**
-     * The FIRST `Done`, not the last.
+     * The EARLIEST `Done`, not a later one.
      *
      * Two sources can speak it -- the guided runner when it has called the
      * prescription through, and the rep counter when it reaches the planned
      * count -- and on every capture held here exactly one does. Taking the
-     * first makes the rule total without resting on that, and a second `Done`
-     * cannot un-tell the lifter the set is over.
+     * EARLIEST terminal instant makes the rule total without resting on that,
+     * and a second `Done` cannot un-tell the lifter the set is over. See
+     * [SetEnd] for why the earliest and the first coincide on every capture
+     * held here.
      */
     @Test
     fun `the first Done bounds the set, not a later one`() {
@@ -152,9 +154,12 @@ class SetEndWindowTest {
         assertEquals(SetEnd.Cued(2_000L), SetEnd.of(spoken))
     }
 
-    /** Every other cue calls a stroke or counts one; none of them ends the set. */
+    /**
+     * Every cue outside [SetEnd.TERMINAL_CUES] calls a stroke or counts one;
+     * none of those ends the set.
+     */
     @Test
-    fun `a cue track that never says Done leaves the set unbounded`() {
+    fun `a cue track with no terminal cue leaves the set unbounded`() {
         val spoken = listOf(
             VoiceCue(1_000L, "Ready"),
             VoiceCue(2_000L, "Up"),

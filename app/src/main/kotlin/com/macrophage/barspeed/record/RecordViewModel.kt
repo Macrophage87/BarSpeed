@@ -3254,9 +3254,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     )
                     p.samples.size >= 8 ->
                         // The set's own cue track, frozen into the pending
-                        // write alongside the samples. It carries the Done cue,
-                        // which is the only thing that says when the app
-                        // stopped prescribing -- and the stream runs on past it
+                        // write alongside the samples. It carries the set's
+                        // terminal cue -- Done where the guide called the
+                        // prescription through, Set ended where it did not
+                        // -- which is the only thing that says when the app
+                        // stopped prescribing, and the stream runs on past it
                         // with the sensor being handled, 4.3 to 13.7 s on the
                         // eleven sets of session 32 that carry both a cue and a
                         // stream. See SetEnd.
