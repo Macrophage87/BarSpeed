@@ -479,7 +479,11 @@ object SensorCapturePolicy {
      * analyse it is known which unit produced samples, and pointing the DSP at
      * an empty buffer publishes an empty summary over a capture the app is
      * holding. Field-36 published `summary: {}` on 13 of 14 sets that way,
-     * with complete 99.4 Hz streams from the other unit in every one of them.
+     * and the other unit's file in each of those 13 spans the whole set at a
+     * span-based 99.33-99.42 Hz. SPAN-BASED, so it says the stream was long
+     * and evenly clocked and NOT that it was complete: a dropout is
+     * arithmetically indistinguishable from a slower sensor and nothing in
+     * that archive can separate them.
      *
      * THE MOVE IS PUBLISHED rather than left to be derived. Before this, an
      * analysed role missing from [present] was the marker for "the figures
