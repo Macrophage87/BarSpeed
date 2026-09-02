@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.model.ExerciseDef
+import com.macrophage.barspeed.model.SessionCloseState
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.Stage
 import kotlin.test.Test
@@ -113,6 +114,50 @@ class LastPlannedSetTest {
         assertEquals(60.0, slot.plannedLoadKg)
         assertEquals(8, slot.plannedReps)
         assertTrue(!slot.isAddedSet)
+    }
+
+    // ---- the tap itself, gated on the same answer the screen draws --------
+
+    /**
+     * The tap and the button ask one question (#195).
+     *
+     * GREEN ON ARRIVAL, and here because nothing else runs against the guard:
+     * `startedNextSetState` is what stands between a tap on a stale
+     * composition and `beginSet`, and a guard with no test is a guard that can
+     * be deleted by accident. Measured, not asserted: neutering the refusal
+     * reds `the tap is refused after the last planned set` and `the tap is
+     * refused while the session is closing`, 33 tests completed 2 failed by
+     * `./gradlew :app:testDebugUnitTest --console=plain --max-workers=1
+     * --continue`. The other two here are the allowed cases and stay green,
+     * which is the point of having them.
+     */
+    @Test
+    fun `the tap is refused after the last planned set`() {
+        assertNull(startedNextSetState(resting(twoSets, queueIndex = 1)))
+    }
+
+    @Test
+    fun `the tap advances where a set is queued`() {
+        val out = assertNotNull(startedNextSetState(resting(twoSets, queueIndex = 0)))
+        assertEquals(1, out.queueIndex)
+        assertEquals(Stage.READY, out.stage)
+    }
+
+    /**
+     * A close in flight refuses the tap for the reason the control is already
+     * withheld: `beginSet` starts the service and the collectors, and the
+     * close lands FINISHED over the top of them.
+     */
+    @Test
+    fun `the tap is refused while the session is closing`() {
+        val closing = resting(twoSets, queueIndex = 0).copy(sessionClose = SessionCloseState.IN_FLIGHT)
+        assertNull(startedNextSetState(closing))
+    }
+
+    /** An ad-hoc session has no queue and must still be able to start a set. */
+    @Test
+    fun `the tap is allowed in an ad-hoc session with no queue`() {
+        assertEquals(Stage.READY, assertNotNull(startedNextSetState(adHoc)).stage)
     }
 }
 
