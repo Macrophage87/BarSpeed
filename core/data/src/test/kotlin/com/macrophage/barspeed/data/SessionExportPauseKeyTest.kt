@@ -2,6 +2,7 @@ package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.RepAnalysis
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.SessionExport
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -174,7 +175,7 @@ class SessionExportPauseKeyTest {
      * it.
      */
     @Test
-    fun `a set recorded before 1_16 still publishes both pause keys under 1_16`() = runTest {
+    fun `a set recorded before 1_16 still publishes both pause keys under the current version`() = runTest {
         val analysis =
             SetAnalysis(
                 reps = listOf(preRuleRep()),
@@ -184,7 +185,17 @@ class SessionExportPauseKeyTest {
                 verdicts = emptyList(),
             )
         val text = exporter(analysis).exportJson(1L, includeRepDetail = true)!!
-        assertTrue("\"schemaVersion\": \"1.16\"" in text, "the document must declare 1.16")
+        // Against the constant, not a literal. The subject of this test is
+        // that a row RECORDED before the 1.16 pause rule keeps both keys
+        // however new the document declaring it is, so pinning the declared
+        // version to a digit made the test fail on the next mint -- 1.17
+        // (#205) is the mint it failed on -- for a reason that has nothing to
+        // do with pauses. `SchemaContractTest` is what pins the constant
+        // itself to the published schema and the published example.
+        assertTrue(
+            "\"schemaVersion\": \"${SessionExport.SCHEMA_VERSION}\"" in text,
+            "the document must declare ${SessionExport.SCHEMA_VERSION}",
+        )
         assertTrue("\"bottomPause_s\": 0.4" in text, "a pre-1.16 row's bottom pause must survive export")
         assertTrue("\"topPause_s\": 1.0" in text, "a pre-1.16 row's top pause must survive export")
     }
