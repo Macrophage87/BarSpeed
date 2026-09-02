@@ -33,8 +33,22 @@ import kotlin.test.assertTrue
  * hand. Nothing here executes SQL -- there is no SQLite on this module's test
  * classpath and no `androidTest` source set anywhere -- so this cannot say
  * that SQLite accepts the statement, that a real file survives it, or that
- * Room's own `TableInfo` check passes afterwards. The emulator exercise is
- * what says that, and it is recorded in the fix commit's body.
+ * Room's own `TableInfo` check passes afterwards.
+ *
+ * ## The emulator exercise that does say it
+ *
+ * Run on AVD `barspeed-api35` and recorded in this commit's body. A debug
+ * build of `f9c6010` -- this branch's parent, `DATABASE_VERSION = 13` -- wrote
+ * a real ad-hoc set, and the v14 build was installed over it with
+ * `adb install -r`. After it: `PRAGMA user_version` reads 14, the row survives
+ * with `side` = "left" and `plannedSide` NULL, and `.schema set_records` shows
+ * `plannedSide TEXT` appended UNQUOTED at the end of the table -- the raw
+ * `ALTER TABLE` signature, which is what distinguishes a migration from Room
+ * recreating the table. A plan session then recorded three sets and published
+ * `plannedSide` in a document declaring 1.17. Downgrading back to the v13
+ * build raised the rescue card rather than wiping anything.
+ *
+ * None of that is executed by CI, and none of it is re-run by this file.
  *
  * ## The shape, and why it is this one
  *
