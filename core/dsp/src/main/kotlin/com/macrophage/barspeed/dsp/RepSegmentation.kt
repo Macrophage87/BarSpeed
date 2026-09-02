@@ -96,18 +96,12 @@ data class RepSpan(
     /**
      * Stillness between this rep's two movement phases -- the turnaround, and
      * the only stationary interval the rep's own phase boundaries contain.
-     */
-    val turnaroundPauseS: Double,
-    /**
-     * Seconds from the end of this rep's LAST movement phase to the start of
-     * the next detected movement, or to the end of the series when none
-     * follows.
      *
-     * NOT a pause of this rep: it lies outside the rep's own phase boundaries
-     * and holds whatever the lifter did between reps, rest included. Issue #93
-     * is what happens when it is published as one.
+     * Null when the rep was counted on the drive alone: there is no second
+     * phase, so there is no interval between two of them. Never 0.0, which
+     * would read as a turnaround the lifter took no time over.
      */
-    val toNextMovementS: Double,
+    val turnaroundPauseS: Double?,
     /**
      * False when no eccentric run was detectable and the rep was counted on the
      * drive alone — the eccentric span is then a placeholder and its duration
@@ -234,8 +228,6 @@ object RepSegmenter {
             }
             val second = runs[j]
             val turnaroundPauseS = series.timeS[second.startIdx] - series.timeS[first.endIdx]
-            val endBoundaryIdx = nextMovementStart(runs, j + 1, series)
-            val toNextMovementS = series.timeS[endBoundaryIdx] - series.timeS[second.endIdx]
             if (displacement(series, second.startIdx, second.endIdx) >= config.minRomM) {
                 reps += RepSpan(
                     first.startIdx,
@@ -243,7 +235,6 @@ object RepSegmenter {
                     second.startIdx,
                     second.endIdx,
                     turnaroundPauseS,
-                    toNextMovementS,
                 )
             }
             i = j + 1
@@ -280,33 +271,24 @@ object RepSegmenter {
             if (j < runs.size && runs[j].type == direction.eccentricRun) {
                 val ecc = runs[j]
                 val turnaroundPauseS = series.timeS[ecc.startIdx] - series.timeS[con.endIdx]
-                val endBoundaryIdx = nextMovementStart(runs, j + 1, series)
-                val toNextMovementS = series.timeS[endBoundaryIdx] - series.timeS[ecc.endIdx]
-                reps += RepSpan(ecc.startIdx, ecc.endIdx, con.startIdx, con.endIdx, turnaroundPauseS, toNextMovementS)
+                reps += RepSpan(ecc.startIdx, ecc.endIdx, con.startIdx, con.endIdx, turnaroundPauseS)
                 i = j + 1
             } else {
-                // No detectable return — count the drive; the eccentric is unknown.
-                val endBoundaryIdx = if (j < runs.size) runs[j].startIdx else series.size - 1
-                val toNextMovementS = series.timeS[endBoundaryIdx] - series.timeS[con.endIdx]
+                // No detectable return — count the drive; the eccentric is
+                // unknown, and so is any turnaround: a turnaround is between
+                // two phases and only one of them resolved.
                 reps += RepSpan(
                     con.endIdx,
                     con.endIdx,
                     con.startIdx,
                     con.endIdx,
-                    turnaroundPauseS = 0.0,
-                    toNextMovementS = toNextMovementS,
+                    turnaroundPauseS = null,
                     hasEccentric = false,
                 )
                 i = j
             }
         }
         return reps
-    }
-
-    private fun nextMovementStart(runs: List<Run>, from: Int, series: VelocitySeries): Int {
-        var k = from
-        while (k < runs.size && runs[k].type == RunType.STILL) k++
-        return if (k < runs.size) runs[k].startIdx else series.size - 1
     }
 
     internal fun displacement(series: VelocitySeries, startIdx: Int, endIdx: Int): Double {

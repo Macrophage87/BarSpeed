@@ -280,7 +280,7 @@ data class SessionExport(
          * `SchemaSensorContractTest` reads the JSON only, and no test in
          * this repository can guard a KDoc.
          */
-        const val SCHEMA_VERSION = "1.15"
+        const val SCHEMA_VERSION = "1.16"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -290,6 +290,7 @@ data class SessionExport(
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
+                "1.16",
             )
 
         /**
@@ -838,9 +839,15 @@ data class SetSummaryExport(
 data class RepMetricsExport(
     /** Null when no eccentric was measurable — never 0, which would read as an instant phase. */
     @SerialName("ecc_s") val eccS: Double? = null,
-    @SerialName("bottomPause_s") val bottomPauseS: Double,
+    /**
+     * Seconds still at the BOTTOM turnaround INSIDE this rep, absent when the
+     * rep has no bottom turnaround to measure -- schema 1.16. See the
+     * property's own description in `docs/schemas/session-export.schema.json`.
+     */
+    @SerialName("bottomPause_s") val bottomPauseS: Double? = null,
     @SerialName("con_s") val conS: Double,
-    @SerialName("topPause_s") val topPauseS: Double,
+    /** Seconds still at the TOP turnaround, on the same rule as [bottomPauseS]. */
+    @SerialName("topPause_s") val topPauseS: Double? = null,
     /** Mean drive velocity, positive in the direction the drive moves. */
     @SerialName("meanConVel_mps") val meanConVelMps: Double,
     @SerialName("peakConVel_mps") val peakConVelMps: Double,
