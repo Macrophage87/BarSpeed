@@ -79,6 +79,20 @@ object SessionPreviewPolicy {
     /**
      * Group the queue into the exercise blocks the preview draws.
      *
+     * THE BOUNDARY IS [PreviewSet.setIndexInExercise] RETURNING TO ZERO, NOT A
+     * CHANGE OF NAME. A session may run two blocks of the same movement back to
+     * back -- a ramp and then the working sets is the ordinary shape of it --
+     * and `flattenPlan` gives each its own `setsInExercise`, counting them
+     * independently. Grouping by name merged those two into one block of five
+     * while the screen the lifter lands on said "Set 1/3", which is exactly the
+     * preview-disagrees-with-the-first-set failure this whole surface exists to
+     * avoid. Reading the same field the record flow counts with is what keeps
+     * the two in step.
+     *
+     * A first set whose index is not zero still opens a block, so a queue
+     * entered part-way -- the equipment-busy jump -- previews as itself rather
+     * than as nothing.
+     *
      * Order is the queue's order and is never sorted: the queue is the running
      * order, and a preview that re-ordered it would be describing a session
      * nobody is going to perform.
@@ -87,10 +101,10 @@ object SessionPreviewPolicy {
         val blocks = mutableListOf<PreviewBlock>()
         for (set in sets) {
             val open = blocks.lastOrNull()
-            if (open != null && open.exerciseName == set.exerciseName) {
-                blocks[blocks.lastIndex] = open.copy(sets = open.sets + set)
-            } else {
+            if (open == null || set.setIndexInExercise == 0) {
                 blocks += PreviewBlock(set.exerciseName, listOf(set))
+            } else {
+                blocks[blocks.lastIndex] = open.copy(sets = open.sets + set)
             }
         }
         return SessionPreview(
