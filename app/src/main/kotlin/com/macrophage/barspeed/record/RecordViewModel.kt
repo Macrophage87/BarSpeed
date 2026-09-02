@@ -2535,7 +2535,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             sessionRrMs.clear()
             // A new session does not inherit the last one's trailing rest
             // window: the previous session's close wrote it onto that
-            // session's last set (#109), and it belongs to neither set here.
+            // session's last set where there was one and the write landed
+            // (#109), and it belongs to neither set here.
             restHrBuffer.clear()
             sessionStartedAtMs = System.currentTimeMillis()
             val queue = sessionRepository.flattenPlan(planSession)
@@ -3211,10 +3212,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 ),
             )
         // Cleared once it is FROZEN into the pending write, not when the next
-        // set begins. The window belongs to the set that follows it, so it has
-        // to survive from one set ending to the next one being written -- and
-        // clearing it here rather than at beginSet means a retry replays the
-        // frozen copy rather than a buffer that kept filling behind it.
+        // set begins. A window belongs to the set that FOLLOWS it, except the
+        // last, which the session close writes onto the set BEFORE it (#109) --
+        // and clearing it here rather than at beginSet means a retry replays
+        // the frozen copy rather than a buffer that kept filling behind it.
         restHrBuffer.clear()
         launchSetWrite()
     }

@@ -474,12 +474,15 @@ class SessionRepository(
      * Both directions of failure are stated. If this throws, the caller's
      * close reports FAILED and the frozen close is replayed; [endSession] is
      * already guarded against writing twice and the decision below is guarded
-     * against inserting twice, so the retry costs nothing and can only add the
-     * window that is missing. If the process dies before the caller reaches
-     * this line, the window is lost -- it lives only in `:app`'s heap until
-     * here -- and that is the SAME durability every other rest window has
-     * between one set and the next. What changes is that this one now has a
-     * write to reach at all.
+     * against inserting twice, so the retry never writes twice, though it is
+     * not free: [endSession]'s guard alone costs one read of the session row,
+     * and reaching this function again costs the set list and that set's raw
+     * streams a second time -- three reads to re-establish state before the
+     * retry can add the window that is missing. If the process dies before
+     * the caller reaches this line, the window is lost -- it lives only in
+     * `:app`'s heap until here -- and that is the SAME durability every other
+     * rest window has between one set and the next. What changes is that this
+     * one now has a write to reach at all.
      *
      * Returns what was decided rather than a bare boolean, so a caller and a
      * reader can tell an absent strap from a session that recorded no set.
@@ -487,6 +490,13 @@ class SessionRepository(
      * columns describe the set, and this window is not part of it.
      */
     suspend fun recordFinalRestWindow(sessionId: Long, samples: List<HrSample>): FinalRestWindowDecision {
+        // ORDER BY orderIdx with no secondary key and no uniqueness
+        // constraint on that column (Daos.kt), so lastOrNull() is only as
+        // correct as the caller's own counter discipline: two set rows
+        // sharing an orderIdx would make this an unspecified SQLite tie
+        // rather than a defined last set. RecordViewModel assigns orderIdx
+        // from an in-memory, monotonically increasing setsCompleted, which
+        // holds today; nothing at the schema level enforces it.
         val last = sessionDao.setsForSession(sessionId).lastOrNull()
         val decision =
             FinalRestWindowPolicy.decide(

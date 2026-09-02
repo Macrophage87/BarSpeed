@@ -370,10 +370,11 @@ private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
     // rests included, and those are held in memory and nowhere else — the
     // per-set heart-rate streams keep the in-set beats and nothing keeps these.
     ExitPrompt.SESSION_NOT_CLOSED ->
-        "This session could not be closed, so it has no end time and no heart-rate or HRV summary. Tapping " +
-            "FINISH SESSION AGAIN on this screen can still write them — freeing some space on the phone " +
-            "first if that is what stopped it. Every set is already saved either way, but the session HRV " +
-            "is not held anywhere else and leaving now loses it."
+        "Part of this session was not written — the end time and the heart-rate and HRV summary, or the " +
+            "rest recorded after your last set. Tapping FINISH SESSION AGAIN on this screen can still " +
+            "write what is missing — freeing some space on the phone first if that is what stopped it. " +
+            "Every set is already saved either way. Whatever has not been written is held only here, and " +
+            "leaving now loses it."
 }
 
 private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (action) {
@@ -2532,10 +2533,11 @@ private fun SessionRpePanel(viewModel: RecordViewModel) {
 }
 
 /**
- * The session did not close: it has no end time, no heart-rate summary and no
- * HRV. Every set is already stored, so what is at risk here is smaller than an
- * unsaved set and is not nothing — the R-R intervals the session HRV is computed
- * from are held in memory here and in no durable place at all.
+ * The session did not close: either the end time and the heart-rate and HRV
+ * summary never landed, or that write landed and only the rest recorded after
+ * the last set did not (#109). Every set is already stored, so what is at risk
+ * here is smaller than an unsaved set and is not nothing — whichever half is
+ * still missing is held in memory here and in no durable place at all.
  *
  * It replaces Finish session rather than sitting beside it, as
  * [UnsavedSetNotice] replaces the effort grid: two controls that both close the
@@ -2546,7 +2548,7 @@ private fun SessionRpePanel(viewModel: RecordViewModel) {
 private fun UnclosedSessionNotice(viewModel: RecordViewModel) {
     Text("THIS SESSION DID NOT FINISH", style = MaterialTheme.typography.titleMedium, color = BarColors.Red)
     Spacer(Modifier.height(6.dp))
-    SectionCaption("Your sets are saved. The end time, heart rate and HRV are not")
+    SectionCaption("Your sets are saved. Part of the session's own record is not")
     Spacer(Modifier.height(10.dp))
     Button(
         onClick = viewModel::retrySessionClose,

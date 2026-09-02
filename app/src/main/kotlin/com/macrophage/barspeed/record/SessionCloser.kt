@@ -159,6 +159,13 @@ class SessionCloser(
                     // copy is replayed; `endSession` refuses a second write
                     // and the repository refuses a second window, so the retry
                     // can only add what is missing.
+                    // FAILED now has two causes and its two consumers say so:
+                    // endSession not landing, or this write not landing after it did.
+                    // The returned FinalRestWindowDecision is discarded: this
+                    // caller only needs to know whether the call threw, not
+                    // which named outcome it reached, and every branch already
+                    // writes or refuses safely without that distinction
+                    // reaching here. No caller reads it today.
                     repository.recordFinalRestWindow(it, p.restHrSamples)
                 }
                 pending = null
