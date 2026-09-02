@@ -1047,7 +1047,9 @@ private fun openJournal(
 )
 
 /**
- * A tap on a plan session: either raise the body-weight prompt, or start (#181).
+ * The START on the session preview: either raise the body-weight prompt, or
+ * start (#181, #202). A tap on the plan session card no longer reaches here --
+ * it calls openPreview.
  *
  * Free function taking the state flow and a start callback, for
  * [planSessionState]'s reason.
@@ -1143,10 +1145,10 @@ private fun previewState(s: RecordState, planSession: PlanSessionDef, queue: Lis
 
 /**
  * Back to the session picker, dropping the queue. `RecordViewModel.abandonSetup`
- * is the only caller and the preview's "Choose another session" is one of its
- * two ways in (#202), which is why [RecordState.previewSession] is cleared
- * here. The queue goes with it rather than being kept, so a second look
- * re-flattens rather than redrawing a list the plan may no longer say.
+ * is the only caller, and the preview's "Choose another session" is in turn
+ * the only thing that calls it (#202), which is why [RecordState.previewSession]
+ * is cleared here. The queue goes with it rather than being kept, so a second
+ * look re-flattens rather than redrawing a list the plan may no longer say.
  */
 private fun previewCancelledState(s: RecordState): RecordState =
     s.copy(stage = Stage.SETUP, previewSession = null, queue = emptyList(), queueIndex = 0)

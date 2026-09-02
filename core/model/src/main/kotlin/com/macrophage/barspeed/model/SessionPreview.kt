@@ -89,9 +89,10 @@ object SessionPreviewPolicy {
      * avoid. Reading the same field the record flow counts with is what keeps
      * the two in step.
      *
-     * A first set whose index is not zero still opens a block, so a queue
-     * entered part-way -- the equipment-busy jump -- previews as itself rather
-     * than as nothing.
+     * The first slot of the queue always opens a block, whatever its index.
+     * Every queue this is called with comes straight from flattenPlan, which
+     * numbers each exercise's sets from zero, so a block's first slot carries
+     * index 0 by construction.
      *
      * Order is the queue's order and is never sorted: the queue is the running
      * order, and a preview that re-ordered it would be describing a session
