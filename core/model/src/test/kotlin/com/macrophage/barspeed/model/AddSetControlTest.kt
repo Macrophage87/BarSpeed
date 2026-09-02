@@ -32,8 +32,52 @@ class AddSetControlTest {
         AddSetSlotKey("seated_row", 1),
     )
 
+    /**
+     * A squat block the lifter has already appended two sets to, then a row
+     * block.
+     *
+     * An appended slot carries the next index in the block, which is what
+     * makes the scan run THROUGH it -- indices 3 and 4 here are appended, and
+     * the block still ends where the row's index 0 starts. Added by #206 as
+     * characterization: removal has to find the same block, and the scan that
+     * finds it is about to be extracted out of `placement`.
+     */
+    private fun blockWithTwoAppended() = listOf(
+        AddSetSlotKey("back_squat", 0),
+        AddSetSlotKey("back_squat", 1),
+        AddSetSlotKey("back_squat", 2),
+        AddSetSlotKey("back_squat", 3),
+        AddSetSlotKey("seated_row", 0),
+    )
+
     private fun at(blocks: List<AddSetSlotKey>, index: Int) =
         AddSetControl.placement(blocks, queueIndex = index, upcomingIndex = index)
+
+    /**
+     * Characterization (#206), green before and after the extraction: from
+     * ANY set of a block carrying appended sets, the block ends at the same
+     * index, and that index is where the next append goes.
+     *
+     * Stated over every anchor in the block rather than one, because the
+     * block's extent is the thing being pinned and an anchor-by-anchor answer
+     * is the only way to see that the scan does not stop at the first
+     * appended slot it meets.
+     */
+    @Test
+    fun `the block ends past its appended sets from every anchor in it`() {
+        val blocks = blockWithTwoAppended()
+        assertEquals(listOf(4, 4, 4, 4), (0..3).map { assertNotNull(at(blocks, it)).insertAt })
+    }
+
+    /**
+     * Characterization (#206): the row block after it is its own block, and
+     * an append anchored there lands at the end of the queue rather than
+     * anywhere inside the squats.
+     */
+    @Test
+    fun `the block after an appended-to block starts where its own index zero is`() {
+        assertEquals(5, assertNotNull(at(blockWithTwoAppended(), 4)).insertAt)
+    }
 
     /**
      * On the LAST set of a block, "after the exercise's remaining sets" and

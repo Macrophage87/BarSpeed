@@ -401,6 +401,24 @@ class AppendedSlotTest {
         assertEquals(false, twice.queue[4].warmup)
     }
 
+    /**
+     * Characterization (#206). Two appends put two slots at the END of the
+     * block, in the order they were added, each carrying the next index.
+     *
+     * Pinned because removal is about to have to name ONE of these two, and
+     * "the last appended set of the exercise" is only a well-defined phrase
+     * while this holds. Green before #206 and after it; nothing here is a
+     * differential.
+     */
+    @Test
+    fun `two appends leave two added slots at the end of the block in order`() {
+        val once = assertNotNull(appendedState(resting(rampedPulldown(), 0)))
+        val twice = assertNotNull(appendedState(once))
+        assertEquals(5, twice.queue.size)
+        assertEquals(listOf(false, false, false, true, true), twice.queue.map { it.isAddedSet })
+        assertEquals(listOf(0, 1, 2, 3, 4), twice.queue.map { it.setIndexInExercise })
+    }
+
     @Test
     fun `every field recorded INHERITED is copied from the anchor unchanged`() {
         for (sweep in sweeps()) {
