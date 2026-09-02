@@ -18,7 +18,10 @@ import kotlin.test.assertEquals
  * Six captures committed since issue 86 landed are included here. Every figure
  * in this file is over those twenty-one, and figures quoted against the earlier
  * fifteen -- seven reps removed, 63 in family, 213 batch runs -- are that
- * corpus and not this one.
+ * corpus and not this one. Issue #87 then moved the BATCH reference this file
+ * classifies against, so its in-family count reads 82 rather than 85 and its
+ * largest in-family live displacement 1.058 m rather than 1.675 m. The live
+ * counter itself is untouched: 101 reps before and after.
  *
  * A TWENTY-SECOND capture is committed and is deliberately NOT in this file's
  * list: field-legpress-single-2011-8rep-s36-set07, landed for issue #93. It is
@@ -48,7 +51,7 @@ import kotlin.test.assertEquals
  *  - the least extreme artefact it catches on the live path sits at 3.34x its
  *    own set's batch median rep ROM, and the largest carries 127.405 m;
  *  - the largest live rep displacement that is IN FAMILY with its own set is
- *    1.675 m, on field-ohp-rotating-8rep-b.
+ *    1.058 m, on field-ohp-rotating-8rep-b.
  *
  * So the admissible range is narrow: 2.0 m clears the largest legitimate rep by
  * only 1.19x, not by the 2x an earlier reading of this claimed. That earlier
@@ -67,7 +70,7 @@ import kotlin.test.assertEquals
  * a reused one.
  *
  * Taken together the two floors leave almost no room at all. A shared constant
- * must clear 1.675 m to keep every in-family live rep and 1.982 m to demote no
+ * must clear 1.058 m to keep every in-family live rep and 1.982 m to demote no
  * batch run, so 2.0 m is very nearly the SMALLEST admissible value rather than
  * a comfortable one. The surviving out-of-family reps are a consequence of that,
  * not of conservatism.
@@ -257,8 +260,8 @@ class LiveCapCalibrationTest {
             inFamilyToday += countedReps(runs, d, c, 0).count { !outOfFamily(it, ref) }
             inFamilyCapped += countedReps(runs, d, c, 1).count { !outOfFamily(it, ref) }
         }
-        assertEquals(85, inFamilyToday, "in-family counted reps today")
-        assertEquals(85, inFamilyCapped, "in-family counted reps with the bound applied")
+        assertEquals(82, inFamilyToday, "in-family counted reps today")
+        assertEquals(82, inFamilyCapped, "in-family counted reps with the bound applied")
     }
 
     @Test
@@ -280,11 +283,11 @@ class LiveCapCalibrationTest {
             }
         }
         // The floor: anything below this destroys a rep that looks like a rep.
-        assertEquals(1.675, largestInFamilyLive, 5e-3, "largest in-family live rep displacement, metres")
+        assertEquals(1.058, largestInFamilyLive, 5e-3, "largest in-family live rep displacement, metres")
         // The second floor, and the binding one: anything below this starts
         // demoting BATCH runs, because the constant is shared and the batch path
         // is the trusted one. 2.0 m clears it by 18 mm.
-        assertEquals(293, batchRuns, "batch movement runs across the corpus")
+        assertEquals(301, batchRuns, "batch movement runs across the corpus")
         assertEquals(1.982, largestBatchRun, 5e-3, "largest batch run displacement, metres")
         assertEquals(2.0, c.maxRunDisplacementM, "the value, barely above both floors")
     }

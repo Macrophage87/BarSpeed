@@ -36,9 +36,10 @@ import kotlin.test.assertEquals
  * this bound removes. The largest run that does cost a rep travels 20.376 m,
  * pinned in [LiveCapCalibrationTest].
  *
- * Over the same fifteen the batch path demotes NOTHING: its 213 movement runs
+ * Over the same fifteen the batch path demotes NOTHING: its 221 movement runs
  * top out at 1.982 m, so the shared constant has never once fired where it
- * originally lived.
+ * originally lived. That count read 213 before issue #87 widened the anchor
+ * supply on seven captures; the ceiling it tops out at did not move.
  *
  * ## What the bound costs
  *
@@ -307,7 +308,7 @@ class LiveDisplacementCapTest {
             demoted += disp.count { it > c.maxRunDisplacementM }
             largest = maxOf(largest, disp.lastOrNull() ?: 0.0)
         }
-        assertEquals(213, runs, "batch movement runs across the corpus")
+        assertEquals(221, runs, "batch movement runs across the corpus")
         assertEquals(0, demoted, "batch runs demoted by maxRunDisplacementM")
         assertEquals(1.982, largest, 5e-3, "largest batch run displacement, metres")
         assertEquals(2.0, c.maxRunDisplacementM, "the cap none of them reached")
@@ -320,8 +321,8 @@ class LiveDisplacementCapTest {
         // metres, live then batch.
         val c = DspConfig()
         val expected = mapOf(
-            "field-ohp-rotating-8rep.csv" to (0.684 to 0.666),
-            "field-ohp-rotating-8rep-b.csv" to (0.864 to 0.747),
+            "field-ohp-rotating-8rep.csv" to (0.684 to 0.743),
+            "field-ohp-rotating-8rep-b.csv" to (0.864 to 0.651),
             "field-bench-rotating-6rep-ok.csv" to (0.268 to 0.333),
             "field-bench-rotating-6rep.csv" to (0.825 to 0.338),
             "field-cablerow-static-8rep.csv" to (0.738 to 0.232),

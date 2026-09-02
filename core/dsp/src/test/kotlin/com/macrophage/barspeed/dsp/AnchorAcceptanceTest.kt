@@ -42,7 +42,7 @@ class AnchorAcceptanceTest {
      * the only non-zero acceleration, so the true travel over the descent is
      * exactly `vMps * (4.0 + 0.2)` metres.
      */
-    private fun descent(vMps: Double, gyroDps: Double = 0.0): List<ImuSample> {
+    private fun descent(vMps: Double, gyroDps: Double = 0.0, quietRestGyro: Boolean = false): List<ImuSample> {
         val hz = 100.0
         val rest = 3.0
         val ramp = 0.2
@@ -63,7 +63,7 @@ class AnchorAcceptanceTest {
                 axG = 0.0,
                 ayG = 0.0,
                 azG = 1.0 + a / DspConfig().gravityMps2,
-                wxDps = gyroDps,
+                wxDps = if (quietRestGyro && t < rest) 0.0 else gyroDps,
                 wyDps = 0.0,
                 wzDps = 0.0,
                 rollDeg = 0.0,
@@ -74,8 +74,8 @@ class AnchorAcceptanceTest {
         return out
     }
 
-    private fun series(vMps: Double, gyroDps: Double = 0.0) =
-        VelocityEstimator.estimate(descent(vMps, gyroDps), DspConfig(), MovementPlane.VERTICAL)
+    private fun series(vMps: Double, gyroDps: Double = 0.0, quietRestGyro: Boolean = false) =
+        VelocityEstimator.estimate(descent(vMps, gyroDps, quietRestGyro), DspConfig(), MovementPlane.VERTICAL)
 
     /**
      * The fraction of the descent the pipeline still reports, as PATH LENGTH
@@ -87,8 +87,8 @@ class AnchorAcceptanceTest {
      * displacement reads 0.012 where path length reads 0.038 at 0.10 m/s. Either
      * puts the cliff in the same place; only path length says how much is left.
      */
-    private fun recoveredFraction(vMps: Double, gyroDps: Double = 0.0): Double {
-        val s = series(vMps, gyroDps)
+    private fun recoveredFraction(vMps: Double, gyroDps: Double = 0.0, quietRestGyro: Boolean = false): Double {
+        val s = series(vMps, gyroDps, quietRestGyro)
         var path = 0.0
         for (i in 1 until s.size) {
             if (s.timeS[i] in 3.0..7.4) path += abs(s.velocityMps[i]) * (s.timeS[i] - s.timeS[i - 1])
@@ -117,13 +117,75 @@ class AnchorAcceptanceTest {
 
     @Test
     fun `the gyro term hides the erasure wherever the implement rotates`() {
-        // The same descents with the gyro at 15 deg/s, over stationaryGyroBandDps,
-        // so no sample is quiet, no anchor is placed and nothing is subtracted.
-        // This is why the erasure is invisible on bar-mounted captures, and why
-        // deleting the gyro term costs measured travel while the cliff stands.
+        // The same descents with the gyro at 15 deg/s for the WHOLE capture,
+        // over stationaryGyroBandDps, so no sample is quiet, no anchor is
+        // placed and nothing is subtracted.
+        //
+        // Issue #87 deliberately leaves this case alone and the test is kept
+        // green rather than inverted. A capture rotating constantly has its
+        // tenth percentile above the gate as well as its median, so its
+        // distribution does not straddle, [VelocityEstimator.gyroGateApplies]
+        // stays true, and the clause is still applied. The set beside this one
+        // -- rotation during the movement, stillness before it -- is the case
+        // #87 does change, and it is what pays for the anchors.
         listOf(0.05, 0.10, 0.14, 0.15).forEach { v ->
             assertEquals(1.0, recoveredFraction(v, gyroDps = 15.0), 5e-4, "$v m/s with the implement rotating")
         }
+    }
+
+    @Test
+    fun `a set whose rotation straddles the gate loses that cover, and that is the price`() {
+        // RED until issue #87 wires [VelocityEstimator.gyroGateApplies] into
+        // the mask. The test above keeps a CONSTANT 15 deg/s through the whole
+        // capture, so its tenth percentile is 15 too and the straddle test does
+        // not fire: nothing changes there, which is the point of the low probe.
+        //
+        // This one rotates at 15 deg/s from the start of the descent onward and
+        // is still for the 3 s before it. 71% of the capture is above the gate
+        // and 29% below, so the distribution straddles, the clause is dropped,
+        // and the anchor supply the rotation used to hide behind is gone.
+        //
+        // THIS IS THE COST OF #87 STATED AS AN ASSERTION. A steady 0.05 m/s
+        // phase on such a set was reported whole and is now erased to 0.2% of
+        // its travel -- exactly the erasure issue #85 bounded but did not
+        // remove, at exactly the speeds below
+        // [DspConfig.anchorSlowPhaseFloorMps]. A 4 s eccentric over the
+        // 0.333-0.345 m bench ROM this corpus has measured runs at
+        // 0.083-0.086 m/s, which is inside the band being spent. Above the
+        // floor nothing is lost, and that is asserted here rather than assumed.
+        assertEquals(
+            15.0,
+            VelocityEstimator.medianGyroDps(descent(0.05, gyroDps = 15.0, quietRestGyro = true)),
+            1e-9,
+            "median rotation of the straddling capture",
+        )
+        assertEquals(
+            0.0,
+            VelocityEstimator.gyroQuantileDps(
+                descent(0.05, gyroDps = 15.0, quietRestGyro = true),
+                VelocityEstimator.GYRO_STILLNESS_QUANTILE,
+            ),
+            1e-9,
+            "tenth percentile of the straddling capture",
+        )
+        assertEquals(
+            0.0015,
+            recoveredFraction(0.05, gyroDps = 15.0, quietRestGyro = true),
+            5e-4,
+            "0.05 m/s on a straddling capture: erased, where a constant rotation would have hidden it",
+        )
+        assertEquals(
+            0.9993,
+            recoveredFraction(0.10, gyroDps = 15.0, quietRestGyro = true),
+            5e-4,
+            "0.10 m/s on a straddling capture: preserved, at the floor",
+        )
+        assertEquals(
+            0.9993,
+            recoveredFraction(0.15, gyroDps = 15.0, quietRestGyro = true),
+            5e-4,
+            "0.15 m/s on a straddling capture: preserved",
+        )
     }
 
     @Test

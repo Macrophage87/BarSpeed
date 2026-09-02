@@ -420,12 +420,15 @@ class CuedRepCoverageTest {
     @Test
     fun `every rep the batch reference rejects is one the metronome called`() {
         // Why no metric is built on that reference, measured rather than
-        // suspected: it rejects fifteen counted reps and the metronome called
-        // thirteen. "Out of family" is LiveCapCalibrationTest's own rule --
+        // suspected: it rejects eighteen counted reps and the metronome called
+        // sixteen. "Out of family" is LiveCapCalibrationTest's own rule --
         // more than twice, or less than a third of, the set's BATCH median rep
         // ROM -- applied to the captures where the metronome says what
         // happened. Five of the seven reps nobody called are IN family, so the
-        // reference does not separate them either.
+        // reference does not separate them either. The rejection count rose
+        // from fifteen to eighteen with issue #87, which widened the batch
+        // reference's ROM spread on seven captures without touching the live
+        // counter those reps come from.
         val c = DspConfig()
         val tol = CueTrack.WINDOW_TOLERANCE_MS.toLong()
         var outOfFamily = 0
@@ -450,10 +453,10 @@ class CuedRepCoverageTest {
                 }
             }
         }
-        assertEquals(15, outOfFamily, "counted reps the batch reference rejects")
-        assertEquals(13, outOfFamilyCalled, "of those, reps the metronome actually called")
-        assertEquals(66, inFamily, "counted reps the batch reference accepts")
-        assertEquals(61, inFamilyCalled, "of those, reps the metronome actually called")
+        assertEquals(18, outOfFamily, "counted reps the batch reference rejects")
+        assertEquals(16, outOfFamilyCalled, "of those, reps the metronome actually called")
+        assertEquals(63, inFamily, "counted reps the batch reference accepts")
+        assertEquals(58, inFamilyCalled, "of those, reps the metronome actually called")
     }
 
     @Test
@@ -461,10 +464,12 @@ class CuedRepCoverageTest {
         // Ties this file to the corpus figures pinned in `the corpus totals,
         // corrected against the ones issue 94 was filed with (pre-fix)` and in
         // `the bound destroys no in-family rep`. Both of those count 101 reps
-        // the shipped tracker reports over TWENTY-ONE captures, of which 85 are
-        // in family with their own set. Sixty-four of the 101 and 53 of the 85
-        // are here, so 37 counted reps and 32 in-family ones are on captures
-        // with no truth, and five out-of-family reps are neither confirmed nor
+        // the shipped tracker reports over TWENTY-ONE captures, of which 82 are
+        // in family with their own set -- 85 before issue #87 moved the batch
+        // reference the classification is taken against. The live counter did
+        // not move; the reference did. Sixty-four of the 101 and 47 of the 82
+        // are here, so 37 counted reps and 35 in-family ones are on captures
+        // with no truth, and two out-of-family reps are neither confirmed nor
         // disproved by any cue track.
         //
         // [outsideCorpusTotals] is subtracted first, because this file's own
@@ -489,9 +494,9 @@ class CuedRepCoverageTest {
         val corpusCounted = 101
         val corpusInFamily = 85
         assertEquals(37, corpusCounted - counted, "counted reps on captures with no cue track")
-        assertEquals(32, corpusInFamily - inFamily, "of those, in family by the batch reference")
+        assertEquals(35, corpusInFamily - inFamily, "of those, in family by the batch reference")
         assertEquals(
-            5,
+            2,
             (corpusCounted - corpusInFamily) - (counted - inFamily),
             "out-of-family reps that no cue track can confirm or disprove",
         )

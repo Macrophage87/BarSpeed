@@ -303,20 +303,24 @@ class FieldDataRegressionTest {
     }
 
     @Test
-    fun `rotating overhead press resolves 3 of the 8 reps performed (pre-fix)`() {
+    fun `rotating overhead press resolves 6 of the 8 reps performed`() {
         // Set 1: seated overhead press, 45 lb warm-up, tempo 3010. The lifter
-        // counted 8. The sensor rolled through 40.4 deg over the set.
+        // counted 8. The sensor rolled through 40.4 deg over the set, and its
+        // median gyro magnitude is 12.06 deg/s -- over the fixed gate, so
+        // [VelocityEstimator.gyroGateApplies] is false here and candidacy rests
+        // on the acceleration term. Issue #87 took this from 3 to 6.
         val analysis = analyze("field-ohp-rotating-8rep.csv")
-        assertEquals(3, analysis.reps.size, "segmented reps; the lifter performed 8")
+        assertEquals(6, analysis.reps.size, "segmented reps; the lifter performed 8")
     }
 
     @Test
-    fun `a second rotating overhead press resolves 4 of the 8 reps performed (pre-fix)`() {
-        // Set 4: same lift at 55 lb, 8 counted, sensor rolled 37.1 deg. Kept
-        // alongside set 1 because the shape of the loss differs — set 1 drops
-        // its first five reps, this one drops four spread through the set.
+    fun `a second rotating overhead press resolves 6 of the 8 reps performed`() {
+        // Set 4: same lift at 55 lb, 8 counted, sensor rolled 37.1 deg, median
+        // gyro 12.98 deg/s. Kept alongside set 1 because the shape of the loss
+        // differs. Issue #87 took this from 4 to 6; two reps remain missing on
+        // both captures and #87 does not claim otherwise.
         val analysis = analyze("field-ohp-rotating-8rep-b.csv")
-        assertEquals(4, analysis.reps.size, "segmented reps; the lifter performed 8")
+        assertEquals(6, analysis.reps.size, "segmented reps; the lifter performed 8")
     }
 
     @Test
@@ -402,17 +406,17 @@ class FieldDataRegressionTest {
         // These are the metres the integrator produces instead. No ground truth
         // is needed to read them and no candidate fix can argue with them.
         //
-        // Four of the seven move and three do not. The two that do not — both
-        // rotating overhead presses — are the two whose anchors all sit in the
-        // first half of the capture, so there is no accepted anchor left for a
-        // tighter rule to refuse. Face pull is the largest improvement,
-        // 4.687 m to 0.709 m, and the cable row and the working bench press
-        // both move AWAY from zero. Refusing anchors removes erasure and leaves
-        // drift, and on these two the drift is the larger term.
+        // The two rotating overhead presses used to be the two that did NOT
+        // move, at 16.142 m and 16.357 m, because every anchor they had sat in
+        // the first half of the capture and there was none left for a tighter
+        // rule to refuse. Issue #87 gives them anchors across the whole set and
+        // they are the largest improvement in the file: 16.142 m to -3.002 m
+        // and 16.357 m to -0.710 m against a physical truth of zero. The other
+        // five are unchanged by #87 -- none of them straddles the gate.
         val todayM =
             mapOf(
-                "field-ohp-rotating-8rep.csv" to 16.142,
-                "field-ohp-rotating-8rep-b.csv" to 16.357,
+                "field-ohp-rotating-8rep.csv" to -3.002,
+                "field-ohp-rotating-8rep-b.csv" to -0.710,
                 "field-bench-rotating-6rep-ok.csv" to -1.316,
                 "field-bench-rotating-6rep.csv" to 9.615,
                 "field-cablerow-static-8rep.csv" to -1.255,
@@ -434,8 +438,8 @@ class FieldDataRegressionTest {
         // this figure by resolving fewer eccentrics has not improved anything.
         val today =
             mapOf(
-                "field-ohp-rotating-8rep.csv" to (3 to 1.244),
-                "field-ohp-rotating-8rep-b.csv" to (4 to 1.011),
+                "field-ohp-rotating-8rep.csv" to (6 to 1.035),
+                "field-ohp-rotating-8rep-b.csv" to (6 to 0.880),
                 "field-bench-rotating-6rep-ok.csv" to (6 to 0.721),
                 "field-bench-rotating-6rep.csv" to (2 to 0.068),
                 "field-cablerow-static-8rep.csv" to (5 to 1.344),
@@ -477,8 +481,8 @@ class FieldDataRegressionTest {
         // Pallof falls by one because it also segments its reps differently.
         val expected =
             mapOf(
-                "field-ohp-rotating-8rep.csv" to (3 to 3.33),
-                "field-ohp-rotating-8rep-b.csv" to (4 to 1.08),
+                "field-ohp-rotating-8rep.csv" to (6 to 2.02),
+                "field-ohp-rotating-8rep-b.csv" to (6 to 1.32),
                 "field-bench-rotating-6rep-ok.csv" to (6 to 3.32),
                 "field-bench-rotating-6rep.csv" to (2 to 2.11),
                 "field-cablerow-static-8rep.csv" to (5 to 3.38),
@@ -518,15 +522,22 @@ class FieldDataRegressionTest {
         // really was the last one performed, and a change that silently
         // disabled it would show here.
         //
-        // Two move. The cable row now names rep 8 rather than rep 2, and gains
-        // the fatigue suffix, because rep 8 resolved an eccentric for the first
-        // time and it is the worst one; the face pull names rep 8 of 11 rather
-        // than rep 12 of 13. Both are the caption following the segmentation
-        // rather than the caption changing.
+        // Two moved when the anchor accept rule changed: the cable row now
+        // names rep 8 rather than rep 2 and gains the fatigue suffix, because
+        // rep 8 resolved an eccentric for the first time and it is the worst
+        // one; the face pull names rep 8 of 11 rather than rep 12 of 13.
+        //
+        // Two more move with issue #87, and only on the two overhead presses,
+        // because both now segment six reps rather than three and four. The
+        // caption follows the segmentation; nothing in the caption rule
+        // changed. Note what that means for the lifter: the sentence under the
+        // eccentric chart names a DIFFERENT REP after this change, on a set
+        // where neither the old nor the new rep list has been checked against
+        // what the lifter actually did.
         val expected =
             mapOf(
-                "field-ohp-rotating-8rep.csv" to "Rep 2 eccentric 2.3 s — 0.7 s too fast.",
-                "field-ohp-rotating-8rep-b.csv" to "Rep 4 eccentric 0.9 s — 2.1 s too fast. Fatigue showing.",
+                "field-ohp-rotating-8rep.csv" to "Rep 1 eccentric 1.8 s — 1.2 s too fast.",
+                "field-ohp-rotating-8rep-b.csv" to "Rep 6 eccentric 0.5 s — 2.5 s too fast. Fatigue showing.",
                 "field-bench-rotating-6rep-ok.csv" to "Rep 6 eccentric 4.6 s — 1.6 s too slow.",
                 "field-bench-rotating-6rep.csv" to "Rep 2 eccentric 1.5 s — 1.5 s too fast. Fatigue showing.",
                 "field-cablerow-static-8rep.csv" to
@@ -584,8 +595,8 @@ class FieldDataRegressionTest {
         // That does not hold on the full session and is retracted here.
         val today =
             mapOf(
-                "field-ohp-rotating-8rep.csv" to listOf(0.000, 0.000, 0.000),
-                "field-ohp-rotating-8rep-b.csv" to listOf(0.000, 0.000, 0.000, 0.000),
+                "field-ohp-rotating-8rep.csv" to listOf(0.000, 0.000, 0.023, 0.000, 0.000, 0.000),
+                "field-ohp-rotating-8rep-b.csv" to listOf(0.000, 0.000, 0.105, 0.000, 0.000, 0.000),
                 "field-bench-rotating-6rep-ok.csv" to listOf(0.000, 0.000, 0.000, 0.000, 0.000, 0.000),
                 "field-bench-rotating-6rep.csv" to listOf(0.000, 0.000),
                 "field-cablerow-static-8rep.csv" to
@@ -998,13 +1009,31 @@ class FieldDataRegressionTest {
         assertEquals<Double>(99.3937495805463, analysis.sampleRateHz, "measured rate, against this set's own meta.json")
         assertEquals(5, analysis.reps.size, "segmented reps; the lifter performed 6")
         assertEquals(0, analysis.detectionsAfterSetEndCue, "detections after Done")
-        assertEquals<Double?>(28.5, analysis.velocityLossPct, "velocity loss reported to the lifter")
-        // Every figure app 0.1.40 published for the five reps it also found,
-        // reproduced here -- the check that the geometry given in the class
-        // KDoc above is the geometry this set was actually recorded with.
-        assertMeasured(listOf(0.606, 0.599, 0.562, 0.561, 0.458), analysis.reps.map { it.romM }, "ROM, metres")
+        assertEquals<Double?>(16.6, analysis.velocityLossPct, "velocity loss reported to the lifter")
+        // THIS NO LONGER REPRODUCES THE SHIPPED EXPORT, and that is the
+        // sharpest cost issue #87 carries. App 0.1.40 published
+        // 0.606/0.599/0.562/0.561/0.458 m and 0.498/0.458/0.385/0.396/0.356
+        // m/s for these five reps and this file reproduced them exactly, which
+        // was the check that the geometry in the class KDoc is the geometry the
+        // set was recorded with. #87 keeps the rep COUNT at 5 and moves three
+        // of the five ROMs to 0.867, 0.919 and 0.636 m.
+        //
+        // Two of those are not plausible travel for this lifter's back squat:
+        // the corpus's other 99 Hz squat reads 0.458-0.606 m and #74's declared
+        // plausibility window tops out at 1.2 m, so they are inside the window
+        // and outside the lift. The velocity loss the lifter reads drops from
+        // 28.5% to 16.6% with them.
+        //
+        // This capture's median gyro magnitude is 11.24 deg/s, the smallest in
+        // the corpus that clears the gate, and its tenth percentile is
+        // 2.97 deg/s, so it straddles and the clause is dropped. Nothing about
+        // the straddle rule protects a set that only just crosses the median
+        // probe, and no attempt is made here to invent a second threshold that
+        // would exclude this one capture. It is recorded as a cost, not
+        // repaired.
+        assertMeasured(listOf(0.604, 0.867, 0.919, 0.636, 0.601), analysis.reps.map { it.romM }, "ROM, metres")
         assertMeasured(
-            listOf(0.498, 0.458, 0.385, 0.396, 0.356),
+            listOf(0.501, 0.284, 0.328, 0.419, 0.418),
             analysis.reps.map { it.meanConVelMps },
             "mean concentric velocity, m/s",
         )

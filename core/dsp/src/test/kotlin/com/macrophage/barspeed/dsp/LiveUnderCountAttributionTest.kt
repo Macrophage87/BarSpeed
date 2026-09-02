@@ -270,7 +270,7 @@ class LiveUnderCountAttributionTest {
         }
         assertEquals(165, performed, "reps the lifter performed")
         assertEquals(101, live, "reps the live counter reports")
-        assertEquals(134, batch, "reps the batch analyzer reports")
+        assertEquals(139, batch, "reps the batch analyzer reports")
         assertEquals(66, absoluteError, "absolute live error")
         assertEquals(64, performed - live, "net live deficit")
     }

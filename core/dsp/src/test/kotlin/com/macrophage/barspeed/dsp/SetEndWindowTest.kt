@@ -247,10 +247,13 @@ class SetEndWindowTest {
      * [CuedRepCoverageTest] `the coverage limit` now does that against the
      * resource directory.
      *
-     * Eight of the thirteen carry none: the four barbell captures of session
-     * 2026-08-17, one of the four leg curls, the back squat and both leg
-     * presses are untouched by this rule, which is what makes the other five
-     * evidence rather than a coincidence of one recording. The affected five
+     * Seven of the thirteen carry none: three of the four barbell captures of
+     * session 2026-08-17, one of the four leg curls, the back squat and both
+     * leg presses are untouched by this rule, which is what makes the other six
+     * evidence rather than a coincidence of one recording. The fourth barbell
+     * capture, field-ohp-rotating-8rep-b, joined the affected group with issue
+     * #87: it resolves six detections rather than four, and the sixth begins
+     * after its Done cue. The affected six
      * are not a random sample either -- three of them are the captures
      * [VelocityLossTest] documents as publishing no velocity loss because their
      * last detection was the fastest of the set, one of which
@@ -262,7 +265,7 @@ class SetEndWindowTest {
      * [FieldDataRegressionTest].
      */
     @Test
-    fun `five of the thirteen cued captures carry a detection that began after Done`() {
+    fun `six of the thirteen cued captures carry a detection that began after Done`() {
         val legCurl = LiftDirection(
             startsWith = StartPhase.CONCENTRIC,
             concentricUp = false,
@@ -278,7 +281,7 @@ class SetEndWindowTest {
             Triple("field-legcurl-1030-12rep-c", legCurl, 2),
             Triple("field-legcurl-1030-10rep", legCurl, 1),
             Triple("field-ohp-rotating-8rep", barbell, 0),
-            Triple("field-ohp-rotating-8rep-b", barbell, 0),
+            Triple("field-ohp-rotating-8rep-b", barbell, 1),
             Triple("field-bench-rotating-6rep", barbell, 0),
             Triple("field-bench-rotating-6rep-ok", barbell, 0),
             // The four cue-tracked captures the list did not cover, in the
@@ -301,7 +304,7 @@ class SetEndWindowTest {
             },
             "detections beginning after Done, per capture",
         )
-        assertEquals(5, corpus.count { it.third > 0 }, "captures carrying at least one post-Done detection")
+        assertEquals(6, corpus.count { it.third > 0 }, "captures carrying at least one post-Done detection")
     }
 
     // ------------------------------------------------------------------
@@ -382,8 +385,8 @@ class SetEndWindowTest {
             Case("field-legcurl-1030-12rep-b", legCurl, 12, VelocityLoss.Measured(34.7), 0.737),
             Case("field-legcurl-1030-12rep-c", legCurl, 9, VelocityLoss.Measured(69.1), 0.768),
             Case("field-legcurl-1030-10rep", legCurl, 10, VelocityLoss.Measured(22.5), 0.910),
-            Case("field-ohp-rotating-8rep", barbell, 3, VelocityLoss.Measured(30.7), 1.062),
-            Case("field-ohp-rotating-8rep-b", barbell, 4, VelocityLoss.Measured(35.9), 1.119),
+            Case("field-ohp-rotating-8rep", barbell, 6, VelocityLoss.Measured(49.8), 1.213),
+            Case("field-ohp-rotating-8rep-b", barbell, 5, VelocityLoss.Measured(19.5), 1.113),
             Case("field-bench-rotating-6rep", barbell, 2, VelocityLoss.Measured(7.0), 0.600),
             Case("field-bench-rotating-6rep-ok", barbell, 6, VelocityLoss.Measured(58.3), 0.676),
             Case(fixture, rearDeltFly, 4, VelocityLoss.Measured(52.1), 2.085),

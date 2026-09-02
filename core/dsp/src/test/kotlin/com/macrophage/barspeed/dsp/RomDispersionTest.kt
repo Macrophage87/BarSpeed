@@ -81,8 +81,8 @@ class RomDispersionTest {
             "field-facepull-static-12rep.csv" to 0.266,
             "field-pallof-static-12rep.csv" to 0.621,
             "field-ohp-100hz-bursty.csv" to 0.645,
-            "field-ohp-rotating-8rep.csv" to 0.424,
-            "field-ohp-rotating-8rep-b.csv" to 0.447,
+            "field-ohp-rotating-8rep.csv" to 0.426,
+            "field-ohp-rotating-8rep-b.csv" to 0.674,
             "field-seated-ohp-2rep.csv" to 0.278,
             "field-legcurl-1030-12rep.csv" to 0.337,
             "field-legcurl-1030-12rep-b.csv" to 0.503,
@@ -102,7 +102,7 @@ class RomDispersionTest {
     @Test
     fun `the plausibility window issue 74 inherits is too blunt to act on (pre-fix)`() {
         val all = corpus.flatMap { (file, d, kg) -> roms(file, d, kg) }
-        assertEquals(98, all.size, "reps segmented across the corpus")
+        assertEquals(103, all.size, "reps segmented across the corpus")
         assertEquals(7, all.count { it < 0.05 || it > 1.2 }, "reps outside the 0.05-1.2 m window issue 74 quotes")
         // The one capture whose travel is known independently: a seated leg
         // curl rail, 0.4 to 0.5 m. Against the machine itself HALF the reps are

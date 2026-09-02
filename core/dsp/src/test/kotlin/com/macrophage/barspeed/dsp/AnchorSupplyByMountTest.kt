@@ -2,6 +2,7 @@ package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -90,7 +91,15 @@ class AnchorSupplyByMountTest {
 
     private data class Supply(
         val medianGyroDps: Double,
-        val candidatePct: Double,
+        /**
+         * Samples passing the ABSOLUTE two-term predicate,
+         * [VelocityEstimator.isQuietSample]. Named for what it measures rather
+         * than for "candidates": since issue #87 the batch mask no longer takes
+         * its candidates from this predicate on every set, so on a set whose
+         * gyro distribution straddles the gate this figure is SMALLER than the
+         * coverage beside it. That inversion is the change, visible.
+         */
+        val absoluteQuietPct: Double,
         val coveragePct: Double,
         val runs: Int,
     )
@@ -105,11 +114,45 @@ class AnchorSupplyByMountTest {
         gyro.sort()
         val mid = n / 2
         val median = if (n % 2 == 1) gyro[mid] else 0.5 * (gyro[mid - 1] + gyro[mid])
-        val candidates = samples.count { VelocityEstimator.isQuietSample(it, config) }
+        val absolute = samples.count { VelocityEstimator.isQuietSample(it, config) }
         val mask = VelocityEstimator.quietMask(samples, timeS, config)
         var runs = 0
         for (i in 0 until n) if (mask[i] && (i == 0 || !mask[i - 1])) runs++
-        return Supply(median, 100.0 * candidates / n, 100.0 * mask.count { it } / n, runs)
+        return Supply(median, 100.0 * absolute / n, 100.0 * mask.count { it } / n, runs)
+    }
+
+    /**
+     * Anchor coverage with the gyro clause forced on or off, bypassing
+     * [VelocityEstimator.gyroGateApplies]. This is how the differential below
+     * is measured now that the shipped mask no longer always applies the
+     * clause.
+     */
+    private fun coverageWithGate(fixture: String, gyroGate: Boolean): Double {
+        val samples = load(fixture)
+        val n = samples.size
+        val spanS = (samples.last().timestampMs - samples.first().timestampMs) / 1000.0
+        val dt = 1.0 / VelocityEstimator.measureSampleRate(n, spanS)
+        val config = DspConfig()
+        val candidate = BooleanArray(n) { VelocityEstimator.isAnchorCandidate(samples[it], config, gyroGate) }
+        var quiet = 0
+        var runStart = -1
+        for (i in 0..n) {
+            val inRun = i < n && candidate[i]
+            if (inRun && runStart < 0) runStart = i
+            if (!inRun && runStart >= 0) {
+                if ((i - 1 - runStart) * dt >= config.minStationaryS) quiet += i - runStart
+                runStart = -1
+            }
+        }
+        return 100.0 * quiet / n
+    }
+
+    /** Every capture on the classpath, as [GyroGateTest] enumerates them. */
+    private val corpus: List<String> by lazy {
+        File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile.list()!!
+            .filter { it.startsWith("field-") && it.endsWith(".csv") && !it.endsWith("-cues.csv") }
+            .map { it.removeSuffix(".csv") }
+            .sorted()
     }
 
     private fun batchReps(fixture: String, startsWith: StartPhase, loadKg: Double): Int =
@@ -125,63 +168,81 @@ class AnchorSupplyByMountTest {
     private fun assertSupply(
         fixture: String,
         medianGyroDps: Double,
-        candidatePct: Double,
+        absoluteQuietPct: Double,
         coveragePct: Double,
         runs: Int,
     ) {
         val s = supply(fixture)
         assertEquals(medianGyroDps, s.medianGyroDps, 0.01, "$fixture: median gyro magnitude, deg/s")
-        assertEquals(candidatePct, s.candidatePct, 0.01, "$fixture: samples passing the quiet predicate, %")
+        assertEquals(absoluteQuietPct, s.absoluteQuietPct, 0.01, "$fixture: samples passing isQuietSample, %")
         assertEquals(coveragePct, s.coveragePct, 0.01, "$fixture: anchor coverage, %")
         assertEquals(runs, s.runs, "$fixture: qualifying quiet runs")
     }
 
     @Test
-    fun `the bar family's anchor supply today`() {
-        // Five bar-mounted sets. Four of the five carry a median gyro
-        // magnitude at or above the 10 deg/s gate -- so on those four the gate
-        // rejects the MAJORITY of the set on rotation alone, before the
-        // acceleration term is consulted.
-        assertSupply("field-ohp-3010-6rep-s37-set02", 16.742, 26.516, 10.380, 5)
-        assertSupply("field-bench-3010-6rep-s37-set05", 23.923, 20.026, 6.546, 4)
-        assertSupply("field-bench-3010-6rep-s37-set06", 32.318, 14.952, 8.158, 4)
-        assertSupply("field-backsquat-4011-6rep-s36-set01", 15.497, 26.372, 18.388, 10)
+    fun `the bar family's anchor supply`() {
+        // Four of the five bar sets straddle the gate -- median above it, tenth
+        // percentile below -- so since issue #87 the gyro clause is not applied
+        // to them and coverage is the acceleration term's alone. The
+        // isQuietSample column is the ABSOLUTE two-term figure and no longer
+        // describes the mask: on all four, coverage is now LARGER than the
+        // share of samples that predicate admits.
+        //
+        //                             median  isQuiet%  coverage%  runs
+        //   ohp   s37 set02           16.74     26.52     10.38 ->  23.54
+        //   bench s37 set05           23.92     20.03      6.55 ->  26.62
+        //   bench s37 set06           32.32     14.95      8.16 ->  27.46
+        //   squat s36 set01           15.50     26.37     18.39 ->  48.57
+        assertSupply("field-ohp-3010-6rep-s37-set02", 16.742, 26.516, 23.535, 13)
+        assertSupply("field-bench-3010-6rep-s37-set05", 23.923, 20.026, 26.624, 7)
+        assertSupply("field-bench-3010-6rep-s37-set06", 32.318, 14.952, 27.464, 7)
+        assertSupply("field-backsquat-4011-6rep-s36-set01", 15.497, 26.372, 48.571, 28)
         // The fifth is the counter-example inside the bar family and is named
-        // as one: the RDL's median is 6.42 deg/s, BELOW the gate, and it still
-        // resolves nothing. Whatever costs that set its reps, the gyro gate is
-        // not the binding term on it.
+        // as one: the RDL's median is 6.42 deg/s, BELOW the gate, so it does
+        // not straddle, the clause still applies, and its figures are
+        // bit-identical to before issue #87. It still resolves nothing.
+        // Whatever costs that set its reps, the gyro gate is not it.
         assertSupply("field-rdl-3010-10rep-s36-set05", 6.423, 48.504, 35.545, 11)
     }
 
     @Test
-    fun `the strap family's anchor supply today`() {
-        // One capture, and the contrast is the whole point: the same sensor,
-        // same lifter, same session, on a mount that does not rotate, spends
-        // 70% of the set anchor-eligible against 6.5-18.4% on the bar.
+    fun `the strap family's anchor supply is untouched by the change`() {
+        // One capture, and it is the guard: the same sensor, same lifter, same
+        // session, on a mount that does not rotate. Its whole gyro
+        // distribution sits under the gate, so the straddle test cannot fire
+        // and every figure here is bit-identical to what it was before issue
+        // #87 -- the same numbers this file pinned at c0.
         assertSupply("field-pullup-3010-8rep-s37-set09", 0.936, 82.408, 69.981, 25)
     }
 
     @Test
-    fun `what the two families resolve today, against the counts performed`() {
-        // Three of the five bar sets resolve NOTHING over healthy 3880-6752
-        // sample streams. field-ohp-...-set02, -bench-...-set05 and -set06 are
-        // the three field-37 sets that publish `summary: {}` in the session
-        // archive, which is issue #138; this is where they are pinned.
-        assertEquals(0, batchReps("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC, 24.948), "ohp, 6 performed")
+    fun `what the two families resolve, against the counts performed`() {
+        // field-ohp-...-set02, -bench-...-set05 and -set06 are the three
+        // field-37 sets that publish `summary: {}` in the session archive,
+        // which is issue #138. All three resolved NOTHING before issue #87 and
+        // all three resolve something now -- 4, 1 and 3 against 6 performed.
+        // None of them is right. Two of the three are still further from the
+        // lifter's count than from zero, and this file claims only that the
+        // sets stopped publishing nothing, not that they became correct.
+        //
+        // The RDL is unchanged at 0 of 10, which is the counter-example: it
+        // does not straddle the gate, so #87 does not touch it.
+        assertEquals(4, batchReps("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC, 24.948), "ohp, 6 performed")
         assertEquals(
-            0,
+            1,
             batchReps("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC, 47.627),
             "bench, 6 performed",
         )
         assertEquals(
-            0,
+            3,
             batchReps("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC, 49.895),
             "bench, 6 performed",
         )
         assertEquals(0, batchReps("field-rdl-3010-10rep-s36-set05", StartPhase.ECCENTRIC, 52.163), "rdl, 10 performed")
-        // The back squat over-resolves instead: 8 detections for 6 reps.
+        // The back squat used to over-resolve, 8 detections for 6 reps, and
+        // now lands exactly on the count performed.
         assertEquals(
-            8,
+            6,
             batchReps("field-backsquat-4011-6rep-s36-set01", StartPhase.ECCENTRIC, 52.163),
             "back squat, 6 performed",
         )
@@ -200,30 +261,106 @@ class AnchorSupplyByMountTest {
         assertEquals(2, liveReps("field-pullup-3010-8rep-s37-set09", StartPhase.CONCENTRIC), "assisted pull-up live")
     }
 
+    /** Anchor coverage this file requires bar-mounted work to clear, per cent. */
+    private val barCoverageFloorPct = 20.0
+
+    @Test
+    fun `the contract - bar coverage clears the floor and no gate-holding capture moves`() {
+        // The two halves of issue #87's bargain, asserted together because
+        // either alone is satisfiable by doing nothing useful. Widening the
+        // predicate everywhere would clear the floor and wreck the strap
+        // family; leaving the predicate alone would preserve the strap family
+        // and leave the floor uncleared.
+        //
+        // FLOOR: 20% is stated, not derived. It sits above the 18.4% the best
+        // of the five bar captures managed before the change and below the
+        // 23.5% the worst manages after it, so it is a line the change crosses
+        // and nothing else in the corpus's history does. It is a coverage
+        // floor, not a correctness floor -- see this file's KDoc.
+        val bar = listOf(
+            "field-ohp-3010-6rep-s37-set02",
+            "field-bench-3010-6rep-s37-set05",
+            "field-bench-3010-6rep-s37-set06",
+            "field-backsquat-4011-6rep-s36-set01",
+            "field-rdl-3010-10rep-s36-set05",
+        )
+        bar.forEach { fixture ->
+            val coverage = supply(fixture).coveragePct
+            assertTrue(
+                coverage >= barCoverageFloorPct,
+                "$fixture: anchor coverage $coverage%, floor $barCoverageFloorPct%",
+            )
+        }
+
+        // NO GATE-HOLDING CAPTURE MOVES: on every capture where
+        // gyroGateApplies is true the shipped mask must be the gate-on mask
+        // sample for sample. That is stronger than pinning rep counts -- a
+        // span cannot change if the mask it is derived from cannot -- and it
+        // covers every strap, rope, stack and machine capture at once.
+        val config = DspConfig()
+        val holding = corpus.filter { VelocityEstimator.gyroGateApplies(load(it), config) }
+        assertEquals(21, holding.size, "captures the gate still applies to")
+        holding.forEach { fixture ->
+            assertEquals(
+                coverageWithGate(fixture, gyroGate = true),
+                supply(fixture).coveragePct,
+                0.0,
+                "$fixture: the gate holds here, so the mask must be bit-identical",
+            )
+        }
+
+        // And the spans themselves, on the strap family and one machine
+        // capture from each session, named rather than left to the mask
+        // argument alone.
+        assertEquals(
+            5,
+            batchReps("field-pullup-3010-8rep-s37-set09", StartPhase.CONCENTRIC, 23.4436),
+            "assisted pull-up spans, 8 performed -- unchanged by #87",
+        )
+        assertEquals(
+            10,
+            batchReps("field-legpress-single-2011-8rep-s36-set07", StartPhase.CONCENTRIC, 20.0),
+            "single leg press spans, 8 performed -- unchanged by #87",
+        )
+        assertEquals(
+            0,
+            batchReps("field-still-0rep", StartPhase.ECCENTRIC, 20.0),
+            "a sensor that did not move still resolves nothing",
+        )
+    }
+
     @Test
     fun `the gyro term is what separates the two families, not the acceleration term`() {
         // The differential that makes this a gyro finding rather than a general
-        // "these sets are noisy" one: widening the gyro band out of the way and
-        // keeping the acceleration clause alone multiplies coverage on the bar
-        // sets, and leaves the strap set bit-identical because its entire gyro
-        // distribution already sits under the gate.
-        val wide = DspConfig(stationaryGyroBandDps = Double.MAX_VALUE)
+        // "these sets are noisy" one. Measured with the clause forced on and
+        // forced off, bypassing the straddle test, because the shipped mask no
+        // longer applies the clause on these four and comparing it against
+        // itself would compare two identical numbers -- a check that cannot
+        // fail.
         listOf(
             "field-ohp-3010-6rep-s37-set02",
             "field-bench-3010-6rep-s37-set05",
             "field-bench-3010-6rep-s37-set06",
             "field-backsquat-4011-6rep-s36-set01",
         ).forEach { f ->
-            val now = supply(f).coveragePct
-            val accOnly = supply(f, wide).coveragePct
-            assertTrue(accOnly > 2.0 * now, "$f: acc-only coverage $accOnly against $now with the gyro term")
+            val gated = coverageWithGate(f, gyroGate = true)
+            val accOnly = coverageWithGate(f, gyroGate = false)
+            assertTrue(accOnly > 2.0 * gated, "$f: acc-only coverage $accOnly against $gated with the gyro clause")
+            // And the shipped mask now takes the second of the two.
+            assertEquals(accOnly, supply(f).coveragePct, 0.01, "$f: the shipped mask drops the clause here")
         }
         val strap = "field-pullup-3010-8rep-s37-set09"
         assertEquals(
-            supply(strap).coveragePct,
-            supply(strap, wide).coveragePct,
+            coverageWithGate(strap, gyroGate = true),
+            coverageWithGate(strap, gyroGate = false),
             0.0,
-            "$strap: the gyro term removes nothing on a mount that does not rotate",
+            "$strap: the gyro clause removes nothing on a mount that does not rotate",
+        )
+        assertEquals(
+            coverageWithGate(strap, gyroGate = true),
+            supply(strap).coveragePct,
+            0.0,
+            "$strap: and the shipped mask still applies it",
         )
     }
 }
