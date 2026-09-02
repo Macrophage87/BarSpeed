@@ -294,12 +294,10 @@ data class SessionExport(
          * which key a given lift writes, why the other is absent rather than
          * zero, and the segmentation limit that survives.
          *
-         * 1.16 carries a SECOND change, under the same number because 1.16
-         * is UNRELEASED -- the rule the 1.13 entry states at length and the
-         * 1.14 entry applied twice more, for its third and fourth changes
-         * (#189 and #194). 1.15 is RELEASED and 1.16 is not: v0.1.47 ships
-         * 1.15, read by `git show v0.1.47:core/model/.../SessionExport.kt`
-         * rather than assumed, and no tag carries 1.16. The change (#141):
+         * 1.16 carries a SECOND change, under the same number -- the rule
+         * the 1.13 entry states at length and the 1.14 entry applied twice
+         * more, for its third and fourth changes (#189 and #194). The
+         * change (#141):
          * a guided set that ends without the guide having called `Done`
          * speaks and records a terminal cue, `Set ended`. That is a set
          * the lifter ended early AND a guided set given no rep target,

@@ -168,7 +168,7 @@ class SessionExportPauseKeyTest {
      * [com.macrophage.barspeed.model.SessionExport]'s log and `PLAN_PROMPT`.
      * `repMetrics` is built at export time but COPIED from the analysis frozen
      * into the row at record time, so a set recorded before 1.16 keeps both
-     * keys inside a document declaring 1.16. A reader is told to treat a rep
+     * keys inside a document declaring 1.16 or any later version. A reader is told to treat a rep
      * carrying both as pre-1.16 data; if the exporter ever started dropping
      * one of them from such a row, that instruction would send the reader
      * looking for a marker the document no longer has. Nothing else detects
