@@ -1,13 +1,16 @@
 // The finished-set correction seam, lifted out of RecordViewModel.kt by #208.
 // Everything here is what the rest screen can still change about the set that
 // has just been written: its effort rating, why it ended, whether it was a
-// warm-up, its rep count and a hold's seconds. Split out before #204, #205 and
-// #206 add controls to the same surface, because the class they would have
+// warm-up, its rep count, a hold's seconds and -- since #205 -- the load it
+// was recorded at. Split out because the class these would otherwise have
 // been added to had one line of growth left under detekt's `LargeClass`
-// default of 600. Nothing here changed behaviour when it moved.
+// default of 600; #206 is the remaining one still to arrive. The move itself
+// changed no behaviour, and the load correction is the first thing added here
+// that did.
 package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.model.SetLimiter
+import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
 import kotlinx.coroutines.CoroutineScope
@@ -210,6 +213,93 @@ internal fun applyDurationCorrection(
         val s = stateFlow.value
         val failed = ratings.correctDuration(seconds, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
         stateFlow.value = durationCorrectedState(stateFlow.value, seconds, failed)
+    }
+}
+
+/**
+ * The added load standing for the SET COMING UP, in kilograms, or null when
+ * nothing is standing for it.
+ *
+ * Two sources and not one, because the carry runs through two different fields
+ * depending on the session. On a plan set `statedLoadKg` is the lifter's
+ * standing statement and is what `SetLoadPolicy.resolve` reads; on an ad-hoc
+ * set that field is not in the path at all and the load box itself is the
+ * declaration, so the box is what would be recorded. Reading only the first
+ * would say "nothing is standing" for every ad-hoc session, which is exactly
+ * the session where the load repeats set after set.
+ *
+ * Null only where the box holds something that is not a number.
+ */
+internal fun standingAddedKg(s: RecordState): Double? = s.statedLoadKg ?: s.weightUnit.parseToKg(s.loadInput)
+
+/**
+ * The state a rest-screen load correction leaves behind (#205).
+ *
+ * [addedKg] is the corrected ADDED load; the total the row stores is computed
+ * beside the write, not here.
+ *
+ * [carryFollows] is `SetLoadPolicy.carryFollowsCorrection`'s answer, decided
+ * BEFORE the write against what was standing at the tap. When it is false this
+ * touches the finished set and nothing else. When it is true the load box and
+ * the standing statement both move to the corrected number, so the set coming
+ * up is not offered the mistake a second time.
+ *
+ * BOTH FIELDS MOVE TOGETHER OR NEITHER DOES. Writing `loadInput` alone would
+ * leave a plan set showing 65 in the box while `resolve` still read the slot's
+ * 60, which is the box disagreeing with what the set would record -- the same
+ * class of defect as #45. Writing `statedLoadKg` alone would record 65 under a
+ * box still reading 60. The box takes the rounded render and the statement
+ * takes the exact value, which is the arrangement `restingState` already uses.
+ */
+internal fun loadCorrectedState(s: RecordState, addedKg: Double, carryFollows: Boolean): RecordState {
+    val corrected = s.copy(lastFeedback = s.lastFeedback?.copy(loadOverrideAddedKg = addedKg))
+    if (!carryFollows) return corrected
+    return corrected.copy(
+        loadInput = s.weightUnit.inputValue(addedKg),
+        statedLoadKg = addedKg,
+    )
+}
+
+/**
+ * The write behind one tap of the load correction (#205).
+ *
+ * Shaped on [applyDurationCorrection] rather than on a new arrangement,
+ * because it is the same kind of control: a delta applied to the figure that
+ * currently stands, so repeated taps accumulate. The delta is resolved and the
+ * carry decided OUTSIDE the coroutine, against the state the finger was
+ * looking at; the write and the publish are inside it, in that order, as every
+ * other correction here but [applyWarmupMark] does.
+ *
+ * Returns without writing when the corrected load is the load already
+ * standing -- a loaded set at an empty bar tapped down again -- so a tap that
+ * changes nothing does not spend a Room write or republish the state.
+ *
+ * THE ANALYSIS IS NOT RECOMPUTED. `SetAnalyzer` derived the per-rep bar power
+ * from the load at set end and that JSON is already stored; see
+ * `SessionRepository.overrideLoad` for why rescaling it here would be worse
+ * than naming it.
+ *
+ * Two taps inside one write window can reach Room in either order, exactly as
+ * [applyWarmupMark]'s doc records for the warm-up mark. Read from source;
+ * never observed.
+ */
+internal fun applyLoadCorrection(
+    stateFlow: MutableStateFlow<RecordState>,
+    deltaKg: Double,
+    ratings: SetRatingTracker,
+    appScope: CoroutineScope,
+) {
+    val s0 = stateFlow.value
+    val feedback = s0.lastFeedback ?: return
+    val before = feedback.effectiveAddedKg
+    val after = SetLoadPolicy.correctedAddedKg(before, deltaKg, feedback.bodyweight)
+    if (after == before) return
+    val carryFollows = SetLoadPolicy.carryFollowsCorrection(standingAddedKg(s0), before, s0.weightUnit)
+    appScope.launch(Dispatchers.Main.immediate) {
+        val current = stateFlow.value.lastFeedback ?: return@launch
+        val total = SetLoadPolicy.correctedTotalKg(current.loadKg, current.addedKg, after)
+        ratings.correctLoad(total) ?: return@launch
+        stateFlow.value = loadCorrectedState(stateFlow.value, after, carryFollows)
     }
 }
 

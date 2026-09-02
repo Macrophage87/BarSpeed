@@ -2908,15 +2908,26 @@ internal fun RestHeader(state: RecordState, viewModel: RecordViewModel) {
             Spacer(Modifier.height(6.dp))
             SectionCaption("Last set")
             state.lastFeedback?.let { feedback ->
+                // effectiveLoadKg / effectiveAddedKg, not loadKg / addedKg:
+                // a load corrected on this screen (#205) moves this line the
+                // way a corrected rep count and a corrected hold already move
+                // the ones below it. Both come off the same correction, so the
+                // total and the split cannot disagree about which set they are
+                // describing.
                 val loadText =
-                    feedback.loadKg.takeIf { it > 0 }?.let { state.weightUnit.format(it) } ?: "BW"
-                // addedKg, NEVER loadKg. feedback.loadKg is
+                    feedback.effectiveLoadKg.takeIf { it > 0 }?.let { state.weightUnit.format(it) } ?: "BW"
+                // The ADDED load, NEVER the total. feedback.effectiveLoadKg is
                 // SetLoadPolicy.totalKg -- the lifter's own mass included on
                 // body-weight work -- so halving it would read "2 x 50 kg" for
                 // a 20 kg weighted dip at 80 kg body weight. The total on
-                // screen stays loadKg; only the split comes off addedKg.
+                // screen stays the total; only the split comes off the added
+                // load.
                 val split =
-                    ImplementLoad.decomposition(feedback.addedKg, feedback.implementCount, state.weightUnit)
+                    ImplementLoad.decomposition(
+                        feedback.effectiveAddedKg,
+                        feedback.implementCount,
+                        state.weightUnit,
+                    )
                 val name =
                     feedback.exerciseName +
                         (feedback.side?.let { " (${it.replaceFirstChar { c -> c.uppercase() }})" } ?: "")
