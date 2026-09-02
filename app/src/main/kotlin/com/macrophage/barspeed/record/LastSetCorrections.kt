@@ -202,6 +202,11 @@ internal fun applyRepCorrection(
  * the figure that currently stands, so repeated taps accumulate;
  * [durationCorrectedState] says why the correction is post-set rather than
  * mid-set.
+ *
+ * Two fast taps here are still LOST rather than reordered, for the reason
+ * [applyLoadCorrection]'s KDoc gives: this one still reads outside the
+ * coroutine and publishes after the write. Not fixed with #205, because the
+ * two paths were changed one at a time.
  */
 internal fun applyDurationCorrection(
     stateFlow: MutableStateFlow<RecordState>,

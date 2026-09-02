@@ -322,20 +322,20 @@ object SetLoadPolicy {
      * THE COMING SLOT'S OWN IDENTITY IS TAKEN HERE, never an answer computed
      * for it earlier. The rest screen can replace the slot coming up -- switch
      * exercise, or append a set -- so a block answer frozen at the rest
-     * transition is about a slot that is no longer next. The comparison itself
-     * arrives with the commit that removes the suppression below.
+     * transition is about a slot that is no longer next, and where the two
+     * declarations render equal the carry then writes the corrected load onto
+     * a different movement.
      *
      * A null on either id means there is nothing to compare and nothing
      * carries.
      */
-    @Suppress("UnusedParameter")
     fun correctionCarryBlock(
         lastExerciseId: String?,
         nextExerciseId: String?,
         nextSetIndexInExercise: Int?,
         comingExerciseId: String?,
     ): Boolean = if (nextExerciseId != null) {
-        lastExerciseId != null
+        sameExerciseBlock(lastExerciseId, nextExerciseId, nextSetIndexInExercise)
     } else {
         lastExerciseId != null && lastExerciseId == comingExerciseId
     }
