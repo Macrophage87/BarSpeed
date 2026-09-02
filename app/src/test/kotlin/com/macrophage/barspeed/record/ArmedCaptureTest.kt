@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.model.ArmedDelivery
+import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.SensorRole
@@ -217,5 +218,88 @@ class ArmedCaptureTest {
 
         assertSame(only, capture.samples, "the capture was dropped on a set with no sensor declaration")
         assertNull(capture.sensors, "a declaration was invented for a set whose one unit delivered")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. The set-end path ASKS about the one link, and
+     * the answer reaches the row.
+     *
+     * A second pin over the same fix, and it exists because a mutation survived
+     * the first one. Deleting the argument [captureAt] passes down --
+     * `soleSilenceOver(startedAtMs, endedAtMs)` cut to `null` -- left every test
+     * in this file green, because they all call [armedCaptureOf] directly and
+     * nothing reached the caller. That is the shape round 3 of #207 found in
+     * this same function and the reason this file was written at all; finding
+     * it again one call up is what a mutation table is for.
+     *
+     * [RecordState] is constructed here rather than mocked: every one of its
+     * properties is a pure Kotlin or `:core:model` type with a default, so the
+     * four that matter -- the paired list, the preference, the link state and
+     * the frame instant -- can be stated and the rest left alone.
+     *
+     * The unit is `Connected` and has never delivered, and the set ran for a
+     * minute, so the reading is [ArmedDelivery.LINKED_SILENT]: the state
+     * field-37 drew a connected indicator for. Whether a real WT901 produces it
+     * is [Field] and is not asserted here.
+     */
+    @Test
+    fun `the set end path asks about the one link and freezes the answer onto the row`() {
+        val address = "AA:BB:CC:DD:EE:01"
+        val state =
+            RecordState(
+                pairedImuAddresses = listOf(address),
+                preferredImuAddress = address,
+                imuState = ConnectionState.Connected("WT901"),
+                imuFrameAtMs = null,
+            )
+
+        val capture =
+            state.captureAt(
+                armed = null,
+                secondaryRole = null,
+                analysedBuffer = emptyList(),
+                secondaryBuffer = emptyList(),
+                startedAtMs = 1_000L,
+                endedAtMs = 61_000L,
+            )
+
+        val sensors = assertNotNull(capture.sensors, "the set end path never asked what the one link was doing")
+        assertEquals(ArmedDelivery.LINKED_SILENT, sensors.soleSilent, "the reading did not reach the row")
+        assertEquals(1, sensors.count, "a set that armed one unit recorded another number")
+        assertEquals(emptyList(), sensors.expected, "a role was invented for a stream that carries none")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. The control at the same call: a one-sensor set
+     * whose unit was delivering when it ended stores nothing at all.
+     *
+     * What keeps every ordinary single-sensor set byte-identical. The frame is
+     * one second before the set ended, inside `ArmedSilencePolicy`'s window, so
+     * the link reads as delivering and there is nothing to say.
+     */
+    @Test
+    fun `the set end path stores nothing when the one link was delivering`() {
+        val address = "AA:BB:CC:DD:EE:01"
+        val only = samples(0L, 10L)
+        val state =
+            RecordState(
+                pairedImuAddresses = listOf(address),
+                preferredImuAddress = address,
+                imuState = ConnectionState.Connected("WT901"),
+                imuFrameAtMs = 60_000L,
+            )
+
+        val capture =
+            state.captureAt(
+                armed = null,
+                secondaryRole = null,
+                analysedBuffer = only,
+                secondaryBuffer = emptyList(),
+                startedAtMs = 1_000L,
+                endedAtMs = 61_000L,
+            )
+
+        assertNull(capture.sensors, "a declaration was invented for a set whose one unit delivered")
+        assertEquals(only, capture.samples, "the capture was dropped on an ordinary one-sensor set")
     }
 }
