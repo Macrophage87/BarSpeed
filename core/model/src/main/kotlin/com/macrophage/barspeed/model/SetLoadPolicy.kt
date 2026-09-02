@@ -302,6 +302,38 @@ object SetLoadPolicy {
         recordedTotalKg - recordedAddedKg + correctedAddedKg
 
     /**
+     * Whether the set coming up is a continuation of the block just finished,
+     * asked where BOTH kinds of session can answer it.
+     *
+     * [sameExerciseBlock] is the plan session's answer and needs a declared
+     * slot on either side. An ad-hoc set has none, so asking it there returns
+     * false for every ad-hoc session -- and ad-hoc is exactly the session where
+     * one load repeats set after set, because nothing re-seeds the load box
+     * from a declaration. Handing [carryFollowsCorrection] that false is not
+     * conservative; it is the feature switched off where it is used most.
+     *
+     * So the question is asked of whichever thing decides the coming set. With
+     * a planned slot ([hasPlannedNext]) that is the plan, and the answer is
+     * [plannedSameBlock] unchanged. Without one it is the exercise the lifter
+     * has selected on the rest screen -- the chips are right there and a tap on
+     * one is a decision about a different movement, which is the same boundary
+     * a block edge is.
+     *
+     * A null on either id means there is nothing to compare and nothing
+     * carries.
+     *
+     * THIS COMMIT ANSWERS THE PLANNED CASE ONLY. The ad-hoc branch is
+     * deliberately absent so the two pins naming it are red here.
+     */
+    @Suppress("UnusedParameter")
+    fun correctionCarryBlock(
+        hasPlannedNext: Boolean,
+        plannedSameBlock: Boolean,
+        lastExerciseId: String?,
+        comingExerciseId: String?,
+    ): Boolean = plannedSameBlock
+
+    /**
      * WHAT THE CORRECTION DOES TO THE CARRY, which #205 asks be decided rather
      * than left implied. True when the added load standing for the set coming
      * up must move with this correction; false when it must be left alone.
