@@ -885,4 +885,68 @@ class ArmedSilencePolicyTest {
             "a link armed for the whole window was excused because the set was shorter than it",
         )
     }
+
+    /**
+     * PIN, review round 1 of #225. A link armed DURING the set is still
+     * floored by the set's start, not by its own later arming.
+     *
+     * `storedGraceFloor` is `minOf(setStartedAtMs, armedAtMs)`, so an arming
+     * instant after the set began is capped back to the set's start rather
+     * than used as-is. The link here is armed one second before a
+     * ten-second set ends, Connected, and has never produced a frame; the
+     * set's span from its own start to its end is ten seconds, well past
+     * [ArmedSilencePolicy.SILENT_AFTER_MS], so the stored word is
+     * [ArmedDelivery.LINKED_SILENT]. Mutation: replacing the `minOf` with
+     * `armedAtMs` floors this case at the arming instant instead, one second
+     * of the window in hand, and reddens this test with `tooSoon`.
+     */
+    @Test
+    fun `a link armed during the set is floored by the set's start, not its own arming`() {
+        val setStart = armedAt
+        val setEnd = after(10_000L)
+
+        assertEquals(
+            mapOf(SensorRole.A to ArmedDelivery.LINKED_SILENT),
+            ArmedSilencePolicy.storedDeliveryByRole(
+                analysed = SensorRole.A,
+                secondary = null,
+                links = links(analysedArmedAtMs = after(9_000L)),
+                setStartedAtMs = setStart,
+                setEndedAtMs = setEnd,
+            ),
+            "a link armed mid-set was excused by its own arming instant instead of the set's start",
+        )
+    }
+
+    /**
+     * PIN, review round 1 of #225. [ArmedSilencePolicy.storedSoleSilence]
+     * reads the analysed link out of [links] and none of the second link's
+     * fields.
+     *
+     * The second link here is given a different state and a frame instant
+     * at the set's end -- delivering, on the wrong link's evidence -- so a
+     * reimplementation that read `secondaryState` and `secondaryFrameAtMs`
+     * instead of the analysed ones would answer [ArmedDelivery.DELIVERING]
+     * and this function's own filter would turn that into null, not
+     * [ArmedDelivery.LINKED_SILENT]. The analysed link is Connected with no
+     * frame, armed an hour before the set, so the correct answer is
+     * [ArmedDelivery.LINKED_SILENT].
+     */
+    @Test
+    fun `storedSoleSilence reads only the analysed link, never the second one`() {
+        val setStart = after(3_600_000L)
+        val setEnd = setStart + 2_000L
+
+        assertEquals(
+            ArmedDelivery.LINKED_SILENT,
+            ArmedSilencePolicy.storedSoleSilence(
+                roster = soloRoster(),
+                pairedImuAddresses = listOf(soloAddress),
+                links = links(secondaryState = ConnectionState.Disconnected, secondaryFrameAtMs = setEnd),
+                setStartedAtMs = setStart,
+                setEndedAtMs = setEnd,
+            ),
+            "the roleless reading came from the second link's state or frame instead of the analysed link's",
+        )
+    }
 }

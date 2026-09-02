@@ -318,11 +318,10 @@ object ArmedSilencePolicy {
      * a link armed an hour earlier and silent throughout stores
      * [ArmedDelivery.LINKED_SILENT] rather than "the app does not know yet".
      *
-     * The set's start is a CEILING on it, not the floor itself. A link armed
-     * mid-set has still had the whole span the app was recording across to
-     * produce a frame, and it is the span this row is about; taking the later
-     * instant instead would excuse a link on the strength of an arming that
-     * happened after the set the row describes had already begun.
+     * The set's start is a CEILING on it, not the floor itself. The row
+     * describes the set's span, so that span is what the reading is measured
+     * over; taking the later instant would excuse a link on an arming that
+     * happened after the set had begun.
      *
      * Private because nothing outside this object should be choosing a floor:
      * the two stored readings are the callers, and they must not diverge.
