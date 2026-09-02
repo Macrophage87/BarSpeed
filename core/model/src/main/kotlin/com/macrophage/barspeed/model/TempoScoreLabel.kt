@@ -83,12 +83,41 @@ object TempoScoreLabel {
     fun of(repsFullyCompliant: Int, repsEvaluated: Int, phases: List<PhaseFacts>): TempoScore? {
         if (repsEvaluated <= 0) return null
         val onRatio = repsFullyCompliant >= repsEvaluated
+        val ungraded = ungradedMovementPhases(phases)
+        // The tick is a claim about the SET, so it needs both: every graded rep
+        // in tolerance, and every phase the set prescribed actually graded. The
+        // ratio alone answers only the first, and a set graded on its drives
+        // alone satisfies it while the eccentric behind it was never measured.
+        val complete = onRatio && ungraded.isEmpty()
         return TempoScore(
-            text = "Tempo $repsFullyCompliant/$repsEvaluated" + if (onRatio) " ✓" else "",
-            tone = if (onRatio) TempoScoreTone.ON_TEMPO else TempoScoreTone.OFF_TEMPO,
-            ungradedPhases = ungradedMovementPhases(phases),
-            ungradedNote = null,
+            text = "Tempo $repsFullyCompliant/$repsEvaluated" + if (complete) " ✓" else "",
+            // Compliance and coverage are separate questions and are answered
+            // separately: a rep outside tolerance is a miss whatever went
+            // ungraded beside it, so a real miss is never softened to PARTIAL.
+            tone =
+            when {
+                !onRatio -> TempoScoreTone.OFF_TEMPO
+                ungraded.isEmpty() -> TempoScoreTone.ON_TEMPO
+                else -> TempoScoreTone.PARTIAL
+            },
+            ungradedPhases = ungraded,
+            ungradedNote = noteFor(ungraded, gradedMovementPhases(phases)),
         )
+    }
+
+    /**
+     * The sentence a screen draws under the chip, or null when the set was
+     * graded on everything it prescribed.
+     *
+     * It names the phase rather than hedging generally, because the lifter's
+     * next question is which half of the rep the app is silent about.
+     */
+    private fun noteFor(ungraded: List<String>, graded: List<String>): String? {
+        if (ungraded.isEmpty()) return null
+        val subject = ungraded.joinToString(" and ").replaceFirstChar { it.uppercase() }
+        val covers =
+            if (graded.isEmpty()) "." else " -- the ratio covers the ${graded.joinToString(" and ")} only."
+        return "$subject not measured this set$covers"
     }
 
     /**
@@ -100,4 +129,8 @@ object TempoScoreLabel {
      */
     private fun ungradedMovementPhases(phases: List<PhaseFacts>): List<String> =
         phases.filter { it.name in MOVEMENT_PHASES && it.prescribed && !it.scored }.map { it.name }
+
+    /** Prescribed movement phases the set WAS graded on -- what the ratio does cover. */
+    private fun gradedMovementPhases(phases: List<PhaseFacts>): List<String> =
+        phases.filter { it.name in MOVEMENT_PHASES && it.prescribed && it.scored }.map { it.name }
 }
