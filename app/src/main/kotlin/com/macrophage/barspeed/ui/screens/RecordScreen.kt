@@ -2531,6 +2531,10 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * for (#153), and [RestHeader] now puts them in the same row: [StartNextSetButton]
  * sits beside the ring rather than at the foot of [NextSetBlock], because they
  * are the only two facts a lifter needs before the phone comes off the floor.
+ * After the last planned set, [StartNextSetButton] draws nothing in this row
+ * and [SessionCloseControls] becomes the filled, primary control below instead
+ * (#195); adding a set through [AddSetSection] brings START back to this row,
+ * since there is a slot to run again.
  * Almost everything about the set that had just finished -- the effort line,
  * the reason row, the warm-up row, the rep- and hold-correction rows and a
  * rep-quality card carrying a 64dp chart -- sits below the next-set block, in

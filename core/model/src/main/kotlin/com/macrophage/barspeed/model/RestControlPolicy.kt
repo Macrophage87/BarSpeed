@@ -138,7 +138,10 @@ object RestControlPolicy {
      * a second `set_records` row with its own gzipped streams, the plan's
      * prescription copied onto it and nothing an export could use to tell it
      * from the planned set it duplicates. What the screen offers instead is
-     * the decision -- the finish, as the one filled control.
+     * the decision -- the finish, as the one filled control. Which composable
+     * draws that filled control, and where on the screen, is a caller decision
+     * this object does not make -- see `RestingStage`'s own KDoc in `:app` for
+     * the layout, kept there rather than duplicated here.
      *
      * THIS IS A GATE ON THE QUEUE, NOT ON THE LAST SET, which is what keeps
      * #188's sequence working: the lifter appends a set through the explicit
