@@ -65,8 +65,9 @@ data class AddSetPlacement(
  *
  * Repeatable by construction: an appended slot carries the next index in the
  * block, so the scan runs through it and a second addition lands after the
- * first. Removal is out of scope (#177 item 5) and nothing here shortens a
- * queue.
+ * first. Nothing in THIS object shortens a queue; [RemoveSetControl] takes an
+ * appended set back out again, reading this object's [blockRange] so the two
+ * cannot disagree about which sets belong to the exercise (#206).
  */
 object AddSetControl {
     /**

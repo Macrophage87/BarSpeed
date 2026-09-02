@@ -74,14 +74,25 @@ object RemoveSetControl {
      * decision -- and at a block boundary the upcoming slot is a different
      * exercise entirely.
      *
-     * c1 DECLARES THIS SEAM AND DOES NOT IMPLEMENT IT. The body is `TODO`
-     * rather than a plausible-looking `null`, so that the differentials
-     * pushed red in c2 fail because the rule is ABSENT and cannot be mistaken
-     * for a rule that ran and disagreed. The rule lands in c3, after c2's red
-     * has its own CI run at its own SHA.
+     * THE BLOCK IS [AddSetControl.blockRange]'s, not a scan of its own, so
+     * the set this takes out can only ever be one the add put in.
+     *
+     * `lastOrNull` is the whole of requirement 5 and it is deliberate rather
+     * than incidental: `firstOrNull` would compile, pass a single-appended-set
+     * test, and take the OLDEST appended set the moment there were two --
+     * undoing a decision the lifter made three sets ago instead of the one
+     * they just made.
      */
-    fun target(blocks: List<AddSetSlotKey>, queueIndex: Int, upcomingIndex: Int): RemoveSetTarget? =
-        TODO("#206 c3: which of ${blocks.size} slots to remove, anchored at $queueIndex, run to $upcomingIndex")
+    fun target(blocks: List<AddSetSlotKey>, queueIndex: Int, upcomingIndex: Int): RemoveSetTarget? {
+        val block = AddSetControl.blockRange(blocks, queueIndex) ?: return null
+        val eligible = block.filter { it >= upcomingIndex && blocks[it].isAddedSet }
+        val at = eligible.lastOrNull() ?: return null
+        return RemoveSetTarget(
+            removeAt = at,
+            wasUpcoming = at == upcomingIndex,
+            removableCount = eligible.size,
+        )
+    }
 
     /**
      * What the control says.
@@ -93,10 +104,13 @@ object RemoveSetControl {
      * saying: with one there is nothing to disambiguate, and naming an
      * ordering the lifter cannot see would be noise.
      *
-     * c1 DECLARES THIS AND DOES NOT IMPLEMENT IT, for [target]'s reason: an
-     * empty string is a wording, and a differential red against one cannot be
-     * told from a differential red against the wrong words.
+     * It opens on the mistake rather than on the act, mirroring the add's
+     * "Load was wrong?": the lifter is answering a question about what they
+     * did, not picking an operation off a menu.
      */
-    fun label(anchorExercise: String, setNumber: Int, several: Boolean): String =
-        TODO("#206 c3: the wording for set $setNumber of $anchorExercise, several=$several")
+    fun label(anchorExercise: String, setNumber: Int, several: Boolean): String = if (several) {
+        "Added by mistake? Remove the last added set, Set $setNumber of $anchorExercise"
+    } else {
+        "Added by mistake? Remove Set $setNumber of $anchorExercise"
+    }
 }

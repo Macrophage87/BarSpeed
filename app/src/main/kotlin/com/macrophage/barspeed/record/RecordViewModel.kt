@@ -1304,8 +1304,9 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * predecessor is always the same exercise, and the slot after the insertion
  * point keeps whichever answer it already had.
  *
- * Repeatable, and removal is out of scope (#177 item 5): nothing here
- * shortens the queue.
+ * Repeatable, and reversible since #206: nothing HERE shortens the queue,
+ * and [removedState] takes the last appended set of the block back out
+ * again while it is still queued.
  *
  * RUN ON A DEVICE, ONCE, and this is the only place that says so -- #177's own
  * commit body listed all of it as `[Field]` because it was written before the
@@ -1441,14 +1442,56 @@ internal fun appendedState(s: RecordState): RecordState? {
  * `internal` for [appendedState]'s reason, and called from one place,
  * [RecordViewModel.removeAddedSetOfCurrentExercise].
  *
- * c1 DECLARES THIS SEAM AND DOES NOT IMPLEMENT IT, for
- * `RemoveSetControl.target`'s reason: c2's differentials have to fail because
- * the rule is absent rather than because a placeholder rule disagreed.
+ * WHAT THE LIFTER IS STANDING ON IS LEFT STANDING (#206 requirement 4). A
+ * load or a rep count corrected for the EXERCISE is not a statement about the
+ * one appended set, so taking that set back out does not roll it back; the
+ * removal touches the queue and nothing else.
+ *
+ * THE ONE EXCEPTION IS NOT AN EXCEPTION TO THAT. Where the removed slot was
+ * the set the next START would have run, every editable box on the rest
+ * screen was seeded FROM IT, and the slot that comes up in its place is
+ * outside the block -- the removal takes the last appended set, so nothing of
+ * that exercise follows it. Leaving the boxes would show the finished
+ * exercise's load on the next exercise's set: the box disagreeing with what
+ * the set would record, which is what #45 and #124 are about. They are
+ * re-seeded from the new upcoming slot, and the stated values cleared,
+ * exactly as [jumpedState] and [appendedState] already do for the same event.
+ * Nothing is reverted; the boxes follow the set that is now coming.
+ *
+ * At the very end of the queue there is no slot to re-seed from and nothing
+ * to run, so the boxes are left alone: the screen becomes "That was the last
+ * planned set".
+ *
+ * NOTHING IS WRITTEN TO ROOM AND NOTHING NEEDS TO BE. The slot being removed
+ * has not run, so no `set_records` row, no raw stream and no export entry
+ * exists for it. A set that HAS run is unreachable from here --
+ * `RemoveSetControl.target` refuses every index below `upcomingIndex` -- which
+ * is the boundary #206 draws and the reason this change carries no schema or
+ * export move.
  */
 internal fun removedState(s: RecordState): RecordState? {
     if (s.adHoc) return null
     val target = s.removeSetTarget ?: return null
-    TODO("#206 c3: drop the slot at ${target.removeAt} and re-seed when ${target.wasUpcoming}")
+    val at = target.removeAt
+    val queue = s.queue.toMutableList().apply { removeAt(at) }
+    if (!target.wasUpcoming) return s.copy(queue = queue)
+    val upcoming = queue.getOrNull(at) ?: return s.copy(queue = queue)
+    val seedKg =
+        SetLoadPolicy.seedAddedKg(
+            hasPlannedNext = true,
+            nextDeclaredAddedKg = upcoming.loadKg,
+            lastAddedKg = null,
+        )
+    return s.copy(
+        queue = queue,
+        loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
+        statedLoadKg = null,
+        statedTempo = null,
+        statedReps = null,
+        statedDurationS = null,
+        repsInput = upcoming.reps?.toString() ?: s.repsInput,
+        durationInput = upcoming.durationS?.toString() ?: s.durationInput,
+    )
 }
 
 /**

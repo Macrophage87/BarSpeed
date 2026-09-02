@@ -88,6 +88,7 @@ import com.macrophage.barspeed.model.PlanValueCaption
 import com.macrophage.barspeed.model.PlateMath
 import com.macrophage.barspeed.model.PreviewBlock
 import com.macrophage.barspeed.model.RecordExitPolicy
+import com.macrophage.barspeed.model.RemoveSetControl
 import com.macrophage.barspeed.model.RestControl
 import com.macrophage.barspeed.model.RestControlPolicy
 import com.macrophage.barspeed.model.RestControls
@@ -792,6 +793,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         // other half is the button above.
         SwitchExerciseSection(state, viewModel)
         AddSetSection(state, viewModel)
+        RemoveSetSection(state, viewModel)
     } else {
         AdHocForm(state, viewModel)
         // Plan sets take their prep from the dialog. The ad-hoc layout keeps
@@ -1448,10 +1450,10 @@ private fun ChangeSetDialog(
  * START is the only filled button on either screen while a set is queued --
  * after the last planned set START is withheld and FINISH SESSION takes the
  * filled place (#195) -- and this line sits beside one that already looks
- * like this. A mis-tap here queues a set the lifter can
- * simply not do -- the plan's remaining sets are dropped whenever a session is
- * finished early, which is how every unwanted queued set has always been
- * disposed of. Removal is out of scope and this is why that is survivable.
+ * like this. A mis-tap here used to be survivable only because the plan's
+ * remaining sets are dropped whenever a session is finished early; since #206
+ * it is survivable directly, because [RemoveSetSection] -- drawn immediately
+ * below this on all three surfaces -- takes the set back out again.
  *
  * Repeatable: every tap appends one more, and nothing here or in
  * [RecordViewModel.addSetOfCurrentExercise] assumes at most one.
@@ -1463,6 +1465,50 @@ private fun AddSetSection(state: RecordState, viewModel: RecordViewModel) {
     TextButton(onClick = viewModel::addSetOfCurrentExercise) {
         Text(
             AddSetControl.label(anchor.exercise.displayName, state.upcomingSlot?.exercise?.displayName),
+            color = BarColors.Blue,
+        )
+    }
+}
+
+/**
+ * "Remove the set you added" -- #177's named remainder, and the other half of
+ * the pair (#206).
+ *
+ * DRAWN IMMEDIATELY BELOW [AddSetSection], on all three surfaces it is drawn
+ * on: the rest screen's next-set block, the rest screen's last-set branch, and
+ * READY. #206 requirement 3 asks the pair to read as one decision rather than
+ * two unrelated controls, and the placement is what makes that true --
+ * whichever screen offered the add offers the undo in the same place, in the
+ * same form.
+ *
+ * DRAWN ONLY WHEN THERE IS SOMETHING TO REMOVE, which is what makes the
+ * eligibility rule visible instead of merely enforced. A plan-prescribed set
+ * never produces a target, and neither does an appended set that has already
+ * RUN: once the set is recorded it is a row of training history with its
+ * samples, its raw stream and its export entry, and the control is simply not
+ * there. The lifter never taps a target that refuses.
+ *
+ * WHAT IT NAMES is the slot the tap will actually take -- one lookup, into the
+ * same [RecordState.removeSetTarget] the ViewModel acts on, so the words and
+ * the act cannot name different sets. With more than one appended set of that
+ * exercise the label says it takes the LAST, because "remove the set you
+ * added" is ambiguous the moment there are two.
+ *
+ * A TextButton for [AddSetSection]'s reason. This one is not destructive of
+ * anything recorded, so it takes no confirmation: the set it removes has not
+ * happened, and the lifter can add it again with the button above.
+ */
+@Composable
+private fun RemoveSetSection(state: RecordState, viewModel: RecordViewModel) {
+    val target = state.removeSetTarget ?: return
+    val slot = state.queue.getOrNull(target.removeAt) ?: return
+    TextButton(onClick = viewModel::removeAddedSetOfCurrentExercise) {
+        Text(
+            RemoveSetControl.label(
+                slot.exercise.displayName,
+                setNumber = slot.setIndexInExercise + 1,
+                several = target.removableCount > 1,
+            ),
             color = BarColors.Blue,
         )
     }
@@ -2607,6 +2653,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
         ChangeSetButton(state, viewModel, next, next = true)
         SwitchExerciseSection(state, viewModel)
         AddSetSection(state, viewModel)
+        RemoveSetSection(state, viewModel)
     } else if (state.adHoc) {
         AdHocForm(state, viewModel)
         PrepAdjuster(state, viewModel)
@@ -2626,6 +2673,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
         // what gives it a slot to run: the queue has a next slot again and
         // START comes back on the same pass.
         AddSetSection(state, viewModel)
+        RemoveSetSection(state, viewModel)
     }
 }
 
