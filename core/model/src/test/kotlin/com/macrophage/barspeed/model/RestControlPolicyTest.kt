@@ -3,6 +3,7 @@ package com.macrophage.barspeed.model
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -169,6 +170,111 @@ class RestControlPolicyTest {
         // non-empty -- an in-flight close draws nothing, deliberately.
         SessionCloseState.entries.forEach { close ->
             assertTrue(RestControlPolicy.controls(close).all { it in RestControl.entries })
+        }
+    }
+
+    // ---- the whole screen in one answer, issue #195 -------------------------
+
+    /**
+     * The one-answer form says what the two existing forms say, and names the
+     * emphasis.
+     *
+     * Green on arrival: [RestControlPolicy.restScreen] accepts `hasNextSlot`
+     * and `adHoc` and does not read them yet. What this pins is the half that
+     * does not change -- a session with a set still to come is untouched by
+     * #195 in every close state.
+     */
+    @Test
+    fun `a session with a set to come draws the close's own controls`() {
+        assertEquals(
+            RestControls(setOf(RestControl.START_NEXT_SET, RestControl.FINISH_SESSION), RestControl.START_NEXT_SET),
+            RestControlPolicy.restScreen(
+                SessionCloseState.NONE,
+                askedToFinish = false,
+                hasNextSlot = true,
+                adHoc = false,
+            ),
+        )
+    }
+
+    /**
+     * Starting work is the emphasis wherever starting work is offered.
+     *
+     * The rest screen exists to get the lifter back under the bar, and the
+     * finish has been the quiet control beside it since that screen was built.
+     */
+    @Test
+    fun `the next set is the primary wherever it is offered`() {
+        SessionCloseState.entries.forEach { close ->
+            listOf(true, false).forEach { asked ->
+                val screen = RestControlPolicy.restScreen(close, asked, hasNextSlot = true, adHoc = false)
+                if (RestControl.START_NEXT_SET in screen.controls) {
+                    assertEquals(RestControl.START_NEXT_SET, screen.primary, "$close/$asked")
+                }
+            }
+        }
+    }
+
+    /**
+     * An in-flight close draws nothing, so there is nothing to emphasise. A
+     * defaulted primary here would be a control the screen is not drawing.
+     */
+    @Test
+    fun `a screen with no controls has no primary`() {
+        val screen =
+            RestControlPolicy.restScreen(
+                SessionCloseState.IN_FLIGHT,
+                askedToFinish = false,
+                hasNextSlot = true,
+                adHoc = false,
+            )
+        assertEquals(emptySet(), screen.controls)
+        assertNull(screen.primary)
+    }
+
+    @Test
+    fun `the primary is always one of the controls drawn`() {
+        SessionCloseState.entries.forEach { close ->
+            listOf(true, false).forEach { asked ->
+                listOf(true, false).forEach { hasNext ->
+                    listOf(true, false).forEach { adHoc ->
+                        val screen = RestControlPolicy.restScreen(close, asked, hasNext, adHoc)
+                        val primary = screen.primary
+                        if (primary != null) {
+                            assertTrue(
+                                primary in screen.controls,
+                                "$close/$asked/$hasNext/$adHoc emphasises a control it does not draw",
+                            )
+                        } else {
+                            assertEquals(
+                                emptySet(),
+                                screen.controls,
+                                "$close/$asked/$hasNext/$adHoc draws controls but names no primary",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Whether another set may be STARTED does not depend on the lifter having
+     * tapped Finish, in any close state.
+     *
+     * This is what makes the rest screen's move onto the one-answer form
+     * behaviour-preserving: `StartNextSetButton` asked the one-argument form
+     * and now asks a form that carries `askedToFinish`, and the two agree
+     * about START everywhere.
+     */
+    @Test
+    fun `asking to finish never changes whether a set may be started`() {
+        SessionCloseState.entries.forEach { close ->
+            assertEquals(
+                RestControl.START_NEXT_SET in RestControlPolicy.controls(close),
+                RestControl.START_NEXT_SET in RestControlPolicy.controls(close, askedToFinish = true),
+                "$close disagrees about START between the two forms",
+            )
         }
     }
 }

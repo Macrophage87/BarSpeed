@@ -50,6 +50,16 @@ enum class RestControl {
  * drawing the control is the honesty half, so the lifter is not tapping a target
  * that does nothing.
  */
+/**
+ * The rest screen's controls and which one carries the primary emphasis.
+ *
+ * [primary] is the one filled button on the screen. It is null only where
+ * [controls] is empty -- an in-flight close draws nothing, on purpose -- and
+ * it is always a member of [controls], so a caller cannot emphasise a control
+ * it is not drawing.
+ */
+data class RestControls(val controls: Set<RestControl>, val primary: RestControl?)
+
 object RestControlPolicy {
     /**
      * The controls to draw while the close is in [close].
@@ -106,4 +116,60 @@ object RestControlPolicy {
             base
         }
     }
+
+    /**
+     * Everything the rest screen needs to decide what to draw, in one answer.
+     *
+     * The whole screen asks one question here rather than each control asking
+     * its own, which is what makes [RestControls.primary] answerable at all:
+     * which control carries the emphasis is a fact about the SET of them, and
+     * two composables each asking about themselves cannot compute it.
+     *
+     * [hasNextSlot] is whether the queue has a slot for START to run --
+     * `nextSlot != null` at the caller, which is also true again the moment
+     * the lifter appends one. [adHoc] is a session with no queue at all,
+     * where every set after the first is started from this screen and there
+     * is never a next slot to have.
+     *
+     * Both are accepted and DELIBERATELY NOT READ in this commit. The
+     * function is the same answer the two existing forms give, wired in so
+     * that this branch's next commit is a difference in behaviour rather than
+     * a compile error -- see #195.
+     *
+     * [askedToFinish] is passed straight through to the two-argument form, so
+     * the rating panel still replaces the finish control and cannot resurrect
+     * one an earlier state withheld.
+     */
+    // Both new inputs are accepted and not yet read, which detekt's
+    // UnusedParameter is right about and which is the point: this commit is
+    // the seam, and the commit after next is the only thing that changes what
+    // the screen draws. The suppression goes with it.
+    @Suppress("UnusedParameter")
+    fun restScreen(
+        close: SessionCloseState,
+        askedToFinish: Boolean,
+        hasNextSlot: Boolean,
+        adHoc: Boolean,
+    ): RestControls {
+        val drawn = controls(close, askedToFinish)
+        return RestControls(drawn, primaryOf(drawn))
+    }
+
+    /**
+     * Which of [drawn] is the one filled button.
+     *
+     * Starting work outranks ending it wherever both are offered: the rest
+     * screen exists to get the lifter back under the bar, and the finish has
+     * been the quiet control beside it since that screen was built. Below
+     * that the order is what is left to do about a close -- the rating the
+     * lifter has already asked for, then a close that came back failed, then
+     * the plain finish. A state that draws nothing has no primary rather than
+     * a defaulted one.
+     */
+    private fun primaryOf(drawn: Set<RestControl>): RestControl? = listOf(
+        RestControl.START_NEXT_SET,
+        RestControl.RATE_SESSION,
+        RestControl.RETRY_FINISH,
+        RestControl.FINISH_SESSION,
+    ).firstOrNull { it in drawn }
 }

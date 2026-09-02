@@ -89,6 +89,7 @@ import com.macrophage.barspeed.model.PlateMath
 import com.macrophage.barspeed.model.RecordExitPolicy
 import com.macrophage.barspeed.model.RestControl
 import com.macrophage.barspeed.model.RestControlPolicy
+import com.macrophage.barspeed.model.RestControls
 import com.macrophage.barspeed.model.SensorAdvice
 import com.macrophage.barspeed.model.SensorAdvicePolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
@@ -2493,6 +2494,22 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
 }
 
 /**
+ * The rest screen's controls, asked once per control that draws one.
+ *
+ * One projection of [RecordState] onto [RestControlPolicy.restScreen]'s four
+ * inputs, here rather than at each call site, so two controls on one screen
+ * cannot ask the policy different questions about the same state. `nextSlot`
+ * is the slot START would run: null after the last planned set, non-null
+ * again the moment the lifter appends one (#188).
+ */
+private fun restControls(state: RecordState): RestControls = RestControlPolicy.restScreen(
+    close = state.sessionClose,
+    askedToFinish = state.askingSessionRpe,
+    hasNextSlot = state.nextSlot != null,
+    adHoc = state.adHoc,
+)
+
+/**
  * Begin the next set, when beginning one is a thing that may be done.
  *
  * Both rest layouts route through this rather than drawing the button twice,
@@ -2513,7 +2530,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
  */
 @Composable
 private fun StartNextSetButton(state: RecordState, viewModel: RecordViewModel) {
-    if (RestControl.START_NEXT_SET !in RestControlPolicy.controls(state.sessionClose)) return
+    if (RestControl.START_NEXT_SET !in restControls(state).controls) return
     Button(
         onClick = viewModel::startNextSet,
         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
@@ -2531,14 +2548,27 @@ private fun StartNextSetButton(state: RecordState, viewModel: RecordViewModel) {
  */
 @Composable
 private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel) {
-    // The two-argument form, because this is the block that draws the finish
-    // control and the rating panel takes its place. StartNextSetButton asks the
-    // one-argument form on purpose: whether another set may be started is the
-    // close's question and not the lifter's intent to finish.
-    val controls = RestControlPolicy.controls(state.sessionClose, state.askingSessionRpe)
+    // Both blocks now ask [restControls], which carries askedToFinish for
+    // everything: the rating panel still takes the finish control's place, and
+    // the START membership it returns is the same the one-argument form gave
+    // -- `asking to finish never changes whether a set may be started` pins
+    // that equality in :core:model, which is what made the move safe.
+    val screen = restControls(state)
+    val controls = screen.controls
     if (RestControl.FINISH_SESSION in controls) {
-        TextButton(onClick = viewModel::askSessionRpe, modifier = Modifier.fillMaxWidth()) {
-            Text("Finish session", color = BarColors.Sub)
+        if (screen.primary == RestControl.FINISH_SESSION) {
+            // Filled, and the only filled control on the screen, because
+            // there is no next set to start and finishing is what is left to
+            // do. Drawn from the same answer that withheld START, so the two
+            // cannot disagree about which one that is.
+            Button(
+                onClick = viewModel::askSessionRpe,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            ) { Text("FINISH SESSION", textAlign = TextAlign.Center) }
+        } else {
+            TextButton(onClick = viewModel::askSessionRpe, modifier = Modifier.fillMaxWidth()) {
+                Text("Finish session", color = BarColors.Sub)
+            }
         }
     }
     if (RestControl.RATE_SESSION in controls) {
