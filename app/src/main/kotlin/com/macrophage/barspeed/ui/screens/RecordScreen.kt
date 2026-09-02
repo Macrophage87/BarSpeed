@@ -124,6 +124,7 @@ import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
 import com.macrophage.barspeed.record.SetRating
 import com.macrophage.barspeed.record.previewSet
+import com.macrophage.barspeed.record.soleSilenceOver
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
 import com.macrophage.barspeed.ui.components.ExpandableNote
@@ -966,12 +967,14 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
  * because the bar-sensor card already on that screen covers the analysed
  * link being DOWN and does not cover a link that is up and silent.
  *
- * AND ONLY WHERE A ROLE IS ARMED, which is two paired bar sensors carrying
- * different labels. On a one-sensor set `SensorRoster.analysed` is null, so
- * `RecordState.armedDelivery` is empty and this composable returns without
- * drawing: a single connected-and-silent unit still gets the delivery dot and
- * nothing else. That remainder is untracked -- no issue is filed for it and
- * the owner files -- rather than widened here.
+ * IT DRAWS FOR ONE UNIT TOO, since #224. `RecordState.armedDelivery` is empty
+ * on a set that armed no role -- one paired bar sensor, or two the app cannot
+ * tell apart -- and until this issue that emptiness was the whole story: a
+ * single connected-and-silent unit got the delivery dot and nothing else, on
+ * the configuration this app is used in most. `RecordState.soleSilenceOver`
+ * answers the same question about the one link the app holds, with no role to
+ * key it by, and `ArmedSilencePolicy.message` is handed both. The two are
+ * mutually exclusive by construction, so the card still shows one situation.
  *
  * NOTHING IN THIS REPOSITORY CAN RUN THIS. `:app` has no test that composes
  * anything, and whether a real WT901 left switched off produces the state this
@@ -989,7 +992,11 @@ private fun ArmedSilenceCard(state: RecordState) {
             delay(1_000)
         }
     }
-    val message = ArmedSilencePolicy.message(state.armedDelivery(nowMs.longValue)) ?: return
+    val message =
+        ArmedSilencePolicy.message(
+            state.armedDelivery(nowMs.longValue),
+            state.soleSilenceOver(state.imuArmedAtMs, nowMs.longValue),
+        ) ?: return
     Spacer(Modifier.height(8.dp))
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {

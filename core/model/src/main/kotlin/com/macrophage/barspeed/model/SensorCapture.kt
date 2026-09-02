@@ -172,6 +172,39 @@ data class RecordedSensors(
      * ended is not recoverable afterwards from anything.
      */
     val silent: Map<SensorRole, ArmedDelivery> = emptyMap(),
+    /**
+     * What the app could see of the ONE armed link on a set whose stream
+     * carries no role, or null when that link delivered or there was none
+     * (#224).
+     *
+     * [silent]'s answer for the set that has no key to hang it off. A role
+     * exists only where two paired units carry two different labels, so on one
+     * bar sensor -- the ordinary configuration, and the owner's own -- [silent]
+     * is structurally empty and the fact that the unit delivered nothing was
+     * unsayable. It is the same reading of the same link by the same function,
+     * [ArmedSilencePolicy.soleSilence]; what differs is that there is no label
+     * to put in front of it, and inventing one would name a unit nobody
+     * labelled.
+     *
+     * NEVER SET BESIDE [silent], and that is enforced at
+     * [SensorCapturePolicy.withSoleSilence] rather than left as a convention: a
+     * set carrying both would state one fact in two vocabularies, and the two
+     * could then disagree about one link.
+     *
+     * Covers two shapes of set, both of which capture one unroled stream
+     * through the one link the app holds: one paired unit, and two the app
+     * cannot tell apart -- the second keeps its [shortfall] beside this, since
+     * that describes the ROSTER and this describes the LINK.
+     *
+     * Null on every ordinary set and absent from the encoded JSON when null,
+     * since the repository encodes with kotlinx's default
+     * `encodeDefaults = false`. So a one-sensor set whose unit delivered stores
+     * no declaration at all and its export is byte-identical to what this app
+     * has always written. Absence also reads correctly on every row an earlier
+     * build wrote: no build before this one could observe an unroled link's
+     * delivery, so a row that says nothing here was never asked.
+     */
+    val soleSilent: ArmedDelivery? = null,
 ) {
     /**
      * The role of the stream that is NOT analysed, or null when there is none.
@@ -507,6 +540,61 @@ object SensorCapturePolicy {
         }
         val shortfall = roster.shortfall ?: return null
         return RecordedSensors(count = DEFAULT_COUNT, shortfall = shortfall)
+    }
+
+    /**
+     * True when a set captures ONE stream carrying no role: one paired unit, or
+     * two the app cannot tell apart (#224).
+     *
+     * Stated once, here, because three places need the same answer -- the card
+     * before the set, the reading frozen at the end of it, and the declaration
+     * that reading lands in -- and three readings of one state is how they come
+     * to disagree about a set already running.
+     *
+     * It is `!isDual` AND something paired, and BOTH halves are load-bearing.
+     * Without the first, a dual set would get a roleless word beside its
+     * role-keyed one; without the second, a manual set with nothing paired
+     * would be reported as holding a silent link, which is absence rendered as
+     * a value -- "the app looked and saw nothing" is a different statement from
+     * "nothing was ever armed".
+     *
+     * PAIRED IS NOT CONNECTED, and this says only the weaker thing: the app has
+     * a unit to point a link at. Whether that link came up is exactly what
+     * [ArmedSilencePolicy.soleSilence] is asked next, and this function does not
+     * pretend to answer it.
+     */
+    fun capturesUnroledStream(roster: SensorRoster, pairedImuAddresses: List<String>): Boolean =
+        !roster.isDual && pairedImuAddresses.isNotEmpty()
+
+    /**
+     * The declaration a set ends with once it is known what its ONE unroled
+     * link was doing (#224).
+     *
+     * The ordinary one-sensor set still stores NOTHING: [soleSilent] is null
+     * there, so this returns whatever [recorded] produced -- null on a set with
+     * one bar sensor that delivered, which is what keeps such an export exactly
+     * what this app has always written.
+     *
+     * Where there IS a word, a set that declared nothing gains a declaration
+     * carrying only that word beside a [RecordedSensors.count] of one. The
+     * count is 1 and [RecordedSensors.expected] stays EMPTY, because the stream
+     * carries no role and inventing one would label a capture nobody labelled
+     * -- the rule the whole of #198 turns on and which this change does not
+     * touch. A set that met two paired units it could not tell apart keeps its
+     * [RecordedSensors.shortfall] and gains the word beside it: one describes
+     * the roster before the set, the other the link during it.
+     *
+     * A declaration that armed ROLES keeps the word out entirely and is
+     * returned untouched. That combination is unreachable through
+     * [ArmedSilencePolicy.soleSilence], which answers null for a dual roster,
+     * and it is refused here as well rather than trusted: the two facts would
+     * be one fact in two vocabularies, and the export contract says outright
+     * that they never appear together.
+     */
+    fun withSoleSilence(armed: RecordedSensors?, soleSilent: ArmedDelivery?): RecordedSensors? {
+        if (soleSilent == null) return armed
+        if (armed != null && armed.expected.isNotEmpty()) return armed
+        return (armed ?: RecordedSensors(count = DEFAULT_COUNT)).copy(soleSilent = soleSilent)
     }
 
     /**

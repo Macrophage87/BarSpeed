@@ -76,6 +76,21 @@
         {
           "load_kg": 110,
           "load_lb": 242.5,
+          "reps": 5,
+          "repsManual": true,
+          "plannedReps": 5,
+          "rest_s": 180,
+          "sensors": {
+            "count": 1,
+            "expected": [],
+            "present": [],
+            "soleSilent": "linkedSilent"
+          },
+          "summary": {}
+        },
+        {
+          "load_kg": 110,
+          "load_lb": 242.5,
           "reps": 1,
           "plannedReps": 5,
           "failed": true,

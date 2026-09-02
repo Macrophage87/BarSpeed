@@ -499,6 +499,7 @@ internal fun armedCaptureOf(
     analysedBuffer: List<ImuSample>,
     secondaryBuffer: List<ImuSample>,
     deliveryByRole: Map<SensorRole, ArmedDelivery> = emptyMap(),
+    soleDelivery: ArmedDelivery? = null,
 ): ArmedCapture {
     val byRole = buildMap {
         armed?.analysed?.let { put(it, analysedBuffer) }
@@ -520,8 +521,18 @@ internal fun armedCaptureOf(
     // that delivered nothing.
     val silent =
         ArmedSilencePolicy.silent(armed?.expected.orEmpty().filterNot { it in streamed }, deliveryByRole)
+    // And the same fact for the set whose single stream carries NO ROLE (#224),
+    // which is one paired unit -- the ordinary configuration -- or two the app
+    // cannot tell apart. `armed` is null on the first of those, so the
+    // declaration is CONSTRUCTED rather than copied, and only where there is a
+    // word: a one-sensor set whose unit delivered still stores nothing at all.
+    // `SensorCapturePolicy.withSoleSilence` decides both, in `:core:model`
+    // where a test runs on it.
     val sensors =
-        armed?.copy(analysed = decision.role, analysedFellBack = decision.fellBack, silent = silent)
+        SensorCapturePolicy.withSoleSilence(
+            armed?.copy(analysed = decision.role, analysedFellBack = decision.fellBack, silent = silent),
+            soleDelivery,
+        )
     return ArmedCapture(
         samples = decision.role?.let { byRole[it] } ?: analysedBuffer,
         sensors = sensors,
@@ -606,6 +617,7 @@ internal fun RecordState.captureAt(
     analysedBuffer.toList(),
     secondaryBuffer.toList(),
     armedDeliveryOver(armed?.analysed, secondaryRole, startedAtMs, endedAtMs),
+    soleSilenceOver(startedAtMs, endedAtMs),
 )
 
 /**
@@ -631,6 +643,40 @@ internal fun RecordState.armedDeliveryOver(
     sinceMs = sinceMs,
     nowMs = nowMs,
 )
+
+/**
+ * What the ONE armed link is doing on a set whose stream carries no role
+ * (#224), or null when this set arms roles, arms nothing, or that link is
+ * delivering.
+ *
+ * [armedDeliveryOver]'s sibling for the configuration this app is used in most,
+ * and an extension rather than a member of [RecordViewModel] for
+ * [armedCaptureOf]'s reason. The DECISION is
+ * [ArmedSilencePolicy.soleSilence]'s, in `:core:model` where a test runs on it,
+ * including which sets it applies to; what is left here is handing it the one
+ * link's state and frame instant, which are [imuState] and [imuFrameAtMs] --
+ * the analysed link, and the only client `AutoConnectManager` maintains when
+ * the roster names no second address.
+ *
+ * Called at the same two instants [armedDeliveryOver] is: [sinceMs] is when the
+ * link was armed while the card is drawing, and the set's own start once it has
+ * ended.
+ *
+ * IT READS THE LIVE ROSTER, so a lifter who pairs a second unit MID-SET moves
+ * this answer to null and the set stores no word. That is the conservative
+ * direction -- it declines to state something rather than stating it of a
+ * roster that no longer holds -- and it is the same direction
+ * [armedDeliveryOver] takes when a link is re-pointed.
+ */
+internal fun RecordState.soleSilenceOver(sinceMs: Long, nowMs: Long): ArmedDelivery? = ArmedSilencePolicy
+    .soleSilence(
+        roster = roster,
+        pairedImuAddresses = pairedImuAddresses,
+        state = imuState,
+        lastFrameAtMs = imuFrameAtMs,
+        armedAtMs = sinceMs,
+        nowMs = nowMs,
+    )
 
 /**
  * The two bar-sensor links as [armedDeliveryOf] needs them: what each one's
@@ -2447,7 +2493,10 @@ data class RecordState(
      * stale answer for as long as nothing else moved.
      *
      * Empty on every one-sensor set, because [SensorRoster.analysed] is null
-     * there and there is no armed role to report against.
+     * there and there is no armed role to report against. That is not the same
+     * as nothing being said about such a set: [soleSilenceOver] answers the
+     * same question about the one link, without a role (#224), and the card
+     * draws from both.
      */
     fun armedDelivery(nowMs: Long): Map<SensorRole, ArmedDelivery> = armedDeliveryOver(
         analysed = roster.analysed,

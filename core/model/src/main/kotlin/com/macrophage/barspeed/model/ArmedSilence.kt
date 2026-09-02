@@ -218,24 +218,78 @@ object ArmedSilencePolicy {
      * Returning a sentence for either would be the claim-stronger-than-its-
      * evidence class in its most direct form.
      *
-     * Each sentence names the ROLE, because that is the label on the unit the
-     * lifter has to go and touch, and the remedy, because #213's own reading
-     * of field-37 is that the three states have three different remedies and
-     * the lifter was offered none of them. It states what the app OBSERVED --
-     * no link, the wrong profile, no data down an open link -- and never why,
-     * which the app does not know.
+     * Each sentence names the unit the lifter has to go and touch, and the
+     * remedy, because #213's own reading of field-37 is that the three states
+     * have three different remedies and the lifter was offered none of them. It
+     * states what the app OBSERVED -- no link, the wrong profile, no data down
+     * an open link -- and never why, which the app does not know.
+     *
+     * A NULL [role] is the set whose single stream carries none (#224), and the
+     * subject becomes "the bar sensor". One template with one substitution
+     * rather than a second set of sentences beside it: three near-copies of
+     * three remedies is the duplicate-documentation class, and the copy that
+     * would drift is the one the single-sensor lifter reads. What must not
+     * appear there is a letter -- a lifter with one unit owns no A, and sending
+     * them to find one is the complaint the dissolved `ONE_SENSOR_PAIRED`
+     * shortfall used to make.
      */
-    fun advice(delivery: ArmedDelivery, role: SensorRole): String? = when (delivery) {
-        ArmedDelivery.DELIVERING, ArmedDelivery.TOO_SOON -> null
-        ArmedDelivery.NOT_LINKED ->
-            "Sensor ${role.name} is armed but not connected. It will record nothing this set unless you " +
-                "switch it on and bring it near the phone."
-        ArmedDelivery.LINK_WITHOUT_SENSOR ->
-            "Sensor ${role.name} answered but is not a bar sensor this app can read. It will record nothing " +
-                "this set -- check which unit is paired as ${role.name}."
-        ArmedDelivery.LINKED_SILENT ->
-            "Sensor ${role.name} is connected but has sent no data. It will record nothing this set unless " +
-                "you power-cycle it."
+    fun advice(delivery: ArmedDelivery, role: SensorRole?): String? {
+        val subject = role?.let { "Sensor ${it.name}" } ?: "The bar sensor"
+        val which = role?.let { " -- check which unit is paired as ${it.name}." } ?: " -- check which unit is paired."
+        return when (delivery) {
+            ArmedDelivery.DELIVERING, ArmedDelivery.TOO_SOON -> null
+            ArmedDelivery.NOT_LINKED ->
+                "$subject is armed but not connected. It will record nothing this set unless you " +
+                    "switch it on and bring it near the phone."
+            ArmedDelivery.LINK_WITHOUT_SENSOR ->
+                "$subject answered but is not a bar sensor this app can read. It will record nothing " +
+                    "this set$which"
+            ArmedDelivery.LINKED_SILENT ->
+                "$subject is connected but has sent no data. It will record nothing this set unless " +
+                    "you power-cycle it."
+        }
+    }
+
+    /**
+     * What the app can see of the ONE armed unit on a set whose stream carries
+     * no role, or null when there is no such unit or it is delivering (#224).
+     *
+     * THE HALF #213 COULD NOT REACH. Its answer is keyed by role, and a role
+     * exists only where two paired units carry two different labels -- so the
+     * owner's habitual configuration, one bar sensor, got no card, no stored
+     * fact, and an amber dot. This is the same judgement asked without a key:
+     * one link, one reading, and no label invented to hang it off.
+     *
+     * [SensorCapturePolicy.capturesUnroledStream] decides WHICH sets this
+     * applies to, stated there rather than restated here, and it covers two
+     * shapes: one paired unit, and two the app cannot tell apart. Both record a
+     * single stream through the single link the app holds, so both can say what
+     * that link was doing.
+     *
+     * The state, the frame instant and the grace floor are that ONE link's, and
+     * it is asked at both instants [deliveryOf] is -- when the screen draws, and
+     * when the set ends -- so the sentence the lifter read and the word the
+     * archive carries cannot disagree about one unit.
+     *
+     * NULL FOR [ArmedDelivery.DELIVERING], which is why the answer is nullable
+     * rather than total: a word for a working unit would put a declaration on
+     * every one-sensor row in the corpus and change what an ordinary export
+     * looks like for the sake of saying nothing was wrong.
+     * [ArmedDelivery.TOO_SOON] survives, the rule [silent] follows and for its
+     * reason -- it is reachable where this is stored, on a set shorter than
+     * [SILENT_AFTER_MS], and dropping it there would leave a silent unit with no
+     * word at all, which reads as a unit nobody looked at.
+     */
+    fun soleSilence(
+        roster: SensorRoster,
+        pairedImuAddresses: List<String>,
+        state: ConnectionState,
+        lastFrameAtMs: Long?,
+        armedAtMs: Long,
+        nowMs: Long,
+    ): ArmedDelivery? {
+        if (!SensorCapturePolicy.capturesUnroledStream(roster, pairedImuAddresses)) return null
+        return deliveryOf(state, lastFrameAtMs, armedAtMs, nowMs).takeIf { it != ArmedDelivery.DELIVERING }
     }
 
     /**
@@ -245,11 +299,20 @@ object ArmedSilencePolicy {
      * slot and because both units being silent is one situation for the lifter
      * rather than two. Ordered by [silent]'s order, which is the armed order,
      * so the sentence about role A comes first whenever A is armed first.
+     *
+     * [sole] is [soleSilence]'s answer for a set whose stream carries no role
+     * (#224), and it takes NO DEFAULT. The two shapes are mutually exclusive by
+     * construction -- a set that armed roles has no unroled link, and a set with
+     * an unroled link armed no roles -- but a defaulted null is exactly how the
+     * caller that forgot it draws a blank card on the configuration the owner
+     * trains most, which is the failure this issue is.
      */
-    fun message(silent: Map<SensorRole, ArmedDelivery>): String? = silent.entries
-        .mapNotNull { (role, delivery) -> advice(delivery, role) }
-        .takeIf { it.isNotEmpty() }
-        ?.joinToString(" ")
+    fun message(silent: Map<SensorRole, ArmedDelivery>, sole: ArmedDelivery?): String? {
+        val sentences =
+            silent.entries.mapNotNull { (role, delivery) -> advice(delivery, role) } +
+                listOfNotNull(sole?.let { advice(it, null) })
+        return sentences.takeIf { it.isNotEmpty() }?.joinToString(" ")
+    }
 
     /**
      * The wire spelling of a delivery state: lowerCamel, as

@@ -426,6 +426,39 @@ data class SessionExport(
          * already carried, `geometry.sensorOnStack` included, are
          * unchanged -- only the new provenance key is affected, and only
          * rows recorded from this version on carry it. (#223)
+         *
+         * 1.17 carries a FIFTH change, under the same number and for the
+         * reason the paragraphs above give: 1.17 is UNRELEASED, and the
+         * newest tag v0.1.48 ships 1.16, read by `git show
+         * v0.1.48:core/model/.../SessionExport.kt` rather than assumed. The
+         * change (#224): a set's `sensors` block may carry `soleSilent`, a
+         * single word for what the app could see of the ONE armed link on a
+         * set whose stream carries no role. The third change keyed its word by
+         * ROLE, and a role exists only where two paired units carry two
+         * different labels -- so a set armed with one bar sensor, which is the
+         * ordinary configuration, published nothing about a unit that was
+         * powered, paired and delivering nothing. Purely additive on the wire
+         * -- the key is absent unless that link was silent, and no existing key
+         * changed type or stopped being written -- but NOT neutral in what a
+         * document contains: a one-sensor set whose unit went silent now
+         * publishes a `sensors` block at all, with `count` 1 and both role
+         * lists EMPTY, where such a set published no block before. A reader
+         * that took an absent `sensors` for "recorded with one bar sensor" must
+         * now also read `count` 1 with an empty `expected` that way. Never
+         * written beside `silent`: the two are one fact in two vocabularies and
+         * the published descriptions say so. It does NOT apply retroactively,
+         * for 1.16's reason -- the reading is frozen into the set's row when the
+         * set is RECORDED. Two published descriptions are REWRITTEN rather than
+         * extended: `silent` stated this gap as a permanent absence and named
+         * this issue for it, and `shortfall` told a reader that `count` 1 with
+         * an empty `expected` and no shortfall is a row written before 1.15,
+         * which needs `soleSilent` as its discriminator to stay true. A third,
+         * `present`, is corrected: an empty list is a set whose stream carries
+         * no role as often as it is a set whose every armed unit went silent,
+         * which was already true of an unlabelled pair before this change. The
+         * raw archive's `meta.json` moves with it under the third change's
+         * rule: a set descriptor carries `sensorsSoleSilent`, written only when
+         * that link was silent.
          */
         const val SCHEMA_VERSION = "1.17"
 
@@ -960,13 +993,49 @@ data class SetSensorsExport(
      * [analysedFellBack] follows and deliberately not the one [expected] and
      * [present] follow: there is no informative empty here, and absence also
      * covers every set recorded by a build that could not observe delivery at
-     * all, which is every set before this version. Two further meanings this
+     * all, which is every set before this version. One further meaning this
      * version cannot remove: a set shorter than three seconds where an armed
-     * unit's last frame arrived during the preceding rest reads as
-     * delivering and is left out; and a set armed with one bar sensor arms
-     * no ROLE at all, so this whole map is absent there too (#224).
+     * unit's last frame arrived during the preceding rest reads as delivering
+     * and is left out.
+     *
+     * A set armed with one bar sensor arms no ROLE at all, so this map is
+     * absent there and [soleSilent] carries the same word without one (#224).
+     * The two are never both written.
      */
     val silent: Map<String, String> = emptyMap(),
+    /**
+     * What the app could see of the ONE armed link on a set whose stream
+     * carries no role, or absent when that link delivered (#224).
+     *
+     * [silent]'s answer for the set that has no key to hang it off. A role
+     * exists only where two paired units carry two different labels, so on the
+     * ordinary one-sensor set -- the configuration this app is used in most --
+     * [silent] is structurally empty, and until this key a whole session of
+     * sets recorded through a powered, paired, silent unit published nothing
+     * about it at all.
+     *
+     * A WORD RATHER THAN A ONE-ENTRY OBJECT, because there is no role to key
+     * it by and a key invented for the purpose -- "sole", "unroled" -- would put
+     * something that reads like a role into a document whose readers are told a
+     * role is the identity of a physical unit.
+     *
+     * Its vocabulary is [silent]'s, spelled as [ArmedSilencePolicy.wireOf]
+     * spells it, and every word is weaker than it looks for the reasons stated
+     * there. The published description in
+     * `docs/schemas/session-export.schema.json` is the copy a reader of the
+     * document has and states each limit in full.
+     *
+     * Never written beside [silent]. It appears on two shapes of set, both of
+     * which record one unroled stream through the one link the app holds: a set
+     * armed with a single paired unit, and one that met two paired units it
+     * could not tell apart -- the second keeps its [shortfall], which describes
+     * the ROSTER, beside this, which describes the LINK.
+     *
+     * Absent rather than empty on the ordinary set, [analysedFellBack]'s rule,
+     * and absent on every set recorded by a build that could not observe an
+     * unroled link's delivery at all.
+     */
+    val soleSilent: String? = null,
 )
 
 /**

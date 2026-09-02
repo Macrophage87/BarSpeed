@@ -435,6 +435,12 @@ class SessionExporter(
                 .map { (role, delivery) ->
                     SensorCapturePolicy.wireOf(role) to ArmedSilencePolicy.wireOf(delivery)
                 }.toMap(),
+            // The same reading for the set whose single stream carries no role
+            // (#224). Read off the row for `silent`'s reason, and never both --
+            // a row carrying roles carries the map, a row carrying none carries
+            // this. Absent on every set an earlier build wrote, which is
+            // correct: no build before this one could observe an unroled link.
+            soleSilent = declared.soleSilent?.let(ArmedSilencePolicy::wireOf),
         )
     }
 
@@ -824,6 +830,14 @@ class RawExporter(
                         "\"${SensorCapturePolicy.wireOf(role)}\": \"${ArmedSilencePolicy.wireOf(delivery)}\""
                     } + "}"
             }
+            // The same word for the set whose single stream carries no role
+            // (#224), and FLAT rather than an object because there is no role
+            // to key it by -- which is what makes it fit this document's flat
+            // convention where `sensorsSilent` could not. Written only when
+            // that one link was silent, so an ordinary one-sensor descriptor
+            // is byte-for-byte what it has always been: such a set stores no
+            // declaration at all and never reaches this branch.
+            str("sensorsSoleSilent", d.soleSilent?.let(ArmedSilencePolicy::wireOf))
         }
         num("startedAt_ms", record.startedAtMs)
         num("endedAt_ms", record.endedAtMs)
