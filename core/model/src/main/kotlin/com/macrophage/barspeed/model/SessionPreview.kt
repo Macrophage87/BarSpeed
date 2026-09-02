@@ -130,28 +130,47 @@ object SessionPreviewPolicy {
      * The one line that states what a set is: side, count or hold, load and
      * tempo, in that order, separated by " · ".
      *
-     * THE SAME FUNCTION THE RECORD FLOW'S OWN CARD USES. `SlotCard` built this
-     * string inline until #202 and now calls this, so the preview and the
-     * "Up next" card on the first set cannot phrase the same set two ways.
-     * Extracting it is what makes the vocabulary one vocabulary rather than a
-     * second rendering of the plan, and it moves the phrasing into a module
-     * where a test runs on it every push.
+     * ONE SOURCE FOR THE BASE TEXT OF A SET, WHICH IS THE WHOLE POINT.
+     * `SlotCard` in `:app` built this string inline until #202. It now draws
+     * [SetCardValues.of]'s pairs, so that the plan's figure can be STRUCK
+     * THROUGH and the figure the set will actually record put beside it
+     * (#204) -- and a plain string cannot be struck halfway, which is why the
+     * card needs pairs and this does not. So rather than keep two spellings
+     * of one vocabulary, this is [SetCardValues.of] rendered by
+     * [SetCardValues.plain]: the same words, the same order, the same
+     * separator, from the same code. An unrun set reads identically in the
+     * preview and on the card because it IS the same string.
      *
-     * "bodyweight" is said only for a TIMED set that carries no load, which is
-     * the rule the record card already shipped: a plank has nothing else to
+     * NOTHING IS EVER STRUCK HERE. Every `planned` argument below is passed
+     * the standing value beside it, so [SetCardValues.of] finds no deviation
+     * to mark; the preview draws sets before the session has started and no
+     * lifter has changed anything yet.
+     *
+     * The rules the line follows are unchanged and are [SetCardValues.of]'s
+     * now: the ADDED load on body-weight work said as an addition to the
+     * lifter and never as a weight on its own (#160), and "bodyweight" said
+     * only for a TIMED set that carries no load -- a plank has nothing else to
      * say, while a rep set the plan gave no load for has a load the lifter is
-     * about to state and naming it "bodyweight" would be an invention.
+     * about to state, and naming it "bodyweight" would be an invention.
      */
-    fun setLine(set: PreviewSet, unit: WeightUnit): String = listOfNotNull(
-        set.side?.replaceFirstChar { it.uppercase() },
-        set.reps?.let { "$it reps" },
-        set.durationS?.let { "${it}s " + if (set.kind == ExerciseKind.CARRY) "carry" else "hold" },
-        if (set.bodyweight) {
-            BodyweightLoadDisplay.label(set.loadKg, unit)
-        } else {
-            set.loadKg?.takeIf { it > 0 }?.let { unit.format(it) }
-                ?: "bodyweight".takeIf { set.durationS != null }
-        },
-        set.tempo?.let { "tempo $it" },
-    ).joinToString(" · ")
+    fun setLine(set: PreviewSet, unit: WeightUnit): String = SetCardValues.plain(
+        SetCardValues.of(
+            kind = set.kind,
+            bodyweight = set.bodyweight,
+            // The same rule PlannedSlot.isTimed carries in :app: a set is
+            // measured on the clock when it declares a duration.
+            timed = set.durationS != null,
+            unit = unit,
+            side = set.side,
+            plannedLoadKg = set.loadKg,
+            statedLoadKg = null,
+            declaredLoadKg = set.loadKg,
+            plannedReps = set.reps,
+            reps = set.reps,
+            plannedDurationS = set.durationS,
+            durationS = set.durationS,
+            plannedTempo = set.tempo,
+            tempo = set.tempo,
+        ),
+    )
 }

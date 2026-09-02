@@ -117,6 +117,41 @@ class SessionPreviewTest {
         assertTrue(SessionPreviewPolicy.setLine(set(), WeightUnit.LB).endsWith(" lb"))
     }
 
+    /**
+     * The preview and the record flow's "Up next" card say one set one way.
+     *
+     * Both sides are pinned against the SAME LITERAL rather than against each
+     * other, because since #202's rebase past #204 [SessionPreviewPolicy.setLine]
+     * IS [SetCardValues.of] rendered plain -- an equality assertion between
+     * them could not fail, and a check that cannot fail reads as coverage. The
+     * card here carries a deviation the preview's set does not: the card
+     * strikes the plan's 90 and states 100, and its base text is the preview's
+     * line for the same standing set.
+     */
+    @Test
+    fun `a set reads the same in the preview as in the card's standing figures`() {
+        val previewLine = SessionPreviewPolicy.setLine(set(loadKg = 100.0, tempo = "3010"), WeightUnit.KG)
+        val cardValues =
+            SetCardValues.of(
+                kind = ExerciseKind.DYNAMIC,
+                bodyweight = false,
+                timed = false,
+                unit = WeightUnit.KG,
+                side = null,
+                plannedLoadKg = 90.0,
+                statedLoadKg = 100.0,
+                declaredLoadKg = 90.0,
+                plannedReps = 5,
+                reps = 5,
+                plannedDurationS = null,
+                durationS = null,
+                plannedTempo = "3010",
+                tempo = "3010",
+            )
+        assertEquals("5 reps · 100 kg · tempo 3010", previewLine)
+        assertEquals("5 reps · 100 kg · tempo 3010", SetCardValues.plain(cardValues))
+    }
+
     @Test
     fun `an empty queue previews as an empty session`() {
         val preview = SessionPreviewPolicy.of(emptyList())

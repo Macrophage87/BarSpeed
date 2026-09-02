@@ -56,6 +56,32 @@ class SetCardValuesTest {
     /** The load value: the one with no word around it. Every case below leaves [side] null. */
     private fun load(list: List<SetCardValue>) = list.single { it.prefix.isEmpty() && it.suffix.isEmpty() }
 
+    /**
+     * [SetCardValues.plain] is the base text: the words once, the standing
+     * figure, nothing struck. It is what the session preview draws (#202),
+     * and pinning it against a literal rather than against
+     * [SessionPreviewPolicy.setLine] is deliberate -- setLine is this function
+     * now, so an equality between the two could not fail.
+     */
+    @Test
+    fun `plain draws the words once around each standing figure`() {
+        assertEquals("5 reps · 90 kg · tempo 4010", SetCardValues.plain(values()))
+    }
+
+    /**
+     * THE COMPOSITION RULE, and the half of it that can go wrong. A plain
+     * string cannot strike a figure through, so the plan's displaced figure is
+     * DROPPED rather than rendered: printing both would tell the lifter to
+     * lift 90 and 100. The card gets the pair and strikes it; the preview,
+     * which draws sets nobody has deviated from, gets this.
+     */
+    @Test
+    fun `plain drops the plan's displaced figure and states only what will be recorded`() {
+        val struck = values(statedLoadKg = 100.0)
+        assertEquals("90 kg", load(struck).planned)
+        assertEquals("5 reps · 100 kg · tempo 4010", SetCardValues.plain(struck))
+    }
+
     @Test
     fun `an untouched set draws the plan's figures and strikes nothing`() {
         assertEquals(

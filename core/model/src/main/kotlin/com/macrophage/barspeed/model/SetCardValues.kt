@@ -123,6 +123,31 @@ object SetCardValues {
     }
 
     /**
+     * [of]'s values as one plain string, with nothing struck.
+     *
+     * The BASE TEXT of a set: the words and the standing figures, in the order
+     * [of] returns them, separated by " · ". A [SetCardValue.planned] figure is
+     * DROPPED here rather than rendered -- a plain string cannot strike a
+     * figure through, and a set that showed both figures unmarked would be
+     * telling the lifter to lift two loads.
+     *
+     * This is what the session preview reads (#202). The preview draws sets no
+     * lifter has deviated from yet, so it needs the base and never the strike,
+     * and routing it through this function is what stops the preview and the
+     * record flow's "Up next" card phrasing one set two ways.
+     * [SessionPreviewPolicy.setLine] is its one caller.
+     *
+     * `RecordScreen.struckLine` in `:app` lays the same words out into an
+     * `AnnotatedString`, adding the struck half where [SetCardValue.planned] is
+     * present. The two agree on the plain case BY INSPECTION AND NOT BY ANY
+     * TEST: nothing on the CI path can build an `AnnotatedString`. Change one
+     * and read the other.
+     */
+    fun plain(values: List<SetCardValue>): String = values.joinToString(" · ") { value ->
+        listOf(value.prefix, value.stated, value.suffix).filter { it.isNotEmpty() }.joinToString(" ")
+    }
+
+    /**
      * The prep pair, or null when the prep is the plan's.
      *
      * Prep is the one deviation with no figure on the card to strike: the
