@@ -337,9 +337,20 @@ object SetLoadPolicy {
      * THE CAPTION SAYS WHEN THIS IS TRUE. A control that quietly changes a
      * second thing is worse than one that changes nothing, so the answer here
      * is what [correctionCaption] renders.
+     *
+     * [sameExerciseBlock] IS ACCEPTED HERE AND NOT YET READ. The bound it
+     * carries is the fix; this commit only puts it in the path, so the pin
+     * `the carry does not follow across an exercise change` is red by
+     * construction and the commit that reads the parameter is what makes it
+     * green.
      */
-    fun carryFollowsCorrection(standingAddedKg: Double?, recordedAddedKg: Double, unit: WeightUnit): Boolean =
-        standingAddedKg != null && unit.inputValue(standingAddedKg) == unit.inputValue(recordedAddedKg)
+    @Suppress("UnusedParameter")
+    fun carryFollowsCorrection(
+        standingAddedKg: Double?,
+        recordedAddedKg: Double,
+        unit: WeightUnit,
+        sameExerciseBlock: Boolean,
+    ): Boolean = standingAddedKg != null && unit.inputValue(standingAddedKg) == unit.inputValue(recordedAddedKg)
 
     /**
      * What the correction says it changes, drawn under the row.
