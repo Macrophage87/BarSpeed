@@ -2260,11 +2260,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private val imuBuffer = mutableListOf<ImuSample>()
 
     /**
-     * The capture from the accelerometer that is NOT analysed (#156).
+     * The capture from the accelerometer that is not the ARMED one (#156).
      *
-     * [imuBuffer] keeps its meaning -- the analysed stream -- so nothing that
-     * already reads it changes. This one is filled by a collector that reaches
-     * the buffer and the journal and nothing else.
+     * [imuBuffer] is the ARMED unit's capture -- the stream of whichever
+     * address the preference names -- and since #207 that is not always the
+     * stream the figures come from: where the armed unit produced nothing and
+     * this one did, [armedCaptureOf] points the analysis here and
+     * [RecordedSensors.analysedFellBack] records the move. This one is filled
+     * by a collector that reaches the buffer and the journal and nothing else.
      */
     private val imuBufferB = mutableListOf<ImuSample>()
     private val hrBuffer = mutableListOf<HrSample>()

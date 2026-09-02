@@ -678,11 +678,13 @@ data class SetExport(
      * a set recorded before the app could capture two -- and deliberately does
      * not distinguish them, exactly as [geometry]'s absence does not.
      *
-     * DECLARED throughout, never derived from what happens to be in the
-     * archive. Nothing here counts files, and a reader must not either: a set
-     * that armed two and captured one is a different fact from a set that
-     * armed one, and only [SetSensorsExport.count] against
-     * [SetSensorsExport.present] can tell them apart.
+     * Nothing here counts FILES, and a reader must not either: a set that
+     * armed two and captured one is a different fact from a set that armed
+     * one, and only [SetSensorsExport.count] against
+     * [SetSensorsExport.present] can tell them apart. What is armed is
+     * declared; [SetSensorsExport.present], [SetSensorsExport.analysedRole]
+     * and [SetSensorsExport.analysedFellBack] are observations of which units
+     * streamed, taken when the set was recorded (#207).
      */
     val sensors: SetSensorsExport? = null,
     /** Always-included summary across reps. */
@@ -693,10 +695,12 @@ data class SetExport(
  * A set's accelerometer configuration: what was armed, what arrived, which of
  * it the numbers came from, and what stopped a second stream.
  *
- * Five statements rather than one because each answers a question the others
- * cannot, and every one of them is a declaration made when the set began --
- * except [present], which is the one observation here and is stated rather
- * than left to be inferred from filenames this document does not contain.
+ * Six statements rather than one because each answers a question the others
+ * cannot. [count], [expected] and [shortfall] are declarations made when the
+ * set began; [present], [analysedRole] and [analysedFellBack] are
+ * observations, decided at the end of the set from which units actually
+ * streamed (#207). [present] is stated rather than left to be inferred from
+ * filenames this document does not contain.
  *
  * No per-stream sample counts or rates. Those live in the raw archive's
  * `meta.json`, where the exporter already holds the inflated text; putting
@@ -760,7 +764,8 @@ data class SetSensorsExport(
      * It can still name a role absent from [present] in two situations, and
      * neither has figures drawn from the surviving stream: a set where NOTHING
      * streamed, whose summary is empty because there was no capture; and a set
-     * recorded by a build older than 1.16, which kept the armed role whatever
+     * recorded by a build that predates this behaviour, whatever the
+     * document's `schemaVersion` says, which kept the armed role whatever
      * happened. Null when no role is in play.
      */
     val analysedRole: String? = null,
@@ -778,8 +783,11 @@ data class SetSensorsExport(
      * `encodeDefaults = false`, and unlike [expected] and [present] this key
      * has an unremarkable normal that omission reads correctly, the same rule
      * [SetExport.failed] and [SetExport.warmup] follow. Absent is also what
-     * every document written before this version carries, and it means the
-     * same thing there -- no build before it could move the analysed role.
+     * every set recorded by a build that predates this key carries, whatever
+     * the document's `schemaVersion` says: the flag is frozen into the set's
+     * row when the set is RECORDED and only copied out at export. It means
+     * the same thing there -- no build before it could move the analysed
+     * role.
      */
     val analysedFellBack: Boolean = false,
     /**

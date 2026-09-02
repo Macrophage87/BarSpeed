@@ -344,10 +344,13 @@ private fun InterruptedSetNotice(
  * remembered. With neither sensor connected there is no count to give and the
  * card says so in words rather than printing a zero.
  *
- * BOTH recovered streams are counted, issue #156. The analysed unit is the one
+ * BOTH recovered streams are counted, issue #156. The armed unit is the one
  * that can be flat while the second one captured the whole set, and this card
  * is the only thing standing between that capture and the DISCARD button
  * beside it.
+ *
+ * ARMED, not analysed: an orphan is zipped or discarded and never analysed,
+ * and since #207 the two words no longer name the same stream.
  */
 private fun interruptedDetail(orphan: OrphanedSet, clock: DateTimeFormatter): String {
     val reps = orphan.repMarks.size
@@ -366,8 +369,8 @@ private fun interruptedDetail(orphan: OrphanedSet, clock: DateTimeFormatter): St
     val parts =
         listOfNotNull(
             when {
-                orphan.header.imuConnected -> "${orphan.imuSamples.size} analysed samples$second"
-                second.isNotEmpty() -> "no analysed sensor connected$second"
+                orphan.header.imuConnected -> "${orphan.imuSamples.size} from the armed sensor$second"
+                second.isNotEmpty() -> "no armed sensor connected$second"
                 else -> "no sensor connected"
             },
             lastMs?.let {

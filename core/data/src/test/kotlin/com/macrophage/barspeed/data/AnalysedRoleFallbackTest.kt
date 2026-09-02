@@ -189,8 +189,9 @@ class AnalysedRoleFallbackTest {
      * What the record path does with a set's samples, mirrored rather than
      * executed.
      *
-     * `RecordViewModel.runSetWrite` lives in `:app`, which no test on the CI
-     * path can reach, so this reproduces its two decisions: analyse only from
+     * `RecordViewModel.runSetWrite` lives in `:app`, where no test on the CI
+     * path reaches `RecordViewModel`, so this reproduces its two decisions:
+     * analyse only from
      * eight samples up, and store a placeholder analysis otherwise. Set 02 was
      * counted by hand -- `repsManual` true -- so the placeholder it would have
      * stored is the manual one.
@@ -285,13 +286,18 @@ class AnalysedRoleFallbackTest {
     /**
      * The record path's own composition, mirrored rather than executed.
      *
-     * `armedCaptureOf` in `RecordViewModel.kt` builds exactly this: the armed
-     * roles keyed to their buffers, the streamed roles by
+     * `armedCaptureOf` in `RecordViewModel.kt` builds the same four decisions,
+     * in the same order, from a copy of this code rather than from this code:
+     * the armed roles keyed to their buffers, the streamed roles by
      * [SensorCapturePolicy.present], the decision by
      * [SensorCapturePolicy.analysedStream], and the partner derived from the
-     * corrected declaration. It lives in `:app`, which no test on the CI path
-     * can reach, so what is verified here is the composition and not that
-     * `:app` performs it -- that half is compile-gated only.
+     * corrected declaration. It lives in `:app`, where no test on the CI path
+     * reaches `RecordViewModel`, so what is verified here is the composition
+     * and not that `:app` performs it -- that half is compile- and
+     * lint-gated only. Nothing detects drift between the two: the mirror
+     * already differs where `armedCaptureOf` falls back to the analysed
+     * buffer on a null role and this returns an empty list, which no dual
+     * declaration can reach.
      */
     private fun asRecorded(byRole: Map<SensorRole, List<ImuSample>>): CompletedSet {
         val streamed = SensorCapturePolicy.present(armedRoles, byRole.filterValues { it.isNotEmpty() }.keys)

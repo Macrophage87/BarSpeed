@@ -111,7 +111,11 @@ class SensorCapturePolicyTest {
 
         assertTrue(roster.isDual)
         assertEquals(listOf(SensorRole.B, SensorRole.A), roster.expected, "the analysed role leads the list")
-        assertEquals(SensorRole.B, roster.analysed, "the preferred address decides which stream is analysed")
+        assertEquals(
+            SensorRole.B,
+            roster.analysed,
+            "the preferred address decides which role the set arms for analysis",
+        )
         assertEquals(SensorRole.A, roster.secondary)
         assertEquals(a, roster.secondaryAddress)
         assertNull(roster.shortfall)

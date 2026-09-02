@@ -100,7 +100,11 @@ object DevicePairingPolicy {
      * The rule this replaced made every newly paired device its role's
      * preferred one, and preferred is not a display flag: `AutoConnectManager`
      * maintains the analysed link to it and `SensorCapturePolicy.roster` reads
-     * it to decide which role's stream the DSP is pointed at. So pairing a
+     * it to decide which role's stream the DSP is pointed at: since #207 that
+     * is the ARMING decision, and `SensorCapturePolicy.analysedStream` can
+     * move the analysis onto whichever role streamed, though the label the
+     * figures are attributed to is still per-address and still moves with the
+     * preference. So pairing a
      * second bar sensor re-pointed a data path as a side effect of a UI act
      * performed for an unrelated reason, and because A/B labels are
      * per-address it silently changed which label the analysed figures came

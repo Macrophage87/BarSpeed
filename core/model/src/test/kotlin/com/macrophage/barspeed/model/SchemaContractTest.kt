@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.model
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
@@ -11,6 +12,19 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+
+/**
+ * The wire names a serializable class declares, read off the class itself.
+ *
+ * A key-set assertion typed out beside the class it names cannot detect the
+ * thing its own failure message claims to: on this branch, #207 added the
+ * Kotlin `analysedFellBack` property with no schema key and CI run
+ * 33590966216 was green. Top-level rather than a method so that reading the
+ * class does not push [SchemaContractTest] over detekt's LargeClass limit,
+ * which it sits on.
+ */
+private fun serialKeysOf(serializer: KSerializer<*>): Set<String> =
+    serializer.descriptor.let { d -> (0 until d.elementsCount).map(d::getElementName).toSet() }
 
 /**
  * The published JSON Schemas are the contract a plan-generating LLM works
@@ -513,14 +527,14 @@ class SchemaContractTest {
             "the sensors block accepts undeclared keys, so a typo would validate",
         )
         assertEquals(
-            setOf("count", "expected", "present", "analysedRole", "analysedFellBack", "shortfall"),
+            serialKeysOf(SetSensorsExport.serializer()),
             sensors["properties"]!!.jsonObject.keys,
             "SetSensorsExport and the published sensors block disagree on keys",
         )
         assertEquals(
             listOf("count", "expected", "present"),
             sensors["required"]!!.jsonArray.map { it.jsonPrimitive.content },
-            "the counts and both role lists must be required; only the analysed role may be absent",
+            "the count and both role lists are required; analysedRole, analysedFellBack and shortfall are not",
         )
         sensors["properties"]!!.jsonObject.forEach { (key, value) ->
             assertTrue(
