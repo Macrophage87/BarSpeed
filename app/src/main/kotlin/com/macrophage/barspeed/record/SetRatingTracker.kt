@@ -4,7 +4,10 @@ import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.model.TimedSetEndPolicy
 
 /**
- * Effort-rating bookkeeping for the set that just finished.
+ * Rest-screen bookkeeping for the set that just finished: the two failure
+ * facts, and every correction the rest screen can write onto its row --
+ * reps, held seconds, why it ended, the warm-up mark and, since #205, the
+ * load.
  *
  * Two independent facts decide whether a set counts as failed: what the lifter
  * tapped ("that was a grinder", "I dropped it") and the objective verdict that
