@@ -122,6 +122,26 @@ class SetRatingTracker(private val repository: SessionRepository) {
     }
 
     /**
+     * Correct the load the set was recorded at, from the rest screen (#205).
+     *
+     * [loadKg] is the body-weight-inclusive total for the row, already
+     * computed; this only writes it. Returns null when there is no recorded
+     * set to correct, the same as every other method here.
+     *
+     * NEITHER FAILURE FACT IS READ OR WRITTEN, unlike [correctReps] and
+     * [correctDuration] which both re-derive the shortfall. The shortfall is a
+     * verdict on the rep count or the seconds against their targets, and no
+     * plan target anywhere is a load: a set done at the wrong weight is not
+     * thereby a set that fell short. Re-deriving here would either be a no-op
+     * or would quietly re-OR a verdict this correction says nothing about.
+     */
+    suspend fun correctLoad(loadKg: Double): Boolean? {
+        val id = setId ?: return null
+        repository.overrideLoad(id, loadKg)
+        return true
+    }
+
+    /**
      * Correct the seconds a hold or a carry is recorded at, from the rest
      * screen (#168).
      *

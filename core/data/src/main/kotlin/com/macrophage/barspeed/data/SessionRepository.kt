@@ -525,12 +525,8 @@ class SessionRepository(
      * now on the row, but nothing in the app recomputes them today. Rescaling
      * them here would put the bar-power rule in a second place; re-running the
      * DSP is a change of its own. Named rather than papered over.
-     *
-     * DELIBERATELY WRONG (#205 c2b). It writes the rep count instead, so that
-     * the pin in SessionRepositoryRecordSetTest is shown failing before the
-     * delegation lands. Corrected in the next commit.
      */
-    suspend fun overrideLoad(setId: Long, loadKg: Double) = sessionDao.overrideReps(setId, loadKg.toInt())
+    suspend fun overrideLoad(setId: Long, loadKg: Double) = sessionDao.overrideLoad(setId, loadKg)
 
     /**
      * Lifter correction of a hold or carry's recorded seconds, from the rest
