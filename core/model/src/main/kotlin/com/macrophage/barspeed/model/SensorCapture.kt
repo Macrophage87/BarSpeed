@@ -200,9 +200,16 @@ data class RecordedSensors(
      * since the repository encodes with kotlinx's default
      * `encodeDefaults = false`. So a one-sensor set whose unit delivered stores
      * no declaration at all and its export is byte-identical to what this app
-     * has always written. Absence also reads correctly on every row an earlier
-     * build wrote: no build before this one could observe an unroled link's
-     * delivery, so a row that says nothing here was never asked.
+     * has always written.
+     *
+     * NULL MEANS THE SET CAPTURED SAMPLES from that one link -- or, on a set
+     * shorter than [ArmedSilencePolicy.SILENT_AFTER_MS], that its last frame
+     * arrived during the preceding rest and read as delivering -- or that the
+     * row was written by a build that could not observe an unroled link at
+     * all, so a row that says nothing here was never asked. A link that fed
+     * part of a set and then went silent is null here too: the caller refuses
+     * the word wherever the set's buffer is not empty, which is why
+     * [SensorCapturePolicy.withSoleSilence] cannot check it and says so.
      */
     val soleSilent: ArmedDelivery? = null,
 ) {

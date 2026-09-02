@@ -1031,9 +1031,14 @@ data class SetSensorsExport(
      * could not tell apart -- the second keeps its [shortfall], which describes
      * the ROSTER, beside this, which describes the LINK.
      *
-     * Absent rather than empty on the ordinary set, [analysedFellBack]'s rule,
-     * and absent on every set recorded by a build that could not observe an
-     * unroled link's delivery at all.
+     * ABSENT MEANS THE SET CAPTURED SAMPLES from that one link -- or, on a set
+     * shorter than [ArmedSilencePolicy.SILENT_AFTER_MS], that its last frame
+     * arrived during the preceding rest and read as delivering -- or that the
+     * document was written by a build that could not observe an unroled link
+     * at all. A link that fed part of a set and then went silent publishes
+     * nothing here either: the word is refused wherever the set's buffer is
+     * not empty. Absent rather than empty on the ordinary set,
+     * [analysedFellBack]'s rule.
      */
     val soleSilent: String? = null,
 )

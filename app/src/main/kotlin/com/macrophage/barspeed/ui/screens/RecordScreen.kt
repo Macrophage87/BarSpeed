@@ -957,7 +957,12 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
  * else would drive a recomposition, and it says NOTHING for the first three
  * seconds after a link is armed: `ArmedSilencePolicy.SILENT_AFTER_MS` is the
  * grace, and accusing a link two seconds into a connect is how a warning
- * becomes something the lifter learns to ignore.
+ * becomes something the lifter learns to ignore. That grace is real only for
+ * the role-keyed reading. The one-unit reading (#224) is handed
+ * `RecordState.imuArmedAtMs`, which `AutoConnectManager` writes once at
+ * construction, so on a unit paired later in the session the floor is already
+ * spent and the card can accuse it while it is still connecting --
+ * `RecordState.soleSilenceOver` states it.
  *
  * Drawn on READY and on RESTING. READY is drawn once per session --
  * `startNextSet` writes READY and calls `beginSet` in the same frame -- so a
