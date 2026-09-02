@@ -2,7 +2,9 @@ package com.macrophage.barspeed.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +43,7 @@ import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescueCompleteness
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.model.ByteSize
+import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.PermissionBanner
@@ -84,8 +88,8 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 8.dp),
                     ) {
-                        SensorDot("IMU", imuState)
-                        SensorDot("HRM", hrmState)
+                        HomeSensorDot("IMU", imuState) { navController.navigate("devices") }
+                        HomeSensorDot("HRM", hrmState) { navController.navigate("devices") }
                         TextButton(onClick = viewModel::toggleWeightUnit) {
                             Text("${state.weightUnit.suffix} ⇄", color = BarColors.Sub)
                         }
@@ -145,6 +149,37 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                 }
             }
         }
+    }
+}
+
+/**
+ * [SensorDot] with a click, issue #200. Tapping either sensor's status dot
+ * opens the Devices screen -- both IMU and HRM go to the same place, since
+ * Devices is one screen showing both kinds and there is no per-role route to
+ * pick.
+ *
+ * The click lives HERE, at the Home call site, rather than inside [SensorDot]
+ * itself. [SensorDot] is drawn five times in this tree: twice here and three
+ * times in `RecordScreen.kt`, mid-set, where navigating away to Devices would
+ * abandon a set in progress -- adding the click to the shared component would
+ * make it wrong at three of its five call sites. Not every site wants it, so
+ * only the site that does carries it.
+ *
+ * `sizeIn(minWidth/minHeight = 48.dp)` gives the tap target this app's stated
+ * 48dp floor (see `rpeOptions`' own KDoc in RecordScreen.kt for where that
+ * floor comes from) without drawing the dot any bigger -- the touch target
+ * and the visual size are kept deliberately separate, by wrapping rather than
+ * resizing. `Modifier.clickable`'s default ripple is the only visual change:
+ * no louder affordance, since these dots are a status indicator and #181's
+ * whole point was not letting this screen nag.
+ */
+@Composable
+private fun HomeSensorDot(label: String, state: ConnectionState, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        SensorDot(label, state)
     }
 }
 
