@@ -16,9 +16,24 @@ import kotlin.test.assertEquals
  * ## The corpus is twenty-one captures, and was fifteen
  *
  * Six captures committed since issue 86 landed are included here. Every figure
- * in this file is over all twenty-one, and figures quoted against the earlier
+ * in this file is over those twenty-one, and figures quoted against the earlier
  * fifteen -- seven reps removed, 63 in family, 213 batch runs -- are that
  * corpus and not this one.
+ *
+ * A TWENTY-SECOND capture is committed and is deliberately NOT in this file's
+ * list: field-legpress-single-2011-8rep-s36-set07, landed for issue #93. It is
+ * excluded so this file's series stays comparable with the figures already
+ * published against the twenty-one. Its live TOTAL matches the count
+ * performed, eight against eight, but by cancellation rather than by
+ * resolution: three of its eight cued reps produce no counted rep, and three
+ * of its eight counted reps land in no cued window, two of those displacing
+ * 1.056 m and 1.466 m -- all pinned in [CuedRepCoverageTest]. Folding its
+ * totals in would move every figure here without being a clean result for
+ * issue 94 or 86 either way, and is a task of its own; the corpus-wide
+ * phrasing in this file means these twenty-one, not every file on the
+ * classpath.
+ * `CuedRepCoverageTest.outsideCorpusTotals` names the same exclusion and is
+ * what keeps its reconciliation arithmetic true.
  *
  * ## The constant has never been calibrated anywhere
  *
