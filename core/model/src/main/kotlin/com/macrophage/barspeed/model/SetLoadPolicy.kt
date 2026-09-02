@@ -321,17 +321,17 @@ object SetLoadPolicy {
      *
      * A null on either id means there is nothing to compare and nothing
      * carries.
-     *
-     * THIS COMMIT ANSWERS THE PLANNED CASE ONLY. The ad-hoc branch is
-     * deliberately absent so the two pins naming it are red here.
      */
-    @Suppress("UnusedParameter")
     fun correctionCarryBlock(
         hasPlannedNext: Boolean,
         plannedSameBlock: Boolean,
         lastExerciseId: String?,
         comingExerciseId: String?,
-    ): Boolean = plannedSameBlock
+    ): Boolean = if (hasPlannedNext) {
+        plannedSameBlock
+    } else {
+        lastExerciseId != null && lastExerciseId == comingExerciseId
+    }
 
     /**
      * WHAT THE CORRECTION DOES TO THE CARRY, which #205 asks be decided rather
