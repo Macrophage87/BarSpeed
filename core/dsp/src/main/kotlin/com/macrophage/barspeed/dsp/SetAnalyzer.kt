@@ -186,10 +186,10 @@ object SetAnalyzer {
         //
         // Spans arrive in drive order, so this removes a suffix and no
         // retained rep is renumbered. The pause figures below were measured by
-        // the segmenter against every span it found, so a kept rep's end pause
-        // still ends where the excluded movement began -- which is what
-        // happened: the pause did end when the sensor moved again, whatever
-        // that movement was.
+        // the segmenter against every span it found, so a kept rep's
+        // RepSpan.toNextMovementS still ends where the excluded movement began
+        // -- which is what happened: the stillness did end when the sensor
+        // moved again, whatever that movement was.
         val within = spans.filterIndexed { idx, _ -> setEnd.startedWithinSet(driveStartMs[idx]) }
         val reps = within.mapIndexed { idx, span -> repMetrics(idx, span, series, direction, loadKg, config) }
         val velocityLoss = velocityLossPct(reps)
@@ -305,8 +305,8 @@ object SetAnalyzer {
         val meanConPower = conPower?.average()
         // The pause after the DOWN stroke is the bottom pause, whichever phase
         // that stroke happens to be.
-        val bottomPause = if (direction.startsAtTop) span.midPauseS else span.endPauseS
-        val topPause = if (direction.startsAtTop) span.endPauseS else span.midPauseS
+        val bottomPause = if (direction.startsAtTop) span.turnaroundPauseS else span.toNextMovementS
+        val topPause = if (direction.startsAtTop) span.toNextMovementS else span.turnaroundPauseS
         return RepAnalysis(
             index = index,
             eccS = eccDur?.let { round2(it) },

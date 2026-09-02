@@ -56,11 +56,11 @@ import kotlin.test.assertEquals
  *
  * ## What this file pins TODAY (pre-fix characterization)
  *
- * `bottomPauseS` here is `RepSpan.endPauseS`: the interval from the end of the
+ * `bottomPauseS` here is `RepSpan.toNextMovementS`: the interval from the end of the
  * rep's LAST detected phase to the start of the next detected movement, or to
  * the end of the stream on the last rep. It is outside the rep's own phase
  * boundaries, so it is not a pause of this rep at all. `topPauseS` here is
- * `RepSpan.midPauseS`, the turnaround, which IS inside them -- except on a rep
+ * `RepSpan.turnaroundPauseS`, the turnaround, which IS inside them -- except on a rep
  * counted from the drive alone, where the segmenter has no second phase and
  * writes a literal 0.0.
  */
