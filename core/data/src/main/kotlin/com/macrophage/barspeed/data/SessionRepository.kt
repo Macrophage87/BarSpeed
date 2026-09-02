@@ -679,12 +679,15 @@ class SessionRepository(
      * Seeded + user-defined exercises, id → definition. Unknown ids infer a kind from the name.
      *
      * `sensorOnStack` comes from [ExerciseDef.ridesStack] on both non-seed
-     * branches (#223). This line changes nothing observable at this SHA --
-     * [SetGeometryPolicy.resolve]'s `stackMount` step re-derives the same
-     * answer from the id directly, whatever this method already returned.
-     * It is here so the two paths cannot disagree if a future caller uses
-     * this definition without resolve (round 2 finding 7). But this is the
-     * PLAN path only: its only caller is
+     * branches (#223). [SetGeometryPolicy.resolve]'s `stackMount` step ORs
+     * what this method returned with `ExerciseDef.ridesStack` of the same
+     * id, and both non-seed branches here already set it to exactly that,
+     * so the OR cannot change the answer at this SHA. It is not ignored: a
+     * `true` from here would survive an id [ExerciseDef.STACK_MOUNTED_IDS]
+     * does not cover, which is why the line is here rather than left to
+     * `resolve` alone -- so a future caller of this definition without
+     * going through `resolve` cannot disagree with the plan path (round 2
+     * finding 7). But this is the PLAN path only: its only caller is
      * `PlanQueue.kt`'s `flattenPlan`. A set started from the exercise
      * picker with no plan at all does not reach this method --
      * `RecordState.currentExercise` resolves it instead, falling back to
