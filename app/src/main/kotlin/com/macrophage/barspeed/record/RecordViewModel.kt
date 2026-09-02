@@ -552,7 +552,9 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
  * platform call it makes is visible in isolation and so that the argument list
  * does not sit inside [RecordViewModel]. Keeping state transitions out of that
  * class is this file's convention against detekt's `LargeClass`; #208 split the
- * correction seam out of it and left 26 lines of growth under the default 600.
+ * correction seam out of it and left 24 lines of growth under the default
+ * 600 -- detekt measures the class at 576, by bisecting `LargeClass.threshold`
+ * on `:app:detekt` until the finding appears.
  *
  * [ZoneId.systemDefault] is the only thing here that cannot be tested: it reads
  * the device setting, and no test in this repository runs on a device. What is
