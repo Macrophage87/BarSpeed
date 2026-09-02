@@ -152,6 +152,17 @@ class FinalRestWindowExportTest {
                         if (r.orderIdx > 0) {
                             add(restStream(r.id, RawStreamEntity.KIND_REST_BEFORE_HRM, restingSamples))
                         }
+                        // [extra] LAST, and that is load-bearing rather than
+                        // arbitrary. The archive's minBpm is not the
+                        // `firstOrNull` selector [SessionExporterTest] pins --
+                        // RawExporter computes it inside the zip loop with a
+                        // `when (stream.kind)` and hands it to the session
+                        // export as an override, so the LAST matching stream
+                        // wins. A trailing stream placed first would be
+                        // overwritten by the set's own hrm stream and the pin
+                        // below would pass while asserting nothing. Measured:
+                        // with [extra] first, widening that branch to admit
+                        // KIND_REST_AFTER_HRM was killed by no pin here.
                         addAll(extra[r.id].orEmpty())
                     }
             }
@@ -235,9 +246,9 @@ class FinalRestWindowExportTest {
      * and `Exporters.minBpm` selects with `firstOrNull { it.kind == KIND_HRM }`.
      * `"rest_after_hrm"` ends in `"hrm"`, so a selection written as a suffix or
      * a `contains` match would take the resting minimum of 81 and publish it
-     * under set 14's name. The stream is placed FIRST for the reason
-     * [SessionExporterTest] gives: with the real one first the pin passes under
-     * a widened selection too, by position rather than by kind.
+     * under set 14's name. Which POSITION makes that detectable depends on the
+     * selector, and here it is last rather than first; the fixture above
+     * carries the measurement and the reason.
      */
     @Test
     fun `a rest_after stream cannot reach the last set's published minimum`() = runTest {
