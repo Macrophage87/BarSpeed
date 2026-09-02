@@ -59,6 +59,12 @@ import kotlin.test.assertTrue
  *
  * `seededSources` reports DEFAULT for `sensorOnStack` because that fixture's
  * mount is false, and a seed default for it is only ever a true.
+ *
+ * `declaredSources` reports SEEDED for `sensorOnStack` and nothing else, which
+ * is load-bearing rather than decorative: with it DECLARED, like three of its
+ * neighbours, the exporter could read `travelRatio`'s source into the
+ * `sensorOnStack` field and every assertion still passed. Measured, not
+ * assumed -- that mutation survived until this value was made unique.
  */
 private val declaredSources = GeometrySources(
     startsWith = GeometrySource.DECLARED,
@@ -66,7 +72,7 @@ private val declaredSources = GeometrySources(
     plane = GeometrySource.DEFAULT,
     kind = GeometrySource.INFERRED,
     travelRatio = GeometrySource.DECLARED,
-    sensorOnStack = GeometrySource.DECLARED,
+    sensorOnStack = GeometrySource.SEEDED,
 )
 
 private val seededSources = GeometrySources(
@@ -576,7 +582,7 @@ class SessionExporterTest {
         assertEquals("default", g.source.plane)
         assertEquals("inferred", g.source.kind)
         assertEquals("declared", g.source.travelRatio)
-        assertEquals("declared", g.source.sensorOnStack)
+        assertEquals("seeded", g.source.sensorOnStack)
     }
 
     /**
