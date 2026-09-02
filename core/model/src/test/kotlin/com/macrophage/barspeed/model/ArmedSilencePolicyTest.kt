@@ -700,19 +700,24 @@ class ArmedSilencePolicyTest {
     }
 
     /**
-     * A genuinely short set on a genuinely fresh link still reads too soon,
-     * under either floor.
+     * A genuinely short set on a genuinely fresh link still reads too soon.
      *
-     * The BOUNDARY item 8 must not move: a two-second set on a link armed one
-     * second before it began has had less than the window either way, and
-     * `tooSoon` there is the honest answer rather than an accusation. Pinned
-     * green in c1 so the differential that follows is visible as a change to
-     * the OTHER case and not to this one.
+     * The link is armed half a second before the set begins and the set runs
+     * two seconds, so it has had 2.5 seconds -- less than the window under
+     * either floor -- and `tooSoon` is the honest answer rather than an
+     * accusation.
+     *
+     * C1 OF #225 GOT THIS FIXTURE WRONG AND THE CLAIM WITH IT. It armed the
+     * link one second before a two-second set, which is exactly the window
+     * from the arming to the set's END, and called the result a boundary item
+     * 8 "must NOT move". It does move, and it is supposed to: reaching the
+     * floor back past the set's start is the whole of item 8. That sentence is
+     * deleted rather than reworded, and the case it got wrong is pinned as a
+     * differential below.
      */
     @Test
     fun `a short set on a link armed just before it still reads too soon`() {
-        val setStart = after(1_000L)
-        val setEnd = setStart + 2_000L
+        val setStart = after(500L)
 
         assertEquals(
             mapOf(SensorRole.A to ArmedDelivery.TOO_SOON),
@@ -721,7 +726,7 @@ class ArmedSilencePolicyTest {
                 secondary = null,
                 links = links(),
                 setStartedAtMs = setStart,
-                setEndedAtMs = setEnd,
+                setEndedAtMs = setStart + 2_000L,
             ),
             "a link that has had less than the window either way was accused",
         )
@@ -846,6 +851,38 @@ class ArmedSilencePolicyTest {
                 nowMs = now,
             ),
             "re-pointing one link excused the other",
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #225 item 8. The window is measured from the ARMING,
+     * and it is inclusive at exactly T.
+     *
+     * The case c1's mis-set fixture stumbled into, pinned deliberately: a link
+     * armed one second before a two-second set has been armed for exactly
+     * [ArmedSilencePolicy.SILENT_AFTER_MS] when the set ends, and
+     * [ArmedSilencePolicy.deliveryOf] speaks at T rather than after it. Under
+     * the set-start floor the same set stored `tooSoon`, because it measured
+     * two seconds and not three.
+     *
+     * It is the SAME boundary `nothing is said before T and something is said
+     * at T` pins for the live reading; what item 8 changes is which instant T
+     * is counted from, not where it falls.
+     */
+    @Test
+    fun `the stored window is counted from the arming and speaks at exactly T`() {
+        val setStart = after(1_000L)
+
+        assertEquals(
+            mapOf(SensorRole.A to ArmedDelivery.LINKED_SILENT),
+            ArmedSilencePolicy.storedDeliveryByRole(
+                analysed = SensorRole.A,
+                secondary = null,
+                links = links(),
+                setStartedAtMs = setStart,
+                setEndedAtMs = setStart + 2_000L,
+            ),
+            "a link armed for the whole window was excused because the set was shorter than it",
         )
     }
 }
