@@ -88,17 +88,17 @@ class SetLoadCorrectionTest {
 
     @Test
     fun `nothing stands for the coming set so nothing follows`() {
-        assertFalse(SetLoadPolicy.carryFollowsCorrection(null, 60.0, WeightUnit.KG))
+        assertFalse(SetLoadPolicy.carryFollowsCorrection(null, 60.0, WeightUnit.KG, sameExerciseBlock = true))
     }
 
     @Test
     fun `the carry follows when the coming set stands at the number being corrected`() {
-        assertTrue(SetLoadPolicy.carryFollowsCorrection(60.0, 60.0, WeightUnit.KG))
+        assertTrue(SetLoadPolicy.carryFollowsCorrection(60.0, 60.0, WeightUnit.KG, sameExerciseBlock = true))
     }
 
     @Test
     fun `the carry does not follow a different prescription`() {
-        assertFalse(SetLoadPolicy.carryFollowsCorrection(80.0, 60.0, WeightUnit.KG))
+        assertFalse(SetLoadPolicy.carryFollowsCorrection(80.0, 60.0, WeightUnit.KG, sameExerciseBlock = true))
     }
 
     @Test
@@ -111,12 +111,25 @@ class SetLoadCorrectionTest {
         val recorded = 60.0
         val standing = WeightUnit.LB.parseToKg(WeightUnit.LB.inputValue(recorded))!!
         assertTrue(standing != recorded)
-        assertTrue(SetLoadPolicy.carryFollowsCorrection(standing, recorded, WeightUnit.LB))
+        assertTrue(SetLoadPolicy.carryFollowsCorrection(standing, recorded, WeightUnit.LB, sameExerciseBlock = true))
     }
 
     @Test
     fun `a stripped bar is a statement the carry follows`() {
-        assertTrue(SetLoadPolicy.carryFollowsCorrection(0.0, 0.0, WeightUnit.KG))
+        assertTrue(SetLoadPolicy.carryFollowsCorrection(0.0, 0.0, WeightUnit.KG, sameExerciseBlock = true))
+    }
+
+    @Test
+    fun `the carry does not follow across an exercise change`() {
+        // Every other carry on this transition is bounded by the block the
+        // statement was made in -- standingStatedAddedKg, standingAdjustedTempo,
+        // standingStatedReps, standingStatedDurationS -- because #124 leaked one
+        // exercise's load into the next. Two consecutive body-weight blocks are
+        // the sharpest case: both seed nothing added, the finished set was
+        // recorded at nothing added, and without the bound a correction to the
+        // set just finished writes a load onto a set of a DIFFERENT movement.
+        assertFalse(SetLoadPolicy.carryFollowsCorrection(0.0, 0.0, WeightUnit.KG, sameExerciseBlock = false))
+        assertFalse(SetLoadPolicy.carryFollowsCorrection(60.0, 60.0, WeightUnit.KG, sameExerciseBlock = false))
     }
 
     @Test

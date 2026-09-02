@@ -310,7 +310,12 @@ private fun LoadCorrectionRow(state: RecordState, viewModel: RecordViewModel) {
     // changes a second thing is worse than one that changes nothing.
     SectionCaption(
         SetLoadPolicy.correctionCaption(
-            SetLoadPolicy.carryFollowsCorrection(standingAddedKg(state), added, state.weightUnit),
+            SetLoadPolicy.carryFollowsCorrection(
+                standingAddedKg(state),
+                added,
+                state.weightUnit,
+                state.lastSetSameBlock,
+            ),
         ),
     )
     Spacer(Modifier.height(4.dp))
