@@ -1474,12 +1474,22 @@ private fun AddSetSection(state: RecordState, viewModel: RecordViewModel) {
  * "Remove the set you added" -- #177's named remainder, and the other half of
  * the pair (#206).
  *
- * DRAWN IMMEDIATELY BELOW [AddSetSection], on all three surfaces it is drawn
- * on: the rest screen's next-set block, the rest screen's last-set branch, and
- * READY. #206 requirement 3 asks the pair to read as one decision rather than
- * two unrelated controls, and the placement is what makes that true --
- * whichever screen offered the add offers the undo in the same place, in the
- * same form.
+ * CALLED IMMEDIATELY BELOW [AddSetSection], at all three of the sites that
+ * call it: the rest screen's next-set block, the rest screen's last-set
+ * branch, and READY. Only the first and the third ever DRAW it. In the
+ * last-set branch [RecordState.nextSlot] is null, so
+ * [RecordState.upcomingIndex] -- `queueIndex + 1` throughout rest -- is
+ * already past the queue's last index; every candidate
+ * [RemoveSetControl.target] considers comes from [AddSetControl.blockRange],
+ * whose indices never reach that far, so its `it >= upcomingIndex` filter is
+ * empty, [RecordState.removeSetTarget] is always null on that branch, and
+ * this function returns before drawing anything. The call stays there
+ * anyway: the moment [AddSetSection] appends a set, [RecordState.nextSlot]
+ * stops being null and the same state renders through the next-set block's
+ * copy of this call instead, where the set just added is eligible. #206
+ * requirement 3 asks the pair to read as one decision rather than two
+ * unrelated controls; on the two surfaces where this can render, calling it
+ * directly under the add is what makes that true.
  *
  * DRAWN ONLY WHEN THERE IS SOMETHING TO REMOVE, which is what makes the
  * eligibility rule visible instead of merely enforced. A plan-prescribed set
