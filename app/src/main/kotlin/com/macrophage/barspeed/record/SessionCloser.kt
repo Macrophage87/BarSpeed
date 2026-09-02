@@ -3,6 +3,7 @@ package com.macrophage.barspeed.record
 import com.macrophage.barspeed.RecordingHolds
 import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.hrm.Hrv
+import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.SessionCloseState
 import kotlinx.coroutines.CancellationException
@@ -37,6 +38,16 @@ private data class PendingSessionClose(
      * is written once per session with no correction surface anywhere.
      */
     val sessionRpe: Int?,
+    /**
+     * The heart rate captured after the last set, on its way to that set's
+     * `rest_after_hrm` stream (#109).
+     *
+     * Frozen for the reason the other three are, and one more: the passive HR
+     * collector keeps appending to the buffer this came from, so a retry that
+     * re-read it would store a window whose end moved to whenever the retry
+     * happened rather than to when the lifter tapped Finish.
+     */
+    val restHrSamples: List<HrSample>,
 )
 
 /**
@@ -61,6 +72,13 @@ private data class PendingSessionClose(
  * principle be recomputed if the R-R ever reached disk, and how a workout FELT
  * is recorded in no artifact at all. It is stated once, at the finish, and a
  * close that never lands takes it with it.
+ *
+ * The rest window after the last set (#109) is written here too, after the
+ * close, because there is no next set for it to ride into the database with.
+ * Its durability before this point is the same as every other rest window's --
+ * none, it lives in `:app`'s heap -- so a process death between the last set
+ * and the tap on Finish loses it exactly as a death mid-rest loses the window
+ * in progress. What changes is that it now has a write to reach at all.
  *
  * [scope] is the process-wide one, created once in `AppContainer` and never
  * cancelled. Dispatching on `Dispatchers.Main.immediate` is the load-bearing
@@ -103,12 +121,13 @@ class SessionCloser(
         endedAtMs: Long,
         rrMs: List<Double>,
         sessionRpe: Int?,
+        restHrSamples: List<HrSample>,
         onState: (SessionCloseState) -> Unit,
         onClosed: () -> Unit,
     ): Boolean {
         if (asked) return false
         asked = true
-        pending = PendingSessionClose(sessionId, endedAtMs, Hrv.rmssdMs(rrMs), sessionRpe)
+        pending = PendingSessionClose(sessionId, endedAtMs, Hrv.rmssdMs(rrMs), sessionRpe, restHrSamples)
         run(onState, onClosed)
         return true
     }
@@ -128,7 +147,20 @@ class SessionCloser(
         holds.acquire(RecordingHold.SESSION_CLOSE)
         scope.launch(Dispatchers.Main.immediate) {
             try {
-                p.sessionId?.let { repository.endSession(it, p.endedAtMs, p.hrvRmssdMs, p.sessionRpe) }
+                p.sessionId?.let {
+                    repository.endSession(it, p.endedAtMs, p.hrvRmssdMs, p.sessionRpe)
+                    // AFTER the close and never before it, and the ordering is
+                    // the whole of the reasoning (#109). This is a second,
+                    // non-atomic write onto a row that is already durable --
+                    // exactly what `rest_before_hrm`'s forward attachment
+                    // exists to avoid -- so it is placed where it cannot delay
+                    // or fail the one write whose input exists nowhere else.
+                    // If it throws, the close reports FAILED and the frozen
+                    // copy is replayed; `endSession` refuses a second write
+                    // and the repository refuses a second window, so the retry
+                    // can only add what is missing.
+                    repository.recordFinalRestWindow(it, p.restHrSamples)
+                }
                 pending = null
                 onClosed()
             } catch (e: CancellationException) {

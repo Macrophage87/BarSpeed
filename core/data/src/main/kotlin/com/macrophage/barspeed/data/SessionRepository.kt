@@ -497,6 +497,24 @@ class SessionRepository(
                     sessionDao.rawStreamsForSet(last.id)
                         .any { it.kind == RawStreamEntity.KIND_REST_AFTER_HRM },
             )
+        // The insert, and only on WRITE. Every other branch is a refusal with
+        // a name, and none of them writes a file: an empty CSV would claim a
+        // window was captured and was silent, which is a different fact from
+        // the strap having been off.
+        if (decision == FinalRestWindowDecision.WRITE && last != null) {
+            sessionDao.insertRawStream(
+                RawStreamEntity(
+                    setId = last.id,
+                    kind = RawStreamEntity.KIND_REST_AFTER_HRM,
+                    csvGzip = Gzip.compress(HrCsv.encode(samples)),
+                    // No rate and no role, for the reasons the prep window
+                    // states: there is no analysis of this stream to take a
+                    // cadence from, and it came from a strap rather than an
+                    // accelerometer. Either written here would label the row
+                    // with another stream's fact.
+                ),
+            )
+        }
         return decision
     }
 

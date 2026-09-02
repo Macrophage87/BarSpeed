@@ -2287,8 +2287,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * the only data anyone could use to measure #81's cost at resting rates.
      *
      * Cleared when the set that carries it is frozen for writing, not when the
-     * next one begins: the window belongs to the set that FOLLOWS it, so it
-     * has to survive from the end of one set to the freeze of the next.
+     * next one begins: a window belongs to the set that FOLLOWS it, except the
+     * last, which the session close writes onto the set BEFORE it (#109).
      */
     private val restHrBuffer = mutableListOf<HrSample>()
 
@@ -2534,9 +2534,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             sessionRrMs.clear()
             // A new session does not inherit the last one's trailing rest
-            // window. That window belongs to no set of either session and is
-            // the one gap this design leaves open, tracked separately; letting
-            // it drift forward would attach it to the wrong session entirely.
+            // window: the previous session's close wrote it onto that
+            // session's last set (#109), and it belongs to neither set here.
             restHrBuffer.clear()
             sessionStartedAtMs = System.currentTimeMillis()
             val queue = sessionRepository.flattenPlan(planSession)
@@ -2906,9 +2905,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * to say at the same moment. [utterance] is what is spoken, and may carry a
      * rep announcement alongside the cue.
      */
-    private fun speakCue(cueText: String, utterance: String = cueText) {
-        speakCues(listOf(cueText), utterance)
-    }
+    // An expression body for the reason toggleAudioCues above is one: detekt
+    // counts this class's statements and it sits on the LargeClass threshold,
+    // so #109's one new argument to closer.close had to be paid for here.
+    private fun speakCue(cueText: String, utterance: String = cueText) = speakCues(listOf(cueText), utterance)
 
     /**
      * Speak one utterance and log every word of it that belongs on the record.
@@ -3515,6 +3515,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             // keeps appending to it for as long as this ViewModel lives.
             rrMs = sessionRrMs.toList(),
             sessionRpe = sessionRpe,
+            restHrSamples = restHrBuffer.toList(),
             onState = ::onSessionCloseState,
             onClosed = ::onSessionClosed,
         )
