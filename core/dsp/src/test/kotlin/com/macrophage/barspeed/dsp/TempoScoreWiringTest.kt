@@ -59,4 +59,15 @@ class TempoScoreWiringTest {
         val score = assertNotNull(TempoScoreLabel.of(c.repsFullyCompliant, c.repsEvaluated, facts(c)))
         assertEquals(listOf(TempoComplianceResult.PHASE_ECCENTRIC), score.ungradedPhases)
     }
+
+    @Test
+    fun `a real drive-only set does not tick, and says why`() {
+        val c = assertNotNull(driveOnlySet().tempoCompliance)
+        val score = assertNotNull(TempoScoreLabel.of(c.repsFullyCompliant, c.repsEvaluated, facts(c)))
+        assertEquals("Tempo 4/4", score.text)
+        assertEquals(
+            "Eccentric not measured this set -- the ratio covers the concentric only.",
+            score.ungradedNote,
+        )
+    }
 }

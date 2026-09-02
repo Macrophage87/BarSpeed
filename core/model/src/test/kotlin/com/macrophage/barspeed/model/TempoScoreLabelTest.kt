@@ -77,4 +77,47 @@ class TempoScoreLabelTest {
             )
         assertEquals(emptyList(), assertNotNull(score(4, 4, phases)).ungradedPhases)
     }
+
+    /**
+     * A concentric-first set whose lowering never cleared the run threshold:
+     * the eccentric was prescribed, nothing measured it, and every drive was
+     * on tempo. `TempoScoreWiringTest` builds this same set for real.
+     */
+    private fun driveOnlyGraded() = listOf(
+        PhaseFacts("eccentric", prescribed = true, scored = false),
+        PhaseFacts("bottomPause", prescribed = true, scored = false),
+        PhaseFacts("concentric", prescribed = true, scored = true),
+        PhaseFacts("topPause", prescribed = true, scored = false),
+    )
+
+    @Test
+    fun `no tick over a phase nothing graded`() {
+        // "Tempo 4/4 ✓" over a set whose eccentric was never measured
+        // states compliance on a phase that has no measurement behind it.
+        assertEquals("Tempo 4/4", assertNotNull(score(4, 4, driveOnlyGraded())).text)
+    }
+
+    @Test
+    fun `partial coverage is neither a pass nor a failure`() {
+        assertEquals(TempoScoreTone.PARTIAL, assertNotNull(score(4, 4, driveOnlyGraded())).tone)
+    }
+
+    @Test
+    fun `the gap is stated in words, naming the phase and what is left`() {
+        assertEquals(
+            "Eccentric not measured this set -- the ratio covers the concentric only.",
+            assertNotNull(score(4, 4, driveOnlyGraded())).ungradedNote,
+        )
+    }
+
+    @Test
+    fun `a missed rep still reads as off tempo when coverage is partial`() {
+        // Coverage and compliance are two questions. A rep outside tolerance
+        // is a miss whether or not another phase went ungraded, and the note
+        // is still owed.
+        val s = assertNotNull(score(3, 4, driveOnlyGraded()))
+        assertEquals("Tempo 3/4", s.text)
+        assertEquals(TempoScoreTone.OFF_TEMPO, s.tone)
+        assertNotNull(s.ungradedNote)
+    }
 }
