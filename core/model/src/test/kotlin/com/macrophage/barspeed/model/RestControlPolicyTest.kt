@@ -277,4 +277,125 @@ class RestControlPolicyTest {
             )
         }
     }
+
+    /**
+     * THE DEFECT (#195). After the last planned set there is nothing for
+     * START NEXT SET to run, and drawing it there re-arms the slot just
+     * recorded -- a second real set row, its own gzipped streams, the plan's
+     * prescription copied onto it and nothing in the export distinguishing it
+     * from the planned set it duplicates. So the screen offers the decision
+     * instead: finish, as the one filled control.
+     *
+     * NOT "hide the button and leave the action". The control set IS the
+     * decision, and the ViewModel gates the tap on this same answer.
+     */
+    @Test
+    fun `the last planned set offers the finish and nothing that re-runs it`() {
+        assertEquals(
+            RestControls(setOf(RestControl.FINISH_SESSION), RestControl.FINISH_SESSION),
+            RestControlPolicy.restScreen(
+                SessionCloseState.NONE,
+                askedToFinish = false,
+                hasNextSlot = false,
+                adHoc = false,
+            ),
+        )
+    }
+
+    /**
+     * The way to get another set is #177's explicit append, which marks the
+     * slot added and nulls the planned fields. The moment it lands the queue
+     * has a next slot again and START comes back, which is the sequence #188
+     * exists to enable -- so this is a gate on the QUEUE, not on the last set.
+     *
+     * Green before the fix as well as after. It is the half of the contract
+     * the fix must not break.
+     */
+    @Test
+    fun `appending a set makes the next set reachable again`() {
+        assertEquals(
+            RestControls(setOf(RestControl.START_NEXT_SET, RestControl.FINISH_SESSION), RestControl.START_NEXT_SET),
+            RestControlPolicy.restScreen(
+                SessionCloseState.NONE,
+                askedToFinish = false,
+                hasNextSlot = true,
+                adHoc = false,
+            ),
+        )
+    }
+
+    /**
+     * An ad-hoc session has no queue, so it never has a next slot and it must
+     * keep START anyway: re-arming READY is how it runs its second and every
+     * later set, and there is no plan for it to duplicate a slot of.
+     *
+     * Green before the fix as well as after, and the reason the rule is
+     * `adHoc || hasNextSlot` rather than `hasNextSlot`.
+     */
+    @Test
+    fun `an ad-hoc session may start another set with no queue at all`() {
+        assertEquals(
+            RestControls(setOf(RestControl.START_NEXT_SET, RestControl.FINISH_SESSION), RestControl.START_NEXT_SET),
+            RestControlPolicy.restScreen(
+                SessionCloseState.NONE,
+                askedToFinish = false,
+                hasNextSlot = false,
+                adHoc = true,
+            ),
+        )
+    }
+
+    /**
+     * The rating panel is what the lifter is looking at, so it is the primary
+     * -- and there is no START beside it to leave the panel by, because there
+     * is no set to start. Finishing is the only thing left, which is what the
+     * panel is for.
+     */
+    @Test
+    fun `the rating panel stands alone after the last planned set`() {
+        assertEquals(
+            RestControls(setOf(RestControl.RATE_SESSION), RestControl.RATE_SESSION),
+            RestControlPolicy.restScreen(
+                SessionCloseState.NONE,
+                askedToFinish = true,
+                hasNextSlot = false,
+                adHoc = false,
+            ),
+        )
+    }
+
+    /**
+     * A close that came back failed leaves the session open, and after the
+     * last planned set the retry is all that is left -- the R-R behind the
+     * session HRV is still only in memory, so the retry has to stay whatever
+     * else is withheld.
+     */
+    @Test
+    fun `a failed close after the last planned set offers only the retry`() {
+        assertEquals(
+            RestControls(setOf(RestControl.RETRY_FINISH), RestControl.RETRY_FINISH),
+            RestControlPolicy.restScreen(
+                SessionCloseState.FAILED,
+                askedToFinish = false,
+                hasNextSlot = false,
+                adHoc = false,
+            ),
+        )
+    }
+
+    /**
+     * Running out of planned sets can only remove a control, never add one.
+     * A close in flight still draws nothing, and no state answers the empty
+     * queue with something it would not have offered a full one.
+     */
+    @Test
+    fun `running out of planned sets never adds a control`() {
+        SessionCloseState.entries.forEach { close ->
+            listOf(true, false).forEach { asked ->
+                val withNext = RestControlPolicy.restScreen(close, asked, hasNextSlot = true, adHoc = false).controls
+                val without = RestControlPolicy.restScreen(close, asked, hasNextSlot = false, adHoc = false).controls
+                assertTrue(withNext.containsAll(without), "$close/$asked gained a control by running out of sets")
+            }
+        }
+    }
 }

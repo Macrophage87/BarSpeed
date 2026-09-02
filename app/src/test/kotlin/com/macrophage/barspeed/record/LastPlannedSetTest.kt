@@ -5,6 +5,7 @@ import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.Stage
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -12,13 +13,15 @@ import kotlin.test.assertTrue
  * What tapping START NEXT SET does to the queue, and what it does when there
  * is nothing left in it (#195).
  *
- * CHARACTERIZATION ONLY IN THIS COMMIT. Three of these tests describe the
- * behaviour that ships today, including the one this issue is about: on the
- * last planned set `advancedState` writes `Stage.READY` and leaves
- * `queueIndex` where it was, so the slot just recorded becomes the current
- * slot again. They are here to make the change visible as a difference rather
- * than to endorse it, and the last-slot pins are reversed by the red
- * differentials in this branch's c2.
+ * RED IN THIS COMMIT. `the last planned set is not re-armed` fails here and
+ * passes at c3. The two pins this file carried describing the re-arm as
+ * correct -- `the last planned set is re-armed on the slot it just recorded`
+ * and `the re-armed slot still carries the plan's prescription and is not
+ * marked added` -- are deleted rather than reworded: they were c0
+ * characterization of the defect and they are now false about what this app
+ * should do. What they measured that is still worth having, that a re-armed
+ * slot is invisible in the export, is kept below as a statement about the
+ * SLOT.
  *
  * REACHABLE FOR [AppendedSlotTest]'s REASON -- `app/build.gradle.kts` pins the
  * test JVM to 21, so a `:app` test may load a `:core:model` type. Nothing here
@@ -63,36 +66,53 @@ class LastPlannedSetTest {
     }
 
     /**
-     * TODAY'S BEHAVIOUR AND THE DEFECT (#195), pinned so the fix is a visible
-     * difference. The last planned set is re-armed: the stage goes back to
-     * READY on the slot just recorded, and `startNextSet` calls `beginSet` in
-     * the same frame, so the tap runs the finished set again.
+     * THE DEFECT (#195). The last planned set must not be re-armed: there is
+     * nothing to advance to, so advancing does nothing and the lifter stays on
+     * the rest screen. `startNextSet` calls `beginSet` in the same frame, so a
+     * state that comes back READY here is a state that records the finished
+     * set a second time.
      */
     @Test
-    fun `the last planned set is re-armed on the slot it just recorded`() {
-        val out = advancedState(resting(twoSets, queueIndex = 1))
-        assertEquals(Stage.READY, out.stage)
-        assertEquals(1, out.queueIndex, "queueIndex moved, so the re-arm is gone")
-        assertEquals("bench_press", out.currentSlot?.exercise?.id)
+    fun `the last planned set is not re-armed`() {
+        val before = resting(twoSets, queueIndex = 1)
+        val out = advancedState(before)
+        assertEquals(before, out, "the finished slot was re-armed")
     }
 
     /**
-     * WHAT THE TAP COSTS, which #195 asks be established before anything is
-     * designed. The re-armed slot is the recorded set's own slot with its
-     * frozen declarations intact and `isAddedSet` false, so the row it writes
-     * carries the same prescription and is indistinguishable in the export
-     * from the planned set it duplicates. The lifter's standing statements are
-     * cleared on the way, so it does not even come back at the load the set
-     * was actually run with.
+     * The way to get another set is #177's append, and it still works in one
+     * pass: appending puts a slot after the last one, and START then runs
+     * THAT.
+     *
+     * Green before the fix as well as after -- the append gives the queue a
+     * next slot, which is the branch that was already correct. It is here
+     * because it is the half of the contract the fix must not break.
      */
     @Test
-    fun `the re-armed slot still carries the plan's prescription and is not marked added`() {
-        val out = advancedState(resting(twoSets, queueIndex = 1, statedLoadKg = 62.5))
-        val slot = out.queue[1]
+    fun `a set appended after the last one is what the next start runs`() {
+        val appended = assertNotNull(appendedState(resting(twoSets, queueIndex = 1)))
+        val out = advancedState(appended)
+        assertEquals(Stage.READY, out.stage)
+        assertEquals(2, out.queueIndex)
+        assertTrue(out.currentSlot?.isAddedSet == true, "START ran something the lifter did not append")
+        assertNull(out.currentSlot?.plannedLoadKg, "an appended set carries a prescription nobody wrote")
+    }
+
+    /**
+     * WHAT THE TAP COSTS TODAY, which #195 asks be established before
+     * anything is designed, kept as the reason the fix is worth making. The
+     * re-armed slot is the recorded set's own slot with `plannedLoadKg`,
+     * `plannedReps` and `isAddedSet = false` intact, so the row it writes is
+     * indistinguishable in the export from the planned set it duplicates --
+     * unlike an appended one, which the test above pins as marked and
+     * unprescribed.
+     */
+    @Test
+    fun `the finished slot is not marked in any way an export could see`() {
+        val slot = twoSets[1]
         assertEquals(60.0, slot.plannedLoadKg)
         assertEquals(8, slot.plannedReps)
-        assertTrue(!slot.isAddedSet, "a re-armed slot would at least be distinguishable if it were marked")
-        assertNull(out.statedLoadKg, "the load the set was run at is dropped")
+        assertTrue(!slot.isAddedSet)
     }
 }
 
