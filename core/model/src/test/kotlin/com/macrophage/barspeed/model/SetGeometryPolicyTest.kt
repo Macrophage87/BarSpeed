@@ -1,9 +1,11 @@
 package com.macrophage.barspeed.model
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -281,5 +283,53 @@ class SetGeometryPolicyTest {
         val g = SetGeometryPolicy.describe(used, plan)
         val text = json.encodeToString(ResolvedGeometry.serializer(), g)
         assertEquals(g, json.decodeFromString(ResolvedGeometry.serializer(), text))
+    }
+
+    // ---- the field-37 shape, as it behaves today (#223) ---------------------
+
+    /**
+     * The machine ids that ride a weight stack are not in [ExerciseDef.SEED] at
+     * all, so an `assisted_pull_up` reaches the record queue as an ad-hoc
+     * definition built from the id -- with every geometry value at its Kotlin
+     * default, `sensorOnStack` included.
+     *
+     * Pinned because the field-37 change rests on it: whatever supplies a
+     * stack default cannot be a SEED entry without also making
+     * [SetGeometryPolicy.describe] report SEEDED for `concentric`, `plane` and
+     * `travelRatio` on those ids, which no seed entry would have decided.
+     */
+    @Test
+    fun `no built-in definition names a stack machine`() {
+        for (id in listOf("assisted_pull_up", "lat_pulldown", "seated_row", "seated_leg_curl")) {
+            assertNull(ExerciseDef.seedById(id), "$id is seeded, so the geometry sources it publishes changed")
+        }
+    }
+
+    /**
+     * Field-37: the plan omitted `sensorOnStack` on an assisted pull-up, which
+     * runs on a pin-selected assist stack. Characterized as it stands before
+     * the fix -- the set is analysed as though the sensor rode what the lifter
+     * holds.
+     */
+    @Test
+    fun `an omitted stack key on an assisted pull-up resolves to bar-mounted`() {
+        val plan = declared("assisted_pull_up")
+        val used = SetGeometryPolicy.resolve(ExerciseDef("assisted_pull_up", "Assisted Pull-Up"), plan)
+        assertEquals(false, used.sensorOnStack)
+    }
+
+    /**
+     * The provenance object's published shape, key by key, so a key arriving or
+     * leaving is a decision somebody has to make rather than a diff nobody
+     * reads. `sensorOnStack` is absent here today.
+     */
+    @Test
+    fun `the published provenance keys are exactly these five`() {
+        val g = SetGeometryPolicy.describe(opinionated, null)
+        assertEquals(
+            setOf("startsWith", "concentric", "plane", "kind", "travelRatio"),
+            json.parseToJsonElement(json.encodeToString(GeometrySources.serializer(), g.sources))
+                .jsonObject.keys,
+        )
     }
 }
