@@ -268,8 +268,15 @@ object ArmedSilencePolicy {
      *
      * The state, the frame instant and the grace floor are that ONE link's, and
      * it is asked at both instants [deliveryOf] is -- when the screen draws, and
-     * when the set ends -- so the sentence the lifter read and the word the
-     * archive carries cannot disagree about one unit.
+     * when the set ends -- so ONE FUNCTION DECIDES BOTH. What that does NOT
+     * make identical is the grace floor: the card is handed the link's armed
+     * instant and the stored reading the set's own start, so a set shorter than
+     * [SILENT_AFTER_MS] can be told [ArmedDelivery.NOT_LINKED] on screen and
+     * store [ArmedDelivery.TOO_SOON]. Nor is the stored answer the card's
+     * answer in the other direction: what is recorded is gated on the set's
+     * analysed buffer being empty (#224 round 1), which the card has no
+     * equivalent of, because a card drawn before the set has no buffer to
+     * read.
      *
      * NULL FOR [ArmedDelivery.DELIVERING], which is why the answer is nullable
      * rather than total: a word for a working unit would put a declaration on

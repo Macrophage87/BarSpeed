@@ -526,12 +526,26 @@ internal fun armedCaptureOf(
     // cannot tell apart. `armed` is null on the first of those, so the
     // declaration is CONSTRUCTED rather than copied, and only where there is a
     // word: a one-sensor set whose unit delivered still stores nothing at all.
-    // `SensorCapturePolicy.withSoleSilence` decides both, in `:core:model`
-    // where a test runs on it.
+    // `SensorCapturePolicy.withSoleSilence` decides what the declaration
+    // becomes, in `:core:model` where a test runs on it.
+    //
+    // THE BUFFER IS WHAT DECIDES WHETHER THERE IS A WORD, and the link reading
+    // only says WHICH word. `soleDelivery` is a reading of one link taken over
+    // a fixed `ArmedSilencePolicy.SILENT_AFTER_MS` window ending when the set
+    // ended, so a unit that fed this whole set and dropped in its last seconds
+    // reads as silent; writing the word there would put "this unit delivered
+    // nothing" onto a row sitting beside a full summary and a real imu.csv,
+    // and a reader of that archive has no way to tell which half to believe.
+    // Round 1 of #224 found it. `analysedBuffer` is the same source
+    // `SensorCapturePolicy.present` is read from just above, so the roleless
+    // set is judged by the fact the role-keyed set is judged by rather than by
+    // a near neighbour of it, and it is the buffer this capture goes on to
+    // publish -- `decision.role` is null on every set that reaches here, so
+    // `samples` below IS `analysedBuffer`.
     val sensors =
         SensorCapturePolicy.withSoleSilence(
             armed?.copy(analysed = decision.role, analysedFellBack = decision.fellBack, silent = silent),
-            soleDelivery,
+            soleDelivery.takeIf { analysedBuffer.isEmpty() },
         )
     return ArmedCapture(
         samples = decision.role?.let { byRole[it] } ?: analysedBuffer,
@@ -658,15 +672,28 @@ internal fun RecordState.armedDeliveryOver(
  * the analysed link, and the only client `AutoConnectManager` maintains when
  * the roster names no second address.
  *
- * Called at the same two instants [armedDeliveryOver] is: [sinceMs] is when the
- * link was armed while the card is drawing, and the set's own start once it has
- * ended.
+ * Called at the same two instants [armedDeliveryOver] is: the card passes
+ * `RecordState.imuArmedAtMs` while it is drawing, and `endSet` passes the set's
+ * own start once the set has ended.
  *
- * IT READS THE LIVE ROSTER, so a lifter who pairs a second unit MID-SET moves
- * this answer to null and the set stores no word. That is the conservative
- * direction -- it declines to state something rather than stating it of a
- * roster that no longer holds -- and it is the same direction
- * [armedDeliveryOver] takes when a link is re-pointed.
+ * THE FIRST IS NOT WHEN THIS LINK WAS ARMED. `AutoConnectManager` writes the
+ * analysed link's instant once at construction and never again -- `imuArmedAt`
+ * is a `MutableStateFlow(clock())` and only `imuArmedAtB` is rewritten, in
+ * `setSecondaryImuAddress` -- so it is the PROCESS's start instant. On the
+ * one-sensor configuration the [ArmedDelivery.TOO_SOON] grace floor is
+ * therefore spent seconds into the process, and a unit paired later is accused
+ * while it is still connecting. `RecordViewModel.armedDelivery` softens this
+ * for the role-keyed reading with `maxOf(imuArmedAtMs, imuArmedAtMsB)`; there
+ * is no second instant here to take the later of. What the lifter sees is a
+ * card naming a unit that is about to come up, on the card only -- the stored
+ * reading takes the set's own start and is not affected.
+ *
+ * IT READS THE LIVE ROSTER. Pairing a second unit MID-SET does NOT silence
+ * this: `SensorRoster.isDual` is `secondary != null`, so an unlabelled second
+ * unit, or one whose label collides with the first, leaves the roster
+ * non-dual and the word is still stored -- beside the shortfall that says why
+ * the app recorded one stream. What moves this answer to null is the roster
+ * becoming DUAL, which is two paired units carrying two different labels.
  */
 internal fun RecordState.soleSilenceOver(sinceMs: Long, nowMs: Long): ArmedDelivery? = ArmedSilencePolicy
     .soleSilence(

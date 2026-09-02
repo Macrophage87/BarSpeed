@@ -575,6 +575,15 @@ object SensorCapturePolicy {
      * one bar sensor that delivered, which is what keeps such an export exactly
      * what this app has always written.
      *
+     * [soleSilent] IS A WORD FOR A SET THAT CAPTURED NOTHING, and the caller
+     * owes that. This function is handed a reading and attaches it; it holds no
+     * buffer and cannot check. A reading of one link over a fixed window ending
+     * when the set ended says a unit that fed the whole set and dropped in its
+     * last seconds is silent, and passing THAT here writes "delivered nothing"
+     * onto a row beside a full summary and a real raw stream. `:app` gates on
+     * the analysed buffer being empty for exactly this, and #224 round 1 is
+     * where the omission was found.
+     *
      * Where there IS a word, a set that declared nothing gains a declaration
      * carrying only that word beside a [RecordedSensors.count] of one. The
      * count is 1 and [RecordedSensors.expected] stays EMPTY, because the stream
