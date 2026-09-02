@@ -37,9 +37,12 @@ import kotlin.test.assertTrue
  *
  * ## The emulator exercise that does say it
  *
- * Run on AVD `barspeed-api35` and recorded in this commit's body. A debug
- * build of `f9c6010` -- this branch's parent, `DATABASE_VERSION = 13` -- wrote
- * a real ad-hoc set, and the v14 build was installed over it with
+ * Run on AVD `barspeed-api35` and recorded in the body of `13ecc3a6`, subject
+ * "Record the 13 to 14 emulator run where the hop's own test points at it". A
+ * debug build of `d39e12eb` -- an earlier commit on this branch, subject "Keep
+ * the grid's one-decision promise, and delete three more false claims", where
+ * `DATABASE_VERSION` is still 13 -- wrote a real ad-hoc set, and the v14 build
+ * was installed over it with
  * `adb install -r`. After it: `PRAGMA user_version` reads 14, the row survives
  * with `side` = "left" and `plannedSide` NULL, and `.schema set_records` shows
  * `plannedSide TEXT` appended UNQUOTED at the end of the table -- the raw

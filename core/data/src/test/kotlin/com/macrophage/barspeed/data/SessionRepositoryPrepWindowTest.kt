@@ -19,10 +19,10 @@ import kotlin.test.assertNull
  * is no better off than before.
  *
  * The window is written as a `raw_streams` row rather than a column, which is
- * what keeps `DATABASE_VERSION` at 13. That makes the count of rows a set
- * writes part of what has to be pinned: every assertion elsewhere in this
- * package reaches a stream through a `firstOrNull`, and a second row of a kind
- * is invisible to all of them.
+ * what kept this change from costing a `DATABASE_VERSION` bump at all. That
+ * makes the count of rows a set writes part of what has to be pinned: every
+ * assertion elsewhere in this package reaches a stream through a `firstOrNull`,
+ * and a second row of a kind is invisible to all of them.
  *
  * Nothing here executes Room, SQLite or Android. The DAO is an interface and
  * the fake below stands in for it; what is verified is the repository's own
