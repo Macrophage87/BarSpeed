@@ -294,7 +294,8 @@ internal fun applyLoadCorrection(
     val before = feedback.effectiveAddedKg
     val after = SetLoadPolicy.correctedAddedKg(before, deltaKg, feedback.bodyweight)
     if (after == before) return
-    val carryFollows = SetLoadPolicy.carryFollowsCorrection(standingAddedKg(s0), before, s0.weightUnit)
+    val carryFollows =
+        SetLoadPolicy.carryFollowsCorrection(standingAddedKg(s0), before, s0.weightUnit, s0.lastSetSameBlock)
     appScope.launch(Dispatchers.Main.immediate) {
         val current = stateFlow.value.lastFeedback ?: return@launch
         val total = SetLoadPolicy.correctedTotalKg(current.loadKg, current.addedKg, after)

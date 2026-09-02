@@ -1396,6 +1396,9 @@ private fun restingState(
         // Set from the frozen index rather than incremented, so a retry cannot
         // count the same set twice.
         setsCompleted = p.orderIdx + 1,
+        // The same block answer the three carries above are bounded by, kept
+        // for the rest screen's load correction rather than asked again.
+        lastSetSameBlock = sameBlock,
         // Pre-fill next-set inputs so in-rest edits start from plan values --
         // except the load, where a statement that still stands is shown ahead
         // of the plan's number, so the box and what the set would record cannot
@@ -1725,6 +1728,20 @@ data class RecordState(
     /** Rolling HRV (RMSSD, ms) over the last ~2 minutes of beats. */
     val hrvMs: Int? = null,
     val lastFeedback: SetFeedback? = null,
+    /**
+     * Whether the set coming up belongs to the same BLOCK as the set just
+     * finished -- [SetLoadPolicy.sameExerciseBlock]'s answer, taken once on the
+     * rest transition and carried rather than asked again.
+     *
+     * Carried because the rest screen's load correction has to know it and
+     * cannot recompute it: the pair of slots it is a fact about is frozen into
+     * the pending write, and by the time a correction is tapped the queue has
+     * moved on. Asking a second question of live state would be a second rule.
+     *
+     * False by default and outside RESTING, which is the safe direction: it
+     * only ever stops a carry.
+     */
+    val lastSetSameBlock: Boolean = false,
     val restRemainingS: Int = 0,
     val restTotalS: Int = 0,
     /** RPE the lifter picked for the just-finished set (rest screen), if any. */
