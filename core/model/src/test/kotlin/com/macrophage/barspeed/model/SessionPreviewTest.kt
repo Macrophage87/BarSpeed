@@ -137,6 +137,58 @@ class SessionPreviewTest {
         assertEquals(listOf(5, 4, 3), preview.blocks[0].sets.map { it.reps })
     }
 
+    /**
+     * The case a name-based grouping gets wrong, and the plan format allows it
+     * on purpose: a ramp block and a working block of the SAME movement, back
+     * to back. `flattenPlan` gives each its own `setsInExercise`, and the
+     * record flow counts "Set 1/3" then "Set 1/2" through them, so a preview
+     * that merged them would tell the lifter five sets of one thing while the
+     * screen they land on says set one of three.
+     */
+    @Test
+    fun `two blocks of one exercise, back to back, stay two blocks`() {
+        val preview =
+            SessionPreviewPolicy.of(
+                listOf(
+                    set(index = 0, of = 3, warmup = true, loadKg = 40.0),
+                    set(index = 1, of = 3, warmup = true, loadKg = 60.0),
+                    set(index = 2, of = 3, warmup = true, loadKg = 80.0),
+                    set(index = 0, of = 2, loadKg = 100.0),
+                    set(index = 1, of = 2, loadKg = 100.0),
+                ),
+            )
+        assertEquals(2, preview.blockCount)
+        assertEquals(listOf(3, 2), preview.blocks.map { it.sets.size })
+        assertEquals(5, preview.totalSets)
+        assertEquals(3, preview.warmupSets)
+    }
+
+    /**
+     * The property the case above is one instance of, stated so a later
+     * grouping rule cannot pass it by accident: a block holds exactly the sets
+     * the queue said were in it.
+     */
+    @Test
+    fun `a block holds the number of sets its own slots declare`() {
+        val preview =
+            SessionPreviewPolicy.of(
+                listOf(
+                    set(index = 0, of = 2),
+                    set(index = 1, of = 2),
+                    set(index = 0, of = 1),
+                    set(name = "Bench press", index = 0, of = 1),
+                ),
+            )
+        preview.blocks.forEach { block ->
+            assertEquals(
+                block.sets.first().setsInExercise,
+                block.sets.size,
+                "block of ${block.exerciseName} holds ${block.sets.size} sets, its slots declare " +
+                    "${block.sets.first().setsInExercise}",
+            )
+        }
+    }
+
     @Test
     fun `two exercises become two blocks, in the queue order`() {
         val preview =
