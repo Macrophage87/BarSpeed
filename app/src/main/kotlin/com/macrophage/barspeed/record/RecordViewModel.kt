@@ -1623,6 +1623,9 @@ internal fun removedState(s: RecordState): RecordState? {
         statedTempo = null,
         statedReps = null,
         statedDurationS = null,
+        // Cleared with the four above it: a side stated for the set that has
+        // just been REMOVED is not a statement about the one that moved up.
+        statedSide = null,
         repsInput = upcoming.reps?.toString() ?: s.repsInput,
         durationInput = upcoming.durationS?.toString() ?: s.durationInput,
     )
