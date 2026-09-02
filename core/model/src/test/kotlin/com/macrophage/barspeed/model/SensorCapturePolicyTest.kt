@@ -414,6 +414,85 @@ class SensorCapturePolicyTest {
         )
     }
 
+    // ---- which stream the DSP is pointed at ----------------------------------
+
+    /**
+     * CHARACTERIZATION, issue #207. Today the analysed role is the armed one
+     * whatever streamed, and this states it at the seam that will change.
+     *
+     * [SensorCapturePolicy.analysedStream] is a new symbol with nothing
+     * deciding inside it yet: it returns the armed role and `fellBack` false,
+     * which is what [SensorCapturePolicy.roster] already means by *"the
+     * preferred address decides which role is analysed, and nothing else
+     * does"*. The middle case is field-36 set 02 -- armed for b, only a
+     * streamed -- and it is the one the fix reverses.
+     */
+    @Test
+    fun `today the analysed role is the one that was armed, whatever streamed`() {
+        assertEquals(
+            AnalysedStream(SensorRole.B, fellBack = false),
+            SensorCapturePolicy.analysedStream(SensorRole.B, listOf(SensorRole.B, SensorRole.A)),
+            "both units streamed",
+        )
+        assertEquals(
+            AnalysedStream(SensorRole.B, fellBack = false),
+            SensorCapturePolicy.analysedStream(SensorRole.B, listOf(SensorRole.A)),
+            "field-36 set 02: armed for b, only a streamed",
+        )
+        assertEquals(
+            AnalysedStream(SensorRole.B, fellBack = false),
+            SensorCapturePolicy.analysedStream(SensorRole.B, emptyList()),
+            "nothing streamed at all",
+        )
+    }
+
+    /**
+     * A set with no role in play has no role to fall back to, and that is not
+     * a state the fix touches.
+     *
+     * The ordinary one-sensor set and the set that met two paired units it
+     * could not tell apart both record one UNROLED stream. There is no second
+     * buffer to move onto and no role to name if there were, so the answer is
+     * null in both directions and no fallback is ever reported.
+     */
+    @Test
+    fun `a set with no role in play stays with no role in play`() {
+        assertEquals(
+            AnalysedStream(null, fellBack = false),
+            SensorCapturePolicy.analysedStream(null, emptyList()),
+        )
+    }
+
+    /**
+     * A row that did not fall back carries no such key, which is every row
+     * every earlier build wrote.
+     *
+     * The repository encodes `sensorsJson` with kotlinx's default
+     * `encodeDefaults = false`, so the flag reaches the column only on a set
+     * that moved. Its absence therefore has to mean the same thing as a stored
+     * false, and it does: no build before #207 could move the analysed role,
+     * so the role such a row names is the role it armed.
+     */
+    @Test
+    fun `the fallback flag is absent from a stored declaration until a set falls back`() {
+        val wire = Json { ignoreUnknownKeys = true }
+        val declaration =
+            RecordedSensors(count = 2, expected = listOf(SensorRole.B, SensorRole.A), analysed = SensorRole.B)
+
+        val stored = wire.encodeToString(RecordedSensors.serializer(), declaration)
+        assertTrue("analysedFellBack" !in stored, "an unremarkable set stored a fallback flag: $stored")
+        assertEquals(
+            declaration,
+            wire.decodeFromString(RecordedSensors.serializer(), stored),
+            "a row without the key decodes as one that did not fall back",
+        )
+        assertTrue(
+            "analysedFellBack" in
+                wire.encodeToString(RecordedSensors.serializer(), declaration.copy(analysedFellBack = true)),
+            "a set that DID fall back must carry the key",
+        )
+    }
+
     // ---- the shortfall vocabulary --------------------------------------------
 
     /**

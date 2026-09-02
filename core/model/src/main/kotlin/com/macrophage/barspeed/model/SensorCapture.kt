@@ -72,6 +72,25 @@ data class RecordedSensors(
     /** Which role's stream every figure in this set was computed from. */
     val analysed: SensorRole? = null,
     /**
+     * True when [analysed] is NOT the role the set was armed to analyse, and
+     * the app moved onto it because the armed one produced nothing.
+     *
+     * A separate fact rather than a comparison a reader is left to make.
+     * "Analysed the preferred unit" and "analysed the only unit that turned
+     * up" are different statements about how much the figures below can be
+     * compared with the rest of the corpus, and deriving the second from
+     * `analysed !in present` cannot be done at all once the fallback lands:
+     * after it, the analysed role IS present in both cases.
+     *
+     * False on every row an earlier build wrote, and that is correct rather
+     * than a default standing in for the unknown -- no build before this one
+     * could move the analysed role, so the role such a row names is the role
+     * it armed. Absent from the encoded JSON when false, since the repository
+     * encodes with kotlinx's default `encodeDefaults = false`; a row that fell
+     * back is the only one that carries the key.
+     */
+    val analysedFellBack: Boolean = false,
+    /**
      * Why this set recorded one stream when two units were PAIRED, or null when
      * there was nothing in the way.
      *
@@ -189,6 +208,26 @@ enum class DualShortfall {
     /** Every paired unit is labelled and two of them share a role, so neither stream could be told from the other. */
     ROLES_COLLIDE,
 }
+
+/**
+ * Which role's stream the DSP is pointed at for one set, and whether that is
+ * the role the set was armed to analyse (#207).
+ *
+ * TWO FACTS IN ONE ANSWER, so they cannot disagree. A caller that asked which
+ * role to analyse and separately asked whether it fell back would be asking
+ * one question twice, and the second answer is exactly the kind that goes
+ * stale when the first rule changes.
+ *
+ * [role] is null only when no role is in play at all, which is the ordinary
+ * one-sensor set and the set that met two paired units it could not tell
+ * apart. Neither of those has a second stream to move onto.
+ */
+data class AnalysedStream(
+    /** The role whose stream the figures are computed from. */
+    val role: SensorRole?,
+    /** True when [role] is not the role the set armed for analysis. */
+    val fellBack: Boolean,
+)
 
 /**
  * Every rule about how many sensors a set captures with, and which stream is
@@ -412,6 +451,32 @@ object SensorCapturePolicy {
         val shortfall = roster.shortfall ?: return null
         return RecordedSensors(count = DEFAULT_COUNT, shortfall = shortfall)
     }
+
+    /**
+     * Which role the DSP is pointed at once it is known which units actually
+     * streamed, and whether that is the role the set armed (#207).
+     *
+     * TODAY THIS FUNCTION CHANGES NOTHING and says so deliberately: it returns
+     * the armed role and `fellBack = false` whatever streamed, which is the
+     * rule [roster] states -- *"[preferredAddress] decides which role is
+     * [SensorRoster.analysed], and nothing else does"* -- lifted to the point
+     * where the streams are known. It is a seam for issue #207 and the commit
+     * that changes its body is what changes behaviour. Nothing else about the
+     * record path moves with it.
+     *
+     * [present] is the roles that put samples in a buffer, in the armed order,
+     * and it is [SensorCapturePolicy.present]'s answer rather than a second
+     * reading of the same question -- the export asks that function which
+     * roles arrived, and a record path asking it differently is how the two
+     * documents come to disagree about one set.
+     */
+    @Suppress("UnusedParameter")
+    fun analysedStream(armed: SensorRole?, present: List<SensorRole>): AnalysedStream =
+        // `present` is unread until the fallback lands. Named in the signature
+        // now rather than added later: a parameter that arrives with the fix
+        // makes this a different function at every call site, and the point of
+        // a seam is that its call sites do not move twice.
+        AnalysedStream(role = armed, fellBack = false)
 
     /**
      * Which of the armed roles actually reached the archive, in the order they
