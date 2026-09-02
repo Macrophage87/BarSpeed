@@ -1169,8 +1169,10 @@ private fun struckLine(lead: String, values: List<SetCardValue>): AnnotatedStrin
  * set -- see `startedFromReadyState`, and note that until it existed they
  * would have accepted the tap and changed nothing.
  *
- * Outlined, never filled: START is the only filled button on either screen,
- * and two full-width filled buttons is how a thumb picks the wrong one. A
+ * Outlined, never filled: START is the only filled button on either screen
+ * while a set is queued -- after the last planned set START is withheld and
+ * FINISH SESSION takes the filled place (#195) -- and two full-width filled
+ * buttons is how a thumb picks the wrong one. A
  * mis-tap here opens a dialog and costs one tap to close; a mis-tap on START
  * begins a set that can only be ended by recording it.
  */
@@ -1311,8 +1313,10 @@ private fun ChangeSetDialog(
  * set is a set the plan does not contain rather than a change to a set it does.
  *
  * A TextButton, not an OutlinedButton, for [SwitchExerciseSection]'s reason:
- * START is the only filled button on either screen, and this line sits beside
- * one that already looks like this. A mis-tap here queues a set the lifter can
+ * START is the only filled button on either screen while a set is queued --
+ * after the last planned set START is withheld and FINISH SESSION takes the
+ * filled place (#195) -- and this line sits beside one that already looks
+ * like this. A mis-tap here queues a set the lifter can
  * simply not do -- the plan's remaining sets are dropped whenever a session is
  * finished early, which is how every unwanted queued set has always been
  * disposed of. Removal is out of scope and this is why that is survivable.
@@ -2557,10 +2561,9 @@ private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel)
     val controls = screen.controls
     if (RestControl.FINISH_SESSION in controls) {
         if (screen.primary == RestControl.FINISH_SESSION) {
-            // Filled, and the only filled control on the screen, because
-            // there is no next set to start and finishing is what is left to
-            // do. Drawn from the same answer that withheld START, so the two
-            // cannot disagree about which one that is.
+            // Filled, because there is no next set to start and finishing is
+            // what is left to do. Drawn from the same answer that withheld
+            // START, so the two cannot disagree about which one that is.
             Button(
                 onClick = viewModel::askSessionRpe,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),

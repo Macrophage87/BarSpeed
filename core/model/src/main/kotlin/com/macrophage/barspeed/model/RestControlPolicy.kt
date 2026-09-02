@@ -28,10 +28,11 @@ enum class RestControl {
 /**
  * The rest screen's controls and which one carries the primary emphasis.
  *
- * [primary] is the one filled button on the screen. It is null only where
- * [controls] is empty -- an in-flight close draws nothing, on purpose -- and
- * it is always a member of [controls], so a caller cannot emphasise a control
- * it is not drawing.
+ * [primary] is the control the screen should emphasise. It is null only
+ * where [controls] is empty -- an in-flight close draws nothing, on purpose
+ * -- and it is always a member of [controls], so a caller cannot emphasise a
+ * control it is not drawing. How a caller renders it is the caller's
+ * decision.
  */
 data class RestControls(val controls: Set<RestControl>, val primary: RestControl?)
 
@@ -169,7 +170,7 @@ object RestControlPolicy {
     }
 
     /**
-     * Which of [drawn] is the one filled button.
+     * Which of [drawn] carries the primary emphasis.
      *
      * Starting work outranks ending it wherever both are offered: the rest
      * screen exists to get the lifter back under the bar, and the finish has

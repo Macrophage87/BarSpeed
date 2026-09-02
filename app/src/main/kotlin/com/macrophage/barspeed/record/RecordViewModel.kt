@@ -1760,12 +1760,9 @@ internal fun advancedState(s: RecordState): RecordState {
  * The state starting another set leaves behind, or null where starting one is
  * not a thing that may be done (#195).
  *
- * A free function for [advancedState]'s reason, and this one is not a
- * preference -- `RecordViewModel` sits hard against detekt's `LargeClass`
- * threshold, so the guard cannot be written as a member. Returning null
- * rather than a boolean is what keeps the call site the three lines it
- * already was, and it is [appendedState]'s and [jumpedToExerciseState]'s
- * idiom besides.
+ * A free function for [advancedState]'s reason. Returning null rather than a
+ * boolean is what keeps the call site the three lines it already was, and it
+ * is [appendedState]'s and [jumpedToExerciseState]'s idiom besides.
  *
  * THE CANCEL NOW FOLLOWS THE WRITE at the call site, which it did not before.
  * Safe because both run on the main dispatcher inside one non-suspending
