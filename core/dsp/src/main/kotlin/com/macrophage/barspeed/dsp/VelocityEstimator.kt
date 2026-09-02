@@ -302,10 +302,17 @@ object VelocityEstimator {
         return !straddles
     }
 
-    /** True where the IMU itself is quiet for at least minStationaryS. */
+    /**
+     * True where the IMU is quiet for at least minStationaryS, with the gyro
+     * clause applied only on sets whose own rotation supports it. See
+     * [gyroGateApplies]; on a set it rejects, candidacy rests on the
+     * acceleration term and on [anchorAcceptable], which is the guard that
+     * actually discriminates rest from slow motion.
+     */
     internal fun quietMask(samples: List<ImuSample>, timeS: DoubleArray, config: DspConfig): BooleanArray {
         val n = samples.size
-        val candidate = BooleanArray(n) { isAnchorCandidate(samples[it], config, gyroGate = true) }
+        val gyroGate = gyroGateApplies(samples, config)
+        val candidate = BooleanArray(n) { isAnchorCandidate(samples[it], config, gyroGate) }
         val quiet = BooleanArray(n)
         var runStart = -1
         for (i in 0..n) {
