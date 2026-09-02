@@ -291,11 +291,18 @@ class AnalysedRoleFallbackTest {
      * the armed roles keyed to their buffers, the streamed roles by
      * [SensorCapturePolicy.present], the decision by
      * [SensorCapturePolicy.analysedStream], and the partner derived from the
-     * corrected declaration. It lives in `:app`, where no test on the CI path
-     * reaches `RecordViewModel`, so what is verified here is the composition
-     * and not that `:app` performs it -- that half is compile- and
-     * lint-gated only. Nothing detects drift between the two: the mirror
-     * already differs where `armedCaptureOf` falls back to the analysed
+     * corrected declaration. What is verified HERE is the composition, not
+     * that `:app` performs it.
+     *
+     * That other half is `ArmedCaptureTest`, in `app/src/test/`, added in
+     * round 4 of #207: it executes `armedCaptureOf` itself. The sentence this
+     * KDoc used to carry -- that `armedCaptureOf` lives in `:app` where no
+     * test on the CI path reaches `RecordViewModel`, so the record half is
+     * compile- and lint-gated only -- was true when it was written and is not
+     * true now. It is deleted rather than reworded.
+     *
+     * Nothing detects DRIFT between the two, and that has not changed: the
+     * mirror already differs where `armedCaptureOf` falls back to the analysed
      * buffer on a null role and this returns an empty list, which no dual
      * declaration can reach.
      */
