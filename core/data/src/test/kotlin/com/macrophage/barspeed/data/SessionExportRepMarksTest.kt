@@ -67,6 +67,10 @@ class SessionExportRepMarksTest {
 
         override suspend fun overrideReps(setId: Long, reps: Int) = Unit
 
+        // Conformance only: SessionDao grew this member for #205 and Kotlin
+        // requires it. Nothing in this file calls it.
+        override suspend fun overrideLoad(setId: Long, loadKg: Double) = Unit
+
         override suspend fun overrideDuration(setId: Long, seconds: Int) = Unit
 
         override suspend fun sessionsInRange(fromMs: Long, toMs: Long): List<SessionEntity> = emptyList()

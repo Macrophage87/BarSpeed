@@ -130,6 +130,24 @@ interface SessionDao {
     @Query("UPDATE set_records SET actualReps = :reps, repsManual = 1 WHERE id = :setId")
     suspend fun overrideReps(setId: Long, reps: Int)
 
+    // The load the lifter states for the set just finished (#205). :loadKg is
+    // the body-weight-INCLUSIVE total, the scale the column is already on, and
+    // plannedLoadKg is deliberately not in the SET list: the plan's
+    // prescription is what the correction is a deviation FROM, and rewriting
+    // it would erase the deviation the row exists to record.
+    //
+    // No "corrected" flag beside it, and unlike the seconds one above that is
+    // a decision rather than a gap. repsManual distinguishes a count the
+    // sensor MEASURED from one the lifter STATED; a load is never measured by
+    // anything, so the same flag on this column would be true of every row
+    // ever written and would carry no information. A corrected load is
+    // therefore indistinguishable in the export from a load typed before the
+    // set -- correctly, because they are the same fact.
+    //
+    // A new @Query changes no table, so DATABASE_VERSION does not move for it.
+    @Query("UPDATE set_records SET loadKg = :loadKg WHERE id = :setId")
+    suspend fun overrideLoad(setId: Long, loadKg: Double)
+
     // No "corrected" flag beside it: reps have repsManual, seconds have no such
     // column, and adding one is a migration this change does not make. A new
     // @Query changes no table, so DATABASE_VERSION does not move for this.

@@ -571,6 +571,38 @@ class SessionRepository(
     suspend fun overrideReps(setId: Long, reps: Int) = sessionDao.overrideReps(setId, reps)
 
     /**
+     * Lifter correction of the load a just-finished set was recorded at, from
+     * the rest screen (#205).
+     *
+     * [loadKg] is the body-weight-inclusive total, computed by
+     * [com.macrophage.barspeed.model.SetLoadPolicy.correctedTotalKg] from the
+     * total and the added load the write itself stored, so this method never
+     * sees a body weight and cannot move one.
+     *
+     * THE SET JUST FINISHED, AND ONLY THAT ONE. This takes an id like every
+     * other correction here and so is not itself what bounds the scope; what
+     * bounds it is that `SetRatingTracker` is pointed at exactly one row and
+     * the rest screen is the only caller. Editing an arbitrary past set from
+     * the history screen is a larger and different change and is not in
+     * #205.
+     *
+     * WHAT IT DOES NOT REWRITE, and this is the part a reader needs. The
+     * stored `analysisJson` was computed by `SetAnalyzer` from the load as it
+     * stood at set end, so the per-rep `peakPowerW` and `meanConPowerW` in it
+     * -- and the set-level figures the export derives from them -- are still
+     * on the OLD load after this runs. They are recomputable, because the
+     * gzipped raw IMU stream is persisted per set and the corrected load is
+     * now on the row, but nothing in the app recomputes them today. Rescaling
+     * them here would put the bar-power rule in a second place; re-running the
+     * DSP is a change of its own. Named rather than papered over.
+     *
+     * DELIBERATELY WRONG (#205 c2b). It writes the rep count instead, so that
+     * the pin in SessionRepositoryRecordSetTest is shown failing before the
+     * delegation lands. Corrected in the next commit.
+     */
+    suspend fun overrideLoad(setId: Long, loadKg: Double) = sessionDao.overrideReps(setId, loadKg.toInt())
+
+    /**
      * Lifter correction of a hold or carry's recorded seconds, from the rest
      * screen.
      *
