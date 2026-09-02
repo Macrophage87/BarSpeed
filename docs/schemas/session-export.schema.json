@@ -131,7 +131,7 @@
       "properties": {
         "load_kg": {
           "type": "number",
-          "description": "The load the set is recorded at, body-weight-inclusive on a bodyweight movement. A load corrected on the rest screen after the set is indistinguishable here from one entered before it -- both are the lifter stating what was on the bar -- and the deviation from plannedLoad_kg is what a reader asks. The per-rep figures under summary are NOT recomputed on a correction."
+          "description": "The load the set is recorded at, body-weight-inclusive on a bodyweight movement. A load corrected on the rest screen after the set is indistinguishable here from one entered before it -- both are the lifter stating what was on the bar -- and the deviation from plannedLoad_kg is what a reader asks. The analysis figures under summary are NOT recomputed on a correction."
         },
         "load_lb": {
           "type": "number",
