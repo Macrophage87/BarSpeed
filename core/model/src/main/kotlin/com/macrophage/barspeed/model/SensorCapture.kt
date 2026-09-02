@@ -456,27 +456,52 @@ object SensorCapturePolicy {
      * Which role the DSP is pointed at once it is known which units actually
      * streamed, and whether that is the role the set armed (#207).
      *
-     * TODAY THIS FUNCTION CHANGES NOTHING and says so deliberately: it returns
-     * the armed role and `fellBack = false` whatever streamed, which is the
-     * rule [roster] states -- *"[preferredAddress] decides which role is
-     * [SensorRoster.analysed], and nothing else does"* -- lifted to the point
-     * where the streams are known. It is a seam for issue #207 and the commit
-     * that changes its body is what changes behaviour. Nothing else about the
-     * record path moves with it.
+     * THE ANALYSED ROLE MUST BE A ROLE THAT STREAMED. [roster] decides which
+     * unit the app is POINTED at before a set begins, from the preferred
+     * address and nothing else, and that is the right rule for arming: it
+     * names the unit whose link the existing client is maintaining. It is the
+     * wrong rule for analysis, because by the time there is anything to
+     * analyse it is known which unit produced samples, and pointing the DSP at
+     * an empty buffer publishes an empty summary over a capture the app is
+     * holding. Field-36 published `summary: {}` on 13 of 14 sets that way,
+     * with complete 99.4 Hz streams from the other unit in every one of them.
      *
-     * [present] is the roles that put samples in a buffer, in the armed order,
-     * and it is [SensorCapturePolicy.present]'s answer rather than a second
-     * reading of the same question -- the export asks that function which
-     * roles arrived, and a record path asking it differently is how the two
-     * documents come to disagree about one set.
+     * THE MOVE IS PUBLISHED rather than left to be derived. Before this, an
+     * analysed role missing from [present] was the marker for "the figures
+     * came from nothing"; after it, the analysed role is present in both the
+     * ordinary case and the fallback, so that comparison separates nothing.
+     * What remains to be said -- these figures came from the unit the app was
+     * pointed at, so they are comparable with a corpus recorded the same way
+     * -- is [AnalysedStream.fellBack] and is said outright.
+     *
+     * NOTHING STREAMING IS NOT A FALLBACK. With no other capture to move onto,
+     * the honest answer is the role the set armed: the figures are empty
+     * because there was no stream, and renaming the role would say a unit was
+     * analysed when none was. Neither is a null [armed], which is the ordinary
+     * one-sensor set and the set that met two paired units it could not tell
+     * apart -- both record one UNROLED stream, and there is no second buffer
+     * and no label to move to.
+     *
+     * The candidate is the first entry of [present] that is not [armed], which
+     * with two [SensorRole] entries is the only one there can be. [present] is
+     * the roles that put samples in a buffer, in the armed order, and it is
+     * [SensorCapturePolicy.present]'s answer rather than a second reading of
+     * the same question -- the export asks that function which roles arrived,
+     * and a record path asking it differently is how the two documents come to
+     * disagree about one set.
+     *
+     * IT DECIDES NOTHING RETROACTIVELY. This runs when a set is recorded, and
+     * the analysis it selects the stream for is frozen into that set's row.
+     * A set already on disk keeps the role and the figures it was written
+     * with, and no export re-decides: republishing an old set's summary from
+     * the other stream would put figures under a role that did not produce
+     * them.
      */
-    @Suppress("UnusedParameter")
-    fun analysedStream(armed: SensorRole?, present: List<SensorRole>): AnalysedStream =
-        // `present` is unread until the fallback lands. Named in the signature
-        // now rather than added later: a parameter that arrives with the fix
-        // makes this a different function at every call site, and the point of
-        // a seam is that its call sites do not move twice.
-        AnalysedStream(role = armed, fellBack = false)
+    fun analysedStream(armed: SensorRole?, present: List<SensorRole>): AnalysedStream {
+        if (armed == null || armed in present) return AnalysedStream(role = armed, fellBack = false)
+        val fallback = present.firstOrNull { it != armed } ?: return AnalysedStream(role = armed, fellBack = false)
+        return AnalysedStream(role = fallback, fellBack = true)
+    }
 
     /**
      * Which of the armed roles actually reached the archive, in the order they
