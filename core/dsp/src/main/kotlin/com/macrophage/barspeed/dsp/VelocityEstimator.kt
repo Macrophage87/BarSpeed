@@ -206,14 +206,106 @@ object VelocityEstimator {
         return dvMps <= biasRateCapMps2 * dtS && 0.5 * dvMps * dtS <= config.minRomM
     }
 
+    /**
+     * The ABSOLUTE quiet test: near 1 g and barely rotating, both thresholds
+     * fixed. This is the predicate [StreamingSetTracker] reads sample by
+     * sample, where there is no set to take a distribution over.
+     */
     internal fun isQuietSample(sample: ImuSample, config: DspConfig): Boolean =
+        isAnchorCandidate(sample, config, gyroGate = true)
+
+    /**
+     * One sample's anchor candidacy, with the gyro clause switchable.
+     *
+     * The acceleration clause is not optional and never has been. The gyro
+     * clause is separated out because it carries an assumption the
+     * acceleration clause does not: see [gyroGateApplies].
+     */
+    internal fun isAnchorCandidate(sample: ImuSample, config: DspConfig, gyroGate: Boolean): Boolean =
         abs(FrameTransform.accMagnitudeG(sample) - 1.0) < config.stationaryAccBandG &&
-            FrameTransform.gyroMagnitudeDps(sample) < config.stationaryGyroBandDps
+            (!gyroGate || FrameTransform.gyroMagnitudeDps(sample) < config.stationaryGyroBandDps)
+
+    /** Median gyro magnitude over the set, deg/s. */
+    internal fun medianGyroDps(samples: List<ImuSample>): Double = gyroQuantileDps(samples, 0.5)
+
+    /**
+     * Linearly-interpolated quantile of gyro magnitude over the set, deg/s.
+     * `fraction` is 0.0 for the minimum and 1.0 for the maximum.
+     */
+    internal fun gyroQuantileDps(samples: List<ImuSample>, fraction: Double): Double {
+        if (samples.isEmpty()) return 0.0
+        val g = DoubleArray(samples.size) { FrameTransform.gyroMagnitudeDps(samples[it]) }
+        g.sort()
+        val pos = (g.size - 1) * fraction
+        val lo = kotlin.math.floor(pos).toInt()
+        val hi = kotlin.math.ceil(pos).toInt()
+        return if (lo == hi) g[lo] else g[lo] + (pos - lo) * (g[hi] - g[lo])
+    }
+
+    /** The low probe of the straddle test in [gyroGateApplies]. */
+    internal const val GYRO_STILLNESS_QUANTILE = 0.10
+
+    /**
+     * Whether this set's own rotation supports the fixed gyro clause.
+     *
+     * [DspConfig.stationaryGyroBandDps] encodes one premise: a resting
+     * implement does not rotate at 10 deg/s. That is a claim about the MOUNT,
+     * not about the lift, and it is testable against the set that was
+     * recorded. The clause is dropped only where the set's gyro distribution
+     * STRADDLES the gate -- more than half of it above, at least a tenth of it
+     * below. Both probes are against the same constant; no second threshold is
+     * introduced.
+     *
+     * The two halves say different things and both are needed.
+     *
+     * Above the median, the clause is no longer discriminating. It rejects the
+     * MAJORITY of the set on rotation alone, which is a veto rather than a
+     * filter, and what it vetoes is the anchor supply of a set whose implement
+     * rotates throughout. That is the bar-mounted case issue #87 is about.
+     *
+     * Below the tenth percentile, the set still contains a genuinely
+     * low-rotation population -- moments where the implement really is close to
+     * still -- so there is something for the acceleration term to find once the
+     * clause is out of the way. Where even the tenth percentile is above the
+     * gate the implement never stops rotating at all, the clause is not the
+     * reason no rest is found, and dropping it only admits samples taken while
+     * the sensor was turning. `field-reardeltfly-s32-set06` is that case: it is
+     * the corpus's only capture with a tenth percentile above the gate
+     * (13.19 deg/s against 2.26-4.28 on the six that straddle), and it is the
+     * only capture the low probe excludes.
+     *
+     * BOTH CHOICES ARE CHOICES. The median is where filtering becomes vetoing;
+     * the tenth percentile is selected on this corpus and nothing derives it.
+     * Measured: the fifth percentile does NOT exclude the rear delt fly (6.50
+     * deg/s, under the gate) and the twenty-fifth wrongly keeps the gate on
+     * `field-bench-3010-6rep-s37-set06` (12.93 deg/s, over it). So the low
+     * probe is fitted to one capture, and saying otherwise would be a claim
+     * stronger than its evidence.
+     *
+     * What IS structural is the consequence. This function selects between
+     * exactly two behaviours that have both been measured over this corpus --
+     * today's two-term predicate, and the acceleration term alone -- so unlike
+     * a retuned band it cannot produce a third, unstudied regime, and every set
+     * whose whole gyro distribution already sits under the gate is
+     * bit-identical either way. That is every stack-mounted, machine and strap
+     * capture in the corpus.
+     *
+     * Not verified: whether a sample admitted here is one where the implement
+     * was actually at rest. Nothing in this repository can answer that; only a
+     * field session with a per-rep stopwatch can. Issue #87 carries the
+     * protocol.
+     */
+    internal fun gyroGateApplies(samples: List<ImuSample>, config: DspConfig): Boolean {
+        val band = config.stationaryGyroBandDps
+        val straddles = medianGyroDps(samples) >= band &&
+            gyroQuantileDps(samples, GYRO_STILLNESS_QUANTILE) < band
+        return !straddles
+    }
 
     /** True where the IMU itself is quiet for at least minStationaryS. */
     internal fun quietMask(samples: List<ImuSample>, timeS: DoubleArray, config: DspConfig): BooleanArray {
         val n = samples.size
-        val candidate = BooleanArray(n) { isQuietSample(samples[it], config) }
+        val candidate = BooleanArray(n) { isAnchorCandidate(samples[it], config, gyroGate = true) }
         val quiet = BooleanArray(n)
         var runStart = -1
         for (i in 0..n) {

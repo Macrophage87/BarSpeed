@@ -1,0 +1,223 @@
+package com.macrophage.barspeed.dsp
+
+import com.macrophage.barspeed.model.ImuSample
+import java.io.File
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+/**
+ * The seam issue #87's fix acts on, pinned on its own before anything uses it.
+ *
+ * [VelocityEstimator.isQuietSample] used to be one predicate serving two
+ * consumers with different needs: the batch anchor walk in
+ * [VelocityEstimator.quietMask], which has the whole set in hand, and
+ * [StreamingSetTracker], which sees one sample at a time and has no
+ * distribution to consult. This file pins the three symbols that split those
+ * jobs apart -- [VelocityEstimator.isAnchorCandidate],
+ * [VelocityEstimator.gyroQuantileDps] and [VelocityEstimator.gyroGateApplies]
+ * -- and pins that introducing them changed nothing.
+ *
+ * The equivalence assertion is the load-bearing one: `isQuietSample` must stay
+ * bit-identical to `isAnchorCandidate(gyroGate = true)` sample for sample,
+ * because that is what keeps the live path out of this change entirely.
+ */
+class GyroGateTest {
+    private fun load(n: String): List<ImuSample> = ImuCsv.decode(
+        javaClass.getResourceAsStream("/$n.csv")!!.readBytes().decodeToString(),
+    )
+
+    /** Every capture in the corpus, so no fixture is silently outside this check. */
+    private val corpus = listOf(
+        "field-backsquat-10hz",
+        "field-backsquat-10hz-set5",
+        "field-backsquat-4011-6rep-s36-set01",
+        "field-backsquat-99hz-6rep",
+        "field-bench-3010-6rep-s37-set05",
+        "field-bench-3010-6rep-s37-set06",
+        "field-bench-rotating-6rep",
+        "field-bench-rotating-6rep-ok",
+        "field-cablerow-static-8rep",
+        "field-facepull-static-12rep",
+        "field-legcurl-1030-10rep",
+        "field-legcurl-1030-12rep",
+        "field-legcurl-1030-12rep-b",
+        "field-legcurl-1030-12rep-c",
+        "field-legpress-2010-8rep",
+        "field-legpress-single-2010-8rep",
+        "field-legpress-single-2011-8rep-s36-set07",
+        "field-ohp-100hz-bursty",
+        "field-ohp-3010-6rep-s37-set02",
+        "field-ohp-rotating-8rep",
+        "field-ohp-rotating-8rep-b",
+        "field-pallof-static-12rep",
+        "field-pullup-3010-8rep-s37-set09",
+        "field-rdl-3010-10rep",
+        "field-rdl-3010-10rep-s36-set05",
+        "field-reardeltfly-s32-set06",
+        "field-seated-ohp-2rep",
+        "field-still-0rep",
+    )
+
+    @Test
+    fun `the split predicate is the old predicate when the gyro gate is on`() {
+        // The whole live path rests on this. StreamingSetTracker keeps calling
+        // isQuietSample and must keep getting the answer it got before.
+        val config = DspConfig()
+        corpus.forEach { fixture ->
+            val samples = load(fixture)
+            val disagreements = samples.count { s ->
+                VelocityEstimator.isQuietSample(s, config) !=
+                    VelocityEstimator.isAnchorCandidate(s, config, gyroGate = true)
+            }
+            assertEquals(0, disagreements, "$fixture: samples where the two forms disagree, of ${samples.size}")
+        }
+    }
+
+    @Test
+    fun `dropping the gyro gate can only widen the candidate set, never narrow it`() {
+        // Structural, not fitted: the two predicates differ by one conjunct, so
+        // every sample admitted with the gate on is admitted with it off. Pinned
+        // because it is what bounds the fix -- the change can add candidate
+        // windows and can never remove one.
+        val config = DspConfig()
+        corpus.forEach { fixture ->
+            val samples = load(fixture)
+            val lost = samples.count { s ->
+                VelocityEstimator.isAnchorCandidate(s, config, gyroGate = true) &&
+                    !VelocityEstimator.isAnchorCandidate(s, config, gyroGate = false)
+            }
+            assertEquals(0, lost, "$fixture: candidates the acceleration term alone would lose")
+        }
+    }
+
+    @Test
+    fun `the median gyro magnitude of each capture that carries a hand count`() {
+        // Pinned exactly, because this number is one of the two gyroGateApplies
+        // reads and a mutation to the quantile that returned, say, the mean
+        // would pass every downstream assertion on most captures.
+        val expected = mapOf(
+            "field-ohp-3010-6rep-s37-set02" to 16.742,
+            "field-bench-3010-6rep-s37-set05" to 23.923,
+            "field-bench-3010-6rep-s37-set06" to 32.318,
+            "field-backsquat-4011-6rep-s36-set01" to 15.497,
+            "field-rdl-3010-10rep-s36-set05" to 6.423,
+            "field-pullup-3010-8rep-s37-set09" to 0.936,
+            "field-ohp-rotating-8rep" to 12.061,
+            "field-ohp-rotating-8rep-b" to 12.976,
+            "field-reardeltfly-s32-set06" to 62.870,
+            "field-cablerow-static-8rep" to 1.099,
+            "field-still-0rep" to 0.0,
+        )
+        expected.forEach { (fixture, median) ->
+            assertEquals(
+                median,
+                VelocityEstimator.medianGyroDps(load(fixture)),
+                0.01,
+                "$fixture: median gyro magnitude, deg/s",
+            )
+        }
+    }
+
+    @Test
+    fun `the tenth-percentile probe, which is the half of the rule fitted to one capture`() {
+        // The low probe of the straddle test, pinned for every capture whose
+        // median clears the gate -- the only captures it can decide. One of the
+        // seven sits above the gate and it is the one the probe exists to
+        // exclude; the other six sit at 2.26-4.28 deg/s, well clear.
+        val expected = mapOf(
+            "field-ohp-3010-6rep-s37-set02" to 3.560,
+            "field-bench-3010-6rep-s37-set05" to 3.807,
+            "field-bench-3010-6rep-s37-set06" to 4.277,
+            "field-backsquat-4011-6rep-s36-set01" to 2.487,
+            "field-backsquat-99hz-6rep" to 2.966,
+            "field-ohp-rotating-8rep" to 2.257,
+            "field-ohp-rotating-8rep-b" to 2.807,
+            "field-reardeltfly-s32-set06" to 13.194,
+        )
+        expected.forEach { (fixture, p10) ->
+            assertEquals(
+                p10,
+                VelocityEstimator.gyroQuantileDps(load(fixture), VelocityEstimator.GYRO_STILLNESS_QUANTILE),
+                0.01,
+                "$fixture: tenth percentile of gyro magnitude, deg/s",
+            )
+        }
+        // And the two alternatives that do not work, measured rather than
+        // asserted from reasoning: the fifth percentile fails to exclude the
+        // rear delt fly, and the twenty-fifth wrongly excludes a bench set the
+        // change is meant to help.
+        assertTrue(
+            VelocityEstimator.gyroQuantileDps(load("field-reardeltfly-s32-set06"), 0.05) < 10.0,
+            "the fifth percentile would not exclude the rear delt fly",
+        )
+        assertTrue(
+            VelocityEstimator.gyroQuantileDps(load("field-bench-3010-6rep-s37-set06"), 0.25) >= 10.0,
+            "the twenty-fifth percentile would wrongly keep the gate on a bench set",
+        )
+    }
+
+    @Test
+    fun `the gate holds on every non-rotating mount in the corpus and fails on the rotating ones`() {
+        // The two families, by the predicate rather than by the file name.
+        val config = DspConfig()
+        val holds = listOf(
+            "field-pullup-3010-8rep-s37-set09",
+            "field-rdl-3010-10rep-s36-set05",
+            "field-cablerow-static-8rep",
+            "field-facepull-static-12rep",
+            "field-pallof-static-12rep",
+            "field-legcurl-1030-10rep",
+            "field-legcurl-1030-12rep",
+            "field-legcurl-1030-12rep-b",
+            "field-legcurl-1030-12rep-c",
+            "field-legpress-2010-8rep",
+            "field-legpress-single-2010-8rep",
+            "field-legpress-single-2011-8rep-s36-set07",
+            "field-still-0rep",
+            "field-backsquat-10hz",
+            "field-backsquat-10hz-set5",
+            "field-bench-rotating-6rep",
+            "field-bench-rotating-6rep-ok",
+            "field-ohp-100hz-bursty",
+            "field-rdl-3010-10rep",
+            "field-seated-ohp-2rep",
+            // Median 62.87 deg/s, well over the gate -- but a tenth percentile
+            // of 13.19, also over it. The implement never stops rotating, so
+            // the gate is not what costs this capture its anchors and dropping
+            // it would only admit samples taken mid-rotation. The low probe of
+            // the straddle test is what keeps this one out.
+            "field-reardeltfly-s32-set06",
+        )
+        val fails = listOf(
+            "field-ohp-3010-6rep-s37-set02",
+            "field-bench-3010-6rep-s37-set05",
+            "field-bench-3010-6rep-s37-set06",
+            "field-backsquat-4011-6rep-s36-set01",
+            "field-backsquat-99hz-6rep",
+            "field-ohp-rotating-8rep",
+            "field-ohp-rotating-8rep-b",
+        )
+        holds.forEach { assertTrue(VelocityEstimator.gyroGateApplies(load(it), config), "$it: gate should hold") }
+        fails.forEach { assertFalse(VelocityEstimator.gyroGateApplies(load(it), config), "$it: gate should fail") }
+        assertEquals(
+            corpus.sorted(),
+            (holds + fails).sorted(),
+            "every capture in the corpus is classified exactly once",
+        )
+    }
+
+    @Test
+    fun `the corpus list here is the resource directory, not a hand-kept subset`() {
+        // Same guard [CuedRepCoverageTest] carries, for the same reason: a
+        // capture added and named nowhere would leave every assertion above
+        // green while the claims they make went narrower than they read.
+        val dir = File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile
+        val onDisk = dir.list()!!
+            .filter { it.startsWith("field-") && it.endsWith(".csv") && !it.endsWith("-cues.csv") }
+            .map { it.removeSuffix(".csv") }
+            .sorted()
+        assertEquals(onDisk, corpus.sorted(), "every capture on the classpath is in this file's corpus")
+    }
+}
