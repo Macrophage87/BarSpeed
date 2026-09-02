@@ -595,6 +595,26 @@ class AppendedSlotTest {
     }
 
     /**
+     * RED before the fix. THE FIFTH FIELD. `removedState` cleared the four
+     * stated values beside it and left [RecordState.statedSide] standing, so
+     * a side stated for the set that is then REMOVED survives into the slot
+     * that moves up. That slot is outside the block -- the removal takes the
+     * last appended set, so nothing of that exercise follows it -- and
+     * `carriedValues` bakes the standing side into it, which `set_records`
+     * then publishes as `side` beside an untouched `plannedSide` (#215).
+     *
+     * Stated on the state the append left, which is where the control lives:
+     * the lifter appends a set, says "left" for it, then takes it back out.
+     */
+    @Test
+    fun `removing the set that had become the coming one clears a stated side`() {
+        val once = assertNotNull(appendedState(resting(pulldownThenPress(), 0)))
+        val back = assertNotNull(removedState(once.copy(statedSide = "left")))
+        assertEquals(press.id, back.upcomingSlot?.exercise?.id)
+        assertNull(back.statedSide)
+    }
+
+    /**
      * RED before c3. THE BOUNDARY, in :app. Once the appended set has RUN it
      * is a recorded set, and no state this function produces removes one.
      *
