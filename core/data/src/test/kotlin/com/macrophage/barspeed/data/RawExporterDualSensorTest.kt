@@ -279,6 +279,39 @@ class RawExporterDualSensorTest {
     }
 
     /**
+     * DIFFERENTIAL, issue #207. The manifest says when the analysed role is
+     * not the role the set armed.
+     *
+     * Both documents or neither: the raw archive and `session.json` are read
+     * by different consumers, and the archive is the one a reader opens to
+     * find the CSV the figures came from. A reader holding only `meta.json`
+     * would otherwise see an `analysedRole` naming the only stream in the
+     * directory and have no way to tell that it was the second choice.
+     *
+     * Written only when it is true, which is the same rule `session.json`
+     * follows -- its exporter drops a false default -- so the two documents
+     * express the ordinary set identically, by omission.
+     */
+    @Test
+    fun `the manifest says when the analysed role is not the one the set armed`() = runTest {
+        val fellBack = descriptor(
+            dual.copy(analysed = SensorRole.B, analysedFellBack = true),
+            listOf(imuStream(2L, "b", secondarySamples, storedRate = 98.5)),
+        )
+        assertEquals("b", fellBack.text("analysedRole"))
+        assertEquals(
+            true,
+            fellBack["analysedFellBack"]?.jsonPrimitive?.content?.toBoolean(),
+            "the manifest never says the analysed role moved",
+        )
+
+        assertNull(
+            descriptor(dual, dualStreams())["analysedFellBack"],
+            "an ordinary dual set's manifest carries the key anyway",
+        )
+    }
+
+    /**
      * DIFFERENTIAL, issue #198. A set that recorded one stream because two
      * paired units could not be told apart says so in the manifest too.
      *
