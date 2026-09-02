@@ -186,10 +186,10 @@ data class ExerciseDef(
          * owner-confirmed, a hang on an assist machine's rope, and that rope
          * did ride the assist stack's cable that session. But the id names
          * the grip implement, not the equipment class, on the same reasoning
-         * that narrows `seated_row` above: a rope dead hang is at least as
-         * often a fixed rig or bar with a rope tied off for grip -- no
-         * cable, no stack, no pin selection at all -- and the id cannot
-         * distinguish that case from field-37's. Adding it here would
+         * that narrows `seated_row` above: a rope dead hang may equally be a
+         * fixed rig or bar with a rope tied off for grip -- no cable, no
+         * stack, no pin selection at all -- and the id cannot distinguish
+         * that case from field-37's. Adding it here would
          * default every future `rope_dead_hang`, including the fixed-rig
          * one, to stack-mounted on the strength of one session. Omitting the
          * key on this id still records bar-mounted; a plan that knows better

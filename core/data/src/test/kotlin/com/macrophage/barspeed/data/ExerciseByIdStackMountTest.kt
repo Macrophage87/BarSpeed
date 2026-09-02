@@ -13,10 +13,11 @@ import kotlin.test.assertEquals
  * `SessionRepository.exerciseById` serves the PLAN path only -- its one
  * caller is `PlanQueue.kt`'s `flattenPlan`. A set the lifter starts from the
  * picker with no plan at all does not reach this method: it resolves through
- * `RecordState.currentExercise`, which falls back to a bare [ExerciseDef]
- * constructor call whose `sensorOnStack` is the plain `false` default, and IS
- * recorded bar-mounted today. A plan that declares the key still overrides
- * it, in `SetGeometryPolicy.resolve`.
+ * `RecordState.currentExercise`, which answers from [ExerciseDef.seedById]
+ * -- the picker offers seeded ids only -- and no SEED entry sets
+ * `sensorOnStack`, so it takes the plain `false` default and IS recorded
+ * bar-mounted today. A plan that declares the key still overrides it, in
+ * `SetGeometryPolicy.resolve`.
  *
  * A FILE OF ITS OWN with its own fakes, for the reason `AppendedSetRecordTest`
  * gives: the classes these assertions belong beside sit on detekt's LargeClass
