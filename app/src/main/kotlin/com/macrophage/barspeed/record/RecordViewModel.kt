@@ -771,13 +771,14 @@ private fun CoroutineScope.mirrorSensorSettings(
 }
 
 /**
- * The collect job for the accelerometer that is NOT analysed.
+ * The collect job for the accelerometer that is not the ARMED one.
  *
  * Deliberately not routed through `onSample`. That function feeds the tracker,
  * the live readout and the rep announcements, and every one of those is about
- * the stream the set is judged on -- a second stream reaching them would make
- * the bar appear to move twice. In the capture release the secondary reaches
- * the buffer and the journal and nothing else.
+ * the ARMED stream -- a second stream reaching them would make the bar appear
+ * to move twice. This collector reaches the buffer and the journal and nothing
+ * else; since #207 [armedCaptureOf] can point the analysis at that buffer at
+ * set end.
  *
  * The journal is passed as a lambda rather than a reference because the field
  * it reads is reassigned by `beginSet` and cleared when a set is stored; the
@@ -804,12 +805,13 @@ private fun CoroutineScope.openSecondaryCollector(
  * the move -- three independent collectors, each copying one link's state onto
  * its own fields.
  *
- * `imuConnected`, `imuConnecting` and `imuState` still mean THE ANALYSED
- * SENSOR and nothing else. They have four consumers between them -- the dot,
- * the SETUP advice, whether an explosive lift is sensor-counted, and the set
- * journal's header -- and the correct answer for a second sensor differs at
- * each, so the second link gets its own fields rather than widening these
- * (#156).
+ * `imuConnected`, `imuConnecting` and `imuState` still mean THE ARMED SENSOR
+ * -- the link to the preferred address -- and nothing else; since #207 that is
+ * not always the stream the set's figures come from. They have four consumers
+ * between them -- the dot, the SETUP advice, whether an explosive lift is
+ * sensor-counted, and the set journal's header -- and the correct answer for a
+ * second sensor differs at each, so the second link gets its own fields rather
+ * than widening these (#156).
  */
 private fun CoroutineScope.mirrorLinkStates(autoConnect: AutoConnectManager, state: MutableStateFlow<RecordState>) {
     launch {

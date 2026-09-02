@@ -101,7 +101,7 @@ class SensorCapturePolicyTest {
     }
 
     @Test
-    fun `two paired and labelled units arm both roles, the preferred one analysed`() {
+    fun `two paired and labelled units arm both roles, the preferred one armed for analysis`() {
         val roster =
             SensorCapturePolicy.roster(
                 pairedImuAddresses = listOf(a, b),
@@ -426,16 +426,16 @@ class SensorCapturePolicyTest {
      *
      * Field-36 is the second case: two units paired and labelled, the
      * preference on b, b in a bag, and 13 of 14 sets published `summary: {}`
-     * over complete role-a streams. The preference decides which unit the
-     * existing link is maintained for and it is a fact about wiring; it cannot
-     * decide which stream the figures come from, because by the time there are
-     * figures it is known which unit produced any.
+     * over role-a streams the app was holding. The preference decides which
+     * unit the existing link is maintained for and it is a fact about wiring;
+     * it cannot decide which stream the figures come from, because by the time
+     * there are figures it is known which unit produced any.
      *
      * `fellBack` is asserted in BOTH directions on every case rather than only
      * where it is true. It is the only thing separating "analysed the
      * preferred unit" from "analysed the only unit that turned up" once both
-     * name a role that is present, and a flag that is only ever checked when
-     * set is a flag nothing stops being written.
+     * name a role that is present, and a flag only ever checked where it is
+     * TRUE is a flag nothing stops being written.
      *
      * NOTHING STREAMED is deliberately not a fallback. There is no other
      * stream to move onto, so the honest answer is the role the set armed and

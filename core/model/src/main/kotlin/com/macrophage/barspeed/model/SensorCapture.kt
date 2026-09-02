@@ -162,7 +162,12 @@ data class SensorRoster(
      * apart, which [shortfall] names.
      */
     val expected: List<SensorRole> = emptyList(),
-    /** Which role's stream feeds the DSP; null when no role is in play. */
+    /**
+     * Which role's stream the set is ARMED to analyse; null when no role is in
+     * play. [SensorCapturePolicy.analysedStream] decides which stream the
+     * figures actually come from, once it is known which units streamed
+     * (#207).
+     */
     val analysed: SensorRole? = null,
     /** The role of the second stream, when there is one. */
     val secondary: SensorRole? = null,
@@ -479,8 +484,8 @@ object SensorCapturePolicy {
      * analyse it is known which unit produced samples, and pointing the DSP at
      * an empty buffer publishes an empty summary over a capture the app is
      * holding. Field-36 published `summary: {}` on 13 of 14 sets that way,
-     * and the other unit's file in each of those 13 spans the whole set at a
-     * span-based 99.33-99.42 Hz. SPAN-BASED, so it says the stream was long
+     * and the other unit's file in each of those 13 holds 3,884-7,104 rows at
+     * a span-based 99.33-99.42 Hz. SPAN-BASED, so it says the stream was long
      * and evenly clocked and NOT that it was complete: a dropout is
      * arithmetically indistinguishable from a slower sensor and nothing in
      * that archive can separate them.

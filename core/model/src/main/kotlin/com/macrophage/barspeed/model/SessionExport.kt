@@ -755,11 +755,12 @@ data class SetSensorsExport(
     /**
      * Which role's stream every figure in this set was computed from.
      *
-     * Since 1.16 it is a role that STREAMED wherever one did: a set armed to
-     * analyse a unit that produced nothing is analysed from the unit that did,
-     * and [analysedFellBack] is what says the app moved. Read that key rather
-     * than comparing this one with [present], which no longer separates the
-     * two cases.
+     * Since #207 it is a role that STREAMED wherever one did -- the boundary
+     * is when the set was RECORDED, not what the document's `schemaVersion`
+     * says: a set armed to analyse a unit that produced nothing is analysed
+     * from the unit that did, and [analysedFellBack] is what says the app
+     * moved. Read that key rather than comparing this one with [present],
+     * which no longer separates the two cases.
      *
      * It can still name a role absent from [present] in two situations, and
      * neither has figures drawn from the surviving stream: a set where NOTHING

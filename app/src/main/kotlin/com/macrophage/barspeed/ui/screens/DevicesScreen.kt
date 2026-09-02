@@ -131,7 +131,8 @@ private fun DualSetupCard(step: DualSetupStep) {
  * sensor knocking the other off (#184). It is now an act with its own control
  * and its own words. For a bar sensor the second unit's stream is still
  * recorded when both are labelled; what "analysed" decides is which one the
- * figures come from.
+ * set is ARMED to analyse; since #207 the figures come from that unit only
+ * where it streamed.
  *
  * The words are `DevicePairingPolicy.preferenceControl`'s, not this file's,
  * because no test on the CI path can render a `@Composable`, and which rows

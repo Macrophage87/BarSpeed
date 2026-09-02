@@ -215,7 +215,7 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
                         // grey dot for every single-sensor lifter, which reads
                         // as something being broken. Labelled with the ROLE
                         // rather than "IMU"/"IMU B" so the dot that goes amber
-                        // names the unit to go and look at -- and the analysed
+                        // names the unit to go and look at -- and the armed
                         // one is not always A (#156).
                         val roster = state.roster
                         SensorDot(roster.analysed?.name ?: "IMU", state.imuState, demoActive = state.demoMode)
