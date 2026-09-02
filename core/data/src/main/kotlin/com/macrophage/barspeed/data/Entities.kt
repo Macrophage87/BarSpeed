@@ -313,7 +313,7 @@ data class SetRecordEntity(
 data class RawStreamEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val setId: Long,
-    /** One of: imu, hrm, rest_before_hrm, cues, reps, prep. */
+    /** One of: imu, hrm, rest_before_hrm, rest_after_hrm, cues, reps, prep. */
     val kind: String,
     /**
      * Gzipped CSV in the canonical format (see ImuCsv / HrCsv / CueCsv /
@@ -374,6 +374,37 @@ data class RawStreamEntity(
          * against exactly this kind reaching it.
          */
         const val KIND_REST_BEFORE_HRM = "rest_before_hrm"
+
+        /**
+         * Heart rate recorded during the rest window AFTER the last set of a
+         * session, issue #109.
+         *
+         * The one window [KIND_REST_BEFORE_HRM]'s forward attachment cannot
+         * reach: there is no next set to carry it. Field-36 measured the cost
+         * -- fourteen `rest_before_hrm` files and nothing after set 14 -- and
+         * the window it drops is the one the lifter is most likely to be
+         * genuinely resting through.
+         *
+         * It attaches BACKWARD, onto the last set's row, and that is the
+         * second, non-atomic write [KIND_REST_BEFORE_HRM] was designed to
+         * avoid. The trade is stated rather than hidden: the alternative is a
+         * column or a table on the session, which costs a `DATABASE_VERSION`
+         * bump and a migration, and `kind` is a free-form string so this costs
+         * neither. A failed second write loses this window and nothing else --
+         * the set row and all its own streams are already durable -- whereas
+         * the forward attachment risks nothing because it rides an insert that
+         * has to happen anyway.
+         *
+         * A SEPARATE KIND FROM [KIND_REST_BEFORE_HRM], not a position. Both
+         * are rest windows and both would be a `rest_before` of some set if
+         * the session had continued; what distinguishes this one is that the
+         * session ended, and a reader must be able to see that from the
+         * filename rather than by counting sets. It is a different population
+         * from [KIND_HRM] for the same reason that one is, and the name ends
+         * in `hrm` in the same trap-laying way: every selector matching it
+         * must match by equality.
+         */
+        const val KIND_REST_AFTER_HRM = "rest_after_hrm"
 
         const val KIND_CUES = "cues"
 

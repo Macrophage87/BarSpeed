@@ -4,6 +4,8 @@ import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.hrm.HrTrust
 import com.macrophage.barspeed.model.ExerciseDef
+import com.macrophage.barspeed.model.FinalRestWindowDecision
+import com.macrophage.barspeed.model.FinalRestWindowPolicy
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PrepWindow
@@ -456,6 +458,46 @@ class SessionRepository(
                 sessionRpe = SessionRpe.accepted(sessionRpe),
             ),
         )
+    }
+
+    /**
+     * The rest window after the LAST set of a session, issue #109.
+     *
+     * SEPARATE FROM [endSession] and called after it, deliberately. The two
+     * writes are not one transaction and cannot be: this one inserts onto a
+     * row that is already durable, which is the second, non-atomic write path
+     * `rest_before_hrm`'s forward attachment exists to avoid. The ordering is
+     * chosen by what is unrecoverable -- `hrvRmssdMs` is held only in `:app`'s
+     * heap and exists nowhere else, so the session close goes first and this
+     * write can never delay or fail it.
+     *
+     * Both directions of failure are stated. If this throws, the caller's
+     * close reports FAILED and the frozen close is replayed; [endSession] is
+     * already guarded against writing twice and the decision below is guarded
+     * against inserting twice, so the retry costs nothing and can only add the
+     * window that is missing. If the process dies before the caller reaches
+     * this line, the window is lost -- it lives only in `:app`'s heap until
+     * here -- and that is the SAME durability every other rest window has
+     * between one set and the next. What changes is that this one now has a
+     * write to reach at all.
+     *
+     * Returns what was decided rather than a bare boolean, so a caller and a
+     * reader can tell an absent strap from a session that recorded no set.
+     * Nothing on the set row is touched: the set's own frozen heart-rate
+     * columns describe the set, and this window is not part of it.
+     */
+    suspend fun recordFinalRestWindow(sessionId: Long, samples: List<HrSample>): FinalRestWindowDecision {
+        val last = sessionDao.setsForSession(sessionId).lastOrNull()
+        val decision =
+            FinalRestWindowPolicy.decide(
+                sampleCount = samples.size,
+                hasSetToAttachTo = last != null,
+                alreadyWritten =
+                last != null &&
+                    sessionDao.rawStreamsForSet(last.id)
+                        .any { it.kind == RawStreamEntity.KIND_REST_AFTER_HRM },
+            )
+        return decision
     }
 
     fun observeSession(id: Long): Flow<SessionEntity?> = sessionDao.observeSession(id)
