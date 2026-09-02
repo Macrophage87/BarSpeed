@@ -122,7 +122,7 @@ class Migration11To12Test {
      * was, and asserting they are equal reds this file on every future bump
      * for no defect. What the hop genuinely owes the constant is that the
      * chain still reaches it. The equality itself is not dropped -- it moves
-     * to the newest hop, in [Migration12To13Test].
+     * to the newest hop, in [Migration13To14Test].
      *
      * The exact-12 assertions below are untouched. An entity changed with this
      * migration left behind still ships a build whose schema the chain cannot

@@ -124,7 +124,7 @@ class Migration10To11Test {
      * produce, and Room throws on the lifter's phone; that is what the NEWEST
      * hop asserts, including the `DATABASE_VERSION` equality this test can no
      * longer carry. That hop was [Migration11To12Test] when this was written
-     * and is [Migration12To13Test] now -- named here as "the newest hop"
+     * and is [Migration13To14Test] now -- named here as "the newest hop"
      * rather than by file, because the file changes on every bump and the
      * sentence naming it goes stale the moment one lands.
      */

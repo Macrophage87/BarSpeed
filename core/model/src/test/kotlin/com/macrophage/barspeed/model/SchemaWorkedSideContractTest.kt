@@ -136,10 +136,10 @@ class SchemaWorkedSideContractTest {
     /**
      * The version stands still and 1.17 gains a further entry.
      *
-     * Entries already ride under 1.17 for #207, #205, #213 and #223, and this
-     * is another. The number may still take entries because no tag carries it;
-     * that is the same rule, and the 1.15 and 1.17 entries each record getting
-     * it wrong once, in opposite directions.
+     * Entries already ride under 1.17 for #207, #205, #213, #223 and #224,
+     * and this is another. The number may still take entries because no tag
+     * carries it; that is the same rule, and the 1.15 and 1.17 entries each
+     * record getting it wrong once, in opposite directions.
      */
     @Test
     fun `the export version stands still and 1_17 gains a further entry`() {
