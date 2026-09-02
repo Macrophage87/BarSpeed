@@ -5,8 +5,10 @@ import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.VelocityEstimator
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.hrm.HrTrust
+import com.macrophage.barspeed.model.AbandonedSetPolicy
 import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.ExerciseExport
+import com.macrophage.barspeed.model.FailureProvenancePolicy
 import com.macrophage.barspeed.model.GeometryExport
 import com.macrophage.barspeed.model.GeometrySourceExport
 import com.macrophage.barspeed.model.HrSessionSummary
@@ -233,6 +235,12 @@ class SessionExporter(
             } else {
                 hrSamples?.let { HrTrust.summarize(it).minBpm }
             }
+        // What this set may publish about its own duration and its own prep,
+        // which depends on whether its work phase ever began (#216). One call
+        // for all three answers, so this writer cannot take one of them and
+        // leave another behind -- and the same call in buildSetDescriptor, so
+        // the two documents cannot disagree.
+        val phase = AbandonedSetPolicy.published(record.workBegan, record.actualDurationS, record.prepS)
         return SetExport(
             loadKg = record.loadKg,
             loadLb = Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0,
@@ -240,12 +248,17 @@ class SessionExporter(
             reps = record.actualReps,
             repsManual = record.repsManual,
             plannedReps = record.plannedReps,
-            durationS = record.actualDurationS,
+            durationS = phase.durationS,
+            abandonedInPrep = phase.abandonedInPrep,
             plannedDurationS = record.plannedDurationS,
             side = record.side,
             plannedSide = record.plannedSide,
             rpe = record.rpe,
             failed = record.failed,
+            // Whose verdict the failure is (#216). Never beside a set that did
+            // not fail: a `false` there would read as a derived failure that
+            // never happened.
+            failedByLifter = FailureProvenancePolicy.published(record.failed, record.failedByLifter),
             // Why it ended, and the words that go with `other` (#189). Both,
             // or the note is orphaned from the answer it belongs to.
             limiter = record.publishedLimiter,
@@ -258,7 +271,7 @@ class SessionExporter(
             warmupByLifter = WarmupMarkPolicy.markedByLifter(record.warmupMark),
             added = record.added,
             plannedPrepS = record.plannedPrepS,
-            prepS = record.prepS,
+            prepS = phase.prepS,
             restS = record.plannedRestS,
             tempoPrescribed = record.tempo,
             tempoCompliance =
@@ -695,6 +708,9 @@ class RawExporter(
         imuFileByRole: Map<String?, String>,
         prepWindow: PrepWindow?,
     ): String {
+        // The same policy the session document asks, so the two cannot
+        // disagree about one set (#216).
+        val phase = AbandonedSetPolicy.published(record.workBegan, record.actualDurationS, record.prepS)
         val fields = mutableListOf<String>()
         fun num(key: String, value: Any?) = value?.let { fields += "\"$key\": $it" }
         fun str(key: String, value: String?) = value?.let { fields += "\"$key\": \"${it.replace("\"", "'")}\"" }
@@ -713,7 +729,11 @@ class RawExporter(
         num("load_lb", Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0)
         num("reps", record.actualReps)
         num("plannedReps", record.plannedReps)
-        num("duration_s", record.actualDurationS)
+        num("duration_s", phase.durationS)
+        // The set never entered its work phase, so the zeros beside this are
+        // absences rather than measurements (#216). In the manifest as well as
+        // the session document: two writers, one fact.
+        flag("abandonedInPrep", phase.abandonedInPrep)
         str("side", record.side)
         // The prescription beside the arm worked, in the archive's manifest as
         // well as in the session document (#215). Two writers, one fact: a key
@@ -722,6 +742,11 @@ class RawExporter(
         str("plannedSide", record.plannedSide)
         num("rpe", record.rpe)
         flag("failed", record.failed)
+        // [bool] and not [flag], gated on there being a failure at all: a
+        // published false here is a real statement -- the app derived it and
+        // the lifter never said so -- and omitting it would lose exactly the
+        // half of the record #216 exists to add.
+        FailureProvenancePolicy.published(record.failed, record.failedByLifter)?.let { bool("failedByLifter", it) }
         // The reason, in the archive's manifest as well as in the session
         // document. Two writers, one fact: a change wired into only one of
         // them publishes half a record, and which half depends on which file
@@ -761,7 +786,7 @@ class RawExporter(
         // prescribed PHRASE_S seconds before the first movement cue whether the
         // prep was 2 seconds or 20.
         num("plannedPrep_s", record.plannedPrepS)
-        num("prep_s", record.prepS)
+        num("prep_s", phase.prepS)
         // Which way the lift moved and how the sensor was mounted.
         //
         // This manifest is the only thing a reader who opens the CSVs alone

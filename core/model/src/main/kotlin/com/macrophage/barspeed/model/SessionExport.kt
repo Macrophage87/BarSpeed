@@ -644,8 +644,34 @@ data class SetExport(
      * holds across 1.12 and 1.13 is comparing figures whose upper end moved:
      * under 1.12 every timed set carried the walk back to the phone inside
      * it.
+     *
+     * ABSENT FROM 1.18 on a set that ended before its work phase began, which
+     * carries [abandonedInPrep] instead. Such a set stores 0 here and that 0
+     * was never a measurement. A set recorded before database v15 carries no
+     * answer either way and publishes this key exactly as it always did.
      */
     @SerialName("duration_s") val durationS: Int? = null,
+    /**
+     * True when the set ENDED BEFORE ITS WORK PHASE BEGAN (1.18, #216).
+     *
+     * The lifter's tap started the recording, the lead-in was still running,
+     * and the set was over before the clock or the cadence started. A
+     * statement about the CAPTURE and not about the lifter -- the same write
+     * path is taken by a set abandoned in its lead-in for any reason,
+     * including a slot the app should not have armed at all.
+     *
+     * What follows from it: [durationS] and [prepS] are absent because neither
+     * was measured, [reps] is 0 because nothing was counted rather than
+     * because nothing was lifted, and any [failed] on such a set is the app's
+     * derivation -- read [failedByLifter] to confirm. The raw stream is real
+     * and worth reading; what it captured is a lead-in.
+     *
+     * Omitted when false, and omission is NOT proof of the opposite: whether
+     * the work began is a database column added at v15, so every set recorded
+     * before it publishes nothing here. A missing key means "the work began,
+     * or the app could not tell".
+     */
+    val abandonedInPrep: Boolean = false,
     @SerialName("plannedDuration_s") val plannedDurationS: Int? = null,
     /**
      * Unilateral sets: the arm the set WORKED -- "left" or "right".
@@ -714,8 +740,29 @@ data class SetExport(
      * set fell short of its planned reps or duration and the app derived a
      * failure, or both. The derived case needs no lifter input at all.
      * Omitted when false.
+     *
+     * WHICH OF THE TWO a given set carries is [failedByLifter], from 1.18.
      */
     val failed: Boolean = false,
+    /**
+     * Whether the LIFTER called this set failed, rather than the app deriving
+     * it from a shortfall (1.18, #216, #169).
+     *
+     * Present only beside [failed], and a `false` is a real statement rather
+     * than a gap: the set failed, the app derived it -- short of its
+     * prescribed reps or seconds, or ended during its lead-in -- and the
+     * lifter never said so.
+     *
+     * Absent on every set that did not fail, and on every set recorded before
+     * database v15, where the tap lived in the rest screen's memory for the
+     * life of that screen and was discarded. Nothing backfills it because
+     * there is nothing to backfill from.
+     *
+     * Moves with [failed] and never apart from it: a re-rating or a rep
+     * correction on the rest screen rewrites both in one statement, so the
+     * pair cannot disagree about one set.
+     */
+    val failedByLifter: Boolean? = null,
     /**
      * Why the set ended, from a CLOSED vocabulary, or absent (#189).
      *
@@ -843,6 +890,12 @@ data class SetExport(
      * carry recorded before a prep reached them. 0 is a value, not an absence: it is
      * the prep in which nothing is spoken before the set begins, and the default
      * here is null precisely so that 0 survives `encodeDefaults = false`.
+     *
+     * FROM 1.18 [prepS] is ALSO absent on a set that ended before its work
+     * phase began: it carries the prep the app SET OUT to play rather than
+     * the prep that elapsed, and on such a set the two provably differ.
+     * [plannedPrepS] still publishes, because the prescription is still true
+     * and without it the withheld figure would read as "no voice guide ran".
      */
     @SerialName("plannedPrep_s") val plannedPrepS: Int? = null,
     @SerialName("prep_s") val prepS: Int? = null,
