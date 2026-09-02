@@ -248,6 +248,22 @@ private fun pulldownThenPress() = listOf(
 )
 
 /**
+ * The three-set pulldown block with a press block behind it (#206).
+ *
+ * The shape in which an appended set is NOT the coming one AND has a slot
+ * after it. `rampedPulldown` has neither -- its appended set lands at the very
+ * end of the queue, so "the boxes were left alone" and "there was nothing to
+ * re-seed from" are the same observation there, and a pin built on it cannot
+ * tell them apart. Found by mutation M8; see this file's removal section.
+ */
+private fun pulldownThenPressBlock() = listOf(
+    slot(pulldown, 0, 3, loadKg = 27.2),
+    slot(pulldown, 1, 3, loadKg = 34.0),
+    slot(pulldown, 2, 3, loadKg = 34.0),
+    slot(press, 0, 2, loadKg = 20.0),
+)
+
+/**
  * One anchor, the slot [appendedState] builds after it, and the statements the
  * lifter had standing at that moment.
  *
@@ -502,6 +518,34 @@ class AppendedSlotTest {
     fun `removing a set that was not the coming one leaves the standing load alone`() {
         val once = assertNotNull(appendedState(resting(rampedPulldown(), 0, statedLoadKg = 40.0)))
         val back = assertNotNull(removedState(once))
+        assertEquals(40.0, back.statedLoadKg)
+        assertEquals(once.loadInput, back.loadInput)
+        assertEquals(once.repsInput, back.repsInput)
+    }
+
+    /**
+     * NOT a differential -- green when it was written, and added because
+     * mutation M8 SURVIVED the pin above it.
+     *
+     * M8 deletes `removedState`'s `if (!target.wasUpcoming)` guard, so every
+     * removal re-seeds. `removing a set that was not the coming one leaves the
+     * standing load alone` did not notice, because on `rampedPulldown` the
+     * appended set is the LAST slot in the queue: there is nothing after it to
+     * re-seed from, the null guard returns the same state either way, and the
+     * pin was reading a coincidence of the fixture as evidence of the rule.
+     *
+     * This one puts a press block behind the pulldowns, so the removal has a
+     * slot after it and re-seeding would be visible. The standing 40 kg is a
+     * statement about the PULLDOWN and must survive a removal that leaves
+     * pulldowns still to run.
+     */
+    @Test
+    fun `removing a set with sets still to come leaves the boxes alone`() {
+        val once = assertNotNull(appendedState(resting(pulldownThenPressBlock(), 0, statedLoadKg = 40.0)))
+        assertEquals(5, once.queue.size)
+        assertTrue(once.queue[3].isAddedSet)
+        val back = assertNotNull(removedState(once))
+        assertEquals(4, back.queue.size)
         assertEquals(40.0, back.statedLoadKg)
         assertEquals(once.loadInput, back.loadInput)
         assertEquals(once.repsInput, back.repsInput)
