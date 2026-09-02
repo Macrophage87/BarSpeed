@@ -38,6 +38,7 @@ import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
+import com.macrophage.barspeed.record.carryBlock
 import com.macrophage.barspeed.record.standingAddedKg
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.SectionCaption
@@ -314,7 +315,7 @@ private fun LoadCorrectionRow(state: RecordState, viewModel: RecordViewModel) {
                 standingAddedKg(state),
                 added,
                 state.weightUnit,
-                state.lastSetSameBlock,
+                carryBlock(state),
             ),
         ),
     )

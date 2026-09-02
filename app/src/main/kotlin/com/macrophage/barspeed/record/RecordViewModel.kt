@@ -1455,6 +1455,9 @@ private fun restingState(
         // The same block answer the three carries above are bounded by, kept
         // for the rest screen's load correction rather than asked again.
         lastSetSameBlock = sameBlock,
+        // Off the pending write, never off s.currentExercise, which by the time
+        // the rest screen draws is already the movement coming up.
+        lastSetExerciseId = p.exercise.id,
         // Pre-fill next-set inputs so in-rest edits start from plan values --
         // except the load, where a statement that still stands is shown ahead
         // of the plan's number, so the box and what the set would record cannot
@@ -1796,8 +1799,23 @@ data class RecordState(
      *
      * False by default and outside RESTING, which is the safe direction: it
      * only ever stops a carry.
+     *
+     * It is the PLAN's answer and needs a declared slot on either side, so it
+     * is false for every ad-hoc set. [lastSetExerciseId] is what answers the
+     * same question there; [SetLoadPolicy.correctionCarryBlock] picks between
+     * them.
      */
     val lastSetSameBlock: Boolean = false,
+    /**
+     * The exercise the set just finished ran against, frozen with the rest of
+     * the write.
+     *
+     * The id, not the display name [SetFeedback.exerciseName] carries: it is
+     * compared against [selectedExerciseId] to decide whether a load corrected
+     * on the rest screen may reach the set coming up on an ad-hoc session,
+     * where there is no slot for [lastSetSameBlock] to be an answer about.
+     */
+    val lastSetExerciseId: String? = null,
     val restRemainingS: Int = 0,
     val restTotalS: Int = 0,
     /** RPE the lifter picked for the just-finished set (rest screen), if any. */
