@@ -250,6 +250,9 @@ internal fun standingAddedKg(s: RecordState): Double? = s.statedLoadKg ?: s.weig
  * a fact about the set just finished and cannot move. `queueIndex` does not
  * advance until the rest ends, so `nextSlot` is the set the lifter is about to
  * do -- including after a switch or an append replaced it during the rest.
+ * The switch half of that is OBSERVED, on the emulator and not on a phone: a
+ * correction taken after Switch exercise left the coming set's declared load
+ * where it was and the corrected load on the finished set's row.
  */
 internal fun carryBlock(s: RecordState): Boolean = SetLoadPolicy.correctionCarryBlock(
     lastExerciseId = s.lastSetExerciseId,
