@@ -66,7 +66,7 @@ object SetCardValues {
      * [plannedLoadKg] is null because no plan prescribed it -- drawing its load
      * instead of falling to nothing.
      */
-    @Suppress("LongParameterList", "UNUSED_PARAMETER")
+    @Suppress("LongParameterList")
     fun of(
         kind: ExerciseKind,
         bodyweight: Boolean,
@@ -83,11 +83,43 @@ object SetCardValues {
         plannedTempo: String?,
         tempo: String?,
     ): List<SetCardValue> {
-        // DELIBERATELY WRONG, and replaced whole in the next commit. This
-        // commit exists so SetCardValuesTest's pins are shown failing before
-        // the implementation lands, which is the only durable evidence that
-        // they can fail at all.
-        return emptyList()
+        val sideValue = side?.replaceFirstChar { it.uppercase() }?.let { SetCardValue(stated = it) }
+        val repsValue =
+            reps?.let {
+                val changed = plannedReps != null && it != plannedReps
+                SetCardValue(
+                    stated = it.toString(),
+                    planned = plannedReps?.toString().takeIf { _ -> changed },
+                    suffix = "reps",
+                )
+            }
+        val holdValue =
+            durationS?.let {
+                val changed = plannedDurationS != null && it != plannedDurationS
+                SetCardValue(
+                    stated = "${it}s",
+                    planned = "${plannedDurationS}s".takeIf { _ -> changed },
+                    suffix = if (kind == ExerciseKind.CARRY) "carry" else "hold",
+                )
+            }
+        // What will be RECORDED, by SetLoadPolicy.resolve's own rule for a
+        // planned set: the statement if there is one, else the declaration,
+        // else nothing added. Comparing THAT against the frozen prescription
+        // is what keeps a stated 0 on a loadless plan silent while a stated 0
+        // on a 90 kg plan speaks. A truthiness guard here would silence
+        // exactly the lifter who stripped the bar.
+        val recordedKg = statedLoadKg ?: declaredLoadKg
+        val loadChanged = (recordedKg ?: 0.0) != (plannedLoadKg ?: 0.0)
+        val statedLoad = loadLabel(bodyweight, timed, unit, recordedKg, speaksZero = loadChanged)
+        val plannedLoad = loadLabel(bodyweight, timed, unit, plannedLoadKg, speaksZero = loadChanged)
+        val loadValue =
+            statedLoad?.let { SetCardValue(stated = it, planned = plannedLoad.takeIf { _ -> loadChanged }) }
+        val tempoValue =
+            tempo?.let {
+                val changed = plannedTempo != null && !sameTempo(plannedTempo, it)
+                SetCardValue(stated = it, planned = plannedTempo.takeIf { _ -> changed }, prefix = "tempo")
+            }
+        return listOfNotNull(sideValue, repsValue, holdValue, loadValue, tempoValue)
     }
 
     /**
@@ -100,9 +132,41 @@ object SetCardValues {
      * deviates, so an untouched set gains nothing.
      */
     fun prep(plannedPrepS: Int, prepS: Int): SetCardValue? =
-        // DELIBERATELY WRONG in the same way and for the same reason as [of]:
-        // it pairs every prep, including one the lifter never touched, so the
-        // pin that says an untouched prep has nothing to draw is shown failing
-        // before the guard that makes it pass exists.
         SetCardValue(stated = "${prepS}s", planned = "${plannedPrepS}s", prefix = "prep")
+            .takeIf { prepS != plannedPrepS }
+
+    /**
+     * How the card says a load, on either side of a strike.
+     *
+     * The first three arms are the card's own rule, unchanged: body-weight
+     * work keeps [BodyweightLoadDisplay]'s notation, a positive load is the
+     * number, and a timed set with nothing added is loaded by the lifter.
+     *
+     * [speaksZero] is the fourth. A non-positive load on loaded work draws
+     * NOTHING on an ordinary card -- there is no plate to name -- but when the
+     * lifter has stripped the bar against a plan that asked for 90, a struck
+     * "90 kg" with an empty space beside it says less than the sentence this
+     * replaced. So the zero is spelled out on exactly the sets where it is a
+     * statement, and stays invisible on the sets where it is an absence.
+     */
+    private fun loadLabel(
+        bodyweight: Boolean,
+        timed: Boolean,
+        unit: WeightUnit,
+        kg: Double?,
+        speaksZero: Boolean,
+    ): String? = when {
+        bodyweight -> BodyweightLoadDisplay.label(kg, unit)
+        kg != null && kg > 0 -> unit.format(kg)
+        speaksZero && kg != null -> unit.format(kg)
+        timed -> "bodyweight"
+        else -> null
+    }
+
+    /** Whether two tempo strings are the same prescription, dashes and all. */
+    private fun sameTempo(a: String, b: String): Boolean {
+        val left = TempoAdjustPolicy.wheelValues(a)?.joinToString("") ?: a
+        val right = TempoAdjustPolicy.wheelValues(b)?.joinToString("") ?: b
+        return left == right
+    }
 }
