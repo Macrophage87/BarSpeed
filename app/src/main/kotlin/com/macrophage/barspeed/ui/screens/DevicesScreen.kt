@@ -39,6 +39,7 @@ import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ConnectionChip
 import com.macrophage.barspeed.ui.components.PermissionBanner
+import com.macrophage.barspeed.ui.components.rememberArmedDelivery
 
 /**
  * Which physical accelerometer this one is, issue #156.
@@ -160,6 +161,10 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
     val imuState by viewModel.imuState.collectAsState()
     val imuStateB by viewModel.imuStateB.collectAsState()
     val hrmState by viewModel.hrmState.collectAsState()
+    val imuFrameAtMs by viewModel.imuFrameAtMs.collectAsState()
+    val imuFrameAtMsB by viewModel.imuFrameAtMsB.collectAsState()
+    val imuArmedAtMs by viewModel.imuArmedAtMs.collectAsState()
+    val imuArmedAtMsB by viewModel.imuArmedAtMsB.collectAsState()
     val links by viewModel.linkAddresses.collectAsState()
     val roles by viewModel.sensorRoles.collectAsState()
 
@@ -209,6 +214,22 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                         DeviceLinkRole.HEART_RATE -> hrmState
                         DeviceLinkRole.NOT_LINKED -> null
                     }
+                // Whether THIS row's link is delivering, keyed off the same
+                // linkRole the state is (#213). A tick meant the app had
+                // issued a notification subscribe and nothing more, which is
+                // what field-37's lifter read as capture on thirteen sets.
+                //
+                // Null for the strap and for an unlinked row: nothing observes
+                // a strap's frame arrivals, and a row no link is pointed at has
+                // no delivery to report. Both render exactly as before.
+                val delivery =
+                    when (linkRole) {
+                        DeviceLinkRole.ANALYSED ->
+                            rememberArmedDelivery(imuState, imuFrameAtMs, imuArmedAtMs)
+                        DeviceLinkRole.SECOND ->
+                            rememberArmedDelivery(imuStateB, imuFrameAtMsB, imuArmedAtMsB)
+                        DeviceLinkRole.HEART_RATE, DeviceLinkRole.NOT_LINKED -> null
+                    }
                 Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Column(Modifier.padding(12.dp)) {
                         Row(horizontalArrangement = Arrangement.SpaceBetween) {
@@ -247,7 +268,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                                     color = BarColors.Sub,
                                 )
                             } else {
-                                ConnectionChip(device.role.name, state)
+                                ConnectionChip(device.role.name, state, delivery = delivery)
                             }
                             TextButton(onClick = { viewModel.forget(device) }) { Text("Forget") }
                         }

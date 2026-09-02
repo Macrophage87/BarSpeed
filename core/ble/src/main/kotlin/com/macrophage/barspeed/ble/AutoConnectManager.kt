@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.min
 
 /**
@@ -25,6 +26,7 @@ class AutoConnectManager(
     context: Context,
     private val registry: DeviceRegistry,
     private val scope: CoroutineScope,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) {
     val imuClient = WitmotionClient(context)
     val hrmClient = HrmClient(context)
@@ -56,9 +58,51 @@ class AutoConnectManager(
     val imuSamplesB: SharedFlow<com.macrophage.barspeed.model.ImuSample> = imuClientB.samples
     val hrSamples: SharedFlow<com.macrophage.barspeed.model.HrSample> = hrmClient.samples
 
+    private val imuFrameAt = MutableStateFlow<Long?>(null)
+    private val imuFrameAtB = MutableStateFlow<Long?>(null)
+    private val imuArmedAt = MutableStateFlow(clock())
+    private val imuArmedAtB = MutableStateFlow(clock())
+
+    /**
+     * When each bar sensor last delivered a frame, on the wall clock, or null
+     * while it never has (#213).
+     *
+     * A LINK fact rather than a screen fact, published here because both
+     * clients live here and three screens need it. [ConnectionState.Connected]
+     * says this app ISSUED a notification subscribe and nothing more -- see
+     * `GattClient.onServicesDiscovered`, which publishes it before
+     * `onDescriptorWrite` would have said whether the subscribe took -- so the
+     * only evidence a unit is feeding the app is a frame.
+     *
+     * The JUDGEMENT is deliberately not here. `ArmedSilencePolicy` in
+     * `:core:model` turns this instant and a [ConnectionState] into a word,
+     * because that module has tests and this one has no test source set at
+     * all.
+     */
+    val imuFrameAtMs: StateFlow<Long?> = imuFrameAt
+
+    /** [imuFrameAtMs] for the second bar sensor. */
+    val imuFrameAtMsB: StateFlow<Long?> = imuFrameAtB
+
+    /**
+     * When each link was last pointed at a device, on the wall clock (#213).
+     *
+     * A grace floor and nothing more: `ArmedSilencePolicy` declines to call a
+     * link silent until it has been armed for its own window, so a unit two
+     * seconds into a connect is not accused of being dead. The second link's
+     * instant moves whenever [setSecondaryImuAddress] re-points it, which is
+     * the moment its wait actually restarts; the first link's is taken when
+     * this object is constructed, which is the only moment it is armed.
+     */
+    val imuArmedAtMs: StateFlow<Long> = imuArmedAt
+
+    /** [imuArmedAtMs] for the second bar sensor. */
+    val imuArmedAtMsB: StateFlow<Long> = imuArmedAtB
+
     private var imuJob: Job? = null
     private var imuJobB: Job? = null
     private var hrmJob: Job? = null
+    private var livenessJob: Job? = null
 
     /**
      * Which device the second link maintains, or null to leave it down.
@@ -102,6 +146,11 @@ class AutoConnectManager(
     fun setSecondaryImuAddress(address: String?) {
         if (secondaryImuAddress.value == address) return
         secondaryImuAddress.value = address
+        // The wait restarts here, so the grace window restarts with it (#213).
+        // Only on a real address: pointing the link at nothing arms nothing,
+        // and moving the instant then would hand three fresh seconds of
+        // excused silence to a link that is about to come down.
+        if (address != null) imuArmedAtB.value = clock()
         // Dropped on EVERY change, not only on null. The loop's Connected
         // branch waits for the link to fall over before doing anything else,
         // so a client already holding the old device would sit there for the
@@ -123,15 +172,61 @@ class AutoConnectManager(
         if (imuJobB == null) {
             imuJobB = scope.launch { maintain(imuClientB) { secondaryImuAddress.value } }
         }
+        // Both bar sensors' frame arrivals, watched for as long as the app
+        // runs (#213). The heart-rate strap already has a passive collector in
+        // `RecordViewModel`'s init for the same reason: a fact that has to be
+        // true BEFORE a set begins cannot be observed by a collector that only
+        // exists during one, and the IMU collectors are opened in `beginSet`.
+        //
+        // COALESCED, and that is the whole of what keeps this off the capture
+        // path. `WitmotionClient.samples` is a MutableSharedFlow whose buffer
+        // advances only as its SLOWEST subscriber drains it, so a subscriber
+        // doing real work per frame could make `tryEmit` start dropping at
+        // 100 Hz -- the one unrecoverable failure in this repository. This one
+        // writes a Long at most once per [FRAME_COALESCE_MS], far cheaper than
+        // the in-set collector already on the same flow, so it cannot become
+        // the slowest. Reasoned from source: nothing here executes a GATT
+        // client, and no device has been watched doing it.
+        //
+        // The sample's own timestamp rather than a second clock read.
+        // `WitmotionClient` stamps it from the same wall clock, so no two
+        // clocks can disagree about one frame.
+        if (livenessJob == null) {
+            livenessJob =
+                scope.launch {
+                    launch { imuClient.samples.collect { watch(imuFrameAt, it.timestampMs) } }
+                    launch { imuClientB.samples.collect { watch(imuFrameAtB, it.timestampMs) } }
+                }
+        }
+    }
+
+    /**
+     * Advance a link's last-frame instant, at most once per
+     * [FRAME_COALESCE_MS].
+     *
+     * The coalescing bounds this flow's emission rate, not the accuracy that
+     * matters: the window `ArmedSilencePolicy` measures against is three
+     * seconds and the error introduced here is at most half of one.
+     *
+     * The comparison is on absolute distance rather than "newer than", so a
+     * clock correction cannot latch the value in the future -- an instant that
+     * far ahead would otherwise read as delivering until real time caught up
+     * with it.
+     */
+    private fun watch(held: MutableStateFlow<Long?>, frameAtMs: Long) {
+        val previous = held.value
+        if (previous == null || abs(frameAtMs - previous) >= FRAME_COALESCE_MS) held.value = frameAtMs
     }
 
     fun stop() {
         imuJob?.cancel()
         imuJobB?.cancel()
         hrmJob?.cancel()
+        livenessJob?.cancel()
         imuJob = null
         imuJobB = null
         hrmJob = null
+        livenessJob = null
         imuClient.disconnect()
         imuClientB.disconnect()
         hrmClient.disconnect()
@@ -300,4 +395,17 @@ class AutoConnectManager(
     }
 
     private fun clientFor(role: DeviceRole): GattClient = if (role == DeviceRole.IMU) imuClient else hrmClient
+
+    private companion object {
+        /**
+         * How far apart two writes of a link's last-frame instant may be, in
+         * milliseconds.
+         *
+         * Half a second against a three-second judgement window, so the error
+         * it introduces cannot change an answer. Its job is to stop a 100 Hz
+         * stream re-emitting a StateFlow a hundred times a second into three
+         * screens.
+         */
+        const val FRAME_COALESCE_MS = 500L
+    }
 }

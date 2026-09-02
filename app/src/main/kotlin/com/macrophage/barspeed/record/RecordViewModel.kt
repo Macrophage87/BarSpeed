@@ -28,6 +28,8 @@ import com.macrophage.barspeed.hrm.Hrv
 import com.macrophage.barspeed.hrm.RrIngest
 import com.macrophage.barspeed.model.AddSetControl
 import com.macrophage.barspeed.model.AddSetSlotKey
+import com.macrophage.barspeed.model.ArmedDelivery
+import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.ExerciseDef
@@ -460,6 +462,7 @@ internal fun armedCaptureOf(
     secondaryRole: SensorRole?,
     analysedBuffer: List<ImuSample>,
     secondaryBuffer: List<ImuSample>,
+    deliveryByRole: Map<SensorRole, ArmedDelivery> = emptyMap(),
 ): ArmedCapture {
     val byRole = buildMap {
         armed?.analysed?.let { put(it, analysedBuffer) }
@@ -468,7 +471,20 @@ internal fun armedCaptureOf(
     val streamed =
         SensorCapturePolicy.present(armed?.expected.orEmpty(), byRole.filterValues { it.isNotEmpty() }.keys)
     val decision = SensorCapturePolicy.analysedStream(armed?.analysed, streamed)
-    val sensors = armed?.copy(analysed = decision.role, analysedFellBack = decision.fellBack)
+    // Which armed roles put NOTHING in a buffer, and what the app could see of
+    // each one's link when the set ended (#213). The roles come from the
+    // BUFFERS -- the same source `present` comes from -- so the two statements
+    // in the export cannot disagree about which unit was missing; the WORD
+    // comes from the link reading, which is the fact nothing else records.
+    //
+    // `ArmedSilencePolicy.silent` drops a role reading DELIVERING. That
+    // combination should be unreachable, the in-set collector and the liveness
+    // watcher being on one flow, and where the app's two readings of one unit
+    // do contradict each other it says nothing rather than picking one.
+    val silent =
+        ArmedSilencePolicy.silent(armed?.expected.orEmpty().filterNot { it in streamed }, deliveryByRole)
+    val sensors =
+        armed?.copy(analysed = decision.role, analysedFellBack = decision.fellBack, silent = silent)
     return ArmedCapture(
         samples = decision.role?.let { byRole[it] } ?: analysedBuffer,
         sensors = sensors,
@@ -480,6 +496,111 @@ internal fun armedCaptureOf(
         secondary = sensors?.secondaryRole?.let { SecondaryCapture(it, byRole[it].orEmpty()) },
     )
 }
+
+/**
+ * What each ARMED role's link is doing, over one window (#213).
+ *
+ * A free function taking what it needs, for [armedCaptureOf]'s reason:
+ * [RecordViewModel] sits at detekt's LargeClass limit. The DECISION is
+ * [ArmedSilencePolicy.deliveryOf]'s, in `:core:model` where a test runs on it;
+ * what is left here is the pairing of a role with the link that holds it, and
+ * it is written as a lookup so nothing on this path can read the second link's
+ * state for the first link's role.
+ *
+ * Called twice with different windows and that is the point. Before a set,
+ * [sinceMs] is when the link was armed and the answer drives the SETUP/READY
+ * card; at the end of a set, [sinceMs] is when the set began and the answer is
+ * frozen onto the row. One function means the sentence the lifter read and the
+ * word the archive carries cannot disagree about one unit.
+ *
+ * A null [analysed] role is the ordinary one-sensor set and the set that met
+ * two paired units it could not tell apart. Neither has a role to report
+ * against, and neither may be reported: this returns an empty map for both.
+ */
+internal fun armedDeliveryOf(
+    analysed: SensorRole?,
+    secondary: SensorRole?,
+    links: ArmedLinks,
+    sinceMs: Long,
+    nowMs: Long,
+): Map<SensorRole, ArmedDelivery> = buildMap {
+    analysed?.let {
+        put(it, ArmedSilencePolicy.deliveryOf(links.analysedState, links.analysedFrameAtMs, sinceMs, nowMs))
+    }
+    secondary?.let {
+        put(it, ArmedSilencePolicy.deliveryOf(links.secondaryState, links.secondaryFrameAtMs, sinceMs, nowMs))
+    }
+}
+
+/**
+ * Everything frozen onto a set that is ending: which buffer the DSP is pointed
+ * at, what the row says about that choice (#207), and which armed links were
+ * silent across the whole set with what the app could see of each (#213).
+ *
+ * A free function taking what it needs, for [armedCaptureOf]'s reason:
+ * [RecordViewModel] is a class detekt measures AT its LargeClass limit, and
+ * this issue's two added lines put it over. So the two answers are composed
+ * here rather than at the call site, which keeps that site the single
+ * statement it already was.
+ *
+ * The buffers are copied HERE, which is the one place the freeze happens now
+ * rather than at every call. The window is the SET's -- its start and its end
+ * -- so the silence reading is over exactly the interval the buffers cover,
+ * and a role reading as delivering while its buffer is empty is a
+ * contradiction [armedCaptureOf] declines to publish rather than resolve.
+ */
+internal fun RecordState.captureAt(
+    armed: RecordedSensors?,
+    secondaryRole: SensorRole?,
+    analysedBuffer: List<ImuSample>,
+    secondaryBuffer: List<ImuSample>,
+    startedAtMs: Long,
+    endedAtMs: Long,
+): ArmedCapture = armedCaptureOf(
+    armed,
+    secondaryRole,
+    analysedBuffer.toList(),
+    secondaryBuffer.toList(),
+    armedDeliveryOver(armed?.analysed, secondaryRole, startedAtMs, endedAtMs),
+)
+
+/**
+ * [armedDeliveryOf] over the two links THIS STATE is holding.
+ *
+ * The one place the screen state's four link fields are turned into
+ * [ArmedLinks], so the two callers -- the READY card, over the arming window,
+ * and `endSet`, over the set's own -- cannot pair one link's state with the
+ * other's frame instant in different ways. An extension rather than a member
+ * of [RecordViewModel] for [armedCaptureOf]'s reason: that class is at
+ * detekt's LargeClass limit and this addition put it over.
+ */
+internal fun RecordState.armedDeliveryOver(
+    analysed: SensorRole?,
+    secondary: SensorRole?,
+    sinceMs: Long,
+    nowMs: Long,
+): Map<SensorRole, ArmedDelivery> = armedDeliveryOf(
+    analysed = analysed,
+    secondary = secondary,
+    links = ArmedLinks(imuState, imuFrameAtMs, imuStateB, imuFrameAtMsB),
+    sinceMs = sinceMs,
+    nowMs = nowMs,
+)
+
+/**
+ * The two bar-sensor links as [armedDeliveryOf] needs them: what each one's
+ * state is, and when each one last delivered a frame.
+ *
+ * One parameter rather than four, so a caller cannot pass the analysed link's
+ * state beside the second link's frame instant -- which is the mistake this
+ * shape exists to make impossible rather than merely unlikely.
+ */
+internal data class ArmedLinks(
+    val analysedState: ConnectionState,
+    val analysedFrameAtMs: Long?,
+    val secondaryState: ConnectionState,
+    val secondaryFrameAtMs: Long?,
+)
 
 /** [armedCaptureOf]'s three answers, which have to be decided together. */
 internal data class ArmedCapture(
@@ -740,6 +861,21 @@ private fun CoroutineScope.openSecondaryCollector(
 }
 
 /**
+ * The four instants [mirrorLinkStates] mirrors in one write (#213).
+ *
+ * A named carrier rather than a `List<Any>` out of `combine`, for
+ * `SensorSettings`' reason: the four are the same primitive type and an
+ * argument order swapped at the lambda would compile and be wrong about which
+ * unit is silent.
+ */
+private data class ArmedLiveness(
+    val analysedFrameAtMs: Long?,
+    val secondaryFrameAtMs: Long?,
+    val analysedArmedAtMs: Long,
+    val secondaryArmedAtMs: Long,
+)
+
+/**
  * Mirror all three links' connection state onto the screen state.
  *
  * One free function rather than three collectors in `init`, and free for
@@ -771,6 +907,35 @@ private fun CoroutineScope.mirrorLinkStates(autoConnect: AutoConnectManager, sta
                 state.value.copy(
                     imuConnectedB = s is ConnectionState.Connected,
                     imuStateB = s,
+                )
+        }
+    }
+    // The two links' DELIVERY, beside their connection state and deliberately
+    // not folded into it (#213). Connected says the app issued a subscribe;
+    // these say something came back. Four flows in one collector rather than
+    // four collectors, because the SETUP card and the dots read them together
+    // and a state right about three of four is a window in which the screen
+    // names the wrong unit.
+    //
+    // `AutoConnectManager` coalesces these to at most one write per half
+    // second per link, so this is nothing like a per-sample write onto the
+    // screen state -- `onSample` already does one of those at 100 Hz during a
+    // set.
+    launch {
+        combine(
+            autoConnect.imuFrameAtMs,
+            autoConnect.imuFrameAtMsB,
+            autoConnect.imuArmedAtMs,
+            autoConnect.imuArmedAtMsB,
+        ) { frameA, frameB, armedA, armedB ->
+            ArmedLiveness(frameA, frameB, armedA, armedB)
+        }.collect { next ->
+            state.value =
+                state.value.copy(
+                    imuFrameAtMs = next.analysedFrameAtMs,
+                    imuFrameAtMsB = next.secondaryFrameAtMs,
+                    imuArmedAtMs = next.analysedArmedAtMs,
+                    imuArmedAtMsB = next.secondaryArmedAtMs,
                 )
         }
     }
@@ -1926,6 +2091,24 @@ data class RecordState(
      */
     val imuStateB: ConnectionState = ConnectionState.Disconnected,
     val imuConnectedB: Boolean = false,
+    /**
+     * When the analysed bar sensor last delivered a frame, or null while it
+     * never has, and when its link was armed (#213).
+     *
+     * Beside [imuState] rather than folded into it, for the reason the second
+     * link got its own fields rather than widening the first's:
+     * [ConnectionState.Connected] means this app ISSUED a notification
+     * subscribe, and these four are the only evidence anything came back. The
+     * armed instants are a grace floor -- see `ArmedSilencePolicy` -- and not
+     * a claim that a link was up at them.
+     *
+     * Read together with [imuStateB] and [imuFrameAtMsB] by
+     * [armedDeliveryOf], and never one without the others.
+     */
+    val imuFrameAtMs: Long? = null,
+    val imuFrameAtMsB: Long? = null,
+    val imuArmedAtMs: Long = 0L,
+    val imuArmedAtMsB: Long = 0L,
     /** Device address to role, as the lifter labelled them; see `SettingsStore.sensorRoles`. */
     val sensorRoles: Map<String, SensorRole> = emptyMap(),
     /** Every paired IMU address, and which of them the analysed link maintains. */
@@ -2003,6 +2186,30 @@ data class RecordState(
      * the capture line and the second dot, and `beginSet` reads it again at
      * the moment the set starts, which is the only moment it is true.
      */
+    /**
+     * What each of this set's ARMED units is doing right now, for the window
+     * that opened when its link was armed (#213).
+     *
+     * A function taking `nowMs` rather than a property, and that is forced:
+     * the answer changes as time passes with no state change to drive a
+     * recomposition, so the SCREEN ticks and passes the instant in. A property
+     * reading the clock itself would answer correctly once and then hold a
+     * stale answer for as long as nothing else moved.
+     *
+     * Empty on every one-sensor set, because [SensorRoster.analysed] is null
+     * there and there is no armed role to report against.
+     */
+    fun armedDelivery(nowMs: Long): Map<SensorRole, ArmedDelivery> = armedDeliveryOver(
+        analysed = roster.analysed,
+        secondary = roster.secondary,
+        // The LATER of the two arming instants, so re-pointing either link
+        // mid-session hands both a fresh grace window rather than accusing the
+        // one that did not move. The conservative direction: it delays a true
+        // warning by three seconds instead of raising a false one.
+        sinceMs = maxOf(imuArmedAtMs, imuArmedAtMsB),
+        nowMs = nowMs,
+    )
+
     val roster: SensorRoster get() = SensorCapturePolicy.roster(
         pairedImuAddresses = pairedImuAddresses,
         preferredAddress = preferredImuAddress,
@@ -3032,7 +3239,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Which buffer the DSP is pointed at, and what the row says about the
         // choice (#207). Frozen here with everything else, from the buffers as
         // they stand at the end of the set.
-        val capture = armedCaptureOf(armedSensors, armedSecondaryRole, imuBuffer.toList(), imuBufferB.toList())
+        // Frozen here with everything else -- see captureAt (#207, #213).
+        val capture = s.captureAt(armedSensors, armedSecondaryRole, imuBuffer, imuBufferB, setStartedAtMs, endedAtMs)
         pendingWrite =
             PendingSetWrite(
                 exercise = exercise,

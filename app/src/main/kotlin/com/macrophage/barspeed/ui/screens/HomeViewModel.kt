@@ -58,6 +58,22 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val hrmState = container.autoConnect.hrmState
 
     /**
+     * When the analysed bar sensor last delivered a frame, and when its link
+     * was armed (#213).
+     *
+     * Home's dot showed [imuState] alone, which goes volt as soon as the app
+     * ISSUES a notification subscribe. Field-37's lifter read that as capture.
+     * These two are what let the dot say whether anything is arriving; the
+     * judgement is `ArmedSilencePolicy`'s, in `:core:model`.
+     *
+     * The strap has no equivalent and gets none: nothing publishes its frame
+     * arrivals, and a dot that went amber because nobody looked would be the
+     * same false claim in the other direction.
+     */
+    val imuFrameAtMs = container.autoConnect.imuFrameAtMs
+    val imuArmedAtMs = container.autoConnect.imuArmedAtMs
+
+    /**
      * Sets that were interrupted before they could be stored.
      *
      * A flow of its own rather than another arm of [state], and the separation

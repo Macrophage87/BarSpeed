@@ -64,6 +64,20 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
     val hrmState = container.autoConnect.hrmState
 
     /**
+     * When each bar sensor last delivered a frame, and when each link was
+     * armed (#213).
+     *
+     * The row's chip drew a tick as soon as a link reported connected, which
+     * means this app ISSUED a notification subscribe and nothing more. These
+     * are what let it say "no data" instead; the judgement is
+     * `ArmedSilencePolicy`'s, in `:core:model` where a test runs on it.
+     */
+    val imuFrameAtMs = container.autoConnect.imuFrameAtMs
+    val imuFrameAtMsB = container.autoConnect.imuFrameAtMsB
+    val imuArmedAtMs = container.autoConnect.imuArmedAtMs
+    val imuArmedAtMsB = container.autoConnect.imuArmedAtMsB
+
+    /**
      * Which paired device each of the three links is maintaining.
      *
      * The screen used to pick a link by ROLE, and its own comment said what

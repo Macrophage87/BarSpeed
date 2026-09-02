@@ -371,6 +371,32 @@ data class SessionExport(
          * `git show origin/main:core/model/.../SessionExport.kt | grep
          * SCHEMA_VERSION` declares "1.17". The published copy of this log in
          * `docs/schemas/session-export.schema.json` says the same.
+         *
+         * 1.17 carries a THIRD change, under the same number and for the same
+         * reason the paragraph above gives: 1.17 is UNRELEASED, and the newest
+         * tag v0.1.48 ships 1.16, read by `git show
+         * v0.1.48:core/model/.../SessionExport.kt` rather than assumed. The
+         * change (#213): a set's `sensors` block may carry `silent`, an object
+         * keyed by role naming each ARMED unit that put nothing in a buffer
+         * for the whole set, and what the app could see of that unit's link
+         * when the set ended. Purely additive on the wire -- the key is absent
+         * unless some armed unit was silent, and no existing key changed type
+         * or stopped being written. It is a fact a reader could NOT derive:
+         * `expected` minus `present` already says WHICH unit was missing, and
+         * this says what the app observed of it, which is the difference
+         * between "power it on", "pair the right unit" and "power-cycle it".
+         * Its vocabulary is deliberately weak, and the published description
+         * says so -- `notLinked` merges powered-off, out of range, refused and
+         * an OS bond removed behind the app's back, because nothing in this
+         * app reads `BluetoothDevice.getBondState()`. It does NOT apply
+         * retroactively, for 1.16's reason: the reading is frozen into the
+         * set's row when the set is RECORDED, so a set recorded before this
+         * version publishes nothing here whatever its document's
+         * `schemaVersion` says, and that absence is correct rather than a
+         * default -- no earlier build could observe delivery at all. The raw
+         * archive's `meta.json` moves with it, as it did for
+         * `analysedFellBack`: a set descriptor carries `sensorsSilent` under
+         * the same rule, written only when something was silent.
          */
         const val SCHEMA_VERSION = "1.17"
 
@@ -874,6 +900,38 @@ data class SetSensorsExport(
      * of the document has.
      */
     val shortfall: String? = null,
+    /**
+     * Which ARMED roles delivered nothing for the whole set, keyed by role,
+     * with what the app could see of each one's link when the set ended
+     * (#213).
+     *
+     * A sibling of [shortfall] rather than a member of it, because the two
+     * answer different questions about different things. [shortfall] is about
+     * the device ROSTER before the set -- two paired units the app cannot tell
+     * apart -- and says nothing about whether either was switched on. This is
+     * about THE SET, is observed at the end of it, and is the only statement
+     * in this document about whether an armed unit actually delivered.
+     *
+     * The ROLE is a key rather than a second list. Which roles were silent is
+     * [expected] minus [present] and a reader can already compute it; a second
+     * list of them would be the duplicate statement [expected]'s own
+     * description refuses. The VALUE is what is new.
+     *
+     * Values are `notLinked`, `linkWithoutSensor`, `linkedSilent` and
+     * `tooSoon`, spelled as [ArmedSilencePolicy.wireOf] spells them, and each
+     * is weaker than it looks. `notLinked` merges powered-off, out of range,
+     * refused and a bond removed in the phone's settings, because nothing in
+     * this app reads the OS bond state. The published description in
+     * `docs/schemas/session-export.schema.json` is the copy a reader of the
+     * document has and states each limit in full.
+     *
+     * Absent rather than empty on the ordinary set, the rule
+     * [analysedFellBack] follows and deliberately not the one [expected] and
+     * [present] follow: there is no informative empty here, and absence also
+     * covers every set recorded by a build that could not observe delivery at
+     * all, which is every set before this version.
+     */
+    val silent: Map<String, String> = emptyMap(),
 )
 
 /**

@@ -5,6 +5,7 @@ import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.VelocityEstimator
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.hrm.HrTrust
+import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.ExerciseExport
 import com.macrophage.barspeed.model.GeometryExport
 import com.macrophage.barspeed.model.GeometrySourceExport
@@ -422,6 +423,18 @@ class SessionExporter(
             // the role it named, with no flag, and that is what it means.
             analysedFellBack = declared.analysedFellBack,
             shortfall = declared.shortfall?.let(SensorCapturePolicy::shortfallToWire),
+            // Read off the row for `analysedFellBack`'s reason (#213). What a
+            // link looked like when a set ended is not recoverable afterwards
+            // from anything, so re-deciding it here would publish a reading of
+            // a link state that exists now rather than one that existed then.
+            // Empty on every set an earlier build wrote, and the exporter
+            // drops an empty map, so such a set publishes no key -- which is
+            // correct rather than a default, no earlier build having been able
+            // to observe delivery at all.
+            silent = declared.silent
+                .map { (role, delivery) ->
+                    SensorCapturePolicy.wireOf(role) to ArmedSilencePolicy.wireOf(delivery)
+                }.toMap(),
         )
     }
 
@@ -791,6 +804,25 @@ class RawExporter(
             // omission, which is also what every archive written before this
             // key existed says.
             flag("analysedFellBack", d.analysedFellBack)
+            // Which armed units delivered nothing, and what the app could see
+            // of each one's link when the set ended (#213). Written only when
+            // something was silent, so an ordinary dual set's descriptor is
+            // what it has always been.
+            //
+            // An object under one key, where every other sensor key here is
+            // flat. The flat convention is about keeping one name from meaning
+            // a number in this document and an object in session.json; this is
+            // a per-role fact and a flattening of it would have to invent
+            // `sensorsSilentA`, whose absence could not be told from a role
+            // that was never armed. It carries the SAME words session.json
+            // carries, so a reader who opens the archive and one who opens the
+            // analysis get one account of one set.
+            if (d.silent.isNotEmpty()) {
+                fields += "\"sensorsSilent\": {" +
+                    d.silent.entries.joinToString(", ") { (role, delivery) ->
+                        "\"${SensorCapturePolicy.wireOf(role)}\": \"${ArmedSilencePolicy.wireOf(delivery)}\""
+                    } + "}"
+            }
         }
         num("startedAt_ms", record.startedAtMs)
         num("endedAt_ms", record.endedAtMs)

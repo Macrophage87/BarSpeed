@@ -41,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -67,6 +68,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.model.AddSetControl
+import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.BlePermissionStep
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
@@ -129,7 +131,9 @@ import com.macrophage.barspeed.ui.components.SensorDot
 import com.macrophage.barspeed.ui.components.SideArrow
 import com.macrophage.barspeed.ui.components.TargetLineBars
 import com.macrophage.barspeed.ui.components.VerdictChip
+import com.macrophage.barspeed.ui.components.rememberArmedDelivery
 import com.macrophage.barspeed.ui.components.velocityLossColor
+import kotlinx.coroutines.delay
 import java.util.Locale
 
 private const val DEFAULT_VELOCITY_LOSS_STOP_PCT = 20.0
@@ -223,8 +227,24 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
                         // names the unit to go and look at -- and the armed
                         // one is not always A (#156).
                         val roster = state.roster
-                        SensorDot(roster.analysed?.name ?: "IMU", state.imuState, demoActive = state.demoMode)
-                        roster.secondary?.let { SensorDot(it.name, state.imuStateB) }
+                        // Volt means FRAMES ARE ARRIVING on these two, not
+                        // that a link is up (#213). The strap passes nothing,
+                        // because nothing publishes its frame arrivals and a
+                        // dot that went amber because nobody looked would be
+                        // the same false claim the other way round.
+                        val deliveryA =
+                            rememberArmedDelivery(state.imuState, state.imuFrameAtMs, state.imuArmedAtMs)
+                        SensorDot(
+                            roster.analysed?.name ?: "IMU",
+                            state.imuState,
+                            demoActive = state.demoMode,
+                            delivery = deliveryA,
+                        )
+                        roster.secondary?.let {
+                            val deliveryB =
+                                rememberArmedDelivery(state.imuStateB, state.imuFrameAtMsB, state.imuArmedAtMsB)
+                            SensorDot(it.name, state.imuStateB, delivery = deliveryB)
+                        }
                         SensorDot("HRM", state.hrmState)
                     }
                 },
@@ -730,6 +750,7 @@ private const val PREP_STEP_S = 5
  */
 @Composable
 private fun SensorCaptureLine(state: RecordState) {
+    ArmedSilenceCard(state)
     if (state.pairedImuAddresses.size < SensorCapturePolicy.MAX_COUNT) return
     val roster = state.roster
     val detail = sensorCaptureDetail(roster) ?: return
@@ -775,6 +796,60 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
         "Both streams are recorded when both units are connected; nothing is derived from the second one yet"
     } else {
         null
+    }
+}
+
+/**
+ * The armed unit that is delivering nothing, named BEFORE the set starts
+ * (#213).
+ *
+ * field-37 armed two units on thirteen sets, received one, and told nobody:
+ * the archive records `present: ["a"]` and the screens read paired throughout.
+ * The READY window already runs for seconds with both units armed, which is
+ * the last moment the lifter can switch one on, re-seat it or decide to lift
+ * with one -- so this is where it is said, and it is a card rather than a
+ * toast because a toast that appears while the lifter is under a bar is a
+ * message nobody reads.
+ *
+ * WHAT IT SAYS is `ArmedSilencePolicy.advice`'s, in `:core:model` where a test
+ * runs on it, and the sentence names the most specific state the BLE stack can
+ * report -- no link, a device answering with the wrong profile, or a link with
+ * nothing coming down it. Those have three different remedies and the lifter
+ * was offered none of them.
+ *
+ * It re-answers once a second because the answer changes with time and nothing
+ * else would drive a recomposition, and it says NOTHING for the first three
+ * seconds after a link is armed: `ArmedSilencePolicy.SILENT_AFTER_MS` is the
+ * grace, and accusing a link two seconds into a connect is how a warning
+ * becomes something the lifter learns to ignore.
+ *
+ * Drawn on the READY stage alone. SETUP has no set armed yet -- there is no
+ * roster until an exercise is chosen -- and the bar-sensor card already there
+ * covers the analysed link being down.
+ *
+ * NOTHING IN THIS REPOSITORY CAN RUN THIS. `:app` has no test that composes
+ * anything, and whether a real WT901 left switched off produces the state this
+ * reads is a [Field] question. The rule it draws is pinned; the drawing is
+ * compile- and lint-gated only.
+ */
+@Composable
+private fun ArmedSilenceCard(state: RecordState) {
+    // remember + LaunchedEffect rather than produceState, for the reason
+    // `rememberArmedDelivery` gives: lint reds the produceState form.
+    val nowMs = remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            nowMs.longValue = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
+    val message = ArmedSilencePolicy.message(state.armedDelivery(nowMs.longValue)) ?: return
+    Spacer(Modifier.height(8.dp))
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text("A sensor is not sending data", style = MaterialTheme.typography.titleSmall)
+            Text(message, style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
+        }
     }
 }
 

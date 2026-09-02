@@ -135,6 +135,43 @@ data class RecordedSensors(
      * count re-exports with no reason`.
      */
     val shortfall: DualShortfall? = null,
+    /**
+     * Which ARMED roles put nothing in a buffer for this whole set, and what
+     * the app could see of each one's link when the set ended (#213).
+     *
+     * The fact that survives beside [shortfall] rather than inside it.
+     * [shortfall] describes the device ROSTER -- two paired units the app
+     * cannot tell apart -- and is read before the set from a persisted list
+     * with no link state in it at all. This describes THE SET, is read at the
+     * end of it, and is the only place in the record that says anything about
+     * whether a unit that was armed actually delivered.
+     *
+     * WHICH roles are silent is [expected] minus the roles that streamed, and
+     * a reader can already compute that. The role here is a KEY, not a second
+     * statement of it; what is new is the WORD, and the word is the thing
+     * field-37 had no way to record. Thirteen sets published `present: ["a"]`
+     * and nothing about whether `b` was switched off, out of range, answering
+     * with the wrong GATT profile, or connected and silent -- and those have
+     * three different remedies, of which the lifter was offered none.
+     *
+     * [ArmedDelivery] states what each word can and cannot be read as, and
+     * `notLinked` in particular is a MERGE: nothing in this app reads
+     * `BluetoothDevice.getBondState()`, so it covers powered-off, out of
+     * range, refused and a bond removed in Settings behind the app's back.
+     *
+     * Empty on every ordinary set, and absent from the encoded JSON when
+     * empty, since the repository encodes with kotlinx's default
+     * `encodeDefaults = false`. Absence therefore reads correctly on every row
+     * an earlier build wrote: no build before this one could observe an armed
+     * unit's delivery, so a row that says nothing here is a row that was never
+     * asked. The same rule [analysedFellBack] follows, and deliberately NOT
+     * the one [expected] follows -- there is no informative empty here.
+     *
+     * It is stored on the row rather than derived at export, for
+     * [analysedFellBack]'s reason: what a link looked like at the moment a set
+     * ended is not recoverable afterwards from anything.
+     */
+    val silent: Map<SensorRole, ArmedDelivery> = emptyMap(),
 ) {
     /**
      * The role of the stream that is NOT analysed, or null when there is none.

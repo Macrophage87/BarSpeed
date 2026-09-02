@@ -42,6 +42,7 @@ import androidx.navigation.NavController
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescueCompleteness
 import com.macrophage.barspeed.data.RescuedDatabase
+import com.macrophage.barspeed.model.ArmedDelivery
 import com.macrophage.barspeed.model.ByteSize
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.WeightUnit
@@ -51,6 +52,7 @@ import com.macrophage.barspeed.ui.components.SectionCaption
 import com.macrophage.barspeed.ui.components.SensorDot
 import com.macrophage.barspeed.ui.components.Sparkline
 import com.macrophage.barspeed.ui.components.StatTile
+import com.macrophage.barspeed.ui.components.rememberArmedDelivery
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -64,6 +66,8 @@ private const val KG_PER_TONNE = 1000.0
 fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
     val imuState by viewModel.imuState.collectAsState()
+    val imuFrameAtMs by viewModel.imuFrameAtMs.collectAsState()
+    val imuArmedAtMs by viewModel.imuArmedAtMs.collectAsState()
     val hrmState by viewModel.hrmState.collectAsState()
     val interrupted by viewModel.interrupted.collectAsState()
     val rescued by viewModel.rescued.collectAsState()
@@ -88,8 +92,12 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 8.dp),
                     ) {
-                        HomeSensorDot("IMU", imuState) { navController.navigate("devices") }
-                        HomeSensorDot("HRM", hrmState) { navController.navigate("devices") }
+                        // Volt on the IMU dot means frames are arriving,
+                        // not that a link is up (#213). The strap's dot is
+                        // unchanged: nothing observes its delivery.
+                        val imuDelivery = rememberArmedDelivery(imuState, imuFrameAtMs, imuArmedAtMs)
+                        HomeSensorDot("IMU", imuState, imuDelivery) { navController.navigate("devices") }
+                        HomeSensorDot("HRM", hrmState, null) { navController.navigate("devices") }
                         TextButton(onClick = viewModel::toggleWeightUnit) {
                             Text("${state.weightUnit.suffix} ⇄", color = BarColors.Sub)
                         }
@@ -174,12 +182,12 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
  * whole point was not letting this screen nag.
  */
 @Composable
-private fun HomeSensorDot(label: String, state: ConnectionState, onClick: () -> Unit) {
+private fun HomeSensorDot(label: String, state: ConnectionState, delivery: ArmedDelivery?, onClick: () -> Unit) {
     Box(
         modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        SensorDot(label, state)
+        SensorDot(label, state, delivery = delivery)
     }
 }
 
