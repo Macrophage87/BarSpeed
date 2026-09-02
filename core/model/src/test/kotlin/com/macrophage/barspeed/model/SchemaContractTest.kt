@@ -507,8 +507,9 @@ class SchemaContractTest {
     // ---- the sensor declaration, issue #156 ---------------------------------
 
     /**
-     * The published `sensors` block declares every key it declares, each
-     * described, and refuses anything else.
+     * The published `sensors` block declares exactly the keys
+     * [SetSensorsExport] serialises, each described, and refuses anything
+     * else.
      *
      * `$defs.set` is `additionalProperties: false`, so an undeclared key would
      * make every dual export INVALID against the contract its consumer was

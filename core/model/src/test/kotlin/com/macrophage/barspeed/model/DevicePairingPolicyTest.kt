@@ -30,9 +30,13 @@ class DevicePairingPolicyTest {
      *
      * Preferred is not a display flag. `AutoConnectManager` maintains the
      * analysed link to it and `SensorCapturePolicy.roster` reads it to decide
-     * which role's stream the DSP is pointed at, so moving it re-points a data
-     * path -- and it moved as a side effect of a UI act the lifter performed
-     * for an unrelated reason. Because labels are per-address, it also
+     * which role's stream the set is ARMED to analyse. Since #207 that is the
+     * ARMING decision and no longer the last word --
+     * `SensorCapturePolicy.analysedStream` can move the analysis onto
+     * whichever role streamed -- but the label the figures are attributed to
+     * is per-address and still moves with the preference. So moving it
+     * re-points a data path, and it moved as a side effect of a UI act the
+     * lifter performed for an unrelated reason. Because labels are per-address, it also
      * silently changed the analysed role from A to B. A wrong pixel is
      * recoverable and a wrongly-attributed stream is not, so the tie goes to
      * leaving it alone.

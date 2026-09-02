@@ -51,9 +51,8 @@ class DeviceRegistry(private val context: Context) {
      * that role has no live preferred device already.
      *
      * It used to prefer whatever was paired last, unconditionally. Preferred
-     * decides which unit [AutoConnectManager] maintains the analysed link to
-     * and which stream `SensorCapturePolicy.roster` reports as ARMED for
-     * analysis, so
+     * decides which unit [AutoConnectManager] maintains a link to and which
+     * stream `SensorCapturePolicy.roster` reports as ARMED for analysis, so
      * pairing a second bar sensor silently re-pointed the DSP -- issue #184.
      * The rule is [DevicePairingPolicy.preferredAfterPairing]'s, in
      * `:core:model` where a test can run against it, and it still prefers the
