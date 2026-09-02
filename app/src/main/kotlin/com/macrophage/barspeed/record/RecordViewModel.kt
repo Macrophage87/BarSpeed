@@ -2219,8 +2219,8 @@ data class RecordState(
      * is being asked.
      *
      * The session itself rather than a boolean, because the answer has to
-     * start THAT session and the picker the tap came from is a list. Holding a
-     * flag and re-reading a selection would be two facts about one intent.
+     * start THAT session. Holding a flag and re-reading a selection would be
+     * two facts about one intent.
      */
     val pendingBodyWeightSession: PlanSessionDef? = null,
     /**

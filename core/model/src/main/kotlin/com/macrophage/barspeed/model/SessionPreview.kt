@@ -22,6 +22,11 @@ package com.macrophage.barspeed.model
  * [setIndexInExercise] and [setsInExercise] are carried rather than derived
  * from the list position, and that is load-bearing -- see
  * [SessionPreviewPolicy.of] for what they decide.
+ *
+ * [implementCount] and [restS] are carried and not yet drawn:
+ * [SessionPreviewPolicy.setLine] reads neither, unlike the running set's
+ * `SlotCard`, whose secondary line adds a "Pick up: …" implement split and a
+ * "rest mm:ss" clause the preview's set line does not repeat.
  */
 data class PreviewSet(
     val exerciseName: String,
@@ -90,13 +95,19 @@ object SessionPreviewPolicy {
      * the two in step.
      *
      * The first slot of the queue always opens a block, whatever its index.
-     * Every queue this is called with comes straight from flattenPlan, which
-     * numbers each exercise's sets from zero, so a block's first slot carries
-     * index 0 by construction.
+     * Every queue the app calls this with comes straight from flattenPlan,
+     * which numbers each exercise's sets from zero, so a block's first slot
+     * carries index 0 by construction.
      *
      * Order is the queue's order and is never sorted: the queue is the running
      * order, and a preview that re-ordered it would be describing a session
      * nobody is going to perform.
+     *
+     * [PreviewSet.exerciseName] is read only where a block OPENS. A slot whose
+     * name differs from the open block's but whose index is not zero is
+     * appended to that block anyway, and the block keeps the first slot's
+     * name -- no queue `flattenPlan` builds can produce that shape, so the
+     * case is unreachable rather than handled, and nothing here pins it.
      */
     fun of(sets: List<PreviewSet>): SessionPreview {
         val blocks = mutableListOf<PreviewBlock>()

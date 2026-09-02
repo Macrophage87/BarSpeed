@@ -582,6 +582,13 @@ private fun PreviewStage(state: RecordState, viewModel: RecordViewModel) {
  * Warm-ups are named rather than netted out. "8 sets, 3 of them warm-ups" and
  * "5 sets" describe different afternoons, and the lifter deciding whether they
  * have time for this is reading for the first.
+ *
+ * [SessionPreview.blockCount] is worded "exercises" here to match the session
+ * picker card, which renders `planSession.exercises.size` the same way; the
+ * count is BLOCKS, not distinct movements (two blocks of the same lift count
+ * twice), but changing the word on this surface alone would create the
+ * disagreement between preview and picker this whole feature exists to
+ * prevent.
  */
 private fun previewSummary(preview: SessionPreview): String {
     if (preview.isEmpty) return "This session has no sets in it."
