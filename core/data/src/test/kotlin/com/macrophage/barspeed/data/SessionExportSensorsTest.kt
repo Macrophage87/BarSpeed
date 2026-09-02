@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -419,5 +420,57 @@ class SessionExportSensorsTest {
             )
 
         assertTrue("sensors" in set.keys, "the summary export dropped the sensor declaration")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #213. A stored declaration naming a role that was
+     * ARMED AND SILENT publishes that word, keyed by the role.
+     *
+     * Fed as stored TEXT rather than as a [RecordedSensors] this build can
+     * construct, for the reason [setObjectFromStoredJson] already exists: it is
+     * the only way to stand a row in front of the current exporter whose shape
+     * the current data class does not have. At the commit that introduces this
+     * the key is dropped on the way through -- `SessionRepository`'s decoder
+     * runs with `ignoreUnknownKeys`, and `SetSensorsExport` has nowhere to put
+     * it -- so the assertion fails on absence rather than on a wrong value.
+     *
+     * field-37's shape: two armed, `a` present, `b` silent. What the archive
+     * could not say then, and says here, is WHICH of the states the stack can
+     * distinguish `b` was in -- and the three have three different remedies.
+     */
+    @Test
+    fun `a role that was armed and silent publishes what the app could see of its link`() = runTest {
+        val stored =
+            """{"count":2,"expected":["A","B"],"analysed":"A","silent":{"B":"LINKED_SILENT"}}"""
+        val set = setObjectFromStoredJson(stored, listOf(imuStream(1L, "a", count = 100)))
+
+        val sensors = set.getValue("sensors").jsonObject
+        assertEquals(listOf("a", "b"), sensors.roles("expected"))
+        assertEquals(listOf("a"), sensors.roles("present"))
+        val silent = assertNotNull(sensors["silent"], "the export dropped what the app saw of the silent unit")
+        assertEquals(
+            mapOf("b" to "linkedSilent"),
+            silent.jsonObject.mapValues { (_, v) -> v.jsonPrimitive.content },
+            "the silent role or the word it carries did not survive the export",
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #213. A set whose armed units all delivered carries
+     * no silence key at all.
+     *
+     * Absence has to keep meaning "nothing was silent, or this document
+     * predates the app being able to tell", exactly as `analysedFellBack`'s
+     * does. A key written as an empty object on every healthy dual set would
+     * put a permanent statement about nothing into the corpus.
+     */
+    @Test
+    fun `a dual set whose units both delivered publishes no silence`() = runTest {
+        val set = setObject(dual, listOf(imuStream(1L, "a", count = 100), imuStream(2L, "b", count = 100)))
+
+        assertNull(
+            set.getValue("sensors").jsonObject["silent"],
+            "a set where nothing went silent published a silence key",
+        )
     }
 }

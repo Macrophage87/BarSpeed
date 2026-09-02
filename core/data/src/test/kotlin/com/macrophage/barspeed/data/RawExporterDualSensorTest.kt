@@ -127,6 +127,42 @@ class RawExporterDualSensorTest {
         role = role,
     )
 
+    private fun rowWithSensorsJson(sensorsJson: String) = SetRecordEntity(
+        id = 5L,
+        sessionId = 1L,
+        orderIdx = 0,
+        exerciseId = "bench_press",
+        exerciseName = "Bench Press",
+        loadKg = 80.0,
+        actualReps = 5,
+        repsManual = true,
+        startedAtMs = 1_000L,
+        endedAtMs = 61_000L,
+        analysisJson = json.encodeToString(SetAnalysis.serializer(), noReps),
+        sensorsJson = sensorsJson,
+    )
+
+    /**
+     * The same manifest path fed a stored declaration VERBATIM, for the reason
+     * `SessionExportSensorsTest.setObjectFromStoredJson` exists: it is the only
+     * way to stand a row in front of the current exporter whose shape the
+     * current data class does not have.
+     */
+    private suspend fun descriptorFromStoredJson(sensorsJson: String, streams: List<RawStreamEntity>): JsonObject {
+        val dao = FakeSessionDao(listOf(rowWithSensorsJson(sensorsJson)), mapOf(5L to streams))
+        val repo = SessionRepository(dao, FakeExerciseDao())
+        val bytes = RawExporter(repo, SessionExporter(repo), appVersion = "0.1.44").buildZip(1L)!!
+        val out = mutableMapOf<String, String>()
+        ZipInputStream(ByteArrayInputStream(bytes)).use { zin ->
+            while (true) {
+                val entry = zin.nextEntry ?: break
+                out[entry.name] = zin.readBytes().decodeToString()
+            }
+        }
+        return Json.parseToJsonElement(out.getValue("meta.json"))
+            .jsonObject.getValue("sets").jsonArray.single().jsonObject
+    }
+
     private fun row(sensors: RecordedSensors?) = SetRecordEntity(
         id = 5L,
         sessionId = 1L,
@@ -443,6 +479,44 @@ class RawExporterDualSensorTest {
         assertEquals(
             manifestRoles,
             declared.getValue("present").jsonArray.map { it.jsonPrimitive.content },
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #213. The archive's own manifest names the silent
+     * unit and what the app could see of its link.
+     *
+     * It moves with `session.json` rather than after it, for the reason 1.17's
+     * first change already gave for `analysedFellBack`: the two documents ride
+     * in one zip, and a reader who opens the archive and reads the manifest
+     * must not get a different account of one set from the reader who opens
+     * `session.json`. Written only when something was silent, so an ordinary
+     * dual set's descriptor is byte-for-byte what it was.
+     */
+    @Test
+    fun `the manifest names an armed unit that delivered nothing`() = runTest {
+        val stored =
+            """{"count":2,"expected":["A","B"],"analysed":"A","silent":{"B":"NOT_LINKED"}}"""
+        val descriptor =
+            descriptorFromStoredJson(stored, listOf(imuStream(1L, "a", analysedSamples, storedRate = 98.5)))
+
+        val silent =
+            assertNotNull(descriptor["sensorsSilent"], "the manifest says nothing about the unit that went silent")
+        assertEquals(
+            mapOf("b" to "notLinked"),
+            silent.jsonObject.mapValues { (_, v) -> v.jsonPrimitive.content },
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #213. A dual set whose units both delivered carries
+     * no such key.
+     */
+    @Test
+    fun `a manifest for a set with nothing silent carries no silence key`() = runTest {
+        assertNull(
+            descriptor(dual, dualStreams())["sensorsSilent"],
+            "a healthy dual set's descriptor grew a statement about nothing",
         )
     }
 }
