@@ -1721,8 +1721,12 @@ private fun adHocSessionState(s: RecordState): RecordState = s.copy(
  * has not already given the same number to: [SetLoadPolicy.resolve] prefers it
  * over a declaration that now equals it, and the plate line prefers it over a
  * `loadKg` that now equals it.
+ *
+ * `internal` rather than private for `appendedState`'s reason: it is a pure
+ * function over [RecordState], and `LastPlannedSetTest` is the only thing on
+ * the CI path that can reach what tapping START does to the queue.
  */
-private fun advancedState(s: RecordState): RecordState {
+internal fun advancedState(s: RecordState): RecordState {
     val next = s.nextSlot
     if (s.adHoc || next == null) {
         return s.copy(
