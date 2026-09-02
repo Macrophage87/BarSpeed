@@ -63,7 +63,6 @@ import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.VoiceCue
-import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -403,10 +402,8 @@ private data class PendingSetWrite(
  * The frozen set-write, in the shape the repository stores.
  *
  * A free function taking what it needs, rather than the inline construction
- * this replaces and for the same reason [openSession] is one: [RecordViewModel]
- * sits at detekt's LargeClass limit -- 599 of 600 logical lines before this
- * change -- so a thirty-line argument list living inside it means the next
- * field anywhere in the class reds `:app:detekt`, which is CI's first step.
+ * this replaces and for the same reason [openSession] is one: it keeps a
+ * thirty-line argument list out of [RecordViewModel].
  * Nothing else about it moved: every argument is the same expression over the
  * same three inputs, all of them already frozen.
  *
@@ -463,8 +460,9 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
  *
  * A free function taking what it needs, rather than a method, so that the one
  * platform call it makes is visible in isolation and so that the argument list
- * does not sit inside [RecordViewModel] -- a class detekt already measures as
- * being at its size limit, where every future addition competes for room.
+ * does not sit inside [RecordViewModel]. Keeping state transitions out of that
+ * class is this file's convention against detekt's `LargeClass`; #208 split the
+ * correction seam out of it and left 26 lines of growth under the default 600.
  *
  * [ZoneId.systemDefault] is the only thing here that cannot be tested: it reads
  * the device setting, and no test in this repository runs on a device. What is
@@ -495,9 +493,8 @@ private suspend fun openSession(repository: SessionRepository, p: PendingSetWrit
  * Apply one tap of the prep control: work out which exercise it changes and what
  * the new value is, clamped, then write it.
  *
- * A free function taking what it needs, for the reason [openSession] gives --
- * detekt measures [RecordViewModel] as at its size limit, and this addition took
- * it over. The behaviour is unchanged by the move.
+ * A free function taking what it needs, for the reason [openSession] gives.
+ * The behaviour is unchanged by the move.
  *
  * Written to the settings store and read back through its flow rather than
  * copied onto the state here. One source of truth: a state field written
@@ -515,97 +512,6 @@ private fun applyPrepAdjustment(s: RecordState, deltaS: Int, appScope: Coroutine
     val exerciseId = s.prepExerciseId(slot)
     val seconds = LeadInPolicy.clamp(s.prepSecondsFor(slot) + deltaS)
     appScope.launch { settings.setPrepS(exerciseId, seconds) }
-}
-
-/**
- * One tap of the rest screen's warm-up mark (#194). Free function for
- * [applyPrepAdjustment]'s reason.
- *
- * The next mark is [WarmupMarkPolicy]'s decision, not this function's: it
- * flips whatever currently stands and never returns to null, because a lifter
- * who has tapped has said something and returning them to silence would hand
- * the plan back a set they had just taken off it.
- *
- * Writes the MARK only. `warmup` -- the plan's declaration -- is untouched, so
- * a set unmarked here still remembers that the plan called it a ramp, and
- * nothing about the rating moves: `warmup: true` beside `rpe: 6` is the point
- * of the whole change.
- *
- * THE NEW MARK IS PUBLISHED BEFORE THE WRITE, not after it. `markWarmup`
- * suspends into Room, and Dispatchers.Main.immediate runs a coroutine body
- * only as far as its first suspension -- so a second tap arriving while the
- * first is still writing used to read a state the first had not replaced yet,
- * compute the same next mark, and be lost. Publishing first makes the second
- * tap toggle from the first tap's answer, and flips the label on the tap
- * rather than on the round trip, which is what the lifter is responding to
- * when they tap again.
- *
- * The rollback is not a race of its own. `markWarmup` returns null only when
- * there is no recorded set, and it decides that BEFORE it suspends, so the
- * restore runs in the same frame as the tap and no other tap can interleave
- * with it.
- *
- * What is NOT ordered is the two writes themselves. `markWarmup` suspends into
- * Room and Room dispatches suspend queries to a pool, so two taps inside one
- * write window can reach the database in either order and the row may keep the
- * first tap's mark while this state keeps the second's. Read from source;
- * never observed, and the bench's two taps did not prove the window was
- * entered.
- */
-private fun applyWarmupMark(
-    stateFlow: MutableStateFlow<RecordState>,
-    ratings: SetRatingTracker,
-    appScope: CoroutineScope,
-) {
-    val s = stateFlow.value
-    val before = s.lastSetWarmupMark
-    val mark = WarmupMarkPolicy.toggled(s.lastSetWarmup, before)
-    stateFlow.value = s.copy(lastSetWarmupMark = mark)
-    appScope.launch(Dispatchers.Main.immediate) {
-        if (ratings.markWarmup(mark) == null) {
-            stateFlow.value = stateFlow.value.copy(lastSetWarmupMark = before)
-        }
-    }
-}
-
-/**
- * Record, change or clear why the just-finished set ended (#189). Free
- * function for [applyPrepAdjustment]'s reason.
- *
- * A null [limiter] clears the answer, which is what a lifter changing their
- * mind back to no answer leaves behind. The note is normalized here, and is
- * DROPPED for any answer other than [SetLimiter.OTHER]:
- * words kept beside "grip gave out" would be read as describing an answer they
- * were never typed for, and the note's own published description promises they
- * are not there.
- *
- * appScope, as `rateLastSet` uses: the rest screen is the only place this can
- * be given, and the pop that leaves it must not cancel the write.
- *
- * THE ANSWER IS PUBLISHED AFTER THE WRITE HERE, unlike [applyWarmupMark]. The
- * page the app opens by itself closes on the published answer rather than on
- * the tap, so until `limit` returns the tiles are still drawn under a finger
- * that has already answered; a second tap inside that window writes a second
- * valid answer rather than losing one, and the two writes are not ordered
- * against each other. Whether the asymmetry should stay is raised here, not
- * settled.
- */
-private fun applyLimiter(
-    stateFlow: MutableStateFlow<RecordState>,
-    limiter: SetLimiter?,
-    note: String?,
-    ratings: SetRatingTracker,
-    appScope: CoroutineScope,
-) {
-    val normalized = if (limiter == SetLimiter.OTHER) SetLimiter.normalizeNote(note) else null
-    appScope.launch(Dispatchers.Main.immediate) {
-        ratings.limit(limiter?.stored, normalized) ?: return@launch
-        stateFlow.value =
-            stateFlow.value.copy(
-                lastSetLimiter = limiter,
-                lastSetLimiterNote = normalized,
-            )
-    }
 }
 
 /**
@@ -680,8 +586,7 @@ private fun CoroutineScope.mirrorPrepOverrides(settings: SettingsStore, state: M
  * in this repository can exercise [RecordViewModel], and this has not been
  * watched happen on a device.
  *
- * A free function for [openSession]'s reason: [RecordViewModel] is a class
- * detekt measures as being at its size limit.
+ * A free function for [openSession]'s reason.
  */
 private fun CoroutineScope.mirrorSensorSettings(
     settings: SettingsStore,
@@ -745,10 +650,8 @@ private fun CoroutineScope.openSecondaryCollector(
  * Mirror all three links' connection state onto the screen state.
  *
  * One free function rather than three collectors in `init`, and free for
- * [openSession]'s reason: [RecordViewModel] is a class detekt measures at its
- * size limit, and the third link took it over. The behaviour is unchanged by
- * the move -- three independent collectors, each copying one link's state onto
- * its own fields.
+ * [openSession]'s reason. The behaviour is unchanged by the move -- three
+ * independent collectors, each copying one link's state onto its own fields.
  *
  * `imuConnected`, `imuConnecting` and `imuState` still mean THE ANALYSED
  * SENSOR and nothing else. They have four consumers between them -- the dot,
@@ -792,9 +695,7 @@ private fun CoroutineScope.mirrorLinkStates(autoConnect: AutoConnectManager, sta
 /**
  * Open the durable capture for a set that is about to begin.
  *
- * A free function taking what it needs, for the reason [openSession] gives:
- * [RecordViewModel] is a class detekt measures as being at its size limit,
- * where every addition competes for room.
+ * A free function taking what it needs, for the reason [openSession] gives.
  *
  * Everything here is read at the moment the set starts, because that is the
  * only moment some of it is true. [RecordState.imuConnected] in particular is
@@ -849,8 +750,7 @@ private fun openJournal(
  * A tap on a plan session: either raise the body-weight prompt, or start (#181).
  *
  * Free function taking the state flow and a start callback, for
- * [planSessionState]'s reason -- [RecordViewModel] is a class detekt measures
- * at its size limit, and the prompt's three entry points took it over.
+ * [planSessionState]'s reason.
  *
  * [BodyWeightPromptPolicy] decides whether to ASK, never whether the lifter may
  * train: both branches end in a started session, one of them after a dialog.
@@ -912,8 +812,7 @@ private fun CoroutineScope.answerBodyWeight(
 
 /**
  * The state opening a plan session leaves behind. Free function for
- * [openSession]'s reason: [RecordViewModel] is a class detekt measures as being
- * at its size limit, and the two seeds added below took it over.
+ * [openSession]'s reason.
  */
 private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue: List<PlannedSlot>): RecordState =
     s.copy(
@@ -1036,10 +935,7 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * `AppendedSlotTest` ask this function directly. It is called from one place,
  * [RecordViewModel.addSetOfCurrentExercise], and nothing else may call it.
  *
- * A FREE FUNCTION taking what it needs, for [jumpedState]'s reason:
- * [RecordViewModel] is a class detekt measures as being AT its size limit, and
- * this method's body took it over -- measured, not guessed, by running detekt
- * with the body inline.
+ * A FREE FUNCTION taking what it needs, for [jumpedState]'s reason.
  *
  * WHERE IT GOES is [AddSetControl.placement]'s, which is pure and pinned in
  * `AddSetControlTest`. The block's remaining sets keep their place; the
@@ -1185,8 +1081,7 @@ internal fun appendedState(s: RecordState): RecordState? {
  * The state "Equipment busy? Switch exercise" leaves behind.
  *
  * A free function taking what it needs, rather than a method, for the reason
- * [openSession] gives: [RecordViewModel] is a class detekt measures as being at
- * its size limit, where every addition competes for room.
+ * [openSession] gives.
  *
  * [fixed] is non-empty because jumpToExercise returns before reaching here when
  * the chosen exercise has no sets left, so there is always a planned next set.
@@ -1237,10 +1132,9 @@ private fun jumpedState(s: RecordState, done: List<PlannedSlot>, fixed: List<Pla
  * MOVED OUT OF [RecordViewModel] UNCHANGED by #177, and behaviour-preserving:
  * every expression is the one that was inside the method, the three early
  * returns became three nulls, and the caller writes what comes back. It moved
- * because that class is AT detekt's LargeClass threshold -- measured, not
- * guessed: adding #177's four-line entry point reds `:app:detekt`, which is
- * CI's first step. This is the same relief [jumpedState], [restingState] and
- * [advancedState] were each extracted for, and their KDocs say so.
+ * out to make room for #177's entry point. This is the same relief
+ * [jumpedState], [restingState] and [advancedState] were each extracted
+ * for, and their KDocs say so.
  */
 private fun jumpedToExerciseState(s: RecordState, exerciseId: String): RecordState? {
     if (s.adHoc) return null
@@ -1258,32 +1152,6 @@ private fun jumpedToExerciseState(s: RecordState, exerciseId: String): RecordSta
         }
     return jumpedState(s, done, fixed)
 }
-
-/**
- * The state a rest-screen effort correction leaves behind.
- *
- * Free function for the reason [restingState] and [advancedState] are: it is a
- * pure `copy` over a state and some arguments, and `RecordViewModel` is at
- * detekt's `LargeClass` limit -- one more multi-line copy inside the class
- * pushes it over, which is not a reason to write the correction in fewer
- * fields.
- *
- * [tappedFailed] is what the lifter just said and [effectiveFailed] is the OR
- * `SetRatingTracker` returned. Both are stored, because the correction grid has
- * to attribute the verdict and the OR cannot say whose it was. #140.
- */
-private fun ratedState(s: RecordState, rpe: Int?, tappedFailed: Boolean, effectiveFailed: Boolean): RecordState =
-    s.copy(
-        lastSetRpe = rpe,
-        lastSetFailed = effectiveFailed,
-        // SetRatingTracker overwrites its own tapped flag on every correction,
-        // so this mirrors it exactly: a correction away from the failed tile
-        // withdraws the tap and leaves the derived shortfall standing.
-        lastSetTappedFailed = tappedFailed,
-        // lastSetWarmup is deliberately NOT written. It is the plan's
-        // declaration about the set, frozen when the set was recorded, and
-        // re-rating the effort says nothing about whether it was a ramp (#187).
-    )
 
 /**
  * The state a set that has just begun recording leaves behind. Free function
@@ -1304,29 +1172,6 @@ private fun inSetState(s: RecordState, manualSet: Boolean, guidedSet: Boolean, l
         guidedFinished = false,
         leadInRunning = leadInRunning,
     )
-
-/**
- * The state a rest-screen duration correction leaves behind (#168). Free
- * function for [ratedState]'s reason, and it mirrors that one exactly:
- * `lastSetTappedFailed` is absent on purpose, because correcting how long a
- * hold lasted re-derives the shortfall and says nothing about whether the
- * lifter felt they failed.
- *
- * Why the correction is here at all, and post-set rather than mid-set: a hold
- * or a carry now ends when its clock reaches the seconds it was working to,
- * so the recorded
- * figure is the announced one and the walk back to the phone is no longer
- * inside it. The rare deliberate overage is stated on the rest screen, where
- * every other post-set correction already lives, because the owner does not
- * look at the phone while holding -- "There are rare instances I even look at
- * the phone mid set" -- so a mid-set affordance would be exercised never. The
- * delta moves the figure that currently stands, so repeated taps accumulate,
- * and `TimedSetEndPolicy.adjustedSeconds` floors the result at zero.
- */
-private fun durationCorrectedState(s: RecordState, seconds: Int, effectiveFailed: Boolean): RecordState = s.copy(
-    lastFeedback = s.lastFeedback?.copy(durationOverrideS = seconds),
-    lastSetFailed = effectiveFailed,
-)
 
 /**
  * The seconds a finished timed set records, or null for a set that is not
@@ -2448,11 +2293,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // Expression bodies, and that is a gate rather than a preference: this
-    // class measures one line under detekt's LargeClass threshold, so the prep
-    // window below could not be wired in without making room. Both were a
-    // `viewModelScope.launch` whose Job nobody read, and both still are; what
-    // changed is the declared return type, which no caller uses.
+    // Expression bodies. Both were a `viewModelScope.launch` whose Job nobody
+    // read, and both still are; what changed is the declared return type,
+    // which no caller uses.
     fun toggleAudioCues() = viewModelScope.launch { container.settings.setAudioCues(!stateFlow.value.audioCues) }
 
     fun toggleWeightUnit() =
@@ -2902,27 +2745,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Rest-screen correction when the sensor miscounted (or the set was manual). */
-    fun overrideLastSetReps(reps: Int) {
-        if (reps < 0) return
-        // appScope, for the reason launchSetWrite is: a correction tapped on the
-        // rest screen and then abandoned by Back is a correction the pop
-        // cancels, and nothing anywhere can edit a stored set once this screen
-        // is gone. Main.immediate keeps it ordered against the other writers and
-        // keeps SetRatingTracker's fields on the thread that already reads them.
-        container.appScope.launch(Dispatchers.Main.immediate) {
-            val s = stateFlow.value
-            val failed = ratings.correctReps(reps, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
-            stateFlow.value =
-                stateFlow.value.copy(
-                    lastFeedback = stateFlow.value.lastFeedback?.copy(repsOverride = reps),
-                    lastSetFailed = failed,
-                    // lastSetTappedFailed is deliberately NOT written here.
-                    // correctReps re-derives only the shortfall; the lifter's
-                    // own tap is untouched by a rep correction, so carrying it
-                    // unchanged is what keeps the two facts two facts.
-                )
-        }
-    }
+    fun overrideLastSetReps(reps: Int) = applyRepCorrection(stateFlow, reps, ratings, container.appScope)
 
     /**
      * Rest-screen correction of a hold or a carry's recorded seconds (#168):
@@ -2930,15 +2753,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * set. See [durationCorrectedState] for why it is not offered mid-set, and
      * [overrideLastSetReps] for why this runs on appScope.
      */
-    fun addLastSetSeconds(deltaS: Int) {
-        val current = stateFlow.value.lastFeedback?.effectiveDurationS ?: return
-        val seconds = TimedSetEndPolicy.adjustedSeconds(current, deltaS)
-        container.appScope.launch(Dispatchers.Main.immediate) {
-            val s = stateFlow.value
-            val failed = ratings.correctDuration(seconds, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
-            stateFlow.value = durationCorrectedState(stateFlow.value, seconds, failed)
-        }
-    }
+    fun addLastSetSeconds(deltaS: Int) = applyDurationCorrection(stateFlow, deltaS, ratings, container.appScope)
 
     /**
      * Voice at each lockout: "Rep N" as reps complete, "Last rep" going into the
@@ -3372,20 +3187,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * how the set FELT, but it cannot erase the fact that the set ended short of
      * its target — that verdict comes from the rep count, not from an opinion.
      */
-    fun rateLastSet(rpe: Int?, failed: Boolean) {
-        // appScope, as overrideLastSetReps: the rest screen is the only place a
-        // set's effort can be corrected, and the pop that leaves it cancelled
-        // the correction on the way out.
-        container.appScope.launch(Dispatchers.Main.immediate) {
-            // The stored warm-up flag is handed back unchanged rather than
-            // taken from the correction: `updateRpe` writes the column on every
-            // correction, so passing anything else here would let re-rating a
-            // ramp set silently turn it into work (#187).
-            val warmup = stateFlow.value.lastSetWarmup
-            val effectiveFailed = ratings.rate(rpe, failed, warmup) ?: return@launch
-            stateFlow.value = ratedState(stateFlow.value, rpe, failed, effectiveFailed)
-        }
-    }
+    fun rateLastSet(rpe: Int?, failed: Boolean) = applyRating(stateFlow, rpe, failed, ratings, container.appScope)
 
     fun toggleLastSetWarmup() = applyWarmupMark(stateFlow, ratings, container.appScope)
 
