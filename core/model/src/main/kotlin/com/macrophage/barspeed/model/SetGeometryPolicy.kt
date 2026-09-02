@@ -116,18 +116,6 @@ data class ResolvedGeometry(
 )
 
 /**
- * How a plan's declarations combine with the app's built-in definition to give
- * the one [ExerciseDef] a set is recorded against, and how to describe the
- * result afterwards.
- *
- * This lived in `app/.../PlanQueue.kt`, inside a suspend extension on
- * `SessionRepository` that no test on the CI path calls, so nothing could run
- * against it. [resolve] is that code moved
- * without change; [describe] is new and reads its values off the definition
- * that was actually used, never recomputing them -- so what gets published
- * cannot drift from what the DSP was handed, whatever else changes upstream.
- */
-/**
  * One resolved `sensorOnStack` value together with where it came from.
  *
  * A pair rather than a bare boolean because the two answers are decided by the
@@ -137,6 +125,19 @@ data class ResolvedGeometry(
  */
 data class StackMount(val onStack: Boolean, val source: GeometrySource)
 
+/**
+ * How a plan's declarations combine with the app's built-in definition to give
+ * the one [ExerciseDef] a set is recorded against, and how to describe the
+ * result afterwards.
+ *
+ * This lived in `app/.../PlanQueue.kt`, inside a suspend extension on
+ * `SessionRepository` that no test on the CI path calls, so nothing could run
+ * against it. [resolve] is that code, moved here and since changed at its
+ * `sensorOnStack` line; [describe] is new and reads its values off the
+ * definition that was actually used, never recomputing them -- so what gets
+ * published cannot drift from what the DSP was handed, whatever else changes
+ * upstream.
+ */
 object SetGeometryPolicy {
     /**
      * Whether the sensor rode a weight stack for this set, and on whose word.
