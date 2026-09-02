@@ -904,9 +904,17 @@ class FieldDataRegressionTest {
      * `load_kg`, carried at the full float precision the app stores it at.
      *
      * The check that this geometry is right: every rep these fixtures
-     * resolve reproduces app 0.1.40's own published `repMetrics` -- ROM, mean
-     * concentric velocity, bottom pause -- to the last digit. That is
-     * asserted directly in the tests below, not merely claimed here.
+     * resolve reproduces app 0.1.40's own published `repMetrics` -- ROM and
+     * mean concentric velocity -- to the last digit. That is asserted
+     * directly in the tests below, not merely claimed here.
+     *
+     * BOTTOM PAUSE USED TO BE IN THAT LIST AND IS NOT ANY MORE. Issue #93
+     * changed what the field is: a rep publishes the turnaround between its
+     * own two phases and nothing at the end its boundary falls on, so on the
+     * two concentric-first sets here the figure 0.1.40 published is one this
+     * repository deliberately no longer computes. The lift-direction evidence
+     * is unaffected -- ROM and mean concentric velocity still reproduce
+     * exactly, and a wrong opening phase moves both.
      *
      * All four sets carry a `Done` cue -- none is a failed set, so issue
      * #141 (failed guided sets never speak `Done`) has no evidence for or
@@ -937,10 +945,20 @@ class FieldDataRegressionTest {
      * the range issue #93 measured for exactly this field on exactly this
      * exercise (mean 1.34 s, max 22.73 s). It is very likely one of #93's own
      * examples; that has not been independently re-derived here, so it is
-     * stated as a match, not an identity. The single-leg press's two resolved
-     * reps carry no such pause (0.04 s, 0.05 s) -- so the two sets share an
-     * undercount and a rough magnitude and do NOT visibly share a mechanism,
-     * which would be easy to misread from "same tempo, same count" alone.
+     * stated as a match, not an identity. It SURVIVES #93's fix, and that is
+     * the honest limit of that fix: this lift turns at the bottom, so the
+     * figure is a genuine turnaround bounded by the detection's own two
+     * phases -- and the detection merged reps, so the turnaround spans them.
+     *
+     * The single-leg press is the other direction and its comparison has
+     * changed. It turns at the TOP, so the 0.04 s and 0.05 s this paragraph
+     * used to quote as its bottom pauses were the interval to the next drive
+     * and are no longer published at all; its turnarounds are 0.13 and
+     * 0.03 s. The two sets still share an undercount and do NOT visibly
+     * share a mechanism, which would be easy to misread from "same tempo,
+     * same count" alone -- but the two numbers are now measured between
+     * different pairs of instants and were never comparable in the first
+     * place, which is the substance of #93.
      *
      * The bilateral leg press set's last resolved rep is also its FASTEST, so
      * today's `SetAnalyzer` withholds velocity loss (`TerminalRepIsFastest`)

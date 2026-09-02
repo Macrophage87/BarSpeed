@@ -51,9 +51,12 @@ import kotlin.test.assertTrue
  * bottomPause_s. That comparison is WITHDRAWN. Those are pipeline outputs, not
  * measurements of a turnaround. The test below pins the discrepancy instead,
  * which is the more useful fact: across these three sets bottomPause_s reads a
- * median of 0.04 s where an estimator that never touches the integrator reads
+ * median of 0.05 s where an estimator that never touches the integrator reads
  * 0.131 s, and the same field reaches 3.01 s on a set whose entire prescribed
- * cadence is five seconds. See #93.
+ * cadence is five seconds. See #93 -- which fixed what that field is measured
+ * between and did NOT close this gap. It read 0.04 s before #93, over a list
+ * that included a fabricated 0.0 for every detection resolving one phase; the
+ * fabrications are gone and the discrepancy is not.
  *
  * So nothing here establishes that this machine settles less than any other.
  * What survives is narrower and still enough: whatever the reversal does, it
