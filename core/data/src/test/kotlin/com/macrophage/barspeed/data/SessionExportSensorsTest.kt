@@ -225,14 +225,20 @@ class SessionExportSensorsTest {
     }
 
     /**
-     * When it is the ANALYSED unit that dropped out, the export says so rather
-     * than quietly renaming the survivor.
+     * A stored declaration naming a role that captured nothing is republished
+     * as it stands, rather than quietly renamed to the survivor.
      *
-     * `analysedRole` is a fact about which sensor the app was pointed at, not
-     * about which one produced data, so it keeps naming `a`. A reader then
-     * sees an analysed role absent from `present` and knows the summary
-     * figures are empty rather than wrong -- which is the state that would
-     * otherwise be unsayable.
+     * THE EXPORTER RE-DECIDES NOTHING, and that is what this pins. Since #207
+     * the record path analyses a role that streamed, so this shape is a row an
+     * OLDER build wrote -- or one where nothing streamed at all -- and its
+     * figures were computed from the role it names. Re-pointing the document
+     * at role `b` here would publish that row's numbers under a sensor that
+     * did not produce them.
+     *
+     * What such a row means to a reader is stated in the published
+     * `analysedRole` description rather than derived from this comparison:
+     * with the fallback in place an analysed role IS in `present` whether or
+     * not it moved, and `analysedFellBack` is the key that separates them.
      */
     @Test
     fun `an analysed role that captured nothing is still the analysed role`() = runTest {

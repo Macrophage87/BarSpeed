@@ -74,7 +74,17 @@ data class SetJournalHeader(
      * strictly worse than it missing a second stream.
      */
     val sensorRoles: List<SensorRole> = emptyList(),
-    /** Which role's capture is in `imu.csv`; null when the streams carry no role. */
+    /**
+     * Which role's capture is in `imu.csv`; null when the streams carry no
+     * role.
+     *
+     * The role the set ARMED for analysis, which since #207 is not always the
+     * role its figures end up coming from: this header is written and closed
+     * before the first sample line, so it cannot know which units streamed.
+     * Nothing downstream needs it to. A recovered orphan is offered back as a
+     * zip or discarded and is never analysed, and `imu.csv` is genuinely the
+     * armed unit's capture however empty that turns out to be.
+     */
     val analysedRole: SensorRole? = null,
     /**
      * Whether the SECOND link was connected at the moment the set began, as

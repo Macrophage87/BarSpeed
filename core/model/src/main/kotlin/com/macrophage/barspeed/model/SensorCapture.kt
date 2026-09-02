@@ -51,11 +51,19 @@ enum class SensorRole { A, B }
  * the count off the list would publish 0 sensors for a set that recorded with
  * one, and [shortfall] is what says why.
  *
- * [analysed] is which role the DSP was pointed at, not which role produced
- * data. It is a fact about wiring, true at the moment the set began, and it
- * stays true when that unit's stream turns out to be empty -- the export then
- * shows an analysed role absent from the present list, which is exactly the
- * state a reader has to be able to see.
+ * [analysed] is which role's stream the figures were actually computed from,
+ * and since #207 that is a role that STREAMED wherever one did. It is decided
+ * at the END of the set by [SensorCapturePolicy.analysedStream] rather than
+ * when the set was armed: the preference names the unit whose link is
+ * maintained, and pointing the DSP at that unit's empty buffer published an
+ * empty summary over a capture the app was holding. [analysedFellBack] is
+ * what says the two differ.
+ *
+ * It can still name a role absent from the present list, and there are
+ * exactly two such sets: one where NOTHING streamed, whose figures are empty
+ * because there was no capture at all; and one an earlier build recorded,
+ * which kept the armed role whatever happened. Neither has figures drawn from
+ * a surviving stream.
  */
 @Serializable
 data class RecordedSensors(
@@ -337,7 +345,14 @@ object SensorCapturePolicy {
      * [preferredAddress] decides which role is [SensorRoster.analysed], and
      * nothing else does. The analysed stream is whichever unit the existing
      * client is maintaining; declaring some other preference would state that
-     * the DSP looked at a stream it did not look at. Where the preference
+     * the DSP looked at a stream it did not look at. THAT IS AN ARMING
+     * DECISION AND IS NOT THE LAST WORD, since #207: nothing here has seen a
+     * sample, so where the preferred unit turns out to produce none,
+     * [analysedStream] moves the analysis onto the role that did and
+     * [RecordedSensors.analysedFellBack] records that it moved. This function
+     * is unchanged by that, deliberately -- what it answers is which link to
+     * hold, which is knowable before a set begins and is not the same
+     * question. Where the preference
      * names no paired unit the set arms one stream and reports NO shortfall:
      * that state is a stale registry entry rather than a pair the app cannot
      * tell apart, and it used to draw "Fewer than two sensors are paired" on a

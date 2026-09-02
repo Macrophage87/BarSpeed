@@ -831,11 +831,17 @@ class RawExporter(
         // The ANALYSED stream, selected by role rather than by "whichever IMU
         // row came first". On a one-sensor set there is no declaration and the
         // unroled entry is read, which is byte-for-byte the behaviour this
-        // manifest has always had. On a dual set whose analysed unit dropped
-        // out there is no entry at all, and every figure below is withheld
-        // rather than taken from the surviving stream -- publishing one
-        // sensor's cadence under a key every reader takes to describe the
-        // other is the wrong pair in its sharpest form.
+        // manifest has always had. Where the analysed role has no entry at all
+        // every figure below is withheld rather than taken from the surviving
+        // stream -- publishing one sensor's cadence under a key every reader
+        // takes to describe the other is the wrong pair in its sharpest form.
+        // Since #207 a set THIS build records reaches that state only when
+        // nothing streamed; one whose armed unit alone was silent is analysed
+        // from the unit that was not, so its role and its entry match. A row
+        // an older build wrote can still be in it and is left there: the
+        // figures that row carries were computed from no stream, and measuring
+        // the survivor here would describe a capture the set was not analysed
+        // from.
         val samples = imuSamples(if (declared == null) imuTextByRole[null] else imuTextByRole[analysedRole])
         // Measured from the stream this key describes, not read off the row.
         //
@@ -864,8 +870,10 @@ class RawExporter(
             }
         // Matched on the role as well as the kind. `firstOrNull { kind ==
         // KIND_IMU }` would take the first IMU row on a dual set whatever it
-        // was, which on a set whose analysed unit produced no row is the OTHER
-        // sensor's stored figure under the analysed sensor's key.
+        // was, which on a set whose analysed role has no row of its own is the
+        // OTHER sensor's stored figure under the analysed sensor's key. Since
+        // #207 that shape is a set an older build recorded, or one where
+        // nothing streamed -- rarer, and still wrong to publish.
         val storedRate =
             streams.firstOrNull { it.kind == RawStreamEntity.KIND_IMU && it.role == analysedRole }?.sampleRateHz
         num("sampleRate_hz", (measuredRate ?: storedRate)?.takeIf { it > 0.0 })
