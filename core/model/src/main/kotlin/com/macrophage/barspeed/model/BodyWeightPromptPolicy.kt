@@ -114,8 +114,19 @@ object BodyWeightPromptPolicy {
      * exactly as much as a session of nothing but dips. An empty session, or
      * one of purely loaded work, needs nothing and is never asked — that is
      * the whole point of #181.
+     *
+     * Reads [SetGeometryPolicy.bodyweightMount]'s resolved answer, not the
+     * raw declaration: a session of nothing but an unflagged pull-up is
+     * exactly #61's population, and it needs the prompt every bit as much as
+     * a session that spelled the flag out (#227).
      */
-    fun sessionNeedsBodyWeight(session: PlanSessionDef): Boolean = session.exercises.any { it.bodyweight ?: false }
+    fun sessionNeedsBodyWeight(session: PlanSessionDef): Boolean = session.exercises.any {
+        SetGeometryPolicy.bodyweightMount(
+            id = it.exercise,
+            base = ExerciseDef.seedById(it.exercise)?.bodyweight ?: false,
+            declared = it.bodyweight,
+        )
+    }
 
     /**
      * Ask now?

@@ -194,7 +194,7 @@
         },
         "bodyweight": {
           "type": "boolean",
-          "description": "True when the lifter's own body is the load — pull-ups, dips, push-ups. The set's load_kg/load_lb is then what was ADDED, and may be NEGATIVE for band or machine assistance. Total load is the lifter's body weight (set in the app) plus that."
+          "description": "True when the lifter's own body is the load — pull-ups, dips, push-ups. The set's load_kg/load_lb is then what was ADDED, and may be NEGATIVE for band or machine assistance. Total load is the lifter's body weight (set in the app) plus that. Omitting this key is NOT the same as declaring false: on pull_up, chin_up, dip, push_up and dead_hang -- ids the app ships as body-weight work by construction -- an omitted key resolves to true, and the import gate says so. Declare false if the load on one of those ids is not the lifter's own body. This adds no key and did not move the plan format, which reads 1.11."
         },
         "implementCount": {
           "type": "integer",

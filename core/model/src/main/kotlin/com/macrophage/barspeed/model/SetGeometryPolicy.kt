@@ -165,6 +165,26 @@ object SetGeometryPolicy {
     }
 
     /**
+     * Whether the lifter's own body was the load for this set.
+     *
+     * The same three-way precedence [stackMount] uses, without a paired
+     * [GeometrySource]: no source is published for `bodyweight` in the export
+     * (see [GeometrySources]'s KDoc for why), so there is nothing here for a
+     * caller to read besides the resolved boolean.
+     *
+     * 1. [declared] non-null -- the plan said so, either way. A declared
+     *    `false` wins over the seed: a plan may genuinely mean a pull-up
+     *    machine whose sensor and load are both external to the lifter.
+     * 2. [base] already true, or [id] is one of [ExerciseDef.BODYWEIGHT_IDS]
+     *    -- the app's own definition of that movement.
+     * 3. Nothing at all, so the type default (false) stands.
+     */
+    fun bodyweightMount(id: String, base: Boolean, declared: Boolean?): Boolean = when {
+        declared != null -> declared
+        else -> base || ExerciseDef.isBodyweightByConstruction(id)
+    }
+
+    /**
      * Overlay a plan exercise's declarations on the built-in definition.
      *
      * A declaration always wins: machines of the same movement pattern really
@@ -176,14 +196,9 @@ object SetGeometryPolicy {
      * `sensorInverted` is still assigned unconditionally because it cannot
      * express omission (see [GeometrySources]); that is the rest of #64 and is
      * not fixed here. `sensorOnStack` and `bodyweight` are not: `sensorOnStack`
-     * goes through [stackMount], so a plan that says nothing gets the app's
-     * default for that machine and a plan that says `false` still wins.
-     * `bodyweight` decodes an omitted key as `null` as of #227, distinct from a
-     * declared `false`, but this function does not consult that difference yet
-     * -- `declared.bodyweight ?: false` reproduces exactly the unconditional
-     * assignment this paragraph used to describe for it, so [base]'s own
-     * `bodyweight` is still discarded on any plan that names the exercise at
-     * all. Fixed in the commit that follows this one.
+     * goes through [stackMount] and `bodyweight` through [bodyweightMount], so
+     * a plan that says nothing about either gets the app's default for that
+     * machine and a plan that says `false` still wins (#61, #223, #227).
      */
     fun resolve(base: ExerciseDef, declared: PlanExerciseDef?): ExerciseDef {
         if (declared == null) return base
@@ -195,7 +210,7 @@ object SetGeometryPolicy {
             travelRatio = declared.travelRatio ?: base.travelRatio,
             horizontal = declared.plane?.let { it == "horizontal" } ?: base.horizontal,
             sensorOnStack = stackMount(base.id, base.sensorOnStack, declared.sensorOnStack).onStack,
-            bodyweight = declared.bodyweight ?: false,
+            bodyweight = bodyweightMount(base.id, base.bodyweight, declared.bodyweight),
         )
     }
 

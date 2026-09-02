@@ -214,6 +214,40 @@ data class ExerciseDef(
         /** Whether the app ships a stack-mount default for this exact id. */
         fun ridesStack(id: String): Boolean = id.lowercase() in STACK_MOUNTED_IDS
 
+        /**
+         * Exercise ids whose load IS the lifter's own body by construction, so
+         * an omitted `bodyweight` on one of them is an omission rather than a
+         * declaration of "loaded work" (#61, #227).
+         *
+         * Deliberately NOT [SEED] entries, for [STACK_MOUNTED_IDS]'s reason:
+         * [ExerciseDef.bodyweight] is the only field this table decides, and a
+         * SEED entry would have to decide [kind], [startsWith], [usesBarbell]
+         * and the rest too. `dead_hang` already has a SEED entry (kind HOLD)
+         * that does not set `bodyweight = true` -- this table is what makes an
+         * omitted key on it resolve correctly without touching that entry.
+         *
+         * `assisted_pull_up`, `assisted_chin_up` and `assisted_dip` are
+         * deliberately ABSENT: an assist machine's counterweight takes load
+         * OFF the lifter rather than the lifter's own mass being the load, and
+         * those three ids are already seeded stack-mounted by
+         * [STACK_MOUNTED_IDS] -- a different fact about a different id.
+         *
+         * `rope_dead_hang` has no entry here for [STACK_MOUNTED_IDS]'s own
+         * reason: it is genuinely body-weight work too, and is left to #228
+         * alongside its stack-mount gap so the two are decided together.
+         */
+        val BODYWEIGHT_IDS: Set<String> =
+            setOf(
+                "pull_up",
+                "chin_up",
+                "dip",
+                "push_up",
+                "dead_hang",
+            )
+
+        /** Whether the app ships a body-weight default for this exact id. */
+        fun isBodyweightByConstruction(id: String): Boolean = id.lowercase() in BODYWEIGHT_IDS
+
         private val EXPLOSIVE_HINTS = listOf("swing", "snatch", "clean", "jerk", "push_press", "throw", "slam")
         private val HOLD_HINTS = listOf("plank", "hold", "hang", "wall_sit", "l_sit")
         private val CARRY_HINTS = listOf("carry", "walk", "farmer", "yoke", "sled")

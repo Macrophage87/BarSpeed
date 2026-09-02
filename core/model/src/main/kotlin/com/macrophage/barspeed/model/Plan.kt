@@ -131,7 +131,17 @@ data class PlanFile(
                     // assist machine subtracts — so negatives are meaningful there.
                     errors += set.validate(
                         "sessions[$si].exercises[$ei].sets[$xi]",
-                        allowNegativeLoad = exercise.bodyweight ?: false,
+                        // The seed default, not the raw declaration: an
+                        // assisted dead hang with a negative (assist) load
+                        // and no declared "bodyweight" key is body-weight
+                        // work by construction, and refusing it here would
+                        // contradict what SetGeometryPolicy.resolve records
+                        // for the same set (#61, #227).
+                        allowNegativeLoad = SetGeometryPolicy.bodyweightMount(
+                            id = exercise.exercise,
+                            base = ExerciseDef.seedById(exercise.exercise)?.bodyweight ?: false,
+                            declared = exercise.bodyweight,
+                        ),
                     )
                 }
             }
@@ -172,6 +182,7 @@ data class PlanFile(
         eachExercise(::prepVsPhrase) +
         eachExercise(::sensorsInert) +
         eachExercise(::stackSeeded) +
+        eachExercise(::bodyweightSeeded) +
         eachExercise(::progressionVsSets) +
         eachExercise(::cueSplit) +
         eachExercise(::cueBehindTapOnly)
@@ -376,6 +387,27 @@ data class PlanFile(
             "sensor rides the weight stack, and this plan does not declare \"sensorOnStack\" - the " +
             "set is recorded as stack-mounted. Declare \"sensorOnStack\": false if the sensor was " +
             "on the handle instead."
+    }
+
+    /**
+     * A movement the app seeds as body-weight work, on a plan that said
+     * nothing about the flag (#61, #227).
+     *
+     * [stackSeeded]'s mirror image and sits beside it for the same reason: the
+     * plan said nothing and the app is about to decide for it, and the
+     * decision changes whether the stored body weight is added to the set's
+     * load at all -- silently, before the set is recorded, with nothing else
+     * at the import gate to say so.
+     *
+     * Silent when the plan declares the key either way, [stackSeeded]'s rule.
+     */
+    private fun bodyweightSeeded(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        if (exercise.bodyweight != null) return null
+        if (!ExerciseDef.isBodyweightByConstruction(exercise.exercise)) return null
+        return "sessions[$si].exercises[$ei]: ${exercise.exercise} is built in as body-weight work, " +
+            "and this plan does not declare \"bodyweight\" - the set is recorded as the lifter's own " +
+            "body weight plus any load_kg/load_lb declared. Declare \"bodyweight\": false if the load " +
+            "is not the lifter's own body."
     }
 
     /**

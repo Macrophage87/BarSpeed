@@ -120,30 +120,37 @@ class SetGeometryPolicyTest {
     }
 
     /**
-     * The two flags that still cannot express omission are assigned
+     * The one flag that still cannot express omission is assigned
      * unconditionally, so a plan silently clears a built-in true. Pinned as it
-     * behaves, not as it ought to: latent today because no seed entry sets
-     * either, and the fix is to make them nullable on the plan side. That is
-     * the rest of #64 and is not done here.
+     * behaves, not as it ought to: latent today because no seed entry sets it,
+     * and the fix is to make it nullable on the plan side. That is the rest of
+     * #64 and is not done here.
      *
-     * This test named THREE flags until #223 made `sensorOnStack` nullable.
-     * The third assertion is not reworded: it is deleted, and the opposite
-     * outcome is asserted in its own test below.
+     * This test named THREE flags until #223 made `sensorOnStack` nullable,
+     * and TWO until #227 made `bodyweight` nullable too. Each deleted
+     * assertion is not reworded: it is removed, and the opposite outcome is
+     * asserted in its own test below.
      */
     @Test
-    fun `the two non-nullable flags are taken from the plan even when it said nothing`() {
+    fun `the one non-nullable flag is taken from the plan even when it said nothing`() {
         val out = SetGeometryPolicy.resolve(opinionated, declared("cable_row"))
         assertEquals(false, out.sensorInverted, "a built-in true was cleared by an omitted key")
-        assertEquals(false, out.bodyweight, "a built-in true was cleared by an omitted key")
     }
 
-    /** The one that can now: an omitted key leaves a built-in stack mount standing. */
+    /** The two that can now: an omitted key leaves a built-in default standing. */
     @Test
     fun `an omitted stack key leaves a built-in stack mount standing`() {
         val plan = declared("cable_row")
         val out = SetGeometryPolicy.resolve(opinionated, plan)
         assertEquals(true, out.sensorOnStack)
         assertEquals(GeometrySource.SEEDED, SetGeometryPolicy.describe(out, plan).sources.sensorOnStack)
+    }
+
+    /** The other: an omitted key leaves a built-in bodyweight standing (#227). */
+    @Test
+    fun `an omitted bodyweight key leaves a built-in bodyweight standing`() {
+        val out = SetGeometryPolicy.resolve(opinionated, declared("cable_row"))
+        assertEquals(true, out.bodyweight)
     }
 
     @Test
