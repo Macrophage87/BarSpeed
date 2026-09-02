@@ -13,9 +13,10 @@ package com.macrophage.barspeed.model
  *
  * This applies to EVERY body-weight exercise, with no fixed-BW subset: the plan
  * contract already permits a signed load on exactly this population and all of
- * it ([PlanFile.validate] passes `allowNegativeLoad = exercise.bodyweight`), so
- * a dead hang can take assistance and a push-up can take a plate whether or not
- * the plan happened to declare a load for them.
+ * it ([PlanFile.validate] passes `allowNegativeLoad = SetGeometryPolicy.bodyweightMount(...)`,
+ * the seeded answer rather than the raw declaration, as of #227), so a dead
+ * hang can take assistance and a push-up can take a plate whether or not the
+ * plan happened to declare a load for them.
  *
  * DISPLAY AND INPUT ONLY. Nothing here is stored, exported or summed. The
  * export keeps its documented scale — [SessionExport]'s `load_kg` and

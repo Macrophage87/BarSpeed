@@ -143,8 +143,24 @@ object SetCardValues {
         // is describing what the set records now, appended or not, not what
         // was prescribed.
         val plannedHadTimedPrescription = timed && plannedDurationS != null
+        // Whether the plan prescribed anything at all -- a rep count or a
+        // duration. loadLabel's BODYWEIGHT arm fires ahead of the timed gate
+        // above and, unlike that gate, was not told whether there was a
+        // prescription: on an APPENDED set (both null) it still resolved a
+        // null plannedLoadKg to BodyweightLoadDisplay's bare "BW" -- a
+        // phantom planned figure struck against an added load the plan
+        // never spoke of. Gating the PLANNED side's bodyweight argument on
+        // this is what stops it (#227 item 1); the STATED side is
+        // unaffected, since it never asks what was planned.
+        val plannedPrescribed = plannedReps != null || plannedDurationS != null
         val plannedLoad =
-            loadLabel(bodyweight, plannedHadTimedPrescription, unit, plannedLoadKg, speaksZero = loadChanged)
+            loadLabel(
+                bodyweight && plannedPrescribed,
+                plannedHadTimedPrescription,
+                unit,
+                plannedLoadKg,
+                speaksZero = loadChanged,
+            )
         val loadValue =
             statedLoad?.let { SetCardValue(stated = it, planned = plannedLoad.takeIf { _ -> loadChanged }) }
         val tempoValue =
