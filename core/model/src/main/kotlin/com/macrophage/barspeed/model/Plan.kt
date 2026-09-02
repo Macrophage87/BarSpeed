@@ -162,6 +162,7 @@ data class PlanFile(
         eachExercise(::prepVsGuide) +
         eachExercise(::prepVsPhrase) +
         eachExercise(::sensorsInert) +
+        eachExercise(::stackSeeded) +
         eachExercise(::cueSplit) +
         eachExercise(::cueBehindTapOnly)
 
@@ -345,6 +346,29 @@ data class PlanFile(
     }
 
     /**
+     * A machine the app seeds as stack-mounted, on a plan that said nothing
+     * about the mount (#223).
+     *
+     * Sits with the inert-declaration warnings because it is their mirror
+     * image: there the plan said something and the app does something else,
+     * here the plan said nothing and the app is about to decide for it. The
+     * decision is not visible anywhere else before the set is recorded, and it
+     * changes which axis the DSP measures on horizontal work.
+     *
+     * Silent when the plan declares the key either way. A gate line on a
+     * correct plan is how a gate becomes something the eye skips -- the same
+     * rule [prepVsPhrase] follows for an inert prep.
+     */
+    private fun stackSeeded(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        if (exercise.sensorOnStack != null) return null
+        if (!ExerciseDef.ridesStack(exercise.exercise)) return null
+        return "sessions[$si].exercises[$ei]: ${exercise.exercise} is built in as a machine whose " +
+            "sensor rides the weight stack, and this plan does not declare \"sensorOnStack\" - the " +
+            "set is recorded as stack-mounted. Declare \"sensorOnStack\": false if the sensor was " +
+            "on the handle instead."
+    }
+
+    /**
      * Both coaching keys on one exercise, saying which of them the lifter reads
      * without touching the phone.
      *
@@ -520,8 +544,16 @@ data class PlanExerciseDef(
      * True when the sensor rides the cable weight stack rather than the handle.
      * The stack travels VERTICALLY however the lifter moves, so this — not
      * [plane] — is what decides which axis is measured.
+     *
+     * Nullable, and null is not false: on the ids in
+     * [ExerciseDef.STACK_MOUNTED_IDS] the app supplies a stack default when
+     * the key is ABSENT, and a plan that means the sensor was on the handle
+     * has to say `false` for that to win. Field-37 is why: six sets ran on an
+     * assist stack under a plan that never mentioned the key, and an omitted
+     * key that decoded to false was indistinguishable from a decision (#223,
+     * and the sensorOnStack third of #64).
      */
-    val sensorOnStack: Boolean = false,
+    val sensorOnStack: Boolean? = null,
     /**
      * Lifter-side travel per unit of sensor travel, for pulleys that do not move
      * 1:1 — a 2:1 cable moves the handle twice as far as the stack, so `2`.

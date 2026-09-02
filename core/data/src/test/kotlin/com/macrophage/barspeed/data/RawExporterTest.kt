@@ -169,6 +169,7 @@ class RawExporterTest {
                 plane = GeometrySource.DEFAULT,
                 kind = GeometrySource.INFERRED,
                 travelRatio = GeometrySource.DECLARED,
+                sensorOnStack = GeometrySource.DECLARED,
             ),
         )
 

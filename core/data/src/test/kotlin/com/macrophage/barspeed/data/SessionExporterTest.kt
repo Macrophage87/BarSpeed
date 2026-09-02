@@ -51,6 +51,33 @@ import kotlin.test.assertTrue
  * this module carries its own fakes, as [SessionRepositoryRecordSetTest] and
  * [SessionRepositoryEndSessionTest] both do.
  */
+/**
+ * Two provenance fixtures, top-level rather than members for the reason
+ * `serialKeysOf` is top-level in `SchemaContractTest`: [SessionExporterTest]
+ * sits on detekt's LargeClass limit, and CI runs detekt before any test, so a
+ * class that grows by three lines never gets as far as running one.
+ *
+ * `seededSources` reports DEFAULT for `sensorOnStack` because that fixture's
+ * mount is false, and a seed default for it is only ever a true.
+ */
+private val declaredSources = GeometrySources(
+    startsWith = GeometrySource.DECLARED,
+    concentric = GeometrySource.DECLARED,
+    plane = GeometrySource.DEFAULT,
+    kind = GeometrySource.INFERRED,
+    travelRatio = GeometrySource.DECLARED,
+    sensorOnStack = GeometrySource.DECLARED,
+)
+
+private val seededSources = GeometrySources(
+    startsWith = GeometrySource.SEEDED,
+    concentric = GeometrySource.SEEDED,
+    plane = GeometrySource.SEEDED,
+    kind = GeometrySource.SEEDED,
+    travelRatio = GeometrySource.SEEDED,
+    sensorOnStack = GeometrySource.DEFAULT,
+)
+
 class SessionExporterTest {
     // ---- fakes -------------------------------------------------------------
 
@@ -216,14 +243,7 @@ class SessionExporterTest {
             travelRatio = 2.0,
             kind = ExerciseKind.DYNAMIC,
             bodyweight = false,
-            sources =
-            GeometrySources(
-                startsWith = GeometrySource.DECLARED,
-                concentric = GeometrySource.DECLARED,
-                plane = GeometrySource.DEFAULT,
-                kind = GeometrySource.INFERRED,
-                travelRatio = GeometrySource.DECLARED,
-            ),
+            sources = declaredSources,
         )
 
     /** An ordinary barbell squat: every boolean false, which is a statement here. */
@@ -237,14 +257,7 @@ class SessionExporterTest {
             travelRatio = 1.0,
             kind = ExerciseKind.DYNAMIC,
             bodyweight = false,
-            sources =
-            GeometrySources(
-                startsWith = GeometrySource.SEEDED,
-                concentric = GeometrySource.SEEDED,
-                plane = GeometrySource.SEEDED,
-                kind = GeometrySource.SEEDED,
-                travelRatio = GeometrySource.SEEDED,
-            ),
+            sources = seededSources,
         )
 
     /** [legCurl] in the form a Room row holds it. */
@@ -550,13 +563,9 @@ class SessionExporterTest {
     }
 
     /**
-     * Where each value came from, because a consumer treats a guess and a
-     * declaration differently.
-     *
-     * Five values carry a source and three do not. The three are not an
-     * oversight: `sensorOnStack`, `sensorInverted` and `bodyweight` are
-     * non-nullable booleans in the plan format, so a declared false and an
-     * omitted key are the same value and the app cannot tell them apart.
+     * Where each value came from: a consumer treats a guess and a declaration
+     * differently. Six carry a source; `sensorInverted` and `bodyweight`
+     * cannot, being non-nullable booleans in the plan format.
      */
     @Test
     fun `the geometry says where each resolvable value came from`() = runTest {
@@ -567,6 +576,7 @@ class SessionExporterTest {
         assertEquals("default", g.source.plane)
         assertEquals("inferred", g.source.kind)
         assertEquals("declared", g.source.travelRatio)
+        assertEquals("declared", g.source.sensorOnStack)
     }
 
     /**

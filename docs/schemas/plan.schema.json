@@ -180,7 +180,7 @@
         },
         "sensorOnStack": {
           "type": "boolean",
-          "description": "True when the sensor rides a cable weight stack. The stack travels VERTICALLY however the lifter moves, so a seated row measured off the stack is a vertical measurement of a horizontal exercise \u2014 set this together with plane: 'horizontal' and sensorInverted as the routing requires."
+          "description": "True when the sensor rides a cable weight stack. The stack travels VERTICALLY however the lifter moves, so a seated row measured off the stack is a vertical measurement of a horizontal exercise \u2014 set this together with plane: 'horizontal' and sensorInverted as the routing requires. Omitting this key is NOT the same as declaring false: on the machines the app ships a mount for -- the assisted pull-up, chin-up and dip machines, the lat pulldown, seated row, seated cable row, cable row and triceps pushdown, the leg curl, seated and lying leg curl and leg extension -- an omitted key resolves to the stack, and the import gate says so. Declare false to say the sensor was on the handle. This adds no key and does not move the plan format, which is still 1.10."
         },
         "bodyweight": {
           "type": "boolean",

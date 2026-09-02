@@ -658,7 +658,16 @@ class SessionRepository(
         null
     }
 
-    /** Seeded + user-defined exercises, id → definition. Unknown ids infer a kind from the name. */
+    /**
+     * Seeded + user-defined exercises, id → definition. Unknown ids infer a kind from the name.
+     *
+     * `sensorOnStack` comes from [ExerciseDef.ridesStack] on both non-seed
+     * branches, so a set recorded on one of those machines carries the app's
+     * built-in mount whether it came from a plan or from the picker (#223). A
+     * plan that declares the key still overrides this in
+     * [SetGeometryPolicy.resolve]; an ad-hoc set has nothing to override it,
+     * which is exactly the case this covers.
+     */
     suspend fun exerciseById(id: String): ExerciseDef {
         ExerciseDef.seedById(id)?.let { return it }
         val custom = exerciseDao.byId(id)
@@ -670,6 +679,7 @@ class SessionRepository(
                 kind = ExerciseDef.inferKind(custom.id),
                 isCustom = true,
                 usesBarbell = ExerciseDef.inferBarbell(custom.id),
+                sensorOnStack = ExerciseDef.ridesStack(custom.id),
             )
         } else {
             ExerciseDef(
@@ -679,6 +689,7 @@ class SessionRepository(
                 kind = ExerciseDef.inferKind(id),
                 isCustom = true,
                 usesBarbell = ExerciseDef.inferBarbell(id),
+                sensorOnStack = ExerciseDef.ridesStack(id),
             )
         }
     }

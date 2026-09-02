@@ -461,6 +461,7 @@ class SessionExporter(
             plane = g.sources.plane.name.lowercase(),
             kind = g.sources.kind.name.lowercase(),
             travelRatio = g.sources.travelRatio.name.lowercase(),
+            sensorOnStack = g.sources.sensorOnStack.name.lowercase(),
         ),
     )
 

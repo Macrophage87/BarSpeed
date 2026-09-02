@@ -399,6 +399,33 @@ data class SessionExport(
          * archive's `meta.json` moves with it, as it did for
          * `analysedFellBack`: a set descriptor carries `sensorsSilent` under
          * the same rule, written only when something was silent.
+         *
+         * 1.17 carries a FOURTH change, under the same number for the reason
+         * the entry just above states: a number takes further entries until
+         * it ships. `geometry.source` gains a sixth key, `sensorOnStack`,
+         * reading `declared`, `seeded` or `default`. Behind it the plan's
+         * `sensorOnStack` key became nullable, so an omitted key on one of
+         * the machines the app ships a mount for -- the assisted pull-up,
+         * chin-up and dip machines, the lat pulldown, seated row, seated
+         * cable row, cable row and triceps pushdown, the leg curl, seated
+         * and lying leg curl and leg extension -- now resolves to the stack
+         * rather than to the bar, and a plan that means the sensor was on
+         * the handle must say `"sensorOnStack": false` for that to win.
+         * NOT purely additive: `geometry.source` is a closed object gaining
+         * a REQUIRED key, so a reader validating against 1.17 as it stood
+         * before this must accept the sixth; and `geometry.sensorOnStack`
+         * may now read true on a set whose plan said nothing, which changes
+         * which axis the DSP measured on horizontal work. A row stored by
+         * any build up to and including v0.1.48 -- before `sensorOnStack`
+         * joined the source block -- decodes with the new key defaulted to
+         * `default` rather than failing to decode, and re-exports with
+         * `geometry.source.sensorOnStack` reading `"default"` regardless of
+         * what the plan declared, because no build before this one tracked
+         * that provenance at all; the default cannot be recovered into a
+         * true answer after the fact. The geometry VALUES such a row
+         * already carried, `geometry.sensorOnStack` included, are
+         * unchanged -- only the new provenance key is affected, and only
+         * rows recorded from this version on carry it. (#223)
          */
         const val SCHEMA_VERSION = "1.17"
 
@@ -993,10 +1020,15 @@ data class GeometryExport(
 /**
  * Declared, seeded, inferred or default, per value.
  *
- * Three of [GeometryExport]'s eight values are missing here on purpose:
- * `sensorOnStack`, `sensorInverted` and `bodyweight` are non-nullable booleans
- * in the plan format, so a declared `false` and an omitted key are the same
- * value and no source can be told apart. Stating one would be an invention.
+ * Two of [GeometryExport]'s eight values are missing here on purpose:
+ * `sensorInverted` and `bodyweight` are non-nullable booleans in the plan
+ * format, so a declared `false` and an omitted key are the same value and no
+ * source can be told apart. Stating one would be an invention.
+ *
+ * `sensorOnStack` was a third until #223 made the plan key nullable. The
+ * sentence naming three is deleted rather than reworded: it is false for that
+ * one now, and an omitted key on a machine the app seeds is answered from
+ * [ExerciseDef.STACK_MOUNTED_IDS] and published as `seeded`.
  */
 @Serializable
 data class GeometrySourceExport(
@@ -1005,6 +1037,7 @@ data class GeometrySourceExport(
     val plane: String,
     val kind: String,
     val travelRatio: String,
+    val sensorOnStack: String,
 )
 
 @Serializable

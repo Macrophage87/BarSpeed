@@ -900,12 +900,13 @@ class SchemaContractTest {
         val source = schema("session-export.schema.json")["\$defs"]!!.jsonObject["geometrySource"]!!.jsonObject
         val sourceRequired = source["required"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
         assertEquals(source["properties"]!!.jsonObject.keys, sourceRequired, "a geometry source key is optional")
-        // The three that carry no provenance, named so their absence is a
+        // The two that carry no provenance, named so their absence is a
         // decision on the record rather than an oversight: they are
         // non-nullable booleans in the plan format, so a declared false and an
-        // omitted key are the same value.
+        // omitted key are the same value. sensorOnStack was a third of them
+        // until #223 made its plan key nullable.
         assertEquals(
-            setOf("sensorOnStack", "sensorInverted", "bodyweight"),
+            setOf("sensorInverted", "bodyweight"),
             geometry["properties"]!!.jsonObject.keys - sourceRequired - setOf("source"),
             "the set of values carrying no provenance changed",
         )

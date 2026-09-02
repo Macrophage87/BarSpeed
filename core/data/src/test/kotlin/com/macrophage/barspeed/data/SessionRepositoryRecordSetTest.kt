@@ -221,6 +221,7 @@ class SessionRepositoryRecordSetTest {
                 plane = GeometrySource.DEFAULT,
                 kind = GeometrySource.INFERRED,
                 travelRatio = GeometrySource.DECLARED,
+                sensorOnStack = GeometrySource.DECLARED,
             ),
         )
 

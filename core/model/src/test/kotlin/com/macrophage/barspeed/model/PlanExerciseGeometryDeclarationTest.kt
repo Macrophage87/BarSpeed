@@ -136,40 +136,49 @@ class PlanExerciseGeometryDeclarationTest {
         assertNull(exercise("back_squat", ""","kind":"isometric"""").kindOverride)
     }
 
-    // ---- the three that cannot say "omitted" --------------------------------
+    // ---- the two that cannot say "omitted" ----------------------------------
 
     /**
-     * `sensorInverted`, `sensorOnStack` and `bodyweight` are non-nullable
-     * `Boolean` on [PlanExerciseDef], so a plan that declared `false` and a
-     * plan that said nothing decode to the same value. There is no `?:` for
-     * `PlanQueue` to test and nothing downstream can recover the difference.
+     * `sensorInverted` and `bodyweight` are non-nullable `Boolean` on
+     * [PlanExerciseDef], so a plan that declared `false` and a plan that said
+     * nothing decode to the same value. There is no `?:` for
+     * [SetGeometryPolicy.resolve] to test and nothing downstream can recover
+     * the difference. That is the rest of #64.
      *
-     * This is why the export publishes no provenance for those three: it would
-     * have to invent one. Pinned so the day they become `Boolean?` this test
-     * reds and says what changed.
+     * This test used to name THREE flags and to say the export publishes no
+     * provenance for any of them. That sentence is deleted rather than
+     * reworded: `sensorOnStack` is `Boolean?` as of #223, an omitted key is a
+     * distinct state, and the export publishes a source for it.
      */
     @Test
-    fun `three geometry flags cannot tell a declared false from an omitted key`() {
+    fun `two geometry flags cannot tell a declared false from an omitted key`() {
         val declaredFalse =
             exercise(
                 "seated_row",
-                ""","sensorInverted":false,"sensorOnStack":false,"bodyweight":false""",
+                ""","sensorInverted":false,"bodyweight":false""",
             )
         val omitted = exercise("seated_row")
         assertEquals(declaredFalse.sensorInverted, omitted.sensorInverted)
-        assertEquals(declaredFalse.sensorOnStack, omitted.sensorOnStack)
         assertEquals(declaredFalse.bodyweight, omitted.bodyweight)
-        assertTrue(!omitted.sensorInverted && !omitted.sensorOnStack && !omitted.bodyweight)
+        assertTrue(!omitted.sensorInverted && !omitted.bodyweight)
+    }
+
+    /** The one that now can: null is not false, and false is not null. */
+    @Test
+    fun `an omitted stack key decodes to null and a declared false to false`() {
+        assertNull(exercise("seated_row").sensorOnStack)
+        assertEquals(false, exercise("seated_row", ""","sensorOnStack":false""").sensorOnStack)
+        assertEquals(true, exercise("seated_row", ""","sensorOnStack":true""").sensorOnStack)
     }
 
     /** A declared true is readable; only the false/omitted pair collapses. */
     @Test
-    fun `a declared true on those three flags is readable`() {
+    fun `a declared true on those two flags is readable`() {
         val on =
             exercise(
                 "seated_row",
-                ""","sensorInverted":true,"sensorOnStack":true,"bodyweight":true""",
+                ""","sensorInverted":true,"bodyweight":true""",
             )
-        assertTrue(on.sensorInverted && on.sensorOnStack && on.bodyweight)
+        assertTrue(on.sensorInverted && on.bodyweight)
     }
 }

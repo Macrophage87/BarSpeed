@@ -35,14 +35,20 @@ enum class GeometrySource {
 }
 
 /**
- * Provenance for the five geometry values whose resolution has more than one
+ * Provenance for the six geometry values whose resolution has more than one
  * possible source.
  *
- * `sensorInverted`, `sensorOnStack` and `bodyweight` are absent on purpose, not
- * by oversight: they are non-nullable `Boolean` on [PlanExerciseDef], so a plan
- * that declared `false` and a plan that said nothing decode to the same value
- * and there is nothing left to observe. Reporting a source for them would mean
- * inventing one.
+ * `sensorInverted` and `bodyweight` are absent on purpose, not by oversight:
+ * they are non-nullable `Boolean` on [PlanExerciseDef], so a plan that declared
+ * `false` and a plan that said nothing decode to the same value and there is
+ * nothing left to observe. Reporting a source for them would mean inventing
+ * one.
+ *
+ * `sensorOnStack` used to be listed with them and is not any more: it is
+ * `Boolean?` on [PlanExerciseDef] as of #223, so an omitted key is now a
+ * distinct state and the app answers it from [ExerciseDef.STACK_MOUNTED_IDS].
+ * The sentence that said all three were unobservable is deleted rather than
+ * reworded, because it is false for one of them now.
  */
 @Serializable
 data class GeometrySources(
@@ -51,6 +57,7 @@ data class GeometrySources(
     val plane: GeometrySource,
     val kind: GeometrySource,
     val travelRatio: GeometrySource,
+    val sensorOnStack: GeometrySource,
 )
 
 /**
@@ -134,10 +141,11 @@ object SetGeometryPolicy {
      * default -- overwriting with the default would discard the built-in
      * definition.
      *
-     * `sensorInverted`, `sensorOnStack` and `bodyweight` are assigned
-     * unconditionally because they cannot express omission (see
-     * [GeometrySources]). That is latent today, since no seed entry sets any of
-     * the three; the first one that does makes it live.
+     * `sensorInverted` and `bodyweight` are still assigned unconditionally
+     * because they cannot express omission (see [GeometrySources]); that is
+     * the rest of #64 and is not fixed here. `sensorOnStack` no longer is:
+     * it goes through [stackMount], so a plan that says nothing gets the
+     * app's default for that machine and a plan that says `false` still wins.
      */
     fun resolve(base: ExerciseDef, declared: PlanExerciseDef?): ExerciseDef {
         if (declared == null) return base
@@ -148,7 +156,7 @@ object SetGeometryPolicy {
             sensorInverted = declared.sensorInverted,
             travelRatio = declared.travelRatio ?: base.travelRatio,
             horizontal = declared.plane?.let { it == "horizontal" } ?: base.horizontal,
-            sensorOnStack = declared.sensorOnStack,
+            sensorOnStack = stackMount(base.id, base.sensorOnStack, declared.sensorOnStack).onStack,
             bodyweight = declared.bodyweight,
         )
     }
@@ -186,8 +194,24 @@ object SetGeometryPolicy {
                 plane = source(declared?.plane != null, seeded, inferable = false),
                 kind = source(declared?.kindOverride != null, seeded, inferable = true),
                 travelRatio = source(declared?.travelRatio != null, seeded, inferable = false),
+                sensorOnStack = stackSource(used.sensorOnStack, declared?.sensorOnStack),
             ),
         )
+    }
+
+    /**
+     * Provenance for the value [used] already carries, never a re-decision.
+     *
+     * Deliberately NOT [stackMount]: that answers what the value SHOULD be and
+     * consults the id table to do it, so calling it here could report SEEDED
+     * beside a published `false` on a set that never went through [resolve] --
+     * an ad-hoc set has no plan. Reading the resolved value is what keeps the
+     * two halves of one published fact from disagreeing.
+     */
+    private fun stackSource(used: Boolean, declared: Boolean?): GeometrySource = when {
+        declared != null -> GeometrySource.DECLARED
+        used -> GeometrySource.SEEDED
+        else -> GeometrySource.DEFAULT
     }
 
     private fun source(declared: Boolean, seeded: Boolean, inferable: Boolean): GeometrySource = when {

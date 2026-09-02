@@ -137,7 +137,14 @@ class StackSeedDifferentialTest {
         assertEquals(required, (0 until twin.elementsCount).map(twin::getElementName).toSet())
     }
 
+    /**
+     * The stored form of a [GeometrySource] is the uppercase enum name; the
+     * exporter lowercases it at the wire boundary. These assertions are
+     * written in the wire vocabulary, so the read is lowercased here. Written
+     * without the lowercase first, which was wrong about the stored form
+     * rather than about the behaviour, and corrected in the fix commit.
+     */
     private fun sourceOf(g: ResolvedGeometry, key: String): String? =
         Json.parseToJsonElement(Json.encodeToString(GeometrySources.serializer(), g.sources))
-            .jsonObject[key]?.jsonPrimitive?.content
+            .jsonObject[key]?.jsonPrimitive?.content?.lowercase()
 }

@@ -120,18 +120,30 @@ class SetGeometryPolicyTest {
     }
 
     /**
-     * The three flags that cannot express omission are assigned
+     * The two flags that still cannot express omission are assigned
      * unconditionally, so a plan silently clears a built-in true. Pinned as it
-     * behaves, not as it ought to: this is latent today because no seed sets
-     * any of the three, and the fix is to make them nullable on the plan side,
-     * which is its own change. If that lands, this test reds and says so.
+     * behaves, not as it ought to: latent today because no seed entry sets
+     * either, and the fix is to make them nullable on the plan side. That is
+     * the rest of #64 and is not done here.
+     *
+     * This test named THREE flags until #223 made `sensorOnStack` nullable.
+     * The third assertion is not reworded: it is deleted, and the opposite
+     * outcome is asserted in its own test below.
      */
     @Test
-    fun `the three non-nullable flags are taken from the plan even when it said nothing`() {
+    fun `the two non-nullable flags are taken from the plan even when it said nothing`() {
         val out = SetGeometryPolicy.resolve(opinionated, declared("cable_row"))
         assertEquals(false, out.sensorInverted, "a built-in true was cleared by an omitted key")
-        assertEquals(false, out.sensorOnStack, "a built-in true was cleared by an omitted key")
         assertEquals(false, out.bodyweight, "a built-in true was cleared by an omitted key")
+    }
+
+    /** The one that can now: an omitted key leaves a built-in stack mount standing. */
+    @Test
+    fun `an omitted stack key leaves a built-in stack mount standing`() {
+        val plan = declared("cable_row")
+        val out = SetGeometryPolicy.resolve(opinionated, plan)
+        assertEquals(true, out.sensorOnStack)
+        assertEquals(GeometrySource.SEEDED, SetGeometryPolicy.describe(out, plan).sources.sensorOnStack)
     }
 
     @Test
@@ -306,28 +318,16 @@ class SetGeometryPolicyTest {
     }
 
     /**
-     * Field-37: the plan omitted `sensorOnStack` on an assisted pull-up, which
-     * runs on a pin-selected assist stack. Characterized as it stands before
-     * the fix -- the set is analysed as though the sensor rode what the lifter
-     * holds.
-     */
-    @Test
-    fun `an omitted stack key on an assisted pull-up resolves to bar-mounted`() {
-        val plan = declared("assisted_pull_up")
-        val used = SetGeometryPolicy.resolve(ExerciseDef("assisted_pull_up", "Assisted Pull-Up"), plan)
-        assertEquals(false, used.sensorOnStack)
-    }
-
-    /**
      * The provenance object's published shape, key by key, so a key arriving or
      * leaving is a decision somebody has to make rather than a diff nobody
-     * reads. `sensorOnStack` is absent here today.
+     * reads. `sensorOnStack` joined it in #223 and this test's name moved
+     * with it.
      */
     @Test
-    fun `the published provenance keys are exactly these five`() {
+    fun `the published provenance keys are exactly these six`() {
         val g = SetGeometryPolicy.describe(opinionated, null)
         assertEquals(
-            setOf("startsWith", "concentric", "plane", "kind", "travelRatio"),
+            setOf("startsWith", "concentric", "plane", "kind", "travelRatio", "sensorOnStack"),
             json.parseToJsonElement(json.encodeToString(GeometrySources.serializer(), g.sources))
                 .jsonObject.keys,
         )
