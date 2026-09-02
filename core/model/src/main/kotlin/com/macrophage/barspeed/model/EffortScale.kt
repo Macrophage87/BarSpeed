@@ -114,6 +114,28 @@ enum class HeadroomTier(val rpe: Int) {
 
     /** One plate pair, or one notch on a stack. */
     ONE_INCREMENT(6),
+    ;
+
+    companion object {
+        /**
+         * The rung a stored `rpe` came from, or null when it is not an
+         * anchored headroom rung.
+         *
+         * Null on 7 through 10, which are the counted end, and null on
+         * [EffortScale.UNANCHORED_RPE] -- 2, 3 and 5 -- which are valid values
+         * with no tile. **That second null is a decision, not an oversight.**
+         * Those three exist so the anchors sort; nothing distinguishes a 3
+         * from its neighbours, so a 3 does not say which increment was left
+         * and is not read as one here. Anything reading this to decide what to
+         * OFFER a lifter therefore offers nothing on an unanchored value,
+         * which is the honest direction: the app never asked that question and
+         * has no answer to act on.
+         *
+         * Null on a null rpe too -- an unrated set, or a failure tile, which
+         * stores none.
+         */
+        fun ofRpe(rpe: Int?): HeadroomTier? = entries.firstOrNull { it.rpe == rpe }
+    }
 }
 
 /** One tile of the effort grid: what it stores and the words it says. */
