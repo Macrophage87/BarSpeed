@@ -954,15 +954,15 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
  * was offered none of them.
  *
  * It re-answers once a second because the answer changes with time and nothing
- * else would drive a recomposition, and it says NOTHING for the first three
- * seconds after a link is armed: `ArmedSilencePolicy.SILENT_AFTER_MS` is the
+ * else would drive a recomposition, and it says NOTHING for three seconds
+ * after the SECOND link is pointed at a device, the only arming instant
+ * `AutoConnectManager` rewrites: `ArmedSilencePolicy.SILENT_AFTER_MS` is the
  * grace, and accusing a link two seconds into a connect is how a warning
- * becomes something the lifter learns to ignore. That grace is real only for
- * the role-keyed reading. The one-unit reading (#224) is handed
- * `RecordState.imuArmedAtMs`, which `AutoConnectManager` writes once at
- * construction, so on a unit paired later in the session the floor is already
- * spent and the card can accuse it while it is still connecting --
- * `RecordState.soleSilenceOver` states it.
+ * becomes something the lifter learns to ignore. The role-keyed floor is that
+ * instant only where the second link was just re-pointed, and the process's
+ * start otherwise; the one-unit reading (#224) gets `RecordState.imuArmedAtMs`
+ * alone, always the process's start -- `RecordState.soleSilenceOver` states
+ * it.
  *
  * Drawn on READY and on RESTING. READY is drawn once per session --
  * `startNextSet` writes READY and calls `beginSet` in the same frame -- so a

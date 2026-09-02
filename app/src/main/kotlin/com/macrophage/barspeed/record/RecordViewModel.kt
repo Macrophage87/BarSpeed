@@ -669,8 +669,10 @@ internal fun RecordState.armedDeliveryOver(
  * [ArmedSilencePolicy.soleSilence]'s, in `:core:model` where a test runs on it,
  * including which sets it applies to; what is left here is handing it the one
  * link's state and frame instant, which are [imuState] and [imuFrameAtMs] --
- * the analysed link, and the only client `AutoConnectManager` maintains when
- * the roster names no second address.
+ * the analysed link, and the only bar-sensor client still holding a device
+ * when the roster names no second address -- `setSecondaryImuAddress(null)`
+ * disconnects the second one and its loop then idles on the no-address
+ * branch.
  *
  * Called at the same two instants [armedDeliveryOver] is: the card passes
  * `RecordState.imuArmedAtMs` while it is drawing, and `endSet` passes the set's

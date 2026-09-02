@@ -614,12 +614,21 @@ class SensorCapturePolicyTest {
      * DIFFERENTIAL, issue #224. Which sets capture ONE stream carrying no role,
      * stated once.
      *
-     * Three shapes answer the same way and one does not, and the rule is here
+     * Three shapes answer true and two answer false, and the rule is here
      * rather than at the screen and the record path both: a set captures an
      * unroled stream when the roster armed no pair AND the app has a unit to
      * hold a link to. The manual set with nothing paired is the one that must
      * answer false -- there is no link, so there is nothing to report on, and a
      * word for it would be absence rendered as a value.
+     *
+     * The third TRUE shape is `readyMismatch`: two paired units carrying two
+     * DIFFERENT labels -- `roster` would call them dual -- but a preferred
+     * address naming neither of them. `roster`'s READY branch returns a bare
+     * `SensorRoster` there (no `expected`, no `shortfall`), which reads exactly
+     * like `unlabelled` to `capturesUnroledStream` even though the pair is
+     * fully labelled. The published `soleSilent` description and its two Kotlin
+     * KDoc twins now name this shape; this pins the roster this branch produces
+     * so the published enumeration cannot drift from it again.
      */
     @Test
     fun `a set captures one unroled stream when a unit is paired and no pair is armed`() {
@@ -627,6 +636,8 @@ class SensorCapturePolicyTest {
         val b = "AA:BB:CC:DD:EE:02"
         val solo = SensorCapturePolicy.roster(listOf(a), a, emptyMap())
         val unlabelled = SensorCapturePolicy.roster(listOf(a, b), a, emptyMap())
+        val readyMismatch =
+            SensorCapturePolicy.roster(listOf(a, b), null, mapOf(a to SensorRole.A, b to SensorRole.B))
         val dual = SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.B))
         val nothing = SensorCapturePolicy.roster(emptyList(), null, emptyMap())
 
@@ -637,6 +648,12 @@ class SensorCapturePolicyTest {
         assertTrue(
             SensorCapturePolicy.capturesUnroledStream(unlabelled, listOf(a, b)),
             "a pair the app cannot tell apart records one unroled stream and is not recognised as doing so",
+        )
+        assertNull(readyMismatch.shortfall, "a labelled pair whose preference names neither unit reported a shortfall")
+        assertFalse(readyMismatch.isDual, "a labelled pair whose preference names neither unit read as armed dual")
+        assertTrue(
+            SensorCapturePolicy.capturesUnroledStream(readyMismatch, listOf(a, b)),
+            "a labelled pair whose preference names neither unit is not recognised as capturing an unroled stream",
         )
         assertFalse(
             SensorCapturePolicy.capturesUnroledStream(dual, listOf(a, b)),

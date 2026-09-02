@@ -257,14 +257,17 @@ object ArmedSilencePolicy {
      * THE HALF #213 COULD NOT REACH. Its answer is keyed by role, and a role
      * exists only where two paired units carry two different labels -- so the
      * owner's habitual configuration, one bar sensor, got no card, no stored
-     * fact, and an amber dot. This is the same judgement asked without a key:
-     * one link, one reading, and no label invented to hang it off.
+     * fact, and a dot: amber where the link still read Connected, grey or red
+     * where it did not -- which state a powered-off unit produces is the
+     * [Field] question #213 left. This is the same judgement asked without a
+     * key: one link, one reading, and no label invented to hang it off.
      *
      * [SensorCapturePolicy.capturesUnroledStream] decides WHICH sets this
-     * applies to, stated there rather than restated here, and it covers two
-     * shapes: one paired unit, and two the app cannot tell apart. Both record a
-     * single stream through the single link the app holds, so both can say what
-     * that link was doing.
+     * applies to, stated there rather than restated here, and it covers three
+     * shapes: one paired unit; two the app cannot tell apart; and two it CAN
+     * tell apart whose preferred address names neither of them. All three
+     * record a single stream through the single link the app holds, so all
+     * three can say what that link was doing.
      *
      * The state and the frame instant are that ONE link's, and the grace floor
      * is whatever instant the caller passes. It is asked at both instants

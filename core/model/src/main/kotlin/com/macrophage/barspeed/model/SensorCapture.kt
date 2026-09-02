@@ -191,10 +191,13 @@ data class RecordedSensors(
      * set carrying both would state one fact in two vocabularies, and the two
      * could then disagree about one link.
      *
-     * Covers two shapes of set, both of which capture one unroled stream
-     * through the one link the app holds: one paired unit, and two the app
-     * cannot tell apart -- the second keeps its [shortfall] beside this, since
-     * that describes the ROSTER and this describes the LINK.
+     * Covers three shapes of set, all of which capture one unroled stream
+     * through the one link the app holds: one paired unit; two the app cannot
+     * tell apart, which keeps its [shortfall] beside this, since that
+     * describes the ROSTER and this describes the LINK; and two paired units
+     * that ARE labelled apart whose preferred address names neither of them,
+     * which carries no [shortfall] -- the roster is fine, the preference is
+     * what is wrong.
      *
      * Null on every ordinary set and absent from the encoded JSON when null,
      * since the repository encodes with kotlinx's default
@@ -550,8 +553,9 @@ object SensorCapturePolicy {
     }
 
     /**
-     * True when a set captures ONE stream carrying no role: one paired unit, or
-     * two the app cannot tell apart (#224).
+     * True when a set captures ONE stream carrying no role: one paired unit,
+     * two the app cannot tell apart, or two it CAN tell apart whose preferred
+     * address names neither of them (#224).
      *
      * Stated once, here, because three places need the same answer -- the card
      * before the set, the reading frozen at the end of it, and the declaration

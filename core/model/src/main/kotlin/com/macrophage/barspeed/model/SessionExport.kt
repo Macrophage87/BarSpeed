@@ -436,8 +436,8 @@ data class SessionExport(
          * set whose stream carries no role. The third change keyed its word by
          * ROLE, and a role exists only where two paired units carry two
          * different labels -- so a set armed with one bar sensor, which is the
-         * ordinary configuration, published nothing about a unit that was
-         * powered, paired and delivering nothing. Purely additive on the wire
+         * ordinary configuration, published nothing about a paired unit whose
+         * link delivered nothing. Purely additive on the wire
          * -- the key is absent unless that link was silent, and no existing key
          * changed type or stopped being written -- but NOT neutral in what a
          * document contains: a one-sensor set whose unit went silent now
@@ -457,8 +457,11 @@ data class SessionExport(
          * no role as often as it is a set whose every armed unit went silent,
          * which was already true of an unlabelled pair before this change. The
          * raw archive's `meta.json` moves with it under the third change's
-         * rule: a set descriptor carries `sensorsSoleSilent`, written only when
-         * that link was silent.
+         * rule: such a set's descriptor carries `sensorsSoleSilent`, and
+         * because it now carries a declaration at all it also carries
+         * `sensorsArmed` 1 and an empty `sensorRolesExpected`, where before
+         * this version a one-sensor set's descriptor carried no sensor key
+         * whatever.
          */
         const val SCHEMA_VERSION = "1.17"
 
@@ -1011,8 +1014,8 @@ data class SetSensorsExport(
      * exists only where two paired units carry two different labels, so on the
      * ordinary one-sensor set -- the configuration this app is used in most --
      * [silent] is structurally empty, and until this key a whole session of
-     * sets recorded through a powered, paired, silent unit published nothing
-     * about it at all.
+     * sets recorded through a paired unit whose link delivered nothing
+     * published nothing about it at all.
      *
      * A WORD RATHER THAN A ONE-ENTRY OBJECT, because there is no role to key
      * it by and a key invented for the purpose -- "sole", "unroled" -- would put
@@ -1025,11 +1028,14 @@ data class SetSensorsExport(
      * `docs/schemas/session-export.schema.json` is the copy a reader of the
      * document has and states each limit in full.
      *
-     * Never written beside [silent]. It appears on two shapes of set, both of
+     * Never written beside [silent]. It appears on three shapes of set, all of
      * which record one unroled stream through the one link the app holds: a set
-     * armed with a single paired unit, and one that met two paired units it
-     * could not tell apart -- the second keeps its [shortfall], which describes
-     * the ROSTER, beside this, which describes the LINK.
+     * armed with a single paired unit; one that met two paired units it could
+     * not tell apart, which keeps its [shortfall], describing the ROSTER,
+     * beside this, describing the LINK; and one whose two paired units ARE
+     * labelled apart but whose preferred address names neither of them, which
+     * carries no [shortfall] at all -- the roster is not what is wrong, the
+     * preference is.
      *
      * ABSENT MEANS THE SET CAPTURED SAMPLES from that one link -- or, on a set
      * shorter than [ArmedSilencePolicy.SILENT_AFTER_MS], that its last frame

@@ -792,15 +792,19 @@ class RawExporter(
             // Absent when nothing was in the way, which is a dual set and the
             // ordinary one-sensor set both -- and the ordinary one does not
             // reach here at all, the whole declaration being null. Present
-            // only for two PAIRED units the app could not tell apart, which is
-            // the state session.json also publishes and which neither document
-            // can otherwise express. Paired, not connected: nothing here has
-            // looked at a link, so it does not say the second unit was on.
+            // for two PAIRED units the app could not tell apart, the state
+            // session.json also publishes and which neither document can
+            // otherwise express, and, since #224, for a one-sensor set whose
+            // sole unit was silent -- which reaches here with a declaration
+            // and no shortfall, because nothing was in the roster's way.
+            // Paired, not connected: nothing here has looked at a link, so it
+            // does not say the second unit was on.
             str("sensorsShortfall", d.shortfall?.let(SensorCapturePolicy::shortfallToWire))
-            // Written even when empty. An empty list is a set that met two
-            // paired units it could not tell apart and armed neither by role,
-            // which is a statement; an absent key would read as this version
-            // not stating it.
+            // Written even when empty. An empty list is a set whose stream
+            // carries no role: two paired units the app could not tell apart,
+            // or -- since #224 -- one paired unit that delivered nothing.
+            // Which of the two is sensorsShortfall and sensorsSoleSilent. An
+            // absent key would read as this version not stating it.
             fields += "\"sensorRolesExpected\": " +
                 "[${d.expected.joinToString(", ") { "\"${SensorCapturePolicy.wireOf(it)}\"" }}]"
             str("analysedRole", analysedRole)
