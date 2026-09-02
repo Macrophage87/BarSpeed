@@ -1,6 +1,8 @@
 package com.macrophage.barspeed.model
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -172,5 +174,50 @@ class SchemaAnalysedFallbackContractTest {
             "if that role is the analysed one, the set's summary is empty rather than wrong" in shippedPrompt,
             "the shipped prompt still tells a reader an absent analysed role means an empty summary",
         )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #207 round 2, review finding 3. The published
+     * example carries a set whose analysis fell back, so ajv sees the key.
+     *
+     * `ci.yml` validates only the two hand-written example payloads, so a key
+     * absent from both is a key ajv never sees -- and `setSensors` is
+     * `additionalProperties: false`, which makes ajv the only check that the
+     * declared key validates inside a real document. The repo has codified
+     * this three times already: `SchemaSensorContractTest` for `shortfall`,
+     * and `SchemaContractTest` for the prep pair and for the rep marks. #207
+     * minted a key in the same object one round later and did neither.
+     *
+     * The block must sit AFTER the dual set. `SchemaContractTest`'s `the
+     * published export example carries a dual set's sensor block` reads the
+     * FIRST sensors block in the document and asserts `count` 2 with
+     * `expected` `[a, b]`.
+     */
+    @Test
+    fun `the published example carries a set whose analysis fell back`() {
+        val sets = schema("examples/session-export.example.json")["exercises"]!!
+            .jsonArray.flatMap { it.jsonObject["sets"]!!.jsonArray }
+        val blocks = sets.mapNotNull { it.jsonObject["sensors"]?.jsonObject }
+        val moved =
+            assertNotNull(
+                blocks.firstOrNull { it["analysedFellBack"] != null },
+                "no set in the published example carries analysedFellBack, so ajv never validates the key",
+            )
+
+        assertTrue(
+            moved.getValue("analysedFellBack").jsonPrimitive.boolean,
+            "the example writes the fallback flag false, which the exporter never emits",
+        )
+        assertEquals(2, moved.getValue("count").jsonPrimitive.int, "a set that fell back armed two streams")
+        val present = moved.getValue("present").jsonArray.map { it.jsonPrimitive.content }
+        val analysed = moved.getValue("analysedRole").jsonPrimitive.content
+        assertEquals(
+            listOf("b", "a"),
+            moved.getValue("expected").jsonArray.map { it.jsonPrimitive.content },
+            "the example's fallback set is not one armed to analyse the second role",
+        )
+        assertEquals(listOf("a"), present, "the example's fallback set does not show one armed unit silent")
+        assertEquals("a", analysed, "the example's fallback set is not analysed from the unit that streamed")
+        assertTrue(analysed in present, "the example publishes a fallback onto a role that never streamed")
     }
 }
