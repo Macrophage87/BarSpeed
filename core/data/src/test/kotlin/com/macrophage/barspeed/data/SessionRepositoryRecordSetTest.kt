@@ -127,6 +127,13 @@ class SessionRepositoryRecordSetTest {
             calls += "overrideReps"
         }
 
+        var loadOverrides = mutableListOf<Pair<Long, Double>>()
+
+        override suspend fun overrideLoad(setId: Long, loadKg: Double) {
+            calls += "overrideLoad"
+            loadOverrides += setId to loadKg
+        }
+
         var durationOverrides = mutableListOf<Pair<Long, Int>>()
 
         override suspend fun overrideDuration(setId: Long, seconds: Int) {
@@ -282,6 +289,33 @@ class SessionRepositoryRecordSetTest {
         repo(dao).overrideDuration(setId = 31L, seconds = 47)
         assertEquals(listOf(31L to 47), dao.durationOverrides)
         assertEquals(listOf("overrideDuration"), dao.calls)
+    }
+
+    /**
+     * The load correction the rest screen makes on the set just finished
+     * (#205), pinned at the seam where it leaves the repository.
+     *
+     * [SessionRepository.overrideLoad] takes the body-weight-INCLUSIVE total,
+     * which is the scale `loadKg` is already on, and its whole job is to hand
+     * that one number to the DAO against that one id.
+     *
+     * THE CALL LIST IS HALF THE ASSERTION. A load correction must not reach
+     * `overrideReps`, `updateRpe` or anything else on the way past: the rep
+     * count and the failed verdict are separate facts about the set, and the
+     * plan's `plannedLoadKg` is what the correction is a deviation FROM, so a
+     * second write folded in here would erase the deviation the row exists to
+     * record. Exactly one call, and it is this one.
+     *
+     * Nothing here executes Room or SQLite; the DAO is an interface and this
+     * fake stands in for it. What the UPDATE did to the row is not tested by
+     * anything in this repository.
+     */
+    @Test
+    fun `a load correction reaches the dao with the set and the total it names`() = runTest {
+        val dao = FakeSessionDao()
+        repo(dao).overrideLoad(setId = 31L, loadKg = 92.5)
+        assertEquals(listOf(31L to 92.5), dao.loadOverrides)
+        assertEquals(listOf("overrideLoad"), dao.calls)
     }
 
     // ---- the row -----------------------------------------------------------
