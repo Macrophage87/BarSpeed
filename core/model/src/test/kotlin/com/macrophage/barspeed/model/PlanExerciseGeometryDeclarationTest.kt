@@ -17,9 +17,12 @@ import kotlin.test.assertTrue
  * precedence it relies on is pinned here on the properties it reads -- before
  * any of it moves.
  *
- * The last test is the awkward one and the reason this file exists: three of
- * the eight declarations cannot express omission at all, so no amount of care
- * downstream can tell a plan that said `false` from a plan that said nothing.
+ * The last test used to be the awkward one and the reason this file exists:
+ * three of the eight declarations could not express omission at all, so no
+ * amount of care downstream could tell a plan that said `false` from a plan
+ * that said nothing. `sensorOnStack` (#223) and `bodyweight` (#227) have since
+ * both become nullable; `sensorInverted` is the one still left, and is the
+ * rest of #64.
  */
 class PlanExerciseGeometryDeclarationTest {
     private val json = Json { ignoreUnknownKeys = true }
@@ -136,34 +139,30 @@ class PlanExerciseGeometryDeclarationTest {
         assertNull(exercise("back_squat", ""","kind":"isometric"""").kindOverride)
     }
 
-    // ---- the two that cannot say "omitted" ----------------------------------
+    // ---- the one that cannot say "omitted" ----------------------------------
 
     /**
-     * `sensorInverted` and `bodyweight` are non-nullable `Boolean` on
-     * [PlanExerciseDef], so a plan that declared `false` and a plan that said
-     * nothing decode to the same value. There is no `?:` for
-     * [SetGeometryPolicy.resolve] to test and nothing downstream can recover
-     * the difference. That is the rest of #64.
+     * `sensorInverted` is a non-nullable `Boolean` on [PlanExerciseDef], so a
+     * plan that declared `false` and a plan that said nothing decode to the
+     * same value. There is no `?:` for [SetGeometryPolicy.resolve] to test and
+     * nothing downstream can recover the difference. That is the rest of #64.
      *
      * This test used to name THREE flags and to say the export publishes no
      * provenance for any of them. That sentence is deleted rather than
-     * reworded: `sensorOnStack` is `Boolean?` as of #223, an omitted key is a
-     * distinct state, and the export publishes a source for it.
+     * reworded: `sensorOnStack` is `Boolean?` as of #223 and `bodyweight` is
+     * `Boolean?` as of #227, an omitted key on either is a distinct state, and
+     * the export publishes a source for `sensorOnStack` (not `bodyweight` --
+     * see [SetGeometryPolicy]'s `GeometrySources` KDoc for why).
      */
     @Test
-    fun `two geometry flags cannot tell a declared false from an omitted key`() {
-        val declaredFalse =
-            exercise(
-                "seated_row",
-                ""","sensorInverted":false,"bodyweight":false""",
-            )
+    fun `one geometry flag cannot tell a declared false from an omitted key`() {
+        val declaredFalse = exercise("seated_row", ""","sensorInverted":false""")
         val omitted = exercise("seated_row")
         assertEquals(declaredFalse.sensorInverted, omitted.sensorInverted)
-        assertEquals(declaredFalse.bodyweight, omitted.bodyweight)
-        assertTrue(!omitted.sensorInverted && !omitted.bodyweight)
+        assertTrue(!omitted.sensorInverted)
     }
 
-    /** The one that now can: null is not false, and false is not null. */
+    /** The two that now can: null is not false, and false is not null. */
     @Test
     fun `an omitted stack key decodes to null and a declared false to false`() {
         assertNull(exercise("seated_row").sensorOnStack)
@@ -171,14 +170,17 @@ class PlanExerciseGeometryDeclarationTest {
         assertEquals(true, exercise("seated_row", ""","sensorOnStack":true""").sensorOnStack)
     }
 
+    /** The other one: an omitted `bodyweight` key decodes to null, not false (#227). */
+    @Test
+    fun `an omitted bodyweight key decodes to null and a declared false to false`() {
+        assertNull(exercise("pull_up").bodyweight)
+        assertEquals(false, exercise("pull_up", ""","bodyweight":false""").bodyweight)
+        assertEquals(true, exercise("pull_up", ""","bodyweight":true""").bodyweight)
+    }
+
     /** A declared true is readable; only the false/omitted pair collapses. */
     @Test
-    fun `a declared true on those two flags is readable`() {
-        val on =
-            exercise(
-                "seated_row",
-                ""","sensorInverted":true,"bodyweight":true""",
-            )
-        assertTrue(on.sensorInverted && on.bodyweight)
+    fun `a declared true on sensorInverted is readable`() {
+        assertTrue(exercise("seated_row", ""","sensorInverted":true""").sensorInverted)
     }
 }

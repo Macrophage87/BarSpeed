@@ -131,7 +131,7 @@ data class PlanFile(
                     // assist machine subtracts — so negatives are meaningful there.
                     errors += set.validate(
                         "sessions[$si].exercises[$ei].sets[$xi]",
-                        allowNegativeLoad = exercise.bodyweight,
+                        allowNegativeLoad = exercise.bodyweight ?: false,
                     )
                 }
             }
@@ -632,8 +632,17 @@ data class PlanExerciseDef(
      * True when the lifter's own body is the load — pull-ups, dips, push-ups.
      * The set's load is then what was ADDED, and may be negative for assistance
      * (band or machine). Total load is body weight plus that.
+     *
+     * Nullable, and null is not false: on the ids in
+     * [ExerciseDef.BODYWEIGHT_IDS] the app supplies a body-weight default when
+     * the key is ABSENT, and a plan that means the load is not the lifter's own
+     * body has to say `false` for that to win — the same shape #223 gave
+     * `sensorOnStack`, for the population #61 named: a plan running pull-ups
+     * without the flag recorded `loadKg` as the added load alone, with no
+     * built-in definition ever setting `bodyweight = true` to catch it (#227
+     * item 2).
      */
-    val bodyweight: Boolean = false,
+    val bodyweight: Boolean? = null,
     /**
      * How many IDENTICAL objects are held at once — 2 for a pair of dumbbells
      * or a two-handled carry, 1 (or omitted) for a barbell, a machine, a

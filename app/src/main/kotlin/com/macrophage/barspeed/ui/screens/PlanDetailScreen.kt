@@ -338,7 +338,14 @@ private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
             Spacer(Modifier.height(10.dp))
             val groups = groupSets(exercise.sets)
             groups.forEach { group ->
-                SetGroupRow(group, unit, kind, exercise.bodyweight, common)
+                // exercise.bodyweight is the RAW plan declaration and Boolean?
+                // as of #227 -- this approval screen reads PlanExerciseDef
+                // directly rather than through SetGeometryPolicy.resolve, so
+                // it does not (yet) see the seed default an omitted key on a
+                // built-in body-weight id would resolve to at record time; an
+                // omitted key here still displays as loaded work, unchanged
+                // from before #227. Preserved rather than fixed in this pass.
+                SetGroupRow(group, unit, kind, exercise.bodyweight ?: false, common)
             }
         }
     }

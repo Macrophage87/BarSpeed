@@ -115,7 +115,7 @@ object BodyWeightPromptPolicy {
      * one of purely loaded work, needs nothing and is never asked — that is
      * the whole point of #181.
      */
-    fun sessionNeedsBodyWeight(session: PlanSessionDef): Boolean = session.exercises.any { it.bodyweight }
+    fun sessionNeedsBodyWeight(session: PlanSessionDef): Boolean = session.exercises.any { it.bodyweight ?: false }
 
     /**
      * Ask now?

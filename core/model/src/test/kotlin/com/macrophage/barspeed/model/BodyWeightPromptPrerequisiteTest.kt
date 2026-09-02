@@ -2,8 +2,7 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.assertNull
 
 /**
  * The facts a "prompt for body weight only when the session needs it" rule
@@ -43,19 +42,33 @@ class BodyWeightPromptPrerequisiteTest {
         return requireNotNull(result.plan).sessions.single()
     }
 
+    /**
+     * `bodyweight` decodes an omitted key as `null`, not `false`, as of #227 --
+     * the same shape #223 gave `sensorOnStack`, and for the same reason: a
+     * document that says nothing has made no declaration for
+     * [SetGeometryPolicy.resolve] to read as a plan-level "no", so the app can
+     * still supply its own default for an id built in as body-weight work
+     * without a plan author's `false` losing to it later. This assertion was
+     * `assertFalse` before #227 and is corrected here rather than reworded
+     * around, because the decoded value genuinely changed.
+     */
     @Test
-    fun `an exercise that omits the bodyweight key is not bodyweight work`() {
+    fun `an exercise that omits the bodyweight key declares nothing, not false`() {
         val session = sessionOf("""{ "exercise": "back_squat", "sets": [{ "reps": 5 }] }""")
-        assertFalse(
+        assertNull(
             session.exercises.single().bodyweight,
-            "a document that says nothing about bodyweight decoded as bodyweight work",
+            "a document that says nothing about bodyweight decoded as a declaration",
         )
     }
 
     @Test
     fun `a declared bodyweight exercise survives decoding as one`() {
         val session = sessionOf("""{ "exercise": "pull_up", "bodyweight": true, "sets": [{ "reps": 5 }] }""")
-        assertTrue(session.exercises.single().bodyweight, "a declared bodyweight exercise decoded as loaded work")
+        assertEquals(
+            true,
+            session.exercises.single().bodyweight,
+            "a declared bodyweight exercise decoded as loaded work",
+        )
     }
 
     @Test
@@ -66,7 +79,7 @@ class BodyWeightPromptPrerequisiteTest {
             { "exercise": "pull_up", "bodyweight": true, "sets": [{ "reps": 8 }] }
             """.trimIndent(),
         )
-        assertEquals(listOf(false, true), session.exercises.map { it.bodyweight })
+        assertEquals(listOf(null, true), session.exercises.map { it.bodyweight })
     }
 
     /**

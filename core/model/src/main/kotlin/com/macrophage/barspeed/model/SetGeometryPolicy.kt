@@ -40,17 +40,21 @@ enum class GeometrySource {
  * Provenance for the six geometry values whose resolution has more than one
  * possible source.
  *
- * `sensorInverted` and `bodyweight` are absent on purpose, not by oversight:
- * they are non-nullable `Boolean` on [PlanExerciseDef], so a plan that declared
- * `false` and a plan that said nothing decode to the same value and there is
- * nothing left to observe. Reporting a source for them would mean inventing
- * one.
+ * `sensorInverted` is absent on purpose, not by oversight: it is a non-nullable
+ * `Boolean` on [PlanExerciseDef], so a plan that declared `false` and a plan
+ * that said nothing decode to the same value and there is nothing left to
+ * observe. Reporting a source for it would mean inventing one.
  *
- * `sensorOnStack` used to be listed with them and is not any more: it is
- * `Boolean?` on [PlanExerciseDef] as of #223, so an omitted key is now a
- * distinct state and the app answers it from [ExerciseDef.STACK_MOUNTED_IDS].
- * The sentence that said all three were unobservable is deleted rather than
- * reworded, because it is false for one of them now.
+ * `sensorOnStack` and `bodyweight` used to be listed beside it and are not any
+ * more, for two different reasons. `sensorOnStack` is `Boolean?` on
+ * [PlanExerciseDef] as of #223, an omitted key is a distinct state, and the
+ * app publishes a source for it here. `bodyweight` is ALSO `Boolean?` as of
+ * #227 -- an omitted key is observable at the type level too -- but no source
+ * is published for it: doing so would add a seventh required key to the
+ * published `geometrySource` object, which is an export contract change this
+ * fix deliberately does not take (session-export schema stays 1.17). The
+ * sentence that said all three were unobservable is deleted rather than
+ * reworded, because it is false for two of them now.
  *
  * `sensorOnStack` defaults to [GeometrySource.DEFAULT] rather than being
  * required, and that default is load-bearing rather than decorative: this
@@ -169,11 +173,17 @@ object SetGeometryPolicy {
      * default -- overwriting with the default would discard the built-in
      * definition.
      *
-     * `sensorInverted` and `bodyweight` are still assigned unconditionally
-     * because they cannot express omission (see [GeometrySources]); that is
-     * the rest of #64 and is not fixed here. `sensorOnStack` no longer is:
-     * it goes through [stackMount], so a plan that says nothing gets the
-     * app's default for that machine and a plan that says `false` still wins.
+     * `sensorInverted` is still assigned unconditionally because it cannot
+     * express omission (see [GeometrySources]); that is the rest of #64 and is
+     * not fixed here. `sensorOnStack` and `bodyweight` are not: `sensorOnStack`
+     * goes through [stackMount], so a plan that says nothing gets the app's
+     * default for that machine and a plan that says `false` still wins.
+     * `bodyweight` decodes an omitted key as `null` as of #227, distinct from a
+     * declared `false`, but this function does not consult that difference yet
+     * -- `declared.bodyweight ?: false` reproduces exactly the unconditional
+     * assignment this paragraph used to describe for it, so [base]'s own
+     * `bodyweight` is still discarded on any plan that names the exercise at
+     * all. Fixed in the commit that follows this one.
      */
     fun resolve(base: ExerciseDef, declared: PlanExerciseDef?): ExerciseDef {
         if (declared == null) return base
@@ -185,7 +195,7 @@ object SetGeometryPolicy {
             travelRatio = declared.travelRatio ?: base.travelRatio,
             horizontal = declared.plane?.let { it == "horizontal" } ?: base.horizontal,
             sensorOnStack = stackMount(base.id, base.sensorOnStack, declared.sensorOnStack).onStack,
-            bodyweight = declared.bodyweight,
+            bodyweight = declared.bodyweight ?: false,
         )
     }
 
