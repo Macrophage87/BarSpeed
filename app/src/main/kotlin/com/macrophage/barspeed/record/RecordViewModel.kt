@@ -1396,9 +1396,6 @@ private fun restingState(
         // Set from the frozen index rather than incremented, so a retry cannot
         // count the same set twice.
         setsCompleted = p.orderIdx + 1,
-        // The same block answer the three carries above are bounded by, kept
-        // for the rest screen's load correction rather than asked again.
-        lastSetSameBlock = sameBlock,
         // Off the pending write, never off s.currentExercise, which by the time
         // the rest screen draws is already the movement coming up.
         lastSetExerciseId = p.exercise.id,
@@ -1732,32 +1729,13 @@ data class RecordState(
     val hrvMs: Int? = null,
     val lastFeedback: SetFeedback? = null,
     /**
-     * Whether the set coming up belongs to the same BLOCK as the set just
-     * finished -- [SetLoadPolicy.sameExerciseBlock]'s answer, taken once on the
-     * rest transition and carried rather than asked again.
-     *
-     * Carried because the rest screen's load correction has to know it and
-     * cannot recompute it: the pair of slots it is a fact about is frozen into
-     * the pending write, and by the time a correction is tapped the queue has
-     * moved on. Asking a second question of live state would be a second rule.
-     *
-     * False by default and outside RESTING, which is the safe direction: it
-     * only ever stops a carry.
-     *
-     * It is the PLAN's answer and needs a declared slot on either side, so it
-     * is false for every ad-hoc set. [lastSetExerciseId] is what answers the
-     * same question there; [SetLoadPolicy.correctionCarryBlock] picks between
-     * them.
-     */
-    val lastSetSameBlock: Boolean = false,
-    /**
      * The exercise the set just finished ran against, frozen with the rest of
      * the write.
      *
      * The id, not the display name [SetFeedback.exerciseName] carries: it is
      * compared against [selectedExerciseId] to decide whether a load corrected
      * on the rest screen may reach the set coming up on an ad-hoc session,
-     * where there is no slot for [lastSetSameBlock] to be an answer about.
+     * where there is no slot to compare against.
      */
     val lastSetExerciseId: String? = null,
     val restRemainingS: Int = 0,

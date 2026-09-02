@@ -238,16 +238,18 @@ internal fun standingAddedKg(s: RecordState): Double? = s.statedLoadKg ?: s.weig
  * Whether the set coming up is a continuation of the block just finished, for
  * the load correction's carry (#205).
  *
- * The plan's frozen answer where there is a planned slot, the exercise the
- * lifter has selected where there is not; [SetLoadPolicy.correctionCarryBlock]
- * holds the rule. `nextSlot` and `selectedExerciseId` are read LIVE rather than
- * frozen with the write, so switching exercise during the rest is a decision
- * this sees.
+ * The slot coming up where there is one, the exercise the lifter has selected
+ * where there is not; [SetLoadPolicy.correctionCarryBlock] holds the rule.
+ *
+ * EVERY OPERAND IS READ LIVE except [RecordState.lastSetExerciseId], which is
+ * a fact about the set just finished and cannot move. `queueIndex` does not
+ * advance until the rest ends, so `nextSlot` is the set the lifter is about to
+ * do -- including after a switch or an append replaced it during the rest.
  */
 internal fun carryBlock(s: RecordState): Boolean = SetLoadPolicy.correctionCarryBlock(
-    hasPlannedNext = s.nextSlot != null,
-    plannedSameBlock = s.lastSetSameBlock,
     lastExerciseId = s.lastSetExerciseId,
+    nextExerciseId = s.nextSlot?.exercise?.id,
+    nextSetIndexInExercise = s.nextSlot?.setIndexInExercise,
     comingExerciseId = s.selectedExerciseId,
 )
 
