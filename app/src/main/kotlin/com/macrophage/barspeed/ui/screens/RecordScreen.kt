@@ -49,9 +49,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -87,7 +92,8 @@ import com.macrophage.barspeed.model.SensorAdvicePolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRoster
 import com.macrophage.barspeed.model.SessionRpe
-import com.macrophage.barspeed.model.SetDeviationSummary
+import com.macrophage.barspeed.model.SetCardValue
+import com.macrophage.barspeed.model.SetCardValues
 import com.macrophage.barspeed.model.SetEndControl
 import com.macrophage.barspeed.model.SetEndControlPolicy
 import com.macrophage.barspeed.model.SetLimiter
@@ -613,15 +619,17 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
             slot,
             heading = "Up next",
             unit = state.weightUnit,
+            values = cardValues(state, slot),
+            prep = cardPrep(state, slot),
             highlight = true,
             plateLoadKgOverride = state.statedLoadKg,
         )
         // Everything the lifter can change about set one now lives behind one
-        // button, and the change itself is stated above it. READY renders at
-        // most once per session -- startNextSet writes READY and calls
-        // beginSet in the same frame -- so this is set one's only chance to
-        // say anything, and until this button it could say only the load.
-        DeviationLine(state, slot)
+        // button, and every change it makes is struck into the card above it.
+        // READY renders at most once per session -- startNextSet writes READY
+        // and calls beginSet in the same frame -- so this is set one's only
+        // chance to say anything, and until this button it could say only the
+        // load.
         ChangeSetButton(state, viewModel, slot, next = false)
         // Kept in place and NOT moved into the dialog: it is one line, it
         // opens a chooser of its own, and a dialog inside a dialog is a shape
@@ -965,53 +973,93 @@ private fun TempoDigitStepper(digit: TempoDigit, tempo: String, selected: String
 }
 
 /**
- * What the lifter has changed about the coming set, under the card that still
- * states the plan.
+ * The values the card states for the coming set, each carrying the plan's
+ * figure when the lifter has changed it.
  *
- * DUMB: every word of it is [SetDeviationSummary.parts], which is pinned in
- * :core:model. This draws the answer and draws nothing when the answer is
- * empty -- absence is absence, and a line reading "no changes" on every rest
- * screen of every session is a line that stops being read before the one rest
- * period where it matters.
+ * DUMB: every string of it is [SetCardValues.of], which is pinned in
+ * :core:model. This resolves the facts that function compares and draws what
+ * comes back.
  *
- * This is the compensation that makes [ChangeSetButton] safe. The "Up next"
- * card goes on stating the PLAN's load and tempo, deliberately, and the load
- * box that used to sit under it -- where the lifter reconciled the two -- is
- * now behind a tap. Without this line, "Up next — 90 kg" would sit above a set
- * that records 100 with nothing on screen saying so.
+ * The FROZEN declarations on the planned side and the lifter's statement on
+ * the other. Until #174 froze them the rest screen read slot.reps and
+ * slot.durationS, which advancedState bakes the edit into: on READY the bake
+ * has already run, so the comparison was a number against itself and a rep
+ * count changed and changed back read as no change. #170 item 6.
+ *
+ * The stated side falls back to the slot's LIVE value rather than to its
+ * declaration, which is what the card drew before #204 and what keeps an
+ * appended set -- prescribed by nothing, so every frozen field on it is null
+ * -- drawing its own load.
  */
-@Composable
-private fun DeviationLine(state: RecordState, slot: PlannedSlot) {
-    val parts =
-        SetDeviationSummary.parts(
-            kind = slot.exercise.kind,
-            bodyweight = slot.exercise.bodyweight,
-            unit = state.weightUnit,
-            plannedLoadKg = slot.plannedLoadKg,
-            statedLoadKg = state.statedLoadKg,
-            // The FROZEN declarations on the planned side and the lifter's
-            // statement on the other, which is what the load and the tempo
-            // above already do. Until #174 froze them these read slot.reps and
-            // slot.durationS, which advancedState bakes the edit into: on
-            // READY the bake has already run, so the line compared a number
-            // against itself and a rep count changed and changed back read as
-            // no change. #170 item 6.
-            plannedReps = if (slot.isTimed) null else slot.plannedReps,
-            statedReps = if (slot.isTimed) null else state.statedReps ?: slot.reps,
-            plannedDurationS = if (slot.isTimed) slot.plannedDurationS else null,
-            statedDurationS = if (slot.isTimed) state.statedDurationS ?: slot.durationS else null,
-            plannedTempo = slot.plannedTempo,
-            tempo = state.statedTempo ?: slot.tempo,
-            plannedPrepS = state.plannedPrepSecondsFor(slot),
-            prepS = state.prepSecondsFor(slot),
-        )
-    if (parts.isEmpty()) return
-    Spacer(Modifier.height(4.dp))
-    Text(
-        "Your changes: ${parts.joinToString(" · ")}",
-        style = MaterialTheme.typography.bodySmall,
-        color = BarColors.Volt,
+private fun cardValues(state: RecordState, slot: PlannedSlot): List<SetCardValue> = SetCardValues.of(
+    kind = slot.exercise.kind,
+    bodyweight = slot.exercise.bodyweight,
+    timed = slot.isTimed,
+    unit = state.weightUnit,
+    side = slot.side,
+    plannedLoadKg = slot.plannedLoadKg,
+    statedLoadKg = state.statedLoadKg,
+    declaredLoadKg = slot.loadKg,
+    plannedReps = if (slot.isTimed) null else slot.plannedReps,
+    reps = if (slot.isTimed) slot.reps else state.statedReps ?: slot.reps,
+    plannedDurationS = if (slot.isTimed) slot.plannedDurationS else null,
+    durationS = if (slot.isTimed) state.statedDurationS ?: slot.durationS else slot.durationS,
+    plannedTempo = slot.plannedTempo,
+    tempo = state.statedTempo ?: slot.tempo,
+)
+
+/**
+ * The prep pair for the card's secondary line, or null for nothing to say.
+ *
+ * Gated on `upcomingPlaysPrep`, which the line this replaces was not: a prep
+ * adjustment is stored against the EXERCISE and outlives the set it was made
+ * on, so a set that plays no prep at all -- an untempoed rep set, where
+ * [LeadInPolicy.playsPrep] is false -- could be told its prep had changed from
+ * a countdown it will never run. The control that changes it is gated the same
+ * way and always has been.
+ */
+private fun cardPrep(state: RecordState, slot: PlannedSlot): SetCardValue? = if (!state.upcomingPlaysPrep) {
+    null
+} else {
+    SetCardValues.prep(
+        plannedPrepS = state.plannedPrepSecondsFor(slot),
+        prepS = state.prepSecondsFor(slot),
     )
+}
+
+/**
+ * One line of card values, with the plan's figure struck through wherever the
+ * lifter has changed it and what the set will record beside it.
+ *
+ * The strike is the whole of #204: the card used to state the plan's numbers
+ * with no sign they had moved, and a sentence under it -- "Your changes: 100
+ * kg" -- said in prose what the number could have carried itself. A lifter
+ * reading the card had to reconcile two places.
+ *
+ * The struck half is drawn in [BarColors.Sub] and the standing half in
+ * [BarColors.Volt], which is the colour the removed line used, so the pair
+ * reads as "not this, that". The words around a figure are outside both spans
+ * and drawn once.
+ */
+private fun struckLine(lead: String, values: List<SetCardValue>): AnnotatedString = buildAnnotatedString {
+    append(lead)
+    values.forEachIndexed { index, value ->
+        if (index > 0) append(" · ")
+        if (value.prefix.isNotEmpty()) append("${value.prefix} ")
+        val planned = value.planned
+        if (planned == null) {
+            append(value.stated)
+        } else {
+            withStyle(
+                SpanStyle(color = BarColors.Sub, textDecoration = TextDecoration.LineThrough),
+            ) {
+                append(planned)
+            }
+            append(" ")
+            withStyle(SpanStyle(color = BarColors.Volt)) { append(value.stated) }
+        }
+        if (value.suffix.isNotEmpty()) append(" ${value.suffix}")
+    }
 }
 
 /**
@@ -1170,8 +1218,8 @@ private fun ChangeSetDialog(
  * coming up; this changes the SESSION, and folding it in would put it under a
  * subtitle reading "Adjust next set (deviations are recorded)" -- which would
  * be a false description of it, and would also make it read as a deviation of
- * the upcoming set on the line that describes deviations. It is not one: the
- * upcoming set is untouched, its deviation line is unchanged, and the appended
+ * the upcoming set. It is not one: the upcoming set is untouched, its card
+ * is unchanged, and the appended
  * set is a set the plan does not contain rather than a change to a set it does.
  *
  * A TextButton, not an OutlinedButton, for [SwitchExerciseSection]'s reason:
@@ -1275,7 +1323,7 @@ private fun loadFieldLabel(slot: PlannedSlot?, unit: WeightUnit): String = Bodyw
  * What the plan prescribed for the load and for the reps or hold, drawn under
  * the pair of boxes that change them.
  *
- * DUMB, the way [DeviationLine] is: every word is [PlanValueCaption]'s and is
+ * DUMB, the way [cardValues] is: every word is [PlanValueCaption]'s and is
  * pinned in :core:model. This resolves the three facts each caption needs and
  * draws whatever comes back, including nothing.
  *
@@ -2300,7 +2348,7 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     )
 }
 
-/** What happens next: the prescription, the deviations, and the way into it. */
+/** What happens next: the prescription with the changes struck into it, and the way in. */
 @Composable
 private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
     val next = state.nextSlot
@@ -2317,14 +2365,14 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
                 "Up next · Set ${next.setIndexInExercise + 1} of ${next.setsInExercise}"
             },
             unit = state.weightUnit,
+            values = cardValues(state, next),
+            prep = cardPrep(state, next),
             highlight = true,
             plateLoadKgOverride = state.statedLoadKg,
         )
-        // The change first, then the way into it. Never the other way round:
-        // the deviation has to be readable without a tap, because the card
-        // above still states the plan's numbers and the box that used to
-        // reconcile them is now behind the button.
-        DeviationLine(state, next)
+        // The change is IN the card above, not under it. It has to be
+        // readable without a tap, because the box that used to reconcile the
+        // plan's number with the lifter's is now behind this button.
         ChangeSetButton(state, viewModel, next, next = true)
         SwitchExerciseSection(state, viewModel)
         AddSetSection(state, viewModel)
@@ -3094,6 +3142,8 @@ private fun SlotCard(
     slot: PlannedSlot,
     heading: String,
     unit: WeightUnit,
+    values: List<SetCardValue>,
+    prep: SetCardValue?,
     highlight: Boolean = false,
     plateLoadKgOverride: Double? = null,
 ) {
@@ -3103,43 +3153,43 @@ private fun SlotCard(
     Card(Modifier.fillMaxWidth().then(border), shape = shape) {
         Column(Modifier.padding(14.dp)) {
             SectionCaption(heading, color = if (highlight) BarColors.Volt else BarColors.Sub)
-            val core =
-                listOfNotNull(
-                    slot.side?.replaceFirstChar { it.uppercase() },
-                    slot.reps?.let { "$it reps" },
-                    slot.durationS?.let {
-                        "${it}s " + if (slot.exercise.kind == ExerciseKind.CARRY) "carry" else "hold"
-                    },
-                    // On body-weight work the slot's load is what was ADDED, so
-                    // it is said as an addition to the lifter rather than as a
-                    // weight on its own -- and the assisted case, which the
-                    // takeIf below drops on the floor, is said at all. #160.
-                    if (slot.exercise.bodyweight) {
-                        BodyweightLoadDisplay.label(slot.loadKg, unit)
-                    } else {
-                        slot.loadKg?.takeIf { it > 0 }?.let { unit.format(it) }
-                            ?: "bodyweight".takeIf { slot.isTimed }
-                    },
-                    slot.tempo?.let { "tempo $it" },
-                ).joinToString(" · ")
+            // The values, and the plan's figures struck through wherever
+            // the lifter has changed them. What each figure SAYS is
+            // [SetCardValues.of]'s -- including the body-weight notation it
+            // keeps on both sides of a strike, and including the stated zero
+            // that a truthiness guard would drop on the floor -- and this
+            // draws it. The line wraps rather than truncating: a struck pair
+            // is roughly twice the width of the figure alone, and at 360dp
+            // with font scale 2 there is not room for both on one line.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(vertical = 4.dp),
             ) {
                 SideArrow(slot.side, Modifier.padding(end = 8.dp))
                 Text(
-                    "${slot.exercise.displayName} — $core",
+                    struckLine("${slot.exercise.displayName} — ", values),
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
+            // Prep joins the rest clock here, and only when it deviates.
+            // It is the one change with no figure of its own on the card --
+            // the card states what the set IS, and the seconds before it
+            // starts are not part of that -- so it is drawn beside the other
+            // duration rather than given a line of its own, which is the line
+            // #204 removes.
             val secondary =
                 listOfNotNull(
-                    slot.targetMeanConVelMps?.let { "target ${trim(it)} m/s" },
-                    slot.velocityLossStopPct?.let { "stop at −${trim(it)}% vel" },
-                    slot.restS?.let { "rest ${formatMmSs(it)}" },
+                    slot.targetMeanConVelMps?.let { SetCardValue(stated = "target ${trim(it)} m/s") },
+                    slot.velocityLossStopPct?.let { SetCardValue(stated = "stop at −${trim(it)}% vel") },
+                    slot.restS?.let { SetCardValue(stated = "rest ${formatMmSs(it)}") },
+                    prep,
                 )
             if (secondary.isNotEmpty()) {
-                Text(secondary.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+                Text(
+                    struckLine("", secondary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BarColors.Sub,
+                )
             }
             // The cue the plan wrote, split by whether the lifter has to touch
             // the phone to read it. The split itself is decided in :core:model
