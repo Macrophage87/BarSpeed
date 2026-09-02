@@ -435,7 +435,7 @@ internal fun armedCaptureOf(
     val decision = SensorCapturePolicy.analysedStream(armed?.analysed, streamed)
     val sensors = armed?.copy(analysed = decision.role, analysedFellBack = decision.fellBack)
     return ArmedCapture(
-        samples = analysedBuffer,
+        samples = decision.role?.let { byRole[it] } ?: analysedBuffer,
         sensors = sensors,
         // The partner is derived from the declaration rather than carried
         // alongside it, so it cannot name a role the declaration does not.
