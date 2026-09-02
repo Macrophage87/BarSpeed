@@ -25,8 +25,8 @@ import java.io.File
  * simply the next such values, and the first-time claim that used to stand here
  * is history rather than something these bumps repeat.
  *
- * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 13 writes the
- * file, then any build carrying 12 or less opens it. A forward install runs
+ * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 14 writes the
+ * file, then any build carrying 13 or less opens it. A forward install runs
  * the migration chain and never enters the rescue at all, so an ordinary
  * upgrade sees none of it.
  *
@@ -35,8 +35,8 @@ import java.io.File
  * twice in v0.1.44 -- the tagged ones read off the tags rather than
  * remembered. What was new at 11 was that a committed baseline existed for the
  * version below it, so for the first time in this repository a migration had a
- * document to be read against; 12 was the second such bump and 13 is the
- * third, with `12.json` as its baseline.
+ * document to be read against; 12 was the second such bump, 13 the third, and
+ * 14 the fourth, with `13.json` as its baseline.
  *
  * A CORRECTION TO WHAT STOOD HERE, named rather than reworded around. This
  * paragraph read "BOTH bumps of this cluster reach the emulator in the SAME
@@ -45,12 +45,20 @@ import java.io.File
  * saying: v0.1.44 WAS cut, at tag
  * `7cf6e8c3cc546ab8d64c9fb2be86de2129250b43`, whose `AppDatabase.kt` reads
  * `DATABASE_VERSION = 12`. A stock install therefore carries 12, the
- * 10 -> 11 -> 12 pair has shipped, and the only hop a phone upgrading to this
- * build runs is 12 -> 13. That also settles which release the two-way bench
+ * 10 -> 11 -> 12 pair has shipped, and the only hop a phone upgrading to that
+ * build ran was 12 -> 13. That also settles which release the two-way bench
  * exercise installs first: v0.1.44, the last tag carrying the old version --
  * not v0.1.43, which carries 10.
+ *
+ * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read rather than carried
+ * forward: v0.1.48 is the newest tag and
+ * `git show v0.1.48:core/data/.../AppDatabase.kt` reads
+ * `DATABASE_VERSION = 13`, so 12 -> 13 has now shipped too and an install
+ * upgrading to this build runs 13 -> 14 alone. A phone still on v0.1.44 runs
+ * 12 -> 13 -> 14 in one open, which is why the emulator exercise installs the
+ * older release first and upgrades over it rather than starting empty.
  */
-const val DATABASE_VERSION = 13
+const val DATABASE_VERSION = 14
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -369,13 +377,14 @@ abstract class AppDatabase : RoomDatabase() {
          * set that the app knew which limb moved, which is exactly the claim
          * #144 was opened to say it could not make.
          *
-         * DECLARED AND NOT YET REGISTERED AT THIS COMMIT: the body, the
-         * [DATABASE_VERSION] bump and the entry in [addMigrations] are #215's
-         * fix commit, and [Migration13To14Test] is red until then.
+         * [Migration13To14Test] pins the statement, the baseline difference
+         * and the refusal.
          */
         internal val MIGRATION_13_14 =
             object : Migration(13, 14) {
-                override fun migrate(db: SupportSQLiteDatabase) = Unit
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN plannedSide TEXT")
+                }
             }
 
         /**
@@ -401,8 +410,8 @@ abstract class AppDatabase : RoomDatabase() {
          * was deleted there rather than reworded. A crash with the data
          * recoverable beats a clean start with it gone.
          *
-         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 13
-         * here, so a rollback from this build to any build carrying 12 or less
+         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 14
+         * here, so a rollback from this build to any build carrying 13 or less
          * enters the rescue; the first version at which that was true of a
          * stock install was 10, and what it exposes on screen is stated at the
          * constant, with issue #118. An ordinary forward install runs the
@@ -432,6 +441,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_10_11,
                     MIGRATION_11_12,
                     MIGRATION_12_13,
+                    MIGRATION_13_14,
                 )
                 .build()
         }

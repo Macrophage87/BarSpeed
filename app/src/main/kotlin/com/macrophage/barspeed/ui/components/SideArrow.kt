@@ -23,20 +23,24 @@ private const val SHAFT_HEIGHT_FRACTION = 0.34f
 /**
  * A unilateral set's side, drawn as an arrow beside the word it qualifies.
  *
- * WHAT IT DRAWS IS THE PRESCRIPTION, NOT AN OBSERVATION. On a planned set
- * `RecordViewModel` resolves the side as `slot?.side` and consults
- * `sideInput` -- what the Both/Left/Right selector binds to -- only when the
- * set is ad-hoc, so a planned set stores a copy of what the plan asked for.
- * `SetRecordEntity` pairs `loadKg` with `plannedLoadKg`, `actualReps` with
- * `plannedReps` and `actualDurationS` with `plannedDurationS`; `side` is a
- * single field with no such pair, so there is nowhere for a worked side to be
- * recorded even if something measured it, and nothing here does. This draws
- * that same prescribed value as a shape. It knows no more than the word
- * beside it, and no reading of it can say which limb moved. Recording a
- * deviation is issue #144, which owns the side planned/actual pair and the
- * control that would let a lifter state one. It was #124 until that issue
- * turned out to be about the LOAD reverting and nothing else; #124's fix
- * carries a stated load across an exercise and leaves side exactly as it is.
+ * WHAT IT DRAWS IS WHAT THE SET WILL WORK, which since #215 is not always the
+ * prescription. Every caller passes
+ * `SideChoicePolicy.carriedIntoNextSet(slot.side, state.statedSide)` or the
+ * value that function already wrote into the slot at the bake: the lifter's
+ * own choice on the change-next-set control where they made one, and the
+ * plan's declaration otherwise. `SetRecordEntity` now pairs `side` with
+ * `plannedSide` the way it pairs `loadKg` with `plannedLoadKg`, so the arrow,
+ * the row and the export all say the same thing and a deviation is readable
+ * in the record -- which is #144, closed by #215 rather than still open
+ * beside it.
+ *
+ * THE PARAGRAPH THAT STOOD HERE IS DELETED RATHER THAN REWORDED. It said this
+ * drew the prescription, that `side` had no planned/actual pair, and that
+ * recording a deviation was issue #144's to do. The first two are false as of
+ * #215 and the third names an issue this change closes. What is still true and
+ * kept: this knows no more than the word beside it, and it is not a
+ * measurement of anything -- nothing in this app observes which limb moved,
+ * and both the word and the arrow are statements a lifter or a plan made.
  *
  * The word stays. The export, the review screen and every screen-reader path
  * read the text, and this draws nothing any of them can read: the arrow is

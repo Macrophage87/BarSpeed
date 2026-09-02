@@ -243,6 +243,7 @@ class SessionExporter(
             durationS = record.actualDurationS,
             plannedDurationS = record.plannedDurationS,
             side = record.side,
+            plannedSide = record.plannedSide,
             rpe = record.rpe,
             failed = record.failed,
             // Why it ended, and the words that go with `other` (#189). Both,
@@ -714,6 +715,11 @@ class RawExporter(
         num("plannedReps", record.plannedReps)
         num("duration_s", record.actualDurationS)
         str("side", record.side)
+        // The prescription beside the arm worked, in the archive's manifest as
+        // well as in the session document (#215). Two writers, one fact: a key
+        // wired into only one of them publishes half a record, and which half
+        // depends on which file the coach opened.
+        str("plannedSide", record.plannedSide)
         num("rpe", record.rpe)
         flag("failed", record.failed)
         // The reason, in the archive's manifest as well as in the session

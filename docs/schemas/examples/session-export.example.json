@@ -202,6 +202,33 @@
           "summary": { "meanConVel_mps": 0.41, "peakConVel_mps": 0.66, "meanEcc_s": 2.8, "meanCon_s": 1.1, "meanRom_m": 0.34, "romSpread_pct": 11.8 }
         }
       ]
+    },
+    {
+      "exercise": "dumbbell_curl",
+      "sets": [
+        {
+          "load_kg": 14,
+          "load_lb": 30.9,
+          "plannedLoad_kg": 14,
+          "reps": 10,
+          "plannedReps": 10,
+          "side": "left",
+          "plannedSide": "left",
+          "rest_s": 90,
+          "summary": { "meanConVel_mps": 0.38, "peakConVel_mps": 0.62, "meanEcc_s": 2.1, "meanCon_s": 1.2, "meanRom_m": 0.42 }
+        },
+        {
+          "load_kg": 14,
+          "load_lb": 30.9,
+          "plannedLoad_kg": 14,
+          "reps": 9,
+          "plannedReps": 10,
+          "side": "left",
+          "plannedSide": "right",
+          "rest_s": 90,
+          "summary": { "meanConVel_mps": 0.34, "peakConVel_mps": 0.58, "meanEcc_s": 2.1, "meanCon_s": 1.2, "meanRom_m": 0.42 }
+        }
+      ]
     }
   ]
 }

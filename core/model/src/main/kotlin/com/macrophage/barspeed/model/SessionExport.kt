@@ -462,6 +462,33 @@ data class SessionExport(
          * `sensorsArmed` 1 and an empty `sensorRolesExpected`, where before
          * this version a one-sensor set's descriptor carried no sensor key
          * whatever.
+         *
+         * 1.17 carries a SIXTH change (#215), under the same number and for
+         * the reason the paragraphs above give: 1.17 is UNRELEASED and the
+         * newest tag v0.1.48 ships 1.16. The ordinal counts against this file
+         * as rebased onto `main`: #223's is the fourth and #224's `soleSilent`
+         * is the fifth. The change: `side` is the arm the set WORKED, and
+         * `plannedSide` beside it is the arm the plan prescribed. NOT purely
+         * additive. No key changes type or stops being written, but `side`
+         * answers a different question on a document written by this build:
+         * until now it was a copy of the plan's own declaration, so it agreed
+         * with the prescription by construction, and a reader who took it for
+         * "what the plan asked for" was right by accident. It may now differ,
+         * because the lifter can state the arm the next set works and that
+         * statement is what is recorded (#144).
+         *
+         * It does NOT apply retroactively, for 1.16's reason: both values are
+         * frozen into the set's row when the set is RECORDED, so every set
+         * recorded before database v14 publishes no `plannedSide` at all
+         * whatever its document's `schemaVersion` says. That absence is
+         * correct rather than a default. It is also the one place a backfill
+         * would have been plausible and wrong: on those rows `side` WAS the
+         * prescription, so copying it across would assert of every past set
+         * that the app knew which limb moved, which is exactly what #144 says
+         * it could not. `plannedSide` is absent on bilateral work, on an
+         * ad-hoc set and on an appended set for the ordinary reason -- nothing
+         * prescribed any of them a side. The raw archive's `meta.json` moves
+         * with it, as it did for `analysedFellBack` and `sensorsSilent`.
          */
         const val SCHEMA_VERSION = "1.17"
 
@@ -555,8 +582,27 @@ data class SetExport(
      */
     @SerialName("duration_s") val durationS: Int? = null,
     @SerialName("plannedDuration_s") val plannedDurationS: Int? = null,
-    /** Unilateral sets: "left" or "right". */
+    /**
+     * Unilateral sets: the arm the set WORKED -- "left" or "right".
+     *
+     * From 1.17 (#215) this is the lifter's own statement where they made one
+     * on the change-next-set control, and the plan's prescription otherwise.
+     * Read it against [plannedSide], which carries what the plan asked for:
+     * where the two differ the lifter swapped arm order, which is a thing
+     * older documents could not say at all (#144).
+     */
     val side: String? = null,
+    /**
+     * The arm the PLAN prescribed for this set, frozen when the set was
+     * recorded (#215).
+     *
+     * Absent on bilateral work, on an ad-hoc set and on an appended set --
+     * none of which was prescribed a side -- and on every set recorded before
+     * database v14, where the column did not exist. Absence is therefore not
+     * "the lifter worked what was asked": it is "nothing asked", or "this set
+     * predates the pair".
+     */
+    val plannedSide: String? = null,
     /**
      * PER-SET RPE, 1 to 10: how much this ONE set had left in it.
      *

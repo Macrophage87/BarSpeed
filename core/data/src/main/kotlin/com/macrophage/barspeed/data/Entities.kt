@@ -112,8 +112,32 @@ data class SetRecordEntity(
      */
     val actualDurationS: Int? = null,
     val plannedDurationS: Int? = null,
-    /** Unilateral sets: "left" or "right". */
+    /**
+     * Unilateral sets: the arm the set WORKED -- "left" or "right".
+     *
+     * Since #215 this is the lifter's own choice where they made one on the
+     * change-next-set control, and the plan's prescription otherwise. On every
+     * row written before v14 it is the prescription and nothing else, because
+     * the app had no way to record a deviation at all: that is #144, and it is
+     * why nothing backfills [plannedSide] from this column.
+     */
     val side: String? = null,
+    /**
+     * The arm the PLAN prescribed, frozen beside [side] the way [plannedReps]
+     * is frozen beside the count (#215).
+     *
+     * Null on bilateral work, on an ad-hoc set, on an appended set -- nothing
+     * prescribed any of those -- and on every row written before v14. Null is
+     * therefore NOT "the lifter worked what was asked": it is "nothing asked",
+     * or "this row predates the pair", and a reader counting adherence has to
+     * skip it rather than score it.
+     *
+     * TEXT, following [side] and [limiter]: the vocabulary is closed and is
+     * enforced where the value is PRODUCED, so a row written by a later build
+     * reads back as an unrecognised string instead of throwing inside a type
+     * converter on the lifter's phone.
+     */
+    val plannedSide: String? = null,
     /**
      * Lifter-reported effort for ONE set, 1 to 10, logged when the set ends
      * and correctable afterward on the rest screen.

@@ -1434,6 +1434,7 @@ internal fun ChangeSetDialog(
                 PlanValueCaptions(state, slot)
                 PerImplementEcho(state, slot)
                 LoadSignHint(slot)
+                if (next) SideAdjuster(state, viewModel, slot)
                 TempoAdjuster(state, viewModel)
                 PrepAdjuster(state, viewModel)
             }
@@ -1755,6 +1756,61 @@ private fun PerImplementEcho(state: RecordState, slot: PlannedSlot?) {
 private fun LoadSignHint(slot: PlannedSlot?) {
     val hint = BodyweightLoadDisplay.fieldHint(slot?.exercise?.bodyweight == true) ?: return
     Text(hint, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+}
+
+/**
+ * Which arm the NEXT set works, on a unilateral set (#215).
+ *
+ * DRAWN ONLY WHERE THE SET IS UNILATERAL. [SideChoicePolicy.offersChoice]
+ * decides, in the module a test runs in, and a bilateral set gets no control at
+ * all -- the same silent-no-draw rule [SideArrow] applies to the arrow. A
+ * Both/Left/Right selector here would let a lifter put a limb on a set that
+ * used two, and unlike the ad-hoc selector one field over, what is chosen here
+ * is RECORDED against a prescription.
+ *
+ * NEXT SET ONLY, which is #215's own scope and the owner's words -- "adjust the
+ * arrow on one-sided exercises in the adjust next set". READY's "Change this
+ * set" therefore does not offer it, so set one of a unilateral block cannot be
+ * swapped. That is a real gap and it is named rather than folded in: the
+ * mechanism would carry over unchanged, `startedFromReadyState` bakes through
+ * the same function, and the only thing missing is this line without its
+ * `next` guard.
+ *
+ * NO ARROW IN THE CHIPS, deliberately. #129 is open on [SideArrow] being sized
+ * in dp beside text sized in sp, so it shrinks against its neighbours at large
+ * font scales; a preview arrow here would be a second site of that defect on
+ * the surface the lifter reads while deciding. The card behind the dialog
+ * redraws its own arrow the moment Done closes this.
+ *
+ * The caption states the prescription rather than the deviation, because the
+ * chip already says what will happen and the plan's own word is the thing the
+ * lifter cannot otherwise see once they have changed it.
+ */
+@Composable
+private fun SideAdjuster(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot) {
+    if (!SideChoicePolicy.offersChoice(slot.side)) return
+    val chosen = SideChoicePolicy.carriedIntoNextSet(declaredSide = slot.side, statedSide = state.statedSide)
+    Spacer(Modifier.height(8.dp))
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Side", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+        SideChoicePolicy.CHOICES.forEach { value ->
+            FilterChip(
+                selected = chosen == value,
+                onClick = { viewModel.stateNextSetSide(value) },
+                label = { Text(value.replaceFirstChar { it.uppercase() }) },
+            )
+        }
+    }
+    slot.plannedSide?.let {
+        Text(
+            "The plan asks for ${it.replaceFirstChar { c -> c.uppercase() }}",
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+    }
 }
 
 @Composable

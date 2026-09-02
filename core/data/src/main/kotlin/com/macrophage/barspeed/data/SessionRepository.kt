@@ -58,8 +58,7 @@ data class CompletedSet(
      *
      * Null on bilateral work, on an ad-hoc set, on an appended set -- nothing
      * prescribed any of those -- and on every set recorded before database
-     * v14. NOT WRITTEN THROUGH AT THIS COMMIT: the column it fills is #215's
-     * fix and the pins for it are red until then.
+     * v14.
      */
     val plannedSide: String? = null,
     val tempo: String?,
@@ -381,6 +380,7 @@ class SessionRepository(
                 actualDurationS = set.actualDurationS,
                 plannedDurationS = set.plannedDurationS,
                 side = set.side,
+                plannedSide = set.plannedSide,
                 rpe = set.rpe,
                 failed = set.failed,
                 warmup = set.warmup,

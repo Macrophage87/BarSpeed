@@ -66,7 +66,7 @@ object SetCardValues {
      * [plannedLoadKg] is null because no plan prescribed it -- drawing its load
      * instead of falling to nothing.
      */
-    @Suppress("LongParameterList", "UNUSED_PARAMETER")
+    @Suppress("LongParameterList")
     fun of(
         kind: ExerciseKind,
         bodyweight: Boolean,
@@ -75,8 +75,7 @@ object SetCardValues {
         side: String?,
         // The side the set will WORK, and beside it the one the plan asked
         // for -- frozen the way plannedReps and plannedTempo are, so the card
-        // can strike one against the other. NOT READ AT THIS COMMIT: the
-        // strike is #215's fix and the pins for it are red until then.
+        // can strike one against the other (#215).
         plannedSide: String? = null,
         plannedLoadKg: Double?,
         statedLoadKg: Double?,
@@ -88,7 +87,19 @@ object SetCardValues {
         plannedTempo: String?,
         tempo: String?,
     ): List<SetCardValue> {
-        val sideValue = side?.replaceFirstChar { it.uppercase() }?.let { SetCardValue(stated = it) }
+        // The struck pair for the arm, on the same rule as the count and the
+        // tempo one line down: a prescription that EXISTS and disagrees. An
+        // appended set was prescribed by nothing, so its side has nothing to
+        // be struck against and draws as one word -- the same reason its load
+        // strikes nothing.
+        val sideChanged = plannedSide != null && side != plannedSide
+        val sideValue =
+            side?.replaceFirstChar { it.uppercase() }?.let {
+                SetCardValue(
+                    stated = it,
+                    planned = plannedSide?.replaceFirstChar { c -> c.uppercase() }.takeIf { _ -> sideChanged },
+                )
+            }
         val repsValue =
             reps?.let {
                 val changed = plannedReps != null && it != plannedReps

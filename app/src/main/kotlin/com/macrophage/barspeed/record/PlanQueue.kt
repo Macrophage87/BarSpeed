@@ -81,6 +81,13 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     // loadKg / plannedLoadKg above.
                     plannedTempo = set.tempo,
                     side = set.side,
+                    // The same declaration twice again, and one of the two is
+                    // frozen: `side` carries the arm the lifter chooses on the
+                    // change-next-set control once `advancedState` bakes it in,
+                    // `plannedSide` never does. Without the frozen copy the
+                    // record cannot say a lifter swapped arm order, which is
+                    // the whole of #144.
+                    plannedSide = set.side,
                     // Read from the exercise block, so two blocks of the same
                     // exercise in one session carry independent counts and
                     // nothing can leak between them. Display only: loadKg

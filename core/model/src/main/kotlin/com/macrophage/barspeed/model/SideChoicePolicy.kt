@@ -53,12 +53,8 @@ object SideChoicePolicy {
      * value that never passed [PlanFile.VALID_SIDES] is not a side, and
      * offering to change it would invite the lifter to state a limb on a set
      * that used both.
-     *
-     * A SEAM AT THIS COMMIT, refusing every slot; #215's fix commit gives it a
-     * body and the pins for it are red until then.
      */
-    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
-    fun offersChoice(declaredSide: String?): Boolean = false
+    fun offersChoice(declaredSide: String?): Boolean = declaredSide in CHOICES
 
     /**
      * The side the next set works.
@@ -66,10 +62,19 @@ object SideChoicePolicy {
      * [declaredSide] is the slot's frozen prescription and [statedSide] is what
      * the lifter picked for THIS set, null when they picked nothing.
      *
-     * A SEAM AT THIS COMMIT, returning the prescription unconditionally, which
-     * is what the app does today at every call site; #215's fix commit gives it
-     * a body and the pins for it are red until then.
+     * EVERY REFUSAL FAILS TOWARDS THE PLAN, and not towards the statement:
+     *
+     * - a slot no side may be stated for keeps whatever it declared, including
+     *   a value that never passed the import gate. Rewriting that here would
+     *   hide a plan-decoding fault from the one place that reports it, and the
+     *   control is not drawn for such a slot in any case.
+     * - a stated word outside [CHOICES] is discarded. `side` is published
+     *   against a closed vocabulary, so a document carrying "Right" or "both"
+     *   would validate against nothing, and the plan's own word always does.
      */
-    @Suppress("UNUSED_PARAMETER")
-    fun carriedIntoNextSet(declaredSide: String?, statedSide: String?): String? = declaredSide
+    fun carriedIntoNextSet(declaredSide: String?, statedSide: String?): String? {
+        if (!offersChoice(declaredSide)) return declaredSide
+        if (statedSide !in CHOICES) return declaredSide
+        return statedSide
+    }
 }

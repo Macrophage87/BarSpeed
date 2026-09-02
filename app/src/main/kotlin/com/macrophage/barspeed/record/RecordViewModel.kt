@@ -445,6 +445,12 @@ private data class PendingSetWrite(
     val targetReps: Int?,
     val manualReps: Int?,
     val side: String?,
+    /**
+     * The arm the PLAN prescribed, frozen beside [side] the way [plannedReps]
+     * is frozen beside [targetReps]. Null on an ad-hoc set, which no plan
+     * prescribed anything for.
+     */
+    val plannedSide: String?,
     val tempoText: String?,
     /** The hold seconds the PLAN prescribed, frozen. Recorded and exported. */
     val plannedDurationS: Int?,
@@ -789,6 +795,7 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
     actualDurationS = p.actualDurationS,
     plannedDurationS = p.plannedDurationS,
     side = p.side,
+    plannedSide = p.plannedSide,
     tempo = p.tempoText,
     targetMeanConVelMps = p.slot?.targetMeanConVelMps,
     velocityLossStopPct = p.slot?.velocityLossStopPct,
@@ -3132,6 +3139,21 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = stateFlow.value.copy(sideInput = side)
     }
 
+    /**
+     * The lifter's statement that the NEXT set works this arm (#215).
+     *
+     * Deliberately not [selectSide], which writes [RecordState.sideInput] --
+     * the ad-hoc selector, read only where there is no plan. This is a
+     * deviation from a prescription that exists, it applies to one set, and
+     * `restingState` clears it once that set has been written.
+     *
+     * Stored raw and judged by [SideChoicePolicy] at every reader, rather than
+     * validated here: one rule, in the module a test runs in.
+     */
+    fun stateNextSetSide(side: String?) {
+        stateFlow.value = stateFlow.value.copy(statedSide = side)
+    }
+
     fun updateTempoInput(text: String) {
         stateFlow.value = stateFlow.value.copy(tempoInput = text)
     }
@@ -3634,6 +3656,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val plannedReps = if (s.adHoc) s.repsInput.toIntOrNull() else slot?.plannedReps
         val targetReps = s.currentTargetReps
         val side = if (s.adHoc) s.sideInput else slot?.side
+        // The slot's FROZEN declaration, never its live `side`, which the bake
+        // has already written the lifter's choice into. Comparing those two
+        // would compare a value against itself and the export could never show
+        // a deviation. An ad-hoc set has no plan to have prescribed one.
+        val plannedSide = if (s.adHoc) null else slot?.plannedSide
         val plannedDurationS =
             when {
                 !isTimed -> null
@@ -3697,6 +3724,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 targetReps = targetReps,
                 manualReps = manualReps,
                 side = side,
+                plannedSide = plannedSide,
                 tempoText = tempoText,
                 plannedDurationS = plannedDurationS,
                 targetDurationS = targetDurationS,
