@@ -158,19 +158,24 @@ data class ExerciseDef(
          *   selectorised machines whose stack is the only place a sensor can
          *   ride the load.
          *
-         * Leg press and hack squat sleds are deliberately ABSENT here, though
-         * this disagrees with what the app itself now tells the model that
-         * writes a plan: `PLAN_PROMPT` in `GuideScreen.kt`, shipped to every
-         * user, names "leg press and hack squat sleds" beside the other
-         * families that must declare `sensorOnStack: true`. A declared
-         * `true` still wins in [SetGeometryPolicy.resolve] whether or not an
-         * id is in this table -- this table only supplies the default for an
-         * OMITTED key -- and either way, `sensorOnStack` forces the measured
-         * axis to vertical (`LiftDirection.measuredPlane`), which on a
-         * 45-degree sled is a claim about an axis nothing here has measured.
-         * Reconciling the two halves of #223 -- what this table seeds by
-         * default and what the shipped prompt tells the model to declare --
-         * is remaining work, not done in this change.
+         * Leg press and hack squat sleds are deliberately ABSENT here. An
+         * earlier round of `PLAN_PROMPT` in `GuideScreen.kt` disagreed,
+         * naming "leg press and hack squat sleds" beside the families that
+         * must declare `sensorOnStack: true`; that sentence was corrected to
+         * match this table (removed the two ids, added the counter-example)
+         * once the disagreement was found -- see the commit that stopped
+         * telling the model to declare a stack mount on a plate-loaded sled.
+         * A declared `true` still wins in [SetGeometryPolicy.resolve]
+         * whether or not an id is in this table -- this table only supplies
+         * the default for an OMITTED key -- and either way, `sensorOnStack`
+         * forces the measured axis to vertical (`LiftDirection.measuredPlane`),
+         * which on a 45-degree sled would be a claim about an axis nothing
+         * here has measured.
+         *
+         * `rope_dead_hang` has no entry here and is not resolved by the
+         * change above: it is a hang on an assist machine's rope, plausibly
+         * stack-mounted, and omitting the seed still records it bar-mounted.
+         * Tracked as #228, not done in this change.
          */
         val STACK_MOUNTED_IDS: Set<String> =
             setOf(
