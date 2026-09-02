@@ -322,8 +322,26 @@ data class SessionExport(
          * cue rides under that number rather than beside it.) The published
          * copy of this log in `docs/schemas/session-export.schema.json` is
          * the one to read for what a reader must do about it.
+         *
+         * 1.17: `load_kg` may be corrected on the rest screen after the set
+         * is over, so it is no longer necessarily the mass the set's power
+         * figures were computed from (#205). NOT additive: no key changes
+         * type or stops being written, but a reader that inferred
+         * `summary.peakPower_w`, `summary.meanConPower_w` and each rep's
+         * `peakPower_w` / `meanConPower_w` under `repMetrics` were derived
+         * from the `load_kg` published beside them can no longer do so.
+         * Power is computed as the set is recorded and frozen into the set's
+         * row; `SessionDao.overrideLoad` rewrites the stored load alone and
+         * nothing recomputes the analysis. A NEW number rather than an
+         * extension of 1.16, because 1.16 is RELEASED: v0.1.48 ships it,
+         * read at tag fca343da4f62b17bed05b4f3b3aa9a612da2d1dd rather than
+         * assumed. That is the rule the 1.13 and 1.15 entries state at
+         * length, applied here for the first time to a number this branch
+         * had already written under. The published copy of this log in
+         * `docs/schemas/session-export.schema.json` is the one to read for
+         * what a reader must do about it.
          */
-        const val SCHEMA_VERSION = "1.16"
+        const val SCHEMA_VERSION = "1.17"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -333,7 +351,7 @@ data class SessionExport(
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
-                "1.16",
+                "1.16", "1.17",
             )
 
         /**
