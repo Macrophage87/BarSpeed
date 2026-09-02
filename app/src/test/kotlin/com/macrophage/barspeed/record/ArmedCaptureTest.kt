@@ -302,4 +302,64 @@ class ArmedCaptureTest {
         assertNull(capture.sensors, "a declaration was invented for a set whose one unit delivered")
         assertEquals(only, capture.samples, "the capture was dropped on an ordinary one-sensor set")
     }
+
+    /**
+     * DIFFERENTIAL, issue #224 round 1, finding 1. A one-sensor set that
+     * STREAMED and then lost its link stores no declaration at all.
+     *
+     * THE DEFECT THIS PINS. `soleSilenceOver` reads the link's state and its
+     * last frame instant and nothing else, and `deliveryOf` tests a fixed
+     * `ArmedSilencePolicy.SILENT_AFTER_MS` window ending when the set ended.
+     * So a unit that fed the whole set and dropped in its last seconds reads
+     * `LINKED_SILENT`, and before this pin that word was written onto a row
+     * sitting beside a full summary and a real `imu.csv`. The archive then
+     * said the one unit delivered nothing while the archive itself held its
+     * stream -- one document contradicting itself about one set, which is
+     * worse than saying nothing, because a reader has no way to tell which
+     * half to believe.
+     *
+     * WHAT DECIDES IT IS THE BUFFER, not a second link reading. The buffer is
+     * the same source `SensorCapturePolicy.present` is read from for a
+     * role-keyed set, so the roleless set is judged by the fact the role-keyed
+     * one is judged by rather than by a near neighbour of it.
+     *
+     * The fixture: one paired unit, `Connected`, last frame at 40 s on a set
+     * that ran 1 s to 61 s -- twenty seconds past the window, so the reading
+     * is `LINKED_SILENT` and is NOT the reason nothing is stored. A hundred
+     * samples are in the buffer. Only the buffer can make this pass.
+     */
+    @Test
+    fun `a one-sensor set that streamed and then lost its link stores no declaration`() {
+        val address = "AA:BB:CC:DD:EE:01"
+        val streamed = samples(0L, 10L, 20L, 30L)
+        val state =
+            RecordState(
+                pairedImuAddresses = listOf(address),
+                preferredImuAddress = address,
+                imuState = ConnectionState.Connected("WT901"),
+                imuFrameAtMs = 40_000L,
+            )
+
+        assertEquals(
+            ArmedDelivery.LINKED_SILENT,
+            state.soleSilenceOver(1_000L, 61_000L),
+            "the fixture does not reach the state this case is about",
+        )
+
+        val capture =
+            state.captureAt(
+                armed = null,
+                secondaryRole = null,
+                analysedBuffer = streamed,
+                secondaryBuffer = emptyList(),
+                startedAtMs = 1_000L,
+                endedAtMs = 61_000L,
+            )
+
+        assertNull(
+            capture.sensors,
+            "a set whose one unit filled the buffer was recorded as having delivered nothing",
+        )
+        assertEquals(streamed, capture.samples, "the capture was dropped on a set that streamed")
+    }
 }

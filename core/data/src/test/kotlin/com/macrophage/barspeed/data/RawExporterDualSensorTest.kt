@@ -530,13 +530,22 @@ class RawExporterDualSensorTest {
      * the reader who opens the analysis. Written only when the one link was
      * silent, so an ordinary one-sensor descriptor is byte-for-byte what it was
      * -- which the control above this file already pins.
+     *
+     * ROUND 1, FINDING 3: THE SET CARRIES NO STREAM. This case handed the
+     * fixture an `imuStream` of a hundred analysed samples while its own name
+     * said the unit delivered nothing, so the document it pinned was one no
+     * build can now write -- the contradiction finding 1 fixed in the recording
+     * path, pinned as the shape to keep. `emptyList()` is what a set whose one
+     * link never came up actually stores: `RawStreamEntity` rows are inserted
+     * per stream, and a set with no samples inserts none. The descriptor is
+     * still emitted, because `meta.json` lists one object per SET RECORD rather
+     * than per stream.
      */
     @Test
     fun `the manifest names a single armed unit that delivered nothing`() = runTest {
         val stored = """{"count":1,"soleSilent":"NOT_LINKED"}"""
 
-        val descriptor =
-            descriptorFromStoredJson(stored, listOf(imuStream(1L, null, analysedSamples, storedRate = 98.5)))
+        val descriptor = descriptorFromStoredJson(stored, emptyList())
 
         assertEquals(
             "notLinked",
