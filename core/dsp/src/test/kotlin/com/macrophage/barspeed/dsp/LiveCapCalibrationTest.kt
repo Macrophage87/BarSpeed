@@ -20,6 +20,17 @@ import kotlin.test.assertEquals
  * fifteen -- seven reps removed, 63 in family, 213 batch runs -- are that
  * corpus and not this one.
  *
+ * A TWENTY-SECOND capture is committed and is deliberately NOT in this file's
+ * list: field-legpress-single-2011-8rep-s36-set07, landed for issue #93. It is
+ * excluded so this file's series stays comparable with the figures already
+ * published against the twenty-one, and because it is the corpus's first
+ * capture on which the live counter resolves every rep performed, which would
+ * move every total here without being evidence about anything issue 94 or 86
+ * measured. Folding it in is a task of its own; the corpus-wide phrasing in
+ * this file means these twenty-one, not every file on the classpath.
+ * `CuedRepCoverageTest.outsideCorpusTotals` names the same exclusion and is
+ * what keeps its reconciliation arithmetic true.
+ *
  * ## The constant has never been calibrated anywhere
  *
  * `maxRunDisplacementM` is 2.0 m and has exactly one consumer, `RepSegmentation`,

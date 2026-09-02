@@ -68,7 +68,14 @@ class LiveIntegratorRunawayTest {
 
     private data class Capture(val fixture: String, val direction: LiftDirection, val cueTracked: Boolean)
 
-    /** All twenty-one committed captures, in the geometry the rest of the suite reads them with. */
+    /**
+     * Twenty-one committed captures, in the geometry the rest of the suite reads
+     * them with. NOT all of them: field-legpress-single-2011-8rep-s36-set07
+     * landed for issue #93 and is deliberately excluded, for the reason
+     * `CuedRepCoverageTest.outsideCorpusTotals` states -- these figures are a
+     * series against the twenty-one, and the 101 quoted in this file's KDoc is
+     * that population.
+     */
     private val corpus = listOf(
         Capture("field-ohp-rotating-8rep", ecc(), true),
         Capture("field-ohp-rotating-8rep-b", ecc(), true),

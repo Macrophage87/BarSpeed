@@ -26,6 +26,17 @@ import kotlin.test.assertEquals
  * batch 98, performed 111, absolute error 39 -- are that corpus and not this
  * one, and the two are not comparable.
  *
+ * A TWENTY-SECOND capture is committed and is deliberately NOT in this file's
+ * list: field-legpress-single-2011-8rep-s36-set07, landed for issue #93. It is
+ * excluded so this file's series stays comparable with the figures already
+ * published against the twenty-one, and because it is the corpus's first
+ * capture on which the live counter resolves every rep performed, which would
+ * move every total here without being evidence about anything issue 94 or 86
+ * measured. Folding it in is a task of its own; the corpus-wide phrasing in
+ * this file means these twenty-one, not every file on the classpath.
+ * `CuedRepCoverageTest.outsideCorpusTotals` names the same exclusion and is
+ * what keeps its reconciliation arithmetic true.
+ *
  * The sharpest single result is on one of the six: field-reardeltfly-s32-set06
  * reports ZERO reps against twelve performed. It is the only capture in the
  * corpus with reps in it on which the live counter reports nothing at all.
