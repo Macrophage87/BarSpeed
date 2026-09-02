@@ -3137,12 +3137,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 targetS = targetDurationS,
                 autoEnded = autoEndedSet,
             )
-        val tempoText =
-            when {
-                isTimed -> null
-                s.adHoc -> s.tempoInput.ifBlank { null }
-                else -> slot?.tempo
-            }
+        val tempoText = when {
+            isTimed -> null
+            s.adHoc -> s.tempoInput.ifBlank { null }
+            else -> slot?.tempo
+        }
         val manualReps = if (s.manualSet) s.manualReps else null
         // Which buffer the DSP is pointed at, and what the row says about the
         // choice (#207). Frozen here with everything else, from the buffers as
