@@ -89,10 +89,21 @@ class AutoConnectManager(
      *
      * A grace floor and nothing more: `ArmedSilencePolicy` declines to call a
      * link silent until it has been armed for its own window, so a unit two
-     * seconds into a connect is not accused of being dead. The second link's
-     * instant moves whenever [setSecondaryImuAddress] re-points it, which is
-     * the moment its wait actually restarts; the first link's is taken when
-     * this object is constructed, which is the only moment it is armed.
+     * seconds into a connect is not accused of being dead.
+     *
+     * THE TWO LINKS ARE NOT SYMMETRIC, and the asymmetry is a real limitation
+     * rather than a shape. The second link's instant moves whenever
+     * [setSecondaryImuAddress] re-points it, which is the moment its wait
+     * actually restarts. The first link's is taken ONCE, when this object is
+     * constructed, and no later write moves it: [pairAndConnect] connects that
+     * link, and [setPreferredAndConnect] and [forgetAndDrop] drop it for
+     * `maintain` to re-point, all without touching this instant. So the
+     * ANALYSED link has a real grace window only in the first seconds of the
+     * process; after that its age is the process's age and the grace floor is
+     * effectively spent. The direction of that error is towards saying
+     * something -- a link re-pointed an hour in is judged immediately rather
+     * than given three seconds -- which is why it is recorded here rather
+     * than fixed under an issue about telling the lifter anything at all.
      */
     val imuArmedAtMs: StateFlow<Long> = imuArmedAt
 

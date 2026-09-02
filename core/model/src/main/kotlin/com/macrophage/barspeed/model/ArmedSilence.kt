@@ -106,24 +106,29 @@ object ArmedSilencePolicy {
      *
      * ## Where the number comes from
      *
-     * It is the longest wait the SETUP window's own machinery already imposes
-     * before a link can be expected to have produced anything. Two figures
-     * bound it, both read from `:core:ble` at the time of writing and NAMED
-     * rather than shared -- this module cannot see that one, the dependency
-     * runs the other way, and a second copy of a constant is a second fact
-     * that can disagree with the first:
+     * Three seconds is a CHOSEN figure. Nothing in this repository derives it,
+     * and the reconnect loop does not bound it. Two `:core:ble` figures are
+     * named here -- named rather than shared, because this module cannot see
+     * that one, the dependency runs the other way, and a second copy of a
+     * constant is a second fact that can disagree with the first -- and
+     * neither is what fixes it:
      *
-     * - `AutoConnectManager.maintain` idles three seconds when the link has no
-     *   address to hold, which is the slowest pass in that loop. Below three
-     *   seconds this policy could accuse a unit the reconnect loop has not yet
-     *   taken one pass at.
+     * - `AutoConnectManager.maintain` waits `delay(backoffS * 1_000)` between
+     *   connect attempts on an armed link: one second on the first, and up to
+     *   thirty at its `min(backoffS * 2, 30L)` cap. Its three-second idle is
+     *   the NO-ADDRESS branch, taken when the link is armed at nothing, so it
+     *   is not the wait an armed link is subject to and it is not the slowest
+     *   pass in that loop. A unit under a backed-off retry can therefore be
+     *   called silent while the loop has not yet taken its next attempt at
+     *   it. This policy accepts that: from the lifter's side, a link that has
+     *   been retrying for thirty seconds IS silent.
      * - `WitmotionClient.onReady` posts four configuration commands spaced
      *   `COMMAND_SPACING_MS` apart, the last of them at 1,200 ms. Frames do not
      *   wait for that sequence -- the notify subscription is live before the
      *   first command -- so it is a ceiling on "the link is still settling",
      *   not a floor on when data may appear.
      *
-     * Three seconds clears both. It is NOT tied to
+     * Three seconds clears the second of those. It is NOT tied to
      * [LeadInPolicy.DEFAULT_S], and that is a decision rather than an
      * oversight: the prep runs AFTER the lifter taps START, so pacing a
      * before-the-set warning by it would measure this window against the wrong

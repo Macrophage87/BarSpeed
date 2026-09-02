@@ -2202,10 +2202,15 @@ data class RecordState(
     fun armedDelivery(nowMs: Long): Map<SensorRole, ArmedDelivery> = armedDeliveryOver(
         analysed = roster.analysed,
         secondary = roster.secondary,
-        // The LATER of the two arming instants, so re-pointing either link
-        // mid-session hands both a fresh grace window rather than accusing the
-        // one that did not move. The conservative direction: it delays a true
-        // warning by three seconds instead of raising a false one.
+        // The LATER of the two arming instants, so a link that has just been
+        // re-pointed hands BOTH a fresh grace window rather than the one that
+        // did not move being accused meanwhile. The conservative direction: it
+        // delays a true warning by three seconds instead of raising a false
+        // one. In practice only the SECOND link's instant ever moves --
+        // AutoConnectManager writes the analysed link's once at construction
+        // and never again, which its own KDoc now says -- so mid-session this
+        // maxOf is the second link's instant whenever that link has been
+        // re-pointed, and the process's start time otherwise.
         sinceMs = maxOf(imuArmedAtMs, imuArmedAtMsB),
         nowMs = nowMs,
     )

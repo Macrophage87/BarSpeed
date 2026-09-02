@@ -827,6 +827,13 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
  * roster until an exercise is chosen -- and the bar-sensor card already there
  * covers the analysed link being down.
  *
+ * AND ONLY WHERE A ROLE IS ARMED, which is two paired bar sensors carrying
+ * different labels. On a one-sensor set `SensorRoster.analysed` is null, so
+ * `RecordState.armedDelivery` is empty and this composable returns without
+ * drawing: a single connected-and-silent unit still gets the delivery dot and
+ * nothing else. That remainder is left for its own issue rather than widened
+ * here.
+ *
  * NOTHING IN THIS REPOSITORY CAN RUN THIS. `:app` has no test that composes
  * anything, and whether a real WT901 left switched off produces the state this
  * reads is a [Field] question. The rule it draws is pinned; the drawing is
