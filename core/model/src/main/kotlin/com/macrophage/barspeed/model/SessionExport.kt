@@ -751,11 +751,17 @@ data class SetSensorsExport(
     /**
      * Which role's stream every figure in this set was computed from.
      *
-     * A fact about which sensor the app was pointed at when the set began, not
-     * about which one produced data. It can name a role absent from [present]
-     * -- that is a set whose analysed unit dropped out, and the summary
-     * figures for it are empty rather than wrong. Null when no role is in
-     * play.
+     * Since 1.16 it is a role that STREAMED wherever one did: a set armed to
+     * analyse a unit that produced nothing is analysed from the unit that did,
+     * and [analysedFellBack] is what says the app moved. Read that key rather
+     * than comparing this one with [present], which no longer separates the
+     * two cases.
+     *
+     * It can still name a role absent from [present] in two situations, and
+     * neither has figures drawn from the surviving stream: a set where NOTHING
+     * streamed, whose summary is empty because there was no capture; and a set
+     * recorded by a build older than 1.16, which kept the armed role whatever
+     * happened. Null when no role is in play.
      */
     val analysedRole: String? = null,
     /**
