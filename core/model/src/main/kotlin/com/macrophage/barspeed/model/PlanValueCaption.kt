@@ -7,9 +7,9 @@ package com.macrophage.barspeed.model
  * Beside [SetCardValues] because it answers the neighbouring question. That
  * object says what the lifter CHANGED, struck through the plan's own figure on
  * the card, without a tap; this one says what the plan ASKED FOR, inside the
- * dialog, beside the control doing the changing. Tempo, prep and sensor count have said it since #152;
- * load, reps and hold -- the three changed most often -- have said nothing at
- * all. #175.
+ * dialog, beside the control doing the changing. Tempo, prep and sensor count
+ * have said it since #152; load, reps and hold -- the three changed most
+ * often -- have said nothing at all. #175.
  *
  * NO FOURTH PHRASING. Two sentences ship today and both are re-used verbatim:
  *
