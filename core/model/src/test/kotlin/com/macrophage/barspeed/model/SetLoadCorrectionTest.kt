@@ -170,6 +170,23 @@ class SetLoadCorrectionTest {
     }
 
     @Test
+    fun `a second block of the same exercise is not a continuation`() {
+        // `flattenPlan` can emit the same movement in two blocks and nothing
+        // in a slot carries a block identity, so `setIndexInExercise == 0` is
+        // what separates them. Delegating on the exercise id alone would let
+        // a correction to the last set of block one move the load of block
+        // two's opener, which is a fresh prescription and not a continuation.
+        assertFalse(
+            SetLoadPolicy.correctionCarryBlock(
+                lastExerciseId = "back_squat",
+                nextExerciseId = "back_squat",
+                nextSetIndexInExercise = 0,
+                comingExerciseId = "back_squat",
+            ),
+        )
+    }
+
+    @Test
     fun `a next slot switched during the rest is a different block`() {
         // Equipment busy? Switch exercise replaces the slot coming up while
         // the rest screen is drawn, and the load correction is tapped after
