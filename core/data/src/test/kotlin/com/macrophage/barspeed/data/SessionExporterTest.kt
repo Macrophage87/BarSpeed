@@ -576,8 +576,13 @@ class SessionExporterTest {
 
     /**
      * Where each value came from: a consumer treats a guess and a declaration
-     * differently. Six carry a source; `sensorInverted` and `bodyweight`
-     * cannot, being non-nullable booleans in the plan format.
+     * differently. Six carry a source. `sensorInverted` cannot, being a
+     * non-nullable boolean in the plan format: a declared `false` and an
+     * omitted key are the same value and no source can be told apart.
+     * `bodyweight` is `Boolean?` as of #227 (c5dd4688) and COULD carry one,
+     * but no source is published for it -- publishing one would add a
+     * seventh required key to the exported geometrySource object for a
+     * value nothing downstream reads yet.
      */
     @Test
     fun `the geometry says where each resolvable value came from`() = runTest {

@@ -199,7 +199,7 @@ class SetCardValuesTest {
     }
 
     /**
-     * RED (#227 item 1). loadLabel's bodyweight arm fires ahead of the timed
+     * RED (#227 item 4). loadLabel's bodyweight arm fires ahead of the timed
      * gate #227 item 4 added, and does not itself know whether anything was
      * prescribed: a null [plannedLoadKg] resolves through
      * [BodyweightLoadDisplay.label] to the bare "BW" whether that null means

@@ -150,7 +150,7 @@ object SetCardValues {
         // null plannedLoadKg to BodyweightLoadDisplay's bare "BW" -- a
         // phantom planned figure struck against an added load the plan
         // never spoke of. Gating the PLANNED side's bodyweight argument on
-        // this is what stops it (#227 item 1); the STATED side is
+        // this is what stops it (#227 item 4); the STATED side is
         // unaffected, since it never asks what was planned.
         val plannedPrescribed = plannedReps != null || plannedDurationS != null
         val plannedLoad =

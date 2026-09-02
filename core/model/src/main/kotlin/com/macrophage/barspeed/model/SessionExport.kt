@@ -1268,15 +1268,18 @@ data class GeometryExport(
 /**
  * Declared, seeded, inferred or default, per value.
  *
- * Two of [GeometryExport]'s eight values are missing here on purpose:
- * `sensorInverted` and `bodyweight` are non-nullable booleans in the plan
- * format, so a declared `false` and an omitted key are the same value and no
- * source can be told apart. Stating one would be an invention.
+ * Two of [GeometryExport]'s eight values are missing here. `sensorInverted`
+ * is a non-nullable boolean in the plan format, so a declared `false` and an
+ * omitted key are the same value and no source can be told apart there --
+ * stating one would be an invention. `bodyweight` is `Boolean?` as of #227
+ * (c5dd4688), so it COULD carry a source the same way the six published
+ * values do; none is published for it because that would add a seventh
+ * required key to this object for a value no consumer reads yet.
  *
- * `sensorOnStack` was a third until #223 made the plan key nullable. The
- * sentence naming three is deleted rather than reworded: it is false for that
- * one now, and an omitted key on a machine the app seeds is answered from
- * [ExerciseDef.STACK_MOUNTED_IDS] and published as `seeded`.
+ * `sensorOnStack` was a third bare-boolean exclusion until #223 made the plan
+ * key nullable. The sentence naming three is deleted rather than reworded: it
+ * is false for that one now, and an omitted key on a machine the app seeds is
+ * answered from [ExerciseDef.STACK_MOUNTED_IDS] and published as `seeded`.
  */
 @Serializable
 data class GeometrySourceExport(

@@ -11,13 +11,13 @@ import kotlin.test.assertTrue
  * built-in [ExerciseDef] sets `bodyweight = true` and
  * [SetGeometryPolicy.resolve] takes the flag only from the plan.
  *
- * Four assertions are RED at the commit that introduces them. Today `resolve`
- * assigns `declared.bodyweight ?: false` unconditionally over whatever the
- * built-in definition said (#227's own refactor commit made that explicit
- * rather than fixing it), [BodyWeightPromptPolicy.sessionNeedsBodyWeight]
- * reads the same raw, un-seeded flag, and the import gate says nothing. The
- * green ones are marked as such: a declared value, either way, and an id
- * nothing seeds are both already correct and must stay so once the fix lands.
+ * Four assertions were RED at the commit that introduced them (d9e4a0d6).
+ * Before ab12bbbc's fix, `resolve` assigned `declared.bodyweight ?: false`
+ * unconditionally over whatever the built-in definition said,
+ * [BodyWeightPromptPolicy.sessionNeedsBodyWeight] read the same raw,
+ * un-seeded flag, and the import gate said nothing. The green ones are
+ * marked as such: a declared value, either way, and an id nothing seeds were
+ * both already correct before the fix and stay so after it.
  *
  * Shaped after [StackSeedDifferentialTest] (#223), the same population shape
  * one field earlier.
@@ -57,10 +57,10 @@ class BodyweightSeedDifferentialTest {
     }
 
     /**
-     * GREEN already, and must stay so once the fix lands: a declared false
-     * wins over the seed on both sides of the change, because `declared.
-     * bodyweight ?: false` reads a declared false as false whether or not
-     * `resolve` ever looks at the seed. Kept beside the red cases as the
+     * GREEN, both before and after ab12bbbc's fix: a declared false wins over
+     * the seed either way, since [SetGeometryPolicy.bodyweightMount] returns
+     * [declared] unconditionally whenever it is non-null and never reaches
+     * the seed at all in that case. Kept beside the red cases as the
      * differential's other half -- the fix must not make this one fail.
      */
     @Test

@@ -270,8 +270,9 @@ object SetLoadPolicy {
      * zero clamps to zero -- an empty bar, which [resolve] already treats as a
      * real measurement rather than an absence. A body-weight set's added load
      * is signed by contract: negative is a band or an assist machine taking
-     * weight off, PlanFile.validate passes allowNegativeLoad =
-     * exercise.bodyweight on exactly this population, and clamping it at zero
+     * weight off, `PlanFile.validate` passes `allowNegativeLoad =
+     * SetGeometryPolicy.bodyweightMount(...)` -- the seeded answer, not the
+     * raw declaration -- on exactly this population, and clamping it at zero
      * would make assistance unsayable.
      *
      * There is no ceiling on either. Nothing here knows what a plate rack

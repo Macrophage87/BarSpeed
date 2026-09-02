@@ -235,6 +235,19 @@ data class ExerciseDef(
          * `rope_dead_hang` has no entry here for [STACK_MOUNTED_IDS]'s own
          * reason: it is genuinely body-weight work too, and is left to #228
          * alongside its stack-mount gap so the two are decided together.
+         *
+         * ab12bbbc's own "left for a follow-up" list named PlanDetailScreen
+         * and GuideScreen's PLAN_PROMPT as the two sites this table does not
+         * yet reach, but there is a THIRD, unnamed there: an AD-HOC set (no
+         * plan slot) resolves its exercise from `RecordState.currentExercise`
+         * as `seedById(id) ?: ExerciseDef(id, id)`, which never calls
+         * [SetGeometryPolicy.bodyweightMount] and so never consults this
+         * table either. `seedById("pull_up")` returns null -- none of
+         * [BODYWEIGHT_IDS] carries a SEED entry, by this table's own design
+         * above -- so an ad-hoc pull-up falls to the bare `ExerciseDef(id,
+         * id)` constructor, whose `bodyweight` default is `false`. It still
+         * records added load alone and is never asked for a body weight:
+         * half of #61's population, unclosed by this table alone.
          */
         val BODYWEIGHT_IDS: Set<String> =
             setOf(
