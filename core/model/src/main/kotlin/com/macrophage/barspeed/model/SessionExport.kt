@@ -513,8 +513,49 @@ data class SessionExport(
          * retroactively, for 1.16's reason: the reading is frozen into the
          * set's row when the set is RECORDED. The published descriptions of
          * both keys are corrected with it.
+         *
+         * 1.18: a set that ended BEFORE its work phase began publishes
+         * neither `duration_s` nor `prep_s`, and carries
+         * [SetExport.abandonedInPrep] instead (#216).
+         *
+         * A NEW number rather than an eighth change under 1.17, and the rule
+         * is the one the 1.15 and 1.17 entries above each state: a number
+         * takes further entries until it SHIPS. 1.17 shipped in v0.1.49, read
+         * by `git show v0.1.49:core/model/.../SessionExport.kt` rather than
+         * assumed, so extending it would redefine a number a consumer has
+         * already been handed.
+         *
+         * NOT additive: no key changes type, but two keys STOP BEING WRITTEN
+         * on one class of set. Such a set published `duration_s: 0`, which is
+         * a measurement claim -- the writer drops nulls and prints zeros, so
+         * nothing downstream could tell that 0 from a hold attempted and held
+         * for no time -- and `prep_s`, which carries the prep the app SET OUT
+         * to play rather than the prep that elapsed. On the capture this was
+         * written from, `prep_s` matches the measured prep window to within
+         * 16 ms on every set whose prep completed, which is what entitles a
+         * reader to read it as elapsed and why publishing it on a set whose
+         * lead-in was cut is a false statement rather than a harmless one.
+         *
+         * It does NOT apply retroactively and cannot: whether the work began
+         * is a capture fact stored from database v15 on, so a row written
+         * before that carries no answer, publishes what it always published,
+         * and carries no `abandonedInPrep`. `reps` is UNCHANGED and still
+         * required, so an abandoned set goes on publishing `reps: 0`;
+         * `abandonedInPrep` is what makes that zero readable, and removing it
+         * is tracked separately rather than folded in here.
+         *
+         * 1.18 carries a SECOND change, under the same number because 1.18 is
+         * unreleased, and it IS additive (#216, #169): a failed set may carry
+         * [SetExport.failedByLifter], saying whether the lifter called the
+         * failure or the app derived it. The two facts have always been held
+         * apart in `SetRatingTracker` and OR-ed, with only the OR published,
+         * so a set the lifter called a grinder and one the app marked short
+         * of its prescription reach a reader identical. `limiter` cannot
+         * separate them: it is an optional answer to a different question,
+         * absent on every set nobody was asked. Absent on a set that did not
+         * fail and on every set recorded before database v15.
          */
-        const val SCHEMA_VERSION = "1.17"
+        const val SCHEMA_VERSION = "1.18"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -524,7 +565,7 @@ data class SessionExport(
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
-                "1.16", "1.17",
+                "1.16", "1.17", "1.18",
             )
 
         /**

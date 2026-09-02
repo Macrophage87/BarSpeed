@@ -143,9 +143,17 @@ class SchemaWorkedSideContractTest {
      */
     @Test
     fun `the export version stands still and 1_17 gains a further entry`() {
-        assertEquals("1.17", SessionExport.SCHEMA_VERSION, "the export version moved; #215 must not mint one")
+        // CORRECTED BY #216, which mints 1.18. This test asserted the
+        // CURRENT constant equals "1.17" -- true while 1.17 was unreleased,
+        // false since v0.1.49 shipped it, read by
+        // `git show v0.1.49:core/model/.../SessionExport.kt`. What this file
+        // owes is that ITS OWN change rode under 1.17 and that 1.17 is still
+        // accepted; an equality against the newest constant belongs to
+        // whichever change is newest and moves every time one lands, which is
+        // the rule the migration tests already apply to DATABASE_VERSION. The
+        // companion `assertFalse("1.18" in SUPPORTED_SCHEMA_VERSIONS)` goes
+        // with it for the same reason: 1.18 is minted now.
         assertTrue("1.17" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.17 left the accepted set")
-        assertFalse("1.18" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "a version nobody minted reached the app")
 
         val entry = entry117()
         assertTrue("#215" in entry, "the 1.17 entry does not name the issue this change came from")

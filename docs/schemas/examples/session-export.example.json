@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.17",
+  "schemaVersion": "1.18",
   "startedAt": "2026-07-18T17:04:00Z",
   "endedAt": "2026-07-18T18:11:00Z",
   "timeZone": { "id": "America/New_York", "utcOffsetMinutes": -240 },
@@ -63,6 +63,7 @@
           "reps": 2,
           "plannedReps": 5,
           "failed": true,
+          "failedByLifter": true,
           "limiter": "grip",
           "rest_s": 180,
           "sensors": {
@@ -132,6 +133,18 @@
             }
           },
           "summary": { "meanConVel_mps": 0.55, "peakConVel_mps": 0.9, "meanEcc_s": 3.6, "meanCon_s": 0.95, "meanRom_m": 0.6, "romSpread_pct": 3.8 }
+        },
+        {
+          "load_kg": 110,
+          "load_lb": 242.5,
+          "reps": 0,
+          "plannedReps": 5,
+          "abandonedInPrep": true,
+          "plannedPrep_s": 20,
+          "failed": true,
+          "failedByLifter": false,
+          "rest_s": 180,
+          "summary": {}
         }
       ]
     },
