@@ -2641,11 +2641,13 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     ArmedSilenceCard(state)
     NextSetBlock(state, viewModel)
     // Directly after the card it changes, and above SessionCloseControls,
-    // which keeps its distance from START for #137's reason. Every input it
-    // reads is frozen at the IN_SET to RESTING transition, so it is present
-    // when this screen first draws or not at all -- it cannot appear under a
-    // finger part-way through a rest. Decides nothing itself; see
-    // [NextSetNudgeSection].
+    // which keeps its distance from START for #137's reason. Four of its
+    // inputs are written by rest-screen controls drawn BELOW it -- the warm-up
+    // mark, the effort re-rating, the rep and duration corrections, and the
+    // appended set -- so this row can appear or vanish part-way through a rest
+    // and shift what is under it. Whether that reaches #137's stacked-target
+    // hazard is unmeasured and is a [Field] question. Decides nothing itself;
+    // see [NextSetNudgeSection].
     NextSetNudgeSection(state, viewModel)
     SessionCloseControls(state, viewModel)
     Spacer(Modifier.height(16.dp))

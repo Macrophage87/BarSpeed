@@ -76,10 +76,21 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  *
  * Drawn from `RestingStage` directly after `NextSetBlock`, because it is about
  * the set coming up and the card it changes is the one immediately above it.
- * It does NOT insert itself under a finger mid-rest: every input it reads is
- * frozen at the IN_SET to RESTING transition, so it is either present when the
- * screen first draws or not at all. That is the stacked-target hazard #137
- * removed elsewhere on this screen, and this control cannot recreate it.
+ *
+ * FOUR OF ITS INPUTS ARE WRITTEN DURING REST, so this row can appear or vanish
+ * part-way through one and shift what is drawn below it. `toggleLastSetWarmup`
+ * writes `lastSetWarmupMark` through `applyWarmupMark`; `ratedState` writes
+ * `lastSetRpe` and `lastSetFailed`; `applyRepCorrection` and
+ * `durationCorrectedState` each write `lastSetFailed`;
+ * `addSetOfCurrentExercise` writes, through `appendedState`, the queue that
+ * `setsLeftInExercise` is counted off. Every one of those is a rest-screen
+ * control drawn BELOW this row, so acting on one can move the next target
+ * under the finger that acted.
+ *
+ * Whether that reaches the stacked-target hazard #137 removed elsewhere on
+ * this screen is UNMEASURED and is a [Field] question, not a property claimed
+ * here. The bench run saw the row drawn and tapped; it never toggled a control
+ * beneath it and re-read the layout.
  */
 @Composable
 internal fun NextSetNudgeSection(state: RecordState, viewModel: RecordViewModel) {

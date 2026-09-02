@@ -106,9 +106,17 @@ data class NextSetNudge(
  * The effort scale asks how much more the lifter could have taken, in the
  * coarse notch a gym's equipment moves in; this grid is the finer control
  * offered afterwards, once the coarse claim has been made, and 2.5 kg is a
- * real pair of 1.25 kg plates. The owner authored the row verbatim: 2.5 / 5 /
- * 7.5 / 10 / 12.5 / 15 kg. [KG_STEP_MULTIPLE] is what this table's own
- * authoring rule is pinned against.
+ * real pair of 1.25 kg plates. THE ROW IS AUTHORED HERE, NOT QUOTED. #214
+ * carries no kilogram figures from the owner anywhere -- the only verbatim
+ * row in it is *"basically 5-30 lbs"*, which is [LB_STEPS] -- and its
+ * requirement 2 asks that every kilogram figure be a whole multiple of the
+ * effort scale's authoring rule, which 2.5, 7.5 and 12.5 are not. That is a
+ * departure from the written requirement, taken on the plate argument above
+ * and RAISED for the owner rather than settled here. The row satisfying
+ * requirement 2 as written would be 5 / 10 / 15 / 20 / 25 / 30 kg, whose
+ * first rung is about 11 lb -- more than twice the pound row's first rung,
+ * on the same tap. [KG_STEP_MULTIPLE] is what this table's own authoring
+ * rule is pinned against.
  */
 object NextSetNudgePolicy {
     /**
