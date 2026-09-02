@@ -1728,6 +1728,34 @@ private fun adHocSessionState(s: RecordState): RecordState = s.copy(
  * function over [RecordState], and `LastPlannedSetTest` is the only thing on
  * the CI path that can reach what tapping START does to the queue.
  */
+internal fun advancedState(s: RecordState): RecordState {
+    if (s.adHoc) {
+        return s.copy(
+            stage = Stage.READY,
+            statedLoadKg = null,
+            statedTempo = null,
+            statedReps = null,
+            statedDurationS = null,
+        )
+    }
+    // Nothing to advance to, so advancing does nothing (#195). This branch
+    // used to share the ad-hoc one: it wrote READY and left `queueIndex`
+    // where it was, so the slot just recorded became the current slot again
+    // and `startNextSet` -- which calls `beginSet` in the same frame -- ran
+    // the finished set a second time. The row it wrote carried the plan's
+    // prescription with `added` false, so nothing in the export could tell it
+    // from the planned set it duplicated.
+    //
+    // The state is returned UNTOUCHED rather than moved to a close state: the
+    // lifter is on the rest screen and finishing is a decision they take, not
+    // one taken for them while the phone is on the floor. The screen no
+    // longer offers a control that reaches here -- `RestControlPolicy
+    // .restScreen` withholds START with no next slot -- so this is the
+    // second half of one rule rather than the only guard.
+    val next = s.nextSlot ?: return s
+    return bakedState(s, next, s.queueIndex + 1)
+}
+
 /**
  * The state starting another set leaves behind, or null where starting one is
  * not a thing that may be done (#195).
@@ -1768,34 +1796,6 @@ internal fun startedNextSetState(s: RecordState): RecordState? {
         )
     if (RestControl.START_NEXT_SET !in screen.controls) return null
     return advancedState(s)
-}
-
-internal fun advancedState(s: RecordState): RecordState {
-    if (s.adHoc) {
-        return s.copy(
-            stage = Stage.READY,
-            statedLoadKg = null,
-            statedTempo = null,
-            statedReps = null,
-            statedDurationS = null,
-        )
-    }
-    // Nothing to advance to, so advancing does nothing (#195). This branch
-    // used to share the ad-hoc one: it wrote READY and left `queueIndex`
-    // where it was, so the slot just recorded became the current slot again
-    // and `startNextSet` -- which calls `beginSet` in the same frame -- ran
-    // the finished set a second time. The row it wrote carried the plan's
-    // prescription with `added` false, so nothing in the export could tell it
-    // from the planned set it duplicated.
-    //
-    // The state is returned UNTOUCHED rather than moved to a close state: the
-    // lifter is on the rest screen and finishing is a decision they take, not
-    // one taken for them while the phone is on the floor. The screen no
-    // longer offers a control that reaches here -- `RestControlPolicy
-    // .restScreen` withholds START with no next slot -- so this is the
-    // second half of one rule rather than the only guard.
-    val next = s.nextSlot ?: return s
-    return bakedState(s, next, s.queueIndex + 1)
 }
 
 /**

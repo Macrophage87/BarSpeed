@@ -26,6 +26,16 @@ enum class RestControl {
 }
 
 /**
+ * The rest screen's controls and which one carries the primary emphasis.
+ *
+ * [primary] is the one filled button on the screen. It is null only where
+ * [controls] is empty -- an in-flight close draws nothing, on purpose -- and
+ * it is always a member of [controls], so a caller cannot emphasise a control
+ * it is not drawing.
+ */
+data class RestControls(val controls: Set<RestControl>, val primary: RestControl?)
+
+/**
  * Which rest-screen controls may be operated, given where the session close has
  * got to.
  *
@@ -50,16 +60,6 @@ enum class RestControl {
  * drawing the control is the honesty half, so the lifter is not tapping a target
  * that does nothing.
  */
-/**
- * The rest screen's controls and which one carries the primary emphasis.
- *
- * [primary] is the one filled button on the screen. It is null only where
- * [controls] is empty -- an in-flight close draws nothing, on purpose -- and
- * it is always a member of [controls], so a caller cannot emphasise a control
- * it is not drawing.
- */
-data class RestControls(val controls: Set<RestControl>, val primary: RestControl?)
-
 object RestControlPolicy {
     /**
      * The controls to draw while the close is in [close].
