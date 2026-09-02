@@ -32,9 +32,9 @@ import kotlin.test.assertTrue
  * follow a rest window, and a session row carrying the summary that session
  * published -- avg 107, max 137, RMSSD 13.1 ms. What field-36 reports as
  * missing is a fifteenth heart-rate file after set 14, and
- * [the archive of a fourteen-set session carries no rest_after file] pins the
- * absence as it stands today so the differential that closes it has something
- * to move.
+ * [a set with no rest_after stream produces no rest_after file] pins the
+ * absence before this branch's write landed so the differential that closes
+ * it has something to move.
  *
  * Nothing here executes Room, SQLite or Android. The DAO is an interface and
  * the fakes below stand in for it; what is verified is the exporter's own
@@ -199,16 +199,18 @@ class FinalRestWindowExportTest {
     // ---- pins --------------------------------------------------------------
 
     /**
-     * The defect, as the archive shows it today.
+     * What the exporter writes for a set carrying no trailing window.
      *
-     * Thirteen `rest_before_hrm` files, one per set after the first, and
-     * nothing covering the window after set 14 -- which is field-36's report in
-     * the one artifact the lifter keeps. Thirteen rather than fourteen here
-     * because the fixture stores no stream for the READY window before set 1,
-     * which the app does write and which this test does not need.
+     * The fixture supplies no rest_after_hrm stream, so this pins that the
+     * exporter adds none -- not that a real session has none. Thirteen
+     * `rest_before_hrm` files, one per set after the first, and nothing
+     * covering the window after set 14 in this fixture. Thirteen rather than
+     * fourteen here because the fixture stores no stream for the READY window
+     * before set 1, which the app does write and which this test does not
+     * need.
      */
     @Test
-    fun `the archive of a fourteen-set session carries no rest_after file`() = runTest {
+    fun `a set with no rest_after stream produces no rest_after file`() = runTest {
         val entries = archive()
         assertEquals(
             13,
@@ -217,7 +219,7 @@ class FinalRestWindowExportTest {
         )
         assertTrue(
             entries.keys.none { it.endsWith("_rest_after_hrm.csv") },
-            "the window after the last set reaches no file: this is #109",
+            "the exporter invented a rest_after file for a set that has no such stream",
         )
     }
 

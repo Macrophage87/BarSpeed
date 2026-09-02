@@ -2906,7 +2906,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * rep announcement alongside the cue.
      */
     // An expression body for the reason toggleAudioCues above is one: detekt
-    // counts this class's statements and it sits on the LargeClass threshold,
+    // counts this class's lines of code and it sits on the LargeClass threshold,
     // so #109's one new argument to closer.close had to be paid for here.
     private fun speakCue(cueText: String, utterance: String = cueText) = speakCues(listOf(cueText), utterance)
 
