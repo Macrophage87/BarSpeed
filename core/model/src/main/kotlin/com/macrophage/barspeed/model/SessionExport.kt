@@ -352,6 +352,27 @@ data class SessionExport(
          * the opposite direction, and it is corrected here rather than
          * reworded away. The published copy of this entry in
          * `docs/schemas/session-export.schema.json` says the same.
+         *
+         * 1.17 carries a SECOND change, under the same number because 1.17
+         * is UNRELEASED. `load_kg` may be corrected on the rest screen after
+         * the set is over, so it is no longer necessarily the mass the set's
+         * power figures were computed from (#205). NOT additive: no key
+         * changes type or stops being written, but a reader that inferred
+         * `summary.peakPower_w`, `summary.meanConPower_w` and each rep's
+         * `peakPower_w` / `meanConPower_w` under `repMetrics` were derived
+         * from the `load_kg` published beside them can no longer do so.
+         * Power is computed as the set is recorded and frozen into the set's
+         * row; `SessionDao.overrideLoad` rewrites the stored load alone and
+         * nothing recomputes the analysis. It EXTENDS 1.17 rather than
+         * minting 1.18, under the rule the 1.16 entry above applies to its
+         * own second change: a number takes further entries until it ships,
+         * and a new one is minted only once the previous number has shipped.
+         * 1.17 was minted on `main` by #207 and is unreleased -- the newest
+         * tag is v0.1.48 and `git show
+         * v0.1.48:core/model/.../SessionExport.kt` declares "1.16", while
+         * `git show origin/main:core/model/.../SessionExport.kt | grep
+         * SCHEMA_VERSION` declares "1.17". The published copy of this log in
+         * `docs/schemas/session-export.schema.json` says the same.
          */
         const val SCHEMA_VERSION = "1.17"
 
