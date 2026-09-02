@@ -23,6 +23,18 @@ class SetRatingTracker(private val repository: SessionRepository) {
     private var setId: Long? = null
     private var autoFailed = false
     private var tappedFailed = false
+
+    /**
+     * The lifter's tap, exposed so the set write can STORE it beside the OR
+     * (#216).
+     *
+     * Read once, by the recorder, immediately after [onSetRecorded] returns.
+     * The two facts have always been kept apart here and only the OR reached
+     * the database, which is why a set the lifter called a grinder and one the
+     * app derived a shortfall for have been indistinguishable in every export
+     * ever written.
+     */
+    val lifterCalledFailure: Boolean get() = tappedFailed
     private var plannedReps: Int? = null
     private var plannedDurationS: Int? = null
 
@@ -105,7 +117,7 @@ class SetRatingTracker(private val repository: SessionRepository) {
         val id = setId ?: return null
         tappedFailed = failed
         val effective = failed || autoFailed
-        repository.rateSet(id, rpe, effective, warmup)
+        repository.rateSet(id, rpe, effective, failedByLifter = failed, warmup = warmup)
         return effective
     }
 
@@ -120,7 +132,7 @@ class SetRatingTracker(private val repository: SessionRepository) {
         autoFailed = planned != null && reps < planned
         val effective = tappedFailed || autoFailed
         repository.overrideReps(id, reps)
-        repository.rateSet(id, rpe = rpe, failed = effective, warmup = warmup)
+        repository.rateSet(id, rpe = rpe, failed = effective, failedByLifter = tappedFailed, warmup = warmup)
         return effective
     }
 
@@ -165,7 +177,7 @@ class SetRatingTracker(private val repository: SessionRepository) {
         autoFailed = TimedSetEndPolicy.fellShort(seconds, plannedDurationS)
         val effective = tappedFailed || autoFailed
         repository.overrideDuration(id, seconds)
-        repository.rateSet(id, rpe = rpe, failed = effective, warmup = warmup)
+        repository.rateSet(id, rpe = rpe, failed = effective, failedByLifter = tappedFailed, warmup = warmup)
         return effective
     }
 }

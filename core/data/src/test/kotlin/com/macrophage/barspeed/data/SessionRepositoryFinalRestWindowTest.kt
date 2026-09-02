@@ -74,7 +74,13 @@ class SessionRepositoryFinalRestWindowTest {
 
         override suspend fun rawStreamsForSet(setId: Long): List<RawStreamEntity> = streams.filter { it.setId == setId }
 
-        override suspend fun updateRpe(setId: Long, rpe: Int?, failed: Boolean, warmup: Boolean) {
+        override suspend fun updateRpe(
+            setId: Long,
+            rpe: Int?,
+            failed: Boolean,
+            failedByLifter: Boolean?,
+            warmup: Boolean,
+        ) {
             setColumnWrites += "updateRpe"
         }
 

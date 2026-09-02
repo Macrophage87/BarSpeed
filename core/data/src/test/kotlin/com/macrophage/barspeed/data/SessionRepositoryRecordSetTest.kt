@@ -111,7 +111,13 @@ class SessionRepositoryRecordSetTest {
 
         override suspend fun rawStreamsForSet(setId: Long): List<RawStreamEntity> = emptyList()
 
-        override suspend fun updateRpe(setId: Long, rpe: Int?, failed: Boolean, warmup: Boolean) {
+        override suspend fun updateRpe(
+            setId: Long,
+            rpe: Int?,
+            failed: Boolean,
+            failedByLifter: Boolean?,
+            warmup: Boolean,
+        ) {
             calls += "updateRpe"
         }
 

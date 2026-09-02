@@ -30,14 +30,14 @@ import java.io.File
  * the migration chain and never enters the rescue at all, so an ordinary
  * upgrade sees none of it.
  *
- * The version has moved before -- twelve times, shipped in v0.1.5, v0.1.10,
+ * The version has moved before -- thirteen times, shipped in v0.1.5, v0.1.10,
  * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, once in v0.1.42,
- * twice in v0.1.44 and once in v0.1.45 -- every one read off
+ * twice in v0.1.44, once in v0.1.45 and once in v0.1.49 -- every one read off
  * `git show <tag>:core/data/.../AppDatabase.kt` rather than remembered. What
  * was new at 11 was that a committed baseline existed for the
  * version below it, so for the first time in this repository a migration had a
- * document to be read against; 12 was the second such bump, 13 the third, and
- * 14 the fourth, with `13.json` as its baseline.
+ * document to be read against; 12 was the second such bump, 13 the third,
+ * 14 the fourth and 15 the fifth, with `14.json` as its baseline.
  *
  * A CORRECTION TO WHAT STOOD HERE, named rather than reworded around. This
  * paragraph read "BOTH bumps of this cluster reach the emulator in the SAME
@@ -52,14 +52,16 @@ import java.io.File
  * not v0.1.43, which carries 10.
  *
  * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read rather than carried
- * forward: v0.1.48 is the newest tag and
- * `git show v0.1.48:core/data/.../AppDatabase.kt` reads
- * `DATABASE_VERSION = 13`, so 12 -> 13 has now shipped too and an install
- * upgrading to this build runs 13 -> 14 alone. A phone still on v0.1.44 runs
- * 12 -> 13 -> 14 in one open, which is why the emulator exercise installs the
- * older release first and upgrades over it rather than starting empty.
+ * forward: v0.1.49 is the newest tag and
+ * `git show v0.1.49:core/data/.../AppDatabase.kt` reads
+ * `DATABASE_VERSION = 14`, so 13 -> 14 has now shipped too and an install
+ * upgrading to this build runs 14 -> 15 alone. A phone still on v0.1.44 runs
+ * 12 -> 13 -> 14 -> 15 in one open, which is why the emulator exercise
+ * installs the older release first and upgrades over it rather than starting
+ * empty. The sentence above about v0.1.48 carrying 13 was true when it was
+ * written and is not now; it is replaced rather than kept beside this one.
  */
-const val DATABASE_VERSION = 14
+const val DATABASE_VERSION = 15
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -389,24 +391,43 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
-         * DECLARED EMPTY AND NOT REGISTERED, on purpose and only for one
-         * commit (#216).
+         * `workBegan` and `failedByLifter` on set_records: whether the set's
+         * work phase ever began, and whether the lifter called the failure
+         * (#216, #169).
          *
-         * [Migration14To15Test] is written against this symbol before the hop
-         * exists, so that its failure is a real artifact rather than an
-         * assertion about one. With an empty body, no committed `15.json` and
-         * [DATABASE_VERSION] still 14, every one of its tests fails; the
-         * commit that fills this body registers it in the chain below and
-         * bumps the constant.
+         * [MIGRATION_13_14]'s shape -- nullable appends with no default -- and
+         * for the sharper version of its reason. Every row written before v15
+         * was recorded by a build that could observe NEITHER fact, so each
+         * column has a real absent state that no value stands for. A default
+         * of 1 on `workBegan` would assert of the whole archive that the app
+         * watched every set start; a default of 0 on `failedByLifter` would
+         * assert that every failure in the lifter's history was the app's
+         * derivation and never their own word.
          *
-         * A migration that is declared and NOT registered cannot run, so this
-         * intermediate state carries no risk to a database: Room sees the same
-         * chain, ending at 14, that the commit before it saw.
+         * TWO COLUMNS IN ONE HOP because they answer one question -- what
+         * happened, as against what the app set out to do -- and because a set
+         * that never started is marked failed BY DERIVATION, so a reader
+         * meeting one needs both in the same document. Shipping one now and
+         * one later would cost the lifter a second migration for half an
+         * answer.
+         *
+         * NO BACKFILL, and both candidates are refused deliberately.
+         * `workBegan` could be copied from whether a prep-window stream
+         * exists; `PrepWindowPolicy.of` also returns null when the two
+         * instants invert, which a mid-set clock correction reaches, so that
+         * would mark sets abandoned because `System.currentTimeMillis` moved.
+         * `failedByLifter` has no candidate at all -- the tap lived in
+         * `SetRatingTracker`'s memory for the life of the rest screen and was
+         * discarded.
+         *
+         * [Migration14To15Test] pins the statements, the baseline difference
+         * and the refusals.
          */
         internal val MIGRATION_14_15 =
             object : Migration(14, 15) {
                 override fun migrate(db: SupportSQLiteDatabase) {
-                    // Filled by the commit that bumps DATABASE_VERSION to 15.
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN workBegan INTEGER")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN failedByLifter INTEGER")
                 }
             }
 
@@ -433,8 +454,8 @@ abstract class AppDatabase : RoomDatabase() {
          * was deleted there rather than reworded. A crash with the data
          * recoverable beats a clean start with it gone.
          *
-         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 14
-         * here, so a rollback from this build to any build carrying 13 or less
+         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 15
+         * here, so a rollback from this build to any build carrying 14 or less
          * enters the rescue; the first version at which that was true of a
          * stock install was 10, and what it exposes on screen is stated at the
          * constant, with issue #118. An ordinary forward install runs the
@@ -465,6 +486,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_11_12,
                     MIGRATION_12_13,
                     MIGRATION_13_14,
+                    MIGRATION_14_15,
                 )
                 .build()
         }

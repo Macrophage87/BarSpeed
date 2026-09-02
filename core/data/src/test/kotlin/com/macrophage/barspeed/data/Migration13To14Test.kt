@@ -120,17 +120,30 @@ class Migration13To14Test {
     }
 
     /**
-     * The compiled version, the committed baseline and the migration's own
-     * endpoints are one number.
+     * The baseline and the migration's own endpoints are one number, inside a
+     * chain that reaches the compiled version.
      *
-     * The assertion the NEWEST hop owes the constant, moved here from
-     * [Migration12To13Test] the way that file took it from
-     * [Migration11To12Test]: a constant left behind at 13 ships a build whose
-     * schema the chain cannot reach, and Room throws on the lifter's phone.
+     * THE FIRST ASSERTION USED TO READ `assertEquals(14, DATABASE_VERSION)`,
+     * and it is corrected here exactly as [Migration12To13Test]'s was one hop
+     * earlier, by the rule that file's KDoc states: the equality belongs to
+     * the NEWEST hop and moves every time one is added. It was true while 14
+     * was the newest and went false the moment #216 added a fifteenth. An
+     * intermediate hop's end version is not the compiled version, and
+     * asserting they are equal reds this file on every future bump for no
+     * defect. The equality is not dropped -- it is in [Migration14To15Test],
+     * where it landed red at that file's own commit while the constant still
+     * read 14.
+     *
+     * The exact-14 assertions below are untouched. An entity changed with this
+     * migration left behind still ships a build whose schema the chain cannot
+     * produce, and Room throws on the lifter's phone.
      */
     @Test
-    fun `the compiled version, the committed baseline and the migration agree on fourteen`() {
-        assertEquals(14, DATABASE_VERSION, "DATABASE_VERSION is not the version this migration ends at")
+    fun `the baseline and the migration agree on fourteen, inside a chain reaching the compiled version`() {
+        assertTrue(
+            AppDatabase.MIGRATION_13_14.endVersion <= DATABASE_VERSION,
+            "this migration ends beyond DATABASE_VERSION, so the chain overshoots the schema this build compiles",
+        )
         assertEquals(14, declaredVersion(14), "14.json does not describe version 14")
         assertEquals(13, declaredVersion(13), "13.json does not describe version 13")
         assertEquals(13, AppDatabase.MIGRATION_13_14.startVersion)

@@ -55,7 +55,13 @@ class SessionRepositoryPrepWindowTest {
 
         override suspend fun rawStreamsForSet(setId: Long): List<RawStreamEntity> = emptyList()
 
-        override suspend fun updateRpe(setId: Long, rpe: Int?, failed: Boolean, warmup: Boolean) = Unit
+        override suspend fun updateRpe(
+            setId: Long,
+            rpe: Int?,
+            failed: Boolean,
+            failedByLifter: Boolean?,
+            warmup: Boolean,
+        ) = Unit
 
         override suspend fun updateLimiter(setId: Long, limiter: String?, limiterNote: String?) = Unit
 

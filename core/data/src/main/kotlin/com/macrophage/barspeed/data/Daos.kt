@@ -100,8 +100,25 @@ interface SessionDao {
     @Query("SELECT * FROM raw_streams WHERE setId = :setId ORDER BY id")
     suspend fun rawStreamsForSet(setId: Long): List<RawStreamEntity>
 
-    @Query("UPDATE set_records SET rpe = :rpe, failed = :failed, warmup = :warmup WHERE id = :setId")
-    suspend fun updateRpe(setId: Long, rpe: Int?, failed: Boolean, warmup: Boolean)
+    // `failedByLifter` moves with `failed` in ONE statement and never in a
+    // second one (#216). The two are one decision -- SetRatingTracker ORs the
+    // lifter's tap with the derived shortfall and this writes both the answer
+    // and its author -- and the rest screen changes them together: re-tapping
+    // the effort restates the author, and correcting a miscounted rep total
+    // re-derives the shortfall under the same author. Split across two
+    // queries, a crash between them leaves a row saying the lifter called a
+    // failure that is no longer recorded, or the reverse.
+    //
+    // This is deliberately NOT [updateWarmupMark]'s shape, and the difference
+    // is the point: `warmup` and `warmupMark` are the PLAN'S word and the
+    // LIFTER'S word, two facts about different authors that must survive each
+    // other, so they are written apart. `failed` and `failedByLifter` are one
+    // fact and its provenance.
+    @Query(
+        "UPDATE set_records SET rpe = :rpe, failed = :failed, " +
+            "failedByLifter = :failedByLifter, warmup = :warmup WHERE id = :setId",
+    )
+    suspend fun updateRpe(setId: Long, rpe: Int?, failed: Boolean, failedByLifter: Boolean?, warmup: Boolean)
 
     // Why the set ended, and the lifter's own words where the answer is
     // `other` (#189). Written as its own statement rather than folded into

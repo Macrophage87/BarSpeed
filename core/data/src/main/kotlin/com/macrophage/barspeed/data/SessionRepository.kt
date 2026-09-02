@@ -185,6 +185,25 @@ data class CompletedSet(
      * keeps compiling and keeps meaning what it meant.
      */
     val prepWindow: PrepWindow? = null,
+    /**
+     * Whether this set's work phase ever began (#216), or null where the
+     * caller cannot say.
+     *
+     * `AbandonedSetPolicy.workBegan` in `:core:model` is what answers it, and
+     * nothing else may. Defaulted last for [prepWindow]'s reason, and the
+     * default is null rather than true: a caller that stops passing it says
+     * "the app could not observe this", which is the state every pre-v15 row
+     * is in, and never "the work began".
+     */
+    val workBegan: Boolean? = null,
+    /**
+     * Whether the LIFTER called this set failed, as against the app deriving
+     * it (#216), or null where the caller cannot say.
+     *
+     * Beside [failed], never inside it: [failed] is the OR of the tap and the
+     * derived shortfall and stays exactly that.
+     */
+    val failedByLifter: Boolean? = null,
 )
 
 /**
@@ -383,6 +402,7 @@ class SessionRepository(
                 plannedSide = set.plannedSide,
                 rpe = set.rpe,
                 failed = set.failed,
+                failedByLifter = set.failedByLifter,
                 warmup = set.warmup,
                 added = set.added,
                 tempo = set.tempo,
@@ -391,6 +411,7 @@ class SessionRepository(
                 plannedRestS = set.plannedRestS,
                 plannedPrepS = set.plannedPrepS,
                 prepS = set.prepS,
+                workBegan = set.workBegan,
                 startedAtMs = set.startedAtMs,
                 endedAtMs = set.endedAtMs,
                 analysisJson = json.encodeToString(SetAnalysis.serializer(), set.analysis),
@@ -555,9 +576,17 @@ class SessionRepository(
 
     suspend fun rawStreams(setId: Long): List<RawStreamEntity> = sessionDao.rawStreamsForSet(setId)
 
-    /** Rest-screen effort rating (RPE, failed, or warm-up) applied to the just-recorded set. */
-    suspend fun rateSet(setId: Long, rpe: Int?, failed: Boolean, warmup: Boolean) =
-        sessionDao.updateRpe(setId, rpe, failed, warmup)
+    /**
+     * Rest-screen effort rating (RPE, failed, or warm-up) applied to the
+     * just-recorded set.
+     *
+     * [failedByLifter] travels with [failed] and is not optional here (#216).
+     * A default would let a call site quietly stop passing it and store "the
+     * app could not tell" over an answer the app has, on the one screen where
+     * the lifter states it.
+     */
+    suspend fun rateSet(setId: Long, rpe: Int?, failed: Boolean, failedByLifter: Boolean?, warmup: Boolean) =
+        sessionDao.updateRpe(setId, rpe, failed, failedByLifter, warmup)
 
     /**
      * The lifter's own statement that the just-recorded set was, or was not,

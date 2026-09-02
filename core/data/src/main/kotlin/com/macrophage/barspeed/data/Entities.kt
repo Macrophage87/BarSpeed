@@ -153,8 +153,34 @@ data class SetRecordEntity(
      * True when the set is marked failed: the lifter tapped it as failed, the
      * set fell short of its planned reps or duration and the app derived a
      * failure, or both. The derived case needs no lifter input at all.
+     *
+     * WHOSE VERDICT IT IS lives in [failedByLifter] beside it, from v15.
      */
     val failed: Boolean = false,
+    /**
+     * Whether the LIFTER called this set failed, rather than the app deriving
+     * it from a shortfall (#216, #169). Null means nobody knows.
+     *
+     * Three states and not two, for [warmupMark]'s reason and by the same
+     * argument. `SetRatingTracker` has always held the lifter's tap and the
+     * derived shortfall apart and OR-ed them into [failed], and that OR is
+     * what the row stored -- so a set the lifter called a grinder and a set
+     * the app marked short of its prescription have been indistinguishable in
+     * the record and in every export written from it. This is the missing
+     * half.
+     *
+     * Null is not a quiet "the app derived it". It is every row written before
+     * v15, and it is permanent: the tap lived in the rest screen's memory for
+     * the life of that screen and was discarded, so there is nothing to
+     * backfill from. A stored false is a real statement -- the set failed, the
+     * app derived it, and the lifter never said so.
+     *
+     * MOVES WITH [failed] AND NEVER APART FROM IT. Both are rewritten by the
+     * one rest-screen statement, `SessionDao.updateRpe`, because a re-rating
+     * and a rep correction each change who the verdict belongs to; two
+     * statements would let the pair disagree about one set.
+     */
+    val failedByLifter: Boolean? = null,
     /**
      * True when the PLAN declared this set preparatory -- a ramp set, a
      * warm-up.
@@ -281,6 +307,32 @@ data class SetRecordEntity(
      */
     val plannedPrepS: Int? = null,
     val prepS: Int? = null,
+    /**
+     * Whether this set's WORK PHASE ever began (#216). Null means the app
+     * could not observe it.
+     *
+     * [prepS] above is the prep the app SET OUT to play; this says whether it
+     * finished. True at the tap on a set with no prep, and otherwise exactly
+     * when `:app` captured the instant the set's own clock started or the
+     * cadence's first stroke call came due --
+     * [com.macrophage.barspeed.model.AbandonedSetPolicy.workBegan] owns the
+     * rule, so both export writers and the recorder reach the same answer.
+     *
+     * False is the state the export could not say before: the lifter's tap
+     * started the recording, the lead-in was still running, and the set was
+     * over before anything was measured. Such a row carries
+     * [actualDurationS] 0 and [actualReps] 0, neither of which is a
+     * measurement.
+     *
+     * DELIBERATELY NOT DERIVED from whether a prep-window stream exists.
+     * `PrepWindowPolicy.of` also refuses a window when the two instants
+     * invert, which a mid-set clock correction reaches, so reading that
+     * absence as "the work never began" would publish an abandonment because
+     * `System.currentTimeMillis` moved.
+     *
+     * Null on every row written before v15, and nothing backfills it.
+     */
+    val workBegan: Boolean? = null,
     val startedAtMs: Long,
     val endedAtMs: Long,
     /** kotlinx-serialized [com.macrophage.barspeed.dsp.SetAnalysis]. */

@@ -26,6 +26,7 @@ import com.macrophage.barspeed.dsp.TimedSetVoice
 import com.macrophage.barspeed.dsp.liftDirection
 import com.macrophage.barspeed.hrm.Hrv
 import com.macrophage.barspeed.hrm.RrIngest
+import com.macrophage.barspeed.model.AbandonedSetPolicy
 import com.macrophage.barspeed.model.AddSetControl
 import com.macrophage.barspeed.model.AddSetSlotKey
 import com.macrophage.barspeed.model.ArmedDelivery
@@ -472,6 +473,17 @@ private data class PendingSetWrite(
      * were.
      */
     val prepWindow: PrepWindow?,
+    /**
+     * Whether this set's WORK PHASE began, frozen with everything else (#216).
+     *
+     * The companion of [prepWindow] and a different question: that one says
+     * whether the prep INTERVAL can be stated, this says whether the work
+     * happened at all. They differ on a set with no prep, where there is no
+     * interval and the work began at the tap, and on a set whose two instants
+     * inverted, where the window is refused and the work did begin.
+     * `AbandonedSetPolicy.workBegan` owns the rule.
+     */
+    val workBegan: Boolean,
     val startedAtMs: Long,
     val endedAtMs: Long,
     val orderIdx: Int,
@@ -733,49 +745,56 @@ internal data class ArmedCapture(
  * function cannot see, and re-deriving it from [p] alone would silently drop
  * the half the lifter stated.
  */
-private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Boolean) = CompletedSet(
-    exerciseId = p.exercise.id,
-    exerciseName = p.exercise.displayName,
-    loadKg = p.loadKg,
-    plannedLoadKg = p.plannedLoadKg,
-    plannedReps = p.plannedReps,
-    manualReps = p.manualReps,
-    actualDurationS = p.actualDurationS,
-    plannedDurationS = p.plannedDurationS,
-    side = p.side,
-    plannedSide = p.plannedSide,
-    tempo = p.tempoText,
-    targetMeanConVelMps = p.slot?.targetMeanConVelMps,
-    velocityLossStopPct = p.slot?.velocityLossStopPct,
-    plannedRestS = p.slot?.restS,
-    plannedPrepS = p.plannedPrepS,
-    prepS = p.prepS,
-    prepWindow = p.prepWindow,
-    startedAtMs = p.startedAtMs,
-    endedAtMs = p.endedAtMs,
-    analysis = analysis,
-    geometry = p.geometry,
-    imuSamples = p.samples,
-    hrSamples = p.hrSamples,
-    restHrSamples = p.restHrSamples,
-    voiceCues = p.cues,
-    repMarks = p.repMarks,
-    sensors = p.sensors,
-    secondary = p.secondary,
-    rpe = p.rating?.rpe,
-    failed = failed,
-    // The plan's declaration, and nothing else can set it: #187 took warm-up
-    // off the effort scale, so there is no tile left to OR in. An ad-hoc or
-    // appended set is false because nothing declared it, which is a gap in
-    // what the app can express rather than a claim that the set was work.
-    warmup = p.slot?.warmup == true,
-    // Off the FROZEN slot, never off live state: the queue has already moved on
-    // by the time a retry runs, and the question this answers is about the set
-    // that was performed. An ad-hoc set has no slot and is not appended to
-    // anything -- it is its own thing, and false is the right answer for it
-    // rather than a missing one (#177).
-    added = p.slot?.isAddedSet == true,
-)
+private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Boolean, failedByLifter: Boolean) =
+    CompletedSet(
+        exerciseId = p.exercise.id,
+        exerciseName = p.exercise.displayName,
+        loadKg = p.loadKg,
+        plannedLoadKg = p.plannedLoadKg,
+        plannedReps = p.plannedReps,
+        manualReps = p.manualReps,
+        actualDurationS = p.actualDurationS,
+        plannedDurationS = p.plannedDurationS,
+        side = p.side,
+        plannedSide = p.plannedSide,
+        tempo = p.tempoText,
+        targetMeanConVelMps = p.slot?.targetMeanConVelMps,
+        velocityLossStopPct = p.slot?.velocityLossStopPct,
+        plannedRestS = p.slot?.restS,
+        plannedPrepS = p.plannedPrepS,
+        prepS = p.prepS,
+        prepWindow = p.prepWindow,
+        workBegan = p.workBegan,
+        startedAtMs = p.startedAtMs,
+        endedAtMs = p.endedAtMs,
+        analysis = analysis,
+        geometry = p.geometry,
+        imuSamples = p.samples,
+        hrSamples = p.hrSamples,
+        restHrSamples = p.restHrSamples,
+        voiceCues = p.cues,
+        repMarks = p.repMarks,
+        sensors = p.sensors,
+        secondary = p.secondary,
+        rpe = p.rating?.rpe,
+        failed = failed,
+        // The OR's two halves, stored apart for the first time (#216). [failed] is
+        // still the OR and nothing about it moves; this says whether the lifter
+        // said so, which the row has never carried and which no export could
+        // therefore publish.
+        failedByLifter = failedByLifter,
+        // The plan's declaration, and nothing else can set it: #187 took warm-up
+        // off the effort scale, so there is no tile left to OR in. An ad-hoc or
+        // appended set is false because nothing declared it, which is a gap in
+        // what the app can express rather than a claim that the set was work.
+        warmup = p.slot?.warmup == true,
+        // Off the FROZEN slot, never off live state: the queue has already moved on
+        // by the time a retry runs, and the question this answers is about the set
+        // that was performed. An ad-hoc set has no slot and is not appended to
+        // anything -- it is its own thing, and false is the right answer for it
+        // rather than a missing one (#177).
+        added = p.slot?.isAddedSet == true,
+    )
 
 /**
  * Open the session row the first set of a session hangs off.
@@ -3678,6 +3697,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 // inventing a window -- no prep, a prep the set was ended
                 // during, and an inverted pair each state nothing.
                 prepWindow = PrepWindowPolicy.of(prepCaseForSet, setStartedAtMs, workStartedAtMs),
+                // The same two facts, asked the other question (#216): did the
+                // work start at all. A set with no prep began at the tap; a
+                // prepped set began when :app captured the instant, and did not
+                // when it never did.
+                workBegan = AbandonedSetPolicy.workBegan(prepCaseForSet, workStartedAtMs),
                 startedAtMs = setStartedAtMs,
                 endedAtMs = endedAtMs,
                 orderIdx = s.setsCompleted,
@@ -3874,7 +3898,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             writtenSetId ?: sessionRepository.recordSet(
                 sessionId = sessionId,
                 orderIdx = p.orderIdx,
-                set = completedSetOf(p, analysis, failed),
+                set = completedSetOf(p, analysis, failed, ratings.lifterCalledFailure),
             ).also { writtenSetId = it }
         ratings.attachTo(setId)
         // The row and every stream belonging to it are in one transactional
