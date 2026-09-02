@@ -138,6 +138,10 @@ class SessionPreviewTest {
                 timed = false,
                 unit = WeightUnit.KG,
                 side = null,
+                // Bilateral on both sides of the pair, as SessionPreview.setLine
+                // passes: this test asserts the preview and the card produce the
+                // same string, so it must call with the same arguments.
+                plannedSide = null,
                 plannedLoadKg = 90.0,
                 statedLoadKg = 100.0,
                 declaredLoadKg = 90.0,
