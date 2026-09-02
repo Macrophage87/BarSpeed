@@ -154,6 +154,15 @@ data class ExerciseDef(
          *   `triceps_pushdown`: cable stations, where the load IS the stack
          *   and the handle is only a handle. The app's own plan prompt uses a
          *   seated cable row as its worked example of the key.
+         *   `seated_row` is the weakest of these. The id does not distinguish
+         *   a cable station from a plate-loaded machine, and on a
+         *   plate-loaded one the seed forces the measured axis to vertical
+         *   for a horizontal exercise. Whether a lifter's `seated_row` plan
+         *   entry names a cable station or a plate-loaded row machine is a
+         *   `[Field]` question: next `seated_row` session, check the machine
+         *   before recording -- on a plate-loaded row, declare
+         *   `sensorOnStack: false` in the plan, because a plate stack does
+         *   not ride the cable's line the way this default assumes.
          * - `leg_curl`, `seated_leg_curl`, `lying_leg_curl`, `leg_extension`:
          *   selectorised machines whose stack is the only place a sensor can
          *   ride the load.
@@ -172,10 +181,19 @@ data class ExerciseDef(
          * which on a 45-degree sled would be a claim about an axis nothing
          * here has measured.
          *
-         * `rope_dead_hang` has no entry here and is not resolved by the
-         * change above: it is a hang on an assist machine's rope, plausibly
-         * stack-mounted, and omitting the seed still records it bar-mounted.
-         * Tracked as #228, not done in this change.
+         * `rope_dead_hang` is deliberately NOT here, decided rather than
+         * merely deferred (#228). Field-37 sets 11-13 (v0.1.48) were,
+         * owner-confirmed, a hang on an assist machine's rope, and that rope
+         * did ride the assist stack's cable that session. But the id names
+         * the grip implement, not the equipment class, on the same reasoning
+         * that narrows `seated_row` above: a rope dead hang is at least as
+         * often a fixed rig or bar with a rope tied off for grip -- no
+         * cable, no stack, no pin selection at all -- and the id cannot
+         * distinguish that case from field-37's. Adding it here would
+         * default every future `rope_dead_hang`, including the fixed-rig
+         * one, to stack-mounted on the strength of one session. Omitting the
+         * key on this id still records bar-mounted; a plan that knows better
+         * must declare `sensorOnStack: true` itself.
          */
         val STACK_MOUNTED_IDS: Set<String> =
             setOf(

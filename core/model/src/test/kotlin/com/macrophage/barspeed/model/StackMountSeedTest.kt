@@ -107,4 +107,17 @@ class StackMountSeedTest {
         assertFalse(ExerciseDef.ridesStack("leg_press"))
         assertFalse(ExerciseDef.ridesStack("hack_squat"))
     }
+
+    /**
+     * `rope_dead_hang` is deliberately excluded too (#228), decided rather
+     * than merely deferred: the id names the grip implement, not the
+     * equipment class, and cannot distinguish a fixed-rig rope (no stack)
+     * from one riding an assist machine's cable, which is what field-37
+     * sets 11-13 owner-confirmed. Guards against a silent reversal of that
+     * decision, not against a bug.
+     */
+    @Test
+    fun `rope dead hang is not seeded as stack-mounted`() {
+        assertFalse(ExerciseDef.ridesStack("rope_dead_hang"))
+    }
 }
