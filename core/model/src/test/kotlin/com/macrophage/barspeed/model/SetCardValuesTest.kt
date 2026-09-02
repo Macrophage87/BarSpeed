@@ -206,6 +206,27 @@ class SetCardValuesTest {
         )
     }
 
+    /**
+     * RED (#227 item 1). One rep is the noun's singular, not its plural with a
+     * digit swapped in front -- "1 reps" reads as a card that does not know
+     * how to count, on a card the lifter reads every set of every session.
+     * The suffix follows the STATED figure, the one describing what the set
+     * IS now, so a set corrected down to one rep singularises even with a
+     * plural count struck beside it.
+     */
+    @Test
+    fun `a single rep says rep, not reps`() {
+        assertEquals(
+            SetCardValue(stated = "1", suffix = "rep"),
+            values(plannedReps = 1, reps = 1).first(),
+        )
+        assertEquals(
+            SetCardValue(stated = "1", planned = "5", suffix = "rep"),
+            values(plannedReps = 5, reps = 1).first(),
+        )
+        assertEquals("1 rep · 90 kg · tempo 4010", SetCardValues.plain(values(plannedReps = 1, reps = 1)))
+    }
+
     @Test
     fun `a changed hold strikes the seconds and names the movement once`() {
         // A carry is not a hold, and the word is drawn once whichever it is.
@@ -349,6 +370,64 @@ class SetCardValuesTest {
                 it.prefix.isEmpty() && it.suffix.isEmpty()
             },
         )
+    }
+
+    /**
+     * RED (#227 item 4). An appended set carries no prescription at all --
+     * every planned* field is null -- so a TIMED appended set with a load
+     * must strike nothing, the same rule an appended REP set already gets for
+     * its load (see `an appended set states its load and strikes nothing`
+     * above). `loadLabel`'s "timed set with nothing added" fallback exists to
+     * say "bodyweight" for a genuinely prescribed hold with no load, using
+     * [SetCardValue.planned]'s null as its only signal that nothing was
+     * declared -- but an appended set's plannedLoadKg is ALSO null, for a
+     * different reason: nothing was ever prescribed, not even a hold. Before
+     * the fix, [SetCardValues.of] could not tell those two nulls apart and
+     * struck a "bodyweight" the plan never said, against a set that carries a
+     * real added load.
+     */
+    @Test
+    fun `a timed appended set with a load strikes no planned bodyweight`() {
+        val appended =
+            values(
+                kind = ExerciseKind.HOLD,
+                timed = true,
+                plannedLoadKg = null,
+                statedLoadKg = null,
+                declaredLoadKg = 10.0,
+                plannedReps = null,
+                reps = null,
+                plannedDurationS = null,
+                durationS = 30,
+                plannedTempo = null,
+                tempo = null,
+            )
+        assertEquals(SetCardValue(stated = "10 kg"), load(appended))
+    }
+
+    /**
+     * The prescribed counterpart, kept green: a genuinely planned timed hold
+     * with no load, where the lifter has now added one, DOES strike a
+     * "bodyweight" the plan can be said to have asked for -- the signal is
+     * [plannedDurationS] being non-null, which an appended set never carries.
+     */
+    @Test
+    fun `a prescribed timed hold that gains a load strikes the plan's bodyweight`() {
+        val loaded =
+            values(
+                kind = ExerciseKind.HOLD,
+                timed = true,
+                plannedLoadKg = null,
+                statedLoadKg = 10.0,
+                declaredLoadKg = null,
+                plannedReps = null,
+                reps = null,
+                plannedDurationS = 30,
+                durationS = 30,
+                plannedTempo = null,
+                tempo = null,
+            )
+        assertEquals(SetCardValue(stated = "10 kg", planned = "bodyweight"), load(loaded))
     }
 
     @Test
