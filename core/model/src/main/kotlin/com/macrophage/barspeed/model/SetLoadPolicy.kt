@@ -215,4 +215,57 @@ object SetLoadPolicy {
      */
     fun recordedPlannedLoadKg(bodyweight: Boolean, bodyWeightKg: Double?, plannedAddedKg: Double?): Double? =
         plannedAddedKg?.let { totalKg(bodyweight, bodyWeightKg, it) }
+
+    // ---- Correcting the load of the set that has just been recorded (#205) ----
+    //
+    // THE SET JUST FINISHED, FROM THE REST SCREEN, AND NOTHING ELSE. Editing an
+    // arbitrary past set from the history screen is a larger and different
+    // thing -- it has no standing load to reconcile, no rest window bounding
+    // it, and no `SetRatingTracker` already pointed at the row -- and it is
+    // deliberately out of scope here. Every function below assumes the row
+    // being corrected is the one the rest screen is resting after.
+    //
+    // WHY LOAD AND NOT SOMETHING ELSE. It is the only value in a set the app
+    // cannot observe. Reps are counted, seconds are clocked, effort and the
+    // limiter are asked; the load is whatever was typed or carried BEFORE the
+    // set ran, so a lifter who set the app to 60 kg and put 65 on the bar had
+    // no way to say so once the set was over.
+    //
+    // BODY-WEIGHT WORK IS CORRECTED ON THE ADDED PORTION, like every other
+    // load in this object, and the added portion may be negative for band or
+    // machine assistance. [correctedTotalKg] is what puts it back on the
+    // body-weight-inclusive scale the row stores.
+
+    /**
+     * DELIBERATELY WRONG (#205 c2). How much one tap of the rest screen's load
+     * correction moves the recorded load, in kilograms.
+     */
+    fun correctionStepKg(unit: WeightUnit): Double = unit.toKg(1.0)
+
+    /**
+     * DELIBERATELY WRONG (#205 c2). The added load the finished set stands at
+     * after one tap.
+     */
+    fun correctedAddedKg(recordedAddedKg: Double, deltaKg: Double, bodyweight: Boolean): Double =
+        if (bodyweight) recordedAddedKg - deltaKg else recordedAddedKg + deltaKg
+
+    /**
+     * DELIBERATELY WRONG (#205 c2). The body-weight-inclusive total to store
+     * once the added load has been corrected.
+     */
+    fun correctedTotalKg(recordedTotalKg: Double, recordedAddedKg: Double, correctedAddedKg: Double): Double =
+        recordedTotalKg - recordedAddedKg - correctedAddedKg
+
+    /**
+     * DELIBERATELY WRONG (#205 c2). Whether the load standing for the set
+     * coming up should move with this correction.
+     */
+    fun carryFollowsCorrection(standingAddedKg: Double?, recordedAddedKg: Double, unit: WeightUnit): Boolean =
+        standingAddedKg != null && unit.inputValue(standingAddedKg) != unit.inputValue(recordedAddedKg)
+
+    /** DELIBERATELY WRONG (#205 c2). What the correction says it changes. */
+    fun correctionCaption(carryFollows: Boolean): String = "Corrects the next set" + if (carryFollows) " too" else ""
+
+    /** DELIBERATELY WRONG (#205 c2). The row's own label. */
+    fun correctionLabel(corrected: Boolean): String = if (corrected) "Corrected" else "Load"
 }
