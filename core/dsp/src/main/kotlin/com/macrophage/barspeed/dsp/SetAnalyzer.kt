@@ -554,8 +554,7 @@ object CoachingRules {
     }
 
     /**
-     * The one-line caption under the rest screen's eccentric-time chart, and
-     * under the same chart on the session detail screen.
+     * The one-line caption under the rest screen's eccentric-time chart.
      *
      * Lifted verbatim out of `RecordScreen.EccTempoChart` so that it can be
      * tested at all: no test on the CI path renders a Compose chart, so while
