@@ -3007,6 +3007,21 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         demoJob?.cancel()
         guidedCadence?.cancel()
         val s = stateFlow.value
+        // The set has to SAY it is over, or nothing on the record does. A
+        // guided set the lifter ends early never reaches the runner's `Done`,
+        // so until #141 its cue track stopped on a stroke and `SetEnd.of`
+        // returned NotCued: the rep list was unbounded, `detectionsAfter`
+        // reported null rather than a count, and the rest clock had no instant
+        // to start from. Spoken as well as written, because the archive is a
+        // record of what the app SAID (#176) and because the lifter gets no
+        // confirmation the set is over on exactly the sets that ended badly.
+        //
+        // BEFORE the cue buffer is frozen below, which is the whole of the
+        // ordering constraint: `speakCues` appends to `cueBuffer`, and the
+        // pending write copies it. The word is chosen by `SetEnd.terminalCall`
+        // in :core:dsp -- which sets get one, and whether the record already
+        // carries a boundary, are its decisions and not this function's.
+        SetEnd.terminalCall(guided = s.guidedSet, spoken = cueBuffer)?.let { speakCues(it.recorded, it.utterance) }
         val exercise = s.currentExercise
         val slot = s.currentSlot
         val isTimed = s.currentIsTimed
@@ -3310,11 +3325,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
         val restS = p.slot?.restS ?: DEFAULT_REST_S
         // Where the rest period started, and how much of it is left now. The
-        // instant comes off the set's own frozen cue track -- the same `Done`
-        // stamp SetEnd bounds the rep window at -- so there is one instant and
-        // nothing recomputes it. A set nothing called over falls back to the
-        // instant this write froze, which is every hold and every set recorded
-        // with the voice off. #172.
+        // instant comes off the set's own frozen cue track -- the same
+        // terminal stamp SetEnd bounds the rep window at -- so there is one
+        // instant and nothing recomputes it. A set nothing called over falls
+        // back to the instant this write froze, which is every hold and every
+        // set recorded with the voice off. #172. Since #141 a guided set the
+        // lifter ended early is no longer in that group: `endSet` speaks
+        // `SetEnd.STOPPED` before freezing the buffer, so the stamp exists.
+        // Which changes the seed by whatever passed between the two, and that
+        // is the few milliseconds of one function -- not a figure worth
+        // claiming a size for.
         val restStartedAtMs =
             RestClockPolicy.startedAtMs(
                 setOverCueAtMs = (SetEnd.of(p.cues) as? SetEnd.Cued)?.atMs,

@@ -39,6 +39,11 @@ import kotlin.test.assertTrue
  * past the cue, measured as last sample minus cue; five of the seventeen never
  * say `Done` at all and are not bounded by this rule. So there is usually
  * somewhere for a spurious detection to land, and whether one does is luck.
+ * Those five are issue #141's subject and every one of them is a set the lifter
+ * failed. A set recorded on this app today says `Set ended` there and IS
+ * bounded; these captures are 0.1.41 and predate that, so what this file
+ * asserts about them is unchanged -- see [FailedSetBoundaryTest] for what the
+ * boundary does and, more usefully, what it does not do.
  * Set 6 is pinned here; set 14 shows the same shape in the same session's
  * export and has no fixture committed. Sets 8 and 10 carry the same published
  * signature and were not analysed.

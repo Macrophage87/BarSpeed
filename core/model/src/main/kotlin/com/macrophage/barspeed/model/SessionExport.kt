@@ -293,6 +293,31 @@ data class SessionExport(
          * `docs/schemas/session-export.schema.json` is the one to read for
          * which key a given lift writes, why the other is absent rather than
          * zero, and the segmentation limit that survives.
+         *
+         * 1.16 carries a SECOND change, under the same number because 1.16
+         * is UNRELEASED -- the rule the 1.13 entry states at length and the
+         * 1.14 entry applied twice more, for its third and fourth changes
+         * (#198). 1.15 is RELEASED and 1.16 is not: v0.1.47 ships 1.15,
+         * read by `git show v0.1.47:core/model/.../SessionExport.kt` rather
+         * than assumed, and no tag carries 1.16. The change (#141): a
+         * guided set the LIFTER ends early speaks and records a terminal
+         * cue, `Set ended`. NOT additive, for the reason the 1.13
+         * `voiceCues` change was not: no key changes type or stops being
+         * written, but an existing array gains a row, and a reader matching
+         * only `Done` to find the end of a set now misses that ending. It
+         * qualifies 1.12's list of unbounded cases -- the third member, a
+         * guided set the lifter ended before the prescription was called
+         * through, no longer occurs. It does NOT tighten any rep list: the
+         * tap that ends a set is the tap that stops the recording, so
+         * nothing can lie past the boundary. What changes is that such a
+         * set stops being an absence. (Two drafts of this paragraph were
+         * wrong and are corrected here rather than quietly reworded: the
+         * first said v0.1.46 shipped 1.15, where that tag carries 1.14; the
+         * second minted 1.16 as a NEW number against a `main` still
+         * declaring 1.15, and #93 landed 1.16 while this branch sat, so the
+         * cue rides under that number rather than beside it.) The published
+         * copy of this log in `docs/schemas/session-export.schema.json` is
+         * the one to read for what a reader must do about it.
          */
         const val SCHEMA_VERSION = "1.16"
 

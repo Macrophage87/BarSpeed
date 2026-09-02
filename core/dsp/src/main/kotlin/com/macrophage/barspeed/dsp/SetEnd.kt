@@ -8,11 +8,18 @@ import com.macrophage.barspeed.model.VoiceCue
  *
  * A guided set goes on recording after the metronome stops prescribing. The
  * eleven sets of session 32 that carry both a `Done` cue and an IMU stream keep
- * recording for 4.3 to 13.7 s past it, measured as last sample minus cue; five
- * of the seventeen never say `Done` at all and are not bounded. The sensor is
- * handled in that window: put down, unclipped, or carried while the load is
- * racked. Movement there segments like any other movement, so it arrives in the
- * rep list as a rep and sets whatever the rep list decides. Issue #125.
+ * recording for 4.3 to 13.7 s past it, measured as last sample minus cue. The
+ * sensor is handled in that window: put down, unclipped, or carried while the
+ * load is racked. Movement there segments like any other movement, so it
+ * arrives in the rep list as a rep and sets whatever the rep list decides.
+ * Issue #125.
+ *
+ * The other five sets of that session say nothing at all. They are exactly the
+ * five the lifter failed, and until issue #141 a guided set ended early emitted
+ * no terminal cue, so the rule had no instant and declined to bound the sets
+ * whose figures were least trustworthy. [STOPPED] is now spoken and recorded at
+ * that ending. What that buys is NOT a tighter rep list -- see [terminalCall]
+ * for why it cannot be -- it is that the set stops being an absence.
  *
  * THE RULE. A detection belongs to the set when its DRIVE BEGAN at or before
  * the instant the set was called over. Nothing else is asked of it.
@@ -27,15 +34,17 @@ import com.macrophage.barspeed.model.VoiceCue
  * ## The three decisions this type makes, and why
  *
  * **A set with no end cue is [NotCued], and nothing is bounded.** An ad-hoc set
- * with the voice off never says `Done`, and neither does a guided set the
- * lifter ended before the prescription was called through -- five of the
- * seventeen sets of session 32. There is then no instant to bound at and none
- * may be invented -- the end of the stream is when the lifter got round to
- * tapping, not when the set ended, and the last sample would be a boundary that
- * excludes nothing while looking like a rule that ran. [detectionsAfter]
- * reports null there rather than 0, because "nothing said when the set ended"
- * and "the set ended and nothing came after" are different facts and a reader
- * of a stored analysis has to be able to tell them apart.
+ * with the voice off says neither terminal word, and neither does any set
+ * recorded before the app wrote cue tracks. There is then no instant to bound
+ * at and none may be invented -- the end of the stream is when the lifter got
+ * round to tapping, not when the set ended, and the last sample would be a
+ * boundary that excludes nothing while looking like a rule that ran.
+ * [detectionsAfter] reports null there rather than 0, because "nothing said
+ * when the set ended" and "the set ended and nothing came after" are different
+ * facts and a reader of a stored analysis has to be able to tell them apart.
+ *
+ * A guided set the lifter ended early used to be in that group and no longer
+ * is (#141): it now says [STOPPED] and reports 0.
  *
  * **The boundary is the cue's own timestamp, not the end of its utterance.**
  * `VoiceCue` carries one instant, taken when the app decided to speak; TTS
@@ -63,15 +72,18 @@ import com.macrophage.barspeed.model.VoiceCue
  *
  * ## Which cue, and on which clock
  *
- * [DONE] is the only cue in the vocabulary that means the set is over; every
- * other one calls a stroke or counts one. `Time` ends a TIMED set, and a timed
- * set publishes no rep list at all, so widening the vocabulary to it would add a
- * case with nothing in it.
+ * [TERMINAL_CUES] is the whole of the vocabulary that means the set is over --
+ * [DONE] when the prescription was called through, [STOPPED] when the lifter
+ * ended it before that. Every other cue calls a stroke or counts one. `Time`
+ * ends a TIMED set, and a timed set publishes no rep list at all, so widening
+ * the vocabulary to it would add a case with nothing in it.
  *
- * The FIRST `Done`, not the last. The boundary is the moment the lifter was told
- * to stop, and a second `Done` cannot un-tell them. Every capture held here
- * carries exactly one; taking the first makes the rule total without depending
- * on that. The known cost is on a sensor-counted set whose count runs ahead: the
+ * The EARLIEST terminal cue by instant, not the last and not the first in list
+ * order. The boundary is the moment the lifter was told to stop, and a second
+ * telling cannot un-tell them. Every capture held here carries at most one, and
+ * cue tracks are written in the order they are spoken, so on every one of them
+ * the earliest and the first are the same row; taking the earliest makes the
+ * rule total without depending on either. The known cost is on a sensor-counted set whose count runs ahead: the
  * app calls `Done` early, and reps performed after it are then excluded from the
  * figures as well as from the count. That set already published a wrong rep
  * count; this rule propagates that error into the velocities rather than
@@ -165,8 +177,10 @@ sealed interface SetEnd {
          */
         val TERMINAL_CUES = setOf(DONE, STOPPED)
 
-        fun of(cues: List<VoiceCue>): SetEnd =
-            cues.firstOrNull { it.cue == DONE }?.let { Cued(it.timestampMs) } ?: NotCued
+        fun of(cues: List<VoiceCue>): SetEnd {
+            val terminal = cues.filter { it.cue in TERMINAL_CUES }.minByOrNull { it.timestampMs }
+            return terminal?.let { Cued(it.timestampMs) } ?: NotCued
+        }
 
         /**
          * What to say and write when a set ends, or null when nothing should
@@ -189,6 +203,18 @@ sealed interface SetEnd {
          * added to [TERMINAL_CUES] later would otherwise get a duplicate
          * boundary written beside it, and the duplicate would be the earlier
          * instant's neighbour rather than a visible defect.
+         *
+         * WHAT THIS DOES NOT BUY, stated here because the issue that asked for
+         * it assumed otherwise. `endSet` cancels the sample collectors before
+         * it reads the clock, so the last sample of a tap-ended set is never
+         * later than the tap and a boundary placed there cannot exclude a
+         * detection -- on session 32's five failed sets, or on any other.
+         * Measured on that session: the eleven completed sets record 4.3 to
+         * 13.7 s past `Done`, the five failed ones 0.482 to 0.832 s past their
+         * last cue. What the boundary changes is that [detectionsAfter] answers
+         * 0 instead of null, that `RestClockPolicy`'s seed instant exists, that
+         * an analysis no longer has to exclude the failed sets, and that the
+         * lifter hears the set end.
          */
         fun terminalCall(guided: Boolean, spoken: List<VoiceCue>): SpokenCall? =
             if (guided && of(spoken) is NotCued) SpokenCall(STOPPED, listOf(STOPPED)) else null

@@ -51,7 +51,15 @@ data class ScriptedCall(
  * and second for second.
  */
 object CadenceVoice {
-    /** The cue that ends a set, and the only one that means the set is over. */
+    /**
+     * The cue the guide speaks when the prescription has been called through.
+     *
+     * One of TWO words that mean a set is over, not the only one: a guided set
+     * the LIFTER ends early speaks `SetEnd.STOPPED` instead, at the tap rather
+     * than from this script (#141). `SetEnd.TERMINAL_CUES` is the whole
+     * vocabulary and the one thing to read for it. Nothing on the guide's own
+     * schedule ever says the other word, which is why only this one is here.
+     */
     const val DONE = "Done"
 
     /**
