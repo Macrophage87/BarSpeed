@@ -81,11 +81,20 @@ class SetCardValuesTest {
     }
 
     @Test
-    fun `a stated zero against a plan that declared no load strikes nothing`() {
+    fun `a stated zero against a plan that declared no load draws no load at all`() {
         // SetLoadPolicy.resolve reads a null declaration as nothing added, so
-        // a stated 0 records exactly what the plan asked for.
-        assertNull(
-            load(values(plannedLoadKg = null, statedLoadKg = 0.0, declaredLoadKg = null)).planned,
+        // a stated 0 records exactly what the plan asked for and there is
+        // nothing to strike. The card draws no load figure for a loaded lift
+        // the plan gave no load for, before this change and after it, so the
+        // silence is an ABSENT value and not an unstruck one -- which is why
+        // this asserts the whole line rather than one field of a value that
+        // is not there.
+        assertEquals(
+            listOf(
+                SetCardValue(stated = "5", suffix = "reps"),
+                SetCardValue(stated = "4010", prefix = "tempo"),
+            ),
+            values(plannedLoadKg = null, statedLoadKg = 0.0, declaredLoadKg = null),
         )
     }
 
