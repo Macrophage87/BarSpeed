@@ -206,11 +206,10 @@ object SetAnalyzer {
         // truncation.
         //
         // Spans arrive in drive order, so this removes a suffix and no
-        // retained rep is renumbered. The pause figures below were measured by
-        // the segmenter against every span it found, so a kept rep's
-        // RepSpan.toNextMovementS still ends where the excluded movement began
-        // -- which is what happened: the stillness did end when the sensor
-        // moved again, whatever that movement was.
+        // retained rep is renumbered. No pause figure depends on the
+        // exclusion: the only pause published is the turnaround between a
+        // rep's own two phases, which is bounded by that rep and cannot reach
+        // an excluded movement.
         val within = spans.filterIndexed { idx, _ -> setEnd.startedWithinSet(driveStartMs[idx]) }
         val reps = within.mapIndexed { idx, span -> repMetrics(idx, span, series, direction, loadKg, config) }
         val velocityLoss = velocityLossPct(reps)
