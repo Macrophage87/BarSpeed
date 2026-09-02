@@ -559,4 +559,50 @@ class SensorCapturePolicyTest {
             "a shortfall the enum declares that no hardware state produces, or the reverse",
         )
     }
+
+    /**
+     * CHARACTERIZATION, field-37 (v0.1.48, 2026-09-02, issue #213). Every one
+     * of that session's thirteen sets armed both roles and received one, and
+     * every rule in this file answers about it exactly as designed -- which is
+     * why nothing in this file moves for #213.
+     *
+     * The block, read out of that session's own `session.json` rather than
+     * transcribed from the issue: `{"count": 2, "expected": ["a", "b"],
+     * "present": ["a"], "analysedRole": "a"}`, byte-identical on all thirteen
+     * sets, with `analysedFellBack` absent from every one.
+     *
+     * Absent is CORRECT there, and pinning it is the point. Role `a` was both
+     * the role the set armed for analysis and the role that streamed, so
+     * #207's fallback had nothing to do and field-37 is not a second instance
+     * of it. The session lost role `b`'s capture on thirteen sets with every
+     * decision here answering correctly, which is the gap #213 is filed for:
+     * nothing in this file can say that a role was ARMED AND SILENT, and
+     * nothing could have said so before the set began.
+     *
+     * Kept GREEN by the fix rather than rewritten by it. What it pins is the
+     * set of answers #213 does not move.
+     */
+    @Test
+    fun `field-37 armed both roles and received one, and every existing rule answers as designed`() {
+        val armed = listOf(SensorRole.A, SensorRole.B)
+
+        assertEquals(
+            listOf(SensorRole.A),
+            SensorCapturePolicy.present(armed, setOf(SensorRole.A)),
+            "field-37: role b put no samples in a buffer on any of the thirteen sets",
+        )
+        assertEquals(
+            AnalysedStream(SensorRole.A, fellBack = false),
+            SensorCapturePolicy.analysedStream(SensorRole.A, listOf(SensorRole.A)),
+            "field-37: the armed role streamed, so nothing fell back and no flag is published",
+        )
+        assertNull(
+            SensorCapturePolicy.roster(
+                pairedImuAddresses = listOf(a, b),
+                preferredAddress = a,
+                roleByAddress = mapOf(a to SensorRole.A, b to SensorRole.B),
+            ).shortfall,
+            "field-37: the pair was labelled apart, so no roster shortfall was in the way",
+        )
+    }
 }
