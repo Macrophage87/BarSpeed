@@ -235,6 +235,23 @@ internal fun applyDurationCorrection(
 internal fun standingAddedKg(s: RecordState): Double? = s.statedLoadKg ?: s.weightUnit.parseToKg(s.loadInput)
 
 /**
+ * Whether the set coming up is a continuation of the block just finished, for
+ * the load correction's carry (#205).
+ *
+ * The plan's frozen answer where there is a planned slot, the exercise the
+ * lifter has selected where there is not; [SetLoadPolicy.correctionCarryBlock]
+ * holds the rule. `nextSlot` and `selectedExerciseId` are read LIVE rather than
+ * frozen with the write, so switching exercise during the rest is a decision
+ * this sees.
+ */
+internal fun carryBlock(s: RecordState): Boolean = SetLoadPolicy.correctionCarryBlock(
+    hasPlannedNext = s.nextSlot != null,
+    plannedSameBlock = s.lastSetSameBlock,
+    lastExerciseId = s.lastSetExerciseId,
+    comingExerciseId = s.selectedExerciseId,
+)
+
+/**
  * The state a rest-screen load correction leaves behind (#205).
  *
  * [addedKg] is the corrected ADDED load; the total the row stores is computed
@@ -314,7 +331,7 @@ internal fun applyLoadCorrection(
     if (after == before) return
     val total = SetLoadPolicy.correctedTotalKg(feedback.loadKg, feedback.addedKg, after)
     val carryFollows =
-        SetLoadPolicy.carryFollowsCorrection(standingAddedKg(s0), before, s0.weightUnit, s0.lastSetSameBlock)
+        SetLoadPolicy.carryFollowsCorrection(standingAddedKg(s0), before, s0.weightUnit, carryBlock(s0))
     stateFlow.value = loadCorrectedState(s0, after, carryFollows)
     appScope.launch(Dispatchers.Main.immediate) {
         if (ratings.correctLoad(total) == null) {

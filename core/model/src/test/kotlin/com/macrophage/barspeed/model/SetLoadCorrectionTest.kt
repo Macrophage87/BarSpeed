@@ -120,6 +120,64 @@ class SetLoadCorrectionTest {
     }
 
     @Test
+    fun `an ad-hoc set carries into the same movement`() {
+        // No planned slot on either side, so the plan's own block answer is
+        // false and cannot be the whole rule: ad-hoc is the session where one
+        // load repeats set after set, because nothing re-seeds the load box
+        // from a declaration.
+        assertTrue(
+            SetLoadPolicy.correctionCarryBlock(
+                hasPlannedNext = false,
+                plannedSameBlock = false,
+                lastExerciseId = "back_squat",
+                comingExerciseId = "back_squat",
+            ),
+        )
+    }
+
+    @Test
+    fun `an ad-hoc set does not carry into a different movement`() {
+        assertFalse(
+            SetLoadPolicy.correctionCarryBlock(
+                hasPlannedNext = false,
+                plannedSameBlock = false,
+                lastExerciseId = "back_squat",
+                comingExerciseId = "bench_press",
+            ),
+        )
+        assertFalse(
+            SetLoadPolicy.correctionCarryBlock(
+                hasPlannedNext = false,
+                plannedSameBlock = false,
+                lastExerciseId = null,
+                comingExerciseId = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `a planned next set is decided by the plan, not by the selection`() {
+        // The chips can hold a movement the plan is not about to run, so where
+        // there IS a declaration it is the declaration that decides.
+        assertTrue(
+            SetLoadPolicy.correctionCarryBlock(
+                hasPlannedNext = true,
+                plannedSameBlock = true,
+                lastExerciseId = "back_squat",
+                comingExerciseId = "bench_press",
+            ),
+        )
+        assertFalse(
+            SetLoadPolicy.correctionCarryBlock(
+                hasPlannedNext = true,
+                plannedSameBlock = false,
+                lastExerciseId = "back_squat",
+                comingExerciseId = "back_squat",
+            ),
+        )
+    }
+
+    @Test
     fun `the carry does not follow across an exercise change`() {
         // Every other carry on this transition is bounded by the block the
         // statement was made in -- standingStatedAddedKg, standingAdjustedTempo,
