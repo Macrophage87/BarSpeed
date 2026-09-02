@@ -198,6 +198,33 @@ class SetCardValuesTest {
         )
     }
 
+    /**
+     * RED (#227 item 1). loadLabel's bodyweight arm fires ahead of the timed
+     * gate #227 item 4 added, and does not itself know whether anything was
+     * prescribed: a null [plannedLoadKg] resolves through
+     * [BodyweightLoadDisplay.label] to the bare "BW" whether that null means
+     * "no load was declared on a real prescription" or "nothing was ever
+     * prescribed at all" -- an APPENDED body-weight set is the second case,
+     * and before the fix it struck a "BW" the plan never spoke of, the same
+     * failure the loaded population already gets a test for in
+     * `an appended set states its load and strikes nothing`.
+     */
+    @Test
+    fun `an appended body-weight set with an added load strikes no planned BW`() {
+        val appended =
+            values(
+                bodyweight = true,
+                plannedLoadKg = null,
+                statedLoadKg = null,
+                declaredLoadKg = 10.0,
+                plannedReps = null,
+                reps = 8,
+                plannedTempo = null,
+                tempo = null,
+            )
+        assertEquals(SetCardValue(stated = "BW + 10 kg"), load(appended))
+    }
+
     @Test
     fun `a changed rep count strikes the count and keeps one word`() {
         assertEquals(
