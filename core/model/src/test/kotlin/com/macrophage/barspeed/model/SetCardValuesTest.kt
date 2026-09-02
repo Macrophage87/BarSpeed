@@ -27,6 +27,7 @@ class SetCardValuesTest {
         timed: Boolean = false,
         unit: WeightUnit = WeightUnit.KG,
         side: String? = null,
+        plannedSide: String? = null,
         plannedLoadKg: Double? = 90.0,
         statedLoadKg: Double? = null,
         declaredLoadKg: Double? = 90.0,
@@ -42,6 +43,7 @@ class SetCardValuesTest {
         timed = timed,
         unit = unit,
         side = side,
+        plannedSide = plannedSide,
         plannedLoadKg = plannedLoadKg,
         statedLoadKg = statedLoadKg,
         declaredLoadKg = declaredLoadKg,
@@ -95,8 +97,45 @@ class SetCardValuesTest {
     }
 
     @Test
-    fun `the side leads the line and is never struck`() {
+    fun `the side leads the line`() {
         assertEquals(SetCardValue(stated = "Left"), values(side = "left").first())
+    }
+
+    /**
+     * DIFFERENTIAL. The card struck nothing for a side before #215, because
+     * there was nothing to strike it against: the value drawn was a copy of
+     * the plan's own declaration. The line this replaces asserted the side was
+     * "never struck", which was a true statement about a card that could not
+     * show a deviation and is DELETED rather than reworded -- keeping it would
+     * pin the defect.
+     */
+    @Test
+    fun `an arm the lifter swapped is struck against the one the plan asked for`() {
+        assertEquals(
+            SetCardValue(stated = "Right", planned = "Left"),
+            values(side = "right", plannedSide = "left").first(),
+        )
+    }
+
+    /** Working the arm the plan asked for is not a deviation and reads as one figure. */
+    @Test
+    fun `an arm worked as prescribed strikes nothing`() {
+        assertEquals(
+            SetCardValue(stated = "Left"),
+            values(side = "left", plannedSide = "left").first(),
+        )
+    }
+
+    /**
+     * An APPENDED set has no prescription at all, so its side has nothing to
+     * be struck against -- the same rule that keeps its load from striking.
+     */
+    @Test
+    fun `a set the plan never prescribed strikes no side`() {
+        assertEquals(
+            SetCardValue(stated = "Right"),
+            values(side = "right", plannedSide = null).first(),
+        )
     }
 
     @Test
