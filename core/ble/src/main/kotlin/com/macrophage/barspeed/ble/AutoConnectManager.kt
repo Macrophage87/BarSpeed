@@ -28,8 +28,8 @@ class AutoConnectManager(
     private val scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    val imuClient = WitmotionClient(context)
-    val hrmClient = HrmClient(context)
+    val imuClient = WitmotionClient(context, clock)
+    val hrmClient = HrmClient(context, clock)
 
     /**
      * The second accelerometer, issue #156.
@@ -49,7 +49,7 @@ class AutoConnectManager(
      * untouched. This is the sibling, and the app decides which physical unit
      * it maintains.
      */
-    val imuClientB = WitmotionClient(context)
+    val imuClientB = WitmotionClient(context, clock)
 
     val imuState: StateFlow<ConnectionState> = imuClient.connectionState
     val imuStateB: StateFlow<ConnectionState> = imuClientB.connectionState
@@ -74,6 +74,12 @@ class AutoConnectManager(
      * `onDescriptorWrite` would have said whether the subscribe took -- so the
      * only evidence a unit is feeding the app is a frame.
      *
+     * IT IS A FACT ABOUT THE LINK'S CURRENT DEVICE, not about the link (#225
+     * item 9). Re-pointing a link at another unit clears it, and so does
+     * [stop]: frames are tested before the connection state, so an instant
+     * carried across a re-point would read as DELIVERING on evidence from a
+     * sensor this link is no longer holding.
+     *
      * The JUDGEMENT is deliberately not here. `ArmedSilencePolicy` in
      * `:core:model` turns this instant and a [ConnectionState] into a word,
      * because that module has tests and this one has no test source set at
@@ -91,19 +97,23 @@ class AutoConnectManager(
      * link silent until it has been armed for its own window, so a unit two
      * seconds into a connect is not accused of being dead.
      *
-     * THE TWO LINKS ARE NOT SYMMETRIC, and the asymmetry is a real limitation
-     * rather than a shape. The second link's instant moves whenever
-     * [setSecondaryImuAddress] re-points it, which is the moment its wait
-     * actually restarts. The first link's is taken ONCE, when this object is
-     * constructed, and no later write moves it: [pairAndConnect] connects that
-     * link, and [setPreferredAndConnect] and [forgetAndDrop] drop it for
-     * `maintain` to re-point, all without touching this instant. So the
-     * ANALYSED link has a real grace window only in the first seconds of the
-     * process; after that its age is the process's age and the grace floor is
-     * effectively spent. The direction of that error is towards saying
-     * something -- a link re-pointed an hour in is judged immediately rather
-     * than given three seconds -- which is why it is recorded here rather
-     * than fixed under an issue about telling the lifter anything at all.
+     * BOTH LINKS MOVE ON A RE-POINT since #225 item 9. Each instant is
+     * rewritten wherever its link is pointed at a device: the second link's in
+     * [setSecondaryImuAddress], the analysed link's in [pairAndConnect] and at
+     * the two drops -- [setPreferredAndConnect] and [forgetAndDrop] -- that
+     * hand it back to `maintain` to re-point. Until then only the second one
+     * ever moved, so the analysed link's instant was the PROCESS's start time
+     * for the life of the process, its grace was spent within seconds of
+     * launch, and a unit paired an hour in was judged immediately rather than
+     * given three seconds.
+     *
+     * WHAT IS STILL NOT A REAL ARMING INSTANT: [stop] followed by [start]
+     * writes neither, and `maintain` re-points a link on its own whenever the
+     * preferred address changes underneath it without calling through any of
+     * the four sites above. So this is when the link was last DELIBERATELY
+     * pointed somewhere, which is a floor on the arming and not the arming
+     * itself. The direction of that remaining error is towards saying
+     * something rather than excusing a dead unit.
      */
     val imuArmedAtMs: StateFlow<Long> = imuArmedAt
 
@@ -153,15 +163,14 @@ class AutoConnectManager(
      * "nothing paired yet, look again in three seconds", and turning that into
      * "disconnect" would change what happens to the analysed sensor and the
      * strap while the registry is momentarily empty.
+     *
+     * The frame instant goes and the grace window restarts -- [rearm] states
+     * both rules and why they differ on a null address.
      */
     fun setSecondaryImuAddress(address: String?) {
         if (secondaryImuAddress.value == address) return
         secondaryImuAddress.value = address
-        // The wait restarts here, so the grace window restarts with it (#213).
-        // Only on a real address: pointing the link at nothing arms nothing,
-        // and moving the instant then would hand three fresh seconds of
-        // excused silence to a link that is about to come down.
-        if (address != null) imuArmedAtB.value = clock()
+        rearm(imuFrameAtB, imuArmedAtB, pointedAtDevice = address != null)
         // Dropped on EVERY change, not only on null. The loop's Connected
         // branch waits for the link to fall over before doing anything else,
         // so a client already holding the old device would sit there for the
@@ -199,9 +208,12 @@ class AutoConnectManager(
         // the slowest. Reasoned from source: nothing here executes a GATT
         // client, and no device has been watched doing it.
         //
-        // The sample's own timestamp rather than a second clock read.
-        // `WitmotionClient` stamps it from the same wall clock, so no two
-        // clocks can disagree about one frame.
+        // The sample's own timestamp rather than a second clock read. Both
+        // `WitmotionClient`s are CONSTRUCTED WITH THIS SAME CLOCK, so no two
+        // clocks can disagree about one frame (#225 item 10). Before that this
+        // class took a `clock` no caller passed and left the clients on their
+        // own default, so the sentence above was true of the default and of
+        // nothing else -- which is the only configuration anything ran.
         if (livenessJob == null) {
             livenessJob =
                 scope.launch {
@@ -229,6 +241,38 @@ class AutoConnectManager(
         if (previous == null || abs(frameAtMs - previous) >= FRAME_COALESCE_MS) held.value = frameAtMs
     }
 
+    /**
+     * A link is being pointed somewhere else: forget the frame it last
+     * delivered, and restart its grace window if it now has a device (#225
+     * item 9).
+     *
+     * THE FRAME INSTANT IS DROPPED ON EVERY RE-POINT, INCLUDING TO NOTHING.
+     * [imuFrameAtMs] is a fact about the link's CURRENT device, and frames are
+     * tested before the connection state, so a link left holding the instant
+     * of the unit it no longer points at reads as DELIVERING for up to
+     * `ArmedSilencePolicy.SILENT_AFTER_MS` on evidence from a different
+     * physical sensor. That is the one direction of error this whole reading
+     * exists to remove.
+     *
+     * The arming instant moves only where the link now HAS a device: pointing
+     * it at nothing arms nothing, and moving the instant then would hand three
+     * fresh seconds of excused silence to a link that is about to come down.
+     *
+     * BOTH LINKS USE THIS NOW. Before #225 only the second link's arming
+     * instant was ever rewritten, so the analysed link's was the process's
+     * start time for the life of the process and a unit paired an hour in was
+     * judged with no grace at all. The three sites that re-point it --
+     * [pairAndConnect], [setPreferredAndConnect] and [forgetAndDrop] -- call
+     * this for the same reason [setSecondaryImuAddress] does.
+     *
+     * NOTHING IN THIS REPOSITORY RUNS THIS. `:core:ble` has no test source
+     * set; this change is compile- and lint-gated only, not test-gated.
+     */
+    private fun rearm(frameAt: MutableStateFlow<Long?>, armedAt: MutableStateFlow<Long>, pointedAtDevice: Boolean) {
+        frameAt.value = null
+        if (pointedAtDevice) armedAt.value = clock()
+    }
+
     fun stop() {
         imuJob?.cancel()
         imuJobB?.cancel()
@@ -241,6 +285,14 @@ class AutoConnectManager(
         imuClient.disconnect()
         imuClientB.disconnect()
         hrmClient.disconnect()
+        // Neither link holds a device any more, so neither frame instant is a
+        // fact about one (#225 item 9). Left standing, a `start()` after this
+        // would read as DELIVERING on a frame from before the stop. The arming
+        // instants are NOT touched: nothing is armed here, and `start()` does
+        // not point either link at a device either -- `maintain` does, and it
+        // is not observable from this call.
+        imuFrameAt.value = null
+        imuFrameAtB.value = null
     }
 
     /**
@@ -261,6 +313,10 @@ class AutoConnectManager(
     suspend fun pairAndConnect(device: KnownDevice) {
         registry.pair(device)
         if (registry.preferredNow(device.role)?.address == device.address) {
+            // The analysed link is being pointed at this unit, so its frame
+            // instant stops being a fact and its grace window restarts (#225
+            // item 9).
+            if (device.role == DeviceRole.IMU) rearm(imuFrameAt, imuArmedAt, pointedAtDevice = true)
             clientFor(device.role).connect(device.address)
         }
     }
@@ -301,7 +357,13 @@ class AutoConnectManager(
         // also nulls the address the third link reads, so waking it cannot
         // have it reconnect to a unit another link is now on.
         if (DeviceLinkRole.SECOND in drop) setSecondaryImuAddress(null)
-        if (DeviceLinkRole.ANALYSED in drop) imuClient.disconnect()
+        if (DeviceLinkRole.ANALYSED in drop) {
+            // Dropped so `maintain` re-points it at the newly preferred
+            // address, which is a real one here -- so the frame instant stops
+            // being a fact and the grace window restarts (#225 item 9).
+            rearm(imuFrameAt, imuArmedAt, pointedAtDevice = true)
+            imuClient.disconnect()
+        }
         if (DeviceLinkRole.HEART_RATE in drop) hrmClient.disconnect()
     }
 
@@ -341,7 +403,13 @@ class AutoConnectManager(
         // link reads, so waking it cannot have it reconnect to the unit that
         // was just forgotten.
         if (DeviceLinkRole.SECOND in drop) setSecondaryImuAddress(null)
-        if (DeviceLinkRole.ANALYSED in drop) imuClient.disconnect()
+        if (DeviceLinkRole.ANALYSED in drop) {
+            // As in setPreferredAndConnect, except that the forget may leave
+            // nothing to promote: with no bar sensor left the link is pointed
+            // at nothing, and arming nothing is not an arming (#225 item 9).
+            rearm(imuFrameAt, imuArmedAt, pointedAtDevice = pairedImu.any { it != device.address })
+            imuClient.disconnect()
+        }
         if (DeviceLinkRole.HEART_RATE in drop) hrmClient.disconnect()
     }
 

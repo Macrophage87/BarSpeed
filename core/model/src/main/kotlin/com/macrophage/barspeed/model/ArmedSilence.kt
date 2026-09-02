@@ -227,20 +227,21 @@ object ArmedSilencePolicy {
      * report against and neither may be reported: this returns an empty map
      * for both, and [soleSilence] is what covers them.
      *
-     * C1 OF #225 KEEPS TODAY'S ANSWER, which is that BOTH links are floored by
-     * the LATER of the two arming instants. That is `RecordState.armedDelivery`'s
-     * `maxOf`, lifted unchanged so the move can be shown to have changed
-     * nothing; item 8's differential is what makes each link answer to its own.
+     * EACH LINK ANSWERS TO ITS OWN ARMING (#225 item 8). Before that this took
+     * the LATER of the two instants for both, so re-pointing the second link
+     * handed three fresh seconds of excused silence to the first -- a figure
+     * measured against the wrong link, and the reason a genuinely dead
+     * analysed unit could stay unreported while the lifter fiddled with the
+     * other one. The per-sensor dots on Home and Devices already read each
+     * link's own instant; this is the same rule for the card.
      */
     fun liveDeliveryByRole(
         analysed: SensorRole?,
         secondary: SensorRole?,
         links: ArmedLinks,
         nowMs: Long,
-    ): Map<SensorRole, ArmedDelivery> {
-        val floor = maxOf(links.analysedArmedAtMs, links.secondaryArmedAtMs)
-        return byRole(analysed, secondary, links, floor, floor, nowMs)
-    }
+    ): Map<SensorRole, ArmedDelivery> =
+        byRole(analysed, secondary, links, links.analysedArmedAtMs, links.secondaryArmedAtMs, nowMs)
 
     /**
      * The same question at the instant a set ENDED, with the floor a stored
@@ -268,12 +269,8 @@ object ArmedSilencePolicy {
         analysed,
         secondary,
         links,
-        // C1 OF #225 KEEPS TODAY'S ANSWER: the set's own start floors both
-        // links, which is what `captureAt` passed before this function
-        // existed. Item 8's differential is what makes each link's own arming
-        // instant count, and it is pushed red before it is made green.
-        setStartedAtMs,
-        setStartedAtMs,
+        storedGraceFloor(setStartedAtMs, links.analysedArmedAtMs),
+        storedGraceFloor(setStartedAtMs, links.secondaryArmedAtMs),
         setEndedAtMs,
     )
 
@@ -287,8 +284,10 @@ object ArmedSilencePolicy {
      * address. Taking the whole bundle rather than three loose arguments is
      * what stops a caller handing this the second link's frame instant.
      *
-     * C1 OF #225 KEEPS TODAY'S ANSWER here too -- the set's own start is the
-     * floor, exactly as `captureAt` passed it.
+     * The floor is [storedGraceFloor]'s, over the ANALYSED link's arming
+     * instant -- the same rule [storedDeliveryByRole] uses, so the row a
+     * one-sensor lifter gets and the row a two-sensor lifter gets cannot mean
+     * different things by the same word.
      */
     fun storedSoleSilence(
         roster: SensorRoster,
@@ -301,9 +300,34 @@ object ArmedSilencePolicy {
         pairedImuAddresses = pairedImuAddresses,
         state = links.analysedState,
         lastFrameAtMs = links.analysedFrameAtMs,
-        armedAtMs = setStartedAtMs,
+        armedAtMs = storedGraceFloor(setStartedAtMs, links.analysedArmedAtMs),
         nowMs = setEndedAtMs,
     )
+
+    /**
+     * The [ArmedDelivery.TOO_SOON] grace floor for a reading STORED on a set
+     * that has ended: the EARLIER of when the set began and when that link was
+     * armed (#225 item 8).
+     *
+     * GRACE IS A LIVE-WARNING CONCEPT. Before a set it stops the app accusing a
+     * link two seconds into its connect, which is how a warning becomes
+     * something the lifter learns to ignore. A row that has already been
+     * written has nothing to act on, and what the archive wants is the most
+     * informative word the app can honestly give -- so the floor reaches back
+     * past the set to when the link was actually armed, and a two-second set on
+     * a link armed an hour earlier and silent throughout stores
+     * [ArmedDelivery.LINKED_SILENT] rather than "the app does not know yet".
+     *
+     * The set's start is a CEILING on it, not the floor itself. A link armed
+     * mid-set has still had the whole span the app was recording across to
+     * produce a frame, and it is the span this row is about; taking the later
+     * instant instead would excuse a link on the strength of an arming that
+     * happened after the set the row describes had already begun.
+     *
+     * Private because nothing outside this object should be choosing a floor:
+     * the two stored readings are the callers, and they must not diverge.
+     */
+    private fun storedGraceFloor(setStartedAtMs: Long, armedAtMs: Long): Long = minOf(setStartedAtMs, armedAtMs)
 
     /** The lookup both readings share, so they cannot pair a role differently. */
     private fun byRole(
@@ -404,14 +428,18 @@ object ArmedSilencePolicy {
      * The state and the frame instant are that ONE link's, and the grace floor
      * is whatever instant the caller passes. It is asked at both instants
      * [deliveryOf] is -- when the screen draws, and when the set ends -- so ONE
-     * FUNCTION DECIDES BOTH. What that does NOT make identical is the grace
-     * floor: the card is handed `RecordState.imuArmedAtMs`, which
-     * `AutoConnectManager` writes once at construction and never rewrites for
-     * this link, so it is the PROCESS's start instant rather than when that
-     * link was armed, and the stored reading is handed the set's own start --
-     * so a set shorter than [SILENT_AFTER_MS] can be told
-     * [ArmedDelivery.NOT_LINKED] on screen and store [ArmedDelivery.TOO_SOON].
-     * Nor is the stored answer the card's answer in the other direction: what
+     * FUNCTION DECIDES BOTH. The card passes `RecordState.imuArmedAtMs`
+     * directly; the stored reading goes through [storedSoleSilence], whose
+     * floor reaches back to the earlier of that instant and the set's start.
+     * The two therefore agree about a link armed before the set began and can
+     * differ only about one armed DURING it, where the row is floored by the
+     * span it describes. (An earlier draft of this paragraph said the card's
+     * instant was the process's start and that a short set could read
+     * [ArmedDelivery.NOT_LINKED] on screen and store [ArmedDelivery.TOO_SOON];
+     * #225 moved both halves and the sentence is deleted rather than
+     * reworded.)
+     * The stored answer is still not the card's answer in the other
+     * direction: what
      * is recorded is gated on the set's analysed buffer being empty (#224
      * round 1), which the card has no equivalent of, because a card drawn
      * before the set has no buffer to read.
@@ -453,15 +481,24 @@ object ArmedSilencePolicy {
      * trains most, which is the failure this issue is.
      *
      * [demoMode] takes no default either, and for the same reason (#225 item
-     * 7). C1 OF #225 CARRIES IT WITHOUT CONSULTING IT, so this refactor
-     * changes no sentence; the differential that silences the card in demo
-     * mode is pushed red before it is made green. The suppression goes with
-     * it: `UnusedParameter` is on in this repository, and a parameter declared
-     * one commit before it is honoured is the price of pushing the red at its
-     * own SHA.
+     * 7). IN DEMO MODE THERE IS NOTHING TO SAY: `startDemoStream` fabricates
+     * samples with no sensor present, so the set DOES record and "It will
+     * record nothing this set" is the one claim demo mode makes FALSE rather
+     * than merely fictional -- `SensorDot` beside this card already takes
+     * `demoActive` for that reason. The suppression is whole rather than per
+     * state: with no unit paired there is nothing to switch on, bring near the
+     * phone or power-cycle, so every sentence [advice] can produce names a
+     * remedy the lifter cannot carry out.
+     *
+     * It is the SENTENCE that is suppressed and not the reading. What a set
+     * recorded in demo mode stores is decided at the set's end by
+     * [storedDeliveryByRole] and [storedSoleSilence], which do not take this
+     * flag: a demo set's buffer is not empty, so no word is stored for it
+     * anyway, and gating the archive on a display flag is how a display
+     * decision comes to change what is recorded.
      */
-    @Suppress("UnusedParameter")
     fun message(silent: Map<SensorRole, ArmedDelivery>, sole: ArmedDelivery?, demoMode: Boolean): String? {
+        if (demoMode) return null
         val sentences =
             silent.entries.mapNotNull { (role, delivery) -> advice(delivery, role) } +
                 listOfNotNull(sole?.let { advice(it, null) })

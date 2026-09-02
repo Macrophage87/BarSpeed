@@ -489,6 +489,28 @@ data class SessionExport(
          * ad-hoc set and on an appended set for the ordinary reason -- nothing
          * prescribed any of them a side. The raw archive's `meta.json` moves
          * with it, as it did for `analysedFellBack` and `sensorsSilent`.
+         *
+         * 1.17 carries a SEVENTH change (#225), under the same number and for
+         * the reason the entries above give: 1.17 is UNRELEASED and the
+         * newest tag v0.1.48 ships 1.16. The ordinal counts against this file
+         * as landed: #223's is the fourth, #224's `soleSilent` is the fifth
+         * and #215's `plannedSide` is the sixth. The change (#225): the grace
+         * floor behind `tooSoon` in `silent` and `soleSilent` is the instant
+         * the app last DELIBERATELY pointed that link at a device, rather
+         * than the start of the set -- a floor on the arming, not the arming
+         * itself. The reading a set stores was floored by the set's own
+         * start, so a two-second set stored `tooSoon` -- "the app does not
+         * know yet" -- about a bar sensor the app had watched deliver nothing
+         * all session, and that row is written exactly when the set captured
+         * nothing, which makes it the row a reader consults to find out why.
+         * NOT additive on the terms 1.4 and 1.5 were not: no key changes
+         * type or stops being written, both keys carry the same four words,
+         * and nothing a reader validates against moves -- but the VALUE
+         * these two keys carry changes on short sets, which is where they
+         * were most often written, and `tooSoon` now means what it says. It
+         * does NOT apply retroactively, for 1.16's reason: the reading is
+         * frozen into the set's row when the set is RECORDED. The published
+         * descriptions of both keys are corrected with it.
          */
         const val SCHEMA_VERSION = "1.17"
 

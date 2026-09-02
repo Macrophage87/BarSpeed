@@ -957,14 +957,16 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
  *
  * It re-answers once a second because the answer changes with time and nothing
  * else would drive a recomposition, and it says NOTHING for three seconds
- * after the SECOND link is pointed at a device, the only arming instant
- * `AutoConnectManager` rewrites: `ArmedSilencePolicy.SILENT_AFTER_MS` is the
- * grace, and accusing a link two seconds into a connect is how a warning
- * becomes something the lifter learns to ignore. The role-keyed floor is that
- * instant only where the second link was just re-pointed, and the process's
- * start otherwise; the one-unit reading (#224) gets `RecordState.imuArmedAtMs`
- * alone, always the process's start -- `RecordState.soleSilenceOver` states
- * it.
+ * after a link is pointed at a device: `ArmedSilencePolicy.SILENT_AFTER_MS` is
+ * the grace, and accusing a link two seconds into a connect is how a warning
+ * becomes something the lifter learns to ignore. EACH LINK ANSWERS TO ITS OWN
+ * ARMING since #225 -- before that both were floored by the later of the two
+ * instants, so re-pointing one link excused the other.
+ *
+ * IT SAYS NOTHING IN DEMO MODE (#225 item 7). `startDemoStream` fabricates
+ * samples with no sensor present, so the set records and the sentence this
+ * card draws is the one claim demo mode makes false; `SensorDot` above already
+ * takes `demoActive` for that reason.
  *
  * Drawn on READY and on RESTING. READY is drawn once per session --
  * `startNextSet` writes READY and calls `beginSet` in the same frame -- so a

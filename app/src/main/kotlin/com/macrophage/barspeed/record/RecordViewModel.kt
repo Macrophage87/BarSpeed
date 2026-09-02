@@ -684,17 +684,16 @@ internal fun RecordState.armedLinks(): ArmedLinks =
  * bundle and the set's two instants; this one is passed
  * `RecordState.imuArmedAtMs` while the card is drawing.
  *
- * THE FIRST IS NOT WHEN THIS LINK WAS ARMED. `AutoConnectManager` writes the
- * analysed link's instant once at construction and never again -- `imuArmedAt`
- * is a `MutableStateFlow(clock())` and only `imuArmedAtB` is rewritten, in
- * `setSecondaryImuAddress` -- so it is the PROCESS's start instant. On the
- * one-sensor configuration the [ArmedDelivery.TOO_SOON] grace floor is
- * therefore spent seconds into the process, and a unit paired later is accused
- * while it is still connecting. `ArmedSilencePolicy.liveDeliveryByRole` softens
- * this for the role-keyed reading with `maxOf` over the two arming instants;
- * there is no second instant here to take the later of. What the lifter sees is a
- * card naming a unit that is about to come up, on the card only -- the stored
- * reading has its own floor and is not affected.
+ * IT IS WHEN THIS LINK WAS LAST DELIBERATELY POINTED SOMEWHERE, since #225
+ * item 9. `AutoConnectManager` rewrites the analysed link's instant wherever
+ * it re-points that link -- `pairAndConnect`, and the two drops in
+ * `setPreferredAndConnect` and `forgetAndDrop` -- as it already did for the
+ * second link. Before that only `imuArmedAtB` ever moved, so this was the
+ * PROCESS's start instant, the grace floor was spent seconds into the
+ * process, and a unit paired an hour in was accused while it was still
+ * connecting. What is still not covered is stated in that property's own
+ * KDoc: a `stop()`/`start()` pair writes neither instant, and `maintain` can
+ * re-point a link on its own when the preferred address moves underneath it.
  *
  * IT READS THE LIVE ROSTER. Pairing a second unit MID-SET does NOT silence
  * this: `SensorRoster.isDual` is `secondary != null`, so an unlabelled second
