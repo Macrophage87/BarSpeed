@@ -887,6 +887,41 @@ class ArmedSilencePolicyTest {
     }
 
     /**
+     * PIN, review round 2 of #225 finding 2. [ArmedSilencePolicy.storedDeliveryByRole]
+     * takes ONE `storedGraceFloor` per link, and the two must not be swappable.
+     *
+     * The analysed link is armed an hour before the set and the secondary link
+     * half a second before it; the set itself runs one second and neither link
+     * has ever produced a frame. Read against its OWN floor, the analysed
+     * link's age is the set's end minus an arming an hour back -- 3,601 s, well
+     * past the window -- so it reads [ArmedDelivery.LINKED_SILENT]; the
+     * secondary link's age is the set's end minus an arming half a second
+     * before the set began -- 1.5 s -- so it reads [ArmedDelivery.TOO_SOON].
+     * Before this pin, swapping the two `storedGraceFloor(setStartedAtMs, …)`
+     * arguments in [ArmedSilencePolicy.storedDeliveryByRole] hands each link
+     * the OTHER link's floor and answers the other way round; nothing in the
+     * suite caught that at this SHA, measured by mutation M4 (`BUILD
+     * SUCCESSFUL` with the swap in place).
+     */
+    @Test
+    fun `storedDeliveryByRole floors each link by its own arming, never the other one's`() {
+        val setStart = after(3_600_000L)
+        val setEnd = setStart + 1_000L
+
+        assertEquals(
+            mapOf(SensorRole.A to ArmedDelivery.LINKED_SILENT, SensorRole.B to ArmedDelivery.TOO_SOON),
+            ArmedSilencePolicy.storedDeliveryByRole(
+                analysed = SensorRole.A,
+                secondary = SensorRole.B,
+                links = links(secondaryArmedAtMs = setStart - 500L),
+                setStartedAtMs = setStart,
+                setEndedAtMs = setEnd,
+            ),
+            "swapping the two per-link floors answered the other way round",
+        )
+    }
+
+    /**
      * PIN, review round 1 of #225. A link armed DURING the set is still
      * floored by the set's start, not by its own later arming.
      *
