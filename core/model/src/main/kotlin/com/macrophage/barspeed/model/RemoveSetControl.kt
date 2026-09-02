@@ -9,8 +9,10 @@ package com.macrophage.barspeed.model
  * the next START would have run, which is what tells the caller its editable
  * boxes were seeded from a set that no longer exists -- the mirror of
  * [AddSetPlacement.becomesNextSet]. [removableCount] is how many appended sets
- * of that exercise are still eligible, INCLUDING the one named here, so a
- * control drawn from this can say which of several it will take.
+ * of the anchor's BLOCK are still eligible, INCLUDING the one named here, so a
+ * control drawn from this can say which of several it will take. The block,
+ * not the exercise: a session running one movement in two consecutive blocks
+ * counts only the block the anchor sits in.
  */
 data class RemoveSetTarget(
     val removeAt: Int,
@@ -99,8 +101,8 @@ object RemoveSetControl {
      *
      * [anchorExercise] is the display name of the exercise the appended set
      * belongs to and [setNumber] is the set's own number as the card shows it,
-     * counting from one. [several] says more than one appended set of that
-     * exercise is eligible, which is the only moment "the last" is worth
+     * counting from one. [several] says more than one appended set of the
+     * anchor's block is eligible, which is the only moment "the last" is worth
      * saying: with one there is nothing to disambiguate, and naming an
      * ordering the lifter cannot see would be noise.
      *

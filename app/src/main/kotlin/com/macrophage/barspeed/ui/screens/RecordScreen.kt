@@ -1502,8 +1502,8 @@ private fun AddSetSection(state: RecordState, viewModel: RecordViewModel) {
  *
  * WHAT IT NAMES is the slot the tap will actually take -- one lookup, into the
  * same [RecordState.removeSetTarget] the ViewModel acts on, so the words and
- * the act cannot name different sets. With more than one appended set of that
- * exercise the label says it takes the LAST, because "remove the set you
+ * the act cannot name different sets. With more than one appended set of the
+ * anchor's block the label says it takes the LAST, because "remove the set you
  * added" is ambiguous the moment there are two.
  *
  * A TextButton for [AddSetSection]'s reason. This one is not destructive of

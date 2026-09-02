@@ -67,7 +67,7 @@ data class AddSetPlacement(
  * block, so the scan runs through it and a second addition lands after the
  * first. Nothing in THIS object shortens a queue; [RemoveSetControl] takes an
  * appended set back out again, reading this object's [blockRange] so the two
- * cannot disagree about which sets belong to the exercise (#206).
+ * cannot disagree about which sets belong to the block (#206).
  */
 object AddSetControl {
     /**
