@@ -106,7 +106,11 @@ object SetCardValues {
                 SetCardValue(
                     stated = it.toString(),
                     planned = plannedReps?.toString().takeIf { _ -> changed },
-                    suffix = "reps",
+                    // Singular for the STATED count, the figure describing
+                    // what the set IS now -- a set corrected down to one rep
+                    // reads "1 rep" even with a plural planned count struck
+                    // beside it (#227 item 1).
+                    suffix = if (it == 1) "rep" else "reps",
                 )
             }
         val holdValue =
@@ -127,7 +131,20 @@ object SetCardValues {
         val recordedKg = statedLoadKg ?: declaredLoadKg
         val loadChanged = (recordedKg ?: 0.0) != (plannedLoadKg ?: 0.0)
         val statedLoad = loadLabel(bodyweight, timed, unit, recordedKg, speaksZero = loadChanged)
-        val plannedLoad = loadLabel(bodyweight, timed, unit, plannedLoadKg, speaksZero = loadChanged)
+        // The PLANNED side's "timed set with nothing added" fallback may only
+        // read as "the plan prescribed a hold with no load" when the plan
+        // prescribed a hold at all -- plannedDurationS non-null is that
+        // signal. An appended set has no prescription whatsoever, so every
+        // planned* argument here is null for the same reason plannedLoadKg
+        // is, and without this gate loadLabel could not tell "a real
+        // bodyweight prescription" from "nothing was ever declared", and
+        // struck a "bodyweight" figure against a load the plan never spoke
+        // of (#227 item 4). The STATED side keeps the plain `timed` flag: it
+        // is describing what the set records now, appended or not, not what
+        // was prescribed.
+        val plannedHadTimedPrescription = timed && plannedDurationS != null
+        val plannedLoad =
+            loadLabel(bodyweight, plannedHadTimedPrescription, unit, plannedLoadKg, speaksZero = loadChanged)
         val loadValue =
             statedLoad?.let { SetCardValue(stated = it, planned = plannedLoad.takeIf { _ -> loadChanged }) }
         val tempoValue =
