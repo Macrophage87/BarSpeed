@@ -85,15 +85,15 @@ enum class ArmedDelivery {
  * when a frame last arrived, what state the link is in -- is made in `:app`
  * and `:core:ble` where it must be; every JUDGEMENT about it is here.
  *
- * ## Two windows, one function
+ * ## Two instants, one function
  *
- * [deliveryOf] is asked the same question twice with different bounds, and
+ * [deliveryOf] is asked the same question twice at different instants, and
  * that is deliberate rather than a coincidence of shape:
  *
- * - Before a set, over the SETUP/READY window, so the lifter is told a unit is
- *   silent while they can still do something about it.
- * - At the end of a set, over the set's own window, so the same reading is
- *   stored on the row and published in the export.
+ * - Before a set, at the moment the screen is drawn, so the lifter is told a
+ *   unit is silent while they can still do something about it.
+ * - At the instant the set ended, with the same three-second lookback, so the
+ *   same reading is stored on the row and published in the export.
  *
  * One function means the sentence the lifter read and the word the archive
  * carries cannot disagree about one unit. Two readings of the same question is
@@ -123,10 +123,12 @@ object ArmedSilencePolicy {
      *   it. This policy accepts that: from the lifter's side, a link that has
      *   been retrying for thirty seconds IS silent.
      * - `WitmotionClient.onReady` posts four configuration commands spaced
-     *   `COMMAND_SPACING_MS` apart, the last of them at 1,200 ms. Frames do not
-     *   wait for that sequence -- the notify subscription is live before the
-     *   first command -- so it is a ceiling on "the link is still settling",
-     *   not a floor on when data may appear.
+     *   `COMMAND_SPACING_MS` apart, the last of them at 1,200 ms. The
+     *   descriptor write is issued before the first command is posted, but
+     *   whether the subscription was accepted is not observable here, and
+     *   nothing has measured when a real WT901 first emits. So 1,200 ms is a
+     *   ceiling on the configuration sequence, not a floor on when data may
+     *   appear.
      *
      * Three seconds clears the second of those. It is NOT tied to
      * [LeadInPolicy.DEFAULT_S], and that is a decision rather than an
@@ -142,7 +144,10 @@ object ArmedSilencePolicy {
     const val SILENT_AFTER_MS = 3_000L
 
     /**
-     * What this link is doing for the window `[armedAtMs, nowMs]`.
+     * What this link is doing AT [nowMs]. The frame test is a fixed
+     * [SILENT_AFTER_MS] window ending at [nowMs], the [ConnectionState] is
+     * read at [nowMs], and [armedAtMs] is used for nothing but the TOO_SOON
+     * grace floor.
      *
      * [lastFrameAtMs] is the instant of the most recent frame from this unit,
      * on the same wall clock as [nowMs], or null when this unit has never

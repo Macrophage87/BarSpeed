@@ -478,9 +478,10 @@ internal fun armedCaptureOf(
     // comes from the link reading, which is the fact nothing else records.
     //
     // `ArmedSilencePolicy.silent` drops a role reading DELIVERING. That
-    // combination should be unreachable, the in-set collector and the liveness
-    // watcher being on one flow, and where the app's two readings of one unit
-    // do contradict each other it says nothing rather than picking one.
+    // combination IS reachable and its error direction is silence: deliveryOf
+    // reads a SILENT_AFTER_MS lookback ending at endedAtMs, which can reach
+    // back past the set's start, so a short set can publish no word for a role
+    // that delivered nothing.
     val silent =
         ArmedSilencePolicy.silent(armed?.expected.orEmpty().filterNot { it in streamed }, deliveryByRole)
     val sensors =
@@ -498,7 +499,7 @@ internal fun armedCaptureOf(
 }
 
 /**
- * What each ARMED role's link is doing, over one window (#213).
+ * What each ARMED role's link is doing at one instant (#213).
  *
  * A free function taking what it needs, for [armedCaptureOf]'s reason:
  * [RecordViewModel] sits at detekt's LargeClass limit. The DECISION is
@@ -507,11 +508,15 @@ internal fun armedCaptureOf(
  * it is written as a lookup so nothing on this path can read the second link's
  * state for the first link's role.
  *
- * Called twice with different windows and that is the point. Before a set,
- * [sinceMs] is when the link was armed and the answer drives the SETUP/READY
- * card; at the end of a set, [sinceMs] is when the set began and the answer is
- * frozen onto the row. One function means the sentence the lifter read and the
- * word the archive carries cannot disagree about one unit.
+ * Called twice at different instants and that is the point. Before a set,
+ * [nowMs] is the moment the screen is drawn, [sinceMs] is when the link was
+ * armed, and the answer drives the card on READY and the rest screen; at the
+ * end of a set, [nowMs] is when the set ended, [sinceMs] is when it began, and
+ * the answer is frozen onto the row. [sinceMs] is the TOO_SOON grace floor
+ * only -- the frame lookback is always the fixed
+ * `ArmedSilencePolicy.SILENT_AFTER_MS` ending at [nowMs] and does not narrow
+ * to it. One function means the sentence the lifter read and the word the
+ * archive carries cannot disagree about one unit.
  *
  * A null [analysed] role is the ordinary one-sensor set and the set that met
  * two paired units it could not tell apart. Neither has a role to report
@@ -544,10 +549,13 @@ internal fun armedDeliveryOf(
  * statement it already was.
  *
  * The buffers are copied HERE, which is the one place the freeze happens now
- * rather than at every call. The window is the SET's -- its start and its end
- * -- so the silence reading is over exactly the interval the buffers cover,
- * and a role reading as delivering while its buffer is empty is a
- * contradiction [armedCaptureOf] declines to publish rather than resolve.
+ * rather than at every call. The set's start and its end are what is passed
+ * down, and a role reading as delivering while its buffer is empty is a
+ * contradiction [armedCaptureOf] declines to publish rather than resolve. On a
+ * set shorter than `ArmedSilencePolicy.SILENT_AFTER_MS` that reading can be
+ * driven by a frame from before the set began, which is where the
+ * contradiction comes from and why the declining direction is silence -- see
+ * [armedCaptureOf].
  */
 internal fun RecordState.captureAt(
     armed: RecordedSensors?,
@@ -568,9 +576,10 @@ internal fun RecordState.captureAt(
  * [armedDeliveryOf] over the two links THIS STATE is holding.
  *
  * The one place the screen state's four link fields are turned into
- * [ArmedLinks], so the two callers -- the READY card, over the arming window,
- * and `endSet`, over the set's own -- cannot pair one link's state with the
- * other's frame instant in different ways. An extension rather than a member
+ * [ArmedLinks], so the two callers -- the card on READY and the rest screen,
+ * asked at the moment it draws, and `endSet`, asked at the moment the set
+ * ended -- cannot pair one link's state with the other's frame instant in
+ * different ways. An extension rather than a member
  * of [RecordViewModel] for [armedCaptureOf]'s reason: that class is at
  * detekt's LargeClass limit and this addition put it over.
  */
@@ -2187,8 +2196,8 @@ data class RecordState(
      * the moment the set starts, which is the only moment it is true.
      */
     /**
-     * What each of this set's ARMED units is doing right now, for the window
-     * that opened when its link was armed (#213).
+     * What each of this set's ARMED units is doing at [nowMs], with the
+     * TOO_SOON grace floor taken from when its link was armed (#213).
      *
      * A function taking `nowMs` rather than a property, and that is forced:
      * the answer changes as time passes with no state change to drive a

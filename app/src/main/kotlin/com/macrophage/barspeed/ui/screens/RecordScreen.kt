@@ -793,7 +793,7 @@ private fun SensorCaptureLine(state: RecordState) {
 private fun sensorCaptureDetail(roster: SensorRoster): String? {
     roster.shortfall?.let { return DualSensorSetup.recordLine(it) }
     return if (roster.isDual) {
-        "Both streams are recorded when both units are connected; nothing is derived from the second one yet"
+        "Both streams are recorded from whichever units are delivering; nothing is derived from the second one yet"
     } else {
         null
     }
@@ -805,11 +805,11 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
  *
  * field-37 armed two units on thirteen sets, received one, and told nobody:
  * the archive records `present: ["a"]` and the screens read paired throughout.
- * The READY window already runs for seconds with both units armed, which is
- * the last moment the lifter can switch one on, re-seat it or decide to lift
- * with one -- so this is where it is said, and it is a card rather than a
- * toast because a toast that appears while the lifter is under a bar is a
- * message nobody reads.
+ * READY and the rest screen are the windows that run for seconds with both
+ * units armed and the lifter's hands free to switch one on, re-seat it or
+ * decide to lift with one -- so those are where it is said, and it is a card
+ * rather than a toast because a toast that appears while the lifter is under a
+ * bar is a message nobody reads.
  *
  * WHAT IT SAYS is `ArmedSilencePolicy.advice`'s, in `:core:model` where a test
  * runs on it, and the sentence names the most specific state the BLE stack can
@@ -823,16 +823,19 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
  * grace, and accusing a link two seconds into a connect is how a warning
  * becomes something the lifter learns to ignore.
  *
- * Drawn on the READY stage alone. SETUP has no set armed yet -- there is no
- * roster until an exercise is chosen -- and the bar-sensor card already there
- * covers the analysed link being down.
+ * Drawn on READY and on RESTING. READY is drawn once per session --
+ * `startNextSet` writes READY and calls `beginSet` in the same frame -- so a
+ * card on READY alone names a silent unit before set one and never again,
+ * while RESTING precedes every later set. SETUP has no set armed yet -- there
+ * is no roster until an exercise is chosen -- and the bar-sensor card already
+ * there covers the analysed link being down.
  *
  * AND ONLY WHERE A ROLE IS ARMED, which is two paired bar sensors carrying
  * different labels. On a one-sensor set `SensorRoster.analysed` is null, so
  * `RecordState.armedDelivery` is empty and this composable returns without
  * drawing: a single connected-and-silent unit still gets the delivery dot and
- * nothing else. That remainder is left for its own issue rather than widened
- * here.
+ * nothing else. That remainder is untracked -- no issue is filed for it and
+ * the owner files -- rather than widened here.
  *
  * NOTHING IN THIS REPOSITORY CAN RUN THIS. `:app` has no test that composes
  * anything, and whether a real WT901 left switched off produces the state this
@@ -2417,6 +2420,13 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // Sets two onwards start from here, not from READY, and this is the screen
     // where the lifter has a rest period to spend fixing it.
     PermissionBanner(demoMode = state.demoMode)
+    // Same reason as the banner above it, for the sensor rather than the
+    // permission: READY renders at most once per session, so a card drawn only
+    // there names a silent unit before set one and never again. Every set from
+    // the second onwards is armed from this screen, and the rest period is the
+    // window in which switching a unit on or re-seating it still costs the
+    // lifter nothing.
+    ArmedSilenceCard(state)
     NextSetBlock(state, viewModel)
     SessionCloseControls(state, viewModel)
     Spacer(Modifier.height(16.dp))
