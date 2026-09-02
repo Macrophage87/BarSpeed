@@ -4,7 +4,9 @@
 // warm-up, its rep count, a hold's seconds and -- since #205 -- the load it
 // was recorded at. Split out because the class these would otherwise have
 // been added to had one line of growth left under detekt's `LargeClass`
-// default of 600; #206 is the remaining one still to arrive. The move itself
+// default of 600. Of the three, only #205 landed here: #204 landed in
+// :core:model, RecordScreen.kt and RecordViewModel.kt without touching this
+// file, and #206 has not arrived. The move itself
 // changed no behaviour, and the load correction is the first thing added here
 // that did.
 package com.macrophage.barspeed.record
@@ -263,12 +265,11 @@ internal fun loadCorrectedState(s: RecordState, addedKg: Double, carryFollows: B
 /**
  * The write behind one tap of the load correction (#205).
  *
- * Shaped on [applyDurationCorrection] rather than on a new arrangement,
- * because it is the same kind of control: a delta applied to the figure that
- * currently stands, so repeated taps accumulate. The delta is resolved and the
- * carry decided OUTSIDE the coroutine, against the state the finger was
- * looking at; the write and the publish are inside it, in that order, as every
- * other correction here but [applyWarmupMark] does.
+ * A delta applied to the figure that currently stands, so repeated taps
+ * accumulate. Everything the tap decides -- the delta, the total the row will
+ * store, whether the carry follows -- is resolved OUTSIDE the coroutine from
+ * ONE snapshot of the state the finger was looking at, so the three cannot
+ * come from different sets.
  *
  * Returns without writing when the corrected load is the load already
  * standing -- a loaded set at an empty bar tapped down again -- so a tap that
@@ -279,9 +280,26 @@ internal fun loadCorrectedState(s: RecordState, addedKg: Double, carryFollows: B
  * `SessionRepository.overrideLoad` for why rescaling it here would be worse
  * than naming it.
  *
- * Two taps inside one write window can reach Room in either order, exactly as
- * [applyWarmupMark]'s doc records for the warm-up mark. Read from source;
- * never observed.
+ * THE CORRECTION IS PUBLISHED BEFORE THE WRITE, as [applyWarmupMark] does and
+ * unlike [applyDurationCorrection]. `correctLoad` suspends into Room and
+ * Dispatchers.Main.immediate runs a coroutine body only as far as its first
+ * suspension, so with the write first a second tap arriving before the first
+ * returned would read a state the first had not replaced yet, compute the same
+ * corrected load, and be LOST -- not reordered, lost: two fast taps of + would
+ * move a 60 kg set to 62.5 and not to 65. Publishing first makes the second tap
+ * step from the first tap's answer.
+ *
+ * The rollback is not a race of its own. `correctLoad` returns null only when
+ * there is no recorded set and it decides that BEFORE it suspends, so the
+ * restore runs in the same frame as the tap, and it restores the fields this
+ * wrote rather than the whole state.
+ *
+ * What is NOT ordered is the two writes themselves. Room dispatches suspend
+ * queries to a pool, so two taps inside one window can still reach the
+ * database in either order and the row may keep the first tap's total while
+ * this state keeps the second's -- the trade [applyWarmupMark] already takes,
+ * a disagreement the next screen shows against a tap silently dropped. Both
+ * paragraphs are read from source; neither was observed on a device.
  */
 internal fun applyLoadCorrection(
     stateFlow: MutableStateFlow<RecordState>,
@@ -294,14 +312,31 @@ internal fun applyLoadCorrection(
     val before = feedback.effectiveAddedKg
     val after = SetLoadPolicy.correctedAddedKg(before, deltaKg, feedback.bodyweight)
     if (after == before) return
+    val total = SetLoadPolicy.correctedTotalKg(feedback.loadKg, feedback.addedKg, after)
     val carryFollows =
         SetLoadPolicy.carryFollowsCorrection(standingAddedKg(s0), before, s0.weightUnit, s0.lastSetSameBlock)
+    stateFlow.value = loadCorrectedState(s0, after, carryFollows)
     appScope.launch(Dispatchers.Main.immediate) {
-        val current = stateFlow.value.lastFeedback ?: return@launch
-        val total = SetLoadPolicy.correctedTotalKg(current.loadKg, current.addedKg, after)
-        ratings.correctLoad(total) ?: return@launch
-        stateFlow.value = loadCorrectedState(stateFlow.value, after, carryFollows)
+        if (ratings.correctLoad(total) == null) {
+            stateFlow.value = loadCorrectionRolledBack(stateFlow.value, s0, carryFollows)
+        }
     }
+}
+
+/**
+ * The state a load correction leaves behind when there was no set to write it
+ * to -- the optimistic publish in [applyLoadCorrection] undone.
+ *
+ * Field-scoped rather than a whole-state restore, exactly as
+ * [applyWarmupMark]'s rollback is: [s0] is the snapshot the tap was taken
+ * against, and anything else that moved between the tap and the null return
+ * has to survive.
+ */
+internal fun loadCorrectionRolledBack(s: RecordState, s0: RecordState, carryFollows: Boolean): RecordState {
+    val restored =
+        s.copy(lastFeedback = s.lastFeedback?.copy(loadOverrideAddedKg = s0.lastFeedback?.loadOverrideAddedKg))
+    if (!carryFollows) return restored
+    return restored.copy(loadInput = s0.loadInput, statedLoadKg = s0.statedLoadKg)
 }
 
 /**

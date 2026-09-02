@@ -2,8 +2,8 @@
 // RecordScreen.kt by #208: the block below the next-set block that says how
 // the set just finished went and lets the lifter correct it -- effort, why it
 // ended, warm-up mark, load (#205), rep count, held seconds, and the per-rep
-// chart. Split out so those additions had somewhere to go; #206 is the
-// remaining one still to arrive. The move itself changed no behaviour -- the
+// chart. Split out so those additions had somewhere to go; of the three, only
+// #205 landed here. The move itself changed no behaviour -- the
 // widened visibility of the helpers it still calls in RecordScreen.kt
 // (private -> internal) was the only edit it needed -- and the load
 // correction is the first thing added here since that did.
