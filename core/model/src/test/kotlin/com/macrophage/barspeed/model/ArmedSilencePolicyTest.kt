@@ -2,6 +2,7 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -237,7 +238,7 @@ class ArmedSilencePolicyTest {
         assertEquals(
             "Sensor B is connected but has sent no data. It will record nothing this set unless you " +
                 "power-cycle it.",
-            ArmedSilencePolicy.message(silent),
+            ArmedSilencePolicy.message(silent, sole = null),
             "the sentence the SETUP window would have shown on every set of field-37",
         )
     }
@@ -255,7 +256,7 @@ class ArmedSilencePolicyTest {
             )
 
         assertEquals(listOf(SensorRole.B, SensorRole.A), silent.keys.toList(), "the armed order was not kept")
-        val message = assertNotNull(ArmedSilencePolicy.message(silent))
+        val message = assertNotNull(ArmedSilencePolicy.message(silent, sole = null))
         assertTrue(
             message.indexOf("Sensor B") < message.indexOf("Sensor A"),
             "the message reordered the units the lifter has to go and find: $message",
@@ -278,7 +279,7 @@ class ArmedSilencePolicyTest {
             )
 
         assertEquals(emptyMap(), silent)
-        assertNull(ArmedSilencePolicy.message(silent))
+        assertNull(ArmedSilencePolicy.message(silent, sole = null))
     }
 
     /**
@@ -294,7 +295,7 @@ class ArmedSilencePolicyTest {
             ArmedSilencePolicy.silent(listOf(SensorRole.B), mapOf(SensorRole.B to ArmedDelivery.TOO_SOON))
 
         assertEquals(mapOf(SensorRole.B to ArmedDelivery.TOO_SOON), silent, "a fact the export needs was dropped")
-        assertNull(ArmedSilencePolicy.message(silent), "the app told the lifter something it did not know")
+        assertNull(ArmedSilencePolicy.message(silent, sole = null), "the app told the lifter something it did not know")
     }
 
     /**
@@ -381,5 +382,230 @@ class ArmedSilencePolicyTest {
             ArmedSilencePolicy.PUBLISHED_WIRE.size,
             "two states share a spelling, or delivering reached the published set",
         )
+    }
+
+    // ---- one unit, no role: issue #224 ---------------------------------------
+
+    private val soloAddress = "AA:BB:CC:DD:EE:01"
+
+    private fun soloRoster() = SensorCapturePolicy.roster(
+        pairedImuAddresses = listOf(soloAddress),
+        preferredAddress = soloAddress,
+        roleByAddress = emptyMap(),
+    )
+
+    /**
+     * DIFFERENTIAL, issue #224. The shape the owner trains most: ONE armed unit,
+     * one stream, and the unit silent.
+     *
+     * The roster gives it no role -- #198's rule, unchanged here -- so
+     * [ArmedSilencePolicy.silent] has nothing to key on and the whole of #213
+     * misses it. This is the answer that does not need a role: what the app
+     * could see of the ONE link it is holding.
+     *
+     * The unit is `Connected` and has never delivered, which is the state
+     * field-37 drew a connected indicator for on thirteen sets. Whether a real
+     * WT901 left switched off produces `Disconnected` rather than a stale
+     * `Connected` is [Field] and is not asserted here.
+     */
+    @Test
+    fun `one armed unit with no role is still named when it goes silent`() {
+        val roster = soloRoster()
+        assertNull(roster.analysed, "a role was invented for a single paired unit")
+        assertEquals(emptyList(), roster.expected, "a single paired unit was armed for a role")
+
+        val sole =
+            ArmedSilencePolicy.soleSilence(
+                roster = roster,
+                pairedImuAddresses = listOf(soloAddress),
+                state = ConnectionState.Connected("WT901"),
+                lastFrameAtMs = null,
+                armedAtMs = armedAt,
+                nowMs = after(4_000),
+            )
+
+        assertEquals(ArmedDelivery.LINKED_SILENT, sole, "the one armed unit went silent and nothing said so")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. The ordinary one-sensor set says nothing.
+     *
+     * The case that must stay quiet, and the reason the answer is null rather
+     * than [ArmedDelivery.DELIVERING]: a word for a working unit would put a
+     * declaration on every one-sensor row in the corpus and a line in front of
+     * every lifter whose sensor is fine.
+     */
+    @Test
+    fun `a sole unit that is delivering says nothing at all`() {
+        val sole =
+            ArmedSilencePolicy.soleSilence(
+                roster = soloRoster(),
+                pairedImuAddresses = listOf(soloAddress),
+                state = ConnectionState.Connected("WT901"),
+                lastFrameAtMs = after(3_900),
+                armedAtMs = armedAt,
+                nowMs = after(4_000),
+            )
+
+        assertNull(sole, "a working single sensor was reported as a problem")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. A dual set never produces the roleless word.
+     *
+     * The two answers are exclusive by construction rather than by a rule
+     * somebody has to remember: where roles are armed, `silent` is keyed by them
+     * and says the same thing per unit. A set carrying both would state one fact
+     * twice in two vocabularies.
+     */
+    @Test
+    fun `a dual roster produces no roleless word`() {
+        val a = soloAddress
+        val b = "AA:BB:CC:DD:EE:02"
+        val roster =
+            SensorCapturePolicy.roster(
+                pairedImuAddresses = listOf(a, b),
+                preferredAddress = a,
+                roleByAddress = mapOf(a to SensorRole.A, b to SensorRole.B),
+            )
+
+        val sole =
+            ArmedSilencePolicy.soleSilence(
+                roster = roster,
+                pairedImuAddresses = listOf(a, b),
+                state = ConnectionState.Disconnected,
+                lastFrameAtMs = null,
+                armedAtMs = armedAt,
+                nowMs = after(9_000),
+            )
+
+        assertNull(sole, "a dual set was given a word meant for a stream that carries no role")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. A manual set with nothing paired says nothing.
+     *
+     * No unit is armed, so there is no link to report on, and a word here would
+     * be absence rendered as a value: "the app looked and saw nothing" is a
+     * different statement from "nothing was ever armed".
+     */
+    @Test
+    fun `a set with no paired unit at all reports no silence`() {
+        val sole =
+            ArmedSilencePolicy.soleSilence(
+                roster = SensorCapturePolicy.roster(emptyList(), null, emptyMap()),
+                pairedImuAddresses = emptyList(),
+                state = ConnectionState.Disconnected,
+                lastFrameAtMs = null,
+                armedAtMs = armedAt,
+                nowMs = after(9_000),
+            )
+
+        assertNull(sole, "a set that armed no sensor at all was reported as having a silent one")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. Two paired units the app cannot tell apart
+     * capture ONE unroled stream, and that stream's silence is sayable too.
+     *
+     * The near neighbour, fixed with the case rather than after it: the roster
+     * arms no role there either, for a different reason, and the single link the
+     * app does hold is the same link. Leaving it out would fix the reported set
+     * and leave the one beside it silent in both senses.
+     */
+    @Test
+    fun `two paired units that cannot be told apart report their one link too`() {
+        val a = soloAddress
+        val b = "AA:BB:CC:DD:EE:02"
+        val roster =
+            SensorCapturePolicy.roster(
+                pairedImuAddresses = listOf(a, b),
+                preferredAddress = a,
+                roleByAddress = emptyMap(),
+            )
+        assertEquals(DualShortfall.ROLES_UNASSIGNED, roster.shortfall, "the fixture is not the unlabelled pair")
+
+        val sole =
+            ArmedSilencePolicy.soleSilence(
+                roster = roster,
+                pairedImuAddresses = listOf(a, b),
+                state = ConnectionState.Disconnected,
+                lastFrameAtMs = null,
+                armedAtMs = armedAt,
+                nowMs = after(9_000),
+            )
+
+        assertEquals(ArmedDelivery.NOT_LINKED, sole, "the one link an unlabelled pair does hold reports nothing")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. Too soon is kept for the store and stays quiet
+     * on the screen, exactly as it is for a role.
+     */
+    @Test
+    fun `a sole unit inside the window is kept as a fact and says nothing`() {
+        val sole =
+            ArmedSilencePolicy.soleSilence(
+                roster = soloRoster(),
+                pairedImuAddresses = listOf(soloAddress),
+                state = ConnectionState.Connected("WT901"),
+                lastFrameAtMs = null,
+                armedAtMs = armedAt,
+                nowMs = after(1_000),
+            )
+
+        assertEquals(ArmedDelivery.TOO_SOON, sole, "a fact a short set needs to store was dropped")
+        assertNull(
+            ArmedSilencePolicy.message(emptyMap(), sole),
+            "the app accused a link one second into its connect",
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. The sentence for a unit with no role names no
+     * role, and still says what it costs.
+     *
+     * Exhaustive over the enum for the reason the role-carrying case is: a state
+     * added later cannot ship without somebody deciding what the lifter does
+     * about it. What must NOT appear is a letter -- there is no A on this
+     * lifter's unit, and telling them to go and find one is telling them about a
+     * device they do not own, which is what the dissolved `ONE_SENSOR_PAIRED`
+     * shortfall did.
+     */
+    @Test
+    fun `the roleless sentence names no role and still says what it costs`() {
+        val advised = ArmedDelivery.entries.filter { ArmedSilencePolicy.advice(it, null) != null }.toSet()
+
+        assertEquals(
+            setOf(ArmedDelivery.NOT_LINKED, ArmedDelivery.LINK_WITHOUT_SENSOR, ArmedDelivery.LINKED_SILENT),
+            advised,
+            "the roleless sentence advises a different set of states from the role-carrying one",
+        )
+        ArmedDelivery.entries.forEach { state ->
+            val text = ArmedSilencePolicy.advice(state, null) ?: return@forEach
+            assertFalse("Sensor A" in text, "$state names a role this lifter does not own: $text")
+            assertFalse("Sensor B" in text, "$state names a role this lifter does not own: $text")
+            assertTrue("bar sensor" in text, "$state does not name the unit the lifter must touch: $text")
+            assertTrue("record nothing" in text, "$state's advice does not say what it costs: $text")
+        }
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. The card draws for a single silent unit, and
+     * draws nothing when there is nothing to say.
+     *
+     * One function for both shapes, so the sentence the lifter reads on a
+     * one-sensor session and the sentence they read on a two-sensor session
+     * cannot come from two rules that disagree.
+     */
+    @Test
+    fun `the card speaks for one unroled unit and stays quiet otherwise`() {
+        assertEquals(
+            "The bar sensor is connected but has sent no data. It will record nothing this set unless you " +
+                "power-cycle it.",
+            ArmedSilencePolicy.message(emptyMap(), ArmedDelivery.LINKED_SILENT),
+            "the sentence a single-sensor lifter reads before the set starts",
+        )
+        assertNull(ArmedSilencePolicy.message(emptyMap(), null), "the card drew for a set with nothing to say")
     }
 }

@@ -3,6 +3,8 @@ package com.macrophage.barspeed.model
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -604,5 +606,102 @@ class SensorCapturePolicyTest {
             ).shortfall,
             "field-37: the pair was labelled apart, so no roster shortfall was in the way",
         )
+    }
+
+    // ---- one unroled stream, and what it can say: issue #224 -----------------
+
+    /**
+     * DIFFERENTIAL, issue #224. Which sets capture ONE stream carrying no role,
+     * stated once.
+     *
+     * Three shapes answer the same way and one does not, and the rule is here
+     * rather than at the screen and the record path both: a set captures an
+     * unroled stream when the roster armed no pair AND the app has a unit to
+     * hold a link to. The manual set with nothing paired is the one that must
+     * answer false -- there is no link, so there is nothing to report on, and a
+     * word for it would be absence rendered as a value.
+     */
+    @Test
+    fun `a set captures one unroled stream when a unit is paired and no pair is armed`() {
+        val a = "AA:BB:CC:DD:EE:01"
+        val b = "AA:BB:CC:DD:EE:02"
+        val solo = SensorCapturePolicy.roster(listOf(a), a, emptyMap())
+        val unlabelled = SensorCapturePolicy.roster(listOf(a, b), a, emptyMap())
+        val dual = SensorCapturePolicy.roster(listOf(a, b), a, mapOf(a to SensorRole.A, b to SensorRole.B))
+        val nothing = SensorCapturePolicy.roster(emptyList(), null, emptyMap())
+
+        assertTrue(
+            SensorCapturePolicy.capturesUnroledStream(solo, listOf(a)),
+            "the ordinary one-sensor set is not recognised as capturing an unroled stream",
+        )
+        assertTrue(
+            SensorCapturePolicy.capturesUnroledStream(unlabelled, listOf(a, b)),
+            "a pair the app cannot tell apart records one unroled stream and is not recognised as doing so",
+        )
+        assertFalse(
+            SensorCapturePolicy.capturesUnroledStream(dual, listOf(a, b)),
+            "a dual set was read as capturing a stream with no role",
+        )
+        assertFalse(
+            SensorCapturePolicy.capturesUnroledStream(nothing, emptyList()),
+            "a manual set with nothing paired was read as holding a link",
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. A set that declared nothing gains a declaration
+     * the moment there is something to say, and nothing more than that.
+     *
+     * `count` is 1 and `expected` stays EMPTY: the stream carries no role and
+     * inventing one would label a capture nobody labelled, which is the rule the
+     * whole of #198 turns on. What the object adds is the word.
+     */
+    @Test
+    fun `a one-sensor set that went silent stores a declaration carrying only the word`() {
+        val stored = SensorCapturePolicy.withSoleSilence(null, ArmedDelivery.LINKED_SILENT)
+
+        val sensors = assertNotNull(stored, "a one-sensor set that went silent stored nothing at all")
+        assertEquals(1, sensors.count, "the set that armed one unit did not record one")
+        assertEquals(emptyList(), sensors.expected, "a role was invented for a stream that carries none")
+        assertNull(sensors.analysed, "a role was named as analysed on a set that armed none")
+        assertEquals(emptyMap(), sensors.silent, "the roleless word was written into the role-keyed map")
+        assertEquals(ArmedDelivery.LINKED_SILENT, sensors.soleSilent, "the word the whole change exists for is absent")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. A pair the app could not tell apart keeps its
+     * reason and gains the word beside it.
+     *
+     * Two different facts about one set. `shortfall` is about the device ROSTER
+     * before the set -- two paired units carrying no distinct labels -- and says
+     * nothing about whether the one link the app did hold delivered. Replacing
+     * one with the other would trade a fact for a fact.
+     */
+    @Test
+    fun `an unlabelled pair keeps its reason and gains the word`() {
+        val declared = RecordedSensors(count = 1, shortfall = DualShortfall.ROLES_UNASSIGNED)
+
+        val stored = assertNotNull(SensorCapturePolicy.withSoleSilence(declared, ArmedDelivery.NOT_LINKED))
+
+        assertEquals(DualShortfall.ROLES_UNASSIGNED, stored.shortfall, "the roster reason was overwritten by the word")
+        assertEquals(ArmedDelivery.NOT_LINKED, stored.soleSilent, "the one link the app held reported nothing")
+        assertEquals(1, stored.count, "the count moved on a set that armed one unit")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. Nothing silent leaves the declaration exactly as
+     * it was, including leaving it absent.
+     *
+     * The control that keeps every ordinary set byte-identical: a one-sensor set
+     * whose unit delivered stores no declaration at all, so `session.json`
+     * publishes no sensors block and the archive manifest grows no sensor keys.
+     */
+    @Test
+    fun `a set with nothing silent stores exactly what it stored before`() {
+        val dual =
+            RecordedSensors(count = 2, expected = listOf(SensorRole.A, SensorRole.B), analysed = SensorRole.A)
+
+        assertNull(SensorCapturePolicy.withSoleSilence(null, null), "a declaration was invented for an ordinary set")
+        assertEquals(dual, SensorCapturePolicy.withSoleSilence(dual, null), "a healthy dual declaration was rewritten")
     }
 }

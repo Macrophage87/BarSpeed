@@ -519,4 +519,32 @@ class RawExporterDualSensorTest {
             "a healthy dual set's descriptor grew a statement about nothing",
         )
     }
+
+    /**
+     * DIFFERENTIAL, issue #224. The archive manifest names a SINGLE armed unit
+     * that delivered nothing.
+     *
+     * It moves with `session.json` rather than after it, for the reason #213's
+     * own manifest case gives: the two documents ride in one zip, and a reader
+     * who opens the manifest must not get a different account of one set from
+     * the reader who opens the analysis. Written only when the one link was
+     * silent, so an ordinary one-sensor descriptor is byte-for-byte what it was
+     * -- which the control above this file already pins.
+     */
+    @Test
+    fun `the manifest names a single armed unit that delivered nothing`() = runTest {
+        val stored = """{"count":1,"soleSilent":"NOT_LINKED"}"""
+
+        val descriptor =
+            descriptorFromStoredJson(stored, listOf(imuStream(1L, null, analysedSamples, storedRate = 98.5)))
+
+        assertEquals(
+            "notLinked",
+            assertNotNull(
+                descriptor["sensorsSoleSilent"],
+                "the manifest says nothing about the one unit that went silent",
+            ).jsonPrimitive.content,
+        )
+        assertNull(descriptor["sensorsSilent"], "a roleless set grew a role-keyed silence map")
+    }
 }

@@ -473,4 +473,64 @@ class SessionExportSensorsTest {
             "a set where nothing went silent published a silence key",
         )
     }
+
+    /**
+     * DIFFERENTIAL, issue #224. A set armed with ONE bar sensor that delivered
+     * nothing publishes what the app could see of that one link.
+     *
+     * The session type the owner trains most. There is no role, so `silent` has
+     * nothing to key on and #213 misses the set entirely; the word rides a
+     * sibling key instead. `count` is 1 and both role lists are EMPTY -- the
+     * single stream carries no role and inventing one would label a capture
+     * nobody labelled.
+     *
+     * Fed as stored TEXT for [setObjectFromStoredJson]'s reason: at the commit
+     * that introduces this, `soleSilent` is not a field of [RecordedSensors] and
+     * cannot be encoded from Kotlin at all, so the assertion fails on absence.
+     */
+    @Test
+    fun `a lone armed unit that delivered nothing publishes what the app could see of it`() = runTest {
+        val stored = """{"count":1,"soleSilent":"LINKED_SILENT"}"""
+
+        val set = setObjectFromStoredJson(stored, listOf(imuStream(1L, null, count = 100)))
+
+        val sensors = assertNotNull(set["sensors"], "a one-sensor set that went silent publishes nothing").jsonObject
+        assertEquals(1, sensors.getValue("count").jsonPrimitive.int, "the set that armed one unit published another")
+        assertEquals(emptyList(), sensors.roles("expected"), "a role was published for a stream that carries none")
+        assertEquals(emptyList(), sensors.roles("present"), "an unroled stream was published under a role")
+        assertNull(sensors["silent"], "the roleless word was published in the role-keyed map as well")
+        assertEquals(
+            "linkedSilent",
+            sensors.getValue("soleSilent").jsonPrimitive.content,
+            "the word the archive could not say about a single sensor did not survive the export",
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. A set that met two paired units it could not
+     * tell apart keeps its reason and gains the word.
+     *
+     * The near neighbour. That set captures ONE unroled stream from the one link
+     * the app holds, exactly as a one-sensor set does, and its `shortfall` says
+     * something about the ROSTER rather than about whether that link delivered.
+     * Publishing one without the other would trade a fact for a fact.
+     */
+    @Test
+    fun `an unlabelled pair publishes both its reason and what its one link did`() = runTest {
+        val stored = """{"count":1,"shortfall":"ROLES_UNASSIGNED","soleSilent":"NOT_LINKED"}"""
+
+        val set = setObjectFromStoredJson(stored, listOf(imuStream(1L, null, count = 100)))
+
+        val sensors = assertNotNull(set["sensors"]).jsonObject
+        assertEquals(
+            "rolesUnassigned",
+            sensors.getValue("shortfall").jsonPrimitive.content,
+            "the roster reason was dropped when the link word arrived",
+        )
+        assertEquals(
+            "notLinked",
+            sensors.getValue("soleSilent").jsonPrimitive.content,
+            "the one link an unlabelled pair holds published nothing",
+        )
+    }
 }

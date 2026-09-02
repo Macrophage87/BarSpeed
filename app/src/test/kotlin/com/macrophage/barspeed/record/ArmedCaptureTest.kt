@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.record
 
+import com.macrophage.barspeed.model.ArmedDelivery
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.SensorRole
@@ -170,5 +171,51 @@ class ArmedCaptureTest {
         assertSame(only, capture.samples, "the capture was dropped on a set with no sensor declaration")
         assertNull(capture.sensors, "a sensor declaration was invented for a set that made none")
         assertNull(capture.secondary, "a second capture was invented for a set that made no declaration")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. The set this issue was filed for: ONE armed bar
+     * sensor, no role, and nothing came down the link.
+     *
+     * The declaration is CONSTRUCTED here, on a set that declared nothing when
+     * it was armed. That is the whole of the change at this site: the roster
+     * gives a single unit no role -- #198's rule, and it stays -- so nothing
+     * before this could hang a fact off the set at all.
+     *
+     * THE DECISION IS NOT HERE. `SensorCapturePolicy.withSoleSilence` decides
+     * what a declaration becomes and `ArmedSilencePolicy.soleSilence` decides
+     * whether there is a word at all; both are pinned in `:core:model`. What
+     * lives in `:app`, and what this pins, is that the word reaches the row.
+     */
+    @Test
+    fun `a single armed unit that went silent reaches the row with no role invented`() {
+        val capture =
+            armedCaptureOf(null, null, emptyList(), emptyList(), soleDelivery = ArmedDelivery.LINKED_SILENT)
+
+        val sensors = assertNotNull(capture.sensors, "the one armed unit went silent and the row said nothing")
+        assertEquals(1, sensors.count, "a set that armed one unit recorded another number")
+        assertEquals(emptyList(), sensors.expected, "a role was invented for a stream that carries none")
+        assertNull(sensors.analysed, "a role was named as analysed on a set that armed none")
+        assertEquals(ArmedDelivery.LINKED_SILENT, sensors.soleSilent, "the word never reached the row")
+        assertNull(capture.secondary, "a second capture was invented for a set that recorded one stream")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #224. The control: a one-sensor set whose unit
+     * delivered still constructs nothing.
+     *
+     * What keeps every ordinary single-sensor set byte-identical to what this
+     * app has always written. The parameter is passed explicitly rather than
+     * defaulted, because the pairing of "nothing was silent" with "no
+     * declaration" is the assertion, not the call shape.
+     */
+    @Test
+    fun `a single armed unit that delivered constructs no declaration`() {
+        val only = samples(0L, 10L)
+
+        val capture = armedCaptureOf(null, null, only, emptyList(), soleDelivery = null)
+
+        assertSame(only, capture.samples, "the capture was dropped on a set with no sensor declaration")
+        assertNull(capture.sensors, "a declaration was invented for a set whose one unit delivered")
     }
 }
