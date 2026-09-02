@@ -726,4 +726,126 @@ class ArmedSilencePolicyTest {
             "a link that has had less than the window either way was accused",
         )
     }
+
+    // ---- #225: the grace floor, and the card in demo mode ---------------------
+
+    /**
+     * DIFFERENTIAL, issue #225 item 7. Demo mode says nothing about sensors.
+     *
+     * `RecordViewModel.startDemoStream` fabricates samples with no sensor
+     * present, so the set DOES record and "It will record nothing this set" is
+     * the one claim demo mode makes FALSE rather than merely fictional -- the
+     * dot beside it already takes `demoActive` for that reason. The
+     * suppression is whole rather than per-state: with no unit paired there is
+     * nothing to switch on, bring near the phone or power-cycle, so every
+     * sentence this function can produce names a remedy the lifter cannot
+     * carry out.
+     */
+    @Test
+    fun `demo mode says nothing about a sensor the set is not using`() {
+        val silent =
+            ArmedSilencePolicy.silent(
+                listOf(SensorRole.A, SensorRole.B),
+                mapOf(SensorRole.A to ArmedDelivery.NOT_LINKED, SensorRole.B to ArmedDelivery.LINKED_SILENT),
+            )
+
+        assertNotNull(
+            ArmedSilencePolicy.message(silent, sole = null, demoMode = false),
+            "the card stopped speaking outside demo mode",
+        )
+        assertNull(
+            ArmedSilencePolicy.message(silent, sole = null, demoMode = true),
+            "demo mode told the lifter the set would record nothing while it fabricates samples",
+        )
+        assertNull(
+            ArmedSilencePolicy.message(emptyMap(), ArmedDelivery.LINKED_SILENT, demoMode = true),
+            "the one-sensor sentence survived demo mode",
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #225 item 8. A short set does not excuse a link the
+     * app has known was silent all session.
+     *
+     * The stored reading was floored by the SET's start, so a two-second set
+     * put `tooSoon` on the row -- "the app does not know yet" -- about a link
+     * armed an hour earlier that had never produced a frame. That is the
+     * strongest word in this vocabulary being replaced by the weakest at the
+     * one place the archive keeps it, and the row is written precisely when
+     * that unit's buffer is empty, so it is the row a lifter reads to find out
+     * why a set recorded nothing.
+     *
+     * Grace is a LIVE-warning concept: it stops the app accusing a link two
+     * seconds into its connect while the lifter can still act. A row that has
+     * already been written has nothing to act on.
+     */
+    @Test
+    fun `a short set does not excuse a link armed long before it`() {
+        val setStart = after(3_600_000L)
+        val setEnd = setStart + 2_000L
+
+        assertEquals(
+            mapOf(SensorRole.A to ArmedDelivery.LINKED_SILENT, SensorRole.B to ArmedDelivery.NOT_LINKED),
+            ArmedSilencePolicy.storedDeliveryByRole(
+                analysed = SensorRole.A,
+                secondary = SensorRole.B,
+                links = links(secondaryState = ConnectionState.Disconnected),
+                setStartedAtMs = setStart,
+                setEndedAtMs = setEnd,
+            ),
+            "a short set stored `the app does not know yet` about links silent for an hour",
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #225 item 8, for the configuration the owner trains
+     * most.
+     *
+     * The same floor reaches the roleless answer (#224), so a short set with
+     * one paired unit stored the same excuse. Fixed with the role-keyed one
+     * rather than after it: one rule, both vocabularies, or the row and the
+     * one-sensor row disagree about what a short set means.
+     */
+    @Test
+    fun `a short one-sensor set does not excuse its link either`() {
+        val setStart = after(3_600_000L)
+
+        assertEquals(
+            ArmedDelivery.LINKED_SILENT,
+            ArmedSilencePolicy.storedSoleSilence(
+                roster = soloRoster(),
+                pairedImuAddresses = listOf(soloAddress),
+                links = links(),
+                setStartedAtMs = setStart,
+                setEndedAtMs = setStart + 2_000L,
+            ),
+            "the one-sensor row stored `the app does not know yet` about a link silent for an hour",
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #225 item 8. One link's arming does not excuse the
+     * other.
+     *
+     * The live reading floored BOTH links with `maxOf` over the two arming
+     * instants, so re-pointing the second link handed three fresh seconds of
+     * excused silence to the first one -- a figure measured against the wrong
+     * link. Each link now answers to its own arming, which is what the
+     * per-sensor dots on Home and Devices already do.
+     */
+    @Test
+    fun `one link's arming does not excuse the other`() {
+        val now = after(3_600_000L)
+
+        assertEquals(
+            mapOf(SensorRole.A to ArmedDelivery.LINKED_SILENT, SensorRole.B to ArmedDelivery.TOO_SOON),
+            ArmedSilencePolicy.liveDeliveryByRole(
+                analysed = SensorRole.A,
+                secondary = SensorRole.B,
+                links = links(secondaryArmedAtMs = now - 1_000L),
+                nowMs = now,
+            ),
+            "re-pointing one link excused the other",
+        )
+    }
 }
