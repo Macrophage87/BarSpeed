@@ -1,5 +1,7 @@
 package com.macrophage.barspeed.model
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
@@ -49,7 +51,32 @@ enum class GeometrySource {
  * distinct state and the app answers it from [ExerciseDef.STACK_MOUNTED_IDS].
  * The sentence that said all three were unobservable is deleted rather than
  * reworded, because it is false for one of them now.
+ *
+ * `sensorOnStack` defaults to [GeometrySource.DEFAULT] rather than being
+ * required, and that default is load-bearing rather than decorative: this
+ * object is stored as JSON in `SetRecordEntity.geometryJson`, and every row
+ * written by a build up to and including v0.1.48 serialized a five-key
+ * `sources` object -- this field did not exist at all. Without a default,
+ * decoding one of those rows throws `MissingFieldException` rather than
+ * reading -- a stored set becomes unreadable the moment this field ships.
+ * The default cannot recover what that build never captured: such a row
+ * re-exports `geometry.source.sensorOnStack` as `"default"` regardless of
+ * what the plan actually said, permanently, because no earlier build
+ * tracked the answer to recover.
+ *
+ * `@EncodeDefault(ALWAYS)` on that field, not silence: `SessionExporter`'s
+ * `Json` sets `encodeDefaults = false`, which is also plain `Json`'s own
+ * default -- `kotlinx.serialization.json.Json`'s `encodeDefaults` is `false`
+ * unless a config says otherwise. Without the annotation, a NEWLY recorded
+ * set whose provenance genuinely resolves to [GeometrySource.DEFAULT] would
+ * have the key silently DROPPED rather than published as `"default"` --
+ * `geometry.source` is a closed six-key required object, so a dropped key is
+ * not a smaller export, it is an invalid one. Caught by
+ * `StackSeedDifferentialTest`'s `an id nothing seeds still publishes a
+ * default stack mount`, which reds without this annotation even though the
+ * default value above is correct.
  */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class GeometrySources(
     val startsWith: GeometrySource,
@@ -57,7 +84,7 @@ data class GeometrySources(
     val plane: GeometrySource,
     val kind: GeometrySource,
     val travelRatio: GeometrySource,
-    val sensorOnStack: GeometrySource,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val sensorOnStack: GeometrySource = GeometrySource.DEFAULT,
 )
 
 /**
