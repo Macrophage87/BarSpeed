@@ -116,10 +116,81 @@ sealed interface SetEnd {
     }
 
     companion object {
-        /** The cue the metronome speaks when the prescription has been called through. */
-        const val DONE = "Done"
+        /**
+         * The cue the metronome speaks when the prescription has been called
+         * through.
+         *
+         * Read off [CadenceVoice], which is the thing that SPEAKS it, rather
+         * than restated as a second literal here. The two were separate copies
+         * of `"Done"` and nothing checked they agreed -- a rename on the
+         * emitting side would have left this rule bounding on a word the app
+         * had stopped saying, and every guided set would have gone quietly
+         * unbounded with no test failing.
+         */
+        const val DONE = CadenceVoice.DONE
+
+        /**
+         * The cue the app speaks when the LIFTER ends a guided set before the
+         * prescription has been called through.
+         *
+         * A different word from [DONE] on purpose, and the choice is argued
+         * rather than incidental. `Done` means the prescription was delivered;
+         * saying it to someone who just failed a set would be both a wrong
+         * thing to hear and a wrong thing to record, and an archive in which
+         * both endings carry one word cannot tell a completed set from an
+         * abandoned one by its cue track at all.
+         *
+         * SPOKEN, not a silent marker written into the track. The alternative
+         * considered was a row the app writes without uttering, which would
+         * have kept the vocabulary at one terminal word -- and it was rejected
+         * on issue #176's rule: the cue track is a record of what the app
+         * SAID, and a row nobody heard makes that false again in a new place,
+         * one release after it was made true. It would also need a way for a
+         * reader to tell a spoken row from a silent one, which the row format
+         * has no field for. Speaking it costs one short utterance and buys the
+         * confirmation the lifter currently does not get on exactly the sets
+         * that ended badly.
+         *
+         * Two words rather than one, and not a digit or a stroke name: the
+         * vocabulary already carries bare digits as tempo counts and `Up`,
+         * `Down`, `Hold`, `Drive`, `Return`, `Brace`, `Ready` and `Time` as
+         * calls, and #147 rejected a form that could be confused with one of
+         * those.
+         */
+        const val STOPPED = "Set ended"
+
+        /**
+         * Every cue that means the set is over, in no particular order --
+         * [of] takes the earliest by INSTANT, not by this list's order.
+         */
+        val TERMINAL_CUES = setOf(DONE, STOPPED)
 
         fun of(cues: List<VoiceCue>): SetEnd =
             cues.firstOrNull { it.cue == DONE }?.let { Cued(it.timestampMs) } ?: NotCued
+
+        /**
+         * What to say and write when a set ends, or null when nothing should
+         * be said.
+         *
+         * [guided] is whether a CADENCE was running -- `RecordViewModel`'s
+         * `guidedSet`, which is `prepCase == CUED`. [spoken] is the set's cue
+         * track as it stands at the moment the set is ending.
+         *
+         * Scoped to guided sets deliberately, and #141 argues why the other
+         * two cases are separate decisions. An unguided set ends by the same
+         * tap, and bounding those would change the figures of every manual set
+         * recorded from here on -- a far larger population, and one no capture
+         * held here measures. A timed set ends on `Time` and publishes no rep
+         * list, so there is nothing for a boundary to bound.
+         *
+         * The question asked is "is this set already bounded", through [of],
+         * rather than "was `Done` spoken". Those are the same question today
+         * and the first is the one that stays right: a second terminal word
+         * added to [TERMINAL_CUES] later would otherwise get a duplicate
+         * boundary written beside it, and the duplicate would be the earlier
+         * instant's neighbour rather than a visible defect.
+         */
+        fun terminalCall(guided: Boolean, spoken: List<VoiceCue>): SpokenCall? =
+            if (guided && of(spoken) is NotCued) SpokenCall(STOPPED, listOf(STOPPED)) else null
     }
 }

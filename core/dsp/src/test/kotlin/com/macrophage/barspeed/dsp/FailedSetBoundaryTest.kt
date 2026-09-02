@@ -4,6 +4,7 @@ import com.macrophage.barspeed.model.VoiceCue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 
 /**
@@ -115,5 +116,103 @@ class FailedSetBoundaryTest {
             SetEnd.of(cues).detectionsAfter(listOf(1_787_341_220_000L, 1_787_341_226_000L)),
             "no boundary, so no count -- and null rather than zero",
         )
+    }
+
+    // ------------------------------------------------------------------
+    // The words that end a set, and which of them the app asks for.
+    // ------------------------------------------------------------------
+
+    /**
+     * One statement of `"Done"`, not two.
+     *
+     * [CadenceVoice] speaks it and [SetEnd] bounds on it, and each used to
+     * declare its own literal. Nothing checked they agreed: renaming the
+     * spoken word would have left the rule looking for a word the app no
+     * longer said, every guided set would have gone unbounded, and the whole
+     * suite would have stayed green because both sides were internally
+     * consistent.
+     */
+    @Test
+    fun `the word the guide speaks and the word the rule bounds on are one constant`() {
+        assertEquals(CadenceVoice.DONE, SetEnd.DONE, "the emitter and the reader must name one word")
+        assertEquals("Done", SetEnd.DONE, "and it is the word the committed cue tracks carry")
+    }
+
+    /**
+     * Two terminal words, and they say different things.
+     *
+     * `Done` is the prescription delivered; `Set ended` is the lifter stopping
+     * before it was. A reader of an archive can tell those apart because the
+     * words differ, which is the whole reason a second one exists rather than
+     * the first being reused.
+     */
+    @Test
+    fun `the terminal vocabulary names both endings and keeps them apart`() {
+        assertEquals(setOf("Done", "Set ended"), SetEnd.TERMINAL_CUES, "the words that end a set")
+        assertNotEquals(SetEnd.DONE, SetEnd.STOPPED, "a completed set and an abandoned one must not read alike")
+    }
+
+    /**
+     * The new word cannot be mistaken for anything the guide already says.
+     *
+     * The vocabulary a cue row can carry is stroke names, bare digits, the rep
+     * calls and the two lead-in words. #147 rejected a bare-digit rep call for
+     * exactly this reason -- a digit already means a tempo count -- and the
+     * same test applies to a terminal word.
+     */
+    @Test
+    fun `the abandoned-set word collides with nothing already in the vocabulary`() {
+        val existing = setOf(
+            "Up", "Down", "Hold", "Drive", "Return", "Brace", "Ready", "Time",
+            "Carry", "Last rep", "Done",
+        )
+        assertFalse(SetEnd.STOPPED in existing, "the terminal word reuses a word that already means something")
+        assertFalse(SetEnd.STOPPED.toIntOrNull() != null, "a bare digit is a tempo count, never a set ending")
+        assertFalse(
+            track(fixture).any { it.cue == SetEnd.STOPPED },
+            "the word already appears in a capture recorded before it existed",
+        )
+    }
+
+    /**
+     * Who is asked for the word: a guided set whose record does not already
+     * end, and nobody else.
+     *
+     * The unguided case is #141's own second design question and is
+     * deliberately not answered here -- a manual set ends by the same tap, and
+     * bounding those changes the figures of every manual set recorded from
+     * here on.
+     */
+    @Test
+    fun `only a guided set with no boundary on its record asks for one`() {
+        assertNull(SetEnd.terminalCall(guided = false, spoken = emptyList()), "an unguided set says nothing")
+        assertNull(
+            SetEnd.terminalCall(guided = false, spoken = track(fixture)),
+            "and it says nothing however its track ends",
+        )
+        assertEquals(
+            SpokenCall("Set ended", listOf("Set ended")),
+            SetEnd.terminalCall(guided = true, spoken = track(fixture)),
+            "session 32 set 9 is exactly the set that should have said this",
+        )
+        assertNull(
+            SetEnd.terminalCall(guided = true, spoken = track(fixture) + VoiceCue(1_787_341_230_000L, SetEnd.DONE)),
+            "a set the guide already called over does not say it twice",
+        )
+    }
+
+    /**
+     * Spoken and recorded as one word, not merged onto anything.
+     *
+     * A merged call exists because TTS cancels an in-flight utterance and two
+     * words had to share one. Nothing is in flight at the tap -- `endSet`
+     * cancels the runner before this is asked -- so this is the plain case,
+     * and the row written is the word uttered.
+     */
+    @Test
+    fun `the boundary is one utterance and one row carrying the same word`() {
+        val call = SetEnd.terminalCall(guided = true, spoken = emptyList())!!
+        assertEquals(SetEnd.STOPPED, call.utterance, "what the lifter hears")
+        assertEquals(listOf(SetEnd.STOPPED), call.recorded, "what the archive keeps")
     }
 }
