@@ -414,6 +414,13 @@ class SessionExporter(
             expected = declared.expected.map(SensorCapturePolicy::wireOf),
             present = SensorCapturePolicy.present(declared.expected, captured).map(SensorCapturePolicy::wireOf),
             analysedRole = declared.analysed?.let(SensorCapturePolicy::wireOf),
+            // Read off the row, never re-decided here (#207). The analysis
+            // this document publishes was computed when the set was RECORDED,
+            // from whichever stream the record path chose then; deciding again
+            // at export time would name a role the frozen figures did not come
+            // from. A row an earlier build wrote therefore keeps publishing
+            // the role it named, with no flag, and that is what it means.
+            analysedFellBack = declared.analysedFellBack,
             shortfall = declared.shortfall?.let(SensorCapturePolicy::shortfallToWire),
         )
     }
@@ -777,6 +784,13 @@ class RawExporter(
             fields += "\"sensorRolesExpected\": " +
                 "[${d.expected.joinToString(", ") { "\"${SensorCapturePolicy.wireOf(it)}\"" }}]"
             str("analysedRole", analysedRole)
+            // [flag], so a false is omitted rather than written: the ordinary
+            // set says nothing here and session.json says nothing there,
+            // because its exporter drops the same default. Both documents
+            // express "the analysed role is the role the set armed" by
+            // omission, which is also what every archive written before this
+            // key existed says.
+            flag("analysedFellBack", d.analysedFellBack)
         }
         num("startedAt_ms", record.startedAtMs)
         num("endedAt_ms", record.endedAtMs)
