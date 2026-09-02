@@ -237,35 +237,138 @@ object SetLoadPolicy {
     // body-weight-inclusive scale the row stores.
 
     /**
-     * DELIBERATELY WRONG (#205 c2). How much one tap of the rest screen's load
-     * correction moves the recorded load, in kilograms.
+     * How much one tap of the rest screen's load correction moves the recorded
+     * load, in kilograms.
+     *
+     * A plate rather than a unit. 2.5 kg and 5 lb are the smallest change most
+     * gyms can actually make to a bar, and a step the lifter cannot load is a
+     * step that always needs a second tap to undo. Named in the DISPLAY unit
+     * and converted, so the number on screen moves by a round figure whichever
+     * chip the lifter is on -- 2.5 kg renders as "5.5 lb", and a lb-unit
+     * session stepping by that would read as a stutter.
+     *
+     * NOT SNAPPED to a multiple of itself. A set recorded at 62 kg steps to
+     * 64.5, not to 62.5: snapping would move a figure by up to a whole step
+     * that the lifter did not ask to move, on the one value in the set nothing
+     * else can check. A large correction is therefore several taps, which is
+     * the accepted cost of the control being a stepper; an arbitrary-value
+     * entry box is a bigger change and is not made here.
      */
-    fun correctionStepKg(unit: WeightUnit): Double = unit.toKg(1.0)
+    fun correctionStepKg(unit: WeightUnit): Double = unit.toKg(if (unit == WeightUnit.KG) 2.5 else 5.0)
 
     /**
-     * DELIBERATELY WRONG (#205 c2). The added load the finished set stands at
-     * after one tap.
+     * The ADDED load the finished set stands at after one tap of the
+     * correction, in kilograms.
+     *
+     * [recordedAddedKg] is what stands now -- the load the set was recorded
+     * with, or the last correction, so repeated taps accumulate the way the
+     * hold correction's do.
+     *
+     * THE FLOOR IS AT ZERO FOR LOADED WORK AND ABSENT FOR BODY-WEIGHT WORK,
+     * and the asymmetry is the whole reason [bodyweight] is a parameter. A
+     * barbell cannot weigh less than nothing, so a loaded set corrected below
+     * zero clamps to zero -- an empty bar, which [resolve] already treats as a
+     * real measurement rather than an absence. A body-weight set's added load
+     * is signed by contract: negative is a band or an assist machine taking
+     * weight off, PlanFile.validate passes allowNegativeLoad =
+     * exercise.bodyweight on exactly this population, and clamping it at zero
+     * would make assistance unsayable.
+     *
+     * There is no ceiling on either. Nothing here knows what a plate rack
+     * holds, and a bound invented from nothing would reject a real set.
      */
-    fun correctedAddedKg(recordedAddedKg: Double, deltaKg: Double, bodyweight: Boolean): Double =
-        if (bodyweight) recordedAddedKg - deltaKg else recordedAddedKg + deltaKg
+    fun correctedAddedKg(recordedAddedKg: Double, deltaKg: Double, bodyweight: Boolean): Double {
+        val next = recordedAddedKg + deltaKg
+        return if (bodyweight) next else Math.max(next, 0.0)
+    }
 
     /**
-     * DELIBERATELY WRONG (#205 c2). The body-weight-inclusive total to store
-     * once the added load has been corrected.
+     * The body-weight-inclusive total to store on the row once the added load
+     * has been corrected -- the scale set_records.loadKg and the export's
+     * load_kg are on, and which [totalKg] put the original one there on.
+     *
+     * NO BODY WEIGHT IS READ HERE, and that is deliberate rather than an
+     * omission. The body-weight term is recovered as [recordedTotalKg] minus
+     * [recordedAddedKg], the difference the write itself produced, so the
+     * correction moves the total by exactly the correction and by nothing
+     * else. Calling [totalKg] again with a fresh bodyWeightKg would fold in
+     * any change the lifter made to their recorded body weight between
+     * finishing the set and correcting it, and would silently rewrite a set
+     * they only meant to add a plate to. On loaded work the two arguments are
+     * the same Double and the difference is exactly zero, so this returns
+     * [correctedAddedKg] unchanged.
      */
     fun correctedTotalKg(recordedTotalKg: Double, recordedAddedKg: Double, correctedAddedKg: Double): Double =
-        recordedTotalKg - recordedAddedKg - correctedAddedKg
+        recordedTotalKg - recordedAddedKg + correctedAddedKg
 
     /**
-     * DELIBERATELY WRONG (#205 c2). Whether the load standing for the set
-     * coming up should move with this correction.
+     * WHAT THE CORRECTION DOES TO THE CARRY, which #205 asks be decided rather
+     * than left implied. True when the added load standing for the set coming
+     * up must move with this correction; false when it must be left alone.
+     *
+     * THE ANSWER IS "ONLY WHERE IT WOULD OTHERWISE REPEAT THE SAME WRONG
+     * NUMBER." The plates are still on the bar. A lifter who set the app to 60
+     * and loaded 65 has 65 standing there for the next set too, so leaving the
+     * carry alone hands them the same wrong number again and a second
+     * correction to make -- and the fix that only fixes the reported instance
+     * is the defect this repo produces most. But the carry is also how a plan
+     * prescribes a change, and how a lifter states a load for the set coming
+     * up before touching this control at all, so overwriting it
+     * unconditionally would let a correction to the past silently displace a
+     * decision about the future.
+     *
+     * So the two cases are separated by what is standing. [standingAddedKg] is
+     * the added load the coming set would currently be recorded at -- the
+     * lifter's standing statement where [standingStatedAddedKg] let one
+     * through, otherwise whatever the load box was seeded with. Where that is
+     * the number being corrected AWAY from, the app is about to repeat the
+     * mistake and the carry follows. Where it is anything else -- a plan
+     * prescribing 80 next, a load already retyped during the rest -- it is a
+     * separate statement about a different set and is left exactly as it is.
+     * Null is not a number being repeated and never follows.
+     *
+     * COMPARED AT THE BOX'S OWN RESOLUTION, not on the Double. The load box
+     * quantises to 0.1 of the display unit, which is the whole of #45, so what
+     * is standing is routinely a rounded copy of what was recorded and
+     * compares unequal to it exactly. Comparing the rendered values makes the
+     * rule the same rule at both units, the way [BodyweightLoadDisplay.label]
+     * already decides the same question about a rendered zero.
+     *
+     * THE CAPTION SAYS WHEN THIS IS TRUE. A control that quietly changes a
+     * second thing is worse than one that changes nothing, so the answer here
+     * is what [correctionCaption] renders.
      */
     fun carryFollowsCorrection(standingAddedKg: Double?, recordedAddedKg: Double, unit: WeightUnit): Boolean =
-        standingAddedKg != null && unit.inputValue(standingAddedKg) != unit.inputValue(recordedAddedKg)
+        standingAddedKg != null && unit.inputValue(standingAddedKg) == unit.inputValue(recordedAddedKg)
 
-    /** DELIBERATELY WRONG (#205 c2). What the correction says it changes. */
-    fun correctionCaption(carryFollows: Boolean): String = "Corrects the next set" + if (carryFollows) " too" else ""
+    /**
+     * What the correction says it changes, drawn under the row.
+     *
+     * IT NAMES THE SET JUST FINISHED, FIRST AND ALWAYS. #188 is the
+     * neighbouring control on this same screen that named the upcoming
+     * exercise when it meant the finished one, and a load control read as
+     * "set the load for the next set" would be tapped by a lifter trying to do
+     * the opposite of what it does. SetLoadCorrectionTest pins the word "next"
+     * out of the case where it would be false.
+     *
+     * [carryFollows] is [carryFollowsCorrection]'s answer, and the second
+     * clause appears only when it is true -- because in that case the tap
+     * really does change two things, and the lifter is entitled to know which.
+     */
+    fun correctionCaption(carryFollows: Boolean): String = if (carryFollows) {
+        "Corrects the set you just finished, and the load offered for the next one"
+    } else {
+        "Corrects the set you just finished"
+    }
 
-    /** DELIBERATELY WRONG (#205 c2). The row's own label. */
-    fun correctionLabel(corrected: Boolean): String = if (corrected) "Corrected" else "Load"
+    /**
+     * The row's own label, which says whether the figure beside it is still
+     * the one the set was recorded with.
+     *
+     * The same arrangement the rep and the hold corrections use one row up --
+     * "Reps counted" against "Reps (corrected)" -- because what is stored is
+     * no longer what was recorded and the screen has to say which it is
+     * showing.
+     */
+    fun correctionLabel(corrected: Boolean): String = if (corrected) "Load (corrected)" else "Load recorded"
 }

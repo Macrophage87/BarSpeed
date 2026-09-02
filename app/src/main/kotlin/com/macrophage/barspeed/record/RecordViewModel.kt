@@ -256,6 +256,18 @@ data class SetFeedback(
      * print "2 x 50 kg" for a 20 kg weighted dip at 80 kg body weight.
      */
     val addedKg: Double,
+    /**
+     * Whether the movement puts the lifter's own mass in the path -- the
+     * exercise's `bodyweight` declaration, frozen with the rest of the write.
+     *
+     * Carried so the rest screen's load correction can apply the right rule
+     * without asking the live queue, which has already moved on to the set
+     * coming up by the time that row draws. It decides two things:
+     * [addedKg] renders in #160's "BW + 10 kg" notation rather than as a bare
+     * number, and a correction may take it below zero for band or machine
+     * assistance.
+     */
+    val bodyweight: Boolean,
     /** The plan's declared implement count for the set just finished, if any. */
     val implementCount: Int?,
     val analysis: SetAnalysis,
@@ -277,8 +289,32 @@ data class SetFeedback(
      * so.
      */
     val durationOverrideS: Int? = null,
+    /**
+     * The ADDED load the lifter stated for this set on the rest screen,
+     * overriding what it was recorded with (#205).
+     *
+     * Null is no correction, not a zero load: a set corrected DOWN to an empty
+     * bar is a different statement from one never corrected, and the row's own
+     * label says which of the two it is showing.
+     *
+     * The ADDED load and never the total, for [addedKg]'s reason: the total is
+     * derived from it by [SetLoadPolicy.correctedTotalKg] at the write, from
+     * the body-weight term this set was actually recorded with.
+     */
+    val loadOverrideAddedKg: Double? = null,
 ) {
     val effectiveReps: Int get() = repsOverride ?: analysis.reps.size
+
+    /** The added load this set stands at now, the correction ahead of the record. */
+    val effectiveAddedKg: Double get() = loadOverrideAddedKg ?: addedKg
+
+    /**
+     * The body-weight-inclusive load this set stands at now.
+     *
+     * Computed by the same function the write uses, from the same pair, so
+     * what the rest screen shows and what the row holds cannot disagree.
+     */
+    val effectiveLoadKg: Double get() = SetLoadPolicy.correctedTotalKg(loadKg, addedKg, effectiveAddedKg)
 
     /**
      * Seconds this set stands at now, the lifter's correction ahead of the
@@ -1317,6 +1353,11 @@ private fun restingState(
             // slot rather than off live state, which has already moved on by
             // the time the rest screen draws.
             addedKg = p.addedKg,
+            // The exercise's own declaration, frozen here with the load it
+            // qualifies. Read off the pending write rather than off
+            // s.currentExercise, which by the time the rest screen draws is
+            // already the movement coming up.
+            bodyweight = p.exercise.bodyweight,
             implementCount = p.slot?.implementCount,
             analysis = analysis,
             // The WORKING targets, not the plan's frozen prescription. This
@@ -2754,6 +2795,15 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * [overrideLastSetReps] for why this runs on appScope.
      */
     fun addLastSetSeconds(deltaS: Int) = applyDurationCorrection(stateFlow, deltaS, ratings, container.appScope)
+
+    /**
+     * Rest-screen correction of the load the just-finished set was recorded at
+     * (#205), the one value in a set nothing in the app can observe. See
+     * [overrideLastSetReps] for why this runs on appScope, and
+     * [applyLoadCorrection] for what it does to the load standing for the set
+     * coming up.
+     */
+    fun addLastSetLoad(deltaKg: Double) = applyLoadCorrection(stateFlow, deltaKg, ratings, container.appScope)
 
     /**
      * Voice at each lockout: "Rep N" as reps complete, "Last rep" going into the

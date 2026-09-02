@@ -1,11 +1,12 @@
 // The rest screen's finished-set correction surface, lifted out of
 // RecordScreen.kt by #208: the block below the next-set block that says how
 // the set just finished went and lets the lifter correct it -- effort, why it
-// ended, warm-up mark, rep count, held seconds, and the per-rep chart. Split
-// out before #204, #205 and #206 add controls to the same surface. Nothing
-// here changed behaviour when it moved; the widened visibility of the helpers
-// it still calls in RecordScreen.kt (private -> internal) is the only edit the
-// move needed.
+// ended, warm-up mark, load (#205), rep count, held seconds, and the per-rep
+// chart. Split out so those additions had somewhere to go; #206 is the
+// remaining one still to arrive. The move itself changed no behaviour -- the
+// widened visibility of the helpers it still calls in RecordScreen.kt
+// (private -> internal) was the only edit it needed -- and the load
+// correction is the first thing added here since that did.
 package com.macrophage.barspeed.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
@@ -27,14 +28,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.EffortCorrectionPolicy
 import com.macrophage.barspeed.model.SetLimiterPagePlacement
 import com.macrophage.barspeed.model.SetLimiterPolicy
+import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
+import com.macrophage.barspeed.record.standingAddedKg
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.SectionCaption
 
@@ -80,6 +84,7 @@ internal fun LastSetDetail(
         onDone = onLimiterDone,
     )
     WarmupMarkRow(state, viewModel)
+    LoadCorrectionRow(state, viewModel)
     state.lastFeedback?.let { RepCorrectionRow(it, viewModel) }
     state.lastFeedback?.let { HoldCorrectionRow(it, viewModel) }
     Spacer(Modifier.height(6.dp))
@@ -240,6 +245,74 @@ private fun WarmupMarkRow(state: RecordState, viewModel: RecordViewModel) {
             },
         )
     }
+    Spacer(Modifier.height(4.dp))
+}
+
+/**
+ * Put a different weight on the bar than the app had? State it here (#205).
+ *
+ * THE SET JUST FINISHED. Every other row on this surface corrects the set that
+ * has been written, and so does this one; the caption says so in words, from
+ * [SetLoadPolicy.correctionCaption], because #188 is the neighbouring control
+ * that named the upcoming exercise when it meant the finished one. Editing an
+ * arbitrary past set from the history screen is a larger and different thing
+ * and is deliberately not here.
+ *
+ * DRAWN ON EVERY SET, unlike [RepCorrectionRow] and [HoldCorrectionRow], which
+ * are mutually exclusive on whether the set was timed. A weighted carry has a
+ * load and so does a squat, and a body-weight set with nothing added is
+ * exactly the case where the lifter clipped a plate on and the app never knew.
+ *
+ * THE FIGURE IS THE ADDED LOAD. On body-weight work that is #160's notation --
+ * "BW + 10 kg", "BW - 50 kg" for assistance, bare "BW" for nothing added --
+ * so the number cannot be read as the whole load, and the steppers move it
+ * signed. On loaded work the added load and the total are the same number and
+ * it renders as any other load does. The implement split the header draws
+ * ("2 x 20 kg") is not repeated here: what is being edited is one figure.
+ *
+ * The corrected figure is amber and the label says corrected, the same way a
+ * corrected rep count and a corrected hold are.
+ */
+@Composable
+private fun LoadCorrectionRow(state: RecordState, viewModel: RecordViewModel) {
+    val feedback = state.lastFeedback ?: return
+    val added = feedback.effectiveAddedKg
+    val corrected = feedback.loadOverrideAddedKg != null
+    val step = SetLoadPolicy.correctionStepKg(state.weightUnit)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            SetLoadPolicy.correctionLabel(corrected),
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+        TextButton(onClick = { viewModel.addLastSetLoad(-step) }) {
+            Text("\u2212", style = MaterialTheme.typography.titleMedium)
+        }
+        Text(
+            if (feedback.bodyweight) {
+                BodyweightLoadDisplay.label(added, state.weightUnit)
+            } else {
+                state.weightUnit.format(added)
+            },
+            style = MaterialTheme.typography.titleMedium,
+            color = if (corrected) BarColors.Amber else BarColors.Text,
+        )
+        TextButton(onClick = { viewModel.addLastSetLoad(step) }) {
+            Text("+", style = MaterialTheme.typography.titleMedium)
+        }
+    }
+    // Whether the tap also moves what the set coming up is offered is
+    // SetLoadPolicy's decision, taken against what is standing right now, and
+    // this caption is that answer said out loud. A control that quietly
+    // changes a second thing is worse than one that changes nothing.
+    SectionCaption(
+        SetLoadPolicy.correctionCaption(
+            SetLoadPolicy.carryFollowsCorrection(standingAddedKg(state), added, state.weightUnit),
+        ),
+    )
     Spacer(Modifier.height(4.dp))
 }
 
