@@ -90,6 +90,14 @@ class SessionRepositoryFinalRestWindowTest {
             setColumnWrites += "overrideReps"
         }
 
+        // Conformance only: SessionDao grew this member for #205 and Kotlin
+        // requires it. Nothing in this file calls it; tracked the same way
+        // as its neighbours so a stray call would still fail the
+        // setColumnWrites assertion below.
+        override suspend fun overrideLoad(setId: Long, loadKg: Double) {
+            setColumnWrites += "overrideLoad"
+        }
+
         override suspend fun overrideDuration(setId: Long, seconds: Int) {
             setColumnWrites += "overrideDuration"
         }
