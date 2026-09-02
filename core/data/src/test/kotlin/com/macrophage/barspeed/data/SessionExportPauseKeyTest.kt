@@ -2,6 +2,7 @@ package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.RepAnalysis
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.SessionExport
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -163,14 +164,14 @@ class SessionExportPauseKeyTest {
      * [com.macrophage.barspeed.model.SessionExport]'s log and `PLAN_PROMPT`.
      * `repMetrics` is built at export time but COPIED from the analysis frozen
      * into the row at record time, so a set recorded before 1.16 keeps both
-     * keys inside a document declaring 1.16. A reader is told to treat a rep
-     * carrying both as pre-1.16 data; if the exporter ever started dropping
-     * one of them from such a row, that instruction would send the reader
-     * looking for a marker the document no longer has. Nothing else detects
-     * it.
+     * keys inside any later document, 1.17 included. A reader is told to
+     * treat a rep carrying both as pre-1.16 data; if the exporter ever
+     * started dropping one of them from such a row, that instruction would
+     * send the reader looking for a marker the document no longer has.
+     * Nothing else detects it.
      */
     @Test
-    fun `a set recorded before 1_16 still publishes both pause keys under 1_16`() = runTest {
+    fun `a set recorded before 1_16 still publishes both pause keys under the current version`() = runTest {
         val analysis =
             SetAnalysis(
                 reps = listOf(preRuleRep()),
@@ -180,7 +181,10 @@ class SessionExportPauseKeyTest {
                 verdicts = emptyList(),
             )
         val text = exporter(analysis).exportJson(1L, includeRepDetail = true)!!
-        assertTrue("\"schemaVersion\": \"1.16\"" in text, "the document must declare 1.16")
+        assertTrue(
+            "\"schemaVersion\": \"${SessionExport.SCHEMA_VERSION}\"" in text,
+            "the document must declare the version the exporter writes",
+        )
         assertTrue("\"bottomPause_s\": 0.4" in text, "a pre-1.16 row's bottom pause must survive export")
         assertTrue("\"topPause_s\": 1.0" in text, "a pre-1.16 row's top pause must survive export")
     }

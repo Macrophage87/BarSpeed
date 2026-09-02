@@ -322,8 +322,38 @@ data class SessionExport(
          * cue rides under that number rather than beside it.) The published
          * copy of this log in `docs/schemas/session-export.schema.json` is
          * the one to read for what a reader must do about it.
+         *
+         * 1.17: a set's `sensors` block may carry `analysedFellBack`, true
+         * when the analysed role is NOT the role the set armed -- that unit
+         * produced no stream, another one did, and the figures come from the
+         * one that did (#207). The app now analyses a role that STREAMED
+         * wherever one did; before this, a set armed to analyse a unit left
+         * switched off published an EMPTY summary over a capture from the
+         * other unit the app was holding. Purely additive on the wire -- the
+         * key is absent unless true, and no existing key changed type or
+         * stopped being written -- but NOT behaviourally neutral: a set that
+         * would have published nothing derived now publishes a summary from
+         * the surviving stream, and `analysedRole` on such a set names that
+         * stream rather than the armed one. It does NOT apply retroactively,
+         * for 1.16's reason: which stream a set was analysed from is frozen
+         * into its row when the set was RECORDED, so a set recorded before
+         * this version publishes what it published whatever its document's
+         * `schemaVersion` says.
+         *
+         * A NEW number rather than a THIRD change to 1.16, and this REVERSES
+         * what two earlier drafts on this branch asserted. Both said 1.16 was
+         * unreleased and that a key added to it therefore extended a number
+         * no consumer had ever seen; each was true when it was written.
+         * Neither is true now: 1.16 SHIPPED in v0.1.48 while this change sat
+         * in review, read by
+         * `git show v0.1.48:core/model/.../SessionExport.kt` rather than
+         * assumed, so extending it would have redefined a number a consumer
+         * has already been handed. That is the 1.15 entry's mistake taken in
+         * the opposite direction, and it is corrected here rather than
+         * reworded away. The published copy of this entry in
+         * `docs/schemas/session-export.schema.json` says the same.
          */
-        const val SCHEMA_VERSION = "1.16"
+        const val SCHEMA_VERSION = "1.17"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -333,7 +363,7 @@ data class SessionExport(
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
-                "1.16",
+                "1.16", "1.17",
             )
 
         /**

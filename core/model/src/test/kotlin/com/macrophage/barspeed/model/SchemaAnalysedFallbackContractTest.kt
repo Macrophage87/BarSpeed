@@ -27,10 +27,12 @@ import kotlin.test.assertTrue
  * role vocabulary; what is here is what this issue changes about what the two
  * documents SAY.
  *
- * The version is deliberately not moved. 1.16 is on `main` and unreleased --
- * v0.1.47 shipped 1.15 -- so a key added to it extends a number no consumer
- * has ever seen, and minting 1.17 would publish a boundary that never existed.
- * That is asserted here rather than assumed.
+ * The version MOVES, and that REVERSES what two earlier rounds of this branch
+ * asserted in this same KDoc. Both said 1.16 was unreleased, so extending it
+ * cost nothing; each was true when it was written. While this branch sat in
+ * review 1.16 shipped in v0.1.48, so the key mints 1.17 instead. Asserted
+ * below against the constant, the accepted set and both published logs rather
+ * than assumed.
  */
 class SchemaAnalysedFallbackContractTest {
     private fun schema(name: String) = Json.parseToJsonElement(
@@ -45,6 +47,9 @@ class SchemaAnalysedFallbackContractTest {
 
     private fun exportVersionLog() = schema("session-export.schema.json")["properties"]!!
         .jsonObject["schemaVersion"]!!.jsonObject["description"]!!.jsonPrimitive.content
+
+    private fun exportVersionEnum() = schema("session-export.schema.json")["properties"]!!
+        .jsonObject["schemaVersion"]!!.jsonObject["enum"]!!.jsonArray.map { it.jsonPrimitive.content }
 
     private val shippedPrompt: String =
         checkNotNull(
@@ -92,7 +97,7 @@ class SchemaAnalysedFallbackContractTest {
      * rest of a corpus recorded the same way.
      */
     @Test
-    fun `the published fallback description says what each answer means`() {
+    fun `the published fallback description names what it is measured against and what absence means`() {
         val text = sensorDescription("analysedFellBack")
 
         assertTrue("armed" in text, "the published fallback never says what it is measured against")
@@ -133,24 +138,35 @@ class SchemaAnalysedFallbackContractTest {
     }
 
     /**
-     * The key extends 1.16 rather than minting 1.17, and the log says so.
+     * The key MINTS 1.17 rather than extending 1.16, and the log says so.
      *
-     * 1.16 is on `main` and unreleased -- v0.1.47 shipped 1.15 -- so no
-     * consumer has ever seen a document declaring it. A new number would
-     * publish a boundary between two states of the contract that never both
-     * existed, which is the mistake the 1.15 entry in this same log records
-     * having been corrected once already.
+     * 1.16 is RELEASED: `git rev-list -n1 v0.1.48` resolves to the commit
+     * whose `SCHEMA_VERSION` is "1.16", so a consumer has already been handed
+     * a document declaring it and a key added under that number would
+     * redefine what it means. Two earlier drafts of this test asserted the
+     * opposite -- that 1.16 was unreleased and extending it was free -- and
+     * each was true when it was written. They are corrected here rather than
+     * reworded away.
+     *
+     * The 1.16 half is asserted as an ABSENCE as well as the 1.17 half as a
+     * presence: moving the constant and leaving the key described under the
+     * old number would publish two logs disagreeing about which contract
+     * added it.
      */
     @Test
-    fun `the fallback extends the unreleased version rather than minting one`() {
-        assertEquals("1.16", SessionExport.SCHEMA_VERSION, "the version moved for an unreleased addition")
-        assertFalse("1.17" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.17 was minted")
-        assertFalse("1.17:" in exportVersionLog(), "the published log opened a 1.17 entry")
+    fun `the fallback mints a new version rather than extending the released one`() {
+        assertEquals("1.17", SessionExport.SCHEMA_VERSION, "the version did not move off the released 1.16")
+        assertTrue("1.17" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
+        assertTrue("1.17" in exportVersionEnum(), "the published enum does not accept the version written")
 
-        val entry = exportVersionLog().substringAfterLast("1.16:")
+        val log = exportVersionLog()
         assertTrue(
-            "analysedFellBack" in entry,
-            "the published 1.16 entry never mentions the key this version adds",
+            "analysedFellBack" in log.substringAfterLast("1.17:"),
+            "the published 1.17 entry never mentions the key this version adds",
+        )
+        assertFalse(
+            "analysedFellBack" in log.substringBefore("1.17:"),
+            "the published log still describes the key under a released version",
         )
     }
 
