@@ -759,6 +759,24 @@ data class SetSensorsExport(
      */
     val analysedRole: String? = null,
     /**
+     * True when [analysedRole] is not the role the set armed for analysis,
+     * because that unit produced no stream and another one did (#207).
+     *
+     * The fact a reader cannot derive. "Analysed the preferred unit" and
+     * "analysed the only unit that turned up" are different statements about
+     * how far these figures can be compared with the rest of a corpus, and
+     * once the analysed role is one that streamed, `analysedRole !in present`
+     * no longer separates them.
+     *
+     * Absent rather than false on the ordinary set: the exporter writes with
+     * `encodeDefaults = false`, and unlike [expected] and [present] this key
+     * has an unremarkable normal that omission reads correctly, the same rule
+     * [SetExport.failed] and [SetExport.warmup] follow. Absent is also what
+     * every document written before this version carries, and it means the
+     * same thing there -- no build before it could move the analysed role.
+     */
+    val analysedFellBack: Boolean = false,
+    /**
      * Why two or more PAIRED units produced one stream, or absent when
      * nothing was in the way.
      *

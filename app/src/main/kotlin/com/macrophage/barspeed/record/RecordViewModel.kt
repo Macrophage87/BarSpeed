@@ -400,6 +400,60 @@ private data class PendingSetWrite(
 )
 
 /**
+ * Which capture the DSP is pointed at, and what the row will say about the
+ * choice (#207).
+ *
+ * A free function taking what it needs, for [completedSetOf]'s reason:
+ * [RecordViewModel] sits at detekt's LargeClass limit, so a dozen lines of
+ * decision inside it reds `:app:detekt`, which is CI's first step.
+ *
+ * The DECISION is [SensorCapturePolicy.analysedStream]'s, in `:core:model`
+ * where a test runs on it. What is left here is a lookup: the roles are keys
+ * and the buffers are values, so nothing on this path can pair a role with the
+ * wrong capture. Which roles count as PRESENT is
+ * [SensorCapturePolicy.present]'s answer and not a second reading of the same
+ * question -- the export asks that same function, and a record path answering
+ * it differently is how two documents come to disagree about one set.
+ *
+ * [ArmedCapture.samples] falls back to the analysed buffer whenever no role is
+ * in play at all, which is the ordinary one-sensor set and the set that met
+ * two paired units it could not tell apart. Both record one unroled stream and
+ * neither has a second buffer to choose between.
+ */
+private fun armedCaptureOf(
+    armed: RecordedSensors?,
+    secondaryRole: SensorRole?,
+    analysedBuffer: List<ImuSample>,
+    secondaryBuffer: List<ImuSample>,
+): ArmedCapture {
+    val byRole = buildMap {
+        armed?.analysed?.let { put(it, analysedBuffer) }
+        secondaryRole?.let { put(it, secondaryBuffer) }
+    }
+    val streamed =
+        SensorCapturePolicy.present(armed?.expected.orEmpty(), byRole.filterValues { it.isNotEmpty() }.keys)
+    val decision = SensorCapturePolicy.analysedStream(armed?.analysed, streamed)
+    val sensors = armed?.copy(analysed = decision.role, analysedFellBack = decision.fellBack)
+    return ArmedCapture(
+        samples = decision.role?.let { byRole[it] } ?: analysedBuffer,
+        sensors = sensors,
+        // The partner is derived from the declaration rather than carried
+        // alongside it, so it cannot name a role the declaration does not.
+        // A role armed and silent still gets a SecondaryCapture with an empty
+        // list, which is what the repository turns into no row and a
+        // declaration that still names the role.
+        secondary = sensors?.secondaryRole?.let { SecondaryCapture(it, byRole[it].orEmpty()) },
+    )
+}
+
+/** [armedCaptureOf]'s three answers, which have to be decided together. */
+private data class ArmedCapture(
+    val samples: List<ImuSample>,
+    val sensors: RecordedSensors?,
+    val secondary: SecondaryCapture?,
+)
+
+/**
  * The frozen set-write, in the shape the repository stores.
  *
  * A free function taking what it needs, rather than the inline construction
@@ -3090,6 +3144,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 else -> slot?.tempo
             }
         val manualReps = if (s.manualSet) s.manualReps else null
+        // Which buffer the DSP is pointed at, and what the row says about the
+        // choice (#207). Frozen here with everything else, from the buffers as
+        // they stand at the end of the set.
+        val capture = armedCaptureOf(armedSensors, armedSecondaryRole, imuBuffer.toList(), imuBufferB.toList())
         pendingWrite =
             PendingSetWrite(
                 exercise = exercise,
@@ -3121,19 +3179,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 startedAtMs = setStartedAtMs,
                 endedAtMs = endedAtMs,
                 orderIdx = s.setsCompleted,
-                samples = imuBuffer.toList(),
+                samples = capture.samples,
                 hrSamples = hrBuffer.toList(),
                 restHrSamples = restHrBuffer.toList(),
                 cues = cueBuffer.toList(),
                 repMarks = journal?.repMarks.orEmpty(),
-                sensors = armedSensors,
+                sensors = capture.sensors,
                 // A role and its samples together, so a full stream cannot
                 // exist without a label. Non-null with an EMPTY list when the
                 // role was armed and its unit produced nothing -- which the
                 // repository turns into no row and a declaration that still
                 // names the role, the state that makes a flat battery readable
                 // afterwards rather than invisible.
-                secondary = armedSecondaryRole?.let { SecondaryCapture(it, imuBufferB.toList()) },
+                secondary = capture.secondary,
                 rating = rating,
                 planName = s.planName.takeIf { !s.adHoc },
                 planSessionName = s.planSessionName.takeIf { !s.adHoc },
