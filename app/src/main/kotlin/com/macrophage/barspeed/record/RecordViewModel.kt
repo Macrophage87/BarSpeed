@@ -420,7 +420,7 @@ private data class PendingSetWrite(
  * two paired units it could not tell apart. Both record one unroled stream and
  * neither has a second buffer to choose between.
  */
-private fun armedCaptureOf(
+internal fun armedCaptureOf(
     armed: RecordedSensors?,
     secondaryRole: SensorRole?,
     analysedBuffer: List<ImuSample>,
@@ -435,7 +435,7 @@ private fun armedCaptureOf(
     val decision = SensorCapturePolicy.analysedStream(armed?.analysed, streamed)
     val sensors = armed?.copy(analysed = decision.role, analysedFellBack = decision.fellBack)
     return ArmedCapture(
-        samples = decision.role?.let { byRole[it] } ?: analysedBuffer,
+        samples = analysedBuffer,
         sensors = sensors,
         // The partner is derived from the declaration rather than carried
         // alongside it, so it cannot name a role the declaration does not.
@@ -447,7 +447,7 @@ private fun armedCaptureOf(
 }
 
 /** [armedCaptureOf]'s three answers, which have to be decided together. */
-private data class ArmedCapture(
+internal data class ArmedCapture(
     val samples: List<ImuSample>,
     val sensors: RecordedSensors?,
     val secondary: SecondaryCapture?,
