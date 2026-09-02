@@ -27,14 +27,14 @@ data class SetCardValue(
  * The values a set card states, each carrying the plan's figure when the lifter
  * has changed it.
  *
- * This replaces the prose [SetDeviationSummary.parts] returned. Both said the
- * same thing; they said it in different places. `parts` produced sentences for
- * a line UNDER the card while the card went on stating the plan's numbers, so a
- * changed load was on screen twice -- once as a number with no sign it had
- * moved, once as a sentence explaining that it had. The owner's ruling for #204
- * is that the number carries it: strike the plan's figure, put the new one
- * beside it. A pair cannot be struck through halfway, which is why this returns
- * pairs and not strings.
+ * This replaces the prose `SetDeviationSummary.parts` returned before #204
+ * deleted it. Both said the same thing; they said it in different places.
+ * `parts` produced sentences for a line UNDER the card while the card went on
+ * stating the plan's numbers, so a changed load was on screen twice -- once as
+ * a number with no sign it had moved, once as a sentence explaining that it
+ * had. The owner's ruling is that the number carries it: strike the plan's
+ * figure, put the new one beside it. A pair cannot be struck through halfway,
+ * which is why this returns pairs and not strings.
  *
  * The edge cases are `parts`'s and are kept deliberately:
  *
