@@ -32,9 +32,10 @@ import kotlin.test.assertTrue
  * follow a rest window, and a session row carrying the summary that session
  * published -- avg 107, max 137, RMSSD 13.1 ms. What field-36 reports as
  * missing is a fifteenth heart-rate file after set 14, and
- * [a set with no rest_after stream produces no rest_after file] pins the
- * absence before this branch's write landed so the differential that closes
- * it has something to move.
+ * [a set with no rest_after stream produces no rest_after file] pinned the
+ * absence before the write in this branch landed; a real fourteen-set
+ * session now carries the file, so what survives here is the fixture-scoped
+ * statement that the exporter invents nothing.
  *
  * Nothing here executes Room, SQLite or Android. The DAO is an interface and
  * the fakes below stand in for it; what is verified is the exporter's own

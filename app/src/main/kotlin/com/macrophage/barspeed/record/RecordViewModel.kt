@@ -3474,10 +3474,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * `hrAvgBpm` and `hrMaxBpm` are all rebuildable later from rows that are
      * already durable — the set rows carry their own end times and their own
      * heart-rate columns. `hrvRmssdMs` is not. Its input is [sessionRrMs],
-     * accumulated across READY, IN_SET and RESTING, and the only R-R that
-     * reaches storage is the per-set `hrm` stream covering IN_SET; the rest
-     * windows are held here and nowhere else. A cancelled close is the
-     * difference between the lifter having that number and never having it.
+     * accumulated across READY, IN_SET and RESTING, and each of those windows
+     * reaches storage on its own: IN_SET as the set's `hrm` stream, READY and
+     * each inter-set rest as the following set's `rest_before_hrm` stream, and
+     * the window after the last set as `rest_after_hrm` written by the close
+     * below (#109). What is held here and nowhere else is the accumulated
+     * list itself and the single `hrvRmssdMs` computed from it. A cancelled
+     * close is the difference between the lifter having that number and
+     * never having it.
      *
      * So the work moves to `appScope`, joining the set write and the two rest
      * screen corrections, and on `Dispatchers.Main.immediate` for the reason
