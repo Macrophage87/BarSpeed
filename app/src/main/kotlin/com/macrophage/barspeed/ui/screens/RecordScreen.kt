@@ -511,8 +511,10 @@ private fun BodyWeightPromptDialog(
  * WHAT IT DRAWS IS THE QUEUE. `state.queue` is the list the record flow walks,
  * built once by `flattenPlan` when the session card was tapped and handed
  * straight to the Start press; this composable projects each slot with
- * `previewSet()` and phrases it with `SessionPreviewPolicy.setLine`, the same
- * function `SlotCard` uses for "Up next" on the first set. Nothing here reads
+ * `previewSet()` and phrases it with `SessionPreviewPolicy.setLine`, whose base
+ * text `SlotCard` shares: "Up next" draws `struckLine` over `SetCardValues.of`,
+ * and `setLine` is that same `of` rendered by `SetCardValues.plain`, so an
+ * unrun set reads the same string on both surfaces. Nothing here reads
  * `PlanSessionDef`, so there is no second rendering of the plan to disagree
  * with the set the lifter lands on.
  *

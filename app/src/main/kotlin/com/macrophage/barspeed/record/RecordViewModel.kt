@@ -257,7 +257,9 @@ data class PlannedSlot(
  * off the slot the record flow is going to run, with no arithmetic and no
  * second consultation of `PlanSessionDef`. That is what stops the preview and
  * the first set's "Up next" card ever disagreeing -- they are the same queue,
- * rendered by the same `SessionPreviewPolicy.setLine`.
+ * and their text has one source: the card draws `SetCardValues.of` with the
+ * plan's displaced figures struck, and `SessionPreviewPolicy.setLine` is that
+ * same `of` rendered plain.
  *
  * It takes [loadKg], [reps], [durationS] and [tempo] -- the STANDING values --
  * rather than their frozen `planned*` twins, because the preview answers "what
