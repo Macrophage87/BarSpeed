@@ -93,7 +93,38 @@ data class ResolvedGeometry(
  * that was actually used, never recomputing them -- so what gets published
  * cannot drift from what the DSP was handed, whatever else changes upstream.
  */
+/**
+ * One resolved `sensorOnStack` value together with where it came from.
+ *
+ * A pair rather than a bare boolean because the two answers are decided by the
+ * same three-way question -- did the plan say, does the app ship a default for
+ * this id, or is nothing known -- and computing them apart is how a published
+ * provenance drifts from the value it describes.
+ */
+data class StackMount(val onStack: Boolean, val source: GeometrySource)
+
 object SetGeometryPolicy {
+    /**
+     * Whether the sensor rode a weight stack for this set, and on whose word.
+     *
+     * Precedence, highest first:
+     *
+     * 1. [declared] non-null -- the plan said so, either way. A declared
+     *    `false` wins over the seed default: the lifter may have clipped the
+     *    sensor to the handle, and only whoever wrote the plan can know.
+     * 2. [base] already true, or [id] is one of [ExerciseDef.STACK_MOUNTED_IDS]
+     *    -- the app's own definition of that machine.
+     * 3. Nothing at all, so the type default stands. Not [GeometrySource.INFERRED]:
+     *    no words in the id are being read, only an exact match against a table
+     *    the app ships, so an id spelled any other way lands here rather than
+     *    being guessed at.
+     */
+    fun stackMount(id: String, base: Boolean, declared: Boolean?): StackMount = when {
+        declared != null -> StackMount(declared, GeometrySource.DECLARED)
+        base || ExerciseDef.ridesStack(id) -> StackMount(true, GeometrySource.SEEDED)
+        else -> StackMount(false, GeometrySource.DEFAULT)
+    }
+
     /**
      * Overlay a plan exercise's declarations on the built-in definition.
      *

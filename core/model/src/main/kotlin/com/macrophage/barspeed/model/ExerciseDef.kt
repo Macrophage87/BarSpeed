@@ -133,6 +133,57 @@ data class ExerciseDef(
 
         fun seedById(id: String): ExerciseDef? = SEED.firstOrNull { it.id == id }
 
+        /**
+         * Exercise ids whose machine carries the sensor on a pin-selected
+         * weight stack by construction, so an omitted `sensorOnStack` on one
+         * of them is an omission rather than a declaration of "on the bar".
+         *
+         * Deliberately NOT [SEED] entries. [SetGeometryPolicy.describe] asks
+         * [seedById] once for the whole geometry object, so seeding these ids
+         * would publish SEEDED for `concentric`, `plane`, `kind` and
+         * `travelRatio` too -- values no entry here has decided, and on a
+         * pulldown the concentric default is the wrong one. This table states
+         * one fact per id and claims nothing else.
+         *
+         * The families, and why each rides a stack:
+         *
+         * - `assisted_pull_up`, `assisted_chin_up`, `assisted_dip`: the
+         *   assistance is a pin-selected counterweight, and the sensor clips
+         *   to the carriage it drives. This is field-37's own shape (#223).
+         * - `lat_pulldown`, `seated_row`, `seated_cable_row`, `cable_row`,
+         *   `triceps_pushdown`: cable stations, where the load IS the stack
+         *   and the handle is only a handle. The app's own plan prompt uses a
+         *   seated cable row as its worked example of the key.
+         * - `leg_curl`, `seated_leg_curl`, `lying_leg_curl`, `leg_extension`:
+         *   selectorised machines whose stack is the only place a sensor can
+         *   ride the load.
+         *
+         * Leg press and hack squat sleds are deliberately ABSENT although
+         * #223 names them. Their sled is the load itself and travels along an
+         * inclined rail, so it is not a stack riding the other end of a cable
+         * -- and `sensorOnStack` forces the measured axis to vertical
+         * (`LiftDirection.measuredPlane`), which on a 45-degree sled would be
+         * a claim about the axis nothing here has measured.
+         */
+        val STACK_MOUNTED_IDS: Set<String> =
+            setOf(
+                "assisted_pull_up",
+                "assisted_chin_up",
+                "assisted_dip",
+                "lat_pulldown",
+                "seated_row",
+                "seated_cable_row",
+                "cable_row",
+                "triceps_pushdown",
+                "leg_curl",
+                "seated_leg_curl",
+                "lying_leg_curl",
+                "leg_extension",
+            )
+
+        /** Whether the app ships a stack-mount default for this exact id. */
+        fun ridesStack(id: String): Boolean = id.lowercase() in STACK_MOUNTED_IDS
+
         private val EXPLOSIVE_HINTS = listOf("swing", "snatch", "clean", "jerk", "push_press", "throw", "slam")
         private val HOLD_HINTS = listOf("plank", "hold", "hang", "wall_sit", "l_sit")
         private val CARRY_HINTS = listOf("carry", "walk", "farmer", "yoke", "sled")
