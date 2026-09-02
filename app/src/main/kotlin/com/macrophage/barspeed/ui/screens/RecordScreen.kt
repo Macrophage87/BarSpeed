@@ -826,9 +826,10 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
  * Drawn on READY and on RESTING. READY is drawn once per session --
  * `startNextSet` writes READY and calls `beginSet` in the same frame -- so a
  * card on READY alone names a silent unit before set one and never again,
- * while RESTING precedes every later set. SETUP has no set armed yet -- there
- * is no roster until an exercise is chosen -- and the bar-sensor card already
- * there covers the analysed link being down.
+ * while RESTING precedes every later set. SETUP draws no card: the roster IS
+ * answerable there, so the omission is a DECISION and not a limit, made
+ * because the bar-sensor card already on that screen covers the analysed
+ * link being DOWN and does not cover a link that is up and silent.
  *
  * AND ONLY WHERE A ROLE IS ARMED, which is two paired bar sensors carrying
  * different labels. On a one-sensor set `SensorRoster.analysed` is null, so

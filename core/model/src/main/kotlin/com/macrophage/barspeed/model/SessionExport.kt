@@ -386,9 +386,11 @@ data class SessionExport(
          * this says what the app observed of it, which is the difference
          * between "power it on", "pair the right unit" and "power-cycle it".
          * Its vocabulary is deliberately weak, and the published description
-         * says so -- `notLinked` merges powered-off, out of range, refused and
-         * an OS bond removed behind the app's back, because nothing in this
-         * app reads `BluetoothDevice.getBondState()`. It does NOT apply
+         * says so -- `notLinked` merges powered-off, out of range, refused,
+         * an OS bond removed behind the app's back, and a connect that
+         * failed service discovery, because nothing in this app reads
+         * `BluetoothDevice.getBondState()` and a discovery failure looks the
+         * same as a link that never opened. It does NOT apply
          * retroactively, for 1.16's reason: the reading is frozen into the
          * set's row when the set is RECORDED, so a set recorded before this
          * version publishes nothing here whatever its document's
@@ -920,8 +922,10 @@ data class SetSensorsExport(
      * Values are `notLinked`, `linkWithoutSensor`, `linkedSilent` and
      * `tooSoon`, spelled as [ArmedSilencePolicy.wireOf] spells them, and each
      * is weaker than it looks. `notLinked` merges powered-off, out of range,
-     * refused and a bond removed in the phone's settings, because nothing in
-     * this app reads the OS bond state. The published description in
+     * refused, a bond removed in the phone's settings, and one that connected
+     * and then failed service discovery, because nothing in this app reads
+     * the OS bond state and a connect that never completes discovery reads
+     * the same as one that never started. The published description in
      * `docs/schemas/session-export.schema.json` is the copy a reader of the
      * document has and states each limit in full.
      *
@@ -929,7 +933,11 @@ data class SetSensorsExport(
      * [analysedFellBack] follows and deliberately not the one [expected] and
      * [present] follow: there is no informative empty here, and absence also
      * covers every set recorded by a build that could not observe delivery at
-     * all, which is every set before this version.
+     * all, which is every set before this version. Two further meanings this
+     * version cannot remove: a set shorter than three seconds where an armed
+     * unit's last frame arrived during the preceding rest reads as
+     * delivering and is left out; and a set armed with one bar sensor arms
+     * no ROLE at all, so this whole map is absent there too (#224).
      */
     val silent: Map<String, String> = emptyMap(),
 )

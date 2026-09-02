@@ -64,7 +64,11 @@ enum class ArmedDelivery {
      */
     TOO_SOON,
 
-    /** No GATT link is up. Powered off, out of range, unbonded or refused -- the app cannot tell which. */
+    /**
+     * No usable GATT link is up at that moment. Powered off, out of range,
+     * unbonded, refused, or one that connected and then failed service
+     * discovery -- the app cannot tell which.
+     */
     NOT_LINKED,
 
     /** A device answered and returned a GATT profile with no notify characteristic this app can use. */
