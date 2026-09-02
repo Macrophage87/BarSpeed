@@ -4,6 +4,7 @@ import com.macrophage.barspeed.model.StartPhase
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Seated leg curl at prescribed 1030, three sets, 2026-08-18 (app 0.1.39), with
@@ -152,14 +153,32 @@ class LegCurlCueTrackTest {
         // synthetic sets whose dwell is set by construction, where it recovers
         // 0.00, 0.25, 0.50, 1.00 and 2.00 s to within 30 ms.
         val raw = sets.flatMap { (name, _, _) -> rawTurnaroundDwellS(name) }.sorted()
-        val pipeline = sets.flatMap { (name, _, kg) -> analyze(name, kg).reps.map { it.bottomPauseS } }.sorted()
+        // The seated leg curl starts concentric with the concentric going
+        // DOWN, so startsAtTop is true and bottomPause_s is the turnaround
+        // between the rep's two phases -- the field #93 keeps, not the one it
+        // removes. Every rep that resolves both phases publishes it.
+        val pipeline = sets
+            .flatMap { (name, _, kg) -> analyze(name, kg).reps.map { it.bottomPauseS } }
+            .filterNotNull()
+            .sorted()
         assertEquals(33, raw.size, "cued eccentrics with a turnaround after them")
         assertEquals(0.131, raw[raw.size / 2], 5e-3, "median turnaround, from the raw signal")
-        assertEquals(0.04, pipeline[pipeline.size / 2], 5e-3, "median bottomPause_s over the same reps")
-        // And why the median hides it: the field absorbs whatever sits between
-        // reps, so on a set whose whole prescribed cadence is 5 s it reports a
-        // single pause of 3.01 s. See #93.
+        // 0.05, not the 0.04 this read before #93: the drive-only detections
+        // used to contribute a fabricated 0.0 to this list and now contribute
+        // nothing, so the list is shorter and the median moves up. It is still
+        // less than half the raw signal's 0.131 s, which is the disagreement
+        // this test exists to record and which #93 does not close.
+        assertEquals(0.05, pipeline[pipeline.size / 2], 5e-3, "median bottomPause_s over the same reps")
+        // And why the median hides it: even bounded by the rep's own phases,
+        // this field is only as good as the segmentation, and on a set whose
+        // whole prescribed cadence is 5 s one detection reports a turnaround of
+        // 3.01 s -- a true statement about a detection that merged reps. See
+        // #93, which fixes the interval and explicitly does not fix this.
         assertEquals(3.01, pipeline.max(), 5e-3, "largest bottomPause_s across the three sets")
+        // The other end is the rep boundary and publishes nothing.
+        val tops = sets.flatMap { (name, _, kg) -> analyze(name, kg).reps.map { it.topPauseS } }
+        assertTrue(tops.isNotEmpty(), "reps resolved")
+        assertTrue(tops.all { it == null }, "topPause_s is not published on a lift that turns at the bottom")
     }
 
     /**

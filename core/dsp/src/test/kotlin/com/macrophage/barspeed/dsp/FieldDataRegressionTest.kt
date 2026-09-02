@@ -1019,7 +1019,13 @@ class FieldDataRegressionTest {
         )
         // Rep 2's bottom pause -- see the class KDoc for why issue #93 is
         // named beside it.
-        assertEquals(14.27, analysis.reps[1].bottomPauseS, 1e-3, "rep 2's bottom pause, seconds -- issue 93")
+        val rep2BottomPause: Double? = analysis.reps[1].bottomPauseS
+        assertEquals<Double?>(14.27, rep2BottomPause, "rep 2's bottom pause, seconds -- issue 93")
+        // Ecc-first, so the top is the rep BOUNDARY and publishes nothing:
+        // the stillness there ran on until the next drive and was rest, which
+        // is the half of #93 that is removed rather than corrected.
+        val tops: List<Double?> = analysis.reps.map { it.topPauseS }
+        assertEquals(listOf<Double?>(null, null), tops, "top pause, seconds -- issue 93")
         // The last of the two resolved reps is also the faster of the two, so
         // today's SetAnalyzer withholds velocity loss instead of publishing
         // the degenerate 0% app 0.1.40 actually reported for this set in the
@@ -1046,10 +1052,14 @@ class FieldDataRegressionTest {
         assertEquals(2, analysis.reps.size, "segmented reps; the lifter performed 8")
         assertEquals(0, analysis.detectionsAfterSetEndCue, "detections after Done")
         assertMeasured(listOf(0.256, 0.103), analysis.reps.map { it.romM }, "ROM, metres")
-        // Contrast with the bilateral leg press above: no bottom pause
-        // anywhere near issue #93's range, despite the same tempo and the
-        // same 2-of-8 count -- see the class KDoc.
-        assertMeasured(listOf(0.04, 0.05), analysis.reps.map { it.bottomPauseS }, "bottom pause, seconds")
+        // Con-first with the drive going up, so the BOTTOM is the rep
+        // boundary: what used to be published here as a bottom pause was the
+        // interval to the next drive, 0.04 and 0.05 s on these two reps, and
+        // it is not published at all now (#93). The turnaround this rep does
+        // contain is at the top.
+        val bottoms: List<Double?> = analysis.reps.map { it.bottomPauseS }
+        assertEquals(listOf<Double?>(null, null), bottoms, "bottom pause, seconds -- issue 93")
+        assertMeasured(listOf(0.13, 0.03), analysis.reps.mapNotNull { it.topPauseS }, "top pause, seconds")
         assertEquals<Double?>(5.2, analysis.velocityLossPct, "velocity loss reported to the lifter")
     }
 

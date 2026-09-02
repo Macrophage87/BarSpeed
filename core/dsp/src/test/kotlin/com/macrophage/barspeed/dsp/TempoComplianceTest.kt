@@ -111,10 +111,16 @@ class TempoComplianceTest {
         assertEquals(4, analysis.reps.count { it.eccS == null }, "reps with no measurable eccentric")
         assertEquals(4, phase(c, "concentric").repsEvaluated, "every drive was measured")
         assertEquals(4, phase(c, "concentric").repsWithinTolerance, "every drive was on tempo")
-        // Where the unresolved lowering ended up: absorbed into the bottom pause
-        // rather than discarded, which is why the eccentric reads as absent and
-        // not as short. Pinned so the figure in the KDoc above is checked.
-        assertEquals(9.9, phase(c, "bottomPause").actualMeanS, "the lowering was absorbed into the pause")
+        // Where the unresolved lowering used to end up: this asserted a mean
+        // bottomPause of 9.9 s and called it "absorbed into the pause". It was
+        // not a pause. These reps resolve ONE phase each, so they contain no
+        // turnaround at all, and 9.9 s was the mean interval from the end of
+        // each drive to the start of the next one -- the lowering plus whatever
+        // rest followed it, measured outside the rep. Issue #93. Both pause
+        // phases now resolve nothing on this set and say so.
+        assertNull(phase(c, "bottomPause").actualMeanS, "a drive-only rep contains no turnaround")
+        assertEquals(0, phase(c, "bottomPause").repsEvaluated, "and none was evaluated")
+        assertNull(phase(c, "topPause").actualMeanS, "nor at the other end")
         // Nothing is said about the eccentric, because the verdict loop is
         // guarded on repsEvaluated > 0. The set-level ratio is the only place
         // this set is described, which is why getting it wrong is silent.
