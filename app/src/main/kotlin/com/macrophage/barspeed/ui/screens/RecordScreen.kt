@@ -3381,6 +3381,9 @@ internal fun RestHeader(state: RecordState, viewModel: RecordViewModel) {
     state.lastFeedback?.let { feedback ->
         Spacer(Modifier.height(6.dp))
         FeedbackChips(feedback, state.hrBpm, state.hrvMs)
+        // What the tempo ratio in the pills above does not cover, when it does
+        // not cover everything the set prescribed. #56.
+        TempoCoverageNote(feedback.analysis)
     }
 }
 
@@ -3430,19 +3433,10 @@ private fun FeedbackChips(feedback: SetFeedback, hrBpm: Int?, hrvMs: Int? = null
                 },
             )
         }
-        // No gradeable rep means no ratio to show. Drawing it anyway printed
-        // "Tempo 0/0 ✓" in the OK tone, because 0 == 0 -- a green tick over a
-        // set nothing graded. On the history screen that tick sits in the same
-        // Card as the "No reps detected" verdict; here the verdict text does
-        // not render for a rep set, so the tick appears beside a "0 ×" header
-        // with nothing to contradict it.
-        analysis.tempoCompliance?.takeIf { it.repsEvaluated > 0 }?.let { compliance ->
-            val ok = compliance.repsFullyCompliant == compliance.repsEvaluated
-            VerdictChip(
-                "Tempo ${compliance.repsFullyCompliant}/${compliance.repsEvaluated}" + if (ok) " ✓" else "",
-                if (ok) ChipTone.OK else ChipTone.WARN,
-            )
-        }
+        // The wording, the tick and the tone are TempoScoreLabel's in
+        // :core:model, so this screen and the history screen cannot drift and
+        // the decision is reachable by a test. #56.
+        tempoScoreOf(analysis)?.let { VerdictChip(it.text, it.tone.chipTone()) }
         // Asked of the reps rather than read off analysis.velocityLossPct, so
         // this chip and the exported velocityLoss_pct are answered by one
         // function and cannot drift apart.

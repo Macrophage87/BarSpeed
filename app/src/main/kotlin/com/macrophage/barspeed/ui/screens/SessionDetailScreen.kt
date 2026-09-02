@@ -206,6 +206,10 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
             SetCardHeader(record, unit)
             analysis?.let { a ->
                 SetChips(record, a)
+                // What the ratio in the chip above does not cover. History
+                // carried no qualifier at all, so a set graded on the drive
+                // alone read as a fully compliant one. #56.
+                TempoCoverageNote(a)
                 if (a.reps.isNotEmpty()) {
                     SetVelocityBars(record, a)
                     // The prescription this set's eccentric was GRADED
@@ -282,16 +286,12 @@ private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis) {
                 },
             )
         }
-        // Same guard as the rest screen: 0/0 is not a score, and 0 == 0 drew it
-        // as a green tick. History reads stored analyses, so sets recorded
-        // before the denominator fix still show their old ratio here.
-        analysis.tempoCompliance?.takeIf { it.repsEvaluated > 0 }?.let { compliance ->
-            val ok = compliance.repsFullyCompliant == compliance.repsEvaluated
-            VerdictChip(
-                "Tempo ${compliance.repsFullyCompliant}/${compliance.repsEvaluated}" + if (ok) " ✓" else "",
-                if (ok) ChipTone.OK else ChipTone.WARN,
-            )
-        }
+        // One decision with the rest screen, in :core:model where a test
+        // reaches it -- the two copies of it here and there could not be
+        // tested and were free to drift. History reads stored analyses, so
+        // sets recorded before the denominator fix still show their old ratio
+        // here. #56.
+        tempoScoreOf(analysis)?.let { VerdictChip(it.text, it.tone.chipTone()) }
         // Asked of the STORED reps, not of the stored velocityLossPct. History
         // renders analyses frozen when each set was recorded, so re-asking here
         // is what makes this rule reach sets recorded before it existed --
