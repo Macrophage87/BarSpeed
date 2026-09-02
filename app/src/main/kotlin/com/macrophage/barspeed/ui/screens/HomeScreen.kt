@@ -212,7 +212,14 @@ private fun HeroCard(state: HomeState, onStart: () -> Unit) {
                 modifier = Modifier.padding(vertical = 4.dp),
             )
             Text(
-                "${state.planSessionCount} sessions · ${state.planExerciseCount} exercises · " +
+                // "distinct exercises", not bare "exercises": this counts
+                // DISTINCT movement ids across the whole plan, while the
+                // record screen's "Up next" summary and the session picker
+                // card both say "exercises" for a BLOCK count scoped to one
+                // session -- two different questions sharing one word would
+                // read as one number to a lifter comparing them (#227 item
+                // 3). See HomeState.planExerciseCount's KDoc.
+                "${state.planSessionCount} sessions · ${state.planExerciseCount} distinct exercises · " +
                     "${state.planSetCount} sets",
                 style = MaterialTheme.typography.bodySmall,
                 color = BarColors.Sub,

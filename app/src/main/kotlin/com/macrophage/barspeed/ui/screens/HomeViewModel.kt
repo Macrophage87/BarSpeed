@@ -39,6 +39,18 @@ data class HomeState(
     val planName: String? = null,
     val planSessionCount: Int = 0,
     val planSetCount: Int = 0,
+    /**
+     * DISTINCT exercise ids across the WHOLE plan, every session summed
+     * together -- not a block count and not scoped to one session.
+     *
+     * Answers a different question from the two other surfaces that draw the
+     * word "exercises": `RecordScreen.previewSummary` and the plan session
+     * picker card both count BLOCKS of the one session about to run (two
+     * blocks of the same lift count twice there; see `previewSummary`'s own
+     * KDoc for why the two agree with each other). `HeroCard` draws this one
+     * as "N distinct exercises" rather than bare "exercises" so the word does
+     * not imply it is answering the same question (#227 item 3).
+     */
     val planExerciseCount: Int = 0,
     val weekVolumeKg: Double = 0.0,
     val weekSessions: Int = 0,
