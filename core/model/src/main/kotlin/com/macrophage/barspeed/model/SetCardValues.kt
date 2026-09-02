@@ -66,13 +66,18 @@ object SetCardValues {
      * [plannedLoadKg] is null because no plan prescribed it -- drawing its load
      * instead of falling to nothing.
      */
-    @Suppress("LongParameterList")
+    @Suppress("LongParameterList", "UNUSED_PARAMETER")
     fun of(
         kind: ExerciseKind,
         bodyweight: Boolean,
         timed: Boolean,
         unit: WeightUnit,
         side: String?,
+        // The side the set will WORK, and beside it the one the plan asked
+        // for -- frozen the way plannedReps and plannedTempo are, so the card
+        // can strike one against the other. NOT READ AT THIS COMMIT: the
+        // strike is #215's fix and the pins for it are red until then.
+        plannedSide: String? = null,
         plannedLoadKg: Double?,
         statedLoadKg: Double?,
         declaredLoadKg: Double?,

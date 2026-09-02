@@ -350,6 +350,35 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
+         * v14: `plannedSide` on set_records -- the side the PLAN prescribed,
+         * frozen beside `side`, which from #215 carries the side the lifter
+         * actually worked (#144).
+         *
+         * NULLABLE WITH NO DEFAULT, which is [MIGRATION_10_11]'s and
+         * [MIGRATION_12_13]'s shape rather than [MIGRATION_11_12]'s: the
+         * entity's field is a `String?` with a real absent state -- bilateral
+         * work, an ad-hoc set, an appended set, and every row written before
+         * this column existed -- and any default would publish a prescription
+         * nobody wrote.
+         *
+         * Nothing is backfilled, and here the refusal is worth stating
+         * precisely because a backfill looks so nearly right: on every row
+         * written before v14, `side` WAS the prescription, so
+         * `UPDATE set_records SET plannedSide = side` would be true of the
+         * plan and false about the lifter. It would assert of every historical
+         * set that the app knew which limb moved, which is exactly the claim
+         * #144 was opened to say it could not make.
+         *
+         * DECLARED AND NOT YET REGISTERED AT THIS COMMIT: the body, the
+         * [DATABASE_VERSION] bump and the entry in [addMigrations] are #215's
+         * fix commit, and [Migration13To14Test] is red until then.
+         */
+        internal val MIGRATION_13_14 =
+            object : Migration(13, 14) {
+                override fun migrate(db: SupportSQLiteDatabase) = Unit
+            }
+
+        /**
          * Open the database, having first made sure opening it cannot destroy
          * it. Issue #101.
          *

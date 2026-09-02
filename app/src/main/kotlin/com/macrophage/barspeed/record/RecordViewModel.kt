@@ -65,6 +65,7 @@ import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetRepsPolicy
 import com.macrophage.barspeed.model.SetWriteState
+import com.macrophage.barspeed.model.SideChoicePolicy
 import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
@@ -153,6 +154,23 @@ data class PlannedSlot(
     val plannedTempo: String? = null,
     /** Unilateral sets: "left" or "right". */
     val side: String? = null,
+    /**
+     * The side the PLAN declared for this set, frozen and never written back
+     * to, the way [plannedTempo] is for tempo and [plannedReps] for the count.
+     *
+     * [side] carries the lifter's choice once `advancedState` has baked it in;
+     * this does not. It is what the export publishes as `plannedSide`, so a
+     * coach can see that the lifter swapped arm order, and it is what the
+     * rest-screen card strikes the changed side against. Until #215 there was
+     * no second field at all and `side` was a copy of the prescription with
+     * nowhere for a worked side to go -- issue #144.
+     *
+     * Null on a bilateral slot, on an APPENDED set -- prescribed by nothing,
+     * so every frozen field on it is null -- and on a slot built before this
+     * field existed; nothing persists a PlannedSlot, so the third case lives
+     * only inside one running session.
+     */
+    val plannedSide: String? = null,
     /**
      * How many identical objects this exercise block is held with, as the plan
      * declared it. DISPLAY ONLY: [loadKg] and [plannedLoadKg] are the TOTAL
@@ -1479,6 +1497,18 @@ internal fun appendedState(s: RecordState): RecordState? {
             plannedReps = null,
             plannedDurationS = null,
             plannedTempo = null,
+            // Nothing prescribed this set, so there is no prescribed side to
+            // freeze either. RESET rather than inherited, with the other four
+            // frozen declarations, and pinned as RESET in AppendedSlotTest.
+            plannedSide = null,
+            // The anchor's own side, EXPLICITLY: `base` is carriedValues(anchor)
+            // whenever the lifter's statements still apply to this exercise,
+            // and since #215 that function writes a stated side into the copy.
+            // A side stated for the set this append DISPLACES is not a
+            // statement about the appended set, and the table records `side`
+            // as INHERITED. Without this line the two would disagree the
+            // moment a lifter appended a set with an arm chosen.
+            side = anchor.side,
             isAddedSet = true,
             // Never inherited. The anchor may be a plan-declared warm-up --
             // the 60 lb pulldown opener this KDoc names -- and an appended
@@ -1517,6 +1547,10 @@ internal fun appendedState(s: RecordState): RecordState? {
         statedTempo = null,
         statedReps = null,
         statedDurationS = null,
+        // Cleared for the same reason, and it would have been cleared on the
+        // next rest transition anyway: a side stated for the set that has just
+        // been displaced is not a statement about the one now coming up.
+        statedSide = null,
         repsInput = appended.reps?.toString() ?: s.repsInput,
         durationInput = appended.durationS?.toString() ?: s.durationInput,
     )
@@ -1627,6 +1661,10 @@ private fun jumpedState(s: RecordState, done: List<PlannedSlot>, fixed: List<Pla
         // statement about the one they switched to.
         statedReps = null,
         statedDurationS = null,
+        // Cleared for statedLoadKg's reason, three fields over: an arm chosen
+        // for the exercise the lifter was about to do is not a statement about
+        // the one they switched to.
+        statedSide = null,
         repsInput = upcoming.reps?.toString() ?: s.repsInput,
         durationInput = upcoming.durationS?.toString() ?: s.durationInput,
         tempoInput = upcoming.tempo ?: "",
@@ -1891,6 +1929,14 @@ private fun restingState(
         (standingDurationS ?: nextSlot?.durationS ?: p.targetDurationS)?.toString() ?: s.durationInput,
         statedDurationS = standingDurationS,
         statedTempo = standingTempo,
+        // NOT carried, and this is the field that differs from the four above
+        // it. A stated side expires with the set it was made for: the plan
+        // writes unilateral work one set per side, so its own order is the
+        // alternation, and a choice that stood would put every remaining set of
+        // the block on one arm. Written explicitly rather than left to the copy
+        // for the reason the reason fields below give -- a field omitted here
+        // keeps the finished set's answer.
+        statedSide = null,
         // The AD-HOC field. On a plan session nothing draws or reads it -- the
         // wheels read statedTempo above, falling back to the slot's own
         // declaration -- and seedTempo no longer hands it the last tempo that
@@ -1945,6 +1991,9 @@ private fun adHocSessionState(s: RecordState): RecordState = s.copy(
     statedLoadKg = null,
     statedReps = null,
     statedDurationS = null,
+    // An ad-hoc session has no prescription to deviate from; its side is
+    // sideInput, which the Both/Left/Right chips write.
+    statedSide = null,
 )
 
 /**
@@ -1976,6 +2025,7 @@ internal fun advancedState(s: RecordState): RecordState {
             statedTempo = null,
             statedReps = null,
             statedDurationS = null,
+            statedSide = null,
         )
     }
     // Nothing to advance to, so advancing does nothing (#195). This branch
@@ -2157,6 +2207,16 @@ private fun carriedValues(slot: PlannedSlot, s: RecordState): PlannedSlot {
             declaredTempo = next.tempo,
             adjustedTempo = s.statedTempo,
         ),
+        // The lifter's choice of arm for THIS set, displacing the plan's
+        // prescription where they made one. plannedSide is deliberately not in
+        // this copy, for the reason every other frozen declaration is not: it
+        // stays at what the plan asked for so the card can strike the change
+        // and the export can publish both.
+        side =
+        SideChoicePolicy.carriedIntoNextSet(
+            declaredSide = next.side,
+            statedSide = s.statedSide,
+        ),
     )
 }
 
@@ -2203,6 +2263,24 @@ data class RecordState(
     val statedDurationS: Int? = null,
     /** Ad-hoc unilateral side: null (bilateral), "left", or "right". */
     val sideInput: String? = null,
+    /**
+     * The side the lifter has said the set now being set up will work, and null
+     * when they have said nothing about it (#215).
+     *
+     * A different fact from [sideInput], which is the AD-HOC selector: that one
+     * says which limb an unplanned set is for and is never read on a planned
+     * set. This is a deviation from a prescription that exists, written only by
+     * a tap of the change-next-set control.
+     *
+     * IT EXPIRES WITH THE SET IT WAS MADE FOR, which is where it parts company
+     * with [statedLoadKg], [statedReps] and [statedTempo]: those stand across
+     * the exercise block until the plan prescribes otherwise, and this is
+     * cleared on every rest transition. A plan writes unilateral work one set
+     * per side, so the plan's own order IS the alternation; a statement that
+     * stood would flip every remaining set of the block onto one arm, which is
+     * the opposite of what a lifter swapping arm order for ONE set asked for.
+     */
+    val statedSide: String? = null,
     /**
      * The AD-HOC tempo text field. A plan session neither draws it nor reads
      * it: its control is the digit steppers, and what they produce is

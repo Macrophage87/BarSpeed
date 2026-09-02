@@ -112,6 +112,7 @@ import com.macrophage.barspeed.model.SetLimiterTile
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetRepsPolicy
 import com.macrophage.barspeed.model.SetWriteState
+import com.macrophage.barspeed.model.SideChoicePolicy
 import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
@@ -775,6 +776,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
             slot,
             heading = "Up next",
             unit = state.weightUnit,
+            side = SideChoicePolicy.carriedIntoNextSet(declaredSide = slot.side, statedSide = state.statedSide),
             values = cardValues(state, slot),
             prep = cardPrep(state, slot),
             highlight = true,
@@ -1230,7 +1232,18 @@ private fun cardValues(state: RecordState, slot: PlannedSlot): List<SetCardValue
     bodyweight = slot.exercise.bodyweight,
     timed = slot.isTimed,
     unit = state.weightUnit,
-    side = slot.side,
+    // The side the set will WORK, by the same rule the bake applies at START,
+    // and the plan's own declaration beside it. Read through the policy rather
+    // than off the slot: on the rest screen the slot has NOT been baked yet, so
+    // reading slot.side would show the prescription while the lifter has
+    // already chosen the other arm -- the card-versus-record disagreement #45
+    // and #124 are both about.
+    side =
+    SideChoicePolicy.carriedIntoNextSet(
+        declaredSide = slot.side,
+        statedSide = state.statedSide,
+    ),
+    plannedSide = slot.plannedSide,
     plannedLoadKg = slot.plannedLoadKg,
     statedLoadKg = state.statedLoadKg,
     declaredLoadKg = slot.loadKg,
@@ -2682,6 +2695,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
                 "Up next · Set ${next.setIndexInExercise + 1} of ${next.setsInExercise}"
             },
             unit = state.weightUnit,
+            side = SideChoicePolicy.carriedIntoNextSet(declaredSide = next.side, statedSide = state.statedSide),
             values = cardValues(state, next),
             prep = cardPrep(state, next),
             highlight = true,
@@ -3501,6 +3515,13 @@ private fun SlotCard(
     slot: PlannedSlot,
     heading: String,
     unit: WeightUnit,
+    /**
+     * The side the set will WORK -- the lifter's choice where they made one,
+     * the plan's prescription otherwise -- and never `slot.side`, which on the
+     * rest screen is the unbaked declaration. Passed in rather than resolved
+     * here so the arrow and the word beside it come from one reading (#215).
+     */
+    side: String?,
     values: List<SetCardValue>,
     prep: SetCardValue?,
     highlight: Boolean = false,
@@ -3532,7 +3553,7 @@ private fun SlotCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(vertical = 4.dp),
             ) {
-                SideArrow(slot.side, Modifier.padding(end = 8.dp))
+                SideArrow(side, Modifier.padding(end = 8.dp))
                 Text(
                     struckLine("${slot.exercise.displayName} — ", values),
                     style = MaterialTheme.typography.titleMedium,

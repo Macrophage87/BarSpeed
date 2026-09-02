@@ -125,6 +125,11 @@ private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     "plannedReps" to Append.RESET,
     "plannedDurationS" to Append.RESET,
     "plannedTempo" to Append.RESET,
+    // #215's frozen side, in the same group and for the same reason: an
+    // appended set has no prescription, so it has no prescribed side. `side`
+    // one group up stays INHERITED -- the appended set is one more set of the
+    // anchor's exercise, on the arm that exercise was being worked with.
+    "plannedSide" to Append.RESET,
     // Facts about this slot's place and purpose, not the anchor's.
     "setIndexInExercise" to Append.RESET,
     "setsInExercise" to Append.RESET,
@@ -157,6 +162,9 @@ private fun slot(
     tempo = "3010",
     plannedTempo = "3010",
     side = side,
+    // Non-null in this fixture on purpose: the RESET sweep can only see a
+    // field being cleared where the anchor had something to clear.
+    plannedSide = side,
     implementCount = 2,
     exerciseNotes = "Brace before the first rep",
     exerciseNotesBehindTap = "Elbows under the bar",

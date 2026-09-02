@@ -43,8 +43,25 @@ data class CompletedSet(
      */
     val actualDurationS: Int? = null,
     val plannedDurationS: Int? = null,
-    /** Unilateral sets: "left" or "right". */
+    /**
+     * The side this set WORKED: "left", "right", or null on bilateral work.
+     *
+     * Since #215 this is the lifter's own choice where they made one on the
+     * change-next-set control, and the plan's prescription otherwise. Before
+     * it, it was always a copy of the prescription and no reading of the row
+     * could say which limb moved (#144).
+     */
     val side: String? = null,
+    /**
+     * The side the PLAN prescribed, frozen beside [side] the way
+     * [plannedReps] is frozen beside the count.
+     *
+     * Null on bilateral work, on an ad-hoc set, on an appended set -- nothing
+     * prescribed any of those -- and on every set recorded before database
+     * v14. NOT WRITTEN THROUGH AT THIS COMMIT: the column it fills is #215's
+     * fix and the pins for it are red until then.
+     */
+    val plannedSide: String? = null,
     val tempo: String?,
     val targetMeanConVelMps: Double?,
     val velocityLossStopPct: Double?,
