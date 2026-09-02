@@ -21,19 +21,20 @@ import java.io.File
  * until 10 no stock install could produce a `rescued/` directory, and the
  * rescued-database card -- three tiers, their titles, the discard dialog and
  * the share path -- had never been reachable outside a test. Ten was the first
- * value that could make that card appear; eleven, twelve and thirteen are
- * simply the next such values, and the first-time claim that used to stand here
- * is history rather than something these bumps repeat.
+ * value that could make that card appear; every value above it, this build's
+ * fourteen included, is simply the next such value, and the first-time claim
+ * that used to stand here is history rather than something these bumps repeat.
  *
  * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 14 writes the
  * file, then any build carrying 13 or less opens it. A forward install runs
  * the migration chain and never enters the rescue at all, so an ordinary
  * upgrade sees none of it.
  *
- * The version has moved before -- eleven times, shipped in v0.1.5, v0.1.10,
- * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, once in v0.1.42 and
- * twice in v0.1.44 -- the tagged ones read off the tags rather than
- * remembered. What was new at 11 was that a committed baseline existed for the
+ * The version has moved before -- twelve times, shipped in v0.1.5, v0.1.10,
+ * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, once in v0.1.42,
+ * twice in v0.1.44 and once in v0.1.45 -- every one read off
+ * `git show <tag>:core/data/.../AppDatabase.kt` rather than remembered. What
+ * was new at 11 was that a committed baseline existed for the
  * version below it, so for the first time in this repository a migration had a
  * document to be read against; 12 was the second such bump, 13 the third, and
  * 14 the fourth, with `13.json` as its baseline.

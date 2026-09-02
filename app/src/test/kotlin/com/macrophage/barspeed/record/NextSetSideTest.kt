@@ -24,10 +24,13 @@ import kotlin.test.assertNull
  * real way to break this and none of them would be caught by the differential
  * alone.
  *
- * WHAT IS NOT REACHABLE FROM HERE, said rather than implied. `restingState` is
- * private and takes a frozen set write, so the EXPIRY -- statedSide cleared on
- * every rest transition, which is what keeps the choice to one set -- is
- * compile-gated only, and is NOT settled by the emulator run either: that
+ * WHAT IS NOT REACHABLE FROM HERE, said rather than implied. The EXPIRY --
+ * statedSide cleared on every rest transition, which is what keeps the choice
+ * to one set -- is four functions, and only one of them is pinned:
+ * `AppendedSlotTest` reaches `removedState`, while `restingState` is private
+ * and takes a frozen set write, and `appendedState` and `jumpedState` are
+ * pinned for the other four stated fields and not for this one. So the expiry
+ * is mostly compile-gated, and is NOT settled by the emulator run either: that
  * run's plan was left / right / left, so set 3's prescription equals the
  * deviation stated for set 2, and it cannot tell expiry from coincidence. A
  * left / right / right plan would settle it and has not been run. And

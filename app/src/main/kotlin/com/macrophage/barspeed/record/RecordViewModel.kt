@@ -1943,9 +1943,8 @@ private fun restingState(
         // it. A stated side expires with the set it was made for: the plan
         // writes unilateral work one set per side, so its own order is the
         // alternation, and a choice that stood would put every remaining set of
-        // the block on one arm. Written explicitly rather than left to the copy
-        // for the reason the reason fields below give -- a field omitted here
-        // keeps the finished set's answer.
+        // the block on one arm. Written explicitly rather than left to the
+        // copy: a field omitted here keeps the finished set's answer.
         statedSide = null,
         // The AD-HOC field. On a plan session nothing draws or reads it -- the
         // wheels read statedTempo above, falling back to the slot's own

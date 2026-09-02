@@ -76,7 +76,7 @@ object SetCardValues {
         // The side the set will WORK, and beside it the one the plan asked
         // for -- frozen the way plannedReps and plannedTempo are, so the card
         // can strike one against the other (#215).
-        plannedSide: String? = null,
+        plannedSide: String?,
         plannedLoadKg: Double?,
         statedLoadKg: Double?,
         declaredLoadKg: Double?,

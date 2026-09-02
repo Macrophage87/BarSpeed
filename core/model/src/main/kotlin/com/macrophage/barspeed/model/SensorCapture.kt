@@ -16,8 +16,8 @@ import kotlinx.serialization.Serializable
  * recovered from an unlabelled one.
  *
  * It is also why this is deliberately NOT [PlanFile.VALID_SIDES]' vocabulary.
- * `side` says which limb was WORKED and is a copy of the prescription (#144);
- * this says where a sensor was. Two facts sharing a vocabulary in one document
+ * `side` says which limb was WORKED and, since #215, `plannedSide` beside it
+ * says which limb the plan asked for; this says where a sensor was. Two facts sharing a vocabulary in one document
  * is how a reader comes to believe the app measured something it never looked
  * at.
  *

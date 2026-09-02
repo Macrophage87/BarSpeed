@@ -165,6 +165,9 @@ object SessionPreviewPolicy {
             timed = set.durationS != null,
             unit = unit,
             side = set.side,
+            // The preview draws the PLAN, so nothing has deviated from it yet and
+            // there is no pair to strike.
+            plannedSide = null,
             plannedLoadKg = set.loadKg,
             statedLoadKg = null,
             declaredLoadKg = set.loadKg,

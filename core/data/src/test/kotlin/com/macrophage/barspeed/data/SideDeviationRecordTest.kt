@@ -139,9 +139,12 @@ class SideDeviationRecordTest {
      * Reflection, deliberately, and it is the one place in this file that uses
      * it: a typed `row.plannedSide` does not compile until the column exists,
      * so this assertion could not be written BEFORE the change it guards. Read
-     * by name, it fails three ways -- no such field, the field left unwritten,
-     * or the wrong value in it -- and only the last of those is a fix that got
-     * halfway.
+     * by name it fails on the field left unwritten and on the wrong value in
+     * it. It does NOT fail on a MISSING field in `a bilateral set publishes no
+     * side at all`: the `?: return null` branch answers null and the assertNull
+     * passes. What stops that going quiet is the typed `plannedSide =
+     * plannedSide` in `curlSet` above, which no longer compiles if the column
+     * goes.
      */
     private fun prescribedSideOf(row: SetRecordEntity): String? {
         val field =
