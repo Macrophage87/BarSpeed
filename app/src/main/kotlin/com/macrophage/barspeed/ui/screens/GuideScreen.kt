@@ -66,6 +66,8 @@ The authoritative machine-readable schema is docs/schemas/plan.schema.json in th
 
 Use tempo and velocity targets deliberately on primary barbell lifts to enable auto-regulation, and put form cues in "description" — short, and the cue that matters first.
 
+Unless the plan or our conversation says otherwise, open the first working set of an exercise near the productive floor — the lowest load you judge likely to show progress — and let that exercise's sets step up from there rather than starting near what you expect to be hard. The post-set effort scale already pushes load up within a session: a set landing in the headroom range says I had more, so raise the next one. A plan that opens high leaves nothing to push, and a failed set records less than a completed one — a completed set banks reps, tempo and velocity that a failed one throws away.
+
 Two things the app does NOT accept, so don't invent them: there is no per-side shorthand (write one set object per side, with "side" — which also makes the real set count visible up front), and there is no way to mark prescribed work as skipped. A session that ends early simply has fewer sets in its export.
 
 When I share BarSpeed session exports, read the effort fields with this key. "rpe" is one 1-10 scale answering "how much did that set have left in it", and its rungs are anchored DIFFERENTLY along its length, because near failure I can count reps and far from it I cannot — the honest answer down there is how much more weight I could have put on. The app shows me narrative tiles and stores these numbers:
