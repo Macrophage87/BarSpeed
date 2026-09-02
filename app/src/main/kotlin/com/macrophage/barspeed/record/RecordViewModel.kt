@@ -114,8 +114,8 @@ data class PlannedSlot(
      * the whole of #174's trap. It is what the export publishes as
      * `plannedReps`, so a coach can see the deviation -- until now the export
      * published the edit and called it the plan (#157). And it is what the
-     * rest screen's deviation line compares against, so a count changed and
-     * changed back no longer reads as no change (#170 item 6).
+     * rest screen's card strikes the changed count against, so a count
+     * changed and changed back no longer reads as no change (#170 item 6).
      *
      * Null on a slot the plan declared no count for, and on a slot built
      * before this field existed -- nothing persists a PlannedSlot, so the
