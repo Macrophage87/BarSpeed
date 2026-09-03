@@ -17,8 +17,12 @@ import kotlin.test.assertTrue
  * copy would drift, which is the whole reason `SchemaContractTest` reads the
  * published schemas rather than copies.
  *
- * Assertions are substring `contains` on the QUOTED form of each key, and
- * deliberately nothing else. Quoted, because the bare tokens are ordinary
+ * Assertions are substring `contains` on the QUOTED form of each key, and,
+ * for the two version sites, a regex whose whole match lies inside one
+ * line. Neither the skeleton pattern nor the prose pattern can cross a
+ * line terminator, so both are indifferent to the trailing carriage
+ * return; a size, an offset or a split-by-line index would not be.
+ * Quoted, because the bare tokens are ordinary
  * English in 15 KB of coaching prose — "sets" occurs 8 times bare and once
  * quoted, "reps" 7 and 2, "tempo" 13 and 2 — so a bare-token assertion is
  * satisfied by the surrounding sentences and is close to a test that cannot
@@ -242,6 +246,11 @@ class GuidePromptContractTest {
      * Read from [rendered], not from the raw source: both sites interpolate
      * [PlanFile.SCHEMA_VERSION], so what a lifter's clipboard receives is the
      * substituted text and not the token.
+     *
+     * Membership in SUPPORTED_SCHEMA_VERSIONS is not re-asserted here:
+     * SchemaContractTest already pins PlanFile.SCHEMA_VERSION in
+     * PlanFile.SUPPORTED_SCHEMA_VERSIONS, so once the extracted version
+     * equals SCHEMA_VERSION this check cannot fail.
      */
     @Test
     fun `the plan prompt skeleton advertises the version the app accepts`() {
@@ -258,11 +267,6 @@ class GuidePromptContractTest {
                 "the plan prompt's JSON skeleton tells the model to write \"$version\" while the app " +
                     "writes ${PlanFile.SCHEMA_VERSION}",
             )
-            assertTrue(
-                version in PlanFile.SUPPORTED_SCHEMA_VERSIONS,
-                "the plan prompt's JSON skeleton advertises \"$version\", which the import gate rejects, " +
-                    "so every plan copied from it fails validation",
-            )
         }
     }
 
@@ -276,12 +280,6 @@ class GuidePromptContractTest {
             "the plan prompt's prose should name the contract version exactly once, as " +
                 "${PlanFile.SCHEMA_VERSION}",
         )
-        named.forEach { version ->
-            assertTrue(
-                version in PlanFile.SUPPORTED_SCHEMA_VERSIONS,
-                "the plan prompt's prose names version \"$version\", which the import gate rejects",
-            )
-        }
     }
 
     /**
