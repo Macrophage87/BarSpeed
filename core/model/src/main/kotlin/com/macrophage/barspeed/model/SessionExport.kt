@@ -720,6 +720,25 @@ data class SessionExport(
          *
          * 1.19 carries a FIFTH change, under the same number and for the
          * reason the entries above state: a number takes further entries
+         * 1.19 carries a FIFTH change, under the same number and for the
+         * reason the entries above state -- 1.19 is unreleased, and a number
+         * takes further entries until it ships. `limiter` and `limiterNote`
+         * may now appear on a set that did NOT fail (#191): a completed set
+         * the lifter rated at the counted end, `rpe` 7 through 10, is asked
+         * the same question the failed set has been asked since #189, and
+         * stores the same answer in the same key. Additive to a validator --
+         * no key changes type, no key stops being written, the closed
+         * vocabulary does not move, and `DATABASE_VERSION` stays at 15
+         * because the column has always been on every set row. NOT nothing to
+         * a READER: a consumer that inferred `failed` from the presence of
+         * `limiter`, which nothing in this repository does but which the
+         * published description previously invited by saying only failed sets
+         * are asked, is wrong from this number on. Read `failed`. It does not
+         * apply retroactively and nothing backfills it. A completed set rated
+         * in the headroom rungs is not asked, so absence still covers
+         * skipped, never asked, and recorded before the app could ask. The
+         * published description of `limiter` is corrected with it.
+         *
          * until it ships, and 1.19 is unreleased. The closed `limiter`
          * vocabulary gains a ninth answer, `setup`: the set was set up wrong
          * before it was ever a test of the muscle (#146). Additive in what
@@ -1005,8 +1024,14 @@ data class SetExport(
      * the lifter's own words go in [limiterNote] beside it and never inside
      * this one.
      *
-     * ABSENT IS NOT AN ANSWER. The page is skippable in one tap and only
-     * failed sets are asked at all, so a missing key covers a question
+     * NOT ONLY FAILED SETS (#191). A completed set the lifter rated at the
+     * counted end -- `rpe` 7 through 10 -- is asked the same question, and a
+     * set carrying this key may therefore have `failed` absent. Read `failed`
+     * for whether the set finished; this key says what limited it either way.
+     * A completed set rated in the headroom rungs is not asked at all.
+     *
+     * ABSENT IS NOT AN ANSWER. The page is skippable in one tap and a whole
+     * class of set is never asked, so a missing key covers a question
      * skipped, a question never asked, and every set recorded before database
      * v13. None of those is a set that ended for an unknown reason and none
      * may be counted as one.

@@ -27,12 +27,13 @@ package com.macrophage.barspeed.model
  * ## The name is not `FailureReason`
  *
  * The column, the enum and the export key are all named for the thing that
- * LIMITED the set rather than for failure, because #191 widens the same field
- * to completed sets. On this programme that widening is not hypothetical: the
- * blocks run 4011 and 3010, so on a light set the tempo is deliberately the
- * limiter. Naming it for failure today would oblige renaming a released field
- * then. The values here are failure-shaped because failure is what is asked
- * about today; the field is not.
+ * LIMITED the set rather than for failure, because #191 has widened the same
+ * field to completed sets: a set rated at the counted end is asked what
+ * limited it whether or not it failed. On this programme that widening is not
+ * hypothetical: the blocks run 4011 and 3010, so on a light set the tempo is
+ * deliberately the limiter. The MEMBERS are still failure-shaped, because
+ * failure is what they were authored for; [SetLimiterScale] rewords the four
+ * that would otherwise claim something a finished set did not do.
  */
 enum class SetLimiter {
     /** The target muscle reached its limit. The load is at the edge. */
@@ -407,13 +408,21 @@ object SetLimiterPolicy {
     /**
      * Whether the page opens by itself for the set that has just been stored.
      *
-     * It opens on a FAILED set that carries no answer yet and whose lifter has
-     * not already dismissed it. All three conditions matter:
+     * It opens on a set that WAS LIMITED BY SOMETHING -- a failure, or a
+     * completed set the lifter rated at the counted end -- and that carries no
+     * answer yet, and whose lifter has not already dismissed it. Every
+     * condition matters:
      *
      * - `failed` is the EFFECTIVE verdict, the lifter's own tap OR-ed with the
      *   derived shortfall. The derived case is the one that most needs asking:
      *   a set ended with END SET EARLY records no tap at all, and "stopped for
-     *   an outside reason" is exactly what makes that record honest.
+     *   an outside reason" is exactly what makes that record honest. A failed
+     *   set is asked whatever it is rated, INCLUDING an unrated one: the
+     *   failure tile stores no rpe at all.
+     * - [ratedNearFailure] is the widening (#191). A completed set rated 7
+     *   through 10 was a test of something and only the lifter knows what; a
+     *   set rated in the headroom rungs was not, and asking is a tap that says
+     *   what a reader could already assume.
      * - a set that already carries an answer is not asked again, or a
      *   correction would be undone by the next recomposition.
      * - [dismissed] is the skip. Skipping must leave absence standing and must
@@ -422,26 +431,26 @@ object SetLimiterPolicy {
      *
      * The row itself stays reachable afterwards either way -- see
      * [offersCorrection] -- so a skip is not a door that locks.
-     *
-     * [rpe] IS NOT READ HERE YET. It is carried for [ratedNearFailure], which
-     * says why the parameter arrives one commit before it is consulted.
      */
-    // Suppressed for exactly one commit. The parameter arrives here before it
-    // is read so that the widening is a differential with a failing test in
-    // front of it rather than a behaviour change hidden inside a signature
-    // change; the commit that reads it deletes this line.
-    @Suppress("UnusedParameter")
     fun prompts(failed: Boolean, rpe: Int?, limiter: SetLimiter?, dismissed: Boolean): Boolean =
-        failed && limiter == null && !dismissed
+        (failed || ratedNearFailure(rpe)) && limiter == null && !dismissed
 
     /**
      * The rating a COMPLETED set has to carry before it is asked at all
      * (#191).
      *
-     * Not read yet. It is the seam the widening turns on, carried to the call
-     * sites first and consulted in a commit of its own, so the change of
-     * behaviour is one line with a failing test in front of it rather than a
-     * line hidden inside a signature change.
+     * The counted rungs, 7 through 10, read off [EffortScale] rather than
+     * restated here so the rungs #187 settled and the rungs this asks about
+     * cannot drift apart. Everything else is false, and each for its own
+     * reason: a headroom rung's whole content is that there was room left, so
+     * nothing limited the set; 2, 3 and 5 are valid values with no tile, never
+     * offered, so the app has no reading to act on; and a null is an unrated
+     * set, with no rung to decide on.
+     *
+     * ONE HALF OF THE ANSWER, NEVER THE WHOLE OF IT. A failed set is asked
+     * whatever it is rated -- see [prompts] -- because the failure tile stores
+     * no rpe, so a rule that consulted only the rating would stop asking the
+     * one set that has been asked since #189.
      */
     fun ratedNearFailure(rpe: Int?): Boolean = rpe != null && rpe >= EffortScale.PROXIMITY_FLOOR_RPE
 
@@ -449,14 +458,15 @@ object SetLimiterPolicy {
      * Whether the rest screen offers the reason row at all for the set just
      * stored.
      *
-     * A failed set, or any set already carrying an answer. The second half is
-     * not redundant: a lifter who answers and then wants to change it must
-     * still reach the row, and #191 will make an answer reachable on sets that
-     * never failed.
+     * Any set that would be asked -- a failure, or a completed set rated at
+     * the counted end -- or any set already carrying an answer whatever it was
+     * rated. The last clause is not redundant twice over: a lifter who answers
+     * and then wants to change it must still reach the row, and a set whose
+     * rating is corrected downward after an answer was given must not have the
+     * answer become unreachable.
      */
-    // Suppressed for exactly one commit, for [prompts]'s reason.
-    @Suppress("UnusedParameter")
-    fun offersCorrection(failed: Boolean, rpe: Int?, limiter: SetLimiter?): Boolean = failed || limiter != null
+    fun offersCorrection(failed: Boolean, rpe: Int?, limiter: SetLimiter?): Boolean =
+        failed || ratedNearFailure(rpe) || limiter != null
 
     /**
      * The whole caption over the page of tiles.
