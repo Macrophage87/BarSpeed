@@ -18,6 +18,14 @@ import kotlin.test.assertTrue
  * collector matches which feed. The cases that DO change are pushed alone, red,
  * in the commit after this one.
  *
+ * THE LAST CASE IN THE FILE EXISTS BECAUSE A MUTATION SURVIVED. Deleting the
+ * guard that leaves the candidate list unfiltered while the armed unit is
+ * analysable -- writing `val candidates = ahead` -- passed all fifteen cases
+ * here and all five in `:app`'s LiveFeedSourceTest, while silently moving the
+ * readout off an armed unit that was delivering perfectly well and merely
+ * running behind a faster partner. The margin is a rule about a unit that is
+ * NOT analysable, and nothing said so.
+ *
  * EVERY CASE HERE WAS REWRITTEN when [LiveFeedPolicy.liveFeed] took frame
  * counts instead of a list of analysable roles. Each call passes the counts
  * that produce the list the same case used to pass, so the inputs are the same
@@ -153,6 +161,14 @@ class LiveFeedPolicyTest {
     fun `the margin holds in either direction`() {
         val feed = LiveFeedPolicy.liveFeed(SensorRole.B, SensorRole.B, BOTH, frames(9, 2))
         assertEquals(SensorRole.B, feed.role)
+        assertFalse(feed.fellBack)
+        assertFalse(feed.switched)
+    }
+
+    @Test
+    fun `an armed unit that is delivering keeps the readout however far ahead its partner is`() {
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, BOTH, frames(400, 900))
+        assertEquals(SensorRole.A, feed.role)
         assertFalse(feed.fellBack)
         assertFalse(feed.switched)
     }
