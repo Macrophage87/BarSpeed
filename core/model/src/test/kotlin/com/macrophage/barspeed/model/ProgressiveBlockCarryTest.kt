@@ -19,13 +19,47 @@ import kotlin.test.assertNull
  * gate. The cases here are written as whole blocks: three declarations, one
  * statement, and the number the set after it is offered.
  *
- * ## Characterization, at this commit
+ * ## The rule these differentials ask for: an OFFSET, not an absolute
  *
- * Every assertion below states what
- * [SetLoadPolicy.standingStatedAddedKg] does TODAY, not what it should do.
- * The ones marked `(pre-fix)` are the defect: they are asserted so the
- * differential that inverts them is a diff of one file and not a claim about
- * a state nobody wrote down.
+ * A lifter who states a load on a set the plan declared a different one for
+ * has said how far off the prescription they are, and that distance is what
+ * holds for the rest of the block. Plan 45 / 55 / 65, opened at 50: the
+ * statement is +5, so set 2 is offered 60 and set 3 is offered 70. The block
+ * still STEPS -- the plan's own differences are untouched -- and the
+ * correction still survives, which is the pair of properties the absolute
+ * carry cannot hold at once. Carrying the absolute 50 flattens 55 and 65 to
+ * 50, which is the defect facing the other way and the reason #124 drew the
+ * boundary #143 is about.
+ *
+ * The offset is the reading #214's grid already committed to. Its tiles are
+ * increments -- `NextSetNudgePolicy.bumpedLoadKg` is `current + nudge.amount`
+ * -- so a lifter who taps "+10 lb" after a headroom rating has said "ten
+ * pounds more than this", once, about the exercise. That claim means the same
+ * thing on a flat block and on a stepping one only if what carries is the ten
+ * pounds. Under an absolute carry the tile's own addition is what disappears
+ * at the next step, which is what `NextSetNudgeGrid`'s KDoc records the grid
+ * inheriting from #143.
+ *
+ * ## Why not the other candidate rule
+ *
+ * The alternative #143 raises is to keep the absolute, yield to the plan's
+ * next step, and make the yield VISIBLE -- tell the lifter the load changed
+ * instead of silently re-seeding. Rejected on two grounds. It needs a Compose
+ * surface no test on this repo's CI path can reach, so the fix would be
+ * compile-gated only; and it answers a lifter who has just corrected the load
+ * with a notification rather than with the load, leaving the correction to be
+ * retyped on every remaining set. Visibility is not lost by choosing the
+ * offset: a carried load never touches `plannedLoad_kg`, so every set it
+ * reaches renders as a deviation against the plan's own figure on the Up next
+ * card and in the export.
+ *
+ * ## Red at this commit
+ *
+ * Eight of the fourteen tests here fail on this commit and are answered by
+ * the commit that follows. The other six -- the two flat-block carries, the
+ * flat block's bit-for-bit identity, the block edge, the mirror null, and the
+ * empty statement -- are the behaviour the fix must not move, and they are
+ * green both sides of it.
  */
 class ProgressiveBlockCarryTest {
     /**
@@ -67,15 +101,16 @@ class ProgressiveBlockCarryTest {
     }
 
     /**
-     * A STEPPING block, correction up (pre-fix). Plan 45 / 55 / 65; the lifter
-     * opens at 50 instead of 45 because the empty bar plus the plates they own
-     * lands there. Today the two declarations compare unequal, the statement is
-     * dropped, and set 2 is offered the plan's own 55 with nothing on screen
-     * marking that the five kilos they added went away.
+     * A STEPPING block, correction up. Plan 45 / 55 / 65; the lifter opens at
+     * 50 instead of 45 because the empty bar plus the plates they own lands
+     * there. That is a correction of +5, and set 2 is offered 60 -- the plan's
+     * own 55 with the same five kilos on it. The step from 45 to 55 is not
+     * touched; only where the block sits.
      */
     @Test
-    fun `a stepping block drops a correction up (pre-fix)`() {
-        assertNull(
+    fun `a stepping block carries a correction up onto the plan's next step`() {
+        assertEquals(
+            60.0,
             SetLoadPolicy.standingStatedAddedKg(
                 statedAddedKg = 50.0,
                 sameExerciseBlock = true,
@@ -87,15 +122,16 @@ class ProgressiveBlockCarryTest {
     }
 
     /**
-     * A STEPPING block, correction down (pre-fix), which is #143's own worked
-     * case. Plan 60 / 80 / 100; the lifter fails at 80, drops to 70, types it,
-     * and does set 2 there. Today the statement is dropped at the transition
-     * out of set 2 and set 3 is offered 100 -- thirty kilos above a weight
-     * they have just failed at.
+     * A STEPPING block, correction down: #143's own worked case. Plan
+     * 60 / 80 / 100; the lifter fails at 80, drops to 70, types it, does set 2
+     * there. The correction is -10, so set 3 is offered 90 rather than the
+     * plan's 100 -- still the step up the plan asked for, and not thirty kilos
+     * above a weight they have just failed at.
      */
     @Test
-    fun `a stepping block drops a correction down (pre-fix)`() {
-        assertNull(
+    fun `a stepping block carries a correction down onto the plan's next step`() {
+        assertEquals(
+            90.0,
             SetLoadPolicy.standingStatedAddedKg(
                 statedAddedKg = 70.0,
                 sameExerciseBlock = true,
@@ -110,13 +146,16 @@ class ProgressiveBlockCarryTest {
      * The set after next, on the same stepping block. The carry is re-decided
      * at every rest transition, so the third set of 45 / 55 / 65 asks the same
      * question about the pair (55, 65) that the second asked about (45, 55) --
-     * here with the lifter at 60 for set 2. Today it drops there too, so the
-     * correction is gone for the whole remainder of the block rather than for
-     * one set of it.
+     * here with the lifter at 60 for set 2. The same +5 comes out of the pair
+     * (55, 65) that came out of (45, 55), so the correction holds for the whole
+     * remainder of the block and not for one set of it. THE OFFSET IS
+     * RE-DERIVED at every transition, never accumulated: two transitions do not
+     * make it +10.
      */
     @Test
-    fun `a stepping block drops the correction again at the next step (pre-fix)`() {
-        assertNull(
+    fun `the same correction re-derives at the next step of the block`() {
+        assertEquals(
+            70.0,
             SetLoadPolicy.standingStatedAddedKg(
                 statedAddedKg = 60.0,
                 sameExerciseBlock = true,
@@ -129,15 +168,21 @@ class ProgressiveBlockCarryTest {
 
     /**
      * The plan declares a load for the set just finished and NONE for the set
-     * coming up (pre-fix). #143's first adjacent note: `60.0 == null` is false,
-     * so the statement is dropped, and `seedAddedKg`'s `?: 0.0` then puts a
-     * zero in the box. A plan that named no load for a set has not prescribed a
-     * change to zero -- it has prescribed nothing -- and the difference is the
-     * whole of the "absence rendered as a value" class.
+     * coming up. #143's first adjacent note: `60.0 == null` compares false, so
+     * the statement was dropped and `seedAddedKg`'s `?: 0.0` put a zero in the
+     * box -- 65 kg of work offered as an empty bar.
+     *
+     * There is no step to shift by here, because the plan prescribed no next
+     * load to shift. A plan that named nothing has not prescribed a change to
+     * zero; it has prescribed nothing, and the difference between those two is
+     * the whole of the "absence rendered as a value" class. So the statement
+     * stands unchanged -- which is also the rule this function already applies
+     * where NEITHER set declares a load.
      */
     @Test
-    fun `a block whose next set declares no load drops the statement (pre-fix)`() {
-        assertNull(
+    fun `a statement stands where the plan declares no load for the next set`() {
+        assertEquals(
+            65.0,
             SetLoadPolicy.standingStatedAddedKg(
                 statedAddedKg = 65.0,
                 sameExerciseBlock = true,
@@ -192,16 +237,140 @@ class ProgressiveBlockCarryTest {
      * second adjacent note: `PlanSetDef.resolvedLoadKg` divides a `load_lb` by
      * `LB_PER_KG` and passes a `load_kg` through, so a plan writing 90 lb for
      * one set and 40.82 kg for the next declares the same bar twice and the two
-     * Doubles differ. Today the statement drops there.
+     * Doubles differ, so the statement was dropped.
+     *
+     * Under the offset rule the two declarations no longer have to be equal,
+     * only comparable, and the difference between them carries through as
+     * itself. What comes out is the statement plus the residue between the two
+     * ways of writing one weight: 45.00331330090319 rather than 45, measured
+     * here and asserted exactly rather than to a tolerance, so a change to
+     * `LB_PER_KG` or to the arithmetic reds this. The residue is 0.0033 kg --
+     * three grams, below the 0.1-of-display-unit grid the load box renders on,
+     * so nothing the lifter reads moves.
      */
     @Test
-    fun `two declarations of one weight in different units drop the statement (pre-fix)`() {
-        assertNull(
+    fun `a weight declared twice in different units carries with its conversion residue`() {
+        assertEquals(
+            45.00331330090319,
             SetLoadPolicy.standingStatedAddedKg(
                 statedAddedKg = 45.0,
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = 40.82,
                 nextDeclaredAddedKg = 90 / WeightUnit.LB_PER_KG,
+                bodyweight = false,
+            ),
+        )
+    }
+
+    /**
+     * A DESCENDING block corrected down far enough to cross zero, on loaded
+     * work. Plan 100 / 20 -- a drop set -- and the lifter does the first at 60.
+     * The offset is -40 and the plan's next step is 20, so the arithmetic alone
+     * would offer -20 kg: a load neither the plan nor the lifter ever named,
+     * and one a barbell cannot hold. It clamps to an empty bar.
+     *
+     * This is the floor `correctedAddedKg` already applies to the other load
+     * control on this screen, applied here for its reason. It exists only
+     * because the offset rule COMPUTES a load; the absolute carry passed one
+     * through and could not invent a sign.
+     */
+    @Test
+    fun `a downward offset that crosses zero clamps to an empty bar on loaded work`() {
+        assertEquals(
+            0.0,
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 60.0,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = 100.0,
+                nextDeclaredAddedKg = 20.0,
+                bodyweight = false,
+            ),
+        )
+    }
+
+    /**
+     * The same block on BODY-WEIGHT work, where the negative is not an
+     * artifact. Assisted pull-ups declare negative added load by contract --
+     * `PlanFile.validate` passes `allowNegativeLoad` on exactly this population
+     * -- so -20 means twenty kilos of band, and clamping it to zero would make
+     * assistance unsayable. The flag taken in the previous commit is what
+     * separates these two cases, and this pair is what reds if it is ignored.
+     */
+    @Test
+    fun `a downward offset stays negative for assisted body-weight work`() {
+        assertEquals(
+            -20.0,
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 60.0,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = 100.0,
+                nextDeclaredAddedKg = 20.0,
+                bodyweight = true,
+            ),
+        )
+    }
+
+    /**
+     * THE FLAT BLOCK RETURNS THE STATEMENT ITSELF, bit for bit, rather than
+     * being put through the arithmetic. A plan declaring 175 lb freezes
+     * 79.3786647517562 on both slots, and `d + (s - d)` on doubles like those
+     * is not guaranteed to be `s`; a carry that moved the lifter's own number
+     * by an ulp would print a deviation they did not make, which is #45, the
+     * defect this object already carries a fix for. Asserted as an exact
+     * equality against a declaration chosen because it is not representable,
+     * so a refactor folding the flat case into the general one reds here.
+     */
+    @Test
+    fun `a flat block returns the stated load unchanged rather than recomputing it`() {
+        val declared = 175 / WeightUnit.LB_PER_KG
+        val stated = 79.4
+        assertEquals(
+            stated,
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = stated,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = declared,
+                nextDeclaredAddedKg = declared,
+                bodyweight = false,
+            ),
+        )
+    }
+
+    /**
+     * Nothing stated is still nothing carried, whatever the declarations step
+     * to. An offset needs a statement to be an offset FROM, and inventing one
+     * from the plan's own step would put the block's next number in the box as
+     * though the lifter had typed it.
+     */
+    @Test
+    fun `a stepping block with no statement carries nothing`() {
+        assertNull(
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = null,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = 45.0,
+                nextDeclaredAddedKg = 55.0,
+                bodyweight = false,
+            ),
+        )
+    }
+
+    /**
+     * A lifter who states exactly what the plan declared has corrected nothing.
+     * The offset is zero and the next set is offered the plan's own step
+     * untouched. Its own case because it is the one input on which the offset
+     * rule and the absolute rule it replaces disagree about nothing while the
+     * declarations still step.
+     */
+    @Test
+    fun `a statement equal to the declaration leaves the plan's step alone`() {
+        assertEquals(
+            55.0,
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 45.0,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = 45.0,
+                nextDeclaredAddedKg = 55.0,
                 bodyweight = false,
             ),
         )
