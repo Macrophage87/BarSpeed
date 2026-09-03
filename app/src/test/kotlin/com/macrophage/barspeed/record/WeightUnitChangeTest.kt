@@ -8,10 +8,13 @@ import kotlin.test.assertEquals
 /**
  * What a change of display unit is allowed to touch in [RecordState].
  *
- * [unitChangedState] is the seam the settings collector now runs, and the only
- * place in the app that observes a new unit. These pins are the parts of its
- * contract that were already true of the collector body it replaced; the load
- * field's conversion, which was NOT, is pinned in
+ * [unitChangedState] is the seam the settings collector now runs -- the only
+ * place a new unit reaches the record screen's state, and therefore the only
+ * place the load field can be converted; see `WeightUnitChange.kt`'s own KDoc
+ * for the other four view models that also observe
+ * `container.settings.weightUnit` without holding a typed load. These pins are
+ * the parts of its contract that were already true of the collector body it
+ * replaced; the load field's conversion, which was NOT, is pinned in
  * `WeightUnitChangeDifferentialTest`.
  */
 class WeightUnitChangeTest {

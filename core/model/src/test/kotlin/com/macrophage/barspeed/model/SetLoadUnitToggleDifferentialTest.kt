@@ -8,13 +8,21 @@ import kotlin.test.assertTrue
 /**
  * #77: tapping the kg/lb chip must CONVERT the typed load, not reinterpret it.
  *
- * Every assertion in this file fails at the commit that introduces it, against
+ * Every test in this file fails at the commit that introduces it, against
  * the identity seam `SetLoadPolicy.convertedLoad` was landed as. The failures
  * are the defect itself, stated as numbers: a field reading `100` with a kg
  * chip goes on reading `100` after the tap, is re-parsed as 100 POUNDS by
  * `endSet`, and the set is recorded at 45.36 kg. Load is metadata the IMU
  * stream cannot reconstruct, so unlike a wrong derived figure that number is
  * not recoverable.
+ *
+ * Two assertions inside `a quarter-kilo result is not flattened to a tenth` do
+ * NOT fail on their own: `KG.inputValue(8 / LB_PER_KG)` is `3.6` and
+ * `inputValue(3.75)` is `3.8` whether or not the fix is in, because
+ * `WeightUnit.inputValue` never calls `convertedLoad`. They show neither
+ * renderer can write `3.75`; they are not there to fail, and that test method
+ * fails only because its first assertion, against `convertedLoad` itself,
+ * does.
  */
 class SetLoadUnitToggleDifferentialTest {
     @Test
