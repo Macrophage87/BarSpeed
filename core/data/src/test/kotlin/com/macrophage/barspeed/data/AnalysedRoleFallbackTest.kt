@@ -307,8 +307,11 @@ class AnalysedRoleFallbackTest {
      *
      * `armedCaptureOf` in `RecordViewModel.kt` builds the same four decisions,
      * in the same order, from a copy of this code rather than from this code:
-     * the armed roles keyed to their buffers, the streamed roles by
-     * [SensorCapturePolicy.present], the decision by
+     * the armed roles keyed to their buffers, the analysable roles by
+     * [SensorCapturePolicy.analysable] (#209) -- which this mirror does NOT
+     * do: it still calls [SensorCapturePolicy.present], so it mirrors a rule
+     * the app no longer follows and stays green only because its fixtures are
+     * a full capture and an empty one -- the decision by
      * [SensorCapturePolicy.analysedStream], and the partner derived from the
      * corrected declaration. What is verified HERE is the composition, not
      * that `:app` performs it.

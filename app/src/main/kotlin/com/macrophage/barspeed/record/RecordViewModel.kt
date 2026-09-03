@@ -602,11 +602,11 @@ internal fun armedCaptureOf(
     val analysable =
         SensorCapturePolicy.analysable(armed?.expected.orEmpty(), byRole.mapValues { it.value.size })
     val decision = SensorCapturePolicy.analysedStream(armed?.analysed, analysable)
-    // Which armed roles put NOTHING in a buffer, and what the app could see of
-    // each one's link when the set ended (#213). The roles come from the
-    // BUFFERS -- the same source `present` comes from -- so the two statements
-    // in the export cannot disagree about which unit was missing; the WORD
-    // comes from the link reading, which is the fact nothing else records.
+    // Which armed roles delivered too few frames to analyse, and what the app
+    // could see of each one's link when the set ended (#213, #209). The roles
+    // come from `analysable` above and NOT from `present`, so since #209 a
+    // role can appear in `present` and in `silent` at once -- that is the
+    // change, not a disagreement.
     //
     // `ArmedSilencePolicy.silent` drops a role reading DELIVERING. That
     // combination IS reachable and its error direction is silence: deliveryOf

@@ -1562,10 +1562,12 @@ data class SetSensorsExport(
      * [ArmedSilencePolicy.SILENT_AFTER_MS], that its last frame arrived during
      * the preceding rest and read as delivering -- or that the document was
      * written by a build that could not observe an unroled link at all. A
-     * link that fed part of a set and then went silent publishes nothing here
-     * either: the word is refused wherever the set's buffer holds a capture
-     * the analysis could run on. Absent rather than empty on the ordinary set,
-     * [analysedFellBack]'s rule.
+     * link that fed enough of a set to analyse and then went silent publishes
+     * nothing here either: the word is refused wherever the set's buffer
+     * holds a capture the analysis could run on. One that sent fewer than
+     * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] and stopped is named here.
+     * Absent rather than empty on the ordinary set, [analysedFellBack]'s
+     * rule.
      */
     val soleSilent: String? = null,
 )

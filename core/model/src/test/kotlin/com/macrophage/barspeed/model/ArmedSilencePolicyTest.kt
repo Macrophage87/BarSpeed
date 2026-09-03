@@ -777,8 +777,8 @@ class ArmedSilencePolicyTest {
      * armed an hour earlier that had never produced a frame. That is the
      * strongest word in this vocabulary being replaced by the weakest at the
      * one place the archive keeps it, and the row is written precisely when
-     * that unit's buffer is empty, so it is the row a lifter reads to find out
-     * why a set recorded nothing.
+     * that unit delivered too few frames to analyse, so it is the row a
+     * lifter reads to find out why a set recorded nothing.
      *
      * Grace is a LIVE-warning concept: it stops the app accusing a link two
      * seconds into its connect while the lifter can still act. A row that has

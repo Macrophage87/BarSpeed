@@ -439,9 +439,10 @@ object ArmedSilencePolicy {
      * reworded.)
      * The stored answer is still not the card's answer in the other
      * direction: what
-     * is recorded is gated on the set's analysed buffer being empty (#224
-     * round 1), which the card has no equivalent of, because a card drawn
-     * before the set has no buffer to read.
+     * is recorded is gated on the set's analysed buffer holding fewer than
+     * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] frames (#224 round 1,
+     * widened from empty by #209), which the card has no equivalent of,
+     * because a card drawn before the set has no buffer to read.
      *
      * NULL FOR [ArmedDelivery.DELIVERING], which is why the answer is nullable
      * rather than total: a word for a working unit would put a declaration on
