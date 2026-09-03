@@ -268,4 +268,28 @@ class SchemaLimiterContractTest {
             "the fourth 1.18 entry does not name the issue that widened the question: $entry",
         )
     }
+
+    /**
+     * The reason's own description says the same widening the version log
+     * names, not just the log.
+     *
+     * The version log entry above is a change note; a reader who never reads
+     * the changelog and jumps straight to `$defs.set.properties.limiter`
+     * still has to be told that a non-null `limiter` no longer implies
+     * `failed`. Round 2 of #191's review found this paragraph unpinned:
+     * deleting it left the suite green.
+     */
+    @Test
+    fun `the published reason says it is asked of completed sets rated at the counted end`() {
+        val description = setProperties()["limiter"]!!.jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "COMPLETED SETS RATED AT THE COUNTED END" in description,
+            "the published reason never says it is asked of a completed set rated at the counted end: " +
+                description,
+        )
+        assertTrue(
+            "#191" in description,
+            "the published reason never names the issue that widened the question: $description",
+        )
+    }
 }
