@@ -129,7 +129,7 @@ class RollExcursionFieldTest {
 
     /**
      * Two sets three degrees apart on the published figure, 394 degrees apart
-     * on what their mounts swept.
+     * in the unwrapped range of the sensor's own reported roll.
      *
      * This is the discrimination the field is supposed to provide and does not:
      * an analysis reading 358.6 against 360.0 cannot tell these two sets apart,

@@ -23,20 +23,32 @@ import kotlin.math.roundToInt
  * captures by recomputation over the `roll_deg` column, and asserted against
  * this code by `RollExcursionFieldTest`: field-36 set 1 reports 358.6 wrapped
  * against 909.0 unwrapped, and its set 5 reports 360.0 against 515.2. Two sets
- * three degrees apart on the published figure differ by 394 degrees on what the
- * mount actually did.
+ * three degrees apart on the published figure differ by 394 degrees in the
+ * range of the sensor's reported roll after unwrapping.
  *
  * [unwrap] removes the discontinuity by accumulating differences: a step larger
  * than half a turn is read as the signal having crossed the boundary rather
  * than the mount having jumped, which is the only reading available on a signal
  * sampled far faster than the mount can rotate. THAT ASSUMPTION IS WHAT THIS
- * BUYS AND WHAT IT COSTS: at the archived rates -- around 99 rows per second --
- * a genuine half-turn between two consecutive rows would need over 17,000
- * degrees per second, well beyond the sensor's own reported range, so on these
- * captures the reading is safe. On a capture with a long dropout across which
- * the mount really did turn past 180 degrees, it is not, and the excursion
- * comes out short by a whole turn per crossing. Nothing in the stream can tell
- * those apart, so nothing here pretends to.
+ * BUYS AND WHAT IT COSTS, in two separate ways.
+ *
+ * First: at the archived rates -- around 99 rows per second -- a genuine
+ * half-turn between two consecutive rows would need over 17,000 degrees per
+ * second, well beyond the sensor's own reported range, so on these captures a
+ * long dropout across which the mount really did turn past 180 degrees is not
+ * a risk this code has seen. Where it is a risk, the excursion comes out short
+ * by a whole turn per crossing.
+ *
+ * Second, and already present in these captures: roll is ill-conditioned as
+ * pitch approaches +-90 degrees, where the sensor's own fused estimate can
+ * trade roll against yaw for the same physical attitude. All twelve crossings
+ * `unwrap` counts in `field-backsquat-wrapping-s36-set01` fall at |pitch|
+ * 87.3-89.9 degrees, with yaw jumping alongside and no gyro axis reporting
+ * above 64.0 degrees/s at any of them -- so on that set, some of what
+ * `unwrap` is counting as swept angle is the fused estimate's own
+ * representation flipping near the pole, not the mount rotating that far.
+ * Nothing in the stream can tell either of these apart from a genuine sweep,
+ * so nothing here pretends to.
  *
  * ## Fault two: the interval is not the set
  *
