@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import java.io.File
+import java.io.RandomAccessFile
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -120,31 +121,28 @@ class DatabaseRescueTest {
      * getOrNull with getOrThrow kills nothing without this test. That is the
      * whole reason it exists.
      *
-     * LIMIT, MEASURED RATHER THAN ASSUMED. It has teeth only where the platform
-     * refuses the open after the permission change, and it establishes that by
-     * TRYING rather than by asking -- canRead() was the precondition first and
-     * answers a different question. On the Windows box this was written on,
-     * probed directly: setReadable returns false, canRead stays true, and the
-     * open still succeeds, so this test asserts nothing there and the mutation
-     * that should kill it (returning the read's exception instead of null)
-     * survives locally. CI is ubuntu-latest, where the permission is honoured.
-     * Treat the mutation evidence for this one property as CI's, not the
-     * author's.
+     * TEETH ON BOTH PLATFORMS, matching the fix [RescuedDatabaseStoreTest]'s
+     * equivalent test carries: `setReadable(false)` alone has no effect on
+     * Windows, where `canRead()` stays true and the open still succeeds, so a
+     * version of this test that only tried that mechanism and returned early
+     * when it did not bite reported PASS while asserting nothing on the only
+     * machine this was written on. [withUnreadable] adds an exclusive
+     * [RandomAccessFile] region lock, which Windows enforces on the read
+     * itself, and asserts loudly when neither mechanism makes the file
+     * unreadable rather than returning quietly.
      */
     @Test
     fun `a file that cannot be opened says nothing rather than throwing`() {
         val file = db(10, name = "unreadable.db")
-        file.setReadable(false)
-        // Whether the OPEN fails, which is the only thing that reaches the
-        // guard. canRead() was the precondition here first and it answers a
-        // different question -- it returned true on a file that would not open,
-        // so the test skipped on the platform it was written on.
-        val stillOpens = runCatching { file.inputStream().use { it.read() } }.isSuccess
-        if (stillOpens) return
-        assertNull(DatabaseRescue.storedVersion(file), "an unopenable file produced a version")
-        assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(file, rescueRoot(), 9))
-        file.setReadable(true)
-        assertTrue(file.isFile, "the database was disturbed by a read that failed")
+
+        val ran =
+            withUnreadable(file) {
+                assertNull(DatabaseRescue.storedVersion(file), "an unopenable file produced a version")
+                assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(file, rescueRoot(), 9))
+                assertTrue(file.isFile, "the database was disturbed by a read that failed")
+            }
+
+        assertNotNull(ran, "no mechanism on this platform makes a file unreadable, so this property went unchecked")
     }
 
     // ---- the rescue itself -------------------------------------------------
@@ -376,5 +374,33 @@ class DatabaseRescueTest {
         assertEquals(0L, found.totalBytes)
         assertNotNull(found.rescuedAtMs, "the store could not date a directory the rescue itself named")
         assertTrue(file.isFile, "the main database moved even though every move was made to fail")
+    }
+
+    private fun opens(file: File): Boolean = runCatching { file.inputStream().use { it.read() } }.isSuccess
+
+    /**
+     * Tries `setReadable(false)` first, then an exclusive [RandomAccessFile]
+     * region lock, which Windows enforces on the read itself where the
+     * permission flag alone is ignored. Runs [block] only once a mechanism
+     * actually makes [file] unreadable, and returns null when neither does --
+     * duplicated from [RescuedDatabaseStoreTest], the file this test's own
+     * shape was copied from.
+     */
+    private fun <T> withUnreadable(file: File, block: () -> T): T? {
+        file.setReadable(false)
+        if (!opens(file)) {
+            try {
+                return block()
+            } finally {
+                file.setReadable(true)
+            }
+        }
+        file.setReadable(true)
+        RandomAccessFile(file, "rw").use { handle ->
+            handle.channel.lock().use {
+                if (!opens(file)) return block()
+            }
+        }
+        return null
     }
 }
