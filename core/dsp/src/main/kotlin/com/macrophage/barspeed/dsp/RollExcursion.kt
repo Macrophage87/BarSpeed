@@ -23,8 +23,11 @@ import kotlin.math.roundToInt
  * captures by recomputation over the `roll_deg` column, and asserted against
  * this code by `RollExcursionFieldTest`: field-36 set 1 reports 358.6 wrapped
  * against 909.0 unwrapped, and its set 5 reports 360.0 against 515.2. Two sets
- * three degrees apart on the published figure differ by 394 degrees in the
- * range of the sensor's reported roll after unwrapping.
+ * 1.4 degrees apart on the published figure differ by 394 degrees in the
+ * range of the sensor's reported roll after unwrapping. Round 1 of this
+ * issue's review corrected this sentence's tail, from "on what the mount
+ * did" to "in the range of the sensor's reported roll after unwrapping",
+ * and left "three degrees apart" standing; 358.6 to 360.0 is 1.4 degrees.
  *
  * [unwrap] removes the discontinuity by accumulating differences: a step larger
  * than half a turn is read as the signal having crossed the boundary rather

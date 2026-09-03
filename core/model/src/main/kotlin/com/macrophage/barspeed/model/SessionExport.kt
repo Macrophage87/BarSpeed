@@ -646,8 +646,9 @@ data class SessionExport(
          * 1.18 carries a SIXTH change, under the same number and for the same
          * reason, and it adds no key to THIS document (#133): the raw
          * archive's `rollExcursion_deg` is measured over the set's WORKING
-         * WINDOW -- `workStartedAt_ms` to the terminal cue, both already in
-         * that same document -- on a roll signal unwrapped across the +-180
+         * WINDOW -- `workStartedAt_ms`, which that document already carries,
+         * to the terminal cue in the set's own cue-track CSV in the same
+         * archive -- on a roll signal unwrapped across the +-180
          * degree boundary, with a new `rollExcursionBasis` naming the interval
          * used. It was `max(roll) - min(roll)` over every row of the capture
          * file, which SATURATES, since `roll_deg` is bounded to (-180, 180]:

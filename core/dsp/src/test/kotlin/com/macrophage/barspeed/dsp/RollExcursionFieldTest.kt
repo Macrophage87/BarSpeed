@@ -36,7 +36,7 @@ import kotlin.test.assertTrue
  * ## What the two sessions each show
  *
  * They fail in DIFFERENT halves, which is why both are here. field-36 shows the
- * SATURATION: its two sets report 358.6 and 360.0 wrapped -- three degrees
+ * SATURATION: its two sets report 358.6 and 360.0 wrapped -- 1.4 degrees
  * apart, and both effectively at the ceiling -- while their unwrapped sweeps
  * are 909.0 and 515.2, which are not close to each other at all. field-37 shows
  * the WINDOW, and shows it in the half the issue did not originally name:
@@ -128,7 +128,7 @@ class RollExcursionFieldTest {
     // ---- saturation: field-36 ----------------------------------------------
 
     /**
-     * Two sets three degrees apart on the published figure, 394 degrees apart
+     * Two sets 1.4 degrees apart on the published figure, 394 degrees apart
      * in the unwrapped range of the sensor's own reported roll.
      *
      * This is the discrimination the field is supposed to provide and does not:

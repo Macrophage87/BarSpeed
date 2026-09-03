@@ -237,35 +237,88 @@ class SetEndWindowTest {
     }
 
     /**
-     * Every committed capture that carries a cue track, and how many of its
-     * detections begin after the set was called over.
+     * Eighteen of the twenty-five committed captures that carry a cue track
+     * over their own base IMU stream -- that population is the only one this
+     * analyzer call can run over at all -- and how many of each one's
+     * detections begin after the set was called over. The seven it does not
+     * cover are named below; this heading said "every committed capture" and
+     * the rebase onto v0.1.50 made that false, so it is narrowed to the
+     * number counted at this tree rather than left as a claim.
      *
-     * All thirteen, enumerated, not nine. The list stood at nine while four
-     * cue-tracked captures were committed beside it, and the KDoc claim to
-     * cover "every committed capture that carries a cue track" stayed green
-     * throughout because nothing checked the enumeration against the corpus --
-     * [CuedRepCoverageTest] `the coverage limit` now does that against the
-     * resource directory.
+     * Eighteen, enumerated, not thirteen and not nine. The list stood at
+     * nine while four cue-tracked captures were committed beside it, and the
+     * KDoc claim to cover "every committed capture that carries a cue track"
+     * stayed green throughout because nothing checked the enumeration
+     * against the corpus -- [CuedRepCoverageTest] `the coverage limit` now
+     * does that against the resource directory. It went stale the same way
+     * a second time: round 1 of this issue's own review corrected nine to
+     * thirteen and missed that issue #133 had, by then, committed a fifth
+     * cue-tracked capture outside this list
+     * (`field-legpress-single-2011-8rep-s36-set07`, issue #93) alongside the
+     * four rotation fixtures (`field-backsquat-wrapping-s36-set01`,
+     * `field-rdl-wrapping-s36-set05`, `field-ohp-prepinflated-s37-set03`,
+     * `field-ohp-prepinflated-s37-set04`) it added for its own purpose.
+     * AND IT WENT STALE A THIRD TIME, on the rebase that put this branch on
+     * `origin/main` at `a7dfa323` (v0.1.50). The sentence here read "six
+     * further captures carry a cue track and are still not here ... none of
+     * them is a gap in this list: none has a base `.csv` committed beside its
+     * `-cues.csv`". Counted at this tree rather than carried: 34 base
+     * captures are committed, 25 of them carry a cue track, and this corpus
+     * covers 18. SEVEN are outside it, and the "no base stream" reason is
+     * true of exactly ONE of them. The claim is deleted rather than reworded.
      *
-     * Seven of the thirteen carry none: three of the four barbell captures of
-     * session 2026-08-17, one of the four leg curls, the back squat and both
-     * leg presses are untouched by this rule, which is what makes the other six
-     * evidence rather than a coincidence of one recording. The fourth barbell
-     * capture, field-ohp-rotating-8rep-b, joined the affected group with issue
-     * #87: it resolves six detections rather than four, and the sixth begins
-     * after its Done cue. The affected six
-     * are not a random sample either -- three of them are the captures
-     * [VelocityLossTest] documents as publishing no velocity loss because their
-     * last detection was the fastest of the set, one of which
-     * (`field-legcurl-1030-10rep`, session 31 set 11) is issue #126's own set.
-     * That case's KDoc says nothing in the rep list can tell a spurious final
-     * detection from a set held flat; the cue track is the thing outside the
-     * rep list that can. The fifth is the Romanian deadlift, whose single
+     * `field-ropedeadhang-hold20-s37-set11` is the one it stays true of in
+     * spirit: it has a base stream, but its track calls no rep -- a
+     * twenty-second hold, `reps: 0` in its own `meta.json` -- so there is no
+     * post-`Done` drive for this question to have an answer about. (The five
+     * tracks with no base `.csv` at all --
+     * `field-inclinepress-3010-10rep-s33-set01`,
+     * `field-lateralraise-2011-s32-set09`, `field-ohp-3010-8rep-s33-set05`,
+     * `field-pushdown-1120-12rep-s33-set13` and
+     * `field-ropedeadhang-hold30-s37-set12` -- are not base captures at all
+     * and were never in the population this KDoc's first sentence names.)
+     *
+     * The other SIX are a real gap and are named as one rather than papered
+     * over: `field-backsquat-4011-6rep-s36-set01`,
+     * `field-bench-3010-6rep-s37-set05`, `field-bench-3010-6rep-s37-set06`,
+     * `field-ohp-3010-6rep-s37-set02`, `field-pullup-3010-8rep-s37-set09`
+     * and `field-rdl-3010-10rep-s36-set05` each carry a base stream and a
+     * cue track and are not scored here. They were committed on `main` for
+     * issue #87 while this branch was in flight, so nothing on either side
+     * asked this question of them. Extending the corpus to them needs each
+     * one's `LiftDirection` read off its own session's archive -- the
+     * provenance rule the five rows added below already follow -- which is
+     * its own task and is raised rather than folded into this one.
+     *
+     * Nine of the eighteen carry none: three of the four barbell captures of
+     * session 2026-08-17, one of the four leg curls, the back squat, one of
+     * the two leg presses, and three of the five added here (the Romanian
+     * deadlift and both prep-inflated overhead presses) are untouched by this
+     * rule. THIS PARAGRAPH READ "eleven of the eighteen ... the other seven"
+     * and both halves were measured against a `main` this branch has since
+     * been rebased onto: `field-ohp-rotating-8rep-b` joined the affected
+     * group with issue #87 and `field-legpress-single-2010-8rep` joined it
+     * with issue #94's runaway correction, so the split is nine and nine. The
+     * figures are re-measured at the rebased SHA rather than carried.
+     *
+     * The nine that carry one are not a random sample -- two of them are
+     * captures [VelocityLossTest] documents as publishing no velocity loss
+     * because their last detection was the fastest of the set:
+     * `field-legcurl-1030-10rep` (session 31 set 11) is issue #126's own set,
+     * and `field-backsquat-wrapping-s36-set01`, added for #133, was never
+     * checked against this rule before now and turns out to share the same
+     * shape. That case's KDoc says nothing in the rep list can tell a
+     * spurious final detection from a set held flat; the cue track is the
+     * thing outside the rep list that can. `field-rdl-3010-10rep`'s single
      * post-`Done` detection is the one issue #125 is named for in
-     * [FieldDataRegressionTest].
+     * [FieldDataRegressionTest]. The remaining six -- two leg curls, the
+     * chest-supported rear delt fly this file is named for, the two captures
+     * #87 and #94 moved, and `field-legpress-single-2011-8rep-s36-set07`,
+     * whose two are the most any capture in this corpus carries -- were
+     * pinned or added without this question being asked of them until now.
      */
     @Test
-    fun `six of the thirteen cued captures carry a detection that began after Done`() {
+    fun `nine of the eighteen cued captures carry a detection that began after Done`() {
         val legCurl = LiftDirection(
             startsWith = StartPhase.CONCENTRIC,
             concentricUp = false,
@@ -295,8 +348,30 @@ class SetEndWindowTest {
             // reject. The bound rejecting more is the bound working.
             Triple("field-legpress-single-2010-8rep", concentricFirst, 1),
             Triple(fixture, rearDeltFly, 1),
+            // The five cue-tracked captures round 2 of issue #133's review
+            // found missing from this list -- one committed for issue #93
+            // before this branch, four committed on this branch for #133's
+            // own rotation measure, which reads roll only and assigns no
+            // LiftDirection to any of them. Every direction below is read off
+            // the session's own field-capture archive's meta.json (issue
+            // #133's own provenance directory) rather than guessed by analogy
+            // with another exercise of the same name: the single-stack leg
+            // press and both overhead-press sets are ALL recorded
+            // concentric-first (`startsWith: "concentric"`, `concentric:
+            // "up"`), matching this file's `concentricFirst`; the back squat
+            // and the Romanian deadlift are recorded eccentric-first,
+            // matching `barbell`. Guessing "barbell" for the overhead-press
+            // sets by analogy with `field-ohp-rotating-8rep` -- which is also
+            // barbell -- would have been wrong here: the two exercises
+            // sharing a name is not evidence they share a direction, and this
+            // session's own meta.json settles it either way.
+            Triple("field-legpress-single-2011-8rep-s36-set07", concentricFirst, 2),
+            Triple("field-backsquat-wrapping-s36-set01", barbell, 1),
+            Triple("field-rdl-wrapping-s36-set05", barbell, 0),
+            Triple("field-ohp-prepinflated-s37-set03", concentricFirst, 0),
+            Triple("field-ohp-prepinflated-s37-set04", concentricFirst, 0),
         )
-        assertEquals(13, corpus.size, "cue-tracked captures covered here")
+        assertEquals(18, corpus.size, "cue-tracked captures covered here")
         // Compared as one map rather than one assertion per row: a per-row loop
         // stops at the first mismatch, so a change that moved several captures
         // would be reported as moving one, and the rows after it would never be
@@ -308,7 +383,7 @@ class SetEndWindowTest {
             },
             "detections beginning after Done, per capture",
         )
-        assertEquals(7, corpus.count { it.third > 0 }, "captures carrying at least one post-Done detection")
+        assertEquals(9, corpus.count { it.third > 0 }, "captures carrying at least one post-Done detection")
     }
 
     // ------------------------------------------------------------------
