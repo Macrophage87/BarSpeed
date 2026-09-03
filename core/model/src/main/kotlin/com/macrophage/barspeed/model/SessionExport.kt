@@ -1400,19 +1400,24 @@ data class SetSensorsExport(
     /**
      * Which role's stream every figure in this set was computed from.
      *
-     * Since #207 it is a role that STREAMED wherever one did -- the boundary
-     * is when the set was RECORDED, not what the document's `schemaVersion`
-     * says: a set armed to analyse a unit that delivered too few frames to
-     * analyse is analysed from the unit that delivered enough, and [analysedFellBack] is what says the app
-     * moved. Read that key rather than comparing this one with [present],
-     * which no longer separates the two cases.
+     * Since #207, widened by #209, it is a role that delivered ENOUGH FRAMES
+     * TO ANALYSE wherever one did -- the boundary is when the set was
+     * RECORDED, not what the document's `schemaVersion` says: a set armed to
+     * analyse a unit that delivered too few frames to analyse is analysed
+     * from the unit that delivered enough, and [analysedFellBack] is what
+     * says the app moved. Read that key rather than comparing this one with
+     * [present], which no longer separates the two cases.
      *
-     * It can still name a role absent from [present] in two situations, and
-     * neither has figures drawn from the surviving stream: a set where NOTHING
-     * streamed, whose summary is empty because there was no capture; and a set
-     * recorded by a build that predates this behaviour, whatever the
-     * document's `schemaVersion` says, which kept the armed role whatever
-     * happened. Null when no role is in play.
+     * It can still name a role absent from [present] in three situations, and
+     * none of them has figures drawn from a surviving stream: a set where
+     * NOTHING streamed, whose summary is empty because there was no capture;
+     * a set whose armed unit delivered NOTHING while the only unit that did
+     * stream delivered fewer than
+     * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES], where the analysis stayed
+     * on the armed role and [present] is NOT empty; and a set recorded by a
+     * build that predates this behaviour, whatever the document's
+     * `schemaVersion` says, which kept the armed role whatever happened. Null
+     * when no role is in play.
      */
     val analysedRole: String? = null,
     /**

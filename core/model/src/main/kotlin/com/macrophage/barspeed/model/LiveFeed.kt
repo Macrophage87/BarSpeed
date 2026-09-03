@@ -90,7 +90,7 @@ object LiveFeedPolicy {
      * samples carry HOST arrival timestamps, so the tracker's reconstructed
      * clock is not broken by the change of source. What no test here can show
      * is what those few frames do to a live velocity on real hardware; that is
-     * a field question and is filed as one.
+     * a field question and is raised in this round report.
      *
      * IT DECIDES NOTHING ABOUT WHAT IS RECORDED. The buffers, the journals and
      * the archived raw streams are untouched by this answer, and the set's

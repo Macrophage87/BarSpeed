@@ -52,18 +52,27 @@ enum class SensorRole { A, B }
  * one, and [shortfall] is what says why.
  *
  * [analysed] is which role's stream the figures were actually computed from,
- * and since #207 that is a role that STREAMED wherever one did. It is decided
- * at the END of the set by [SensorCapturePolicy.analysedStream] rather than
- * when the set was armed: the preference names the unit whose link is
- * maintained, and pointing the DSP at that unit's empty buffer published an
- * empty summary over a capture the app was holding. [analysedFellBack] is
- * what says the two differ.
+ * and since #207 -- widened by #209 -- that is a role that delivered ENOUGH
+ * FRAMES TO ANALYSE wherever one did. It is decided at the END of the set by
+ * [SensorCapturePolicy.analysedStream] rather than when the set was armed:
+ * the preference names the unit whose link is maintained, and pointing the
+ * DSP at that unit's empty buffer published an empty summary over a capture
+ * the app was holding. [analysedFellBack] is what says the two differ.
  *
  * It can still name a role absent from the present list, and there are
- * exactly two such sets: one where NOTHING streamed, whose figures are empty
- * because there was no capture at all; and one an earlier build recorded,
- * which kept the armed role whatever happened. Neither has figures drawn from
- * a surviving stream.
+ * exactly THREE such sets, none of them with figures drawn from a surviving
+ * stream. One where NOTHING streamed, whose figures are empty because there
+ * was no capture at all. One where the armed unit delivered NOTHING and the
+ * only unit that did stream delivered fewer than
+ * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]:
+ * [SensorCapturePolicy.analysedStream] then has no candidate to move to and
+ * keeps the armed role, and this is the one of the three where the present
+ * list is NOT empty. And one an earlier build recorded, which kept the armed
+ * role whatever happened.
+ *
+ * The second of those is #209's own, and it did not exist before: the
+ * candidate list was the roles that reached the archive, so the partner's
+ * handful of frames was a candidate and the analysed role moved onto it.
  */
 @Serializable
 data class RecordedSensors(
