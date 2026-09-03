@@ -283,6 +283,35 @@ object SetLimiterScale {
             SetLimiter.FORM to "Position broke down",
         )
 
+    /**
+     * The wording for a set that was COMPLETED rather than failed (#191).
+     *
+     * Highest precedence of the three tables, and read for both a rep set and
+     * a hold, which is why [SetLimiter.FORM] names form OR position here: one
+     * override that reads correctly on both beats a fourth table indexed by
+     * two booleans.
+     *
+     * Only the four answers whose noun is plainly false on a finished set are
+     * overridden. "Muscle failure" on a set the lifter completed is a claim
+     * about something that did not happen, and the same holds for a grip that
+     * did not give out and a pace that was not lost -- but "Slipped", "Bad
+     * setup or position", "Pain, or something felt wrong" and "Stopped for an
+     * outside reason" all read unchanged on a set that finished anyway, so
+     * they are absent from this map and keep their wording. Anything absent
+     * keeping its wording is what makes a reworded answer a visible diff
+     * rather than a silent divergence between two full tables.
+     *
+     * AUTHORED, NOT MEASURED. No lifter has read these four strings in a gym.
+     * They are carried as a field item, not as a settled table.
+     */
+    private val COMPLETED_LABELS: Map<SetLimiter, String> =
+        mapOf(
+            SetLimiter.MUSCLE to "The muscle was the limit",
+            SetLimiter.GRIP to "Grip was the limit",
+            SetLimiter.FORM to "Form or position was going",
+            SetLimiter.PACE to "Holding the tempo",
+        )
+
     // [SetLimiter.SETUP] is deliberately NOT in that map. A hold is set up in
     // a position too -- a hand position on a dead hang, a bench at the wrong
     // height -- so the answer applies unchanged, and the rep wording already
@@ -313,20 +342,30 @@ object SetLimiterScale {
      * not an index the drawing code counts to. Order is named here, never
      * counted to at the call site.
      */
-    fun tiles(timed: Boolean): List<SetLimiterTile> {
+    fun tiles(timed: Boolean, failed: Boolean): List<SetLimiterTile> {
         val offered = SetLimiter.entries.filter { !(timed && it == SetLimiter.PACE) }
         return offered.map { limiter ->
             SetLimiterTile(
                 limiter = limiter,
-                label = label(limiter, timed),
+                label = label(limiter, timed, failed),
                 group = GROUPS.getValue(limiter),
             )
         }
     }
 
-    /** The wording one answer reads with, for the rest-screen line. */
-    fun label(limiter: SetLimiter, timed: Boolean): String =
-        (if (timed) TIMED_LABELS[limiter] else null) ?: REP_LABELS.getValue(limiter)
+    /**
+     * The wording one answer reads with, for the rest-screen line.
+     *
+     * Three tables, in precedence order: the completed-set override, then the
+     * hold rewording, then the rep table which is the only complete one. A
+     * completed HOLD therefore reads the completed override where one exists
+     * and the hold wording where it does not, which is the ordering that lets
+     * [COMPLETED_LABELS] hold four entries instead of eight.
+     */
+    fun label(limiter: SetLimiter, timed: Boolean, failed: Boolean): String =
+        (if (!failed) COMPLETED_LABELS[limiter] else null)
+            ?: (if (timed) TIMED_LABELS[limiter] else null)
+            ?: REP_LABELS.getValue(limiter)
 }
 
 /**
@@ -383,9 +422,28 @@ object SetLimiterPolicy {
      *
      * The row itself stays reachable afterwards either way -- see
      * [offersCorrection] -- so a skip is not a door that locks.
+     *
+     * [rpe] IS NOT READ HERE YET. It is carried for [ratedNearFailure], which
+     * says why the parameter arrives one commit before it is consulted.
      */
-    fun prompts(failed: Boolean, limiter: SetLimiter?, dismissed: Boolean): Boolean =
+    // Suppressed for exactly one commit. The parameter arrives here before it
+    // is read so that the widening is a differential with a failing test in
+    // front of it rather than a behaviour change hidden inside a signature
+    // change; the commit that reads it deletes this line.
+    @Suppress("UnusedParameter")
+    fun prompts(failed: Boolean, rpe: Int?, limiter: SetLimiter?, dismissed: Boolean): Boolean =
         failed && limiter == null && !dismissed
+
+    /**
+     * The rating a COMPLETED set has to carry before it is asked at all
+     * (#191).
+     *
+     * Not read yet. It is the seam the widening turns on, carried to the call
+     * sites first and consulted in a commit of its own, so the change of
+     * behaviour is one line with a failing test in front of it rather than a
+     * line hidden inside a signature change.
+     */
+    fun ratedNearFailure(rpe: Int?): Boolean = rpe != null && rpe >= EffortScale.PROXIMITY_FLOOR_RPE
 
     /**
      * Whether the rest screen offers the reason row at all for the set just
@@ -396,7 +454,41 @@ object SetLimiterPolicy {
      * still reach the row, and #191 will make an answer reachable on sets that
      * never failed.
      */
-    fun offersCorrection(failed: Boolean, limiter: SetLimiter?): Boolean = failed || limiter != null
+    // Suppressed for exactly one commit, for [prompts]'s reason.
+    @Suppress("UnusedParameter")
+    fun offersCorrection(failed: Boolean, rpe: Int?, limiter: SetLimiter?): Boolean = failed || limiter != null
+
+    /**
+     * The whole caption over the page of tiles.
+     *
+     * Here rather than in the composable because the two cases ask different
+     * questions and one of them is new: "Why did that set end?" over a set
+     * the lifter finished is a question about something that did not happen.
+     *
+     * The `optional` half is part of the string rather than appended at the
+     * call site, so what the lifter reads is pinned end to end. It says
+     * optional in both cases and must go on doing so: a completed set is
+     * asked once, and an unanswered one is a set nobody was asked about
+     * rather than a gap in the record.
+     */
+    fun pageTitle(failed: Boolean): String =
+        if (failed) "Why did that set end? · optional" else "What limited that set? · optional"
+
+    /** What the rest-screen reason line is labelled, before the answer. */
+    fun lineLabel(failed: Boolean): String = if (failed) "Ended" else "Limited by"
+
+    /**
+     * The wording on the button that opens the page from the reason row.
+     *
+     * "Say why" is the failure wording and stays exactly as it shipped. A
+     * completed set is not being asked why it ended, so it reads "Answer";
+     * either, once answered, reads "Change".
+     */
+    fun lineAction(failed: Boolean, limiter: SetLimiter?): String = when {
+        limiter != null -> "Change"
+        failed -> "Say why"
+        else -> "Answer"
+    }
 
     /**
      * What the rest-screen reason line reads.
@@ -410,13 +502,13 @@ object SetLimiterPolicy {
      * there are none -- Other tapped, note left empty -- it falls back to the
      * tile's wording rather than printing an empty quotation.
      */
-    fun lineText(limiter: SetLimiter?, note: String?, timed: Boolean): String {
+    fun lineText(limiter: SetLimiter?, note: String?, timed: Boolean, failed: Boolean): String {
         if (limiter == null) return NOT_GIVEN
         val normalized = SetLimiter.normalizeNote(note)
         return if (limiter == SetLimiter.OTHER && normalized != null) {
             normalized
         } else {
-            SetLimiterScale.label(limiter, timed)
+            SetLimiterScale.label(limiter, timed, failed)
         }
     }
 
@@ -435,12 +527,13 @@ object SetLimiterPolicy {
      */
     fun placement(
         failed: Boolean,
+        rpe: Int?,
         limiter: SetLimiter?,
         dismissed: Boolean,
         changing: Boolean,
     ): SetLimiterPagePlacement = when {
         changing -> SetLimiterPagePlacement.CORRECTION
-        prompts(failed, limiter, dismissed) -> SetLimiterPagePlacement.PROMPT
+        prompts(failed, rpe, limiter, dismissed) -> SetLimiterPagePlacement.PROMPT
         else -> SetLimiterPagePlacement.NONE
     }
 

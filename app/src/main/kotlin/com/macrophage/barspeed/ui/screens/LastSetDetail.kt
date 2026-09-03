@@ -197,7 +197,14 @@ private fun LimiterCorrection(
     onDone: () -> Unit,
 ) {
     if (state.lastFeedback == null) return
-    if (!SetLimiterPolicy.offersCorrection(state.lastSetFailed, state.lastSetLimiter)) return
+    if (!SetLimiterPolicy.offersCorrection(
+            state.lastSetFailed,
+            state.lastSetRpe,
+            state.lastSetLimiter,
+        )
+    ) {
+        return
+    }
     LimiterLine(state, timed, onChange)
     // Under the row that opened it. A page the lifter asked for belongs
     // beside the finger that asked; only the automatic offer goes to the top.

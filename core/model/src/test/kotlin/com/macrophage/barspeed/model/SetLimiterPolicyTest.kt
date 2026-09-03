@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class SetLimiterPolicyTest {
     @Test
     fun `a failed set with no reason yet is asked`() {
-        assertTrue(SetLimiterPolicy.prompts(failed = true, limiter = null, dismissed = false))
+        assertTrue(SetLimiterPolicy.prompts(failed = true, rpe = null, limiter = null, dismissed = false))
     }
 
     /**
@@ -21,7 +21,7 @@ class SetLimiterPolicyTest {
      */
     @Test
     fun `a set that did not fail is not asked`() {
-        assertFalse(SetLimiterPolicy.prompts(failed = false, limiter = null, dismissed = false))
+        assertFalse(SetLimiterPolicy.prompts(failed = false, rpe = null, limiter = null, dismissed = false))
     }
 
     /**
@@ -32,12 +32,12 @@ class SetLimiterPolicyTest {
      */
     @Test
     fun `a dismissed page does not reopen`() {
-        assertFalse(SetLimiterPolicy.prompts(failed = true, limiter = null, dismissed = true))
+        assertFalse(SetLimiterPolicy.prompts(failed = true, rpe = null, limiter = null, dismissed = true))
     }
 
     @Test
     fun `a set already carrying a reason is not asked again`() {
-        assertFalse(SetLimiterPolicy.prompts(failed = true, limiter = SetLimiter.GRIP, dismissed = false))
+        assertFalse(SetLimiterPolicy.prompts(failed = true, rpe = null, limiter = SetLimiter.GRIP, dismissed = false))
     }
 
     /**
@@ -46,25 +46,28 @@ class SetLimiterPolicyTest {
      */
     @Test
     fun `the correction row is offered on any failed set and on any set carrying an answer`() {
-        assertTrue(SetLimiterPolicy.offersCorrection(failed = true, limiter = null))
-        assertTrue(SetLimiterPolicy.offersCorrection(failed = true, limiter = SetLimiter.PAIN))
-        assertTrue(SetLimiterPolicy.offersCorrection(failed = false, limiter = SetLimiter.PAIN))
-        assertFalse(SetLimiterPolicy.offersCorrection(failed = false, limiter = null))
+        assertTrue(SetLimiterPolicy.offersCorrection(failed = true, rpe = null, limiter = null))
+        assertTrue(SetLimiterPolicy.offersCorrection(failed = true, rpe = null, limiter = SetLimiter.PAIN))
+        assertTrue(SetLimiterPolicy.offersCorrection(failed = false, rpe = null, limiter = SetLimiter.PAIN))
+        assertFalse(SetLimiterPolicy.offersCorrection(failed = false, rpe = null, limiter = null))
     }
 
     @Test
     fun `a set with no reason reads as a named absence`() {
         assertEquals(
             SetLimiterPolicy.NOT_GIVEN,
-            SetLimiterPolicy.lineText(limiter = null, note = "ignored", timed = false),
+            SetLimiterPolicy.lineText(limiter = null, note = "ignored", timed = false, failed = true),
         )
     }
 
     @Test
     fun `a listed answer reads with its own wording, and a hold reads the hold's`() {
-        assertEquals("Grip gave out", SetLimiterPolicy.lineText(SetLimiter.GRIP, null, timed = false))
-        assertEquals("Muscle failure", SetLimiterPolicy.lineText(SetLimiter.MUSCLE, null, timed = false))
-        assertEquals("Could not hold it any longer", SetLimiterPolicy.lineText(SetLimiter.MUSCLE, null, timed = true))
+        assertEquals("Grip gave out", SetLimiterPolicy.lineText(SetLimiter.GRIP, null, timed = false, failed = true))
+        assertEquals("Muscle failure", SetLimiterPolicy.lineText(SetLimiter.MUSCLE, null, timed = false, failed = true))
+        assertEquals(
+            "Could not hold it any longer",
+            SetLimiterPolicy.lineText(SetLimiter.MUSCLE, null, timed = true, failed = true),
+        )
     }
 
     /**
@@ -76,12 +79,15 @@ class SetLimiterPolicyTest {
      */
     @Test
     fun `a note beside a listed answer does not replace the answer`() {
-        assertEquals("Slipped", SetLimiterPolicy.lineText(SetLimiter.SLIP, "bar rolled", timed = false))
+        assertEquals("Slipped", SetLimiterPolicy.lineText(SetLimiter.SLIP, "bar rolled", timed = false, failed = true))
     }
 
     @Test
     fun `other reads as the lifter's own words, normalized`() {
-        assertEquals("dog needed out", SetLimiterPolicy.lineText(SetLimiter.OTHER, "  dog\nneeded out ", timed = false))
+        assertEquals(
+            "dog needed out",
+            SetLimiterPolicy.lineText(SetLimiter.OTHER, "  dog\nneeded out ", timed = false, failed = true),
+        )
     }
 
     /**
@@ -91,8 +97,8 @@ class SetLimiterPolicyTest {
      */
     @Test
     fun `other with no words reads as the tile's wording`() {
-        assertEquals("Other", SetLimiterPolicy.lineText(SetLimiter.OTHER, "   ", timed = false))
-        assertEquals("Other", SetLimiterPolicy.lineText(SetLimiter.OTHER, null, timed = false))
+        assertEquals("Other", SetLimiterPolicy.lineText(SetLimiter.OTHER, "   ", timed = false, failed = true))
+        assertEquals("Other", SetLimiterPolicy.lineText(SetLimiter.OTHER, null, timed = false, failed = true))
     }
 
     /** Nothing to ask and nothing tapped: the page is not drawn at all. */
@@ -100,7 +106,7 @@ class SetLimiterPolicyTest {
     fun `a set with nothing to ask draws the page nowhere`() {
         assertEquals(
             SetLimiterPagePlacement.NONE,
-            SetLimiterPolicy.placement(failed = false, limiter = null, dismissed = false, changing = false),
+            SetLimiterPolicy.placement(failed = false, rpe = null, limiter = null, dismissed = false, changing = false),
         )
     }
 
@@ -109,7 +115,7 @@ class SetLimiterPolicyTest {
     fun `a dismissed page is drawn nowhere`() {
         assertEquals(
             SetLimiterPagePlacement.NONE,
-            SetLimiterPolicy.placement(failed = true, limiter = null, dismissed = true, changing = false),
+            SetLimiterPolicy.placement(failed = true, rpe = null, limiter = null, dismissed = true, changing = false),
         )
     }
 
@@ -126,6 +132,7 @@ class SetLimiterPolicyTest {
             SetLimiterPagePlacement.CORRECTION,
             SetLimiterPolicy.placement(
                 failed = true,
+                rpe = null,
                 limiter = SetLimiter.GRIP,
                 dismissed = true,
                 changing = true,
@@ -141,7 +148,7 @@ class SetLimiterPolicyTest {
     fun `a tap on an unanswered set still draws the page under the row`() {
         assertEquals(
             SetLimiterPagePlacement.CORRECTION,
-            SetLimiterPolicy.placement(failed = true, limiter = null, dismissed = false, changing = true),
+            SetLimiterPolicy.placement(failed = true, rpe = null, limiter = null, dismissed = false, changing = true),
         )
     }
 
@@ -184,7 +191,7 @@ class SetLimiterPolicyTest {
     fun `a page the app opened by itself is drawn where the lifter is looking`() {
         assertEquals(
             SetLimiterPagePlacement.PROMPT,
-            SetLimiterPolicy.placement(failed = true, limiter = null, dismissed = false, changing = false),
+            SetLimiterPolicy.placement(failed = true, rpe = null, limiter = null, dismissed = false, changing = false),
         )
     }
 }

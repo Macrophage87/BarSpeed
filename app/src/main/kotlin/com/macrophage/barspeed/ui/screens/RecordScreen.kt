@@ -2768,10 +2768,15 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     val timed = state.lastFeedback?.actualDurationS != null
     val placement =
         if (state.lastFeedback != null &&
-            SetLimiterPolicy.offersCorrection(state.lastSetFailed, state.lastSetLimiter)
+            SetLimiterPolicy.offersCorrection(
+                state.lastSetFailed,
+                state.lastSetRpe,
+                state.lastSetLimiter,
+            )
         ) {
             SetLimiterPolicy.placement(
                 failed = state.lastSetFailed,
+                rpe = state.lastSetRpe,
                 limiter = state.lastSetLimiter,
                 dismissed = dismissed,
                 changing = changing,
@@ -3200,11 +3205,17 @@ internal fun LimiterLine(state: RecordState, timed: Boolean, onChange: () -> Uni
     // The wording is SetLimiterPolicy's, including the named absence: a blank
     // here would read as the app having lost the answer rather than as a
     // question nobody has answered.
-    val text = SetLimiterPolicy.lineText(state.lastSetLimiter, state.lastSetLimiterNote, timed)
+    val text =
+        SetLimiterPolicy.lineText(
+            state.lastSetLimiter,
+            state.lastSetLimiterNote,
+            timed,
+            state.lastSetFailed,
+        )
     val unanswered = state.lastSetLimiter == null
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         SectionCaption(
-            "Ended · $text",
+            "${SetLimiterPolicy.lineLabel(state.lastSetFailed)} · $text",
             // Amber for an unanswered failure, as the unrated effort line is:
             // nothing is wrong, but there is something the lifter can do and
             // the rest period is the only window it can be done in.
@@ -3212,7 +3223,10 @@ internal fun LimiterLine(state: RecordState, timed: Boolean, onChange: () -> Uni
             modifier = Modifier.weight(1f),
         )
         TextButton(onClick = onChange) {
-            Text(if (unanswered) "Say why" else "Change", color = BarColors.Sub)
+            Text(
+                SetLimiterPolicy.lineAction(state.lastSetFailed, state.lastSetLimiter),
+                color = BarColors.Sub,
+            )
         }
     }
     Spacer(Modifier.height(4.dp))
@@ -3255,7 +3269,7 @@ internal fun LimiterPage(
     // being replaced with nothing, and it exists in no other artifact.
     var words by
         remember(state.setsCompleted) { mutableStateOf(state.lastSetLimiterNote ?: "") }
-    SectionCaption("Why did that set end? · optional")
+    SectionCaption(SetLimiterPolicy.pageTitle(state.lastSetFailed))
     Spacer(Modifier.height(6.dp))
     if (typing) {
         LimiterWords(
@@ -3271,7 +3285,7 @@ internal fun LimiterPage(
         return
     }
     var group: SetLimiterGroup? = null
-    for (tile in SetLimiterScale.tiles(timed)) {
+    for (tile in SetLimiterScale.tiles(timed, state.lastSetFailed)) {
         // A gap between groups, so pain is drawn apart from the performance
         // answers -- which #189 asks for in as many words, because a coach
         // scanning an export must not have to read carefully to notice it.

@@ -56,7 +56,10 @@ class SetLimiterTest {
 
     @Test
     fun `the rep page offers every answer exactly once, in the enum's order`() {
-        assertEquals(SetLimiter.entries.toList(), SetLimiterScale.tiles(timed = false).map { it.limiter })
+        assertEquals(
+            SetLimiter.entries.toList(),
+            SetLimiterScale.tiles(timed = false, failed = true).map { it.limiter },
+        )
     }
 
     /**
@@ -68,7 +71,7 @@ class SetLimiterTest {
      */
     @Test
     fun `a hold drops the pace answer and nothing else`() {
-        val timed = SetLimiterScale.tiles(timed = true).map { it.limiter }
+        val timed = SetLimiterScale.tiles(timed = true, failed = true).map { it.limiter }
         assertEquals(SetLimiter.entries - SetLimiter.PACE, timed)
     }
 
@@ -82,8 +85,8 @@ class SetLimiterTest {
      */
     @Test
     fun `a hold rewords only the two answers whose noun changes`() {
-        val rep = SetLimiterScale.tiles(timed = false).associate { it.limiter to it.label }
-        val timed = SetLimiterScale.tiles(timed = true).associate { it.limiter to it.label }
+        val rep = SetLimiterScale.tiles(timed = false, failed = true).associate { it.limiter to it.label }
+        val timed = SetLimiterScale.tiles(timed = true, failed = true).associate { it.limiter to it.label }
         assertEquals(
             setOf(SetLimiter.MUSCLE, SetLimiter.FORM),
             timed.filter { (limiter, label) -> rep.getValue(limiter) != label }.keys,
@@ -102,7 +105,7 @@ class SetLimiterTest {
      */
     @Test
     fun `pain is the only welfare answer and it follows every performance answer`() {
-        val tiles = SetLimiterScale.tiles(timed = false)
+        val tiles = SetLimiterScale.tiles(timed = false, failed = true)
         assertEquals(
             listOf(SetLimiter.PAIN),
             tiles.filter { it.group == SetLimiterGroup.WELFARE }.map { it.limiter },
@@ -121,11 +124,14 @@ class SetLimiterTest {
      */
     @Test
     fun `the outside reason is neither a performance answer nor free text`() {
-        val tiles = SetLimiterScale.tiles(timed = false).associate { it.limiter to it.group }
+        val tiles = SetLimiterScale.tiles(timed = false, failed = true).associate { it.limiter to it.group }
         assertEquals(SetLimiterGroup.CONTEXT, tiles.getValue(SetLimiter.OUTSIDE))
         assertEquals(
             listOf(SetLimiter.OTHER),
-            SetLimiterScale.tiles(timed = false).filter { it.group == SetLimiterGroup.FREE }.map { it.limiter },
+            SetLimiterScale.tiles(
+                timed = false,
+                failed = true,
+            ).filter { it.group == SetLimiterGroup.FREE }.map { it.limiter },
         )
     }
 
@@ -405,7 +411,7 @@ class SetLimiterTest {
     @Test
     fun `the set-up answer is offered on the rep page and on the hold page`() {
         for (timed in listOf(false, true)) {
-            val tiles = SetLimiterScale.tiles(timed)
+            val tiles = SetLimiterScale.tiles(timed, failed = true)
             val setup =
                 assertNotNull(
                     tiles.firstOrNull { it.limiter.stored == "setup" },
@@ -429,7 +435,7 @@ class SetLimiterTest {
      */
     @Test
     fun `the set-up answer is drawn among the performance answers, before pain`() {
-        val order = SetLimiterScale.tiles(timed = false).map { it.limiter.stored }
+        val order = SetLimiterScale.tiles(timed = false, failed = true).map { it.limiter.stored }
         val setup = order.indexOf("setup")
         assertTrue(
             setup >= 0 && setup < order.indexOf("pain"),
