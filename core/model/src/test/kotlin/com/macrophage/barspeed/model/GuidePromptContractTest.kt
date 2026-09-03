@@ -277,6 +277,15 @@ class GuidePromptContractTest {
      * SchemaContractTest already pins PlanFile.SCHEMA_VERSION in
      * PlanFile.SUPPORTED_SCHEMA_VERSIONS, so once the extracted version
      * equals SCHEMA_VERSION this check cannot fail.
+     *
+     * The two halves pin different CARDINALITIES on purpose. Any number of
+     * skeleton sites is allowed provided every one names SCHEMA_VERSION,
+     * because the prompt may legitimately show more than one JSON fragment;
+     * the prose sentence is a single sentence and is pinned to exactly one
+     * occurrence. So `isNotEmpty` here is not a weaker form of the prose
+     * test's `assertEquals(listOf(...))` -- deleting the skeleton line reds
+     * this, and duplicating the prose sentence reds that, and neither
+     * mutation reds the other.
      */
     @Test
     fun `the plan prompt skeleton advertises the version the app accepts`() {
