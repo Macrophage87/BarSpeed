@@ -15,7 +15,7 @@ enum class FinalRestWindowDecision {
     WRITE,
 
     /**
-     * Nothing arrived after the last set.
+     * The final rest window is empty.
      *
      * A file would be worse than no file: an empty heart-rate CSV claims a
      * window was captured and that it was silent, which is a different fact
@@ -66,8 +66,14 @@ enum class FinalRestWindowDecision {
  */
 object FinalRestWindowPolicy {
     /**
-     * [sampleCount] is how many heart-rate samples arrived after the last set
-     * ended; [hasSetToAttachTo] is whether the session has any set row at all;
+     * [sampleCount] is how many samples the final rest window holds. Since
+     * #178 that includes the last set's own capture from the instant it was
+     * called over -- copied forward, not moved -- so a set that spoke `Done`
+     * and kept recording now reaches [FinalRestWindowDecision.WRITE] where it
+     * used to reach [FinalRestWindowDecision.NO_SAMPLES]: the buffer this
+     * count is taken over is seeded by [RestClockPolicy.restWindowSeed] before
+     * any genuinely-after-the-set sample can arrive.
+     * [hasSetToAttachTo] is whether the session has any set row at all;
      * [alreadyWritten] is whether that set already carries a trailing window.
      */
     fun decide(sampleCount: Int, hasSetToAttachTo: Boolean, alreadyWritten: Boolean): FinalRestWindowDecision = when {

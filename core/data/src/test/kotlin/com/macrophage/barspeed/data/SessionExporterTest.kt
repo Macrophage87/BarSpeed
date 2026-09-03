@@ -1036,9 +1036,14 @@ class SessionExporterTest {
      * any kind at all, and `Exporters.minBpm` selects with
      * `firstOrNull { it.kind == KIND_HRM }`. This pins that selection against a
      * kind that does not exist yet: heart-rate samples recorded during the REST
-     * window before a set are a different population from the set's own, and
-     * folding them into a figure published under the set's name would be the
-     * mixed-population defect this repository has already shipped once.
+     * window before a set OVERLAP the set's own capture by design since #178 --
+     * the tail of the set's own recording, from the instant it was called
+     * over, is copied forward into the following rest window -- so it is the
+     * SELECTION, not the population, that must stay disjoint here. Folding a
+     * `rest_before_hrm` stream into a figure published under the set's name
+     * would be the mixed-population defect this repository has already
+     * shipped once, whatever samples that stream happens to share with the
+     * set it followed.
      *
      * Written before the rest stream exists, deliberately -- the kind here is a
      * literal rather than a constant, so this test does not need the feature it

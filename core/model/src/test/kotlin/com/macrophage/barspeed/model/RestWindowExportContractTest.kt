@@ -39,11 +39,20 @@ class RestWindowExportContractTest {
         )
     }
 
+    /**
+     * Mutation M7 (replace "the rest starts when the set was CALLED OVER" with
+     * "the rest starts at some instant") SURVIVED the earlier form of this
+     * pin, `assertTrue("called over" in description, ...)`: the fallback
+     * clause -- "on a set nothing called over" -- also contains the phrase
+     * "called over", so the substring check passed on a description that no
+     * longer said which instant the rest runs from. Asserting the whole rule
+     * sentence closes that.
+     */
     @Test
     fun `the published rest_s description says which instant the rest runs from`() {
         val description = restS["description"]?.jsonPrimitive?.content.orEmpty()
         assertTrue(
-            "called over" in description,
+            "the rest starts when the set was CALLED OVER" in description,
             "the published rest_s description never says which instant the rest runs from: $description",
         )
     }

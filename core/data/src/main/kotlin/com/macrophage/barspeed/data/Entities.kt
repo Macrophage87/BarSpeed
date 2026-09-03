@@ -526,9 +526,13 @@ data class RawStreamEntity(
          * [SessionDao.insertSetWithStreams] transaction as the set's own
          * streams. The direction is chosen by atomicity, not by how it reads.
          *
-         * A DIFFERENT POPULATION FROM [KIND_HRM], and nothing may blur them.
-         * `Exporters.minBpm` selects on equality with [KIND_HRM] and is pinned
-         * against exactly this kind reaching it.
+         * OVERLAPS [KIND_HRM] BY DESIGN since #178: the tail of a set's own
+         * capture, from the instant it was called over, is COPIED into the
+         * following rest window, so the two are no longer disjoint
+         * populations of samples. Only the SELECTION stays disjoint --
+         * `Exporters.minBpm` matches [KIND_HRM] by equality and is pinned
+         * against a stream of this kind ever reaching it, whatever samples
+         * that stream happens to share with the set it followed.
          */
         const val KIND_REST_BEFORE_HRM = "rest_before_hrm"
 
@@ -556,10 +560,11 @@ data class RawStreamEntity(
          * are rest windows and both would be a `rest_before` of some set if
          * the session had continued; what distinguishes this one is that the
          * session ended, and a reader must be able to see that from the
-         * filename rather than by counting sets. It is a different population
-         * from [KIND_HRM] for the same reason that one is, and the name ends
-         * in `hrm` in the same trap-laying way: every selector matching it
-         * must match by equality.
+         * filename rather than by counting sets. It OVERLAPS [KIND_HRM] by
+         * design for the same reason [KIND_REST_BEFORE_HRM] does -- the tail
+         * of the last set's own capture is copied in, never moved -- and the
+         * name ends in `hrm` in the same trap-laying way: every selector
+         * matching it must match by equality, not by containing the string.
          */
         const val KIND_REST_AFTER_HRM = "rest_after_hrm"
 
