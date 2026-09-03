@@ -32,6 +32,14 @@ import kotlin.test.assertTrue
  * captures below are the two families side by side, from two sessions recorded
  * a day apart.
  *
+ * THE TWO FAMILY LISTS BELOW ARE HAND-WRITTEN AND CANNOT FIRE ON A CAPTURE
+ * NOBODY ADDED TO THEM. `field-rdl-3010-10rep-s36-set04` is bar-mounted, was
+ * committed on this branch for issue #138, and is in neither list; the
+ * corpus-wide guards that DO see it are `GyroGateTest`'s resource-directory
+ * check and this file's gate-holding sweep, which reads the same directory.
+ * "The six captures below" and "the five bar sets" mean these lists, not
+ * every bar capture on the classpath.
+ *
  * ## What is pinned here and what it is not
  *
  * These are CHARACTERIZATION pins: they record what the pipeline does today,
@@ -102,8 +110,11 @@ class AnchorSupplyByMountTest {
          * [VelocityEstimator.isQuietSample]. Named for what it measures rather
          * than for "candidates": since issue #87 the batch mask no longer takes
          * its candidates from this predicate on every set, so on a set whose
-         * gyro distribution straddles the gate this figure is SMALLER than the
-         * coverage beside it. That inversion is the change, visible.
+         * gyro distribution straddles the gate this figure can be SMALLER than
+         * the coverage beside it, and is on three of the four bar captures; on
+         * `field-ohp-3010-6rep-s37-set02` it is larger, 26.52% against 23.54%.
+         * That inversion is the change, visible, and it does not run the same
+         * way on every straddling set.
          */
         val absoluteQuietPct: Double,
         val coveragePct: Double,
@@ -221,8 +232,10 @@ class AnchorSupplyByMountTest {
         // percentile below -- so since issue #87 the gyro clause is not applied
         // to them and coverage is the acceleration term's alone. The
         // isQuietSample column is the ABSOLUTE two-term figure and no longer
-        // describes the mask: on all four, coverage is now LARGER than the
-        // share of samples that predicate admits.
+        // describes the mask: on three of the four, coverage is now LARGER
+        // than the share of samples that predicate admits; on
+        // field-ohp-3010-6rep-s37-set02 it is SMALLER, 23.54% against 26.52%.
+        // Both figures are the ones asserted in the block below.
         //
         //                             median  isQuiet%  coverage%  runs
         //   ohp   s37 set02           16.74     26.52     10.38 ->  23.54
@@ -260,6 +273,9 @@ class AnchorSupplyByMountTest {
         // sets 11, 12 and 13 are rope dead hangs, and for a timed hold with
         // no reps performed an empty summary is the right answer. Counted
         // from the session's own session.json, not from these fixtures.
+        // Issue #138 is the same symptom filed on a DIFFERENT session: three
+        // dumbbell sets of the 2026-08-21 capture, none of which is committed
+        // here.
         // All three of the rep sets resolved NOTHING before issue #87; #87 took
         // them to 4, 1 and 3 against 6 performed, and issue #94's runaway
         // correction to 9, 4 and 6. Two of the three now sit at or above the
@@ -319,10 +335,11 @@ class AnchorSupplyByMountTest {
         //
         // The three field-37 sets replace `summary: {}` -- 0 reps, no ROM, no
         // velocity loss -- with a summary. Two bench reps read 1.363 m and
-        // 1.724 m against the 0.333-0.345 m bench ROM this corpus has
-        // measured, both above the 1.2 m ceiling of the plausibility window
-        // issue #74 quotes, and issue #94's runaway correction does not fix
-        // that: it ADDS reps beside them at 0.896, 0.898, 0.143 m and 0.462,
+        // 1.724 m against the 0.333-0.345 m bench ROM issue #87
+        // records, both above the 1.2 m ceiling of the plausibility window
+        // issue #74 quotes, and nothing rejects it -- 1.724 m is below
+        // maxRunDisplacementM = 2.0, so the pipeline publishes it. Issue
+        // #94's runaway correction does not fix that either: it ADDS reps beside them at 0.896, 0.898, 0.143 m and 0.462,
         // 1.045, 1.384 m. Recovering a rep and measuring it are different
         // things and this is the clearest place in the corpus to see it.
         //
@@ -375,10 +392,13 @@ class AnchorSupplyByMountTest {
         // and leave the floor uncleared.
         //
         // FLOOR: 20% is stated, not derived. It sits above the 18.4% the best
-        // of the five bar captures managed before the change and below the
-        // 23.5% the worst manages after it, so it is a line the change crosses
-        // and nothing else in the corpus's history does. It is a coverage
-        // floor, not a correctness floor -- see this file's KDoc.
+        // of the four STRADDLING bar captures managed before the change and
+        // below the 23.5% the worst of the five manages after it, so it is a
+        // line the change crosses and nothing else in the corpus's history
+        // does. The fifth, field-rdl-3010-10rep-s36-set05, does not straddle:
+        // it reads 35.5% both before and after, so it was already the best of
+        // the five before the change and 18.4% was never its figure. It is a
+        // coverage floor, not a correctness floor -- see this file's KDoc.
         val bar = listOf(
             "field-ohp-3010-6rep-s37-set02",
             "field-bench-3010-6rep-s37-set05",

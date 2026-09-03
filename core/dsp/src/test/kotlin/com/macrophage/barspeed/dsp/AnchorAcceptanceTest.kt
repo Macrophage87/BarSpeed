@@ -150,7 +150,7 @@ class AnchorAcceptanceTest {
         // its travel -- exactly the erasure issue #85 bounded but did not
         // remove, at exactly the speeds below
         // [DspConfig.anchorSlowPhaseFloorMps]. A 4 s eccentric over the
-        // 0.333-0.345 m bench ROM this corpus has measured runs at
+        // 0.333-0.345 m bench ROM issue #87 records runs at
         // 0.083-0.086 m/s, which is inside the band being spent. Above the
         // floor nothing is lost, and that is asserted here rather than assumed.
         assertEquals(
@@ -191,8 +191,8 @@ class AnchorAcceptanceTest {
     @Test
     fun `reported peak velocity is the true velocity at and above the floor`() {
         // The same behaviour read as the number a lifter would see rather than
-        // as a fraction. A 3 s eccentric over the 0.333-0.345 m bench ROM this
-        // corpus has actually measured is 0.111-0.115 m/s: it used to be
+        // as a fraction. A 3 s eccentric over the 0.333-0.345 m bench ROM
+        // issue #87 records is 0.111-0.115 m/s: it used to be
         // reported at half speed and is now reported whole.
         fun peakOverTrue(v: Double): Double {
             val s = series(v)

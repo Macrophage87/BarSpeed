@@ -23,9 +23,10 @@ data class DspConfig(
     /**
      * Gyro magnitude limit for quiet detection (deg/s).
      *
-     * ONE CONSTANT, THREE JOBS. Since issue #87 this value is read at three
-     * places that answer different questions, and a change to it moves all
-     * three at once:
+     * ONE CONSTANT, FOUR JOBS. Since issue #87 this value is read at three
+     * places that answer different questions, and one of those reads drives
+     * two consumers rather than one, so a change to it moves four things at
+     * once:
      *
      *  1. **The live per-sample quiet clause.** [VelocityEstimator.isQuietSample]
      *     -- which is [VelocityEstimator.isAnchorCandidate] with the gate
@@ -33,6 +34,16 @@ data class DspConfig(
      *     and [StreamingSetTracker] calls it once per arriving sample with no
      *     distribution to consult. Raising this admits more live ZUPT anchors
      *     on every set; lowering it admits fewer.
+     *
+     *     That one call has TWO consumers, which is why this heading says
+     *     four and the list has three entries. The single `isQuietSample`
+     *     result `StreamingSetTracker.feed` computes gates the ZUPT update
+     *     AND the exponential accel-bias update immediately above it, so this
+     *     constant moves the learned bias as well as the anchors -- and the
+     *     bias is then subtracted from every sample that follows, quiet or
+     *     not. How much of the live rep count the learner alone accounts for
+     *     is NOT measured anywhere in this repository and no figure is quoted
+     *     here for it.
      *  2. **The batch clause, on the sets where the gate is kept.**
      *     [VelocityEstimator.quietMask] passes the same threshold through
      *     `isAnchorCandidate`, but only where
@@ -42,13 +53,20 @@ data class DspConfig(
      *     [VelocityEstimator.gyroGateApplies], which decides job 2. The
      *     median of the set's gyro magnitude is compared against this value
      *     and so is its tenth percentile; there is no second threshold.
+     *     A second NUMBER does exist: [VelocityEstimator.GYRO_STILLNESS_QUANTILE]
+     *     = 0.10, the low probe's fraction. It is fitted to one capture, it is
+     *     not a member of this class, and it is therefore not configurable per
+     *     exercise the way everything here is.
      *
      * So this is not only a per-sample filter -- it is also the reference the
      * per-set POLICY is chosen against. Moving it re-partitions the corpus
      * into gate-kept and gate-dropped sets before it changes a single sample
      * verdict, and jobs 1 and 2 then move in opposite directions on the sets
-     * that cross over. `GyroGateTest` pins the partition and both probes on
-     * every capture; nothing pins the consequence to a lifter-facing figure.
+     * that cross over. `GyroGateTest` pins the partition on every capture --
+     * its corpus list is checked against the resource directory -- and each
+     * probe on the subset it can decide: the median on twelve captures and
+     * the tenth percentile on the eight whose median clears the gate. Nothing
+     * pins the consequence to a lifter-facing figure.
      */
     val stationaryGyroBandDps: Double = 10.0,
     /**

@@ -319,8 +319,9 @@ object VelocityEstimator {
      * tail to the last sample, and re-run `gyroGateApplies` on the buffer
      * truncated at the cue and on the full buffer. Pass criterion: the two agree
      * on all eleven sets. Any disagreement is a set whose published summary
-     * depends on how fast the lifter reached the phone. Issue #87 carries the
-     * protocol.
+     * depends on how fast the lifter reached the phone. This protocol is
+     * written here and tracked in no issue: #87 carries the seated-OHP
+     * stopwatch protocol and nothing about tap latency or truncation.
      *
      * The two halves say different things and both are needed.
      *
@@ -351,17 +352,19 @@ object VelocityEstimator {
      * What IS structural is the consequence. This function selects between
      * exactly two behaviours that have both been measured over this corpus --
      * today's two-term predicate, and the acceleration term alone -- so unlike
-     * a retuned band it cannot produce a third, unstudied regime, and the 22
-     * captures the gate still holds on are bit-identical either way -- not
-     * because their whole distribution sits under the gate
+     * a retuned band it cannot produce a third, unstudied regime, and the
+     * captures the gate still holds on are bit-identical either way. How many
+     * that is, is asserted and not narrated: `AnchorSupplyByMountTest` pins
+     * the gate-holding set at 23 of the corpus's 30 and asserts the mask is
+     * identical sample for sample on every one of them. They are not
+     * bit-identical because their whole distribution sits under the gate
      * (`field-legcurl-1030-12rep-c` peaks at 585 deg/s) but because on
-     * twenty-one of the twenty-two the MEDIAN does, and on
+     * twenty-two of the twenty-three the MEDIAN does, and on
      * `field-reardeltfly-s32-set06` -- median 62.87 deg/s -- the tenth
      * percentile is above the gate too, which is the low probe doing its job.
-     * Ten of the 22 are bar- or hand-held. (It read 21, twenty of twenty-one
-     * and nine before `field-rdl-3010-10rep-s36-set04` was committed for issue
-     * #138; that capture's median is 5.81 deg/s, so it holds the gate and is
-     * bar-mounted.)
+     * (This sentence read 21 and then 22 as captures were committed on this
+     * branch, and carried a count of bar- and hand-held captures among them
+     * that nothing pinned; the count is deleted rather than re-derived.)
      *
      * Not verified: whether a sample admitted here is one where the implement
      * was actually at rest. Nothing in this repository can answer that; only a
@@ -380,7 +383,10 @@ object VelocityEstimator {
      * clause applied only on sets whose own rotation supports it. See
      * [gyroGateApplies]; on a set it rejects, candidacy rests on the
      * acceleration term and on [anchorAcceptable], which is the guard that
-     * actually discriminates rest from slow motion.
+     * actually discriminates rest from slow motion AT ANCHOR SELECTION. It
+     * does not reach the other consumer of this mask: the clamp at the end of
+     * `applyZupt` reads `quiet` directly and zeroes any sample under
+     * [DspConfig.pauseBandMps] there, accepted or not.
      */
     internal fun quietMask(samples: List<ImuSample>, timeS: DoubleArray, config: DspConfig): BooleanArray {
         val n = samples.size
@@ -473,7 +479,11 @@ object VelocityEstimator {
                 }
             corrected[k] = rawV[k] - offset
         }
-        // Inside accepted quiet windows the bar is genuinely still; clamp to zero.
+        // Quiet samples under pauseBandMps are clamped to zero. This is
+        // quietMask's SECOND consumer and [anchorAcceptable] does not guard
+        // it: acceptance is tested only in the anchor walk above, so this
+        // loop fires on every quiet sample, accepted or not, and on the seven
+        // straddling captures those samples carry no rotation bound at all.
         for (k in 0 until n) {
             if (quiet[k] && abs(corrected[k]) < config.pauseBandMps) corrected[k] = 0.0
         }
