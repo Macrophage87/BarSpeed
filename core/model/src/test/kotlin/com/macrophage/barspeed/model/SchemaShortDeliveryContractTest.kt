@@ -14,14 +14,15 @@ import kotlin.test.assertTrue
  *
  * DIFFERENTIALS. Every assertion here fails at the commit that introduces it.
  *
- * The behaviour change is small and the CONTRACT change is the whole risk. Two
- * published keys stop meaning what they say: `analysedFellBack` said the armed
- * unit "produced no stream", and `silent` said its roles "delivered NOTHING
- * for this whole set". After #209 both cover a unit that delivered a handful
- * of frames -- fewer than
+ * The behaviour change is small and the CONTRACT change is the whole risk.
+ * Three published keys stop meaning what they say: `analysedFellBack` said the
+ * armed unit "produced no stream", `silent` said its roles "delivered NOTHING
+ * for this whole set", and `soleSilent` was absent only when its one link
+ * "delivered" at all. After #209 all three cover a unit that delivered a
+ * handful of frames -- fewer than
  * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES], which is the estimator's own
  * bound -- and `present` can therefore name a role the analysis moved off.
- * Leaving those sentences standing would publish three false claims in the one
+ * Leaving those sentences standing would publish four false claims in the one
  * document a downstream reader is pointed at.
  *
  * NO VERSION NUMBER IS ASSERTED HERE, deliberately. The mint of 1.18 belongs
@@ -116,6 +117,31 @@ class SchemaShortDeliveryContractTest {
         assertTrue(
             theCase in text,
             "the published present never warns that a role here may be one the analysis could not use",
+        )
+    }
+
+    /**
+     * `soleSilent` stops being absent only when its one link delivered
+     * anything at all.
+     *
+     * The near neighbour of the other two: it is [silent]'s own vocabulary for
+     * the set that has no role to key it by, and c10d9e52 widened
+     * `analysedFellBack`, `silent` and the schema's `present` without touching
+     * this key's own published description, so a reader of the document alone
+     * would still read a one-sensor set that delivered a handful of frames as
+     * one whose link "delivered".
+     */
+    @Test
+    fun `the published soleSilent no longer says its one link delivered nothing`() {
+        val text = sensorDescription("soleSilent").lowercase()
+
+        assertFalse(
+            "absent when that link delivered (1.17" in text,
+            "the published soleSilent still says any delivery at all clears it",
+        )
+        assertTrue(
+            theCase in text,
+            "the published soleSilent never says a handful of frames is what it also covers",
         )
     }
 
