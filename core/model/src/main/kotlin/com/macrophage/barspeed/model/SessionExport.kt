@@ -1588,10 +1588,12 @@ data class GeometryExport(
  * here instead of restating it: three copies of the rule drifted, and two
  * review rounds running corrected them one file at a time.
  *
- * ONE of [GeometryExport]'s eight values is missing here on purpose:
- * `sensorInverted` is a non-nullable boolean in the plan format, so a declared
- * `false` and an omitted key are the same value and no source can be told
- * apart. Stating one would be an invention.
+ * ONE of [GeometryExport]'s eight values is missing here: `sensorInverted`.
+ * Plan schema 1.12 widened its plan key to `Boolean?`, so a declared `false`
+ * and an omitted key are two distinct states there now and it COULD carry a
+ * source the way the seven published values do; none is published because
+ * that would add a required key to this object for a value no consumer reads
+ * yet.
  *
  * `sensorOnStack` was a second until #223 made the plan key nullable, and an
  * omitted key on a machine the app seeds is answered from

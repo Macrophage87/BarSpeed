@@ -27,16 +27,19 @@ class PlanGeometryNullabilityContractTest {
 
     /**
      * The three geometry flags are published NULLABLE, so the document a
-     * plan-writing model validates against says what the app has done since
-     * v0.1.49: an absent key is not a declared `false`.
+     * plan-writing model validates against says what the app already does: an
+     * absent key is not a declared `false`.
      *
      * This is the schema catching up with the code, and the gap it closes was
-     * real rather than cosmetic. `sensorOnStack` (#223) and `bodyweight` (#227)
-     * were made `Boolean?` in Kotlin and shipped that way, while this document
-     * still typed both as plain booleans -- so the published contract and the
+     * real rather than cosmetic, though not on the same date for both.
+     * `sensorOnStack` (#223) has read an omitted key as undeclared since
+     * v0.1.49; `bodyweight` (#227) has done so only since it made the same
+     * change, which has shipped in no release yet. Both left this document
+     * still typing them as plain booleans, so the published contract and the
      * running app disagreed about what an omitted key meant, and a plan
      * spelling absence as `null` was refused by the schema and accepted by the
-     * app. `sensorInverted` is the third and is widened with them.
+     * app. `sensorInverted` is the third and is widened with them, in this
+     * same schema mint that first makes it nullable in Kotlin too.
      *
      * `type` is asserted as the two-element list rather than by membership: a
      * bare `"boolean"` and a `["boolean", "null"]` are the whole difference

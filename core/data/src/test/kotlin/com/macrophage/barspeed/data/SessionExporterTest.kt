@@ -581,7 +581,7 @@ class SessionExporterTest {
     /**
      * Where each value came from: a consumer treats a guess and a declaration
      * differently. Six carry a source; `sensorInverted` and `bodyweight` do
-     * not, for the two different reasons stated once at
+     * not, for the one reason stated once at
      * [com.macrophage.barspeed.model.GeometrySourceExport]'s KDoc.
      */
     @Test
