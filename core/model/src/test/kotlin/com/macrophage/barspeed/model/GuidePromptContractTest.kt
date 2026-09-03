@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.model
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -35,6 +36,14 @@ class GuidePromptContractTest {
         ) {
             "GuideScreen.kt is not on the test classpath - see the include filter in core/model/build.gradle.kts"
         }.readBytes().decodeToString()
+
+    /**
+     * The prompt as the model receives it: the source interpolates
+     * [PlanFile.SCHEMA_VERSION] into its version sites, and this substitutes
+     * the same value the compiler would. On a source that spells the version
+     * out instead, the replace is a no-op and this is the raw text.
+     */
+    private val rendered: String = prompt.replace(VERSION_TOKEN, PlanFile.SCHEMA_VERSION)
 
     private fun assertDocuments(key: String) = assertTrue(
         prompt.contains("\"$key\""),
@@ -216,15 +225,74 @@ class GuidePromptContractTest {
         )
     }
 
+    /**
+     * The prompt states its version TWICE -- once in prose, once inside the
+     * JSON skeleton the model is told to copy -- and one `contains` over the
+     * whole file stood for both until #136. That assertion is DISJUNCTIVE:
+     * either site satisfies it on its own, so the skeleton could advertise a
+     * version `PlanFile.validate()` rejects while the prose stayed right, and
+     * the suite would stay green. Every plan written from the copied skeleton
+     * would then be refused at the import gate.
+     *
+     * The two sites are pinned separately, each against `SCHEMA_VERSION` and
+     * against the set the import gate actually consults. Deleted with this
+     * change: `the plan prompt states the schema version the code writes`,
+     * whose single disjunctive assertion is implied by either of these.
+     *
+     * Read from [rendered], not from the raw source: both sites interpolate
+     * [PlanFile.SCHEMA_VERSION], so what a lifter's clipboard receives is the
+     * substituted text and not the token.
+     */
     @Test
-    fun `the plan prompt states the schema version the code writes`() {
-        // The prompt names the contract version in prose. There are four other
-        // statements of this contract in the repo and they already disagree;
-        // this is the one an LLM is actually given, so it is the one pinned.
+    fun `the plan prompt skeleton advertises the version the app accepts`() {
+        val advertised = SKELETON_VERSION.findAll(rendered).map { it.groupValues[1] }.toList()
         assertTrue(
-            prompt.contains(PlanFile.SCHEMA_VERSION),
-            "the plan prompt does not mention version ${PlanFile.SCHEMA_VERSION}, " +
-                "so it is describing a contract the app no longer publishes",
+            advertised.isNotEmpty(),
+            "the plan prompt has no JSON skeleton declaring a \"schemaVersion\", so the model is left " +
+                "to invent one",
         )
+        advertised.forEach { version ->
+            assertEquals(
+                PlanFile.SCHEMA_VERSION,
+                version,
+                "the plan prompt's JSON skeleton tells the model to write \"$version\" while the app " +
+                    "writes ${PlanFile.SCHEMA_VERSION}",
+            )
+            assertTrue(
+                version in PlanFile.SUPPORTED_SCHEMA_VERSIONS,
+                "the plan prompt's JSON skeleton advertises \"$version\", which the import gate rejects, " +
+                    "so every plan copied from it fails validation",
+            )
+        }
+    }
+
+    /** The prose half of the same pin; the skeleton test says why they are separate. */
+    @Test
+    fun `the plan prompt prose names the version the app accepts`() {
+        val named = PROSE_VERSION.findAll(rendered).map { it.groupValues[1] }.toList()
+        assertEquals(
+            listOf(PlanFile.SCHEMA_VERSION),
+            named,
+            "the plan prompt's prose should name the contract version exactly once, as " +
+                "${PlanFile.SCHEMA_VERSION}",
+        )
+        named.forEach { version ->
+            assertTrue(
+                version in PlanFile.SUPPORTED_SCHEMA_VERSIONS,
+                "the plan prompt's prose names version \"$version\", which the import gate rejects",
+            )
+        }
+    }
+
+    private companion object {
+        /**
+         * The source spelling of the interpolation both version sites use. The
+         * backslash is this file's escape; GuideScreen.kt carries a plain
+         * interpolation of the same constant.
+         */
+        const val VERSION_TOKEN = "\${PlanFile.SCHEMA_VERSION}"
+
+        val SKELETON_VERSION = Regex("\"schemaVersion\": *\"([^\"]*)\"")
+        val PROSE_VERSION = Regex("""full (\d+\.\d+) contract""")
     }
 }
