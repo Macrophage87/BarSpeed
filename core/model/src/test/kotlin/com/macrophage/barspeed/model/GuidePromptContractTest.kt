@@ -360,6 +360,29 @@ class GuidePromptContractTest {
         )
     }
 
+    /**
+     * The prompt tells the model a set carrying "limiter" did not necessarily
+     * fail, since #191 widened the question to a completed set rated near
+     * failure.
+     *
+     * `e1c2601c` edited this sentence into `GuideScreen.kt` and never touched
+     * this file, so the change had no pin at all -- round 2 of #191's review
+     * found it. `SchemaLimiterContractTest` pins the same widening in the
+     * published schema; this is the prompt's own copy, and the prompt is the
+     * only statement of the contract a plan-writing LLM actually reads.
+     */
+    @Test
+    fun `the plan prompt says limiter did not necessarily fail on a set rated near failure`() {
+        assertTrue(
+            "rated near failure" in prompt,
+            "the plan prompt never says a completed set can be rated near failure",
+        )
+        assertTrue(
+            "did not necessarily fail" in prompt,
+            "the plan prompt never says a set carrying \"limiter\" did not necessarily fail",
+        )
+    }
+
     private companion object {
         /**
          * The source spelling of the interpolation both version sites use. The
