@@ -2,6 +2,7 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 
 /**
@@ -66,9 +67,16 @@ class SetLoadUnitToggleTest {
      * must return the identical string -- otherwise a lifter checking the other
      * unit and changing their mind is charged for the look.
      *
-     * A hand-typed value that is not on the new unit's step lattice IS
-     * quantised, once, on the first tap. That is the bounded loss the test
-     * above pins. From the second tap onward there is none.
+     * BLIND SPOT, NAMED RATHER THAN LEFT IMPLICIT: `settled` here is always
+     * built by hopping off the KG lattice (`viaOther`, then back through
+     * `from`), so this sweep only ever asks the kg-lattice-seeded question.
+     * It structurally cannot see an LB-lattice text that never had a kg value
+     * pass through it -- `SetLoadPolicy.convertedLoad`'s own KDoc names 93 of
+     * 1001 lb-lattice values, checked over 0-500 lb by 0.5, that do not
+     * survive lb-to-kg-to-lb. `a value seeded directly on the lb lattice
+     * settles by the second tap, not the first`, below, pins that case
+     * instead: it is stable one tap later than the kg-lattice case is, not
+     * on the same tap a since-corrected claim here used to assert.
      */
     @Test
     fun `toggling twice returns the same text, exhaustively`() {
@@ -88,5 +96,32 @@ class SetLoadUnitToggleTest {
             }
             kg += 0.25
         }
+    }
+
+    /**
+     * The case the sweep above cannot see: a text seeded directly on the LB
+     * lattice, with no kg value ever entering it. `105` lb is one of 93 (of
+     * 1001 checked, 0-500 lb by 0.5) that do not survive lb-to-kg-to-lb,
+     * because 0.25 kg (the KG step) is 0.5512 lb, wider than the 0.5 lb
+     * step, so two adjacent LB-lattice values can snap to the same KG value.
+     *
+     * Tap 1 (LB -> KG) already lands on a KG-lattice value, `47.75`, and from
+     * there the KG side is a fixed point: tap 3 repeats tap 1 exactly. But
+     * tap 1's own LB ancestor, `105`, is NOT reproduced by tap 2 (KG -> LB):
+     * tap 2 gives `105.5`, and tap 4 repeats tap 2. So the LB text drifts
+     * once more after the tap that looked, from the KG side, already settled
+     * -- two taps to a fixed point, not one.
+     */
+    @Test
+    fun `a value seeded directly on the lb lattice settles by the second tap, not the first`() {
+        val tap1 = SetLoadPolicy.convertedLoad("105", WeightUnit.LB, WeightUnit.KG).text
+        val tap2 = SetLoadPolicy.convertedLoad(tap1, WeightUnit.KG, WeightUnit.LB).text
+        val tap3 = SetLoadPolicy.convertedLoad(tap2, WeightUnit.LB, WeightUnit.KG).text
+        val tap4 = SetLoadPolicy.convertedLoad(tap3, WeightUnit.KG, WeightUnit.LB).text
+        assertEquals("47.75", tap1)
+        assertEquals("105.5", tap2)
+        assertNotEquals("105", tap2, "the lb text drifts past its own ancestor")
+        assertEquals(tap1, tap3, "the kg side is already a fixed point by tap 1")
+        assertEquals(tap2, tap4, "the lb side needs tap 2 to reach its fixed point")
     }
 }

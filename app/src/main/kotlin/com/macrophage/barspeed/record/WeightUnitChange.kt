@@ -35,6 +35,18 @@ import com.macrophage.barspeed.model.WeightUnit
  * and the rest screen showed it back as "Load recorded 100 kg". Tapping the
  * chip a second time returned the field to `Load (kg)` 100. That is bench
  * evidence at one SHA, not a gate: nothing re-runs it.
+ *
+ * `043e63d030facf7298af2b379a5097d7a7e21c0b` IS NOT AN ANCESTOR OF THIS
+ * BRANCH -- the branch was rebased onto `e74d4e61` after this run, and
+ * `git merge-base --is-ancestor 043e63d0 HEAD` fails, as it does for the red
+ * CI run named in `SetLoadPolicy.kt`'s history too. The bench evidence still
+ * applies: this file and `SetLoadPolicy.kt` are byte-identical across the
+ * rebase (`git diff --stat 043e63d0 ce07d6a3 --
+ * app/src/main/kotlin/com/macrophage/barspeed/record/WeightUnitChange.kt
+ * core/model/src/main/kotlin/com/macrophage/barspeed/model/SetLoadPolicy.kt`
+ * is empty), and `git diff --name-only 043e63d0 ce07d6a3` names four other
+ * `app/` files that did change -- `GuideScreen`, `HomeViewModel`,
+ * `SessionDetailScreen`, `SessionDetailViewModel` -- none on the load path.
  */
 internal fun unitChangedState(s: RecordState, unit: WeightUnit): RecordState {
     val converted = SetLoadPolicy.convertedLoad(s.loadInput, s.weightUnit, unit)

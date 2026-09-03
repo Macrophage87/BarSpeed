@@ -492,15 +492,20 @@ object SetLoadPolicy {
      * rendering the exact conversion, puts `220.46226218` in an edit box the
      * lifter reads at arm's length between sets.
      *
-     * STABLE ON ITS OWN OUTPUT, which is the property that matters for a chip
+     * STABLE WITHIN TWO TAPS, NOT ONE -- the property that matters for a chip
      * the lifter can tap twice. Every text this returns lies on a step
-     * lattice, and converting a lattice value out and back returns the same
-     * text -- swept over 0-400 kg in both directions by
-     * `SetLoadUnitToggleTest`. A hand-typed value off the lattice is quantised
-     * once, on the first tap, and never drifts again. The two steps cannot
-     * both be exactly invertible into each other, so which one absorbs the
-     * quantisation had to be chosen; the first tap absorbs it, because that is
-     * the tap where the lifter is looking at the number.
+     * lattice, but the two lattices are not the same width: 0.25 kg is 0.5512
+     * lb, wider than the 0.5 lb step. A KG-lattice text IS a fixed point --
+     * converting it to lb and back always returns it, checked over 0-450 kg
+     * by 0.25 (1801 values, 0 fail) -- but an LB-lattice text need not be: 93
+     * of 1001 values checked over 0-500 lb by 0.5 do not survive
+     * lb-to-kg-to-lb. So a hand-typed value that quantises into LB on its
+     * first tap can still move again on the second: 47.7 kg taps to `105`
+     * lb, then `47.75` kg, then `105.5` lb -- three renderings a tenth of a
+     * kilo apart, not the one settled value the earlier claim here promised.
+     * From the kg side onward it is exact. `SetLoadUnitToggleTest` sweeps the
+     * kg-lattice-seeded case exhaustively and pins the lb-lattice case
+     * directly, seeded on that lattice with no kg value ever entering it.
      *
      * RENDERED HERE RATHER THAN BY `WeightUnit.inputValue`, which quantises to
      * 0.1 of the display unit and so cannot write a quarter at all: 8 lb
