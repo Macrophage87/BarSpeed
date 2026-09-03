@@ -491,7 +491,7 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.11"
+        const val SCHEMA_VERSION = "1.12"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader parsing this as a float
@@ -501,7 +501,7 @@ data class PlanFile(
         val SUPPORTED_SCHEMA_VERSIONS =
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9",
-                "1.10", "1.11",
+                "1.10", "1.11", "1.12",
             )
         val VALID_SIDES = setOf("left", "right")
 
@@ -631,8 +631,20 @@ data class PlanExerciseDef(
      * usual case on a cable machine, where the sensor rides the weight stack, so
      * pulling the handle down sends the stack (and the sensor) up. Without this
      * every phase label and every velocity on that exercise is backwards.
+     *
+     * Nullable, and null is not false, the shape [sensorOnStack] took at #223
+     * and [bodyweight] at #227 — an omitted key leaves the app's own definition
+     * of that exercise standing rather than clearing it. What differs is what
+     * is behind the omission: there is no id table here, because no entry in
+     * [ExerciseDef.SEED] sets this and inversion is a property of how a machine
+     * is ROUTED, which only whoever clipped the sensor on can know. So an
+     * omitted key resolves to false today exactly as it did before it was
+     * nullable, the import gate has no inference to name for it, and what the
+     * type buys is that a plan CAN say false as a decision rather than by
+     * silence — and that the day an inverted machine is built in, a plan that
+     * says nothing defers to it (the last third of #64).
      */
-    val sensorInverted: Boolean = false,
+    val sensorInverted: Boolean? = null,
     /**
      * True when the sensor rides the cable weight stack rather than the handle.
      * The stack travels VERTICALLY however the lifter moves, so this — not

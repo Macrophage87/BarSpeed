@@ -209,12 +209,15 @@ object SetGeometryPolicy {
      * default -- overwriting with the default would discard the built-in
      * definition.
      *
-     * `sensorInverted` is still assigned unconditionally because it cannot
-     * express omission (see [GeometrySources]); that is the rest of #64 and is
-     * not fixed here. `sensorOnStack` and `bodyweight` are not: `sensorOnStack`
-     * goes through [stackMount] and `bodyweight` through [bodyweightMount], so
-     * a plan that says nothing about either gets the app's default for that
-     * machine and a plan that says `false` still wins (#61, #223, #227).
+     * All three geometry flags now take that precedence, which closes #64.
+     * `sensorOnStack` goes through [stackMount] and `bodyweight` through
+     * [bodyweightMount], so a plan that says nothing about either gets the
+     * app's default for that machine and a plan that says `false` still wins
+     * (#61, #223, #227). `sensorInverted` is the last of the three and needs
+     * neither helper: there is no id table behind it, so the precedence is the
+     * plain one every other key here uses -- a declaration wins, an omission
+     * defers to [base]. It was assigned unconditionally until now, which
+     * cleared a built-in inversion on any plan that did not mention it.
      */
     fun resolve(base: ExerciseDef, declared: PlanExerciseDef?): ExerciseDef {
         if (declared == null) return base
@@ -222,7 +225,7 @@ object SetGeometryPolicy {
             startsWith = declared.startPhaseOverride ?: base.startsWith,
             concentricUp = declared.concentric?.let { it == "up" } ?: base.concentricUp,
             kind = declared.effectiveKind,
-            sensorInverted = declared.sensorInverted,
+            sensorInverted = declared.sensorInverted ?: base.sensorInverted,
             travelRatio = declared.travelRatio ?: base.travelRatio,
             horizontal = declared.plane?.let { it == "horizontal" } ?: base.horizontal,
             sensorOnStack = stackMount(base.id, base.sensorOnStack, declared.sensorOnStack).onStack,
