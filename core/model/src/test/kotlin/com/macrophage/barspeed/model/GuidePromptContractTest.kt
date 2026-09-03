@@ -284,6 +284,36 @@ class GuidePromptContractTest {
         }
     }
 
+    /**
+     * Two pins agreeing is not the same as one fact. The prose and the
+     * skeleton can each be right about a version and still be two independent
+     * copies of it, which is the shape that drifted in the first place: a
+     * version bump edits one site, the other is missed, and only a test
+     * written afterwards catches it.
+     *
+     * So both sites interpolate [PlanFile.SCHEMA_VERSION] -- the same constant
+     * `PlanFile.validate()` checks its input against -- and a bump moves the
+     * prompt with no edit to `GuideScreen.kt` at all. This asserts on the RAW
+     * source rather than [rendered], because the token is exactly what it is
+     * checking for.
+     *
+     * Narrow, and said so: this cannot check the prompt describes 1.11 well,
+     * only that neither version site is a literal a bump can leave behind.
+     */
+    @Test
+    fun `both plan prompt version sites interpolate PlanFile SCHEMA_VERSION`() {
+        assertTrue(
+            prompt.contains("\"schemaVersion\": \"$VERSION_TOKEN\""),
+            "the plan prompt's JSON skeleton spells its version out instead of interpolating " +
+                "PlanFile.SCHEMA_VERSION, so a bump can leave it behind",
+        )
+        assertTrue(
+            prompt.contains("full $VERSION_TOKEN contract"),
+            "the plan prompt's prose spells its version out instead of interpolating " +
+                "PlanFile.SCHEMA_VERSION, so a bump can leave it behind",
+        )
+    }
+
     private companion object {
         /**
          * The source spelling of the interpolation both version sites use. The
