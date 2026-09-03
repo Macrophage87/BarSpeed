@@ -32,7 +32,7 @@ import kotlin.test.assertTrue
  *
  * ## What this does NOT say
  *
- * It does not say the counter no longer invents reps. Eight captures carry no
+ * It does not say the counter no longer invents reps. Nine captures carry no
  * cue track, and previously identified survivors are in that group --
  * field-ohp-100hz-bursty keeps runs of 1.553, 1.604 and 1.892 m against a
  * 0.766 m median, all UNPINNED figures quoted in [LiveCapCalibrationTest].
@@ -168,7 +168,8 @@ class CuedRepCoverageTest {
     )
 
     /**
-     * The nine that do not, which is where the surviving artefacts live.
+     * The ten this file does not score, nine of which carry no cue track at
+     * all.
      *
      * `field-rdl-3010-10rep-s36-set04` is here by choice and the choice is
      * worth stating: the capture HAS a cue track in its session archive and it
@@ -492,14 +493,12 @@ class CuedRepCoverageTest {
     fun `the out-of-family survivors reconcile with the corpus totals`() {
         // Ties this file to the corpus figures pinned in `the corpus totals,
         // corrected against the ones issue 94 was filed with (pre-fix)` and in
-        // `the bound destroys no in-family rep`. Both of those count 101 reps
-        // the shipped tracker reports over TWENTY-ONE captures, of which 82 are
-        // in family with their own set -- 85 before issue #87 moved the batch
-        // reference the classification is taken against. The live counter did
-        // not move; the reference did. Sixty-four of the 101 and 47 of the 82
-        // are here, so 37 counted reps and 35 in-family ones are on captures
-        // with no truth, and two out-of-family reps are neither confirmed nor
-        // disproved by any cue track.
+        // `the bound destroys no in-family rep (pre-fix)`. Both of those count
+        // 101 reps the shipped tracker reports over TWENTY-ONE captures, of
+        // which 83 are in family with their own set. Sixty-four of the 101 and
+        // 51 of the 83 are here, so 37 counted reps and 32 in-family ones are
+        // on captures with no truth, and five out-of-family reps are neither
+        // confirmed nor disproved by any cue track.
         //
         // [outsideCorpusTotals] is subtracted first, because this file's own
         // lists cover THIRTY captures and those totals cover twenty-one.
@@ -521,11 +520,11 @@ class CuedRepCoverageTest {
             }
         }
         val corpusCounted = 101
-        val corpusInFamily = 85
+        val corpusInFamily = 83
         assertEquals(37, corpusCounted - counted, "counted reps on captures with no cue track")
-        assertEquals(34, corpusInFamily - inFamily, "of those, in family by the batch reference")
+        assertEquals(32, corpusInFamily - inFamily, "of those, in family by the batch reference")
         assertEquals(
-            3,
+            5,
             (corpusCounted - corpusInFamily) - (counted - inFamily),
             "out-of-family reps that no cue track can confirm or disprove",
         )

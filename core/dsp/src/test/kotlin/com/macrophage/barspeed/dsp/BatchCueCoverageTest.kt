@@ -349,7 +349,7 @@ class BatchCueCoverageTest {
         // field-bench-3010-6rep-s37-set05 is the clearest single case. It
         // resolves FOUR detections, not the one this note used to claim, and
         // the longest of them runs 4.29 s. Its drive starts inside the last
-        // window; its midpoint falls 209 ms past that window's close, which
+        // window; its midpoint falls 226 ms past that window's close, which
         // WINDOW_TOLERANCE_MS of 150 ms does not cover, and there is no
         // window after it -- so the start rule matches it and the midpoint
         // rule scores it a stray. Measured at this commit from the span
