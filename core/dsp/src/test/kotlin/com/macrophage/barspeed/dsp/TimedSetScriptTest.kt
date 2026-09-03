@@ -111,8 +111,9 @@ class TimedSetScriptTest {
      * length.
      *
      * `LeadInPlan.RECORDED` is the rule; this checks the replay obeys it, on
-     * the 12 s prep both captures ran, whose countdown says "5", "4" and "3"
-     * out loud and writes none of them.
+     * the 12 s prep both captures ran, which opens with the prep length
+     * itself ("12 seconds"), falls silent, then counts "5", "4" and "3" out
+     * loud -- all four spoken and none of them written to the record.
      */
     @Test
     fun `the replay writes only the lead-in words that reach the record`() {
@@ -128,8 +129,8 @@ class TimedSetScriptTest {
      * POLICY hands a hold today rather than of the ones field-37 recorded:
      * replay set 11's prep, target and captured stray-digit instants, and
      * nothing numeric may reach the record at or before `Hold`. Before the
-     * fix the first row is a bare `1` 0.186 s early, which is what the lifter
-     * heard.
+     * fix the first row is a bare `1` 0.186 s before `workStartedAt_ms`, and
+     * so 0.184 s before the `Hold` row -- which is what the lifter heard.
      */
     @Test
     fun `a hold speaks no bare digit before the word that starts its clock`() {
