@@ -18,13 +18,20 @@ import kotlin.test.assertTrue
  * collector matches which feed. The cases that DO change are pushed alone, red,
  * in the commit after this one.
  *
+ * EVERY CASE HERE WAS REWRITTEN when [LiveFeedPolicy.liveFeed] took frame
+ * counts instead of a list of analysable roles. Each call passes the counts
+ * that produce the list the same case used to pass, so the inputs are the same
+ * inputs; the assertions are untouched. The three added at the bottom pass
+ * both before and after the margin rule lands, which is why they are here and
+ * not in the red commit.
+ *
  * The seam is why this file can exist. The decision runs inside `:app`'s sample
  * handlers, which no test on the CI path reaches.
  */
 class LiveFeedPolicyTest {
     @Test
     fun `the armed role feeds the tracker while it is delivering`() {
-        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, listOf(SensorRole.A, SensorRole.B))
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, BOTH, frames(8, 8))
         assertEquals(SensorRole.A, feed.role)
         assertFalse(feed.fellBack)
         assertFalse(feed.switched)
@@ -32,7 +39,7 @@ class LiveFeedPolicyTest {
 
     @Test
     fun `nothing has been analysable yet at the start of a set`() {
-        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, emptyList())
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, BOTH, frames(0, 0))
         assertEquals(SensorRole.A, feed.role)
         assertFalse(feed.fellBack)
         assertFalse(feed.switched)
@@ -40,7 +47,7 @@ class LiveFeedPolicyTest {
 
     @Test
     fun `the readout moves to the partner when the armed unit cannot be analysed`() {
-        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, listOf(SensorRole.B))
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, BOTH, frames(0, 8))
         assertEquals(SensorRole.B, feed.role)
         assertTrue(feed.fellBack)
         assertTrue(feed.switched)
@@ -48,7 +55,7 @@ class LiveFeedPolicyTest {
 
     @Test
     fun `the move is the same in either direction`() {
-        val feed = LiveFeedPolicy.liveFeed(SensorRole.B, SensorRole.B, listOf(SensorRole.A))
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.B, SensorRole.B, BOTH, frames(8, 0))
         assertEquals(SensorRole.A, feed.role)
         assertTrue(feed.fellBack)
         assertTrue(feed.switched)
@@ -56,8 +63,8 @@ class LiveFeedPolicyTest {
 
     @Test
     fun `the switch is announced on the frame that makes it and no later one`() {
-        val first = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, listOf(SensorRole.B))
-        val next = LiveFeedPolicy.liveFeed(SensorRole.A, first.role, listOf(SensorRole.B))
+        val first = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, BOTH, frames(0, 8))
+        val next = LiveFeedPolicy.liveFeed(SensorRole.A, first.role, BOTH, frames(0, 9))
         assertEquals(SensorRole.B, next.role)
         assertTrue(next.fellBack)
         assertFalse(next.switched)
@@ -65,7 +72,7 @@ class LiveFeedPolicyTest {
 
     @Test
     fun `the readout does not return to the armed stream once it has left it`() {
-        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.B, listOf(SensorRole.A, SensorRole.B))
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.B, BOTH, frames(8, 8))
         assertEquals(SensorRole.B, feed.role)
         assertTrue(feed.fellBack)
         assertFalse(feed.switched)
@@ -73,7 +80,7 @@ class LiveFeedPolicyTest {
 
     @Test
     fun `a set with no roles has no role to feed from`() {
-        val feed = LiveFeedPolicy.liveFeed(null, null, emptyList())
+        val feed = LiveFeedPolicy.liveFeed(null, null, emptyList(), emptyMap())
         assertNull(feed.role)
         assertFalse(feed.fellBack)
         assertFalse(feed.switched)
@@ -93,5 +100,37 @@ class LiveFeedPolicyTest {
         assertTrue(LiveFeedPolicy.feedsTracker(feed, SensorRole.B))
         assertFalse(LiveFeedPolicy.feedsTracker(feed, SensorRole.A))
         assertFalse(LiveFeedPolicy.feedsTracker(feed, null))
+    }
+
+    @Test
+    fun `the readout moves off an armed unit its partner has left far behind`() {
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, BOTH, frames(0, 400))
+        assertEquals(SensorRole.B, feed.role)
+        assertTrue(feed.fellBack)
+        assertTrue(feed.switched)
+    }
+
+    @Test
+    fun `neither unit has enough frames to be worth moving to`() {
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, BOTH, frames(0, 7))
+        assertEquals(SensorRole.A, feed.role)
+        assertFalse(feed.fellBack)
+        assertFalse(feed.switched)
+    }
+
+    @Test
+    fun `a partner exactly eight frames ahead takes the readout`() {
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, BOTH, frames(7, 15))
+        assertEquals(SensorRole.B, feed.role)
+        assertTrue(feed.fellBack)
+        assertTrue(feed.switched)
+    }
+
+    private companion object {
+        /** Both roles armed, in the order they were armed in. */
+        val BOTH = listOf(SensorRole.A, SensorRole.B)
+
+        /** Frames delivered so far by role A and role B. */
+        fun frames(a: Int, b: Int) = mapOf(SensorRole.A to a, SensorRole.B to b)
     }
 }

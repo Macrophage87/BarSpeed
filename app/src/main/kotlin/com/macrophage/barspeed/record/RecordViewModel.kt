@@ -599,7 +599,8 @@ internal fun liveFeedOf(
     return LiveFeedPolicy.liveFeed(
         armed = armed?.analysed,
         fedBy = fedBy,
-        analysable = SensorCapturePolicy.analysable(armed?.expected.orEmpty(), framesByRole),
+        expected = armed?.expected.orEmpty(),
+        framesByRole = framesByRole,
     )
 }
 

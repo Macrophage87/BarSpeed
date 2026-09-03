@@ -50,9 +50,16 @@ object LiveFeedPolicy {
      * Which role feeds the tracker, given what has arrived so far.
      *
      * [fedBy] is the role feeding the tracker now -- the armed role at the
-     * start of a set -- and [analysable] is
-     * [SensorCapturePolicy.analysable]'s answer over the frames counted SO FAR,
-     * which is why the answer can change while the set runs.
+     * start of a set -- and [framesByRole] is how many frames each of
+     * [expected] has delivered SO FAR, which is why the answer can change
+     * while the set runs.
+     *
+     * IT TAKES COUNTS RATHER THAN [SensorCapturePolicy.analysable]'S ANSWER,
+     * as of this commit, and takes [expected] with them so it can ask that
+     * question itself. The caller used to ask it and hand the list down. No
+     * behaviour moves: the same call is made on the same inputs, one frame
+     * later in the stack. The counts are here because the next commit's rule
+     * needs a MARGIN between two of them, which a list of roles cannot state.
      *
      * THE SAME PURE FUNCTION THE ANALYSIS USES, and deliberately not a second
      * rule beside it. Which stream is worth reading is
@@ -100,9 +107,15 @@ object LiveFeedPolicy {
      * nothing is wrong with either sensor -- a field question about whether
      * that is tolerable to read, not a defect this file can fix.
      */
-    fun liveFeed(armed: SensorRole?, fedBy: SensorRole?, analysable: List<SensorRole>): LiveFeed {
+    fun liveFeed(
+        armed: SensorRole?,
+        fedBy: SensorRole?,
+        expected: List<SensorRole>,
+        framesByRole: Map<SensorRole, Int>,
+    ): LiveFeed {
         val latched = fedBy?.takeIf { it != armed }
         if (latched != null) return LiveFeed(role = latched, fellBack = true, switched = false)
+        val analysable = SensorCapturePolicy.analysable(expected, framesByRole)
         val decision = SensorCapturePolicy.analysedStream(armed, analysable)
         return LiveFeed(role = decision.role, fellBack = decision.fellBack, switched = decision.role != fedBy)
     }
