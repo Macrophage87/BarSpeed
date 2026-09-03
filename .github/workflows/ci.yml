@@ -30,6 +30,9 @@ jobs:
       - name: Unit tests (all modules)
         run: ./gradlew test --stacktrace
 
+      # Scoped to :app only (#98). The library modules -- :core:ble, :core:dsp, :core:data,
+      # :core:model, :core:hrm, :core:witmotion -- carry no lint step here; a suppression
+      # inside them (e.g. GattClients.kt, BleScanner.kt) is not gated by this job.
       - name: Android lint
         run: ./gradlew :app:lintDebug --stacktrace
 

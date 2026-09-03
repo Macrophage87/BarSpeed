@@ -1,3 +1,7 @@
+// #98: ci.yml runs Android Lint only on :app (`:app:lintDebug`); :core:ble has no lint step
+// at all, so this suppression is not holding back a gate -- there is no gate here to hold
+// back. It is a deliberate "leave lint off for :core:ble" choice, stated rather than implied
+// by omission, not evidence that a lint run has judged the calls below clean.
 @file:Suppress("DEPRECATION", "MissingPermission")
 
 package com.macrophage.barspeed.ble
