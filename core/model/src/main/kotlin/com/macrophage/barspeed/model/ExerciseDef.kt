@@ -139,15 +139,33 @@ data class ExerciseDef(
          *
          * Lifted here from `RecordState.currentExercise`, which is a property
          * on a data class inside `RecordViewModel.kt` that no test on the CI
-         * path can construct. As introduced this is that expression EXACTLY,
-         * defect and all: it consults [SEED] and then the bare constructor,
-         * and it does not consult [SetGeometryPolicy.bodyweightMount], so
-         * #227's body-weight seed default does not reach an ad-hoc set. A
-         * helper written correct from birth could not have redded against a
-         * wiring omission, so this one is written wrong on purpose and the
-         * differential that follows repoints its pin. #229 item 3.
+         * path can construct. It was lifted as the bare
+         * `seedById(id) ?: ExerciseDef(id, id)` that stood there, defect
+         * included, so a differential had something to red against.
+         *
+         * It now runs the result through [SetGeometryPolicy.bodyweightMount],
+         * which is what a PLAN slot has always got via
+         * [SetGeometryPolicy.resolve]: an ad-hoc pull-up, chin-up, dip,
+         * push-up or dead hang is body-weight work whether or not a plan
+         * declared it. There is no plan here to declare anything, so
+         * `declared` is null and the seed default decides. #229 item 3, and
+         * half of #61's population.
+         *
+         * `copy` rather than a fresh constructor call, deliberately: the seed
+         * entry for `dead_hang` carries a display name, a HOLD kind and
+         * `usesBarbell = false`, and rebuilding it from `ExerciseDef(id, id)`
+         * would set one flag and discard those three.
+         *
+         * Only `bodyweight` is seeded here. `sensorOnStack` has the same gap
+         * on the same path and is #228's; deciding it belongs with that issue
+         * rather than in a body-weight fix.
          */
-        fun resolvedById(id: String): ExerciseDef = seedById(id) ?: ExerciseDef(id, id)
+        fun resolvedById(id: String): ExerciseDef {
+            val base = seedById(id) ?: ExerciseDef(id, id)
+            return base.copy(
+                bodyweight = SetGeometryPolicy.bodyweightMount(base.id, base.bodyweight, declared = null),
+            )
+        }
 
         /**
          * Exercise ids whose machine carries the sensor on a pin-selected
@@ -254,18 +272,18 @@ data class ExerciseDef(
          *
          * The commit "Seed pull-ups, dips, push-ups, chin-ups and dead hangs
          * as body weight" left a follow-up list naming PlanDetailScreen and
-         * GuideScreen's PLAN_PROMPT as the two sites this table does not yet
-         * reach, but there is a THIRD, unnamed there: an AD-HOC set (no plan
-         * slot) resolves its exercise from `RecordState.currentExercise` as
-         * `seedById(id) ?: ExerciseDef(id, id)`, which never calls
-         * [SetGeometryPolicy.bodyweightMount] and so never consults this
-         * table either. `seedById("pull_up")` returns null -- four of the five
-         * ids here carry no SEED entry, and `dead_hang`'s SEED entry does not
-         * set `bodyweight = true` -- so an ad-hoc pull-up falls to the bare
-         * `ExerciseDef(id, id)` constructor and an ad-hoc dead hang to a seed
-         * whose `bodyweight` is false. Either way the set records added load
-         * alone and is never asked for a body weight: half of #61's
-         * population, unclosed by this table alone. Tracked as #229.
+         * GuideScreen's PLAN_PROMPT as the two sites this table did not yet
+         * reach, and there was a THIRD it did not name: the AD-HOC path.
+         * [resolvedById] closes that one -- it runs the seed lookup through
+         * [SetGeometryPolicy.bodyweightMount], so a set started from the
+         * exercise picker gets the same answer a plan slot gets. #229 item 3.
+         *
+         * The two sites named in that list are still open and are still
+         * #229's items 1 and 2. Four of the five ids here carry no SEED entry,
+         * and `dead_hang`'s SEED entry does not set `bodyweight = true`, so
+         * both the seed lookup and the bare constructor still need the mount
+         * policy on top -- which is exactly what [resolvedById] does rather
+         * than editing the five entries.
          */
         val BODYWEIGHT_IDS: Set<String> =
             setOf(

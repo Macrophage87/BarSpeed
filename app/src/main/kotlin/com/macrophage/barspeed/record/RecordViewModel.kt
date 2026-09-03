@@ -1209,6 +1209,43 @@ private fun askOrStartSession(
  * Returns without doing anything when no prompt is pending, so a double tap on
  * SKIP or SAVE cannot start the session twice.
  */
+/**
+ * A refused body-weight set has been answered (#61). [kg] null is CANCEL, and
+ * a cancel is not a skip: no set starts, nothing is written, and the next
+ * START asks again. There is nothing to skip to -- the app cannot record the
+ * set without the number.
+ *
+ * On an answer the settings write is AWAITED and the state is then updated
+ * from [kg] on the same continuation rather than waited for. `bodyWeightKg`
+ * reaches [RecordState] through a collector on the settings flow, which is a
+ * separate coroutine, so calling [onBegin] on the strength of the durable
+ * write alone would race that collector and hit the refusal a second time
+ * with the figure already stored.
+ *
+ * Returns without doing anything when no set is refused, so a double tap on
+ * either button cannot start two sets.
+ *
+ * Free function taking the state flow, for [askOrStartSession]'s reason.
+ */
+private fun CoroutineScope.answerRefusedSet(
+    state: MutableStateFlow<RecordState>,
+    settings: SettingsStore,
+    kg: Double?,
+    onBegin: () -> Unit,
+) {
+    val s = state.value
+    if (!s.bodyWeightRequiredForSet) return
+    if (kg == null) {
+        state.value = s.copy(bodyWeightRequiredForSet = false)
+        return
+    }
+    launch {
+        settings.setBodyWeightKg(kg)
+        state.value = state.value.copy(bodyWeightKg = kg, bodyWeightRequiredForSet = false)
+        onBegin()
+    }
+}
+
 private fun CoroutineScope.answerBodyWeight(
     state: MutableStateFlow<RecordState>,
     settings: SettingsStore,
@@ -2488,6 +2525,18 @@ data class RecordState(
      */
     val bodyWeightPromptSkipped: Boolean = false,
     /**
+     * A set was asked to start, the lifter's own body is its load, and no body
+     * weight is stored -- so it did NOT start and the screen is asking for one
+     * (#61).
+     *
+     * A refusal, not a prompt, and the two are deliberately different fields.
+     * [bodyWeightPromptSkipped] silences the start-of-session ASK; nothing
+     * silences this, because there is no answer it could take that would let
+     * the app record a load it does not have. `RecordViewModel.beginSet`
+     * writes it and refuses; `answerBodyWeightForSet` clears it.
+     */
+    val bodyWeightRequiredForSet: Boolean = false,
+    /**
      * The lifter's prep adjustments, exercise id to seconds. Empty until the
      * settings flow first emits, which is why nothing here reads it directly --
      * [prepSecondsFor] falls back through the plan's declaration to the default.
@@ -3100,6 +3149,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun answerBodyWeightPrompt(kg: Double?) =
         viewModelScope.answerBodyWeight(stateFlow, container.settings, kg, ::startPlanSession)
 
+    /** The refused set's answer, null meaning cancel; [answerRefusedSet] decides (#61). */
+    fun answerBodyWeightForSet(kg: Double?) =
+        viewModelScope.answerRefusedSet(stateFlow, container.settings, kg, ::beginSet)
+
     /**
      * Start on the queue the lifter has just READ -- the same list `openPreview`
      * built, never a second flatten of the same plan (#202).
@@ -3200,6 +3253,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * pass straight through it untouched.
      */
     fun beginSet() {
+        // BEFORE the bake and before anything is armed: a set that will not be
+        // allowed to start must leave no trace of having been asked to. Why it
+        // refuses at all is SetLoadPolicy.blocksSetStart's KDoc (#61).
+        //
+        // Here rather than on the START button, because the button is not the
+        // only door: `startNextSet` writes READY and calls this in the same
+        // frame for every set after the first, so a gate on the tap would
+        // cover set one and nothing else.
+        val before = stateFlow.value
+        if (SetLoadPolicy.blocksSetStart(before.currentExercise.bodyweight, before.bodyWeightKg)) {
+            stateFlow.value = before.copy(bodyWeightRequiredForSet = true)
+            return
+        }
         // The rating panel goes with it. Starting another set is how a lifter
         // backs out of a mistapped Finish, and a flag left set here would
         // reopen the panel the next time they reach the rest screen -- asking
@@ -4185,6 +4251,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 // Cleared here rather than at the next start so the flag names
                 // one session and cannot be read as a standing preference.
                 bodyWeightPromptSkipped = false,
+                // A refusal is a fact about a set that was never started, and
+                // this session has no more sets. Left set, it would draw its
+                // dialog over the finished screen (#61).
+                bodyWeightRequiredForSet = false,
             )
     }
 

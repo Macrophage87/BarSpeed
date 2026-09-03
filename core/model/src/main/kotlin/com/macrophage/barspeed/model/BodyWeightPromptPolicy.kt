@@ -18,6 +18,11 @@ package com.macrophage.barspeed.model
  * skippable and a skip is not a refusal of the session — see [shouldPrompt]'s
  * [skippedThisSession] parameter, which is the only thing that suppresses it
  * once a lifter has said no.
+ *
+ * A SET is a different question and is [SetLoadPolicy.blocksSetStart]'s: a
+ * body-weight set with nothing stored is refused outright, because there is no
+ * load it could be recorded against (#61). That refusal is not skippable and
+ * this ask still is; the two are deliberately separate decisions.
  */
 object BodyWeightPromptPolicy {
     /**

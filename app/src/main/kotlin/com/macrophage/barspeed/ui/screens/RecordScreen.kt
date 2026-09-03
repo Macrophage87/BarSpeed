@@ -509,6 +509,79 @@ private fun BodyWeightPromptDialog(
 }
 
 /**
+ * A body-weight set was asked to start and there is no body weight to record
+ * it against, so it did not start (#61).
+ *
+ * NOT [BodyWeightPromptDialog], and the difference is the whole point. That
+ * one is an ASK raised before a session, it has a SKIP, and skipping starts
+ * the session anyway (#181). This one is a REFUSAL raised by
+ * `RecordViewModel.beginSet`, and its second button is CANCEL: it takes the
+ * lifter back to the screen they were on with no set started, because there is
+ * no answer that would let the app record a load it does not have.
+ *
+ * SAVE is disabled until the box parses to a positive number, so the one
+ * control that ends the refusal cannot end it with another absence.
+ *
+ * Every sentence comes from [SetLoadPolicy] and [BodyWeightPromptPolicy]
+ * rather than from here, so a test on the CI path runs on the wording.
+ */
+/**
+ * Raise [BodyWeightRequiredDialog] when a set has been refused, and nothing
+ * otherwise. The exercise it names is `currentExercise`, the same definition
+ * `beginSet` asked [SetLoadPolicy.blocksSetStart] about, so the dialog cannot
+ * name one movement while the refusal was about another.
+ */
+@Composable
+private fun BodyWeightRefusal(state: RecordState, viewModel: RecordViewModel) {
+    if (!state.bodyWeightRequiredForSet) return
+    BodyWeightRequiredDialog(
+        exerciseName = state.currentExercise.displayName,
+        unit = state.weightUnit,
+        onCancel = { viewModel.answerBodyWeightForSet(null) },
+        onSet = { viewModel.answerBodyWeightForSet(it) },
+    )
+}
+
+@Composable
+private fun BodyWeightRequiredDialog(
+    exerciseName: String,
+    unit: WeightUnit,
+    onCancel: () -> Unit,
+    onSet: (Double) -> Unit,
+) {
+    var text by rememberSaveable { mutableStateOf("") }
+    val parsed = unit.parseToKg(text)?.takeIf { it > 0 }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Body weight needed for $exerciseName") },
+        text = {
+            Column {
+                Text(SetLoadPolicy.BODY_WEIGHT_REQUIRED, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    BodyWeightPromptPolicy.WHY_IT_MATTERS,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BarColors.Sub,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Body weight (${unit.suffix})") },
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { parsed?.let(onSet) }, enabled = parsed != null) {
+                Text("Save and start")
+            }
+        },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel", color = BarColors.Sub) } },
+    )
+}
+
+/**
  * The whole of the upcoming session, read before anything starts (#202).
  *
  * WHAT IT DRAWS IS THE QUEUE. `state.queue` is the list the record flow walks,
@@ -766,6 +839,14 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     // record nothing. It renders at most once per session -- startNextSet writes
     // READY and calls beginSet in the same frame -- which is why RESTING carries
     // this too.
+    //
+    // The refusal is drawn HERE and only here, and it covers both doors:
+    // `startNextSet` runs `advancedState` -- which writes Stage.READY on the
+    // planned and the ad-hoc branch alike -- before it calls `beginSet`, so a
+    // set refused from the rest screen is refused with this stage already
+    // showing. Without that, a refusal on the rest path would be a set that
+    // silently failed to start.
+    BodyWeightRefusal(state, viewModel)
     PermissionBanner(demoMode = state.demoMode)
     val slot = state.currentSlot
     if (slot != null) {

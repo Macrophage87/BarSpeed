@@ -294,14 +294,18 @@ object SetLoadPolicy {
      * may state as negative for band or machine assistance. Loaded work has
      * no body in the path, so this is [addedKg] unchanged.
      *
-     * [bodyWeightKg] null means the lifter has never recorded a body weight
-     * -- #61's silent-default gap, not fixed here. The body-weight term is
-     * simply 0 in that state, so a body-weight set with no recorded body
-     * weight records its added load alone. This function does not widen
-     * that gap or narrow it: whatever [bodyWeightKg] holds when it runs is
-     * exactly what both the actual load and its paired planned load below
-     * are computed from, so the two stay on the same scale regardless of
-     * whether it is null.
+     * [bodyWeightKg] null still renders the body-weight term as 0, so a
+     * body-weight set reaching here with nothing stored would record its
+     * added load alone -- #61's silent default. Nothing reaches here in that
+     * state any more: [blocksSetStart] refuses the set before it runs. The
+     * arithmetic is deliberately unchanged rather than made nullable,
+     * because a null return would have to mean something in the export and
+     * this change publishes no way to say "unmeasured"; it stops the set
+     * that would have needed one.
+     *
+     * Whatever [bodyWeightKg] holds when it runs is exactly what both the
+     * actual load and its paired planned load below are computed from, so
+     * the two stay on the same scale regardless (#25).
      */
     fun totalKg(bodyweight: Boolean, bodyWeightKg: Double?, addedKg: Double): Double =
         if (bodyweight) (bodyWeightKg ?: 0.0) + addedKg else addedKg
@@ -336,17 +340,26 @@ object SetLoadPolicy {
      * performed, which is worse than the wrong number it was trying to
      * prevent.
      *
-     * As introduced this returns `false` unconditionally, which is what the
-     * app does today: nothing anywhere consults the stored body weight before
-     * starting a set. It is a bug-preserving identity for the same reason
-     * [ExerciseDef.resolvedById] is one -- a function written correct from
-     * birth cannot red against the absence of a call to it -- and the
-     * differential that follows repoints its pin.
+     * It is deliberately NARROW, because a refusal that fires too widely is a
+     * wall in front of a session. Three things it does not do: it does not
+     * refuse a loaded set, whose numbers do not depend on the lifter's mass;
+     * it does not refuse on a STALE figure, which is
+     * [BodyWeightPromptPolicy.shouldPrompt]'s question and stays skippable
+     * (#181); and it does not judge whether the stored figure is plausible.
+     * Absence is the only thing it can be sure of.
+     *
+     * A stored `0.0` refuses exactly as a null does. That is
+     * [BodyWeightPromptPolicy.isAbsent]'s reading and not a second rule:
+     * accepting a zero here would let the set through and record the very
+     * number this refusal exists to prevent.
+     *
+     * It returned `false` unconditionally when it was introduced, which was
+     * what the app checked before starting a set: nothing. That identity
+     * existed so a differential could red against a wiring omission, the
+     * shape #25 arrived at, and it is gone now.
      */
-    // Both suppressions are the identity's, not the answer's, and both come
-    // off in the commit that implements it.
-    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
-    fun blocksSetStart(bodyweight: Boolean, bodyWeightKg: Double?): Boolean = false
+    fun blocksSetStart(bodyweight: Boolean, bodyWeightKg: Double?): Boolean =
+        bodyweight && BodyWeightPromptPolicy.isAbsent(bodyWeightKg)
 
     /**
      * Why the app will not start this set, in the lifter's terms.
