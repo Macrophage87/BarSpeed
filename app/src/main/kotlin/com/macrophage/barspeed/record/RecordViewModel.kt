@@ -1192,24 +1192,6 @@ private fun askOrStartSession(
 }
 
 /**
- * The body-weight prompt has been answered. Either way the session starts (#181).
- *
- * [kg] null is the SKIP, and it is a real absence rather than a sentinel: a
- * skip writes nothing at all, not even a confirmation of the figure already
- * stored, because dating an unconfirmed number would buy fourteen days of
- * quiet for a value nobody looked at. What a skip does write is the
- * session-scoped flag that stops a second ask, cleared when the session closes.
- *
- * The write and the start are sequential inside one coroutine, so the stored
- * weight is durable before the session's first set can be set up. The recorded
- * load reads `bodyWeightKg` off the state at recordSet time, minutes later
- * either way, so the ordering is belt-and-braces rather than the thing that
- * makes the load right.
- *
- * Returns without doing anything when no prompt is pending, so a double tap on
- * SKIP or SAVE cannot start the session twice.
- */
-/**
  * A refused body-weight set has been answered (#61). [kg] null is CANCEL, and
  * a cancel is not a skip: no set starts, nothing is written, and the next
  * START asks again. There is nothing to skip to -- the app cannot record the
@@ -1246,6 +1228,24 @@ private fun CoroutineScope.answerRefusedSet(
     }
 }
 
+/**
+ * The body-weight prompt has been answered. Either way the session starts (#181).
+ *
+ * [kg] null is the SKIP, and it is a real absence rather than a sentinel: a
+ * skip writes nothing at all, not even a confirmation of the figure already
+ * stored, because dating an unconfirmed number would buy fourteen days of
+ * quiet for a value nobody looked at. What a skip does write is the
+ * session-scoped flag that stops a second ask, cleared when the session closes.
+ *
+ * The write and the start are sequential inside one coroutine, so the stored
+ * weight is durable before the session's first set can be set up. The recorded
+ * load reads `bodyWeightKg` off the state at recordSet time, minutes later
+ * either way, so the ordering is belt-and-braces rather than the thing that
+ * makes the load right.
+ *
+ * Returns without doing anything when no prompt is pending, so a double tap on
+ * SKIP or SAVE cannot start the session twice.
+ */
 private fun CoroutineScope.answerBodyWeight(
     state: MutableStateFlow<RecordState>,
     settings: SettingsStore,
@@ -3253,8 +3253,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * pass straight through it untouched.
      */
     fun beginSet() {
-        // BEFORE the bake and before anything is armed: a set that will not be
-        // allowed to start must leave no trace of having been asked to. Why it
+        // Before anything this function arms. NOT before the bake on the
+        // rest-screen door: startNextSet has already run advancedState and
+        // cancelled the rest clock, so a refusal there leaves the queue
+        // advanced with no rest countdown. Nothing durable is written. Why it
         // refuses at all is SetLoadPolicy.blocksSetStart's KDoc (#61).
         //
         // Here rather than on the START button, because the button is not the

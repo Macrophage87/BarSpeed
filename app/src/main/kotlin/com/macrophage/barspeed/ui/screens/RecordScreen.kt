@@ -509,23 +509,6 @@ private fun BodyWeightPromptDialog(
 }
 
 /**
- * A body-weight set was asked to start and there is no body weight to record
- * it against, so it did not start (#61).
- *
- * NOT [BodyWeightPromptDialog], and the difference is the whole point. That
- * one is an ASK raised before a session, it has a SKIP, and skipping starts
- * the session anyway (#181). This one is a REFUSAL raised by
- * `RecordViewModel.beginSet`, and its second button is CANCEL: it takes the
- * lifter back to the screen they were on with no set started, because there is
- * no answer that would let the app record a load it does not have.
- *
- * SAVE is disabled until the box parses to a positive number, so the one
- * control that ends the refusal cannot end it with another absence.
- *
- * Every sentence comes from [SetLoadPolicy] and [BodyWeightPromptPolicy]
- * rather than from here, so a test on the CI path runs on the wording.
- */
-/**
  * Raise [BodyWeightRequiredDialog] when a set has been refused, and nothing
  * otherwise. The exercise it names is `currentExercise`, the same definition
  * `beginSet` asked [SetLoadPolicy.blocksSetStart] about, so the dialog cannot
@@ -542,6 +525,25 @@ private fun BodyWeightRefusal(state: RecordState, viewModel: RecordViewModel) {
     )
 }
 
+/**
+ * A body-weight set was asked to start and there is no body weight to record
+ * it against, so it did not start (#61).
+ *
+ * NOT [BodyWeightPromptDialog], and the difference is the whole point. That
+ * one is an ASK raised before a session, it has a SKIP, and skipping starts
+ * the session anyway (#181). This one is a REFUSAL raised by
+ * `RecordViewModel.beginSet`, and its second button is CANCEL: it takes the
+ * lifter back to the screen they were on with no set started, because there is
+ * no answer that would let the app record a load it does not have.
+ *
+ * SAVE is disabled until the box parses to a positive number, so the one
+ * control that ends the refusal cannot end it with another absence.
+ *
+ * The two sentences that explain the refusal come from
+ * [SetLoadPolicy.BODY_WEIGHT_REQUIRED] and [BodyWeightPromptPolicy.WHY_IT_MATTERS],
+ * so a test on the CI path runs on that wording. The title, the field label
+ * and both button words are written here and nothing tests them.
+ */
 @Composable
 private fun BodyWeightRequiredDialog(
     exerciseName: String,
