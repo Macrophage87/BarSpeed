@@ -355,6 +355,31 @@ object SensorCapturePolicy {
      */
     const val MAX_COUNT = 2
 
+    /**
+     * The fewest frames a unit has to deliver before its capture can be
+     * analysed at all (#209).
+     *
+     * IT IS THE ESTIMATOR'S OWN BOUND, restated here rather than invented
+     * here: `VelocityEstimator.estimate` in `:core:dsp` opens
+     * `require(samples.size >= MIN_ANALYSABLE_FRAMES)` and refuses anything
+     * shorter, and `RecordViewModel` publishes "No sensor data recorded." for
+     * such a set. It lives in `:core:model` because the decision that reads it
+     * -- [analysable] -- has to run where a test runs on it and where `:app`
+     * and `:core:dsp` can both see one copy; `:core:model` cannot see
+     * `:core:dsp`, so the dependency points this way and both consumers name
+     * this constant rather than a literal. `VelocityEstimatorMinimumTest` pins
+     * the number against the estimator itself, which is what stops the two
+     * drifting apart.
+     *
+     * WHAT IT IS NOT is a judgement about whether a capture is any good. Eight
+     * frames is where the arithmetic refuses, and at the 99.30-99.98 Hz field
+     * session 37 measured across its thirteen `imu-a` streams that is roughly
+     * 70-80 ms of bar travel -- less than a rep by two orders of magnitude. A
+     * stream above this bound is one the DSP will run on, and nothing here
+     * says its figures are worth having.
+     */
+    const val MIN_ANALYSABLE_FRAMES = 8
+
     /** The wire spelling of a role: the lowercased name, as the published schemas state. */
     fun wireOf(role: SensorRole): String = role.name.lowercase()
 
@@ -685,4 +710,34 @@ object SensorCapturePolicy {
      */
     fun present(expected: List<SensorRole>, captured: Collection<SensorRole>): List<SensorRole> =
         expected.filter { it in captured }
+
+    /**
+     * Which of the armed roles delivered enough frames to be analysed, in the
+     * order they were armed in (#209).
+     *
+     * A DIFFERENT QUESTION FROM [present], and the whole of #209 is that the
+     * two were being answered by one function. [present] asks which roles
+     * reached the raw archive, which is what the export publishes and which is
+     * true of any capture at all -- one frame is a file. This asks which roles
+     * the analysis can be pointed at, which stops being true below
+     * [MIN_ANALYSABLE_FRAMES]. Between the two lies the set #209 was filed
+     * for: an armed unit that delivered a handful of frames beside a partner
+     * that delivered a full capture kept the armed role, and the app published
+     * an empty summary over a capture it was holding.
+     *
+     * FEED THIS TO [analysedStream] AND [present] TO THE EXPORT. Pointing the
+     * DSP at a buffer it will refuse publishes nothing; publishing an archive
+     * list that omitted a file the archive contains would be a false statement
+     * about the zip. Both statements are true at once and they are not the
+     * same list, which is why there are two functions rather than one widened
+     * one.
+     *
+     * A ROLE WITH NO ENTRY IN [framesByRole] DELIVERED NOTHING. The caller
+     * builds the map from the buffers it holds, so a missing key is a role
+     * with no buffer rather than a role nobody looked at; it is answered the
+     * same way a zero is, and that is said here rather than left to a default
+     * a reader has to find.
+     */
+    fun analysable(expected: List<SensorRole>, framesByRole: Map<SensorRole, Int>): List<SensorRole> =
+        expected.filter { (framesByRole[it] ?: 0) >= MIN_ANALYSABLE_FRAMES }
 }

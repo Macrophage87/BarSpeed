@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.SensorCapturePolicy
 import kotlin.math.abs
 
 /** Uniformly-indexed vertical kinematics for one recorded set. */
@@ -87,7 +88,15 @@ object VelocityEstimator {
         config: DspConfig = DspConfig(),
         plane: MovementPlane = MovementPlane.VERTICAL,
     ): VelocitySeries {
-        require(samples.size >= 8) { "Not enough samples (${samples.size})" }
+        // The bound is `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES` rather
+        // than a literal, because #209 made the record path depend on it:
+        // a unit that delivers fewer frames than this cannot be analysed,
+        // so the app moves onto the partner that can. Two copies of the
+        // number would let the two decisions drift, and the drift would be
+        // silent -- a set pointed at a stream this then refuses.
+        require(samples.size >= SensorCapturePolicy.MIN_ANALYSABLE_FRAMES) {
+            "Not enough samples (${samples.size})"
+        }
 
         // BLE delivers frames in bursts: several frames share one arrival
         // timestamp, then a ~100 ms jump. The sensor itself samples uniformly,

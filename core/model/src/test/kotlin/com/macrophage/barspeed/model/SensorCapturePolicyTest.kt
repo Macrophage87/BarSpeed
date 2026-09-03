@@ -721,4 +721,82 @@ class SensorCapturePolicyTest {
         assertNull(SensorCapturePolicy.withSoleSilence(null, null), "a declaration was invented for an ordinary set")
         assertEquals(dual, SensorCapturePolicy.withSoleSilence(dual, null), "a healthy dual declaration was rewritten")
     }
+
+    // ---- which streams the analysis can be pointed at -------------------------
+
+    /**
+     * The armed roles that delivered enough frames to be analysed, in the
+     * armed order (#209).
+     *
+     * The order is asserted with a REVERSED `expected`, because a function
+     * that filtered the map's keys instead of the declaration would answer the
+     * same set in the wrong order, and the order is what pairs a role with a
+     * buffer at the call site.
+     */
+    @Test
+    fun `analysable is the armed roles that delivered enough frames, in the armed order`() {
+        val expected = listOf(SensorRole.B, SensorRole.A)
+        val frames = mapOf(SensorRole.A to 400, SensorRole.B to 900)
+
+        assertEquals(expected, SensorCapturePolicy.analysable(expected, frames))
+        assertEquals(
+            listOf(SensorRole.A),
+            SensorCapturePolicy.analysable(expected, mapOf(SensorRole.A to 400, SensorRole.B to 0)),
+        )
+        assertEquals(emptyList(), SensorCapturePolicy.analysable(expected, emptyMap()))
+    }
+
+    /**
+     * The boundary itself, at both sides of it (#209).
+     *
+     * One frame below the bound is not analysable and the bound itself is,
+     * which is the pair the whole of #209 turns on: `present` counts either of
+     * these as a stream that reached the archive, and the analysis can only be
+     * pointed at the second. Stated against
+     * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] rather than against a
+     * literal 7 and 8, so moving the constant moves the fixture with it and
+     * this test goes on asking about the boundary rather than about the number
+     * 8. `VelocityEstimatorMinimumTest` in `:core:dsp` is what pins the number
+     * against the estimator that owns it.
+     */
+    @Test
+    fun `a role one frame below the analysis minimum is not analysable and the minimum itself is`() {
+        val expected = listOf(SensorRole.A)
+        val bound = SensorCapturePolicy.MIN_ANALYSABLE_FRAMES
+
+        assertEquals(
+            emptyList(),
+            SensorCapturePolicy.analysable(expected, mapOf(SensorRole.A to bound - 1)),
+            "a stream the estimator refuses was offered to the analysis anyway",
+        )
+        assertEquals(
+            expected,
+            SensorCapturePolicy.analysable(expected, mapOf(SensorRole.A to bound)),
+            "a stream the estimator accepts was withheld from the analysis",
+        )
+    }
+
+    /**
+     * A role with no entry at all delivered nothing, and a role that was never
+     * armed is not analysable however much it sent (#209).
+     *
+     * The first is the honest reading rather than a defensive one: the caller
+     * builds the map from the buffers it holds, so a missing key is a role
+     * with no buffer. The second is [present]'s rule at the same site -- the
+     * declaration is the deliberate statement and a stray key does not widen
+     * it.
+     */
+    @Test
+    fun `analysable answers only about roles the set armed`() {
+        assertEquals(
+            emptyList(),
+            SensorCapturePolicy.analysable(listOf(SensorRole.A), mapOf(SensorRole.B to 900)),
+            "a role the set never armed was offered to the analysis",
+        )
+        assertEquals(
+            listOf(SensorRole.A),
+            SensorCapturePolicy.analysable(listOf(SensorRole.A), mapOf(SensorRole.A to 900, SensorRole.B to 900)),
+            "a role the set never armed changed the answer for one it did",
+        )
+    }
 }

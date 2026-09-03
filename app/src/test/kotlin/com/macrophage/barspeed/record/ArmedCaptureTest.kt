@@ -53,6 +53,19 @@ class ArmedCaptureTest {
         )
     }
 
+    /**
+     * A capture of [n] frames at 10 ms, which is a stream the analysis can be
+     * pointed at whenever [n] reaches
+     * [com.macrophage.barspeed.model.SensorCapturePolicy.MIN_ANALYSABLE_FRAMES].
+     *
+     * Every fixture below that stands for a unit that STREAMED is built from
+     * this rather than from a hand-listed two or three timestamps. #209 is the
+     * reason: a handful of frames is no longer a stream the analysis will
+     * accept, so a fixture of three frames standing for a full capture asks
+     * the wrong question and would pass for the wrong reason.
+     */
+    private fun stream(n: Int, firstMs: Long = 0L): List<ImuSample> = samples(*LongArray(n) { firstMs + it * 10L })
+
     private fun armed(vararg roles: SensorRole) =
         RecordedSensors(count = roles.size, expected = roles.toList(), analysed = roles.firstOrNull())
 
@@ -65,8 +78,8 @@ class ArmedCaptureTest {
      */
     @Test
     fun `a set whose armed unit streamed is analysed from it and carries no flag`() {
-        val a = samples(0L, 10L, 20L)
-        val b = samples(1L, 11L)
+        val a = stream(12)
+        val b = stream(9, firstMs = 1L)
 
         val capture = armedCaptureOf(armed(SensorRole.A, SensorRole.B), SensorRole.B, a, b)
 
@@ -90,7 +103,7 @@ class ArmedCaptureTest {
     @Test
     fun `a set whose armed unit was silent is analysed from the one that streamed`() {
         val armedButSilent = emptyList<ImuSample>()
-        val survivor = samples(0L, 10L, 20L, 30L)
+        val survivor = stream(12)
 
         val capture = armedCaptureOf(armed(SensorRole.A, SensorRole.B), SensorRole.B, armedButSilent, survivor)
 
@@ -325,13 +338,21 @@ class ArmedCaptureTest {
      *
      * The fixture: one paired unit, `Connected`, last frame at 40 s on a set
      * that ran 1 s to 61 s -- twenty seconds past the window, so the reading
-     * is `LINKED_SILENT` and is NOT the reason nothing is stored. A hundred
-     * samples are in the buffer. Only the buffer can make this pass.
+     * is `LINKED_SILENT` and is NOT the reason nothing is stored. Twelve
+     * frames are in the buffer. Only the buffer can make this pass.
+     *
+     * THE FIXTURE GREW FROM FOUR FRAMES TO TWELVE at #209, and the sentence
+     * saying a hundred samples were in it is deleted rather than reworded: it
+     * was false when it was written and four frames was never a stream.
+     * Twelve is above `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES`, so the set
+     * this pins is one whose unit really did feed an analysable capture --
+     * which is what "streamed and then lost its link" has to mean for the pin
+     * to be about what its name says.
      */
     @Test
     fun `a one-sensor set that streamed and then lost its link stores no declaration`() {
         val address = "AA:BB:CC:DD:EE:01"
-        val streamed = samples(0L, 10L, 20L, 30L)
+        val streamed = stream(12)
         val state =
             RecordState(
                 pairedImuAddresses = listOf(address),

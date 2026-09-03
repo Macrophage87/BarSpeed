@@ -4025,7 +4025,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         // "30s of 45s -- just short".
                         timedVerdicts(p.actualDurationS, p.targetDurationS),
                     )
-                    p.samples.size >= 8 ->
+                    p.samples.size >= SensorCapturePolicy.MIN_ANALYSABLE_FRAMES ->
                         // The set's own cue track, frozen into the pending
                         // write alongside the samples. It carries the set's
                         // terminal cue -- Done where the guide called the
