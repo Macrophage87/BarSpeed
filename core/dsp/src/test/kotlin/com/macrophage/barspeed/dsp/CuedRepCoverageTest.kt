@@ -15,10 +15,10 @@ import kotlin.test.assertTrue
  *
  * ## What the corpus says today
  *
- * Twenty of the twenty-eight committed captures carry a cue track. Across them
- * the metronome called 170 reps; 74 produce a counted rep and 96 produce none.
- * Seven counted reps land outside every cued window. All four figures are
- * pinned below.
+ * Twenty-one of the thirty committed captures carry a cue track, and the
+ * twenty in [cueTracked] are scored here. Across them the metronome called
+ * 170 reps; 74 produce a counted rep and 96 produce none. Seven counted reps
+ * land outside every cued window. All four figures are pinned below.
  *
  * They have moved twice. They read 118 / 62 / 56 / 2 over thirteen captures,
  * then 126 / 67 / 59 / 5 over fourteen once
@@ -502,7 +502,7 @@ class CuedRepCoverageTest {
         // disproved by any cue track.
         //
         // [outsideCorpusTotals] is subtracted first, because this file's own
-        // lists cover TWENTY-EIGHT captures and those totals cover twenty-one.
+        // lists cover THIRTY captures and those totals cover twenty-one.
         // Without it the subtraction below silently changes meaning: it would
         // read as "reps on captures with no cue track" while actually being
         // that plus the seven later captures' own counted reps.

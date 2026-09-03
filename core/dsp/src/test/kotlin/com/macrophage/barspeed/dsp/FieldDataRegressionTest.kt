@@ -379,7 +379,7 @@ class FieldDataRegressionTest {
         assertEquals(11, analysis.reps.size, "segmented reps; the lifter performed 8")
         // Velocity loss is best rep to LAST rep. The last rep here is one of
         // the two slow ones, so the set the lifter completed as prescribed is
-        // reported to them as an 81% drawdown.
+        // reported to them as an 85% drawdown.
         assertEquals<Double?>(85.1, analysis.velocityLossPct, "velocity loss reported to the lifter")
     }
 
@@ -586,10 +586,10 @@ class FieldDataRegressionTest {
         //
         // Issue #94's runaway correction moves three: the second overhead
         // press from rep 6 to rep 8, the rotating bench press from rep 2 to
-        // rep 1, and the cable row from rep 8 to rep 7 — the cable row also
-        // LOSES its fatigue suffix, because the worst eccentric is no longer
-        // the last rep measured. That suffix is the strongest sentence this
-        // app says about a set and it turns on which reps resolved.
+        // rep 1, and the cable row from rep 8 to rep 7 — the rotating bench
+        // press and the cable row BOTH lose the fatigue suffix. That suffix is
+        // the strongest sentence this app says about a set and it turns on
+        // which reps resolved.
         val expected =
             mapOf(
                 "field-ohp-rotating-8rep.csv" to "Rep 1 eccentric 1.8 s — 1.2 s too fast.",

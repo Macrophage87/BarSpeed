@@ -33,20 +33,23 @@ import kotlin.test.assertEquals
  * asserts, and `RunawayDrift` runs inside `VelocityEstimator.estimate` on the
  * batch path only. No live rep total is quoted here.
  *
- * A TWENTY-SECOND capture is committed and is deliberately NOT in this file's
- * list: field-legpress-single-2011-8rep-s36-set07, landed for issue #93. It is
+ * NINE committed captures are deliberately NOT in this file's list. They are
  * excluded so this file's series stays comparable with the figures already
- * published against the twenty-one. Its live TOTAL matches the count
- * performed, eight against eight, but by cancellation rather than by
- * resolution: three of its eight cued reps produce no counted rep, and three
- * of its eight counted reps land in no cued window, two of those displacing
- * 1.056 m and 1.466 m -- all pinned in [CuedRepCoverageTest]. Folding its
- * totals in would move every figure here without being a clean result for
- * issue 94 or 86 either way, and is a task of its own; the corpus-wide
- * phrasing in this file means these twenty-one, not every file on the
- * classpath.
- * `CuedRepCoverageTest.outsideCorpusTotals` names the same exclusion and is
- * what keeps its reconciliation arithmetic true.
+ * published against the twenty-one; the corpus-wide phrasing in this file
+ * means these twenty-one, not every file on the classpath.
+ * `CuedRepCoverageTest.outsideCorpusTotals` names seven of those nine and is
+ * what keeps its reconciliation arithmetic true;
+ * field-rdl-3010-10rep-s36-set04 and field-ropedeadhang-hold20-s37-set11 are
+ * the other two.
+ *
+ * One of the nine is field-legpress-single-2011-8rep-s36-set07, landed for
+ * issue #93. Its live TOTAL matches the count performed, eight against eight,
+ * but by cancellation rather than by resolution: three of its eight cued reps
+ * produce no counted rep, and three of its eight counted reps land in no cued
+ * window, two of those displacing 1.056 m and 1.466 m -- all pinned in
+ * [CuedRepCoverageTest]. Folding its totals in would move every figure here
+ * without being a clean result for issue 94 or 86 either way, and is a task of
+ * its own.
  *
  * ## The constant has never been calibrated anywhere
  *

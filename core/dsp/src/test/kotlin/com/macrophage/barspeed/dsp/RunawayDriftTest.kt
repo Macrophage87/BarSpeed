@@ -23,8 +23,11 @@ import kotlin.test.assertTrue
  * the batch pipeline publishes runs through it; the corpus scoring of that
  * change is in [BatchCueCoverageTest]. This KDoc claimed the opposite --
  * "NOTHING HERE IS WIRED INTO THE ANALYZER YET" -- which was true when the
- * symbol landed at 96ae49f7 and false from bf580fd9, where the wiring landed
- * and the sentence was left standing. It is corrected here, not reworded.
+ * symbol landed at de30594db0bcb18fe8451944efb95772334807d5 (`Give the
+ * segmenter a name for a stretch that is neither phase nor pause`) and false
+ * from a4e90d939ba5e25b96771d4098483e89a247196a (`Stop reading a drifted
+ * stretch of real reps as one long pause`), where the wiring landed and the
+ * sentence was left standing. It is corrected here, not reworded.
  */
 class RunawayDriftTest {
     private val config = DspConfig()

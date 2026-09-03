@@ -137,8 +137,9 @@ class BatchCueCoverageTest {
      * - `field-ropedeadhang-hold20-s37-set11` HAS a committed track, and the
      *   track calls no reps -- it is a twenty-second hold, `kind: "hold"`,
      *   `reps: 0` in its own `meta.json`. There is no `Down`, so there is no
-     *   window to open. It is scored by `a hold and two no-rep controls` below
-     *   instead, which is the assertion that matters for it.
+     *   window to open. It is scored by `a hold and two no-rep controls, and
+     *   what each resolves on the phase it declares` below instead, which is
+     *   the assertion that matters for it.
      */
     private val notScored = listOf(
         "field-backsquat-10hz",
@@ -272,7 +273,7 @@ class BatchCueCoverageTest {
     }
 
     @Test
-    fun `a hold and two no-rep controls resolve nothing on the phase they declare`() {
+    fun `a hold and two no-rep controls, and what each resolves on the phase it declares`() {
         // The guard against buying coverage with phantoms. All three are
         // captures where the right answer is zero, and two of the three carry a
         // sensor mount this corpus otherwise has one example of.
@@ -292,6 +293,8 @@ class BatchCueCoverageTest {
         // loaded and moving slightly.
         //
         // The phase each is scored on is the phase its own archive declares.
+        // field-backsquat-10hz-set5 resolves ONE detection where the lifter
+        // performed none; the other two resolve nothing.
         val declared = listOf(
             Triple("field-ropedeadhang-hold20-s37-set11", eccFirst, 0),
             Triple("field-still-0rep", eccFirst, 0),

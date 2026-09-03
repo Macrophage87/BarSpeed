@@ -348,8 +348,9 @@ class AnchorSupplyByMountTest {
         // published NOTHING for it before, and the REP COUNT IS NOT THE
         // PUBLICATION RULE -- this comment used to say it was.
         // `VelocityLoss.of` withholds on three grounds, only one of which is
-        // a count. Measured at 7a1fc5ef093c7ea5ac29b97bc9556ae21762afc2, the
-        // commit before issue #94's runaway correction: set05 resolved ONE
+        // a count. Measured at eeda83de52fd7a95482eaa59dd9415521cd5243b
+        // (`Name the anchored series so a second drift stage has a before`),
+        // the commit before issue #94's runaway correction: set05 resolved ONE
         // rep and its basis was `notEnoughReps`, which is the count ground;
         // set06 resolved THREE and its basis was `terminalRepIsFastest` --
         // its last rep, at 0.452 m/s, was the fastest of the three -- which
