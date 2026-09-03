@@ -16,7 +16,7 @@ class SetLimiterPolicyTest {
      * An UNRATED set that did not fail is not asked.
      *
      * Renamed, because the name it carried -- `a set that did not fail is not
-     * asked` -- became false at 5cc7a31414554ec32e7d9c44a67f2babfcd0fe53: a
+     * asked` -- became false at e1c2601c8084e9d9f38dc97375f4aa474541723c: a
      * completed set rated at the counted end is asked. The assertion is
      * unchanged and still holds, and SetLimiterCompletedAskTest is where the
      * widened rule is pinned.
