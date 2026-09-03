@@ -23,15 +23,13 @@ import kotlin.test.assertTrue
  * line terminator, so both are indifferent to the trailing carriage
  * return; a size, an offset or a split-by-line index would not be.
  * Quoted, because the bare tokens are ordinary
- * English in 15 KB of coaching prose — "sets" occurs 8 times bare and once
- * quoted, "reps" 7 and 2, "tempo" 13 and 2 — so a bare-token assertion is
+ * English in a long block of coaching prose — each of these tokens occurs
+ * many times bare and only a few times quoted — so a bare-token assertion is
  * satisfied by the surrounding sentences and is close to a test that cannot
  * fail. Nothing else, because the file is not byte-identical across machines:
  * `core.autocrlf=true` with no tracked `.gitattributes` means the working copy
- * is 15,366 bytes on Windows and 15,183 on CI. Line COUNTS agree (183 either
- * way); line CONTENT does not, since each carries a trailing carriage return on
- * one of them. A substring test is indifferent to that; a size, an offset or a
- * split-by-line index is not.
+ * carries a trailing carriage return on every line where CI's does not, so the
+ * two differ in byte size and every line differs by one character.
  */
 class GuidePromptContractTest {
     private val prompt: String =
