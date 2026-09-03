@@ -93,7 +93,10 @@ class BlankAnalysisTest {
     /** Every capture on the classpath, as [GyroGateTest] and [AnchorSupplyByMountTest] enumerate them. */
     private val corpus: List<String> by lazy {
         File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile.list()!!
-            .filter { it.startsWith("field-") && it.endsWith(".csv") && !it.endsWith("-cues.csv") }
+            .filter {
+                it.startsWith("field-") && it.endsWith(".csv") &&
+                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
+            }
             .map { it.removeSuffix(".csv") }
             .sorted()
     }

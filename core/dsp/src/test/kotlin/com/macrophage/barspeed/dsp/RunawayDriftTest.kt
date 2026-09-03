@@ -60,7 +60,10 @@ class RunawayDriftTest {
     /** The anchored series, before any second-stage correction: see [VelocityEstimator.estimateAnchored]. */
     private val corpus: List<String> by lazy {
         File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile.list()!!
-            .filter { it.startsWith("field-") && it.endsWith(".csv") && !it.endsWith("-cues.csv") }
+            .filter {
+                it.startsWith("field-") && it.endsWith(".csv") &&
+                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
+            }
             .map { it.removeSuffix(".csv") }
             .sorted()
     }
@@ -178,14 +181,19 @@ class RunawayDriftTest {
         }
         assertEquals(4, passesNeeded.values.max(), "the most passes any committed capture needs")
         assertEquals(
-            mapOf(0 to 11, 1 to 17, 2 to 1, 4 to 1),
+            mapOf(0 to 11, 1 to 19, 2 to 2, 3 to 1, 4 to 1),
             passesNeeded.values.groupingBy { it }.eachCount().toSortedMap(),
             "captures by passes needed",
         )
         assertEquals(
-            mapOf("field-rdl-3010-10rep-s36-set04" to 4, "field-rdl-3010-10rep-s36-set05" to 2),
+            mapOf(
+                "field-ohp-prepinflated-s37-set03" to 3,
+                "field-rdl-3010-10rep-s36-set04" to 4,
+                "field-rdl-3010-10rep-s36-set05" to 2,
+                "field-rdl-wrapping-s36-set05" to 2,
+            ),
             passesNeeded.filterValues { it >= 2 },
-            "the captures needing more than one pass, both Romanian deadlifts from session 36",
+            "the captures needing more than one pass",
         )
     }
 

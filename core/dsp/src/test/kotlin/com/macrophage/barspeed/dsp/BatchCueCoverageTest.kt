@@ -155,6 +155,26 @@ class BatchCueCoverageTest {
         "field-ropedeadhang-hold20-s37-set11",
     )
 
+    /**
+     * Committed for a purpose other than cue coverage, so out of every figure
+     * above rather than scored badly by it.
+     *
+     * These four arrived with issue #133 for a rotation measure that reads
+     * roll only. They carry cue tracks, so `notScored` would be a false
+     * statement about them -- that list's own reason is "no track, or a track
+     * that calls no rep" -- and scoring them would silently move the corpus
+     * totals #87 and #94 measured. [CuedRepCoverageTest] holds the same four
+     * in its own `notRepCorpus` for the same reason; the two lists exist so
+     * the classpath partition stays TOTAL, which is what makes the coverage
+     * guard below able to catch the next capture nobody classified.
+     */
+    private val notRepCorpus = listOf(
+        "field-backsquat-wrapping-s36-set01",
+        "field-ohp-prepinflated-s37-set03",
+        "field-ohp-prepinflated-s37-set04",
+        "field-rdl-wrapping-s36-set05",
+    )
+
     /** One median cue cycle per window, opening at each `Down`. */
     private fun windows(fixture: String): List<Pair<Long, Long>> {
         val downs = CueTrack.movement(fixture, "Down")
@@ -392,18 +412,27 @@ class BatchCueCoverageTest {
         // resource directory is silently outside every figure above, which is
         // exactly how a corpus total goes stale while staying green.
         val onDisk = File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile.list()!!
-            .filter { it.startsWith("field-") && it.endsWith(".csv") && !it.endsWith("-cues.csv") }
+            .filter {
+                it.startsWith("field-") && it.endsWith(".csv") &&
+                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
+            }
             .map { it.removeSuffix(".csv") }
             .sorted()
         assertEquals(
             onDisk,
-            (scored.map { it.fixture } + notScored).sorted(),
+            (scored.map { it.fixture } + notScored + notRepCorpus).sorted(),
             "every capture on the classpath is either scored against its marks or named as having none",
         )
         assertTrue(
-            scored.none { it.fixture in notScored },
+            scored.none { it.fixture in notScored } && scored.none { it.fixture in notRepCorpus },
             "a capture cannot be both scored and named unscorable",
         )
+        notRepCorpus.forEach { fixture ->
+            assertTrue(
+                javaClass.getResource("/$fixture-cues.csv") != null,
+                "$fixture is named as out of scope but carries no track, so it belongs in notScored instead",
+            )
+        }
         // And the reason the unscorable ones are unscorable, checked rather
         // than asserted in a comment: nine have no committed track, and the
         // tenth has a track that calls no rep.

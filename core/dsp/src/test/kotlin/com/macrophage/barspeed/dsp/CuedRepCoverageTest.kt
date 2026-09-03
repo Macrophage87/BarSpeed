@@ -15,10 +15,17 @@ import kotlin.test.assertTrue
  *
  * ## What the corpus says today
  *
- * Twenty-one of the thirty committed captures carry a cue track, and the
- * twenty in [cueTracked] are scored here. Across them the metronome called
+ * Twenty-five of the thirty-four committed captures carry a cue track, and
+ * the twenty in [cueTracked] are scored here. Across them the metronome called
  * 170 reps; 74 produce a counted rep and 96 produce none. Seven counted reps
  * land outside every cued window. All four figures are pinned below.
+ *
+ * The resource directory holds MORE captures than the corpus does. Four
+ * arrived with issue #133 for a rotation measure, carry cue tracks nobody has
+ * counted reps against, and are named in `notRepCorpus` so the partition stays
+ * total without their being read as covered. The count of committed captures
+ * in the sentence above moves with every such commit and is re-read from the
+ * resource directory rather than carried forward.
  *
  * They have moved twice. They read 118 / 62 / 56 / 2 over thirteen captures,
  * then 126 / 67 / 59 / 5 over fourteen once
@@ -36,10 +43,10 @@ import kotlin.test.assertTrue
  * cue track, and previously identified survivors are in that group --
  * field-ohp-100hz-bursty keeps runs of 1.553, 1.604 and 1.892 m against a
  * 0.766 m median, all UNPINNED figures quoted in [LiveCapCalibrationTest].
- * Nothing here disproves them. The boundary between the two groups is pinned
- * in `the coverage limit`, against the resource directory rather than against
- * a hand-kept number, so the figures above cannot be read as corpus-wide and
- * cannot silently become stale when a fixture is added.
+ * Nothing here disproves them. The boundaries between the three groups are
+ * pinned in `the coverage limit`, against the resource directory rather than
+ * against a hand-kept number, so the figures above cannot be read as
+ * directory-wide and cannot silently become stale when a fixture is added.
  *
  * ## A cue is an instruction, not a measurement
  *
@@ -195,6 +202,30 @@ class CuedRepCoverageTest {
         "field-ropedeadhang-hold20-s37-set11",
         "field-seated-ohp-2rep",
         "field-still-0rep",
+    )
+
+    /**
+     * Captures committed for something other than rep coverage, named here so
+     * the partition below stays total.
+     *
+     * These four carry cue tracks and are deliberately NOT in [cueTracked].
+     * They arrived with issue #133, which is about how far the sensor's ROLL
+     * swept over a set -- `RollExcursionFieldTest` is what reads them -- and
+     * nothing has counted their reps against their tracks. Folding them into
+     * the corpus would move every figure this file pins for a reason that has
+     * nothing to do with rep counting, and would state a coverage result
+     * nobody measured.
+     *
+     * The guard the partition provides is unchanged: a capture added and named
+     * in no list still fails, which is the failure this test was written for.
+     * What a name here says is "classified, and out of scope" -- never
+     * "checked".
+     */
+    private val notRepCorpus = listOf(
+        "field-backsquat-wrapping-s36-set01",
+        "field-ohp-prepinflated-s37-set03",
+        "field-ohp-prepinflated-s37-set04",
+        "field-rdl-wrapping-s36-set05",
     )
 
     /**
@@ -411,13 +442,16 @@ class CuedRepCoverageTest {
         // file's headline claim went false.
         val dir = File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile
         val onDisk = dir.list()!!
-            .filter { it.startsWith("field-") && it.endsWith(".csv") && !it.endsWith("-cues.csv") }
+            .filter {
+                it.startsWith("field-") && it.endsWith(".csv") &&
+                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
+            }
             .map { it.removeSuffix(".csv") }
             .sorted()
         assertTrue(onDisk.size >= 28, "captures found on the classpath: ${onDisk.size}")
         assertEquals(
             onDisk,
-            (cueTracked.map { it.fixture } + notCueTracked).sorted(),
+            (cueTracked.map { it.fixture } + notCueTracked + notRepCorpus).sorted(),
             "every capture in the resource directory must be named in exactly one list",
         )
         cueTracked.forEach { (fixture, _, _) ->
@@ -440,6 +474,13 @@ class CuedRepCoverageTest {
         }
         assertEquals(20, cueTracked.size, "captures with a cue track")
         assertEquals(10, notCueTracked.size, "captures with no track that calls a rep")
+        assertEquals(4, notRepCorpus.size, "captures committed for something other than rep coverage")
+        notRepCorpus.forEach { fixture ->
+            assertTrue(
+                javaClass.getResourceAsStream("/$fixture-cues.csv") != null,
+                "$fixture is named as out of scope but carries no cue track, so it is simply unclassified",
+            )
+        }
         assertTrue("field-ohp-100hz-bursty" in notCueTracked, "the survivors' capture has no truth")
     }
 

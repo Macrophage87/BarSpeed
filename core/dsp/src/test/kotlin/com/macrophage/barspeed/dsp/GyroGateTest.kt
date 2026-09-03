@@ -34,6 +34,7 @@ class GyroGateTest {
         "field-backsquat-10hz-set5",
         "field-backsquat-4011-6rep-s36-set01",
         "field-backsquat-99hz-6rep",
+        "field-backsquat-wrapping-s36-set01",
         "field-bench-3010-6rep-s37-set05",
         "field-bench-3010-6rep-s37-set06",
         "field-bench-rotating-6rep",
@@ -49,6 +50,8 @@ class GyroGateTest {
         "field-legpress-single-2011-8rep-s36-set07",
         "field-ohp-100hz-bursty",
         "field-ohp-3010-6rep-s37-set02",
+        "field-ohp-prepinflated-s37-set03",
+        "field-ohp-prepinflated-s37-set04",
         "field-ohp-rotating-8rep",
         "field-ohp-rotating-8rep-b",
         "field-pallof-static-12rep",
@@ -56,6 +59,7 @@ class GyroGateTest {
         "field-rdl-3010-10rep",
         "field-rdl-3010-10rep-s36-set04",
         "field-rdl-3010-10rep-s36-set05",
+        "field-rdl-wrapping-s36-set05",
         "field-reardeltfly-s32-set06",
         "field-ropedeadhang-hold20-s37-set11",
         "field-seated-ohp-2rep",
@@ -127,8 +131,12 @@ class GyroGateTest {
     fun `the tenth-percentile probe, which is the half of the rule fitted to one capture`() {
         // The low probe of the straddle test, pinned for every capture whose
         // median clears the gate -- the only captures it can decide. One of the
-        // eight sits above the gate and it is the one the probe exists to
-        // exclude; the other seven sit at 2.26-4.28 deg/s, well clear.
+        // eleven sits above the gate and it is the one the probe exists to
+        // exclude; the other ten sit at 2.26-5.63 deg/s, well clear. It read
+        // "one of the eight ... the other seven ... 2.26-4.28" until the three
+        // clearing captures issue #133 committed were measured into it; the
+        // claim to cover EVERY capture whose median clears the gate is what
+        // made the older wording false rather than merely narrow.
         val expected = mapOf(
             "field-ohp-3010-6rep-s37-set02" to 3.560,
             "field-bench-3010-6rep-s37-set05" to 3.807,
@@ -138,6 +146,9 @@ class GyroGateTest {
             "field-ohp-rotating-8rep" to 2.257,
             "field-ohp-rotating-8rep-b" to 2.807,
             "field-reardeltfly-s32-set06" to 13.194,
+            "field-backsquat-wrapping-s36-set01" to 2.308,
+            "field-ohp-prepinflated-s37-set03" to 5.633,
+            "field-ohp-prepinflated-s37-set04" to 3.613,
         )
         expected.forEach { (fixture, p10) ->
             assertEquals(
@@ -162,7 +173,7 @@ class GyroGateTest {
     }
 
     @Test
-    fun `the gate holds where the gyro distribution does not straddle it, and fails on the seven that do`() {
+    fun `the gate holds where the gyro distribution does not straddle it, and fails on the ten that do`() {
         val config = DspConfig()
         val holds = listOf(
             "field-pullup-3010-8rep-s37-set09",
@@ -180,6 +191,11 @@ class GyroGateTest {
             "field-legpress-single-2011-8rep-s36-set07",
             "field-still-0rep",
             "field-ropedeadhang-hold20-s37-set11",
+            // Committed on this branch for issue #133's rotation measure and
+            // classified here rather than left to the corpus guard to catch:
+            // median 6.42 deg/s with a tenth percentile of 0.0, so the
+            // distribution sits entirely under the gate.
+            "field-rdl-wrapping-s36-set05",
             "field-backsquat-10hz",
             "field-backsquat-10hz-set5",
             "field-bench-rotating-6rep",
@@ -202,6 +218,12 @@ class GyroGateTest {
             "field-backsquat-99hz-6rep",
             "field-ohp-rotating-8rep",
             "field-ohp-rotating-8rep-b",
+            // The other three committed on this branch for #133. Each
+            // straddles: medians 15.34, 25.62 and 21.27 deg/s against tenth
+            // percentiles of 2.31, 5.63 and 3.61.
+            "field-backsquat-wrapping-s36-set01",
+            "field-ohp-prepinflated-s37-set03",
+            "field-ohp-prepinflated-s37-set04",
         )
         holds.forEach { assertTrue(VelocityEstimator.gyroGateApplies(load(it), config), "$it: gate should hold") }
         fails.forEach { assertFalse(VelocityEstimator.gyroGateApplies(load(it), config), "$it: gate should fail") }
@@ -249,7 +271,10 @@ class GyroGateTest {
         // green while the claims they make went narrower than they read.
         val dir = File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile
         val onDisk = dir.list()!!
-            .filter { it.startsWith("field-") && it.endsWith(".csv") && !it.endsWith("-cues.csv") }
+            .filter {
+                it.startsWith("field-") && it.endsWith(".csv") &&
+                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
+            }
             .map { it.removeSuffix(".csv") }
             .sorted()
         assertEquals(onDisk, corpus.sorted(), "every capture on the classpath is in this file's corpus")

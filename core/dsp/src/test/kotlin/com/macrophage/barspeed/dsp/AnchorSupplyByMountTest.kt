@@ -188,7 +188,10 @@ class AnchorSupplyByMountTest {
     /** Every capture on the classpath, as [GyroGateTest] enumerates them. */
     private val corpus: List<String> by lazy {
         File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile.list()!!
-            .filter { it.startsWith("field-") && it.endsWith(".csv") && !it.endsWith("-cues.csv") }
+            .filter {
+                it.startsWith("field-") && it.endsWith(".csv") &&
+                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
+            }
             .map { it.removeSuffix(".csv") }
             .sorted()
     }
@@ -431,7 +434,7 @@ class AnchorSupplyByMountTest {
         // covers every strap, rope, stack and machine capture at once.
         val config = DspConfig()
         val holding = corpus.filter { VelocityEstimator.gyroGateApplies(load(it), config) }
-        assertEquals(23, holding.size, "captures the gate still applies to")
+        assertEquals(24, holding.size, "captures the gate still applies to")
         holding.forEach { fixture ->
             assertContentEquals(
                 maskWithGate(fixture, gyroGate = true),
