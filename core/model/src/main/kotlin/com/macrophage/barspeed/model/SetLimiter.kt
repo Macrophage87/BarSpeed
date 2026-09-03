@@ -50,6 +50,21 @@ enum class SetLimiter {
     /** Technical or equipment, not capacity. */
     SLIP,
 
+    /**
+     * The set was set up wrong before it was ever a test of the muscle: a bad
+     * body position, a seat or a pin at the wrong height, the wrong grip
+     * taken (#146).
+     *
+     * Its own rung and not a shade of [FORM] or [SLIP], because the three
+     * carry three different prescriptions. [FORM] is form degrading UNDER
+     * load, which reads as reduce the load or the volume; [SLIP] is something
+     * going wrong mid-set; this is an error the lifter made before the first
+     * rep and corrects next session at the SAME load. Folded into either of
+     * those, a positioning error reads as a capacity ceiling that is not
+     * there, which is the whole of what #146 reports.
+     */
+    SETUP,
+
     /** Never a progression signal, and the one a coach most needs to see. */
     PAIN,
 
@@ -249,6 +264,7 @@ object SetLimiterScale {
             SetLimiter.FORM to "Form broke down",
             SetLimiter.PACE to "Lost the pace",
             SetLimiter.SLIP to "Slipped",
+            SetLimiter.SETUP to "Bad setup or position",
             SetLimiter.PAIN to "Pain, or something felt wrong",
             SetLimiter.OUTSIDE to "Stopped for an outside reason",
             SetLimiter.OTHER to "Other",
@@ -267,6 +283,13 @@ object SetLimiterScale {
             SetLimiter.FORM to "Position broke down",
         )
 
+    // [SetLimiter.SETUP] is deliberately NOT in that map. A hold is set up in
+    // a position too -- a hand position on a dead hang, a bench at the wrong
+    // height -- so the answer applies unchanged, and the rep wording already
+    // reads correctly for one. It is also what keeps it distinguishable from
+    // the reworded [SetLimiter.FORM] tile beside it: "Bad setup or position"
+    // is where the set STARTED, "Position broke down" is what happened to it.
+
     /** Which reading each answer gets. [SetLimiterGroup] carries why. */
     private val GROUPS: Map<SetLimiter, SetLimiterGroup> =
         mapOf(
@@ -275,6 +298,7 @@ object SetLimiterScale {
             SetLimiter.FORM to SetLimiterGroup.PERFORMANCE,
             SetLimiter.PACE to SetLimiterGroup.PERFORMANCE,
             SetLimiter.SLIP to SetLimiterGroup.PERFORMANCE,
+            SetLimiter.SETUP to SetLimiterGroup.PERFORMANCE,
             SetLimiter.PAIN to SetLimiterGroup.WELFARE,
             SetLimiter.OUTSIDE to SetLimiterGroup.CONTEXT,
             SetLimiter.OTHER to SetLimiterGroup.FREE,

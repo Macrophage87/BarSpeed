@@ -717,6 +717,21 @@ data class SessionExport(
          * so an old session re-exports under the new rule and says which bound
          * it lacked. `RollExcursion` in `:core:dsp` is where the rule and the
          * measurements live.
+         *
+         * 1.19 carries a FIFTH change, under the same number and for the
+         * reason the entries above state: a number takes further entries
+         * until it ships, and 1.19 is unreleased. The closed `limiter`
+         * vocabulary gains a ninth answer, `setup`: the set was set up wrong
+         * before it was ever a test of the muscle (#146). Additive in what
+         * the app writes -- no key changes type or stops being written and no
+         * existing answer changes meaning -- but NOT nothing to a validator,
+         * because `limiter` is a CLOSED enum: a reader validating against
+         * 1.18, which v0.1.50 shipped carrying eight answers, rejects a
+         * document carrying the ninth. It does NOT apply retroactively and
+         * nothing backfills it: the answer is the lifter's own, given at the
+         * set or not at all. Storage does not move -- the column is TEXT
+         * holding the answer's own name, so `DATABASE_VERSION` stays at 15
+         * and no migration is owed.
          */
         const val SCHEMA_VERSION = "1.19"
 
