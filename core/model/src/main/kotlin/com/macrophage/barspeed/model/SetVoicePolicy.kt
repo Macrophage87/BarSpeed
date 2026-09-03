@@ -47,22 +47,21 @@ enum class SetVoiceGuide {
  * tap is accepted -- so the one question this file asks was answered by a
  * variable answering three others, in a module no test on the CI path reaches.
  *
- * It was wrong for timed sets, on every timed set the app has ever recorded.
- * `manualSet` is false on a hold, so the sensor counter ran beside the hold
- * clock and both spoke: field-37's sets 11 and 12 carry the hold cadence on the
- * work-start grid and a stray bare-digit stream 0.8 s off it, the first digit
- * 0.186 s before `Hold`. That is issue #217 and
- * `TimedHoldCueTrackTest` in `:core:dsp` measures it.
+ * It was wrong for timed sets, on every timed set the app had recorded up to
+ * 0.1.48. `manualSet` is false on a hold, so the sensor counter ran beside the
+ * hold clock and both spoke: field-37's sets 11 and 12 carry the hold cadence
+ * on the work-start grid and a stray bare-digit stream 0.774-0.836 s off it,
+ * the first digit 0.186 s before `Hold`. That is issue #217;
+ * `TimedHoldCueTrackTest` in `:core:dsp` measures it and this file fixes it.
  *
  * ## The contract
  *
- * **At most one guide -- and that does not hold yet.** A set has one voice;
- * two voices counting different quantities in overlapping vocabularies is the
- * defect above, and a lifter cannot be expected to tell whose `1` they just
- * heard. This commit lifts the rule out of `:app` UNCHANGED, so a timed set
- * still returns two guides here exactly as it behaved before. The pin that
- * asserts one, and the change that makes it true, are #217's own commits. The
- * empty set is legal and means the set is counted by the lifter, silently.
+ * **At most one guide.** A set has one voice; two voices counting different
+ * quantities in overlapping vocabularies is the defect above, and a lifter
+ * cannot be expected to tell whose `1` they just heard.
+ * `SetVoicePolicyTest > no set is guided by two voices at once` asserts it
+ * over every shape. The empty set is legal and means the set is counted by
+ * the lifter, silently.
  *
  * Returning a SET rather than a single value or a null is deliberate. Before
  * #217 two guides genuinely did run at once, and a type that could not say so
@@ -91,9 +90,12 @@ object SetVoicePolicy {
         imuConnected: Boolean,
     ): Set<SetVoiceGuide> {
         val cued = LeadInPolicy.prepCase(hasTempo, isTimed, kind) == PrepCase.CUED
-        // Kept as `:app` computed it, so lifting the decision here changes
-        // nothing on its own. #217 changes it, in its own commit.
-        val sensor = !cued && (isTimed || demoMode || (kind == ExerciseKind.EXPLOSIVE && imuConnected))
+        // `!isTimed` is #217. A set measured on the clock is guided by the
+        // clock: there is one movement, it lasts the whole set, and there are
+        // no strokes for a phase counter to count. What it counted instead was
+        // whatever the sensor made of a lifter hanging still.
+        val sensor = !cued && !isTimed &&
+            (demoMode || (kind == ExerciseKind.EXPLOSIVE && imuConnected))
         return buildSet {
             if (cued) add(SetVoiceGuide.CUED_CADENCE)
             if (isTimed) add(SetVoiceGuide.TIMED_CLOCK)
