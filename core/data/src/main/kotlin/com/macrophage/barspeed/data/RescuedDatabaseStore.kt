@@ -225,11 +225,11 @@ class RescuedDatabaseStore(
      *
      * THE PARTIAL OUTPUT IS REMOVED ON ANY FAILURE, NOT ONLY AN IOException.
      * That cleanup used to live in `catch (e: IOException)`, which left the
-     * half-written archive on disk for anything thrown that was not one -- a
-     * SecurityException from opening a file, or any Error -- restoring, by
-     * the shape of a catch clause, the exact outcome the paragraph above
-     * exists to make unreachable. A `finally` guarded by a completion flag
-     * covers every exit instead.
+     * half-written archive on disk for anything thrown that was not one --
+     * an OutOfMemoryError or a StackOverflowError, neither an IOException --
+     * restoring, by the shape of a catch clause, the exact outcome the
+     * paragraph above exists to make unreachable. A `finally` guarded by a
+     * completion flag covers every exit instead.
      *
      * NOTHING PINS THAT WIDENING. Reverting to the exact IOException-only
      * shape leaves this module's suite green; only the completion flag and
