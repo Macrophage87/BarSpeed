@@ -39,6 +39,8 @@ import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.LeadInPolicy
+import com.macrophage.barspeed.model.LiveFeed
+import com.macrophage.barspeed.model.LiveFeedPolicy
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PrepCase
@@ -661,6 +663,49 @@ internal fun armedCaptureOf(
 }
 
 /**
+ * Which stream the live readout follows right now, from what has arrived so
+ * far (#210).
+ *
+ * A free function taking what it needs, for [armedCaptureOf]'s reason:
+ * [RecordViewModel] sits AT detekt's LargeClass limit.
+ *
+ * THE LATCH. Once the readout has moved off the armed stream it stays moved,
+ * for the whole set. That is [LiveFeedPolicy]'s rule and not this function's,
+ * and it is carried across frames by RecordViewModel.liveFedBy, which this
+ * takes as [fedBy] and whose next value is the answer's own role.
+ *
+ * BOTH COLLECTORS RUN ON viewModelScope, whose dispatcher is the main one, so
+ * the two calls to this are serialised by the same thread that writes the
+ * screen state. That is what makes the latch a plain field.
+ *
+ * The DECISION is [LiveFeedPolicy.liveFeed]'s, in `:core:model` where a test
+ * runs on it. What is left here is the same lookup [armedCaptureOf] does --
+ * roles as keys, frame counts as values -- so the live half and the set-end
+ * half read one another's vocabulary rather than two spellings of it.
+ *
+ * COUNTS, NOT BUFFERS. [armedCaptureOf] hands the analysis a list of samples
+ * and must therefore hold both; this decides nothing about what is recorded,
+ * so it takes the sizes and cannot reach a sample at all.
+ */
+internal fun liveFeedOf(
+    armed: RecordedSensors?,
+    secondaryRole: SensorRole?,
+    fedBy: SensorRole?,
+    analysedFrames: Int,
+    secondaryFrames: Int,
+): LiveFeed {
+    val framesByRole = buildMap {
+        armed?.analysed?.let { put(it, analysedFrames) }
+        secondaryRole?.let { put(it, secondaryFrames) }
+    }
+    return LiveFeedPolicy.liveFeed(
+        armed = armed?.analysed,
+        fedBy = fedBy,
+        analysable = SensorCapturePolicy.analysable(armed?.expected.orEmpty(), framesByRole),
+    )
+}
+
+/**
  * Everything frozen onto a set that is ending: which buffer the DSP is pointed
  * at, what the row says about that choice (#207), and which armed links were
  * silent across the whole set with what the app could see of each (#213).
@@ -1015,11 +1060,14 @@ private fun CoroutineScope.mirrorSensorSettings(
  * The collect job for the accelerometer that is not the ARMED one.
  *
  * Deliberately not routed through `onSample`. That function feeds the tracker,
- * the live readout and the rep announcements, and every one of those is about
- * the ARMED stream -- a second stream reaching them would make the bar appear
- * to move twice. This collector reaches the buffer and the journal and nothing
- * else; since #207 [armedCaptureOf] can point the analysis at that buffer at
- * set end.
+ * the live readout and the rep announcements, and a second stream reaching
+ * them unconditionally would make the bar appear to move twice. So the sample
+ * is OFFERED to [onLive] rather than fed: whether the tracker takes it is
+ * [LiveFeedPolicy]'s answer and never this collector's, and on every set where
+ * the armed unit is delivering the answer is no.
+ *
+ * The buffer is written BEFORE the offer, because the decision is taken over
+ * frame counts and this frame is one of them.
  *
  * The journal is passed as a lambda rather than a reference because the field
  * it reads is reassigned by `beginSet` and cleared when a set is stored; the
@@ -1030,10 +1078,12 @@ private fun CoroutineScope.openSecondaryCollector(
     buffer: MutableList<ImuSample>,
     journal: () -> SetJournal?,
     role: SensorRole,
+    onLive: (ImuSample) -> Unit,
 ): Job = launch {
     samples.collect { sample ->
         buffer += sample
         journal()?.appendSecondaryImu(sample, role)
+        onLive(sample)
     }
 }
 
@@ -2952,6 +3002,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      */
     private var armedSensors: RecordedSensors? = null
     private var armedSecondaryRole: SensorRole? = null
+
+    /** Which role's samples are reaching the tracker, this set: [liveFeedOf] (#210). */
+    private var liveFedBy: SensorRole? = null
     private var hrJob: Job? = null
     private var tickJob: Job? = null
     private var restJob: Job? = null
@@ -3335,6 +3388,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val roster = s.roster
         armedSensors = SensorCapturePolicy.recorded(roster)
         armedSecondaryRole = roster.secondary
+        // The readout starts on the armed unit; nothing has arrived yet.
+        liveFedBy = armedSensors?.analysed
         endingSet = false
         lastCountedPhase = Phase.IDLE
         lastSpokenSecond = 0
@@ -3432,7 +3487,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // does not exist.
         collectJobB =
             roster.secondary?.let { role ->
-                viewModelScope.openSecondaryCollector(autoConnect.imuSamplesB, imuBufferB, { journal }, role)
+                viewModelScope.openSecondaryCollector(
+                    autoConnect.imuSamplesB, imuBufferB, { journal }, role, ::onSecondarySample,
+                )
             }
         if (s.demoMode && !s.currentIsTimed) startDemoStream(s, exercise)
         hrJob =
@@ -3461,15 +3518,29 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private fun onSample(sample: ImuSample) {
         imuBuffer += sample
         journal?.appendImu(sample)
+        if (LiveFeedPolicy.feedsTracker(liveFeedNow(), armedSensors?.analysed)) feedTracker(sample)
+    }
+
+    /** A frame from the unit that is NOT the armed one; see [liveFeedOf] (#210). */
+    private fun onSecondarySample(sample: ImuSample) {
+        if (LiveFeedPolicy.feedsTracker(liveFeedNow(), armedSecondaryRole ?: return)) feedTracker(sample)
+    }
+
+    /** Which stream feeds the readout, and the latch with it: [liveFeedOf]. */
+    private fun liveFeedNow(): LiveFeed =
+        liveFeedOf(armedSensors, armedSecondaryRole, liveFedBy, imuBuffer.size, imuBufferB.size)
+            .also { liveFedBy = it.role }
+
+    /** The body [onSample] carried until #210, now reachable from either collector. */
+    private fun feedTracker(sample: ImuSample) {
         val live = tracker?.feed(sample) ?: return
         stateFlow.value = stateFlow.value.copy(live = live)
         // Manual/guided sets: the app (or the lifter) is the counter — the
         // sensor keeps recording for velocity metrics, but its phase counts and
         // rep calls must stay silent or two voices count over each other.
-        if (sensorVoiceRuns) {
-            countPhaseSeconds(live.phase, live.currentPhaseElapsedS)
-            announceRepMilestones(live.repCount)
-        }
+        if (!sensorVoiceRuns) return
+        countPhaseSeconds(live.phase, live.currentPhaseElapsedS)
+        announceRepMilestones(live.repCount)
     }
 
     /**
