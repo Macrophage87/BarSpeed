@@ -38,11 +38,14 @@ private fun soleSerialKeysOf(serializer: KSerializer<*>): Set<String> =
  * are about the ROLE-keyed map, and what is here is the half #213's own gate
  * split out. The two are read together.
  *
- * The version does NOT move. 1.17 is UNRELEASED on `main` -- no tag carries it,
- * v0.1.48 ships 1.16 -- so this is a FURTHER entry under it rather than a mint,
- * the rule #207, #205 and #213 each applied under the same number. The
- * constant, the accepted set and the role vocabulary are asserted UNCHANGED
- * below rather than left inferred.
+ * The version does NOT move. 1.17 was UNRELEASED WHEN THIS WAS WRITTEN and
+ * is not now -- v0.1.49 shipped it, read by
+ * `git show v0.1.49:core/model/.../SessionExport.kt`. The extension was
+ * correct when it was made: at the time, no tag carried 1.17 and v0.1.48
+ * shipped 1.16, so this rode as a FURTHER entry rather than a mint, the rule
+ * #207, #205 and #213 each applied under the same number. The constant, the
+ * accepted set and the role vocabulary are asserted UNCHANGED below rather
+ * than left inferred.
  *
  * The PLAN contract does not move at all. A plan declares no sensors since
  * #198's 1.10, and whether an armed unit delivered is not something a coach
@@ -280,7 +283,10 @@ class SchemaSoleSilenceContractTest {
 
     /**
      * The version does not move, and the change rides as a further entry under
-     * the unreleased 1.17.
+     * 1.17, which was UNRELEASED WHEN THIS WAS WRITTEN and is not now --
+     * v0.1.49 shipped it, read by
+     * `git show v0.1.49:core/model/.../SessionExport.kt`. The extension was
+     * correct when it was made.
      */
     @Test
     fun `the export version stands still and 1_17 gains a further entry`() {

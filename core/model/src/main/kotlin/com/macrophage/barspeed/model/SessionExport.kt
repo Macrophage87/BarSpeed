@@ -351,10 +351,13 @@ data class SessionExport(
          * reworded away. The published copy of this entry in
          * `docs/schemas/session-export.schema.json` says the same.
          *
-         * 1.17 carries a SECOND change, under the same number because 1.17
-         * is UNRELEASED. `load_kg` may be corrected on the rest screen after
-         * the set is over, so it is no longer necessarily the mass the set's
-         * power figures were computed from (#205). NOT additive: no key
+         * 1.17 carries a SECOND change, under the same number: 1.17 was
+         * UNRELEASED WHEN THAT WAS WRITTEN and is not now -- v0.1.49
+         * shipped it, read by `git show
+         * v0.1.49:core/model/.../SessionExport.kt`. `load_kg` may be
+         * corrected on the rest screen after the set is over, so it is no
+         * longer necessarily the mass the set's power figures were
+         * computed from (#205). NOT additive: no key
          * changes type or stops being written, but a reader that inferred
          * `summary.peakPower_w`, `summary.meanConPower_w` and each rep's
          * `peakPower_w` / `meanConPower_w` under `repMetrics` were derived

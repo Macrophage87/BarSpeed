@@ -33,9 +33,11 @@ private fun serialKeysOf(serializer: KSerializer<*>): Set<String> =
  * the sensor block's keys, closure and role vocabulary; what is here is what
  * #213 changes about what the document SAYS.
  *
- * The version does NOT move. 1.17 is UNRELEASED on `main` -- no tag carries it,
- * and this is a FURTHER entry under it rather than a mint, which is the same
- * rule the 1.13, 1.14 and 1.16 entries each applied while they were unreleased.
+ * The version does NOT move. 1.17 was UNRELEASED WHEN THIS WAS WRITTEN and
+ * is not now -- v0.1.49 shipped it, read by
+ * `git show v0.1.49:core/model/.../SessionExport.kt`. The extension was
+ * correct when it was made, which is the same rule the 1.13, 1.14 and 1.16
+ * entries each applied while they were unreleased.
  * The constant, the accepted set and the enum are asserted UNCHANGED below
  * rather than left inferred, because "do not touch the constant" is exactly the
  * kind of instruction a diff can violate silently.
@@ -205,14 +207,18 @@ class SchemaArmedSilenceContractTest {
 
     /**
      * The version does not move, and the change rides as a further entry under
-     * the unreleased 1.17.
+     * 1.17, which was UNRELEASED WHEN THIS WAS WRITTEN and is not now --
+     * v0.1.49 shipped it, read by
+     * `git show v0.1.49:core/model/.../SessionExport.kt`. The extension was
+     * correct when it was made.
      *
      * The rule this applies is the one the 1.13, 1.14 and 1.16 entries each
      * applied and the 1.15 entry got wrong in one direction and the 1.17 entry
      * got wrong in the other: a number nobody has been handed may still grow;
-     * a number that shipped may not. No tag carries 1.17 -- v0.1.48 ships 1.16,
-     * which is what #207's own entry records reading at that tag -- so this is
-     * an extension rather than a mint.
+     * a number that shipped may not. At the time this rode as a further entry,
+     * no tag carried 1.17 -- v0.1.48 shipped 1.16, which is what #207's own
+     * entry records reading at that tag -- so it was an extension rather than
+     * a mint, correctly.
      */
     @Test
     fun `the export version stands still and 1_17 gains a further entry`() {

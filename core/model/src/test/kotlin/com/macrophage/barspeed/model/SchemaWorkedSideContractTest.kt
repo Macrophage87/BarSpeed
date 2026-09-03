@@ -34,11 +34,14 @@ private fun serialKeysOf(serializer: KSerializer<*>): Set<String> =
  * belong to one issue and say what that issue changes about what the document
  * MEANS.
  *
- * The version does NOT move. 1.17 is unreleased -- v0.1.48 ships 1.16, which
- * #207's own log entry records reading at that tag -- so this is a FURTHER
- * entry under it and not a mint, the rule the 1.13, 1.14 and 1.16 entries each
- * applied while they were open. The constant, the accepted set and the absence
- * of a 1.18 are asserted UNCHANGED rather than left inferred.
+ * The version does NOT move. 1.17 was UNRELEASED WHEN THIS WAS WRITTEN and
+ * is not now -- v0.1.49 shipped it, read by
+ * `git show v0.1.49:core/model/.../SessionExport.kt`. The extension was
+ * correct when it was made: at the time, v0.1.48 shipped 1.16, which #207's
+ * own log entry records reading at that tag, so this rode as a FURTHER entry
+ * under it and not a mint, the rule the 1.13, 1.14 and 1.16 entries each
+ * applied while they were open. The constant, the accepted set and the
+ * absence of a 1.18 are asserted UNCHANGED rather than left inferred.
  *
  * The PLAN contract does not move either, and that is worth an assertion of
  * its own: a plan has declared `side` per set since long before this, and what
@@ -137,9 +140,11 @@ class SchemaWorkedSideContractTest {
      * The version stands still and 1.17 gains a further entry.
      *
      * Entries already ride under 1.17 for #207, #205, #213, #223 and #224,
-     * and this is another. The number may still take entries because no tag
-     * carries it; that is the same rule, and the 1.15 and 1.17 entries each
-     * record getting it wrong once, in opposite directions.
+     * and this is another. At the time this rode as a further entry, 1.17
+     * was UNRELEASED WHEN THIS WAS WRITTEN and is not now -- v0.1.49 shipped
+     * it, read by `git show v0.1.49:core/model/.../SessionExport.kt`. The
+     * extension was correct when it was made, and the 1.15 and 1.17 entries
+     * each record getting it wrong once, in opposite directions.
      */
     @Test
     fun `the export version stands still and 1_17 gains a further entry`() {
