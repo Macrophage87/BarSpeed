@@ -174,12 +174,15 @@ class SchemaWorkedSideContractTest {
      *
      * #215 changes what is RECORDED, not what a coach may write. Pinned
      * because the two vocabularies are one word apart and a change made in the
-     * wrong document would mint a plan version for nothing -- 1.11 is this
-     * branch's mint already, for #214's `progression` key.
+     * wrong document would mint a plan version for nothing. The figure this
+     * asserts is not 1.11 any more: #64 minted 1.12 on this branch for the
+     * three nullable geometry keys, and the sentence naming 1.11 as the
+     * branch's mint is deleted rather than reworded. What the test checks is
+     * unchanged -- that the plan version moved for a PLAN reason.
      */
     @Test
     fun `the plan contract is untouched by a recorded side`() {
-        assertEquals("1.11", PlanFile.SCHEMA_VERSION, "the plan version moved for a change to the record")
+        assertEquals("1.12", PlanFile.SCHEMA_VERSION, "the plan version moved for a change to the record")
         val planSet = schema("plan.schema.json").getValue("\$defs").jsonObject.getValue("set").jsonObject
         assertFalse(
             "plannedSide" in planSet.getValue("properties").jsonObject.keys,

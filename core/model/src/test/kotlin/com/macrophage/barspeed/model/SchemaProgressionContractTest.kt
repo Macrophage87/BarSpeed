@@ -49,10 +49,12 @@ class SchemaProgressionContractTest {
 
     // ---- 1. the version ----
 
-    @Test
-    fun `the app writes plan schema 1_11`() {
-        assertEquals("1.11", PlanFile.SCHEMA_VERSION)
-    }
+    // `the app writes plan schema 1_11` lived here and is DELETED, not
+    // reworded: the app writes 1.12 from the #64 mint, so an assertion that it
+    // writes 1.11 is simply false. What this class is for -- that 1.11 exists,
+    // is accepted, is published and imports clean -- is unaffected and is
+    // pinned by the tests below. The version the app currently writes is pinned
+    // in PlanGeometryNullabilityContractTest, beside the mint that moved it.
 
     @Test
     fun `the import gate accepts both 1_10 and the freshly minted 1_11`() {

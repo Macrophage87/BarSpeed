@@ -58,6 +58,64 @@ class PlanGeometryNullabilityContractTest {
     }
 
     /**
+     * The version the app writes, pinned beside the mint that moved it.
+     *
+     * `SchemaProgressionContractTest` held this assertion while 1.11 was the
+     * newest, and the copy naming 1.11 is deleted rather than carried forward.
+     * It lives with whichever mint is current so that the next one has one
+     * place to move it from, and so that a bump left half-done -- the schema
+     * enum widened, `PlanFile.SCHEMA_VERSION` left behind -- reds here rather
+     * than shipping a prompt asking for a version the app does not write.
+     */
+    @Test
+    fun `the app writes plan schema 1_12`() {
+        assertEquals("1.12", PlanFile.SCHEMA_VERSION)
+    }
+
+    /**
+     * A plan written against the previous contract imports unchanged.
+     *
+     * The claim the mint rests on, and the one worth pinning rather than
+     * asserting in prose: 1.12 widens the accepted TYPE of three keys and
+     * changes the meaning of none, so a 1.11 document declaring all three
+     * explicitly resolves to exactly the geometry it always did. Green before
+     * the mint as well as after -- it is a premise, not a differential -- and
+     * it is here so that a later change to the precedence cannot quietly
+     * re-read an explicit `false`.
+     */
+    @Test
+    fun `a 1_11 plan declaring the three flags false imports unchanged`() {
+        val text = """
+            {
+              "schemaVersion": "1.11",
+              "planName": "P",
+              "sessions": [
+                {
+                  "name": "S",
+                  "exercises": [
+                    {
+                      "exercise": "seated_row",
+                      "sensorInverted": false,
+                      "sensorOnStack": false,
+                      "bodyweight": false,
+                      "sets": [ { "reps": 5 } ]
+                    }
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+        val plan = Json { ignoreUnknownKeys = true }.decodeFromString(PlanFile.serializer(), text)
+        assertEquals(emptyList(), plan.validate(), "a 1.11 document is refused by the 1.12 build")
+        val declared = plan.sessions[0].exercises[0]
+        val base = ExerciseDef(id = "seated_row", displayName = "Seated Row", sensorOnStack = true)
+        val out = SetGeometryPolicy.resolve(base, declared)
+        assertEquals(false, out.sensorInverted, "a declared false stopped winning on sensorInverted")
+        assertEquals(false, out.sensorOnStack, "a declared false stopped winning on sensorOnStack")
+        assertEquals(false, out.bodyweight, "a declared false stopped winning on bodyweight")
+    }
+
+    /**
      * The plan's 1.12 entry states the omission rule ONCE, for all three keys
      * at once, and says which ids carry a built-in default under it.
      *
