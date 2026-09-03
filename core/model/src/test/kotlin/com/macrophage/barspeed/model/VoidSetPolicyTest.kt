@@ -176,11 +176,24 @@ class VoidSetPolicyTest {
      * act is undoable. This screen's only other destructive control deletes
      * the session and every raw stream in it, so a confirmation that said
      * only "are you sure" would be read as the same kind of act.
+     *
+     * The first two assertions pin the PAIRING, not just the digits. The
+     * fixture is field-37 set 13, at orderIdx 12; sets 11 and 12 of that same
+     * session are `rope_dead_hang` too, read from its `meta.json` in
+     * `TimedHoldCueTrackTest`'s provenance block. So 13 counts SESSION sets,
+     * and a confirmation reading "Set 13 of Rope Dead Hang" names a set of
+     * that exercise which does not exist. No ordinal is asserted for the set
+     * within its exercise: sets 1-10 are not enumerated anywhere in this tree,
+     * so "the Nth Rope Dead Hang" is not a fact this repo holds. The exercise
+     * is therefore named without a number, and the number is attributed to
+     * the session -- the session-wide index is the only counter the call site
+     * holds.
      */
     @Test
     fun `the confirmation says the set is kept, exported and undoable`() {
         val text = VoidSetPolicy.confirmation("Rope Dead Hang", setNumber = 13)
-        assertTrue("Set 13 of Rope Dead Hang" in text, "the confirmation does not name the set: $text")
+        assertTrue("this Rope Dead Hang set" in text, "the confirmation does not name the exercise: $text")
+        assertTrue("set 13 of the session" in text, "the confirmation does not say which set of the session: $text")
         assertTrue("sensor data" in text, "the confirmation does not say the sensor data is kept: $text")
         assertTrue("exported" in text, "the confirmation does not say the set is still exported: $text")
         assertTrue("volume" in text, "the confirmation does not say what stops counting: $text")
