@@ -88,6 +88,10 @@ object TempoScoreLabel {
         // in tolerance, and every phase the set prescribed actually graded. The
         // ratio alone answers only the first, and a set graded on its drives
         // alone satisfies it while the eccentric behind it was never measured.
+        // Graded is set-level: PhaseFacts.scored is SetAnalyzer's own flag, true
+        // the moment ONE rep resolves the phase. A set where some reps resolved
+        // an eccentric and others did not reports no gap here and still ticks.
+        // Untracked remainder, issue #230.
         val complete = onRatio && ungraded.isEmpty()
         return TempoScore(
             text = "Tempo $repsFullyCompliant/$repsEvaluated" + if (complete) " ✓" else "",
