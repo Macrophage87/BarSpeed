@@ -22,11 +22,11 @@ import java.io.File
  * rescued-database card -- three tiers, their titles, the discard dialog and
  * the share path -- had never been reachable outside a test. Ten was the first
  * value that could make that card appear; every value above it, this build's
- * fourteen included, is simply the next such value, and the first-time claim
+ * sixteen included, is simply the next such value, and the first-time claim
  * that used to stand here is history rather than something these bumps repeat.
  *
- * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 14 writes the
- * file, then any build carrying 13 or less opens it. A forward install runs
+ * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 16 writes the
+ * file, then any build carrying 15 or less opens it. A forward install runs
  * the migration chain and never enters the rescue at all, so an ordinary
  * upgrade sees none of it.
  *
@@ -37,7 +37,8 @@ import java.io.File
  * was new at 11 was that a committed baseline existed for the
  * version below it, so for the first time in this repository a migration had a
  * document to be read against; 12 was the second such bump, 13 the third,
- * 14 the fourth and 15 the fifth, with `14.json` as its baseline.
+ * 14 the fourth, 15 the fifth and 16 the sixth, with `15.json` as its
+ * baseline.
  *
  * A CORRECTION TO WHAT STOOD HERE, named rather than reworded around. This
  * paragraph read "BOTH bumps of this cluster reach the emulator in the SAME
@@ -55,13 +56,14 @@ import java.io.File
  * forward: v0.1.49 is the newest tag and
  * `git show v0.1.49:core/data/.../AppDatabase.kt` reads
  * `DATABASE_VERSION = 14`, so 13 -> 14 has now shipped too and an install
- * upgrading to this build runs 14 -> 15 alone. A phone still on v0.1.44 runs
- * 12 -> 13 -> 14 -> 15 in one open, which is why the emulator exercise
+ * upgrading to this build runs 14 -> 15 -> 16, neither of which has shipped
+ * in any tag. A phone still on v0.1.44 runs 12 -> 13 -> 14 -> 15 -> 16 in one
+ * open, which is why the emulator exercise
  * installs the older release first and upgrades over it rather than starting
  * empty. The sentence above about v0.1.48 carrying 13 was true when it was
  * written and is not now; it is replaced rather than kept beside this one.
  */
-const val DATABASE_VERSION = 15
+const val DATABASE_VERSION = 16
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -435,21 +437,44 @@ abstract class AppDatabase : RoomDatabase() {
          * v16: `voided` and `voidReason` on set_records -- the mark that says
          * the lifter did not perform this set, and optionally why (#60).
          *
-         * DECLARED EMPTY AND UNREGISTERED AT THIS COMMIT, on purpose. The
-         * differentials for the hop are written against this symbol in the
-         * commit after it, and a test naming a symbol that does not exist
-         * cannot be pushed as a red -- it is a compile error, which reds the
-         * build for a reason unrelated to the defect. So the declaration lands
-         * first, with no body and out of the chain, where it changes nothing:
-         * [DATABASE_VERSION] is still 15 here and `build` does not pass this
-         * object to `addMigrations`, so no database in the world enters it.
+         * TWO SHAPES, DELIBERATELY DIFFERENT FROM EACH OTHER. `voided` is
+         * `INTEGER NOT NULL DEFAULT 0`, which is [MIGRATION_11_12]'s `added`
+         * shape: the mark is a statement the lifter makes, a set they have not
+         * marked is a set they performed, and there is no third state for the
+         * column to hold. `voidReason` is nullable with no default, which is
+         * [MIGRATION_13_14]'s shape: a voided set may carry no reason at all,
+         * and a default would put words in the lifter's mouth on every row in
+         * the database.
          *
-         * [Migration15To16Test] is what fills in what the shape has to be and
-         * why; it does not exist yet either.
+         * The `0` carries the same ambiguity `added` states for itself and it
+         * is stated rather than hidden: every row written before v16 reads
+         * false, so a set an earlier build recorded that the lifter never
+         * performed is indistinguishable from one they did. What the mark
+         * recovers is the ability to SAY so from now on, on old rows as well
+         * as new ones.
+         *
+         * Nothing is backfilled, and the refusal matters here because a
+         * plausible rule exists.
+         * `UPDATE set_records SET voided = 1 WHERE actualDurationS = 0 AND
+         * failed = 1` would mark field-37 set 13, the row this change was
+         * opened for -- and it would equally mark a set the lifter unracked,
+         * failed instantly and tapped, and #216's abandoned-in-lead-in
+         * case. v15's `workBegan` separates that third case on rows written
+         * from v15 on and on no others -- it is null on every row this
+         * migration could sweep, field-37 set 13 included -- so nothing
+         * stored separates the three for any row a backfill would reach, and this mark is the
+         * LIFTER'S statement: a guessed one is indistinguishable in the export
+         * from a made one, and would drop real sets out of the volume figure.
+         *
+         * [Migration15To16Test] pins the statements, the baseline difference
+         * and the refusal.
          */
         internal val MIGRATION_15_16 =
             object : Migration(15, 16) {
-                override fun migrate(db: SupportSQLiteDatabase) = Unit
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN voided INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN voidReason TEXT")
+                }
             }
 
         /**
@@ -475,8 +500,8 @@ abstract class AppDatabase : RoomDatabase() {
          * was deleted there rather than reworded. A crash with the data
          * recoverable beats a clean start with it gone.
          *
-         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 15
-         * here, so a rollback from this build to any build carrying 14 or less
+         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 16
+         * here, so a rollback from this build to any build carrying 15 or less
          * enters the rescue; the first version at which that was true of a
          * stock install was 10, and what it exposes on screen is stated at the
          * constant, with issue #118. An ordinary forward install runs the
@@ -508,6 +533,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_12_13,
                     MIGRATION_13_14,
                     MIGRATION_14_15,
+                    MIGRATION_15_16,
                 )
                 .build()
         }

@@ -144,6 +144,26 @@ interface SessionDao {
     @Query("UPDATE set_records SET warmupMark = :warmupMark WHERE id = :setId")
     suspend fun updateWarmupMark(setId: Long, warmupMark: Boolean?)
 
+    // The lifter's statement that they did not perform this set, and their
+    // words for why (#60). Its own statement rather than a fifth argument of
+    // [updateRpe]: an effort correction on the rest screen must not carry a
+    // mark the lifter never made, and the mark is applied from a different
+    // screen at a different time -- after the session has ended, from session
+    // detail.
+    //
+    // BOTH COLUMNS MOVE TOGETHER, for the reason [updateLimiter] gives for the
+    // pair it writes: the reason belongs to the mark, so un-voiding must clear
+    // the words that went with it, or the export publishes "app fabricated
+    // this set" on a set the lifter says they DID perform. The caller passes
+    // null for the reason when it passes false for the mark; the query does
+    // not enforce that, and [SessionRepository.setVoided] is where it is
+    // enforced, once, in code a test can reach.
+    //
+    // The columns arrived at v16; this @Query changes no table, so
+    // DATABASE_VERSION does not move for the query itself.
+    @Query("UPDATE set_records SET voided = :voided, voidReason = :reason WHERE id = :setId")
+    suspend fun updateVoided(setId: Long, voided: Boolean, reason: String?)
+
     @Query("UPDATE set_records SET actualReps = :reps, repsManual = 1 WHERE id = :setId")
     suspend fun overrideReps(setId: Long, reps: Int)
 

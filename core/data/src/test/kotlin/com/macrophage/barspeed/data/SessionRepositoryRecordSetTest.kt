@@ -129,6 +129,15 @@ class SessionRepositoryRecordSetTest {
             calls += "updateWarmupMark"
         }
 
+        // Recorded like every other write this fake sees, though nothing in
+        // this file calls it: SessionDao grew the member for #60 and Kotlin
+        // requires it, and a fake that silently swallowed one write while
+        // recording the rest would report a clean column list for a change
+        // that had written to the row.
+        override suspend fun updateVoided(setId: Long, voided: Boolean, reason: String?) {
+            calls += "updateVoided"
+        }
+
         override suspend fun overrideReps(setId: Long, reps: Int) {
             calls += "overrideReps"
         }

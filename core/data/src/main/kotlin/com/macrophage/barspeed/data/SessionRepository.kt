@@ -17,6 +17,7 @@ import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
+import com.macrophage.barspeed.model.VoidSetPolicy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
 
@@ -612,6 +613,31 @@ class SessionRepository(
      */
     suspend fun setLimiter(setId: Long, limiter: String?, limiterNote: String?) =
         sessionDao.updateLimiter(setId, limiter, limiterNote)
+
+    /**
+     * Mark a recorded set as one the lifter did not perform, or take the mark
+     * back (#60).
+     *
+     * NOTHING IS DELETED. The row keeps its place and its `orderIdx`, its
+     * gzipped IMU, heart-rate and cue streams stay in `raw_streams`, and both
+     * export writers go on carrying the set -- marked.
+     * [com.macrophage.barspeed.model.VoidSetPolicy] states what the mark
+     * excludes and what it keeps, and it is the only place that list is
+     * written down.
+     *
+     * THE REASON IS NORMALIZED AND CLEARED HERE, not at the screen. Normalized
+     * because it reaches the raw archive's manifest, whose string writer
+     * escapes nothing, so a newline or a backslash in it would make that whole
+     * document unparseable for every set in the session; cleared because a
+     * reason surviving an un-void would publish "the app fabricated this set"
+     * beside a set the lifter says they DID perform. The DAO's query writes
+     * whatever it is handed, so both rules live in this one method rather than
+     * at each caller.
+     */
+    suspend fun setVoided(setId: Long, voided: Boolean, reason: String? = null) {
+        val stored = if (voided) VoidSetPolicy.reason(reason) else null
+        sessionDao.updateVoided(setId = setId, voided = voided, reason = stored)
+    }
 
     /** Lifter correction of a miscounted (or uncounted) set's reps. */
     suspend fun overrideReps(setId: Long, reps: Int) = sessionDao.overrideReps(setId, reps)

@@ -91,6 +91,10 @@ class SessionExportAbandonedSetTest {
 
         override suspend fun updateWarmupMark(setId: Long, warmupMark: Boolean?) = Unit
 
+        // Conformance only: SessionDao grew this member for #60 and Kotlin
+        // requires it. Nothing in this file calls it.
+        override suspend fun updateVoided(setId: Long, voided: Boolean, reason: String?) = Unit
+
         override suspend fun overrideReps(setId: Long, reps: Int) = Unit
 
         override suspend fun overrideLoad(setId: Long, loadKg: Double) = Unit

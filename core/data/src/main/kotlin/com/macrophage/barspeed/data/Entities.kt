@@ -241,6 +241,61 @@ data class SetRecordEntity(
      */
     val added: Boolean = false,
     /**
+     * True when the lifter says they did NOT perform this set (#60).
+     *
+     * THE ROW STAYS AND SO DOES EVERYTHING UNDER IT. The set keeps its
+     * `orderIdx`, its analysis, and its gzipped IMU, heart-rate and cue
+     * streams; the export goes on carrying it, marked. What the flag changes
+     * is what the set is COUNTED in: it leaves the volume figure and the
+     * performed count, and
+     * [com.macrophage.barspeed.model.VoidSetPolicy] is where that list is
+     * stated once so no reader has to remember it.
+     *
+     * WHY NOT DELETE THE ROW. The only delete this app has ever had is
+     * `DELETE FROM sessions`, which takes the session and every stream in it.
+     * A per-row delete would take the only copy of what the sensors saw and
+     * would leave the sets after it sitting at indices the plan no longer
+     * matches. A voided set's samples are also the evidence for why it was
+     * voided.
+     *
+     * IT IS THE LIFTER'S STATEMENT AND NOTHING DERIVES IT. The app cannot tell
+     * a set that did not happen from one that failed instantly: field-37 set
+     * 13 is a 0-second failed hang the app fabricated (#195), and a lifter who
+     * unracks and fails at once writes the identical row. So nothing sets this
+     * column but the control on the session detail screen, and the migration
+     * backfills nothing.
+     *
+     * FALSE IS THE HONEST DEFAULT AND ALSO AN AMBIGUITY, stated rather than
+     * hidden, exactly as [added] states its own: every row written before v16
+     * reads false, and a set an older build recorded that the lifter never
+     * performed is indistinguishable from one they did -- until they mark it,
+     * which they now can, on an old row as easily as a new one.
+     *
+     * REVERSIBLE. Un-voiding clears this and [voidReason] together.
+     */
+    val voided: Boolean = false,
+    /**
+     * The lifter's own words for why the set was not performed, or null
+     * (#60).
+     *
+     * OPTIONAL ON A VOIDED SET AND MEANINGLESS ON AN UNVOIDED ONE, which is
+     * why it is nullable with no default while [voided] is a non-null flag:
+     * null is a real state that no value stands for, and a default would put
+     * words in the lifter's mouth on every row in the database.
+     *
+     * Normalized by [com.macrophage.barspeed.model.VoidSetPolicy.reason],
+     * which is [com.macrophage.barspeed.model.SetLimiter.normalizeNote] and
+     * not a second spelling of it: this string reaches the raw archive's
+     * manifest, which is assembled as text by a writer that escapes nothing,
+     * so a backslash or a newline here would make that whole document
+     * unparseable for every set in the session rather than merely corrupting
+     * one reason. [limiterNote] is the column that rule was written for.
+     *
+     * Cleared with the mark. A reason left behind on an un-voided set would be
+     * published beside a set the lifter says they DID perform.
+     */
+    val voidReason: String? = null,
+    /**
      * Why the set ended, from a closed vocabulary, or null (#189).
      *
      * A NULLABLE COLUMN ON EVERY SET ROW, deliberately not a field keyed off
