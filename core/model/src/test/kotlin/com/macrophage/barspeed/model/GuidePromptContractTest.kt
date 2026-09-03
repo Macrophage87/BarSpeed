@@ -350,6 +350,14 @@ class GuidePromptContractTest {
             "not a capacity reading" in prompt.lowercase(),
             "the plan prompt never says the set-up answer's numbers are not a capacity reading",
         )
+        assertTrue(
+            "do not drop the load for it" in prompt,
+            "the plan prompt never tells the model not to drop the load for a bad set-up",
+        )
+        assertTrue(
+            "correct the set-up next session at the same load" in prompt.lowercase(),
+            "the plan prompt never tells the model the set-up is corrected next session at the same load",
+        )
     }
 
     private companion object {
