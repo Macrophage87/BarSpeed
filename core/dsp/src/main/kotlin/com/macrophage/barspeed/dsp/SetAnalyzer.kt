@@ -165,6 +165,22 @@ data class SetAnalysis(
      * anything else the row carries.
      */
     val detectionsAfterSetEndCue: Int? = null,
+    /**
+     * Why [reps] is empty, or null when it is not. Issue #138.
+     *
+     * A healthy stream can resolve nothing, and until this existed the
+     * analysis said so only by omission -- a set whose integrator ran away was
+     * byte-identical to a manual set recorded with no sensor. [NoRepsReason]
+     * carries what that type claims and, as importantly, what it does not:
+     * this is null the moment ONE rep survives, so it says nothing at all
+     * about a set that resolved 1 of 10.
+     *
+     * Null on every set analysed before this field existed, and permanently
+     * so. It is computed once, when the set is analysed, and frozen into the
+     * stored analysis beside [tempoCompliance]; nothing re-runs the segmenter
+     * at export time, so an old blank set stays blank and unexplained.
+     */
+    val noRepsReason: NoRepsReason? = null,
 )
 
 /** Full batch analysis of one recorded set. */

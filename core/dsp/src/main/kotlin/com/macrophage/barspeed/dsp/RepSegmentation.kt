@@ -123,19 +123,61 @@ data class RepSpan(
  * should not be read as the athlete's timing.
  */
 object RepSegmenter {
+    /** [segmentDetailed]'s result: the spans, and the census of how they were arrived at. */
+    data class Segmentation(val spans: List<RepSpan>, val census: SegmentationCensus)
+
     fun segment(
         series: VelocitySeries,
         direction: LiftDirection = LiftDirection(),
         config: DspConfig = DspConfig(),
-    ): List<RepSpan> {
-        val runs = classifyRuns(series, config)
-        return pairRuns(runs, series, direction, config)
-    }
+    ): List<RepSpan> = segmentDetailed(series, direction, config).spans
 
     fun segment(series: VelocitySeries, startsWith: StartPhase, config: DspConfig = DspConfig()): List<RepSpan> =
         segment(series, LiftDirection(startsWith), config)
 
-    internal fun classifyRuns(series: VelocitySeries, config: DspConfig): List<Run> {
+    /**
+     * [segment], plus the counts a caller needs to say why the span list came
+     * back empty. Issue #138.
+     *
+     * This is the only implementation; [segment] delegates to it and discards
+     * the census. There is deliberately no second walk over the series, so the
+     * counts describe the run that produced the spans rather than a
+     * reconstruction of it.
+     */
+    fun segmentDetailed(
+        series: VelocitySeries,
+        direction: LiftDirection = LiftDirection(),
+        config: DspConfig = DspConfig(),
+    ): Segmentation {
+        val classified = classifyRunsDetailed(series, config)
+        val paired = pairRuns(classified.runs, series, direction, config)
+        return Segmentation(
+            paired.spans,
+            SegmentationCensus(
+                movementRuns = classified.movementRuns,
+                overDisplacementCap = classified.overDisplacementCap,
+                belowStartThreshold = classified.belowStartThreshold,
+                shorterThanMinPhase = classified.shorterThanMinPhase,
+                qualifyingRuns = classified.runs.count { it.type != RunType.STILL },
+                pairsBelowMinRom = paired.pairsBelowMinRom,
+                spans = paired.spans.size,
+            ),
+        )
+    }
+
+    /** [classifyRunsDetailed]'s result. */
+    internal data class ClassifiedRuns(
+        val runs: List<Run>,
+        val movementRuns: Int,
+        val overDisplacementCap: Int,
+        val belowStartThreshold: Int,
+        val shorterThanMinPhase: Int,
+    )
+
+    internal fun classifyRuns(series: VelocitySeries, config: DspConfig): List<Run> =
+        classifyRunsDetailed(series, config).runs
+
+    internal fun classifyRunsDetailed(series: VelocitySeries, config: DspConfig): ClassifiedRuns {
         val v = series.velocityMps
         val n = series.size
         val rawTypes =
@@ -163,14 +205,27 @@ object RepSegmenter {
         }
         // Demote movement runs that never exceed the start threshold, are too
         // brief, or displace implausibly far (unanchored drift, not a lift).
+        //
+        // The three counts below are taken WHILE this runs, for #138's
+        // diagnosis, and are independent: a run failing two terms is counted
+        // under both, because the demotion is one three-way `||` and nothing
+        // here attributes it to a single cause. They change no verdict.
+        var movementRuns = 0
+        var overDisplacementCap = 0
+        var belowStartThreshold = 0
+        var shorterThanMinPhase = 0
         val demoted =
             runs.map { run ->
                 if (run.type == RunType.STILL) {
                     run
                 } else {
+                    movementRuns++
                     val duration = series.timeS[run.endIdx] - series.timeS[run.startIdx]
                     val peak = (run.startIdx..run.endIdx).maxOf { abs(v[it]) }
                     val disp = displacement(series, run.startIdx, run.endIdx)
+                    if (peak < config.startThresholdMps) belowStartThreshold++
+                    if (duration < config.minPhaseS) shorterThanMinPhase++
+                    if (disp > config.maxRunDisplacementM) overDisplacementCap++
                     if (peak < config.startThresholdMps || duration < config.minPhaseS ||
                         disp > config.maxRunDisplacementM
                     ) {
@@ -190,15 +245,18 @@ object RepSegmenter {
                 merged += run
             }
         }
-        return merged
+        return ClassifiedRuns(merged, movementRuns, overDisplacementCap, belowStartThreshold, shorterThanMinPhase)
     }
+
+    /** [pairRuns]'s result: the spans, and how many pairs the [DspConfig.minRomM] floor discarded. */
+    private data class Paired(val spans: List<RepSpan>, val pairsBelowMinRom: Int)
 
     private fun pairRuns(
         runs: List<Run>,
         series: VelocitySeries,
         direction: LiftDirection,
         config: DspConfig,
-    ): List<RepSpan> = if (direction.startsWith == StartPhase.ECCENTRIC) {
+    ): Paired = if (direction.startsWith == StartPhase.ECCENTRIC) {
         pairEccentricFirst(runs, series, direction, config)
     } else {
         pairConcentricFirst(runs, series, direction, config)
@@ -210,8 +268,9 @@ object RepSegmenter {
         series: VelocitySeries,
         direction: LiftDirection,
         config: DspConfig,
-    ): List<RepSpan> {
+    ): Paired {
         val reps = mutableListOf<RepSpan>()
+        var belowMinRom = 0
         var i = 0
         while (i < runs.size) {
             val first = runs[i]
@@ -236,10 +295,12 @@ object RepSegmenter {
                     second.endIdx,
                     turnaroundPauseS,
                 )
+            } else {
+                belowMinRom++
             }
             i = j + 1
         }
-        return reps
+        return Paired(reps, belowMinRom)
     }
 
     /**
@@ -255,14 +316,18 @@ object RepSegmenter {
         series: VelocitySeries,
         direction: LiftDirection,
         config: DspConfig,
-    ): List<RepSpan> {
+    ): Paired {
         val reps = mutableListOf<RepSpan>()
+        var belowMinRom = 0
         var i = 0
         while (i < runs.size) {
             val con = runs[i]
-            if (con.type != direction.concentricRun ||
-                displacement(series, con.startIdx, con.endIdx) < config.minRomM
-            ) {
+            if (con.type != direction.concentricRun) {
+                i++
+                continue
+            }
+            if (displacement(series, con.startIdx, con.endIdx) < config.minRomM) {
+                belowMinRom++
                 i++
                 continue
             }
@@ -288,7 +353,7 @@ object RepSegmenter {
                 i = j
             }
         }
-        return reps
+        return Paired(reps, belowMinRom)
     }
 
     internal fun displacement(series: VelocitySeries, startIdx: Int, endIdx: Int): Double {

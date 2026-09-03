@@ -591,6 +591,35 @@ data class SessionExport(
          * are NOT re-derived by a void, so they still include a voided set;
          * recomputing them over the sets this mark tells a reader to count --
          * that is, with the voided ones dropped -- will not reproduce them.
+         *
+         * 1.18 carries a FOURTH change, under the same number for the same
+         * reason the second and third are: 1.18 is UNRELEASED. It is additive
+         * (#138): a set's `summary` may carry `noRepsReason`, a single word
+         * saying why the set resolved no reps. A healthy IMU stream --
+         * contiguous `sample_idx`, no gap over 100 ms, the whole set window
+         * covered -- can segment to nothing, and until now the document said
+         * so only by OMISSION: `reps: []`, `summary: {}`, no
+         * `velocityLossBasis`, which is byte-identical to a manual set
+         * recorded with no sensor at all. The key is drawn from
+         * [VALID_NO_REPS_REASONS] and names WHICH GATE of the segmenter
+         * emptied the list, nothing more.
+         *
+         * Additive on the terms 1.4 and 1.5 were not: nothing already written
+         * changes type, meaning or presence, and a reader that ignores the key
+         * reads a 1.18 document exactly as it read a 1.17 one.
+         *
+         * IT DOES NOT APPLY RETROACTIVELY, for 1.16's reason. The value is
+         * computed when the set is ANALYSED and frozen into its stored
+         * analysis; nothing re-runs the segmenter at export time. Every set
+         * recorded before this number ships keeps publishing `summary: {}`
+         * with no reason, permanently.
+         *
+         * AND IT SAYS NOTHING ABOUT AN UNDER-RESOLVED SET. It is written only
+         * when the rep list is EMPTY. A set resolving 1 of 10 performed reps
+         * publishes a full summary computed from that one rep and carries no
+         * `noRepsReason` at all -- the corpus holds such a capture, with a
+         * single movement run displacing 123.64 m. Reading the key's absence
+         * as "the reps are trustworthy" is wrong.
          */
         const val SCHEMA_VERSION = "1.18"
 
@@ -640,6 +669,35 @@ data class SessionExport(
          */
         val VALID_VELOCITY_LOSS_BASES =
             setOf("measured", "notEnoughReps", "noReference", "terminalRepIsFastest")
+
+        /**
+         * Why a set resolved no reps, the values [SetSummaryExport.noRepsReason]
+         * is drawn from. Schema 1.18, issue #138.
+         *
+         * The names are owned by `NoRepsReason` in `:core:dsp`, which this
+         * module cannot see -- the dependency runs the other way. They are
+         * mirrored here so the published schema has a Kotlin constant to be
+         * pinned against, the same arrangement [VALID_VELOCITY_LOSS_BASES]
+         * uses, and `BlankAnalysisReasonTest` asserts the two lists are equal
+         * from the side that can see both.
+         *
+         * Each value names WHICH GATE emptied the rep list and claims nothing
+         * about the bar or the lifter. `runsExceedDisplacementCap` in
+         * particular says the set's movement runs displaced further than any
+         * real phase can, which the DSP reads as unanchored integration drift;
+         * no capture in this repository has been checked against a tape
+         * measure, so the reading is the DSP's and not an observation.
+         */
+        val VALID_NO_REPS_REASONS =
+            setOf(
+                "afterSetEndCue",
+                "noMovement",
+                "runsExceedDisplacementCap",
+                "runsBelowStartThreshold",
+                "runsTooBrief",
+                "phasesUnpaired",
+                "driveBelowMinRom",
+            )
     }
 }
 
@@ -1393,6 +1451,22 @@ data class SetSummaryExport(
     @SerialName("peakPower_w") val peakPowerW: Double? = null,
     /** Mean of per-rep average concentric power, watts. */
     @SerialName("meanConPower_w") val meanConPowerW: Double? = null,
+    /**
+     * Why this set resolved no reps -- schema 1.18, issue #138. Drawn from
+     * [SessionExport.VALID_NO_REPS_REASONS].
+     *
+     * The one key in this object written when every other key is absent. A
+     * healthy stream can segment to nothing, and a `summary: {}` carrying no
+     * reason is byte-identical to a manual set recorded with no sensor; this
+     * is what separates them.
+     *
+     * ABSENT ON A SET THAT RESOLVED ANY REP AT ALL, including one that
+     * resolved 1 of 10. Its absence is not a statement that the reps are
+     * right. Absent too on every set recorded before 1.18, because the value
+     * is frozen into the stored analysis when the set is recorded and nothing
+     * re-runs the segmenter at export time.
+     */
+    @SerialName("noRepsReason") val noRepsReason: String? = null,
 )
 
 @Serializable
