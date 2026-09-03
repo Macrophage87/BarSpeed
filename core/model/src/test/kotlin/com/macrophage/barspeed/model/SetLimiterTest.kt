@@ -320,4 +320,80 @@ class SetLimiterTest {
         val typed = phrase.fold("") { held, ch -> SetLimiter.sanitizeForTyping(held + ch) }
         assertEquals(phrase, SetLimiter.normalizeNote(typed))
     }
+
+    // ---- a set-up error is its own answer (#146) -----------------------------
+
+    /**
+     * The vocabulary can say the set was SET UP wrong, and that answer is
+     * neither form nor slip (#146).
+     *
+     * The motivating set is the owner's own: "stopped early on the first set
+     * as I was in a bad position. Will correct next time." #189 shipped eight
+     * answers and none of them is that one. `form` is form DEGRADING under
+     * load, which reads as reduce the load; `slip` is something going wrong
+     * mid-set; `outside` is an interruption with no training content at all.
+     * A set-up error is the lifter's own, is known before the muscle was
+     * tested, and is corrected next session at the SAME load -- the opposite
+     * prescription from the answer nearest it, which is what earns it a rung.
+     *
+     * Probed through [SetLimiter.ofStored] rather than by naming a member, so
+     * this fails on a vocabulary that has no such answer instead of failing
+     * to compile against one.
+     */
+    @Test
+    fun `a bad set-up is its own answer, not form and not slip`() {
+        val setup =
+            assertNotNull(
+                SetLimiter.ofStored("setup"),
+                "the vocabulary cannot say the set was set up wrong",
+            )
+        assertTrue(
+            setup != SetLimiter.FORM && setup != SetLimiter.SLIP && setup != SetLimiter.OUTSIDE,
+            "the set-up answer collides with an answer carrying a different prescription",
+        )
+    }
+
+    /**
+     * It is offered on the rep page and on the hold page, worded like no other
+     * tile.
+     *
+     * A hold is set up in a position too -- a bad hand position on a dead
+     * hang, a bench at the wrong height -- so this is not an answer the timed
+     * branch drops the way it drops pace. Two tiles reading the same words
+     * would be two tiles the lifter picks between at random.
+     */
+    @Test
+    fun `the set-up answer is offered on the rep page and on the hold page`() {
+        for (timed in listOf(false, true)) {
+            val tiles = SetLimiterScale.tiles(timed)
+            val setup =
+                assertNotNull(
+                    tiles.firstOrNull { it.limiter.stored == "setup" },
+                    "the reason page offers no set-up answer for timed=$timed",
+                )
+            assertEquals(SetLimiterGroup.PERFORMANCE, setup.group)
+            assertTrue(setup.label.isNotBlank(), "the set-up tile carries no wording")
+            assertTrue(
+                tiles.none { it.limiter != setup.limiter && it.label == setup.label },
+                "the set-up answer reads the same as another tile for timed=$timed",
+            )
+        }
+    }
+
+    /**
+     * It is drawn among the performance answers, before pain.
+     *
+     * The page draws its group boundary wherever the group changes, so a
+     * performance answer placed after pain would draw pain back among them and
+     * undo the separation #189 asks for in as many words.
+     */
+    @Test
+    fun `the set-up answer is drawn among the performance answers, before pain`() {
+        val order = SetLimiterScale.tiles(timed = false).map { it.limiter.stored }
+        val setup = order.indexOf("setup")
+        assertTrue(
+            setup >= 0 && setup < order.indexOf("pain"),
+            "the set-up answer is missing, or is drawn after pain: $order",
+        )
+    }
 }

@@ -192,4 +192,54 @@ class SchemaLimiterContractTest {
             )
         }
     }
+
+    /**
+     * The published vocabulary carries the set-up answer, and its own entry
+     * says how a coach reads it (#146).
+     *
+     * The equality above pins the two vocabularies to each other and would
+     * stay green if BOTH lost this answer, so it cannot stand for #146. This
+     * names the answer, and names the reading that is the whole reason for
+     * adding it: the set tested the set-up and not the muscle, so the numbers
+     * are not a capacity reading and the load stands next session. The word is
+     * looked for INSIDE that answer's own entry, because "capacity" already
+     * appears in the outside answer's.
+     */
+    @Test
+    fun `the published reason carries the set-up answer and says it is not a capacity reading`() {
+        val limiter = setProperties()["limiter"]!!.jsonObject
+        assertTrue(
+            "setup" in limiter["enum"]!!.jsonArray.map { it.jsonPrimitive.content },
+            "the published vocabulary cannot say the set was set up wrong",
+        )
+        val description = limiter["description"]!!.jsonPrimitive.content
+        val start = description.indexOf("setup:")
+        assertTrue(start >= 0, "the published description never explains the set-up answer: $description")
+        val end = description.indexOf("pain:", start)
+        assertTrue(end > start, "the set-up answer is not described before the pain answer")
+        val entry = description.substring(start, end)
+        assertTrue(
+            "capacity" in entry,
+            "the published set-up answer never says its numbers are not a capacity reading: $entry",
+        )
+    }
+
+    /**
+     * The version log names it under 1.18, the number this branch already
+     * opened and nothing has shipped.
+     *
+     * v0.1.49 shipped 1.17, so 1.18 takes further entries rather than minting
+     * 1.19 -- the rule the 1.13, 1.15 and 1.17 entries each state. A closed
+     * enum gaining a value is a change to the number even so: a reader
+     * validating against 1.18 as it stood before this rejects a document
+     * carrying the ninth answer.
+     */
+    @Test
+    fun `the 1_18 version log names the set-up answer under the open number`() {
+        val log = versionLog()
+        val start = log.indexOf("1.18 carries a THIRD change")
+        assertTrue(start >= 0, "the version log carries no third 1.18 entry")
+        val entry = log.substring(start)
+        assertTrue("`setup`" in entry, "the third 1.18 entry does not name the set-up answer: $entry")
+    }
 }
