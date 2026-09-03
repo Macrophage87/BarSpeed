@@ -109,6 +109,33 @@ class GuidePromptContractTest {
         )
     }
 
+    /**
+     * The prompt states the omission rule for the three geometry flags.
+     *
+     * The published schema has said since 1.12 that an absent `sensorOnStack`,
+     * `bodyweight` or `sensorInverted` is not a declared `false`. The prompt is
+     * the only statement of the contract anything actually sends anywhere, and
+     * it said nothing about absence at all -- so a model writing a plan from it
+     * leaves the key out meaning "false" and the app reads that as "no
+     * opinion", which on a seeded stack machine or a pull-up is the opposite
+     * answer. A rule stated only where nobody is pointed is not stated.
+     *
+     * Narrow, and said so: this cannot check the prompt teaches the rule well,
+     * only that the rule and the empty `sensorInverted` table are both in the
+     * text a lifter's clipboard receives.
+     */
+    @Test
+    fun `the plan prompt states what omitting a geometry flag means`() {
+        assertTrue(
+            "Omitting one is not the same as declaring it false" in prompt,
+            "the plan prompt never tells the model that an omitted geometry flag is not a declared false",
+        )
+        assertTrue(
+            "which no built-in exercise carries" in prompt,
+            "the plan prompt never says sensorInverted has no built-in default behind an omitted key",
+        )
+    }
+
     @Test
     fun `the plan prompt documents kind`() {
         // Red until the prompt is rewritten. kind is declarable from the commit

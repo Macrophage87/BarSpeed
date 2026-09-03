@@ -139,30 +139,37 @@ class PlanExerciseGeometryDeclarationTest {
         assertNull(exercise("back_squat", ""","kind":"isometric"""").kindOverride)
     }
 
-    // ---- the one that cannot say "omitted" ----------------------------------
+    // ---- all three can now say "omitted" ------------------------------------
 
     /**
-     * `sensorInverted` is a non-nullable `Boolean` on [PlanExerciseDef], so a
-     * plan that declared `false` and a plan that said nothing decode to the
-     * same value. There is no `?:` for [SetGeometryPolicy.resolve] to test and
-     * nothing downstream can recover the difference. That is the rest of #64.
+     * The third declaration can tell an omitted key from a declared `false` on
+     * the wire, which is where that difference has to exist before any
+     * precedence can act on it.
      *
-     * This test used to name THREE flags and to say the export publishes no
-     * provenance for any of them. That sentence is deleted rather than
-     * reworded: `sensorOnStack` is `Boolean?` as of #223 and `bodyweight` is
-     * `Boolean?` as of #227, an omitted key on either is a distinct state, and
-     * the export publishes a source for `sensorOnStack` (not `bodyweight` --
-     * see [GeometrySourceExport]'s KDoc for why).
+     * Read off the SERIALIZER's descriptor rather than off a decoded value,
+     * because a decoded value cannot express the difference while the property
+     * is a non-null `Boolean`: the assertion would not compile, and a test that
+     * fails to compile reds the build for something other than the defect. The
+     * descriptor states the wire contract either way, so this test reads the
+     * same before and after the widening.
+     *
+     * The test this replaces asserted the opposite -- that a declared `false`
+     * and an omitted key are one value, with nothing downstream able to recover
+     * the difference. It is deleted rather than reworded, the way the same
+     * sentence was deleted for `sensorOnStack` at #223 and for `bodyweight` at
+     * #227.
      */
     @Test
-    fun `one geometry flag cannot tell a declared false from an omitted key`() {
-        val declaredFalse = exercise("seated_row", ""","sensorInverted":false""")
-        val omitted = exercise("seated_row")
-        assertEquals(declaredFalse.sensorInverted, omitted.sensorInverted)
-        assertTrue(!omitted.sensorInverted)
+    fun `the sensorInverted declaration can express omission`() {
+        val d = PlanExerciseDef.serializer().descriptor
+        val i = (0 until d.elementsCount).first { d.getElementName(it) == "sensorInverted" }
+        assertTrue(
+            d.getElementDescriptor(i).isNullable,
+            "sensorInverted is not nullable, so an omitted key and a declared false are one value",
+        )
     }
 
-    /** The two that now can: null is not false, and false is not null. */
+    /** The other two: null is not false, and false is not null. */
     @Test
     fun `an omitted stack key decodes to null and a declared false to false`() {
         assertNull(exercise("seated_row").sensorOnStack)

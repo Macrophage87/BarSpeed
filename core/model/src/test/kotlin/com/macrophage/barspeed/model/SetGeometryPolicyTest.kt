@@ -120,24 +120,27 @@ class SetGeometryPolicyTest {
     }
 
     /**
-     * The one flag that still cannot express omission is assigned
-     * unconditionally, so a plan silently clears a built-in true. Pinned as it
-     * behaves, not as it ought to: latent today because no seed entry sets it,
-     * and the fix is to make it nullable on the plan side. That is the rest of
-     * #64 and is not done here.
+     * The third flag, and the last third of #64: an omitted `sensorInverted`
+     * leaves the built-in definition standing instead of clearing it.
      *
-     * This test named THREE flags until #223 made `sensorOnStack` nullable,
-     * and TWO until #227 made `bodyweight` nullable too. Each deleted
-     * assertion is not reworded: it is removed, and the opposite outcome is
-     * asserted in its own test below.
+     * [opinionated] is inverted and the plan says nothing about it, so a policy
+     * that assigns the declaration unconditionally publishes `false` for a
+     * machine the app itself defines as wired backwards -- and every phase
+     * label and every velocity on that set comes out reversed, with nothing in
+     * the export saying a plan decided it.
+     *
+     * Latent rather than shipping, and the distinction is worth keeping: no
+     * seed entry is inverted (`no built-in definition is inverted by
+     * construction` pins that), so nothing in the app reaches this today. It is
+     * the ad-hoc definitions and the next seeded cable machine that would.
      */
     @Test
-    fun `the one non-nullable flag is taken from the plan even when it said nothing`() {
+    fun `an omitted sensorInverted key leaves a built-in inversion standing`() {
         val out = SetGeometryPolicy.resolve(opinionated, declared("cable_row"))
-        assertEquals(false, out.sensorInverted, "a built-in true was cleared by an omitted key")
+        assertEquals(true, out.sensorInverted, "a built-in inversion was cleared by an omitted key")
     }
 
-    /** The two that can now: an omitted key leaves a built-in default standing. */
+    /** The other two: an omitted key leaves a built-in default standing. */
     @Test
     fun `an omitted stack key leaves a built-in stack mount standing`() {
         val plan = declared("cable_row")
