@@ -487,7 +487,8 @@ data class RawStreamEntity(
      * which every equality selector in this package would then miss -- and the
      * fix for that is prefix matching, which is the one idiom
      * [KIND_REST_BEFORE_HRM] exists to outlaw: it CONTAINS the string `hrm` and
-     * is a different population from [KIND_HRM]. A nullable column keeps every
+     * is a different STREAM from [KIND_HRM] -- it overlaps it by design since
+     * #178, so only the selection is disjoint. A nullable column keeps every
      * `kind` comparison an equality and makes selecting the analysed stream
      * explicit instead of string-derived.
      *
