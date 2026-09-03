@@ -42,6 +42,13 @@ class SchemaShortDeliveryContractTest {
     private fun exportVersionLog() = schema()["properties"]!!
         .jsonObject["schemaVersion"]!!.jsonObject["description"]!!.jsonPrimitive.content
 
+    private val shippedPrompt: String =
+        checkNotNull(
+            javaClass.getResourceAsStream("/kotlin/com/macrophage/barspeed/ui/screens/GuideScreen.kt"),
+        ) {
+            "GuideScreen.kt is not on the test classpath - see the include filter in core/model/build.gradle.kts"
+        }.readBytes().decodeToString()
+
     /** The phrase all three keys are made to carry, so one reading covers the case. */
     private val theCase = "too few frames to analyse"
 
@@ -162,6 +169,90 @@ class SchemaShortDeliveryContractTest {
         assertTrue(
             "#209" in log,
             "the published changelog does not name the issue the short-delivery change came from",
+        )
+    }
+
+    /**
+     * ROUND 2 FINDING 2. The published `analysedRole` description states the
+     * rule its Kotlin twin states, rather than the one #209 replaced.
+     *
+     * `SessionExport.kt`'s `analysedRole` KDoc already reads "delivered too
+     * few frames to analyse" / "delivered enough". The published copy still
+     * read "produced nothing" / "the unit that did", so the document a
+     * downstream reader is actually pointed at and the source stated two
+     * different rules for one key. Asserted as an ABSENCE over both halves of
+     * the old sentence and as a PRESENCE over both halves of the new one, so
+     * the description cannot go quiet about the case instead.
+     */
+    @Test
+    fun `the published analysed role states the rule its Kotlin twin states`() {
+        val text = sensorDescription("analysedRole").lowercase()
+
+        listOf(
+            "a unit that produced nothing",
+            "is analysed from the unit that did",
+        ).forEach { phrase ->
+            assertFalse(phrase in text, "the published analysedRole still states the pre-#209 rule: $phrase")
+        }
+        assertTrue(theCase in text, "the published analysedRole never says what too little delivery is")
+        assertTrue(
+            "delivered enough" in text,
+            "the published analysedRole never says what the unit it moves to did",
+        )
+    }
+
+    /**
+     * ROUND 2 FINDING 1. The published `analysedRole` enumerates THREE sets it
+     * can name a role absent from `present` on, not two.
+     *
+     * #209 created the third and the enumeration was not moved. An armed unit
+     * that delivered NOTHING beside a partner that delivered one to seven
+     * frames leaves `analysable` empty, so
+     * [SensorCapturePolicy.analysedStream] finds no candidate and keeps the
+     * armed role -- while `present` names the partner, because one frame is a
+     * file in the archive. That is the only one of the three where `present`
+     * is NOT empty, which is exactly the shape a reader would use the old
+     * "two situations" sentence to rule out.
+     */
+    @Test
+    fun `the published analysed role names the third set it can sit outside present on`() {
+        val text = sensorDescription("analysedRole").lowercase()
+
+        assertFalse(
+            "in two situations" in text,
+            "the published analysedRole still enumerates two sets it can sit outside present on",
+        )
+        assertTrue(
+            "in three situations" in text,
+            "the published analysedRole does not say how many sets it can sit outside present on",
+        )
+        assertTrue(
+            "stayed on the armed role" in text,
+            "the published analysedRole never names the set where nothing analysable arrived and present is not empty",
+        )
+    }
+
+    /**
+     * ROUND 2 FINDING 5. The shipped plan prompt stops opening the
+     * analysed-role rule with a clause its own next sentence contradicts.
+     *
+     * `PLAN_PROMPT` read "The app analyses a role that STREAMED wherever one
+     * did, so an analysed role absent from `present` never means ..." and then
+     * gave "or every unit that streamed sent fewer than eight frames" as one
+     * of the cases -- a unit that streamed, and was not analysed. The clause
+     * is deleted rather than reworded; the rest of the sentence was already
+     * true and is left alone. This is the copy an LLM is handed, so it is the
+     * one place the contradiction reaches a reader who has no source to check.
+     */
+    @Test
+    fun `the shipped prompt no longer opens the analysed role rule with a contradicted clause`() {
+        assertFalse(
+            "analyses a role that STREAMED wherever one did" in shippedPrompt,
+            "the shipped prompt still promises any streaming role is the analysed one",
+        )
+        assertTrue(
+            "every unit that streamed sent fewer than eight frames" in shippedPrompt,
+            "the shipped prompt stopped naming the case that contradicts the deleted clause",
         )
     }
 }
