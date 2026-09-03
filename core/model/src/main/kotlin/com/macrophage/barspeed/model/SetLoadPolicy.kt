@@ -1,5 +1,7 @@
 package com.macrophage.barspeed.model
 
+import java.util.Locale
+
 /**
  * Pure decisions about which load a set is recorded and pre-filled against.
  *
@@ -459,27 +461,68 @@ object SetLoadPolicy {
     /**
      * The load field re-rendered for a new display unit.
      *
-     * THIS BODY IS TODAY'S BEHAVIOUR AND IS WRONG. It returns [typed]
-     * unchanged, which is exactly what the app does now: tapping the kg/lb chip
-     * leaves the text alone and re-parses it under the new unit, so a field
-     * reading `100` with a kg chip becomes 100 POUNDS -- 45.36 kg -- and that
-     * is the number the set is recorded with (#77). It is written here, as a
-     * seam, so that the differential proving the defect is an assertion failure
-     * against a real function rather than a compile error against a missing
-     * one. The fix replaces this body and this paragraph.
+     * Tapping the kg/lb chip is the lifter asking to SEE the same weight in
+     * other units. Until this converted, the text was left alone and re-parsed
+     * under the new unit, so a field reading `100` with a kg chip became 100
+     * POUNDS -- 45.36 kg -- the moment the chip was tapped, and that was the
+     * number the set was recorded with. Load is metadata the IMU stream cannot
+     * reconstruct, so unlike a wrong derived figure the wrong number was
+     * permanent (#77).
      *
      * Text in, text out, because the field is a string and the string is the
      * declaration for an ad-hoc set. [typed] that names no number -- blank, a
-     * lone minus, a lifter mid-retype -- must pass through untouched rather
-     * than be replaced with a zero: a field stating nothing goes on stating
+     * lone minus, a lifter mid-retype -- passes through untouched rather than
+     * being replaced with a zero: a field stating nothing goes on stating
      * nothing, and this function has no business finishing someone's typing.
-     * [from] equal to [to] is the identity for the same reason. Those two
-     * clauses are the parts of the contract that are already true, and they are
-     * pinned now.
+     * [from] equal to [to] is the identity for the same reason.
+     *
+     * NOTHING HERE WRITES A STATED LOAD. [ConvertedLoad.kg] is reported so a
+     * caller can name the quantity the tap promised not to move; it is not a
+     * value to seed `statedLoadKg` with. That field means "the lifter said
+     * this", it is already in kilograms and therefore already right, and a
+     * chip tap is not a keystroke.
+     *
+     * NOT EXACT, AND THE INEXACTNESS IS BOUNDED AND DELIBERATE. The new text
+     * is snapped to [displayStep] of [to], so the kg the new text names can
+     * differ from [ConvertedLoad.kg] by up to half a step -- at most 0.125 kg
+     * converting to kg, at most 0.25 lb (0.113 kg) converting to lb. That is
+     * the same kind of lossiness `WeightUnit.inputValue` already has at every
+     * other seed site and that `WeightUnitTest` pins (#45); what changed is
+     * its size, from a factor of 2.2 to a tenth of a kilo. The alternative,
+     * rendering the exact conversion, puts `220.46226218` in an edit box the
+     * lifter reads at arm's length between sets.
+     *
+     * STABLE ON ITS OWN OUTPUT, which is the property that matters for a chip
+     * the lifter can tap twice. Every text this returns lies on a step
+     * lattice, and converting a lattice value out and back returns the same
+     * text -- swept over 0-400 kg in both directions by
+     * `SetLoadUnitToggleTest`. A hand-typed value off the lattice is quantised
+     * once, on the first tap, and never drifts again. The two steps cannot
+     * both be exactly invertible into each other, so which one absorbs the
+     * quantisation had to be chosen; the first tap absorbs it, because that is
+     * the tap where the lifter is looking at the number.
+     *
+     * RENDERED HERE RATHER THAN BY `WeightUnit.inputValue`, which quantises to
+     * 0.1 of the display unit and so cannot write a quarter at all: 8 lb
+     * converts to 3.75 kg, and `inputValue` gives `3.6` from the exact
+     * conversion or `3.8` from the quarter. A coarser grid than the one just
+     * chosen, applied after it.
      */
-    // [to] is unread because the seam ignores it, which IS the defect; the fix
-    // deletes this suppression along with the body below.
-    @Suppress("UnusedParameter")
-    fun convertedLoad(typed: String, from: WeightUnit, to: WeightUnit): ConvertedLoad =
-        ConvertedLoad(typed, from.parseToKg(typed))
+    fun convertedLoad(typed: String, from: WeightUnit, to: WeightUnit): ConvertedLoad {
+        val kg = from.parseToKg(typed)
+        if (kg == null || from == to) return ConvertedLoad(typed, kg)
+        val step = displayStep(to)
+        val snapped = Math.round(to.fromKg(kg) / step) * step
+        val text =
+            if (snapped == Math.floor(snapped)) {
+                snapped.toInt().toString()
+            } else {
+                // Two places, because the grid is quarters; trailing zeros go
+                // so 220.50 reads as 220.5. A value off the whole numbers has
+                // a non-zero second or first decimal by construction, so this
+                // can never leave a bare trailing point.
+                String.format(Locale.US, "%.2f", snapped).trimEnd('0')
+            }
+        return ConvertedLoad(text, kg)
+    }
 }
