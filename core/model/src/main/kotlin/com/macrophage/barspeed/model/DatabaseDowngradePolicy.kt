@@ -101,4 +101,54 @@ object DatabaseDowngradePolicy {
         } else {
             DatabaseOpenAction.OPEN
         }
+
+    /**
+     * The version the database actually has, from the two places that can say.
+     *
+     * Issue #113. [headerVersion] is the main file's own header, which in WAL
+     * mode is the version as of the last checkpoint and can be arbitrarily
+     * stale. [walVersion] is what [SqliteWal.committedUserVersion] recovered
+     * from the `-wal`, or null when the log carries no committed page-1 frame,
+     * which is the ordinary case.
+     *
+     * THE HIGHER OF THE TWO WINS, and this is a deliberate reversal of the
+     * tie-break [decide] takes for a version it cannot read at all. That
+     * function resolves doubt towards OPEN, because rescuing on an unreadable
+     * header would move a database aside on the strength of a guess. Here the
+     * two readings are both real and disagree, and the harms are not symmetric:
+     *
+     *  - RESCUING WHEN IT WAS NOT NEEDED moves the corpus into `files/rescued/`
+     *    and the app comes up empty. Bad, and recoverable -- every byte is on
+     *    disk, and the card offers to send it off the phone.
+     *  - MISSING A RESCUE lets Room open a newer file, which throws, because no
+     *    destructive fallback is in the chain. That is described as the safe
+     *    direction and it is safe for the BYTES; it is not safe for what a
+     *    lifter does next, because what an app that will not start invites is
+     *    an uninstall, and an uninstall takes the whole data directory.
+     *
+     * So the reading that detects a downgrade is preferred over the reading
+     * that misses one. In practice the two agree: a WAL frame cannot be older
+     * than the main file for the same page, so the maximum is the WAL's answer
+     * whenever the WAL has one. Taking the maximum rather than simply
+     * preferring the WAL costs nothing and means a scan that picked the wrong
+     * frame can still only fail towards detection.
+     *
+     * Null only when NEITHER says anything, which [decide] then reads as OPEN.
+     */
+    fun effectiveVersion(headerVersion: Int?, walVersion: Int?): Int? = when {
+        headerVersion == null -> walVersion
+        walVersion == null -> headerVersion
+        else -> maxOf(headerVersion, walVersion)
+    }
+
+    /**
+     * [decide] over both readings of the file. Issue #113.
+     *
+     * The three-argument form exists so the combination and the comparison are
+     * one call at the site that matters, rather than a caller in :core:data
+     * remembering to fold [effectiveVersion] in first. Nothing about the
+     * comparison changes; only what is compared.
+     */
+    fun decide(headerVersion: Int?, walVersion: Int?, compiledVersion: Int): DatabaseOpenAction =
+        decide(effectiveVersion(headerVersion, walVersion), compiledVersion)
 }
