@@ -37,9 +37,10 @@ enum class GeometrySource {
 }
 
 /**
- * Provenance for the six geometry values whose resolution has more than one
- * possible source. [GeometrySourceExport]'s KDoc is the one statement of
- * which values carry a source and why -- read it there, not here.
+ * Provenance for the seven geometry values whose resolution has more than one
+ * possible source. [GeometrySourceExport]'s KDoc, in `SessionExport.kt`, is
+ * the one statement of which values carry a source and why -- read it there,
+ * not here.
  *
  * `sensorOnStack` defaults to [GeometrySource.DEFAULT] rather than being
  * required, and that default is load-bearing rather than decorative: this
@@ -75,13 +76,30 @@ data class GeometrySources(
     val travelRatio: GeometrySource,
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val sensorOnStack: GeometrySource = GeometrySource.DEFAULT,
     /**
-     * NEUTRAL AT THIS COMMIT and not yet written by [SetGeometryPolicy.describe]
-     * -- introduced so `BodyweightProvenanceTest` compiles and fails on the
-     * answer rather than on the build. It carries no annotation yet either, so
-     * the pin that a defaulted word survives `encodeDefaults = false` reds
-     * here too. Both are the fix's job.
+     * Where `bodyweight` came from (1.18, #220), on the same terms
+     * `sensorOnStack` is stored and defaulted under.
+     *
+     * The default is load-bearing for the same reason: every row written by a
+     * build up to and including v0.1.49 holds a `sources` object without this
+     * key, and without a default, decoding one throws `MissingFieldException`
+     * -- a stored set becomes unreadable the moment this ships. The default
+     * cannot recover what those builds never captured; such a row re-exports
+     * `default` however the plan was written, permanently.
+     *
+     * `@EncodeDefault(ALWAYS)` for the reason stated above this field:
+     * `geometry.source` is a closed required object, so a key dropped by
+     * `encodeDefaults = false` makes the document invalid rather than smaller.
+     *
+     * This field carried LESS than the five above it when it was written:
+     * `PlanExerciseDef.bodyweight` was a non-nullable `Boolean`, so a declared
+     * `false` and an omitted key were one value and both published
+     * [GeometrySource.DEFAULT]. `#227` made the plan key `Boolean?` after this
+     * text was written, so the two ARE now distinguishable the way
+     * `sensorOnStack`'s pair is -- [SetGeometryPolicy.bodyweightSource] has not
+     * been updated to read them apart, and still answers [GeometrySource.DEFAULT]
+     * for both. See [SetGeometryPolicy.bodyweightSource].
      */
-    val bodyweight: GeometrySource = GeometrySource.DEFAULT,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val bodyweight: GeometrySource = GeometrySource.DEFAULT,
 )
 
 /**
@@ -241,6 +259,7 @@ object SetGeometryPolicy {
                 kind = source(declared?.kindOverride != null, seeded, inferable = true),
                 travelRatio = source(declared?.travelRatio != null, seeded, inferable = false),
                 sensorOnStack = stackSource(used.sensorOnStack, declared?.sensorOnStack),
+                bodyweight = bodyweightSource(used.bodyweight, declared?.bodyweight),
             ),
         )
     }
@@ -255,14 +274,36 @@ object SetGeometryPolicy {
      * two halves of one published fact from disagreeing.
      */
     /**
-     * Provenance for `bodyweight`, on [stackSource]'s rule and NEUTRAL AT THIS
-     * COMMIT: it answers [GeometrySource.DEFAULT] for every input, which is
-     * what makes `BodyweightProvenanceTest`'s differentials red rather than
-     * uncompilable. The reasoning for the answers it will give is written
-     * there.
+     * Provenance for the `bodyweight` value [used] already carries (#220).
+     *
+     * [stackSource]'s rule and deliberately not [resolve]'s: the value is read
+     * off the definition the set was recorded against, never re-decided from
+     * the id, so the published word cannot disagree with the published flag.
+     *
+     * [declared] is the plan's key for this exercise, null when there was no
+     * plan. WRITTEN when `PlanExerciseDef.bodyweight` was a non-nullable
+     * `Boolean`, so [declared] being `false` and being absent decoded to the
+     * same wire value and this function could not have told them apart even
+     * if it tried; the three answers below reflect that. `#227` made the plan
+     * key `Boolean?` afterwards, the same change #223 made for `sensorOnStack`,
+     * so [declared] `== false` is now a real declaration and no longer merely
+     * `used`'s absence -- this function has not been updated to read it that
+     * way, unlike [stackSource]. `declared == true` stays the only path to
+     * [GeometrySource.DECLARED]:
+     *
+     * 1. `true` -- a declaration.
+     * 2. otherwise, [used] true -- nothing declared true and the set was
+     *    body-weight work anyway, which only the app's own definition of that
+     *    lift can have supplied. [GeometrySource.SEEDED], never
+     *    [GeometrySource.INFERRED]: no words in the id are read.
+     * 3. otherwise [GeometrySource.DEFAULT] -- a declared `false` and an
+     *    omitted key both land here, though the type no longer forces that.
      */
-    @Suppress("UNUSED_PARAMETER")
-    fun bodyweightSource(used: Boolean, declared: Boolean?): GeometrySource = GeometrySource.DEFAULT
+    fun bodyweightSource(used: Boolean, declared: Boolean?): GeometrySource = when {
+        declared == true -> GeometrySource.DECLARED
+        used -> GeometrySource.SEEDED
+        else -> GeometrySource.DEFAULT
+    }
 
     private fun stackSource(used: Boolean, declared: Boolean?): GeometrySource = when {
         declared != null -> GeometrySource.DECLARED

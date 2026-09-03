@@ -1412,20 +1412,23 @@ data class GeometryExport(
  * here instead of restating it: three copies of the rule drifted, and two
  * review rounds running corrected them one file at a time.
  *
- * Two of [GeometryExport]'s eight values are missing here, for two DIFFERENT
- * reasons. `sensorInverted` is a non-nullable boolean in the plan format, so
- * a declared `false` and an omitted key are the same value and no source can
- * be told apart there -- stating one would be an invention. `bodyweight` is
- * not in that case: its plan key is `Boolean?` as of #227 ("Make bodyweight
- * nullable so an omitted key is not a silent false"), so it COULD carry a
- * source the same way the six published values do; none is published for it
- * because that would add a seventh required key to this object for a value no
- * consumer reads yet.
+ * ONE of [GeometryExport]'s eight values is missing here on purpose:
+ * `sensorInverted` is a non-nullable boolean in the plan format, so a declared
+ * `false` and an omitted key are the same value and no source can be told
+ * apart. Stating one would be an invention.
  *
- * `sensorOnStack` was a third bare-boolean exclusion until #223 made the plan
- * key nullable. The sentence naming three is deleted rather than reworded: it
- * is false for that one now, and an omitted key on a machine the app seeds is
- * answered from [ExerciseDef.STACK_MOUNTED_IDS] and published as `seeded`.
+ * `sensorOnStack` was a second until #223 made the plan key nullable, and an
+ * omitted key on a machine the app seeds is answered from
+ * [ExerciseDef.STACK_MOUNTED_IDS] and published as `seeded`.
+ *
+ * `bodyweight` was a third until 1.18 (#220), which publishes it. `#227`
+ * ("Make bodyweight nullable so an omitted key is not a silent false"), on
+ * `origin/main`, made `PlanExerciseDef.bodyweight` a `Boolean?` after #220's
+ * text below was written -- so a declared `false` and an omitted key ARE now
+ * two distinct states the app could tell apart, the same way #223 made
+ * `sensorOnStack`'s pair distinct. [SetGeometryPolicy.bodyweightSource] does
+ * not yet make that distinction; it still reads both as `default`, which is
+ * the gap #227 closed for `sensorOnStack` and has not closed here.
  */
 @Serializable
 data class GeometrySourceExport(
@@ -1435,6 +1438,7 @@ data class GeometrySourceExport(
     val kind: String,
     val travelRatio: String,
     val sensorOnStack: String,
+    val bodyweight: String,
 )
 
 @Serializable

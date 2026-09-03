@@ -375,14 +375,21 @@ class SetGeometryPolicyTest {
     /**
      * The provenance object's published shape, key by key, so a key arriving or
      * leaving is a decision somebody has to make rather than a diff nobody
-     * reads. `sensorOnStack` joined it in #223 and this test's name moved
-     * with it.
+     * reads. `sensorOnStack` joined it in #223 and `bodyweight` under 1.18
+     * (#220); this test's name has moved with each of them.
+     *
+     * It caught the second arrival, which is what it is for -- and it did so
+     * at the FIX rather than at the differential commit before it, because at
+     * that commit the new field was deliberately unannotated and
+     * `encodeDefaults = false` dropped it, leaving six keys and this pin
+     * green. Recorded rather than tidied away: the shape pin is not among the
+     * five reds that were pushed alone.
      */
     @Test
-    fun `the published provenance keys are exactly these six`() {
+    fun `the published provenance keys are exactly these seven`() {
         val g = SetGeometryPolicy.describe(opinionated, null)
         assertEquals(
-            setOf("startsWith", "concentric", "plane", "kind", "travelRatio", "sensorOnStack"),
+            setOf("startsWith", "concentric", "plane", "kind", "travelRatio", "sensorOnStack", "bodyweight"),
             json.parseToJsonElement(json.encodeToString(GeometrySources.serializer(), g.sources))
                 .jsonObject.keys,
         )

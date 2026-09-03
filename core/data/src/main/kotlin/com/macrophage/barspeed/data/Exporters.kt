@@ -510,6 +510,7 @@ class SessionExporter(
             kind = g.sources.kind.name.lowercase(),
             travelRatio = g.sources.travelRatio.name.lowercase(),
             sensorOnStack = g.sources.sensorOnStack.name.lowercase(),
+            bodyweight = g.sources.bodyweight.name.lowercase(),
         ),
     )
 

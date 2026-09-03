@@ -38,7 +38,8 @@
               "plane": "seeded",
               "kind": "seeded",
               "travelRatio": "seeded",
-              "sensorOnStack": "default"
+              "sensorOnStack": "default",
+              "bodyweight": "default"
             }
           },
           "sensors": {
@@ -145,7 +146,8 @@
               "plane": "seeded",
               "kind": "seeded",
               "travelRatio": "seeded",
-              "sensorOnStack": "default"
+              "sensorOnStack": "default",
+              "bodyweight": "default"
             }
           },
           "summary": { "meanConVel_mps": 0.55, "peakConVel_mps": 0.9, "meanEcc_s": 3.6, "meanCon_s": 0.95, "meanRom_m": 0.6, "romSpread_pct": 3.8 }
@@ -224,7 +226,8 @@
               "plane": "default",
               "kind": "inferred",
               "travelRatio": "default",
-              "sensorOnStack": "seeded"
+              "sensorOnStack": "seeded",
+              "bodyweight": "default"
             }
           },
           "repMarks": [1784397124000, 1784397128120, 1784397132060, 1784397136210, 1784397140340, 1784397144290, 1784397148480, 1784397152610, 1784397156900, 1784397161180],
