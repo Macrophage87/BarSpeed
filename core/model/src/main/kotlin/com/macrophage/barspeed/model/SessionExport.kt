@@ -585,6 +585,11 @@ data class SessionExport(
          * WHAT DOES NOT MOVE IS THE POINT. A voided set is published with its
          * load, its reps or hold, its prescription, its summary and its raw
          * streams intact. The mark is a reading instruction, not a redaction.
+         *
+         * NOR DOES THE SESSION'S HEART RATE MOVE. The session's
+         * `heartRate.avgBpm` and `maxBpm` are frozen at the session close and
+         * are NOT re-derived by a void, so they still include a voided set;
+         * recomputing them from the published sets will not reproduce them.
          */
         const val SCHEMA_VERSION = "1.18"
 

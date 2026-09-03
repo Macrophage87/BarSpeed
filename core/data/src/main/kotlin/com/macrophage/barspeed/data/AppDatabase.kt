@@ -65,9 +65,11 @@ import java.io.File
  *
  * SIXTEEN IS NOT SETTLED UNTIL THIS LANDS, and the check belongs at the
  * landing rather than here. `origin/claude/v0150-export-truth-2`, read at
- * `bde6a114228e888fd8944918692a25bb159f4e4d` on 2026-09-03 and confirmed
- * unlanded by `git merge-base --is-ancestor bde6a114 origin/main` failing,
- * also declares `DATABASE_VERSION = 16` with its own hop. Two unlanded lanes
+ * `0d07c2319d9f58e8b6e73e4648ecba40b9b552da` by
+ * `git ls-remote --heads origin refs/heads/claude/v0150-export-truth-2` on
+ * 2026-09-03, still declaring `DATABASE_VERSION = 16` at its line 66 and
+ * still unlanded -- `git merge-base --is-ancestor 0d07c231 origin/main`
+ * fails -- also declares its own hop. Two unlanded lanes
  * cannot both be 16, and whichever lands second is the one that must move: an
  * install that ran the other lane's 16 would find this schema under the same
  * number and Room would either skip the hop or fail its `TableInfo` check.
@@ -80,11 +82,16 @@ import java.io.File
  * this branch adds, and re-run the emulator upgrade exercise -- the hop being
  * verified would be a different hop.
  *
- * THAT PIN IS RE-READ EVERY ROUND AND NEVER CARRIED FORWARD. An earlier
- * round's commit body gave that lane's tip as `80f813bd` and the round-3
- * verdict gave it as `2a954f11`; both were true when written and both are
- * stale, which is the whole reason the SHA is re-read here rather than
- * quoted from either.
+ * THAT PIN IS RE-READ EVERY ROUND AND NEVER CARRIED FORWARD, and every
+ * value it has held so far has gone stale before the next round read it:
+ * `80f813bd` in an earlier commit body, `2a954f11` in the round-3 verdict,
+ * `bde6a114` in the sentence this one replaces, and `74819226` in the
+ * round-4 verdict. `bde6a114` was rewritten off that branch rather than
+ * landed -- it is an ancestor of neither the tip above nor `origin/main`.
+ * `74819226` is a real ancestor of the tip above but is no longer the tip.
+ * Every one of them was true when written. That is the point: this SHA is
+ * re-read from the remote at the moment of use and never quoted from a
+ * verdict, a commit body or this comment.
  */
 const val DATABASE_VERSION = 16
 

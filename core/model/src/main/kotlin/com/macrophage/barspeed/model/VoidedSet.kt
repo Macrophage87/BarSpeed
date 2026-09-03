@@ -37,6 +37,13 @@ enum class SetPlace {
  * There is no `countsAsASession` field because nothing should read one; if a
  * later round decides a fully-voided session should stop counting, it is a
  * new field here and not a fifth boolean at the call site.
+ *
+ * Nor a session's heart rate. `endSession` freezes `hrAvgBpm` and `hrMaxBpm`
+ * over every set row and voiding does not re-derive them, so both go on
+ * including a voided set's beats -- for the reason above -- and the export's
+ * `heartRate` block and the session detail header publish them unchanged.
+ * That is the SECOND exclusion, and it was unnamed until round 5 named it:
+ * the list above claimed one exclusion and had two.
  */
 data class VoidedSetEffects(
     /**
