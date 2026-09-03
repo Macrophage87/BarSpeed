@@ -1,10 +1,5 @@
-package com.macrophage.barspeed.record
+package com.macrophage.barspeed.model
 
-import com.macrophage.barspeed.model.ArmedDelivery
-import com.macrophage.barspeed.model.ConnectionState
-import com.macrophage.barspeed.model.ImuSample
-import com.macrophage.barspeed.model.RecordedSensors
-import com.macrophage.barspeed.model.SensorRole
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -17,25 +12,30 @@ import kotlin.test.assertTrue
  * Which buffer [armedCaptureOf] hands the DSP, and what the row it builds says
  * about that choice (#207).
  *
- * THE DECISION IS NOT HERE. [com.macrophage.barspeed.model.SensorCapturePolicy]
- * decides which role is analysed and whether that was a fallback, and
- * `SensorCapturePolicyTest` in `:core:model` pins it. What lives in `:app`, and
- * what this file pins, is the step after: turning a role into the LIST OF
- * SAMPLES the analysis actually runs on, and into the second capture's role and
- * rows. That is the pairing a policy test cannot see, and the one whose failure
- * mode is silent -- a right role beside the wrong buffer publishes a summary of
- * one sensor under the other one's name.
+ * THE ROLE DECISION IS NOT HERE. [SensorCapturePolicy] decides which role is
+ * analysed and whether that was a fallback, and `SensorCapturePolicyTest` pins
+ * it. What this file pins is the step after: turning a role into the LIST OF
+ * SAMPLES the analysis actually runs on, and into the second capture's role
+ * and rows. That is the pairing a policy test cannot see, and the one whose
+ * failure mode is silent -- a right role beside the wrong buffer publishes a
+ * summary of one sensor under the other one's name.
  *
- * IT HAD NOTHING RUNNING AGAINST IT UNTIL THIS FILE. Round 3 of #207 found that
- * `samples = decision.role?.let { byRole[it] } ?: analysedBuffer` could be cut
- * back to `analysedBuffer` -- the shipped defect, restored -- with the whole
- * suite still green, because no test on the CI path reached [armedCaptureOf] at
- * all. `AnalysedRoleFallbackTest` in `:core:data` re-types the same four steps
- * against its own copy of them, and a mirror agrees with itself.
+ * IT HAD NOTHING RUNNING AGAINST IT UNTIL ROUND 4 OF #207 WROTE IT. Round 3 of
+ * that issue found that `samples = decision.role?.let { byRole[it] } ?:
+ * analysedBuffer` could be cut back to `analysedBuffer` -- the shipped defect,
+ * restored -- with the whole suite still green, because no test on the CI path
+ * reached [armedCaptureOf] at all. `AnalysedRoleFallbackTest` in `:core:data`
+ * re-types a mirror of the same steps, and a mirror agrees with itself.
  *
- * REACHABLE ONLY BECAUSE `app/build.gradle.kts` PINS THE TEST JVM TO 21, for
- * the reason `AppendedSlotTest` states: [ImuSample] and [RecordedSensors] are
- * `:core:model` types at class file 65 and `:app` is `jvmToolchain(17)`.
+ * THE FILE MOVED FROM `:app` TO `:core:model` AT #212, with the function it
+ * drives. Two sentences it used to carry are DELETED rather than reworded,
+ * because the move made them false: that what it pins is what "lives in
+ * `:app`", and that it is reachable only because `app/build.gradle.kts` pins
+ * `:app`'s test JVM to 21. Neither applies to a `:core:model` test, which runs
+ * on 21 because the module is `jvmToolchain(21)`. Three of the file's thirteen
+ * tests could NOT move: they drive `RecordState.captureAt` and
+ * `RecordState.soleSilenceOver`, which are `:app` extensions on an `:app`
+ * type, and they are now `CaptureAtTest` in `app/src/test`.
  */
 class ArmedCaptureTest {
     private fun samples(vararg atMs: Long): List<ImuSample> = atMs.map { t ->
@@ -56,7 +56,7 @@ class ArmedCaptureTest {
     /**
      * A capture of [n] frames at 10 ms, which is a stream the analysis can be
      * pointed at whenever [n] reaches
-     * [com.macrophage.barspeed.model.SensorCapturePolicy.MIN_ANALYSABLE_FRAMES].
+     * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES].
      *
      * Every fixture below that stands for a unit that STREAMED is built from
      * this rather than from a hand-listed two or three timestamps. #209 is the
@@ -321,156 +321,5 @@ class ArmedCaptureTest {
 
         assertSame(only, capture.samples, "the capture was dropped on a set with no sensor declaration")
         assertNull(capture.sensors, "a declaration was invented for a set whose one unit delivered")
-    }
-
-    /**
-     * DIFFERENTIAL, issue #224. The set-end path ASKS about the one link, and
-     * the answer reaches the row.
-     *
-     * A second pin over the same fix, and it exists because a mutation survived
-     * the first one. Deleting the argument [captureAt] passes down --
-     * `soleSilenceOver(startedAtMs, endedAtMs)` cut to `null` -- left every test
-     * in this file green, because they all call [armedCaptureOf] directly and
-     * nothing reached the caller. That is the shape round 3 of #207 found in
-     * this same function and the reason this file was written at all; finding
-     * it again one call up is what a mutation table is for.
-     *
-     * [RecordState] is constructed here rather than mocked: every one of its
-     * properties is a pure Kotlin or `:core:model` type with a default, so the
-     * four that matter -- the paired list, the preference, the link state and
-     * the frame instant -- can be stated and the rest left alone.
-     *
-     * The unit is `Connected` and has never delivered, and the set ran for a
-     * minute, so the reading is [ArmedDelivery.LINKED_SILENT]: the state
-     * field-37 drew a connected indicator for. Whether a real WT901 produces it
-     * is [Field] and is not asserted here.
-     */
-    @Test
-    fun `the set end path asks about the one link and freezes the answer onto the row`() {
-        val address = "AA:BB:CC:DD:EE:01"
-        val state =
-            RecordState(
-                pairedImuAddresses = listOf(address),
-                preferredImuAddress = address,
-                imuState = ConnectionState.Connected("WT901"),
-                imuFrameAtMs = null,
-            )
-
-        val capture =
-            state.captureAt(
-                armed = null,
-                secondaryRole = null,
-                analysedBuffer = emptyList(),
-                secondaryBuffer = emptyList(),
-                startedAtMs = 1_000L,
-                endedAtMs = 61_000L,
-            )
-
-        val sensors = assertNotNull(capture.sensors, "the set end path never asked what the one link was doing")
-        assertEquals(ArmedDelivery.LINKED_SILENT, sensors.soleSilent, "the reading did not reach the row")
-        assertEquals(1, sensors.count, "a set that armed one unit recorded another number")
-        assertEquals(emptyList(), sensors.expected, "a role was invented for a stream that carries none")
-    }
-
-    /**
-     * DIFFERENTIAL, issue #224. The control at the same call: a one-sensor set
-     * whose unit was delivering when it ended stores nothing at all.
-     *
-     * What keeps every ordinary single-sensor set byte-identical. The frame is
-     * one second before the set ended, inside `ArmedSilencePolicy`'s window, so
-     * the link reads as delivering and there is nothing to say.
-     */
-    @Test
-    fun `the set end path stores nothing when the one link was delivering`() {
-        val address = "AA:BB:CC:DD:EE:01"
-        val only = samples(0L, 10L)
-        val state =
-            RecordState(
-                pairedImuAddresses = listOf(address),
-                preferredImuAddress = address,
-                imuState = ConnectionState.Connected("WT901"),
-                imuFrameAtMs = 60_000L,
-            )
-
-        val capture =
-            state.captureAt(
-                armed = null,
-                secondaryRole = null,
-                analysedBuffer = only,
-                secondaryBuffer = emptyList(),
-                startedAtMs = 1_000L,
-                endedAtMs = 61_000L,
-            )
-
-        assertNull(capture.sensors, "a declaration was invented for a set whose one unit delivered")
-        assertEquals(only, capture.samples, "the capture was dropped on an ordinary one-sensor set")
-    }
-
-    /**
-     * DIFFERENTIAL, issue #224 round 1, finding 1. A one-sensor set that
-     * STREAMED and then lost its link stores no declaration at all.
-     *
-     * THE DEFECT THIS PINS. `soleSilenceOver` reads the link's state and its
-     * last frame instant and nothing else, and `deliveryOf` tests a fixed
-     * `ArmedSilencePolicy.SILENT_AFTER_MS` window ending when the set ended.
-     * So a unit that fed the whole set and dropped in its last seconds reads
-     * `LINKED_SILENT`, and before this pin that word was written onto a row
-     * sitting beside a full summary and a real `imu.csv`. The archive then
-     * said the one unit delivered nothing while the archive itself held its
-     * stream -- one document contradicting itself about one set, which is
-     * worse than saying nothing, because a reader has no way to tell which
-     * half to believe.
-     *
-     * WHAT DECIDES IT IS THE BUFFER, not a second link reading. The buffer is
-     * the same source `SensorCapturePolicy.present` is read from for a
-     * role-keyed set, so the roleless set is judged by the fact the role-keyed
-     * one is judged by rather than by a near neighbour of it.
-     *
-     * The fixture: one paired unit, `Connected`, last frame at 40 s on a set
-     * that ran 1 s to 61 s -- twenty seconds past the window, so the reading
-     * is `LINKED_SILENT` and is NOT the reason nothing is stored. Twelve
-     * frames are in the buffer. Only the buffer can make this pass.
-     *
-     * THE FIXTURE GREW FROM FOUR FRAMES TO TWELVE at #209, and the sentence
-     * saying a hundred samples were in it is deleted rather than reworded: it
-     * was false when it was written and four frames was never a stream.
-     * Twelve is above `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES`, so the set
-     * this pins is one whose unit really did feed an analysable capture --
-     * which is what "streamed and then lost its link" has to mean for the pin
-     * to be about what its name says.
-     */
-    @Test
-    fun `a one-sensor set that streamed and then lost its link stores no declaration`() {
-        val address = "AA:BB:CC:DD:EE:01"
-        val streamed = stream(12)
-        val state =
-            RecordState(
-                pairedImuAddresses = listOf(address),
-                preferredImuAddress = address,
-                imuState = ConnectionState.Connected("WT901"),
-                imuFrameAtMs = 40_000L,
-            )
-
-        assertEquals(
-            ArmedDelivery.LINKED_SILENT,
-            state.soleSilenceOver(1_000L, 61_000L),
-            "the fixture does not reach the state this case is about",
-        )
-
-        val capture =
-            state.captureAt(
-                armed = null,
-                secondaryRole = null,
-                analysedBuffer = streamed,
-                secondaryBuffer = emptyList(),
-                startedAtMs = 1_000L,
-                endedAtMs = 61_000L,
-            )
-
-        assertNull(
-            capture.sensors,
-            "a set whose one unit filled the buffer was recorded as having delivered nothing",
-        )
-        assertEquals(streamed, capture.samples, "the capture was dropped on a set that streamed")
     }
 }

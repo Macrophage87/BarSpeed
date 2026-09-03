@@ -5,6 +5,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.model.DualShortfall
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedSensors
+import com.macrophage.barspeed.model.SecondaryCapture
 import com.macrophage.barspeed.model.SensorRole
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf

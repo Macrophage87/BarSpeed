@@ -7,6 +7,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedSensors
+import com.macrophage.barspeed.model.SecondaryCapture
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.StartPhase
@@ -305,7 +306,8 @@ class AnalysedRoleFallbackTest {
     /**
      * The record path's own composition, mirrored rather than executed.
      *
-     * `armedCaptureOf` in `RecordViewModel.kt` builds the same four decisions,
+     * `armedCaptureOf` -- in `ArmedCapture.kt` in `:core:model` since #212, and
+     * in `RecordViewModel.kt` before that -- builds the same four decisions,
      * in the same order, from a copy of this code rather than from this code:
      * the armed roles keyed to their buffers, the analysable roles by
      * [SensorCapturePolicy.analysable] (#209) -- which this mirror does NOT
@@ -316,9 +318,10 @@ class AnalysedRoleFallbackTest {
      * corrected declaration. What is verified HERE is the composition, not
      * that `:app` performs it.
      *
-     * That other half is `ArmedCaptureTest`, in `app/src/test/`, added in
-     * round 4 of #207: it executes `armedCaptureOf` itself. The sentence this
-     * KDoc used to carry -- that `armedCaptureOf` lives in `:app` where no
+     * That other half is `ArmedCaptureTest`, added in round 4 of #207: it
+     * executes `armedCaptureOf` itself. It was in `app/src/test/` and is in
+     * `core/model/src/test/` since #212, which moved the function. The sentence
+     * this KDoc used to carry -- that `armedCaptureOf` lives in `:app` where no
      * test on the CI path reaches `RecordViewModel`, so the record half is
      * compile- and lint-gated only -- was true when it was written and is not
      * true now. It is deleted rather than reworded.

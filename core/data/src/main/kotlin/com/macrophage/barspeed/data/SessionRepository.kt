@@ -12,8 +12,8 @@ import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.ResolvedGeometry
+import com.macrophage.barspeed.model.SecondaryCapture
 import com.macrophage.barspeed.model.SensorCapturePolicy
-import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
@@ -211,21 +211,6 @@ data class CompletedSet(
      * derived shortfall and stays exactly that.
      */
     val failedByLifter: Boolean? = null,
-)
-
-/**
- * The stream from the accelerometer that is not analysed, with the role that
- * identifies it.
- *
- * Non-null role by construction -- see [CompletedSet.secondary]. The samples
- * may still be empty, which is the armed-but-absent case: the unit was
- * declared, its battery was flat, and no row is written for it. That is a
- * different fact from the set not having been armed for it at all, and
- * [CompletedSet.sensors] is what keeps the two apart.
- */
-data class SecondaryCapture(
-    val role: SensorRole,
-    val samples: List<ImuSample>,
 )
 
 class SessionRepository(

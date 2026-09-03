@@ -19,9 +19,11 @@ import kotlin.test.assertTrue
  * one -- counts swapped between roles would move the readout onto the silent
  * unit and leave it there, on exactly the sets where nothing else is wrong.
  *
- * It is [ArmedCaptureTest]'s argument for existing, applied to the live half of
- * the same question, and it is reachable for the same reason: `:app`'s test JVM
- * is pinned to 21, so [RecordedSensors] loads.
+ * It is `ArmedCaptureTest`'s argument for existing -- that file is in
+ * `:core:model` since #212, with the function it drives -- applied to the live
+ * half of the same question. `liveFeedOf` is still in `:app`, so this file is
+ * reachable only because `:app`'s test JVM is pinned to 21 and
+ * [RecordedSensors] therefore loads.
  */
 class LiveFeedSourceTest {
     @Test
