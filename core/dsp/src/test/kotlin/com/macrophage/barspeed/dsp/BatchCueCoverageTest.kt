@@ -337,9 +337,10 @@ class BatchCueCoverageTest {
         //
         // A CORRECTION THIS FILE OWES THAT MEASUREMENT. Its method note said
         // the start rule and the midpoint rule "agree with each other and
-        // disagree with" the end rule. That was measured on the LIVE tracker,
-        // where a counted rep is an instant. It is FALSE of the batch path,
-        // where a span is a run seconds long: the three rules disagree
+        // disagree with" the end rule. That claim is withdrawn in its own
+        // file too: start and midpoint differ on
+        // field-legcurl-1030-12rep-c. It is more wrong here, where a span is
+        // a run seconds long rather than an instant: the three rules disagree
         // per-capture on SEVENTEEN of the twenty captures here -- "disagree"
         // meaning the (matched, empty, doubled, stray) tuple is not identical
         // under all three -- measured at this commit by running the three
