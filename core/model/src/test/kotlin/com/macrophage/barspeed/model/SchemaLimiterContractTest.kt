@@ -41,6 +41,24 @@ class SchemaLimiterContractTest {
     }
 
     /**
+     * The text of ONE "1.18 carries a &lt;ORDINAL&gt; change" paragraph, bounded
+     * at the next such marker rather than run to the end of the whole log.
+     *
+     * Unbounded, `"setup" in log.substring(start)` is satisfied by any LATER
+     * paragraph too, so a rebase that leaves two paragraphs both claiming the
+     * same ordinal -- exactly what #64's merge with `main`'s `voided` THIRD
+     * entry produced here before it was corrected -- passes silently as long
+     * as the word appears somewhere downstream. Bounding to the next marker
+     * makes the assertion about THIS paragraph and nothing after it.
+     */
+    private fun paragraphAt(log: String, marker: String): String {
+        val start = log.indexOf(marker)
+        assertTrue(start >= 0, "the version log carries no entry matching \"$marker\"")
+        val next = log.indexOf("1.18 carries a", start + marker.length)
+        return if (next < 0) log.substring(start) else log.substring(start, next)
+    }
+
+    /**
      * The published export declares the reason, and declares it CLOSED to
      * exactly the answers the app can write.
      *
@@ -233,18 +251,22 @@ class SchemaLimiterContractTest {
      * enum gaining a value is a change to the number even so: a reader
      * validating against 1.18 as it stood before this rejects a document
      * carrying the ninth answer.
+     *
+     * FOURTH, not THIRD, since #64's rebase onto `main` merged in #60's
+     * `voided`/`voidReason` entry ahead of this one -- main's own THIRD
+     * 1.18 entry is the void mark, landed there first, so this branch's
+     * set-up answer and #191's widening both shift one place down. The
+     * ordinal names the position in the merged log, not the order either
+     * branch wrote its own paragraph in.
      */
     @Test
     fun `the 1_18 version log names the set-up answer under the open number`() {
-        val log = versionLog()
-        val start = log.indexOf("1.18 carries a THIRD change")
-        assertTrue(start >= 0, "the version log carries no third 1.18 entry")
-        val entry = log.substring(start)
-        assertTrue("`setup`" in entry, "the third 1.18 entry does not name the set-up answer: $entry")
+        val entry = paragraphAt(versionLog(), "1.18 carries a FOURTH change")
+        assertTrue("`setup`" in entry, "the fourth 1.18 entry does not name the set-up answer: $entry")
     }
 
     /**
-     * The version log names #191's widening under a FOURTH 1.18 entry, so a
+     * The version log names #191's widening under a FIFTH 1.18 entry, so a
      * reader of the published document (not just the Kotlin KDoc it is
      * copied from) is told that a non-null `limiter` no longer implies
      * `failed`.
@@ -252,20 +274,23 @@ class SchemaLimiterContractTest {
      * The Kotlin KDoc on [SessionExport.SCHEMA_VERSION] already carries this
      * paragraph; nothing pinned the PUBLISHED schema to it, which is why the
      * omission there passed CI. Round 1 of #191's review found the drift.
+     *
+     * FIFTH, not FOURTH: #64's rebase onto `main` inserted #60's `voided`
+     * entry as the merged log's THIRD paragraph, which pushed this branch's
+     * own set-up answer to FOURTH and this widening to FIFTH. The ordinal is
+     * a position in the merged log, re-verified against the rebased tree
+     * rather than carried from the pre-rebase branch.
      */
     @Test
-    fun `the 1_18 version log names the fourth entry and says limiter may appear on a set that did not fail`() {
-        val log = versionLog()
-        val start = log.indexOf("1.18 carries a FOURTH change")
-        assertTrue(start >= 0, "the version log carries no fourth 1.18 entry")
-        val entry = log.substring(start)
+    fun `the 1_18 version log names the fifth entry and says limiter may appear on a set that did not fail`() {
+        val entry = paragraphAt(versionLog(), "1.18 carries a FIFTH change")
         assertTrue(
             "did NOT fail" in entry || "did not fail" in entry,
-            "the fourth 1.18 entry does not say limiter may appear on a set that did not fail: $entry",
+            "the fifth 1.18 entry does not say limiter may appear on a set that did not fail: $entry",
         )
         assertTrue(
             "#191" in entry,
-            "the fourth 1.18 entry does not name the issue that widened the question: $entry",
+            "the fifth 1.18 entry does not name the issue that widened the question: $entry",
         )
     }
 

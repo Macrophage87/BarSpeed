@@ -733,9 +733,15 @@ data class SessionExport(
          * holding the answer's own name, so `DATABASE_VERSION` stays at 15
          * and no migration is owed.
          *
-         * 1.19 carries a FIFTH change, under the same number and for the
+         * 1.19 carries a SIXTH change, under the same number and for the
          * reason the entries above state -- 1.19 is unreleased, and a number
-         * takes further entries until it ships. `limiter` and `limiterNote`
+         * takes further entries until it ships. THIS PARAGRAPH AND THE SET-UP
+         * ANSWER ABOVE IT both read FIFTH after the rebase that merged this
+         * branch onto `main`, so a reader asking for the fifth 1.19 entry
+         * found two different answers; the set-up answer keeps FIFTH and this
+         * widening is SIXTH. The ordinal names a position in the merged log,
+         * re-verified against the rebased tree rather than carried from
+         * before the rebase. `limiter` and `limiterNote`
          * may now appear on a set that did NOT fail (#191): a completed set
          * the lifter rated at the counted end, `rpe` 7 through 10, is asked
          * the same question the failed set has been asked since #189, and
