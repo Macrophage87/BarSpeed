@@ -48,10 +48,20 @@ import kotlin.test.assertNull
  * surface no test on this repo's CI path can reach, so the fix would be
  * compile-gated only; and it answers a lifter who has just corrected the load
  * with a notification rather than with the load, leaving the correction to be
- * retyped on every remaining set. Visibility is not lost by choosing the
- * offset: a carried load never touches `plannedLoad_kg`, so every set it
- * reaches renders as a deviation against the plan's own figure on the Up next
- * card and in the export.
+ * retyped on every remaining set.
+ *
+ * THE SENTENCE THAT STOOD HERE CLAIMED "VISIBILITY IS NOT LOST BY CHOOSING
+ * THE OFFSET" AND IS DELETED RATHER THAN REWORDED, #143 round 2. It was true
+ * of the Up next card and the export -- a carried load never touches
+ * `plannedLoad_kg`, so every set it reaches still renders as a deviation
+ * there -- but PlanValueCaption's own reach sentence is a THIRD visibility
+ * surface the argument did not check, and unlike the other two it names a
+ * SPECIFIC number: "the rest of this exercise runs $shown". On a stepping
+ * block that number is only true of the very next set, so the sentence was
+ * wrong exactly where this file's offset carry made it reachable, and
+ * "visibility is not lost" was false of the one surface a lifter reads
+ * mid-set. `PlanValueCaptionContractTest`'s stepping-block differentials are
+ * where that is fixed.
  *
  * ## Red at this commit
  *
@@ -64,6 +74,21 @@ import kotlin.test.assertNull
  * flat-block carries, the flat block's bit-for-bit identity, the block edge,
  * the mirror null, and the empty statement -- are the behaviour the fix does
  * not move, and are green both sides of it.
+ *
+ * ## Round 2: the warm-up opener is not a step (#143)
+ *
+ * A warm-up opener declares a load DIFFERENT from its working sets BY
+ * DESIGN -- lighter, so the lifter can move before the working weight is on
+ * the bar -- not as a step in a progression the way 45 / 55 / 65 is. A
+ * correction stated on the opener, rounding it to the plates the rack
+ * actually has, is not a distance the working sets should be shifted by, and
+ * until this round the function above could not tell the two apart: any pair
+ * of differing declarations was read as a step, warm-up or not.
+ * [SetLoadPolicy.standingStatedAddedKg]'s `finishedWarmup`/`nextWarmup`
+ * parameters are the guard, checked only on the branch that computes a
+ * shift -- the equal-declaration and no-next-declaration branches above
+ * already carry the statement through unchanged, and a warm-up whose own
+ * declaration matches the working weight has corrected nothing to exclude.
  */
 class ProgressiveBlockCarryTest {
     /**
@@ -420,6 +445,78 @@ class ProgressiveBlockCarryTest {
                 bodyweight = false,
                 finishedWarmup = false,
                 nextWarmup = false,
+            ),
+        )
+    }
+
+    /**
+     * RED before the fix, #143 round 2. A warm-up opener declared 20 kg; the
+     * rack only has plates for 22.5, so the lifter states that. The first
+     * working set is declared 60 -- a designed jump, not a step -- and must
+     * not be offered 62.5: the opener's own rounding is not a distance the
+     * working weight should move by. Null is offered here rather than
+     * asserting 60 directly so this pin is about the CARRY, not about
+     * `seedAddedKg`'s separate answer for what fills the box when nothing
+     * carries.
+     */
+    @Test
+    fun `a warm-up opener's correction does not shift the working set it steps to`() {
+        assertNull(
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 22.5,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = 20.0,
+                nextDeclaredAddedKg = 60.0,
+                bodyweight = false,
+                finishedWarmup = true,
+                nextWarmup = false,
+            ),
+        )
+    }
+
+    /**
+     * Green before the fix and after it, characterizing the guard's scope. A
+     * warm-up opener declared the SAME load as the working set that follows
+     * it -- an activation set at working weight, marked warmup for RPE
+     * purposes rather than for a lighter load -- has corrected nothing to
+     * exclude: the equal-declaration branch above already carries the
+     * statement through untouched, before the warmup check is ever reached.
+     */
+    @Test
+    fun `a warm-up opener declared at the working weight still carries its correction`() {
+        assertEquals(
+            62.5,
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 62.5,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = 60.0,
+                nextDeclaredAddedKg = 60.0,
+                bodyweight = false,
+                finishedWarmup = true,
+                nextWarmup = false,
+            ),
+        )
+    }
+
+    /**
+     * RED before the fix. The guard is scoped to the warm-up-TO-working
+     * transition specifically, not to "a warm-up is involved" -- a ramp of
+     * two warm-up sets before the working weight is a progression in exactly
+     * the sense 45 / 55 / 65 is, and a correction stated on the first warm-up
+     * still steps onto the second one.
+     */
+    @Test
+    fun `a correction still steps from one warm-up to the next`() {
+        assertEquals(
+            32.0,
+            SetLoadPolicy.standingStatedAddedKg(
+                statedAddedKg = 22.0,
+                sameExerciseBlock = true,
+                lastDeclaredAddedKg = 20.0,
+                nextDeclaredAddedKg = 30.0,
+                bodyweight = false,
+                finishedWarmup = true,
+                nextWarmup = true,
             ),
         )
     }

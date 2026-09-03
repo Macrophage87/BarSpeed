@@ -90,6 +90,57 @@ class PlanValueCaptionContractTest {
     }
 
     /**
+     * RED before the fix, #143 round 2's own scenario. Plan 45 / 55 / 65
+     * opened at 50: the correction DOES carry (#143), but the literal $shown
+     * figure -- 50 -- does not, because the plan's own next step is 55 and the
+     * set after THAT would read 60, not 50. The reach sentence asserts a
+     * fixed continuing number, so it is withheld once the plan itself steps,
+     * and the export sentence is used instead -- true of this box regardless
+     * of whether the value reaches further.
+     */
+    @Test
+    fun `a stepping block does not claim a fixed number carries forward`() {
+        assertEquals(
+            "Plan says 45 kg - your change is recorded in the export",
+            PlanValueCaption.load(
+                adHoc = false,
+                added = false,
+                bodyweight = false,
+                unit = WeightUnit.KG,
+                plannedAddedKg = 45.0,
+                nextDeclaredAddedKg = 55.0,
+                shownAddedKg = 50.0,
+                standsForLaterSets = true,
+            ),
+        )
+    }
+
+    /**
+     * Green before the fix and after it: no next declaration at all -- the
+     * ad-hoc tail of the plan, or the last set of the exercise -- is not
+     * stepping, so the reach sentence still names $shown. `standingKg` agrees:
+     * with nextDeclaredAddedKg null, SetLoadPolicy.standingStatedAddedKg's
+     * "nothing prescribed for the coming set to yield to" branch returns the
+     * statement unshifted, so the box really would read $shown.
+     */
+    @Test
+    fun `a block with no next declaration still claims the fixed number`() {
+        assertEquals(
+            "Plan says 45 kg - the rest of this exercise runs 50 kg unless the plan changes it",
+            PlanValueCaption.load(
+                adHoc = false,
+                added = false,
+                bodyweight = false,
+                unit = WeightUnit.KG,
+                plannedAddedKg = 45.0,
+                nextDeclaredAddedKg = null,
+                shownAddedKg = 50.0,
+                standsForLaterSets = true,
+            ),
+        )
+    }
+
+    /**
      * RED before the fix. On the last set of a block, and wherever the plan
      * prescribes a different number next, the statement reaches no further --
      * so the reach sentence would be false and the prep adjuster's sentence is
@@ -242,6 +293,26 @@ class PlanValueCaptionContractTest {
         )
     }
 
+    /**
+     * RED before the fix. The reps box's own stepping case: a descending
+     * scheme of 10 / 8 / 6 opened at 9 has corrected by -1, and the reach
+     * sentence must not claim "runs 9" when set 3 is actually offered 5.
+     */
+    @Test
+    fun `a stepping rep scheme does not claim a fixed count carries forward`() {
+        assertEquals(
+            "Plan says 10 - your change is recorded in the export",
+            PlanValueCaption.reps(
+                adHoc = false,
+                added = false,
+                plannedReps = 10,
+                nextDeclaredReps = 8,
+                shownReps = 9,
+                standsForLaterSets = true,
+            ),
+        )
+    }
+
     /** RED before the fix. Seconds, because the box is labelled in them. */
     @Test
     fun `a changed hold names the plan's seconds`() {
@@ -253,6 +324,25 @@ class PlanValueCaptionContractTest {
                 plannedDurationS = 45,
                 nextDeclaredDurationS = 45,
                 shownDurationS = 30,
+                standsForLaterSets = true,
+            ),
+        )
+    }
+
+    /**
+     * RED before the fix. The hold box's own stepping case, seconds rather
+     * than kilograms.
+     */
+    @Test
+    fun `a stepping hold scheme does not claim a fixed duration carries forward`() {
+        assertEquals(
+            "Plan says 45s - your change is recorded in the export",
+            PlanValueCaption.hold(
+                adHoc = false,
+                added = false,
+                plannedDurationS = 45,
+                nextDeclaredDurationS = 30,
+                shownDurationS = 40,
                 standsForLaterSets = true,
             ),
         )
