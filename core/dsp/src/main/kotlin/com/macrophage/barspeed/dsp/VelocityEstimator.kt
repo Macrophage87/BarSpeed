@@ -45,7 +45,29 @@ data class VelocitySeries(
  * bounds how much travel an anchor is allowed to declare to have been drift.
  */
 object VelocityEstimator {
+    /**
+     * The series every consumer gets. Identical to [estimateAnchored] today;
+     * the split exists so a second drift stage has a named BEFORE to be
+     * measured against rather than a reconstruction of one. See issue #94.
+     */
     fun estimate(
+        samples: List<ImuSample>,
+        config: DspConfig = DspConfig(),
+        plane: MovementPlane = MovementPlane.VERTICAL,
+    ): VelocitySeries = estimateAnchored(samples, config, plane)
+
+    /**
+     * Velocity with the ZUPT anchor pass applied and nothing after it.
+     *
+     * Internal because no production caller should reach for a partly-corrected
+     * series: [estimate] is the series the analyzer runs on. It exists so a
+     * test can say what a later stage changed, which a test rebuilding the
+     * pipeline for itself could only approximate -- and a rebuilt pipeline that
+     * drifts from the shipped one is a measurement of nothing. Issue #94's own
+     * record carries an instance: four test files measured a
+     * `StreamingSetTracker` construction the app had stopped using.
+     */
+    internal fun estimateAnchored(
         samples: List<ImuSample>,
         config: DspConfig = DspConfig(),
         plane: MovementPlane = MovementPlane.VERTICAL,

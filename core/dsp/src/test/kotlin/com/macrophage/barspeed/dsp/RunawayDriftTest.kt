@@ -52,6 +52,7 @@ class RunawayDriftTest {
         javaClass.getResourceAsStream("/$n.csv")!!.readBytes().decodeToString(),
     )
 
+    /** The anchored series, before any second-stage correction: see [VelocityEstimator.estimateAnchored]. */
     private val corpus: List<String> by lazy {
         File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile.list()!!
             .filter { it.startsWith("field-") && it.endsWith(".csv") && !it.endsWith("-cues.csv") }
@@ -151,7 +152,7 @@ class RunawayDriftTest {
         assertEquals(8, RunawayDrift.MAX_PASSES, "the bound")
         val passesNeeded = corpus.associateWith { fixture ->
             val samples = load(fixture)
-            var series = VelocityEstimator.estimate(samples, config, MovementPlane.VERTICAL)
+            var series = VelocityEstimator.estimateAnchored(samples, config, MovementPlane.VERTICAL)
             var passes = 0
             while (RunawayDrift.runaways(series.velocityMps, series.timeS, config).isNotEmpty()) {
                 val next = series.velocityMps.copyOf()
@@ -191,7 +192,7 @@ class RunawayDriftTest {
         // vertical series, which is the plane every capture in this corpus but
         // none is measured in.
         val untouched = corpus.filter { fixture ->
-            val series = VelocityEstimator.estimate(load(fixture), config, MovementPlane.VERTICAL)
+            val series = VelocityEstimator.estimateAnchored(load(fixture), config, MovementPlane.VERTICAL)
             RunawayDrift.runaways(series.velocityMps, series.timeS, config).isEmpty()
         }
         assertEquals(
@@ -212,7 +213,7 @@ class RunawayDriftTest {
             "captures with no runaway, which the correction cannot change",
         )
         corpus.filter { it !in untouched }.forEach { fixture ->
-            val series = VelocityEstimator.estimate(load(fixture), config, MovementPlane.VERTICAL)
+            val series = VelocityEstimator.estimateAnchored(load(fixture), config, MovementPlane.VERTICAL)
             assertTrue(
                 !RunawayDrift.corrected(series, config).velocityMps.contentEquals(series.velocityMps),
                 "$fixture has a runaway, so the correction must change its series",
