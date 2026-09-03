@@ -39,6 +39,31 @@ class LiveFeedPolicyTest {
     }
 
     @Test
+    fun `the readout moves to the partner when the armed unit cannot be analysed`() {
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, listOf(SensorRole.B))
+        assertEquals(SensorRole.B, feed.role)
+        assertTrue(feed.fellBack)
+        assertTrue(feed.switched)
+    }
+
+    @Test
+    fun `the move is the same in either direction`() {
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.B, SensorRole.B, listOf(SensorRole.A))
+        assertEquals(SensorRole.A, feed.role)
+        assertTrue(feed.fellBack)
+        assertTrue(feed.switched)
+    }
+
+    @Test
+    fun `the switch is announced on the frame that makes it and no later one`() {
+        val first = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, listOf(SensorRole.B))
+        val next = LiveFeedPolicy.liveFeed(SensorRole.A, first.role, listOf(SensorRole.B))
+        assertEquals(SensorRole.B, next.role)
+        assertTrue(next.fellBack)
+        assertFalse(next.switched)
+    }
+
+    @Test
     fun `the readout does not return to the armed stream once it has left it`() {
         val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.B, listOf(SensorRole.A, SensorRole.B))
         assertEquals(SensorRole.B, feed.role)

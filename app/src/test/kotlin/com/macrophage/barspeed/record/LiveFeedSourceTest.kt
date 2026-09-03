@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Which stream [liveFeedOf] says the live readout is following, and which
@@ -32,6 +33,48 @@ class LiveFeedSourceTest {
                 analysed = SensorRole.A,
             )
         val feed = liveFeedOf(armed, SensorRole.B, SensorRole.A, analysedFrames = 400, secondaryFrames = 400)
+        assertEquals(SensorRole.A, feed.role)
+        assertFalse(feed.fellBack)
+        assertFalse(feed.switched)
+    }
+
+    @Test
+    fun `the readout follows the partner when the armed unit has fed almost nothing`() {
+        val armed =
+            RecordedSensors(
+                count = 2,
+                expected = listOf(SensorRole.A, SensorRole.B),
+                analysed = SensorRole.A,
+            )
+        val feed = liveFeedOf(armed, SensorRole.B, SensorRole.A, analysedFrames = 3, secondaryFrames = 400)
+        assertEquals(SensorRole.B, feed.role)
+        assertTrue(feed.fellBack)
+        assertTrue(feed.switched)
+    }
+
+    @Test
+    fun `the counts are read against the roles they belong to`() {
+        val armed =
+            RecordedSensors(
+                count = 2,
+                expected = listOf(SensorRole.A, SensorRole.B),
+                analysed = SensorRole.A,
+            )
+        val feed = liveFeedOf(armed, SensorRole.B, SensorRole.A, analysedFrames = 400, secondaryFrames = 3)
+        assertEquals(SensorRole.A, feed.role)
+        assertFalse(feed.fellBack)
+        assertFalse(feed.switched)
+    }
+
+    @Test
+    fun `a partner that has fed too little to analyse does not take the readout`() {
+        val armed =
+            RecordedSensors(
+                count = 2,
+                expected = listOf(SensorRole.A, SensorRole.B),
+                analysed = SensorRole.A,
+            )
+        val feed = liveFeedOf(armed, SensorRole.B, SensorRole.A, analysedFrames = 0, secondaryFrames = 7)
         assertEquals(SensorRole.A, feed.role)
         assertFalse(feed.fellBack)
         assertFalse(feed.switched)
