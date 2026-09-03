@@ -508,6 +508,23 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
+         * `bodyWeightKg` on set_records: the body weight the load arithmetic
+         * used for this set (#220).
+         *
+         * EMPTY AND UNREGISTERED AT THIS COMMIT, and [DATABASE_VERSION] is
+         * still 16. It is declared so [Migration16To17Test]'s differentials
+         * compile and fail on the answer rather than on the build --
+         * [MIGRATION_15_16] was introduced the same way, one hop earlier.
+         *
+         * This hop was written as 15 -> 16 and REBASED onto #60's landed
+         * 15 -> 16, which took that number first; it is 16 -> 17 here.
+         */
+        internal val MIGRATION_16_17 =
+            object : Migration(16, 17) {
+                override fun migrate(db: SupportSQLiteDatabase) = Unit
+            }
+
+        /**
          * Open the database, having first made sure opening it cannot destroy
          * it. Issue #101.
          *
