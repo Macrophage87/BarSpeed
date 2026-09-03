@@ -178,12 +178,28 @@ object SetLoadPolicy {
      * A carried load does not touch `plannedLoad_kg`. The plan's prescription
      * is stored beside the load actually recorded for every set, so a carry is
      * visible afterwards as a deviation on each set it reached.
+     *
+     * [bodyweight] IS NOT READ ON THIS COMMIT. It is whether the movement the
+     * carry lands on is body-weight work, taken here ahead of the arithmetic
+     * that will read it: a carry that computes a number rather than passing
+     * one through needs a floor, and the floor is [correctedAddedKg]'s --
+     * signed for body-weight work, where negative is band or machine
+     * assistance, and clamped at zero for loaded work, where a bar cannot
+     * weigh less than nothing. Taking the fact in this commit keeps the
+     * signature change out of the commit that changes the behaviour, so that
+     * one is a diff of this expression alone. #143.
      */
+    // Suppressed for exactly one commit: [bodyweight] is taken here and read
+    // by the commit that replaces the expression below. The suppression goes
+    // with the expression, so a parameter left permanently unread would fail
+    // detekt the moment the fix stopped needing it.
+    @Suppress("UnusedParameter")
     fun standingStatedAddedKg(
         statedAddedKg: Double?,
         sameExerciseBlock: Boolean,
         lastDeclaredAddedKg: Double?,
         nextDeclaredAddedKg: Double?,
+        bodyweight: Boolean,
     ): Double? = statedAddedKg?.takeIf { sameExerciseBlock && lastDeclaredAddedKg == nextDeclaredAddedKg }
 
     /**

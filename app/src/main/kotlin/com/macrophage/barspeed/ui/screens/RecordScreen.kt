@@ -1682,6 +1682,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
                     sameExerciseBlock = sameBlock,
                     lastDeclaredAddedKg = slot.plannedLoadKg,
                     nextDeclaredAddedKg = after?.plannedLoadKg,
+                    bodyweight = after?.exercise?.bodyweight ?: false,
                 ) != null,
             ),
             if (slot.isTimed) {

@@ -1812,6 +1812,12 @@ private fun restingState(
             sameExerciseBlock = sameBlock,
             lastDeclaredAddedKg = p.slot?.plannedLoadKg,
             nextDeclaredAddedKg = nextSlot?.plannedLoadKg,
+            // The COMING slot's movement, because that is the set the answer
+            // is offered for. Inside a block the two are the same exercise by
+            // construction -- sameExerciseBlock compared their ids -- so this
+            // differs from the finished set's only where the answer is null
+            // anyway.
+            bodyweight = nextSlot?.exercise?.bodyweight ?: false,
         )
     // The same question about the tempo, decided by the same four boundaries.
     // plannedTempo on both sides, never tempo: the bake has already written the

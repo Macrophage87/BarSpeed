@@ -533,6 +533,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
+                bodyweight = false,
             ),
         )
         // The lifter types 105 during that rest; tapping through bakes it into
@@ -559,6 +560,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
+                bodyweight = false,
             )
         assertEquals(stated, standing, "the statement still stands for set 13")
 
@@ -595,6 +597,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = false,
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = 0.0,
+                bodyweight = false,
             ),
         )
     }
@@ -720,6 +723,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
+                bodyweight = false,
             ),
         )
     }
@@ -741,6 +745,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
+                bodyweight = false,
             ),
         )
     }
@@ -760,6 +765,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = 100.0,
                 nextDeclaredAddedKg = 100.0,
+                bodyweight = false,
             ),
         )
     }
@@ -779,6 +785,10 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = -20.0,
                 nextDeclaredAddedKg = -20.0,
+                // Assisted work IS body-weight work, and this is the one case
+                // in the file where the flag is not a formality: it is what
+                // says the negative is a band rather than a number to floor.
+                bodyweight = true,
             ),
         )
     }
@@ -796,6 +806,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = false,
                 lastDeclaredAddedKg = 90 / WeightUnit.LB_PER_KG,
                 nextDeclaredAddedKg = 90 / WeightUnit.LB_PER_KG,
+                bodyweight = false,
             ),
         )
     }
@@ -816,6 +827,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = 60.0,
                 nextDeclaredAddedKg = 80.0,
+                bodyweight = false,
             ),
         )
     }
@@ -833,6 +845,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
+                bodyweight = false,
             ),
         )
     }
@@ -857,6 +870,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = 60.0,
                 nextDeclaredAddedKg = null,
+                bodyweight = false,
             ),
         )
         assertNull(
@@ -865,6 +879,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = null,
                 nextDeclaredAddedKg = 60.0,
+                bodyweight = false,
             ),
         )
     }
@@ -885,6 +900,7 @@ class SetLoadPolicyTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = null,
                 nextDeclaredAddedKg = null,
+                bodyweight = false,
             ),
         )
     }

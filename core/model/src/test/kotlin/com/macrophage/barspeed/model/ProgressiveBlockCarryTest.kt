@@ -43,6 +43,7 @@ class ProgressiveBlockCarryTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = 55.0,
                 nextDeclaredAddedKg = 55.0,
+                bodyweight = false,
             ),
         )
     }
@@ -60,6 +61,7 @@ class ProgressiveBlockCarryTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = 55.0,
                 nextDeclaredAddedKg = 55.0,
+                bodyweight = false,
             ),
         )
     }
@@ -79,6 +81,7 @@ class ProgressiveBlockCarryTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = 45.0,
                 nextDeclaredAddedKg = 55.0,
+                bodyweight = false,
             ),
         )
     }
@@ -98,6 +101,7 @@ class ProgressiveBlockCarryTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = 80.0,
                 nextDeclaredAddedKg = 100.0,
+                bodyweight = false,
             ),
         )
     }
@@ -118,6 +122,7 @@ class ProgressiveBlockCarryTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = 55.0,
                 nextDeclaredAddedKg = 65.0,
+                bodyweight = false,
             ),
         )
     }
@@ -138,6 +143,7 @@ class ProgressiveBlockCarryTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = 60.0,
                 nextDeclaredAddedKg = null,
+                bodyweight = false,
             ),
         )
     }
@@ -158,6 +164,7 @@ class ProgressiveBlockCarryTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = null,
                 nextDeclaredAddedKg = 60.0,
+                bodyweight = false,
             ),
         )
     }
@@ -175,6 +182,7 @@ class ProgressiveBlockCarryTest {
                 sameExerciseBlock = false,
                 lastDeclaredAddedKg = 45.0,
                 nextDeclaredAddedKg = 55.0,
+                bodyweight = false,
             ),
         )
     }
@@ -194,6 +202,7 @@ class ProgressiveBlockCarryTest {
                 sameExerciseBlock = true,
                 lastDeclaredAddedKg = 40.82,
                 nextDeclaredAddedKg = 90 / WeightUnit.LB_PER_KG,
+                bodyweight = false,
             ),
         )
     }
