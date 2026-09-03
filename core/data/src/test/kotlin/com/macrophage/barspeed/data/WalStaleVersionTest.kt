@@ -206,6 +206,47 @@ class WalStaleVersionTest {
     }
 
     /**
+     * A TORN FINAL FRAME COSTS ONLY ITSELF, not the frames before it.
+     *
+     * FOUND BY MUTATION. Relaxing the whole-frame bound in `walVersion` from
+     * `offset + stride <= length` to `offset < length` survived the entire
+     * suite; nothing pinned it, so this is the pin.
+     *
+     * THE FIRST ATTEMPT AT THIS TEST DID NOT KILL THAT MUTATION EITHER, and
+     * the reason is worth keeping. It appended 100 bytes of junk, whose first
+     * 24 parse as a frame header with garbage salts -- so the salt check
+     * stopped the scan and the answer came out right whether the bound was
+     * there or not. A test that passes for a reason other than the one it
+     * names is the thing a mutation table exists to catch, and it caught this
+     * one before it was committed.
+     *
+     * WHAT A TORN WRITE ACTUALLY LEAVES is a REAL frame cut short: its 24-byte
+     * header is intact and its salts MATCH, and only the page image is
+     * truncated. That is what this appends -- a page-1 frame header with the
+     * fixture's own salts, followed by 50 bytes where 512 belong.
+     *
+     * SQLite stops at the damaged frame and honours everything before it,
+     * verified at 3.50.4 against exactly these bytes: user_version 17 and two
+     * rows. With the bound, the short frame is never reached and the answer is
+     * 17. Without it, the page read runs off the end, the exception guard
+     * discards the WHOLE scan, and the answer falls back to the main header's
+     * stale 16 -- a missed rescue, which is the direction that ends in a
+     * crash-loop and an uninstall. One damaged frame must not cost the version
+     * the frames before it committed.
+     */
+    @Test
+    fun `a torn final frame does not discard the frames before it`() {
+        val db = fixture()
+        val wal = File(db.path + "-wal")
+        val salts = wal.readBytes().copyOfRange(16, 24)
+        val tornHeader = byteArrayOf(0, 0, 0, 1) + ByteArray(4) + salts + ByteArray(8)
+        wal.writeBytes(wal.readBytes() + tornHeader + ByteArray(50) { it.toByte() })
+        assertEquals(17, DatabaseRescue.storedVersion(db), "a torn tail discarded the committed frames")
+        val outcome = DatabaseRescue.rescue(db, File(root, DatabaseRescue.RESCUE_DIR), 16)
+        assertTrue(outcome is RescueOutcome.Rescued, "expected Rescued, got " + outcome)
+    }
+
+    /**
      * A MAIN FILE THIS CODE CANNOT READ STAYS UNREADABLE, whatever the `-wal`
      * beside it says.
      *
