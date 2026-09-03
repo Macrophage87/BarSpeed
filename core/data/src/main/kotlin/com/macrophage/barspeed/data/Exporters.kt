@@ -246,6 +246,14 @@ class SessionExporter(
             loadKg = record.loadKg,
             loadLb = Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0,
             plannedLoadKg = record.plannedLoadKg,
+            // How much of loadKg was the lifter (#220). Straight off the row,
+            // never recomputed: it is the figure the arithmetic used, and the
+            // one body weight the app holds has moved since. Absent where the
+            // row holds none, which is loaded work, a row written before
+            // database v17, and a body-weight set recorded while the app knew
+            // no body weight -- the column's own KDoc says the last two cannot
+            // be told apart.
+            bodyWeightKg = record.bodyWeightKg,
             reps = record.actualReps,
             repsManual = record.repsManual,
             plannedReps = record.plannedReps,
@@ -778,6 +786,10 @@ class RawExporter(
         str("exercise", record.exerciseId)
         num("load_kg", record.loadKg)
         num("load_lb", Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0)
+        // Beside the sum it is part of, in the manifest as well as in
+        // session.json (#220). `num` drops a null, so a set with no
+        // body-weight term publishes no key rather than a zero.
+        num("bodyWeight_kg", record.bodyWeightKg)
         num("reps", record.actualReps)
         num("plannedReps", record.plannedReps)
         num("duration_s", phase.durationS)

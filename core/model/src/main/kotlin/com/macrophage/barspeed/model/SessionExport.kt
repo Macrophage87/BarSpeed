@@ -728,9 +728,27 @@ data class SetExport(
     /**
      * The body weight [loadKg] was computed with, kilograms (1.18, #220).
      *
-     * NEUTRAL AT THIS COMMIT: nothing writes it, which is what makes
-     * `BodyWeightPublishedTest`'s differentials fail on the answer rather than
-     * on the build.
+     * On body-weight work `SetLoadPolicy.totalKg` returns this plus the added
+     * load, which may be negative for band or machine assistance -- so this is
+     * usually the LARGEST term in [loadKg], and the added or assisting load is
+     * `load_kg - bodyWeight_kg`. Published because a reader comparing the same
+     * lift across sessions was otherwise mixing body-weight drift with
+     * assistance changes and could not see it.
+     *
+     * SUBTRACTION RECOVERS THE ADDED LOAD TO WITHIN ROUNDING, not
+     * bit-exactly: both figures are doubles and the sum was formed in double,
+     * so the difference is exact only where the addition was.
+     *
+     * THE FIGURE THE ARITHMETIC USED, frozen when the set was written, not the
+     * lifter's weight today -- the app holds one body weight and it moves.
+     *
+     * ABSENT, never 0, and three states share the absence: loaded work, which
+     * has no body in the load path and is readable from `geometry.bodyweight`
+     * beside it; a set recorded before database v17, which no build stored;
+     * and a body-weight set recorded while the app held no body weight at all,
+     * where `totalKg` used 0 kg (#61). The last two are NOT distinguishable
+     * here, and nothing in the document pretends otherwise. A published 0.0
+     * would read as a lifter with no mass.
      */
     @SerialName("bodyWeight_kg") val bodyWeightKg: Double? = null,
     val reps: Int,

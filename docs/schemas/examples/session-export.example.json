@@ -280,6 +280,42 @@
           "summary": {}
         }
       ]
+    },
+    {
+      "exercise": "assisted_pull_up",
+      "sets": [
+        {
+          "load_kg": 30.25,
+          "load_lb": 66.7,
+          "bodyWeight_kg": 116.43,
+          "reps": 5,
+          "plannedReps": 8,
+          "failed": true,
+          "failedByLifter": false,
+          "repsManual": true,
+          "rest_s": 150,
+          "geometry": {
+            "startsWith": "concentric",
+            "concentric": "up",
+            "plane": "vertical",
+            "sensorOnStack": false,
+            "sensorInverted": false,
+            "travelRatio": 1,
+            "kind": "dynamic",
+            "bodyweight": true,
+            "source": {
+              "startsWith": "declared",
+              "concentric": "declared",
+              "plane": "declared",
+              "kind": "declared",
+              "travelRatio": "default",
+              "sensorOnStack": "default",
+              "bodyweight": "declared"
+            }
+          },
+          "summary": { "meanConVel_mps": 0.35, "peakConVel_mps": 0.6, "meanEcc_s": 2.4, "meanCon_s": 1.3, "meanRom_m": 0.58 }
+        }
+      ]
     }
   ]
 }
