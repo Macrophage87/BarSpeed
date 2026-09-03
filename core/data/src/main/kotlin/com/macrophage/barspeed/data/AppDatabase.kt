@@ -30,12 +30,14 @@ import java.io.File
  * the migration chain and never enters the rescue at all, so an ordinary
  * upgrade sees none of it.
  *
- * The version has moved before -- thirteen SHIPPED times, in v0.1.5, v0.1.10,
+ * The version has moved before -- fifteen SHIPPED times, in v0.1.5, v0.1.10,
  * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, once in v0.1.42,
- * twice in v0.1.44, once in v0.1.45 and once in v0.1.49 -- every one read off
- * `git show <tag>:core/data/.../AppDatabase.kt` rather than remembered. What
- * was new at 11 was that a committed baseline existed for the
- * version below it, so for the first time in this repository a migration had a
+ * twice in v0.1.44, once in v0.1.45, once in v0.1.49 and twice in v0.1.50 --
+ * every one read off `git show <tag>:core/data/.../AppDatabase.kt` rather
+ * than remembered. It read "thirteen ... once in v0.1.49" and stopped there,
+ * which was true until v0.1.50 was cut carrying 16 against v0.1.49's 14.
+ * What was new at 11 was that a committed baseline existed for the version
+ * below it, so for the first time in this repository a migration had a
  * document to be read against; 12 was the second such bump, 13 the third,
  * 14 the fourth, 15 the fifth, 16 the sixth and 17 the seventh, with
  * `16.json` as its baseline.
@@ -53,15 +55,20 @@ import java.io.File
  * not v0.1.43, which carries 10.
  *
  * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read rather than carried
- * forward: v0.1.49 is still the newest tag and
- * `git show v0.1.49:core/data/.../AppDatabase.kt` reads
- * `DATABASE_VERSION = 14`, so 14 -> 15, 15 -> 16 and 16 -> 17 have all NOT
- * SHIPPED. An install upgrading from v0.1.49 to this build runs
+ * forward: v0.1.50 is the newest tag and
+ * `git show v0.1.50:core/data/.../AppDatabase.kt` reads
+ * `DATABASE_VERSION = 16`, so only 16 -> 17 has NOT SHIPPED. A stock v0.1.50
+ * install therefore runs 16 -> 17 alone, an install still on v0.1.49 runs
  * 14 -> 15 -> 16 -> 17 in one open, and a phone still on v0.1.44 runs
  * 12 -> 13 -> 14 -> 15 -> 16 -> 17, which is why the emulator exercise
  * installs an older release first and upgrades over it rather than starting
- * empty. The sentence above about v0.1.48 carrying 13 was true when it was
- * written and is not now; it is replaced rather than kept beside this one.
+ * empty. TWO CLAIMS ARE DELETED HERE RATHER THAN REWORDED, both of them
+ * this lane's: that v0.1.49 is still the newest tag, and that 14 -> 15 and
+ * 15 -> 16 have not shipped. v0.1.50 exists, resolves to the same commit as
+ * `origin/main`'s tip, and carries 16, so two of the three hops that
+ * sentence called unshipped had shipped before it was written. The sentence
+ * above about v0.1.48 carrying 13 was true when it was written and is not
+ * now; it is replaced rather than kept beside this one.
  *
  * SEVENTEEN IS WHAT #60 TOLD THIS LANE TO USE, and the collision it warned
  * about happened. The paragraph that stood here said sixteen was not settled
