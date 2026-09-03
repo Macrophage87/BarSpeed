@@ -1095,7 +1095,13 @@ data class SetExport(
      * set's own cue track, or the set's end instant where nothing called it
      * over. The countdown and the archive's `rest_before_hrm` window both
      * begin there (#178); until 1.18 the window began when the set's capture
-     * stopped instead, up to 53.06 s later on one measured set.
+     * stopped instead, up to 53.06 s later on one measured set. `rest_after_hrm`
+     * -- the window a session close writes onto the LAST set, when there is no
+     * next set to carry `rest_before_hrm` forward -- follows the same instant
+     * and the same copy-forward. A gap this does not close: `endSet` cancels
+     * the in-set collector before the app enters its rest stage, so a
+     * notification landing in that interval reaches neither capture -- 0.08 to
+     * 0.58 s on the one session measured.
      */
     @SerialName("rest_s") val restS: Int? = null,
     val tempoPrescribed: String? = null,
@@ -1477,13 +1483,12 @@ data class GeometryExport(
  * [ExerciseDef.STACK_MOUNTED_IDS] and published as `seeded`.
  *
  * `bodyweight` was a third until 1.18 (#220), which publishes it. `#227`
- * ("Make bodyweight nullable so an omitted key is not a silent false"), on
- * `origin/main`, made `PlanExerciseDef.bodyweight` a `Boolean?` after #220's
- * text below was written -- so a declared `false` and an omitted key ARE now
- * two distinct states the app could tell apart, the same way #223 made
- * `sensorOnStack`'s pair distinct. [SetGeometryPolicy.bodyweightSource] does
- * not yet make that distinction; it still reads both as `default`, which is
- * the gap #227 closed for `sensorOnStack` and has not closed here.
+ * ("Make bodyweight nullable so an omitted key is not a silent false") made
+ * `PlanExerciseDef.bodyweight` a `Boolean?`, the same change #223 made for
+ * `sensorOnStack`, so a declared `false` and an omitted key are two distinct
+ * states now; [SetGeometryPolicy.bodyweightSource] reads a declared `false`
+ * as `declared`, the same as `sensorOnStack`'s pair, since the round-1 fix
+ * to issue #178's review.
  */
 @Serializable
 data class GeometrySourceExport(

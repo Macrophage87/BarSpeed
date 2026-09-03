@@ -93,11 +93,13 @@ data class GeometrySources(
      * This field carried LESS than the five above it when it was written:
      * `PlanExerciseDef.bodyweight` was a non-nullable `Boolean`, so a declared
      * `false` and an omitted key were one value and both published
-     * [GeometrySource.DEFAULT]. `#227` made the plan key `Boolean?` after this
-     * text was written, so the two ARE now distinguishable the way
-     * `sensorOnStack`'s pair is -- [SetGeometryPolicy.bodyweightSource] has not
-     * been updated to read them apart, and still answers [GeometrySource.DEFAULT]
-     * for both. See [SetGeometryPolicy.bodyweightSource].
+     * [GeometrySource.DEFAULT]. `#227` made the plan key `Boolean?`, the same
+     * change #223 made for `sensorOnStack`, and the round-1 fix to issue
+     * #178's review brought [SetGeometryPolicy.bodyweightSource] into line
+     * with it: a declared `false` now reads [GeometrySource.DECLARED], the
+     * same as `sensorOnStack`'s pair, and only a genuinely omitted key reads
+     * [GeometrySource.DEFAULT] (or [GeometrySource.SEEDED]). See
+     * [SetGeometryPolicy.bodyweightSource].
      */
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val bodyweight: GeometrySource = GeometrySource.DEFAULT,
 )
@@ -276,31 +278,32 @@ object SetGeometryPolicy {
     /**
      * Provenance for the `bodyweight` value [used] already carries (#220).
      *
-     * [stackSource]'s rule and deliberately not [resolve]'s: the value is read
-     * off the definition the set was recorded against, never re-decided from
-     * the id, so the published word cannot disagree with the published flag.
+     * [stackSource]'s rule, exactly, since the round-1 fix to issue #178's
+     * review: the value is read off the definition the set was recorded
+     * against, never re-decided from the id, so the published word cannot
+     * disagree with the published flag.
      *
      * [declared] is the plan's key for this exercise, null when there was no
-     * plan. WRITTEN when `PlanExerciseDef.bodyweight` was a non-nullable
-     * `Boolean`, so [declared] being `false` and being absent decoded to the
-     * same wire value and this function could not have told them apart even
-     * if it tried; the three answers below reflect that. `#227` made the plan
-     * key `Boolean?` afterwards, the same change #223 made for `sensorOnStack`,
-     * so [declared] `== false` is now a real declaration and no longer merely
-     * `used`'s absence -- this function has not been updated to read it that
-     * way, unlike [stackSource]. `declared == true` stays the only path to
-     * [GeometrySource.DECLARED]:
+     * plan. WRITTEN FIRST when `PlanExerciseDef.bodyweight` was a non-nullable
+     * `Boolean`, so a declared `false` and an omitted key decoded to the same
+     * wire value and no reading could have told them apart; `#227` made the
+     * plan key `Boolean?` afterwards, the same change #223 made for
+     * `sensorOnStack`, so [declared] `!= null` is now a real declaration
+     * whatever its value, and this function was corrected to read it that way
+     * to match [stackSource]:
      *
-     * 1. `true` -- a declaration.
-     * 2. otherwise, [used] true -- nothing declared true and the set was
+     * 1. [declared] non-null -- a declaration, either way. A declared `false`
+     *    wins over the seed: a plan may genuinely mean a pull-up machine whose
+     *    sensor and load are both external to the lifter.
+     * 2. otherwise, [used] true -- nothing declared it and the set was
      *    body-weight work anyway, which only the app's own definition of that
      *    lift can have supplied. [GeometrySource.SEEDED], never
      *    [GeometrySource.INFERRED]: no words in the id are read.
-     * 3. otherwise [GeometrySource.DEFAULT] -- a declared `false` and an
-     *    omitted key both land here, though the type no longer forces that.
+     * 3. otherwise [GeometrySource.DEFAULT] -- nothing declared and nothing
+     *    seeded.
      */
     fun bodyweightSource(used: Boolean, declared: Boolean?): GeometrySource = when {
-        declared == true -> GeometrySource.DECLARED
+        declared != null -> GeometrySource.DECLARED
         used -> GeometrySource.SEEDED
         else -> GeometrySource.DEFAULT
     }
