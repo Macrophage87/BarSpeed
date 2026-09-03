@@ -27,8 +27,9 @@ import kotlin.test.assertNotEquals
  *   whose drive actually goes up. So the cancellation is a property of the two
  *   flags, not of the leg curl.
  * - Under a declared stack mount, leaving `concentricUp` at its default is the
- *   same analysis as writing `up` out. That is the invariant issue 96 asked
- *   for, and it holds. Nothing is structurally dropped from pairing.
+ *   same analysis as writing `up` out. That is a pin on the DEFAULT VALUE of
+ *   `concentricUp`, not a statement about pairing: at this SHA the two
+ *   declarations are the same [LiftDirection].
  * - **Issue 223's seed default changes no number on these sets.**
  *   `sensorOnStack` only picks [LiftDirection.measuredPlane], which was
  *   already VERTICAL, so seeding it for `assisted_pull_up` leaves the analysis
@@ -179,7 +180,10 @@ class StackMountGeometryTest {
     fun `seeding the stack mount alone changes no number on a vertical lift`() {
         // Issue 223 seeds sensorOnStack for assisted_pull_up. On a vertical
         // exercise that only re-picks an axis already vertical, so field-37's
-        // six mis-declared sets would analyse identically under the seed.
+        // other three mis-declared sets are rope dead hangs, and
+        // rope_dead_hang is in neither ExerciseDef.STACK_MOUNTED_IDS nor
+        // BODYWEIGHT_IDS (#228), so issue 223's seed does not reach them at
+        // all.
         assertSameAnalysis(seededStack, asShipped, "sensorOnStack alone on a vertical lift")
         assertEquals(MovementPlane.VERTICAL, asShipped.measuredPlane, "already vertical without the seed")
         // sensorInverted is what would actually move them, and it is not seeded.

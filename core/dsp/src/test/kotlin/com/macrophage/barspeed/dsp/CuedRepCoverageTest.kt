@@ -557,10 +557,10 @@ class CuedRepCoverageTest {
         // confirmed nor disproved by any cue track.
         //
         // [outsideCorpusTotals] is subtracted first, because this file's own
-        // lists cover THIRTY captures and those totals cover twenty-one.
+        // lists cover THIRTY-THREE captures and those totals cover twenty-one.
         // Without it the subtraction below silently changes meaning: it would
         // read as "reps on captures with no cue track" while actually being
-        // that plus the seven later captures' own counted reps.
+        // that plus the later captures' own counted reps.
         val c = DspConfig()
         var counted = 0
         var inFamily = 0
