@@ -236,11 +236,24 @@ object VoidSetPolicy {
      * is deleted, and what the mark actually changes. A control that says only
      * "are you sure" on a screen whose other destructive action deletes the
      * session invites reading this one as the same kind of act.
+     *
+     * [setNumber] is the set's position in the SESSION, and the sentence says
+     * so rather than pairing it with the exercise. The only caller,
+     * `SessionDetailScreen`'s `VoidRow`, passes `record.orderIdx + 1`, and
+     * `orderIdx` is written from `RecordUiState.setsCompleted` -- one counter
+     * per session, never reset when the exercise changes. Pairing that number
+     * with the exercise name produced "Set 13 of Rope Dead Hang" for a set
+     * whose exercise has no thirteenth set, which is a worse thing for a
+     * confirmation to say than saying nothing: the lifter is being asked to
+     * identify the set they are about to mark. Do not "fix" this back to
+     * `Set N of <exercise>` without giving the caller a per-exercise counter
+     * first -- there is not one.
      */
     fun confirmation(exerciseName: String, setNumber: Int): String =
-        "Mark Set $setNumber of $exerciseName as not performed. The set stays in this " +
-            "session with its sensor data and is still exported, marked; it stops counting " +
-            "toward volume and progression. You can undo this."
+        "Mark this $exerciseName set -- set $setNumber of the session -- as not " +
+            "performed. The set stays in this session with its sensor data and is " +
+            "still exported, marked; it stops counting toward volume and progression. " +
+            "You can undo this."
 }
 
 /**

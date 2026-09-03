@@ -25,6 +25,10 @@ can be pasted straight back into the app via Plans → Import → Paste.
 >
 > Be specific and quantitative. Reference set/rep numbers.
 >
+> Any set with "voided": true was not performed -- exclude it from volume,
+> from set counts and from every trend, but read "voidReason" if it is
+> there.
+>
 > ```json
 > {paste session-export JSON here}
 > ```
@@ -51,6 +55,11 @@ can be pasted straight back into the app via Plans → Import → Paste.
 > ```
 >
 > This week's sessions:
+>
+> Any set with "voided": true was not performed -- exclude it from volume,
+> from set counts and from every trend, but read "voidReason" if it is
+> there.
+>
 > ```json
 > {paste one or more session exports}
 > ```
