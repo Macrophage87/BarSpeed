@@ -23,9 +23,15 @@ import kotlin.test.assertTrue
  *
  * Until 1.18 a set whose segmentation resolved nothing published `reps: []`,
  * `summary: {}` and no `velocityLossBasis` -- byte-identical to a manual set
- * recorded with no sensor at all. Three sets of the field-37 session are in
- * exactly that state in the archive, and the lifter meets three blanks on a
- * 36-minute session with nothing saying which kind of blank they are.
+ * recorded with no sensor at all. SIX of the field-37 session's thirteen sets
+ * are in exactly that state in the archive -- three that performed six reps
+ * each and resolved none, plus sets 11, 12 and 13, rope dead hangs for which
+ * an empty summary is the right answer -- so the lifter meets six blanks on a
+ * 36-minute session with nothing saying which kind of blank each one is.
+ * Counted from that session's own `session.json`, which carries thirteen sets
+ * and six `summary: {}`. An earlier draft of this paragraph said three, the
+ * same undercount `AnchorSupplyByMountTest` retracts; the sentence that said
+ * it is deleted rather than reworded.
  *
  * A separate file from [SessionExporterTest] because that class is already at
  * detekt's `LargeClass` limit, the same reason [SessionExportRepMarksTest] and
@@ -72,7 +78,13 @@ class SessionExportNoRepsReasonTest {
 
         override suspend fun rawStreamsForSet(setId: Long): List<RawStreamEntity> = emptyList()
 
-        override suspend fun updateRpe(setId: Long, rpe: Int?, failed: Boolean, warmup: Boolean) = Unit
+        override suspend fun updateRpe(
+            setId: Long,
+            rpe: Int?,
+            failed: Boolean,
+            failedByLifter: Boolean?,
+            warmup: Boolean,
+        ) = Unit
 
         override suspend fun updateLimiter(setId: Long, limiter: String?, limiterNote: String?) = Unit
 

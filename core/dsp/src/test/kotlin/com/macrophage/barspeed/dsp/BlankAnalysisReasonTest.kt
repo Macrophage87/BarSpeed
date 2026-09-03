@@ -23,8 +23,8 @@ import kotlin.test.assertTrue
  * every branch is pinned that way below. That is complete coverage of the
  * RULE, and it is not evidence about any capture.
  *
- * **The corpus** says which reasons real captures actually produce. Two, at
- * this commit, out of seven. The other five are pinned only by the synthetic
+ * **The corpus** says which reasons real captures actually produce. Three, at
+ * this commit, out of seven. The other four are pinned only by the synthetic
  * censuses, and saying otherwise would be a claim stronger than the evidence:
  * nothing here has seen a field capture emptied by the minimum-ROM floor or by
  * a set-end cue.

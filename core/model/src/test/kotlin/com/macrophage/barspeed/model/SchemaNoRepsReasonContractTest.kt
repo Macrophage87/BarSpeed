@@ -17,12 +17,15 @@ import kotlin.test.assertTrue
  * `SchemaAnalysedFallbackContractTest` gives: a version mint has several
  * halves that must move together, and grouping them says which they are.
  *
- * THE KEY MINTS 1.18 RATHER THAN EXTENDING 1.17, and this is the first mint
- * on this repository for which that is true by release rather than by
- * accident: 1.17 shipped in v0.1.49, so the seven "1.17 is UNRELEASED"
- * entries in [SessionExport]'s own log stop applying here. Both halves are
- * asserted -- that the version moved off 1.17, and that 1.17 is still
- * accepted.
+ * THE KEY DOES NOT MINT A NUMBER. It rides as a FURTHER entry under 1.18,
+ * which issue #216 had already minted on `main` for `abandonedInPrep` and
+ * then extended for `failedByLifter`, and which no tag carries -- v0.1.49
+ * shipped 1.17. A branch written against 1.17 minted its own 1.18 for this
+ * key; that was a collision with #216's, and the paragraph claiming this was
+ * "the first mint by release rather than by accident" is DELETED rather than
+ * reworded. One number now covers all three keys. What is asserted below is
+ * what that leaves true: the constant reads 1.18, 1.18 is accepted and
+ * published, and 1.17 is still readable.
  */
 class SchemaNoRepsReasonContractTest {
     private fun schema(name: String) = Json.parseToJsonElement(
@@ -42,8 +45,11 @@ class SchemaNoRepsReasonContractTest {
         .map { it.jsonObject }
 
     @Test
-    fun `the version moved to 1_18 and 1_17 is still accepted`() {
-        assertEquals("1.18", SessionExport.SCHEMA_VERSION, "the version did not move off the released 1.17")
+    fun `the key rides under the unreleased 1_18 and 1_17 is still accepted`() {
+        // Not a mint. #216 minted 1.18 and no tag carries it, so a further
+        // entry under it is free -- the rule every "1.17 is UNRELEASED" entry
+        // in SessionExport's log applied while 1.17 was in that state.
+        assertEquals("1.18", SessionExport.SCHEMA_VERSION, "the number this key rides under moved")
         assertTrue("1.18" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
         assertTrue("1.18" in exportVersionEnum(), "the published enum does not accept the version written")
         assertTrue("1.17" in exportVersionEnum(), "1.17 stopped being readable, so this is not additive")
