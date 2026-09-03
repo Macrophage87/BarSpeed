@@ -725,6 +725,14 @@ data class SetExport(
     /** Same load in pounds, for readers who think in lb; kg remains canonical. */
     @SerialName("load_lb") val loadLb: Double? = null,
     @SerialName("plannedLoad_kg") val plannedLoadKg: Double? = null,
+    /**
+     * The body weight [loadKg] was computed with, kilograms (1.18, #220).
+     *
+     * NEUTRAL AT THIS COMMIT: nothing writes it, which is what makes
+     * `BodyWeightPublishedTest`'s differentials fail on the answer rather than
+     * on the build.
+     */
+    @SerialName("bodyWeight_kg") val bodyWeightKg: Double? = null,
     val reps: Int,
     /** True when reps were entered or corrected manually rather than sensor-counted. */
     val repsManual: Boolean = false,
