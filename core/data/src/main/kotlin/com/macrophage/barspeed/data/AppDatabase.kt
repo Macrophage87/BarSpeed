@@ -511,10 +511,13 @@ abstract class AppDatabase : RoomDatabase() {
          * Open the database, having first made sure opening it cannot destroy
          * it. Issue #101.
          *
-         * BEFORE ROOM IS ASKED FOR ANYTHING, the file on disk is read directly
-         * and, if it is newer than this build, moved aside -- so Room then
-         * finds nothing, creates an empty database, and the destructive
-         * downgrade path is never entered. That is why
+         * BEFORE ROOM IS ASKED FOR ANYTHING, the files on disk are read
+         * directly and, if the database is newer than this build, moved aside
+         * -- so Room then finds nothing, creates an empty database, and the
+         * destructive downgrade path is never entered. FILES, plural, since
+         * issue #113: the main file's header carries the version only as of the
+         * last checkpoint, so the `-wal` is scanned for a newer committed one.
+         * Neither read goes through SQLite. That is why
          * fallbackToDestructiveMigrationOnDowngrade is gone from the chain
          * below: with the rescue in front of it, it was unreachable, and
          * removing it means a downgrade the rescue MISSES now throws instead of

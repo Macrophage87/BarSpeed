@@ -3,7 +3,10 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.model.DatabaseDowngradePolicy
 import com.macrophage.barspeed.model.DatabaseOpenAction
 import com.macrophage.barspeed.model.SqliteHeader
+import com.macrophage.barspeed.model.SqliteWal
+import com.macrophage.barspeed.model.WalFrame
 import java.io.File
+import java.io.RandomAccessFile
 
 /** What [DatabaseRescue] did, so a caller can say it rather than infer it. */
 sealed interface RescueOutcome {
@@ -64,10 +67,17 @@ sealed interface RescueOutcome {
  * one off the phone or throw it away, showing its size so the decision is made
  * with the number in front of them, is filed separately.
  *
- * NOTHING ON THE NORMAL LAUNCH PATH CHANGES. Every failure and every doubt
- * resolves to [RescueOutcome.NotNeeded], no exception escapes, and the case
- * this release actually meets -- a database at the same version as the code --
- * takes the same branch as a first install.
+ * THE LAUNCH PATH READS TWO FILES NOW, NOT ONE. That sentence used to read
+ * "nothing on the normal launch path changes", and issue #113 made it false:
+ * the version is no longer the main file's header alone, because in WAL mode
+ * that header is only as current as the last checkpoint. The `-wal` is scanned
+ * too, at 24 bytes per frame plus 100 for a frame carrying page 1 -- never a
+ * whole page, and never through SQLite, which is still the thing this code
+ * exists to get ahead of. What has NOT changed is everything the old sentence
+ * was really promising: every failure and every doubt still resolves to
+ * [RescueOutcome.NotNeeded], no exception escapes, and the case this release
+ * actually meets -- a database at the same version as the code, whose log
+ * mentions no other -- still takes the same branch as a first install.
  */
 object DatabaseRescue {
     /** Where rescued databases live, beside the in-flight set journals. */
@@ -96,14 +106,51 @@ object DatabaseRescue {
     private const val JOURNAL_SUFFIX = "-journal"
 
     /**
-     * The version [databaseFile] declares, or null if it will not say.
+     * The version [databaseFile] ACTUALLY has, or null if it will not say.
      *
-     * Every failure is null: absent, unreadable, too short, not a database,
-     * permission denied, a directory where a file was expected. No exception
-     * escapes, because this runs before anything else on the launch path and
-     * an exception here would stop the app opening at all.
+     * TWO PLACES CAN SAY, AND THE MAIN FILE ALONE IS NOT ENOUGH. Issue #113:
+     * Room journals in WAL mode, and in WAL mode the main file's header is the
+     * version as of the last CHECKPOINT. Every committed change since then
+     * lives in the `-wal` and the header is not rewritten until a checkpoint
+     * runs. An installer force-stopping the app for an in-place reinstall never
+     * lets it checkpoint on the way out, which is exactly the path a rollback
+     * takes -- so the header can read older than the database is, and this
+     * function used to return that older number.
+     *
+     * Reproduced against SQLite 3.50.4 rather than reasoned about, and the pair
+     * of files is committed at `core/data/src/test/resources/sqlite/`: a
+     * database checkpointed at 16, then bumped to 17 and committed without a
+     * checkpoint, reads 16 from the header and 17 through the log.
+     *
+     * THE LOG ONLY RAISES A VERSION THE MAIN FILE DECLARED. When
+     * [headerVersion] says nothing the answer is nothing, and the log is not
+     * consulted at all -- issue #101's rule, unchanged: a database whose own
+     * header will not parse is never acted on, because moving one aside on a
+     * guess is the destructive direction. A torn reinstall can leave a
+     * half-written main file beside an intact log, and that is not a rescue.
+     *
+     * Every failure is still null: absent, unreadable, too short, not a
+     * database, permission denied, a directory where a file was expected, and
+     * now also a `-wal` that will not parse. No exception escapes, because this
+     * runs before anything else on the launch path and an exception here would
+     * stop the app opening at all.
      */
-    fun storedVersion(databaseFile: File): Int? = runCatching {
+    fun storedVersion(databaseFile: File): Int? {
+        val header = headerVersion(databaseFile) ?: return null
+        return DatabaseDowngradePolicy.effectiveVersion(
+            headerVersion = header,
+            walVersion = walVersion(File(databaseFile.path + WAL_SUFFIX)),
+        )
+    }
+
+    /**
+     * The version [databaseFile]'s own 100-byte header declares.
+     *
+     * This was the whole of [storedVersion] until issue #113; it is now the
+     * first of two readings and its limit has a name. In WAL mode this is the
+     * version as of the last checkpoint, not the version the database has.
+     */
+    private fun headerVersion(databaseFile: File): Int? = runCatching {
         if (!databaseFile.isFile) return null
         val header = ByteArray(SqliteHeader.HEADER_BYTES)
         databaseFile.inputStream().use { stream ->
@@ -117,6 +164,74 @@ object DatabaseRescue {
         }
         SqliteHeader.userVersion(header)
     }.getOrNull()
+
+    /**
+     * The version committed into [walFile], or null when it says nothing.
+     *
+     * Null is the ordinary answer and not a failure. Most transactions never
+     * touch page 1, so a healthy log carries no version at all; so does a
+     * device in TRUNCATE or DELETE mode, which has no `-wal` in the first
+     * place. In every one of those cases the main file's header is the whole
+     * story and this changes nothing about the launch.
+     *
+     * BOUNDED BY CONSTRUCTION, because this runs before the app has drawn
+     * anything. Per frame it reads the 24-byte frame header, and 100 bytes more
+     * only for a frame that carries page 1 -- never the page itself, which can
+     * be 64 KB. The frame count is the file length over the stride, so a log
+     * that has grown large costs two small reads per frame and no allocation
+     * that scales with it.
+     *
+     * A FRAME MUST LIE WHOLLY INSIDE THE FILE to be read at all, which is the
+     * cheap stand-in for the checksums this does not verify: a torn final write
+     * leaves a short frame, and a short frame is never reached. What that does
+     * NOT exclude is a torn frame that happens to be complete, whose salts
+     * match and whose page-1 body still parses as a database header;
+     * [SqliteWal]'s KDoc states that residue and this does not narrow it.
+     *
+     * No exception escapes. A read that fails part-way discards the scan and
+     * returns null, leaving the header's reading to stand.
+     */
+    internal fun walVersion(walFile: File): Int? = runCatching {
+        if (!walFile.isFile) return null
+        val length = walFile.length()
+        if (length < SqliteWal.HEADER_BYTES) return null
+        RandomAccessFile(walFile, "r").use { file ->
+            val headerBytes = ByteArray(SqliteWal.HEADER_BYTES)
+            file.readFully(headerBytes)
+            val walHeader = SqliteWal.header(headerBytes) ?: return null
+            val stride = SqliteWal.FRAME_HEADER_BYTES.toLong() + walHeader.pageSize
+            val frames = sequence {
+                var offset = SqliteWal.HEADER_BYTES.toLong()
+                while (offset + stride <= length) {
+                    yield(readFrame(file, offset) ?: break)
+                    offset += stride
+                }
+            }
+            SqliteWal.committedUserVersion(walHeader, frames)
+        }
+    }.getOrNull()
+
+    /**
+     * One frame at [offset], with page 1's declared version when it carries
+     * page 1.
+     *
+     * The body is read through [SqliteHeader.userVersion], which checks the
+     * database magic before it reads an offset, so a frame claiming page 1
+     * whose body is not a database header contributes nothing rather than a
+     * number. The caller has already established that the whole frame lies
+     * inside the file, so the 100 bytes are always there: the minimum page size
+     * this parser accepts is 512.
+     */
+    private fun readFrame(file: RandomAccessFile, offset: Long): WalFrame? {
+        file.seek(offset)
+        val frameHeaderBytes = ByteArray(SqliteWal.FRAME_HEADER_BYTES)
+        file.readFully(frameHeaderBytes)
+        val frameHeader = SqliteWal.frameHeader(frameHeaderBytes) ?: return null
+        if (frameHeader.pageNumber != 1) return WalFrame(frameHeader, null)
+        val page = ByteArray(SqliteHeader.HEADER_BYTES)
+        file.readFully(page)
+        return WalFrame(frameHeader, SqliteHeader.userVersion(page))
+    }
 
     /**
      * The three files of a database, in the order they must be moved.
