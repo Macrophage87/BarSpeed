@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.data
 
+import com.macrophage.barspeed.model.SqliteWal
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.AfterTest
@@ -101,32 +102,106 @@ class WalStaleVersionTest {
     }
 
     /**
-     * THE DEFECT, CHARACTERIZED. Issue #113: the rescue reads the main file's
-     * header alone, so it reports 16 for a database SQLite reads as 17.
+     * THE DIFFERENTIAL. Issue #113: the version this reports must be the
+     * version the database HAS, which for the committed fixture is 17 -- what
+     * SQLite reports reading through the same two files.
      *
-     * This assertion is expected to be INVERTED by the fix. It is here so the
-     * wrong answer is a recorded fact with a fixture behind it rather than a
-     * paragraph in an issue, and so that the change of behaviour is visible as
-     * a diff rather than as a new test appearing beside an old one.
+     * c0 pinned the wrong answer here, 16, read from the main header alone.
+     * That assertion is DELETED rather than left beside this one: it was a
+     * record of a defect, not a property, and keeping both would leave the file
+     * asserting two different answers to one question.
      */
     @Test
-    fun `today the stored version ignores the wal and reads the stale header`() {
-        assertEquals(16, DatabaseRescue.storedVersion(fixture()))
+    fun `the stored version reads through the wal, not the stale header`() {
+        assertEquals(17, DatabaseRescue.storedVersion(fixture()))
     }
 
     /**
-     * THE CONSEQUENCE, CHARACTERIZED. A build compiled at 16 meeting a database
-     * that is really at 17 takes the Open branch, so Room opens it, reads 17
-     * through the WAL, finds it newer, and -- with no destructive fallback in
-     * the chain -- throws. The corpus survives and the app does not start.
+     * THE CONSEQUENCE. A build compiled at 16 meeting a database that is really
+     * at 17 must rescue it.
      *
-     * Expected to be inverted by the fix.
+     * Before this, the Open branch was taken, Room opened the file, read 17
+     * through the WAL, found it newer, and -- with no destructive fallback in
+     * the chain -- threw. The corpus survived and the app did not start. c0
+     * pinned that as `today a database that is really newer is not rescued`;
+     * that assertion is deleted here, not reworded.
      */
     @Test
-    fun `today a database that is really newer is not rescued`() {
+    fun `a database that is really newer is rescued`() {
         val db = fixture()
+        val outcome = DatabaseRescue.rescue(db, File(root, DatabaseRescue.RESCUE_DIR), 16)
+        assertTrue(outcome is RescueOutcome.Rescued, "expected Rescued, got " + outcome)
+        assertTrue(!db.exists(), "the database is still in place, so Room would meet it and throw")
+    }
+
+    /**
+     * THE WAL MOVES WITH IT, and for this defect that is not the same
+     * assertion as `the wal and shm move with the database` already makes in
+     * DatabaseRescueTest. There the `-wal` is three bytes of the word "wal";
+     * here it is the only place the newer schema exists at all. Leaving it
+     * behind would strand the newer half beside the database Room is about to
+     * recreate under that name, and the rescued directory would hold a corpus
+     * missing everything committed since the last checkpoint.
+     */
+    @Test
+    fun `the wal carrying the newer version is rescued with the database`() {
+        val db = fixture()
+        val walBytes = File(db.path + "-wal").readBytes()
+        val outcome = DatabaseRescue.rescue(db, File(root, DatabaseRescue.RESCUE_DIR), 16)
+        assertTrue(outcome is RescueOutcome.Rescued, "expected Rescued, got " + outcome)
+        assertEquals(
+            listOf("accelerometer_lifting.db", "accelerometer_lifting.db-wal"),
+            outcome.directory.listFiles().orEmpty().map { it.name }.sorted(),
+        )
+        assertEquals(
+            walBytes.toList(),
+            File(outcome.directory, "accelerometer_lifting.db-wal").readBytes().toList(),
+            "the rescued wal is not the wal that was on disk",
+        )
+        assertTrue(!File(db.path + "-wal").exists(), "the wal was left beside the name Room will recreate")
+    }
+
+    /**
+     * A MIGRATION KILLED BEFORE ITS COMMIT MUST NOT PROVOKE A RESCUE, and this
+     * is the one test in this commit that is GREEN before the fix as well as
+     * after. It is here rather than in c0 because it cannot be red: before the
+     * fix nothing reads the log at all, so the answer is the header's 16 for
+     * the trivial reason. It guards the fix from over-reaching in the other
+     * direction, which is a failure c0 could not have expressed.
+     *
+     * The fixture is the committed `-wal` truncated to its first frame, which
+     * is exactly what a kill between the page-1 write and the commit leaves.
+     * Verified against SQLite 3.50.4: reading that pair back gives
+     * user_version 16 and one row, the newer row gone.
+     */
+    @Test
+    fun `a version bumped but never committed is not a rescue`() {
+        val db = fixture()
+        val wal = File(db.path + "-wal")
+        wal.writeBytes(wal.readBytes().copyOfRange(0, SqliteWal.HEADER_BYTES + SqliteWal.FRAME_HEADER_BYTES + 512))
+        assertEquals(16, DatabaseRescue.storedVersion(db), "an uncommitted bump was read as the version")
         assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(db, File(root, DatabaseRescue.RESCUE_DIR), 16))
-        assertTrue(db.isFile, "the database moved on a build that cannot detect the downgrade at all")
+        assertTrue(db.isFile, "a database the running build could open was moved aside")
+    }
+
+    /**
+     * A `-wal` that is not a write-ahead log changes nothing. Anything this
+     * code cannot read must leave the header's reading exactly as it was, on
+     * the same rule that governs an unreadable main file: never conclude
+     * anything from bytes you could not parse.
+     */
+    @Test
+    fun `a wal that is not a wal leaves the header's reading alone`() {
+        val db = fixture()
+        File(db.path + "-wal").writeText("this is not a write-ahead log".repeat(40))
+        assertEquals(16, DatabaseRescue.storedVersion(db))
+        assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(db, File(root, DatabaseRescue.RESCUE_DIR), 16))
+
+        File(db.path + "-wal").writeBytes(ByteArray(12))
+        assertEquals(16, DatabaseRescue.storedVersion(db), "a wal too short to hold a header changed the answer")
+
+        File(db.path + "-wal").writeBytes(ByteArray(0))
+        assertEquals(16, DatabaseRescue.storedVersion(db), "an empty wal changed the answer")
     }
 
     /**
