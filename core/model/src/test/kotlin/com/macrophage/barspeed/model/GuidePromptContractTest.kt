@@ -155,6 +155,67 @@ class GuidePromptContractTest {
         )
     }
 
+    /**
+     * The prompt's reading key names the void mark and says what to do with
+     * it (#60).
+     *
+     * DIFFERENTIAL. Fails at the commit that introduces it: the prompt
+     * documents `warmup`, `failed`, `limiter`, `limiterNote`,
+     * `repMetricsComplete`, `velocityLossBasis` and `sensors`, and has never
+     * named `voided`. This is the copy the COPY PLAN PROMPT button puts on
+     * the clipboard, so a key absent from it is a key the reading model is
+     * never told about -- and the failure mode is not a missing feature, it
+     * is a wrong number: a coach handed a document with a voided set and no
+     * instruction counts a set nobody performed into volume and into every
+     * trend, which is the read the mark exists to stop.
+     *
+     * The absence rule is asserted with the rest, because it is the half a
+     * reader cannot recover: no mark on a session recorded before database
+     * v16 means the app could not ask, not that the set was performed.
+     */
+    @Test
+    fun `the plan prompt tells the reader what a voided set is and to drop it`() {
+        assertDocuments("voided")
+        assertDocuments("voidReason")
+        assertTrue(
+            "did not perform" in prompt,
+            "the plan prompt never says what the void mark asserts, so the key reads as unexplained",
+        )
+        assertTrue(
+            "database v16" in prompt,
+            "the plan prompt never says an absent mark can mean the app could not ask",
+        )
+    }
+
+    /**
+     * The prompt no longer tells the reader that a session ending early
+     * simply has fewer sets in it (#60).
+     *
+     * DIFFERENTIAL, and a correction rather than an addition. The sentence
+     * was true when it was written and this change falsifies half of it. The
+     * plan-side clause still holds -- a plan cannot mark prescribed work as
+     * skipped -- but the export-side clause now mis-instructs, because a set
+     * the lifter DID record and did not perform stays in the document
+     * carrying its mark instead of vanishing from it. A reader following the
+     * old sentence reads a voided set as work that happened.
+     *
+     * Asserted within one line and never across a line boundary, for the
+     * reason this class's KDoc gives: the source is not byte-identical across
+     * machines, since `core.autocrlf=true` leaves the working copy a trailing
+     * carriage return CI's copy does not carry.
+     */
+    @Test
+    fun `the plan prompt does not tell the reader an unperformed set is simply absent`() {
+        assertFalse(
+            "simply has fewer sets in its export." in prompt,
+            "the plan prompt still tells the reader an unperformed set is simply absent from the export",
+        )
+        assertTrue(
+            "recorded and not performed" in prompt,
+            "the plan prompt never separates a set never started from one recorded and not performed",
+        )
+    }
+
     @Test
     fun `the plan prompt states the schema version the code writes`() {
         // The prompt names the contract version in prose. There are four other
