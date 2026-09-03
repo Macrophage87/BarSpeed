@@ -45,32 +45,41 @@ import kotlin.test.assertTrue
  *
  * ## The emulator exercise that does say it
  *
- * AVD `barspeed-api35`, headless, 2026-09-02, round 1. The OLD build is a
- * debug build of tag `v0.1.49`, whose `AppDatabase.kt` reads
- * `DATABASE_VERSION = 14` -- so the upgrade exercised is 14 -> 15 -> 16, both
- * hops in one open, which is what a phone upgrading from the shipped release
- * runs. After `adb install -r` of a debug build of this branch:
- * `PRAGMA user_version` reads 16; both set rows, all four `raw_streams` rows
- * and the session survive; and `.schema set_records` shows `workBegan
- * INTEGER`, `failedByLifter INTEGER`, `voided INTEGER NOT NULL DEFAULT 0` and
+ * AVD `barspeed-api35`, headless, 2026-09-03, round 4. THIS REPLACES A
+ * PARAGRAPH DESCRIBING A ROUND-1 RUN, which was measured on this branch
+ * before it was rebased and while it still carried a MIGRATION_14_15 of its
+ * own; the hop that lands is not the hop that run exercised, so the old
+ * paragraph is deleted rather than kept beside this one.
+ *
+ * The OLD build is a debug build of `origin/main` at
+ * `e4be366826a3b6e900236d86285d2d78d18ea470`, whose `AppDatabase.kt` reads
+ * `DATABASE_VERSION = 15` -- so the hop exercised is exactly 15 -> 16, this
+ * branch's own and nothing else's. Two sets were recorded on it (Back Squat
+ * 5 x 60 kg and 3 x 60 kg, manual count, no sensor), the session finished
+ * and rated, and `PRAGMA user_version` read 15 with `set_records` carrying
+ * neither `voided` nor `voidReason`.
+ *
+ * After `adb install -r` of a debug build of this branch at
+ * `ffa629cc6341991aa2e5fe9a3296a760e785779a`: `PRAGMA user_version` reads
+ * 16; both set rows, all four `raw_streams` rows and the session survive;
+ * and `.schema set_records` shows `voided INTEGER NOT NULL DEFAULT 0` and
  * `voidReason TEXT` appended UNQUOTED at the end of the table, which is the
- * raw `ALTER TABLE` signature rather than Room recreating the table -- every
- * pre-existing column is still backtick-quoted. Both legacy rows read
- * `voided` 0 with `voidReason` NULL and `workBegan` / `failedByLifter` NULL:
- * nothing was backfilled. Logcat scoped to the app's pid carried no
- * `SQLiteException` and no migration error.
+ * raw `ALTER TABLE` signature rather than Room recreating the table --
+ * every pre-existing column is still backtick-quoted. Both legacy rows read
+ * `voided` 0 with `voidReason` NULL: nothing was backfilled. Logcat scoped
+ * to the app's pid carried no `SQLiteException` and no fatal.
  *
  * A RELEASE APK CANNOT SERVE AS THE OLD BUILD: `adb install -r` of a debug
  * APK over a release-signed one is refused with
- * `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, different signing keys. The old build
- * is therefore a DEBUG build of v0.1.49, carrying the same
- * `DATABASE_VERSION = 14` the tag ships.
+ * `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, different signing keys. The old
+ * build is therefore a locally-built DEBUG APK of the commit named above.
  *
- * The rest of that run is in the commit body: the void control, the volume
- * and set-count exclusion, both export writers, the un-void, and the
- * downgrade back to the v14 build, which raised the rescue card rather than
- * wiping anything. None of it is executed by CI and none of it is re-run by
- * this file.
+ * The rest of that run is in the body of the commit that carries this
+ * paragraph: the void control on a row written before the column existed,
+ * the volume and set-count exclusion, both export writers, the un-void, and
+ * the downgrade back to the SAME DB-15 build, which raised the rescue card
+ * rather than wiping anything. None of it is executed by CI and none of it
+ * is re-run by this file.
  *
  * ## The two shapes, and why they differ from each other
  *
