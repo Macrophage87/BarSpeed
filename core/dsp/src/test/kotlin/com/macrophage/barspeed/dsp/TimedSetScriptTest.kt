@@ -38,19 +38,23 @@ class TimedSetScriptTest {
         val SET12_SENSOR_COUNTS = listOf(1788342930181L, 1788342931170L)
     }
 
-    private val holdGuides = SetVoicePolicy.guidesFor(
-        hasTempo = false,
-        isTimed = true,
-        kind = ExerciseKind.HOLD,
-        demoMode = false,
-        imuConnected = true,
-    )
+    /**
+     * The guides field-37 was RECORDED under, written out rather than asked
+     * of the policy.
+     *
+     * The two replays below assert that the model reproduces an archive, and
+     * an archive does not change when the policy does. Reading them from
+     * `SetVoicePolicy` -- which c1 did -- would turn a claim about what app
+     * 0.1.48 said into a claim about what the current build would say, and
+     * #217 changes the second and not the first.
+     */
+    private val guidesAsRecorded = setOf(SetVoiceGuide.TIMED_CLOCK, SetVoiceGuide.SENSOR_COUNT)
 
     private fun replay(
         targetS: Int,
         workStartedAtMs: Long,
         sensorCountsAtMs: List<Long>,
-        guides: Set<SetVoiceGuide> = holdGuides,
+        guides: Set<SetVoiceGuide> = guidesAsRecorded,
     ) = TimedSetScript.script(
         prepS = PREP_S,
         targetS = targetS,
@@ -115,6 +119,54 @@ class TimedSetScriptTest {
         val beforeWork = replay(SET11_TARGET_S, SET11_WORK_STARTED_MS, emptyList())
             .filter { it.atMs < SET11_WORK_STARTED_MS }
         assertEquals(listOf("Ready", "Brace"), beforeWork.map { it.cue })
+    }
+
+    /**
+     * A hold speaks no bare digit before the word that starts its clock.
+     *
+     * The differential #217 exists for, and it is asked of the guides the
+     * POLICY hands a hold today rather than of the ones field-37 recorded:
+     * replay set 11's prep, target and captured stray-digit instants, and
+     * nothing numeric may reach the record at or before `Hold`. Before the
+     * fix the first row is a bare `1` 0.186 s early, which is what the lifter
+     * heard.
+     */
+    @Test
+    fun `a hold speaks no bare digit before the word that starts its clock`() {
+        val guides = SetVoicePolicy.guidesFor(
+            hasTempo = false,
+            isTimed = true,
+            kind = ExerciseKind.HOLD,
+            demoMode = false,
+            imuConnected = true,
+        )
+        val script = replay(SET11_TARGET_S, SET11_WORK_STARTED_MS, SET11_SENSOR_COUNTS, guides = guides)
+        val early = script.filter { it.atMs <= SET11_WORK_STARTED_MS && it.cue.all(Char::isDigit) }
+        assertEquals(emptyList(), early, "a bare digit still precedes the word that starts the hold")
+    }
+
+    /**
+     * A hold says the cadence and only the cadence.
+     *
+     * The whole track, not just its opening: whatever the sensor stream did
+     * during the hold, the rows are the prep's two words, the start word, the
+     * milestone, the ten-digit countdown and the terminal word.
+     */
+    @Test
+    fun `a hold records the clock cadence and nothing beside it`() {
+        val guides = SetVoicePolicy.guidesFor(
+            hasTempo = false,
+            isTimed = true,
+            kind = ExerciseKind.HOLD,
+            demoMode = false,
+            imuConnected = true,
+        )
+        val script = replay(SET11_TARGET_S, SET11_WORK_STARTED_MS, SET11_SENSOR_COUNTS, guides = guides)
+        assertEquals(
+            listOf("Ready", "Brace", "Hold", "15 seconds") +
+                (10 downTo 1).map { it.toString() } + TimedSetVoice.TIME_UP,
+            script.map { it.cue },
+        )
     }
 
     /**

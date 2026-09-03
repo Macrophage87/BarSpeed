@@ -6,10 +6,13 @@ import kotlin.test.assertEquals
 /**
  * Who speaks on a set of each shape.
  *
- * Every case here is what `RecordViewModel.beginSet` computed before the
- * decision was lifted out of it, so this class is the record that the lift
- * changed nothing. The set of shapes is exhaustive: every [ExerciseKind]
- * against tempo, timed, demo and sensor.
+ * The set of shapes is exhaustive: every [ExerciseKind] against tempo, timed,
+ * demo and sensor.
+ *
+ * These were c1's characterization of what `RecordViewModel.beginSet` computed
+ * before the decision was lifted out of it. The timed case is no longer that
+ * and says so at the point it changed; the rest are unchanged by #217 and are
+ * still the record that the lift changed nothing.
  */
 class SetVoicePolicyTest {
     private fun guides(
@@ -66,27 +69,57 @@ class SetVoicePolicyTest {
     }
 
     /**
-     * A timed set runs its clock -- and, before #217, the sensor counter too.
+     * A timed set is guided by its clock and by nothing else.
      *
-     * This is the defect as the shipped app computed it, pinned so the lift
-     * out of `:app` can be shown to have changed nothing. Both cases the
-     * field-37 captures were recorded under are here: a hold with a sensor
-     * connected, which is what sets 11 and 12 were.
+     * The c1 pin here said the opposite -- that a timed set is spoken over by
+     * the sensor counter as well as its clock -- and it was true of the
+     * shipped app. It is DELETED rather than reworded: it characterised the
+     * defect for one commit, its job is done, and a pin that describes what
+     * the app used to do reads later as a pin on what it should do.
+     *
+     * All three shapes the field has produced are here. A hold and a carry
+     * with a sensor connected are what field-37's sets 11, 12 and 13 were; a
+     * timed set carrying a tempo string is reachable on the ad-hoc path, which
+     * has no validator (#217).
      */
     @Test
-    fun `a timed set is spoken over by the sensor counter as well as its clock`() {
+    fun `a timed set is guided by its clock alone`() {
+        assertEquals(setOf(SetVoiceGuide.TIMED_CLOCK), guides(isTimed = true, kind = ExerciseKind.HOLD))
+        assertEquals(setOf(SetVoiceGuide.TIMED_CLOCK), guides(isTimed = true, kind = ExerciseKind.CARRY))
         assertEquals(
-            setOf(SetVoiceGuide.TIMED_CLOCK, SetVoiceGuide.SENSOR_COUNT),
-            guides(isTimed = true, kind = ExerciseKind.HOLD),
-        )
-        assertEquals(
-            setOf(SetVoiceGuide.TIMED_CLOCK, SetVoiceGuide.SENSOR_COUNT),
-            guides(isTimed = true, kind = ExerciseKind.CARRY),
-        )
-        assertEquals(
-            setOf(SetVoiceGuide.TIMED_CLOCK, SetVoiceGuide.SENSOR_COUNT),
+            setOf(SetVoiceGuide.TIMED_CLOCK),
             guides(isTimed = true, hasTempo = true, kind = ExerciseKind.HOLD),
         )
+        assertEquals(setOf(SetVoiceGuide.TIMED_CLOCK), guides(isTimed = true, demoMode = true))
+    }
+
+    /**
+     * No set is guided by two voices at once.
+     *
+     * The whole contract, over every shape: kind against tempo, timed, demo
+     * and sensor. Two voices counting different quantities in overlapping
+     * vocabularies is what a lifter cannot resolve -- on field-37's set 11 the
+     * bare `1` the sensor counter spoke landed 0.186 s before the `Hold` that
+     * meant the clock had started.
+     */
+    @Test
+    fun `no set is guided by two voices at once`() {
+        for (kind in ExerciseKind.entries) {
+            for (hasTempo in listOf(false, true)) {
+                for (isTimed in listOf(false, true)) {
+                    for (demo in listOf(false, true)) {
+                        for (imu in listOf(false, true)) {
+                            val g = SetVoicePolicy.guidesFor(hasTempo, isTimed, kind, demo, imu)
+                            assertEquals(
+                                true,
+                                g.size <= 1,
+                                "$kind tempo=$hasTempo timed=$isTimed demo=$demo imu=$imu speaks with $g",
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -106,32 +139,6 @@ class SetVoicePolicyTest {
                                 SetVoiceGuide.SENSOR_COUNT in
                                     SetVoicePolicy.guidesFor(hasTempo, isTimed, kind, demo, imu),
                                 SetVoicePolicy.sensorCounts(hasTempo, isTimed, kind, demo, imu),
-                                "$kind tempo=$hasTempo timed=$isTimed demo=$demo imu=$imu",
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * The cadence and the sensor counter never both run.
-     *
-     * That much of the one-voice contract already held, and is pinned here so
-     * a later change to the timed branch cannot break it on the way past.
-     */
-    @Test
-    fun `no set is both cued and sensor counted`() {
-        for (kind in ExerciseKind.entries) {
-            for (hasTempo in listOf(false, true)) {
-                for (isTimed in listOf(false, true)) {
-                    for (demo in listOf(false, true)) {
-                        for (imu in listOf(false, true)) {
-                            val g = SetVoicePolicy.guidesFor(hasTempo, isTimed, kind, demo, imu)
-                            assertEquals(
-                                false,
-                                SetVoiceGuide.CUED_CADENCE in g && SetVoiceGuide.SENSOR_COUNT in g,
                                 "$kind tempo=$hasTempo timed=$isTimed demo=$demo imu=$imu",
                             )
                         }
