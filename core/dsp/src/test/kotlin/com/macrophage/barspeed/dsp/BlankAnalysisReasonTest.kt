@@ -3,6 +3,7 @@ package com.macrophage.barspeed.dsp
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.StartPhase
+import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.serialization.json.Json
 import java.io.File
 import kotlin.test.Test
@@ -333,5 +334,85 @@ class BlankAnalysisReasonTest {
                 "$pair segments to nothing and states no reason",
             )
         }
+    }
+
+    // ---- through SetAnalyzer, which is where a recorded set gets its reason --
+
+    @Test
+    fun `SetAnalyzer publishes the reason on every capture that resolves nothing`() {
+        // The wiring, not the rule. NoRepsReason.of is pinned above from
+        // censuses; this asserts that the analysis a recorded set actually
+        // carries reaches the same answer, because the census the analyzer
+        // hands it comes from its own segmentation pass and nothing else
+        // checks that it hands over the right one.
+        fun reasonOf(fixture: String, startsWith: StartPhase): NoRepsReason? =
+            SetAnalyzer.analyze(load(fixture), LiftDirection(startsWith), loadKg = 52.163122551154075).noRepsReason
+        assertEquals(
+            NoRepsReason.RUNS_EXCEED_DISPLACEMENT_CAP,
+            reasonOf("field-rdl-3010-10rep-s36-set05", StartPhase.ECCENTRIC),
+            "the Romanian deadlift issue #87 could not reach",
+        )
+        assertEquals(
+            NoRepsReason.RUNS_EXCEED_DISPLACEMENT_CAP,
+            reasonOf("field-rdl-3010-10rep-s36-set05", StartPhase.CONCENTRIC),
+            "and the same set read the other way round",
+        )
+        assertEquals(
+            NoRepsReason.NO_MOVEMENT,
+            reasonOf("field-still-0rep", StartPhase.ECCENTRIC),
+            "a sensor that was on and did not move",
+        )
+        assertEquals(
+            NoRepsReason.PHASES_UNPAIRED,
+            reasonOf("field-seated-ohp-2rep", StartPhase.ECCENTRIC),
+            "runs survived and none paired",
+        )
+    }
+
+    @Test
+    fun `SetAnalyzer publishes no reason on a capture that resolves anything`() {
+        // The other half, and the one that stops the fix being "set the field
+        // unconditionally". Four captures, including the three #87 moved off
+        // zero and the neighbour that resolves 1 of 10 through 123.64 m of
+        // runaway. This test is GREEN before the wiring and must stay green
+        // after it.
+        fun reasonOf(fixture: String, startsWith: StartPhase): NoRepsReason? =
+            SetAnalyzer.analyze(load(fixture), LiftDirection(startsWith), loadKg = 24.948).noRepsReason
+        assertNull(reasonOf("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC), "ohp s37 set02, 4 of 6")
+        assertNull(reasonOf("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC), "bench s37 set05, 1 of 6")
+        assertNull(reasonOf("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC), "bench s37 set06, 3 of 6")
+        assertNull(reasonOf("field-rdl-3010-10rep-s36-set04", StartPhase.ECCENTRIC), "the RDL that resolves 1 of 10")
+    }
+
+    @Test
+    fun `a set whose every detection began after its own end cue says so`() {
+        // The one reason that does NOT mean segmentation failed, reached
+        // through the real analyzer rather than a census. The cue track is
+        // synthetic and says so: a terminal cue at the set's first instant
+        // puts every drive after the end of the set, which is the shape
+        // SetEnd.startedWithinSet excludes. No capture in this corpus is in
+        // that state, so nothing here claims a lifter has produced one.
+        val samples = load("field-rdl-3010-10rep")
+        val ended = listOf(VoiceCue(samples.first().timestampMs, SetEnd.STOPPED))
+        val bounded = SetAnalyzer.analyze(
+            samples,
+            LiftDirection(StartPhase.ECCENTRIC),
+            loadKg = 52.163122551154075,
+            cues = ended,
+        )
+        assertEquals(emptyList(), bounded.reps, "the cue bound did not empty the set, so this pins nothing")
+        assertEquals(
+            NoRepsReason.AFTER_SET_END_CUE,
+            bounded.noRepsReason,
+            "an emptied-by-the-cue set is reported as a segmentation failure",
+        )
+        // Unbounded, the same stream resolves eleven and states no reason.
+        val unbounded = SetAnalyzer.analyze(
+            samples,
+            LiftDirection(StartPhase.ECCENTRIC),
+            loadKg = 52.163122551154075,
+        )
+        assertEquals(11, unbounded.reps.size, "the same stream unbounded")
+        assertNull(unbounded.noRepsReason, "the unbounded set states a reason for reps it published")
     }
 }
