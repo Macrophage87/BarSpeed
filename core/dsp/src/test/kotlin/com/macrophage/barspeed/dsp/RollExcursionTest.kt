@@ -116,10 +116,27 @@ class RollExcursionTest {
 
     // ---- absence is not a low number ---------------------------------------
 
+    /**
+     * The window holds EXACTLY ONE sample here, and that is the point.
+     *
+     * An earlier form of this test used bounds that excluded every sample, so
+     * it was really a second copy of `a window holding no samples states
+     * nothing` and mutation M4 -- relaxing the guard from `size < 2` to
+     * `size < 1` -- survived it. A check that cannot fail reads as coverage.
+     */
     @Test
     fun `a window holding one sample states nothing`() {
+        assertEquals(
+            1,
+            samples(100L to 0.0, 420L to 90.0, 500L to 5.0).count { it.timestampMs in 400L..450L },
+            "the fixture must put exactly one sample in the window or this test checks nothing",
+        )
         assertNull(
-            RollExcursion.of(samples(100L to 0.0, 500L to 90.0), workStartedAtMs = 400L, end = cuedAt(450L)),
+            RollExcursion.of(
+                samples(100L to 0.0, 420L to 90.0, 500L to 5.0),
+                workStartedAtMs = 400L,
+                end = cuedAt(450L),
+            ),
             "one sample has a range of zero, and zero here reads as did not rotate",
         )
     }
