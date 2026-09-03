@@ -79,13 +79,17 @@ class FieldDataRegressionTest {
     fun `batch analysis segments slow squats from the 10 Hz field set`() {
         val samples = load("field-backsquat-10hz.csv")
         val analysis = SetAnalyzer.analyze(samples, StartPhase.ECCENTRIC, loadKg = 47.6)
-        // The lifter did exactly 5 slow-tempo reps. The analyzer finds 4: the
-        // file ends mid-re-rack, which smears the final rep. Pinned exactly,
-        // because the old `in 4..6` band could not tell 4 from 5 and so could
-        // not tell a fix from a coincidence.
-        assertEquals(4, analysis.reps.size, "segmented reps; the lifter performed 5")
+        // The lifter did exactly 5 slow-tempo reps and the analyzer now finds
+        // SIX. Issue #94's runaway correction took this from 4 to 6, so it
+        // crossed the count rather than landing on it: the last 6.7 s of this
+        // capture is the re-rack, it was one over-cap run the segmenter
+        // discarded whole, and de-trending it yields two detections where one
+        // real rep was left to find. Under-count became over-count here.
+        // Pinned exactly, because the old `in 4..6` band could not tell 4 from
+        // 5 and so could not tell a fix from a coincidence.
+        assertEquals(6, analysis.reps.size, "segmented reps; the lifter performed 5")
         val sane = analysis.reps.count { (it.eccS ?: 0.0) in 2.5..8.0 && it.romM < 1.5 }
-        assertEquals(4, sane, "reps showing the slow-tempo character, of ${analysis.reps.size} segmented")
+        assertEquals(5, sane, "reps showing the slow-tempo character, of ${analysis.reps.size} segmented")
     }
 
     @Test
@@ -132,14 +136,14 @@ class FieldDataRegressionTest {
             analysis.sampleRateHz in 90.0..110.0,
             "measured rate ${analysis.sampleRateHz} (sensor streamed 100 Hz)",
         )
-        assertEquals(8, analysis.reps.size, "segmented reps; the lifter performed 8")
+        assertEquals(10, analysis.reps.size, "segmented reps; the lifter performed 8")
         // Continuous cycling leaves stretches with no ZUPT anchor, so some reps
         // ride on residual drift; only a core of these look kinematically like
         // presses. (Before this fix the analyzer produced single "reps"
         // spanning 50 s and 150 m of ROM.) Pinned exactly: `sane >= 3` was true
         // of any outcome from 3 upwards and so measured nothing.
         val sane = analysis.reps.count { it.conS in 0.2..2.5 && it.romM in 0.2..1.2 }
-        assertEquals(4, sane, "reps that look like real presses, of ${analysis.reps.size} segmented")
+        assertEquals(6, sane, "reps that look like real presses, of ${analysis.reps.size} segmented")
         // Deliberately still bounds: one-sided runaway-drift guards, not
         // measurements of the lift.
         analysis.reps.forEach { rep ->
@@ -166,12 +170,17 @@ class FieldDataRegressionTest {
         // at what a press looks like.
         val samples = load("field-seated-ohp-2rep.csv")
         val analysis = SetAnalyzer.analyze(samples, StartPhase.CONCENTRIC, loadKg = 20.4)
-        assertEquals(2, analysis.reps.size, "segmented reps; the lifter performed 2 presses")
-        assertEquals(2, analysis.reps.count { it.eccS == null }, "reps counted on the drive alone")
-        assertMeasured(listOf(1.71, 4.28), analysis.reps.map { it.conS }, "concentric seconds")
-        assertMeasured(listOf(0.857, 0.484), analysis.reps.map { it.romM }, "ROM, metres")
-        // Only the first is a press by any kinematic reading of it.
-        assertEquals(1, analysis.reps.count { it.conS in 0.2..2.5 }, "reps whose drive lasts a press")
+        // THREE detections for two presses since issue #94's runaway
+        // correction. The 5.5-11.5 s stretch was one over-cap run and is now
+        // two detections of 1.42 s and 1.73 s; the 4.28 s artefact described
+        // above survives unchanged. So this capture went from the right total
+        // by cancellation to one too many, and the reps whose drive lasts a
+        // press went from 1 of 2 to 2 of 3.
+        assertEquals(3, analysis.reps.size, "segmented reps; the lifter performed 2 presses")
+        assertEquals(3, analysis.reps.count { it.eccS == null }, "reps counted on the drive alone")
+        assertMeasured(listOf(1.42, 1.73, 4.28), analysis.reps.map { it.conS }, "concentric seconds")
+        assertMeasured(listOf(0.364, 0.864, 0.484), analysis.reps.map { it.romM }, "ROM, metres")
+        assertEquals(2, analysis.reps.count { it.conS in 0.2..2.5 }, "reps whose drive lasts a press")
 
         val tracker = StreamingSetTracker(StartPhase.CONCENTRIC)
         var last = LiveSetState()
@@ -305,31 +314,40 @@ class FieldDataRegressionTest {
     }
 
     @Test
-    fun `rotating overhead press resolves 6 of the 8 reps performed`() {
+    fun `rotating overhead press resolves all 8 reps performed`() {
         // Set 1: seated overhead press, 45 lb warm-up, tempo 3010. The lifter
         // counted 8. The sensor rolled through 40.4 deg over the set, and its
         // median gyro magnitude is 12.06 deg/s -- over the fixed gate, so
         // [VelocityEstimator.gyroGateApplies] is false here and candidacy rests
-        // on the acceleration term. Issue #87 took this from 3 to 6.
+        // on the acceleration term. Issue #87 took this from 3 to 6 and issue
+        // #94's runaway correction from 6 to 8, which is the count the lifter
+        // performed. The count agreeing is not the reps being right: two of
+        // the eight measure 1.05 m and 1.06 m of ROM on an overhead press.
         val analysis = analyze("field-ohp-rotating-8rep.csv")
-        assertEquals(6, analysis.reps.size, "segmented reps; the lifter performed 8")
+        assertEquals(8, analysis.reps.size, "segmented reps; the lifter performed 8")
     }
 
     @Test
-    fun `a second rotating overhead press resolves 6 of the 8 reps performed`() {
+    fun `a second rotating overhead press resolves all 8 reps performed`() {
         // Set 4: same lift at 55 lb, 8 counted, sensor rolled 37.1 deg, median
         // gyro 12.98 deg/s. Kept alongside set 1 because the shape of the loss
-        // differs. Issue #87 took this from 4 to 6; two reps remain missing on
-        // both captures and #87 does not claim otherwise.
+        // differs. Issue #87 took this from 4 to 6 and issue #94 from 6 to 8.
+        // Per-window scoring in BatchCueCoverageTest says 7 of the 8 metronome
+        // marks are matched and one detection is doubled, so the total lands
+        // on 8 with one mark still empty.
         val analysis = analyze("field-ohp-rotating-8rep-b.csv")
-        assertEquals(6, analysis.reps.size, "segmented reps; the lifter performed 8")
+        assertEquals(8, analysis.reps.size, "segmented reps; the lifter performed 8")
     }
 
     @Test
-    fun `rotating bench press resolves 2 of the 6 reps performed (pre-fix)`() {
-        // Set 6: bench press, 95 lb, 6 counted, sensor rolled 46.1 deg.
+    fun `rotating bench press resolves 5 of the 6 reps performed`() {
+        // Set 6: bench press, 95 lb, 6 counted, sensor rolled 46.1 deg. Issue
+        // #94's runaway correction took this from 2 to 5; one detection reads
+        // 1.051 m, which is not a bench rep at any ROM this corpus has
+        // measured (0.333-0.345 m on the sister capture), so the count moving
+        // toward the truth has not made every rep true.
         val analysis = analyze("field-bench-rotating-6rep.csv")
-        assertEquals(2, analysis.reps.size, "segmented reps; the lifter performed 6")
+        assertEquals(5, analysis.reps.size, "segmented reps; the lifter performed 6")
     }
 
     @Test
@@ -345,18 +363,24 @@ class FieldDataRegressionTest {
     }
 
     @Test
-    fun `stack-mounted cable row resolves 8 for 8 by cancelling misses against drift (pre-fix)`() {
+    fun `stack-mounted cable row resolves 11 detections for the 8 reps performed`() {
         // Set 8: seated cable row, 60 lb warm-up, 8 counted, sensor on the
         // weight stack and rolling 0.5 deg over the whole set. The count agrees
-        // with the lifter and the reps do not: two of the eight carry a tenth
-        // of the others' velocity. A count alone cannot see this, which is why
-        // the per-rep pins below exist.
+        // and the reps did not: two of the eight carried a tenth of the
+        // others' velocity. A count alone cannot see that, which is why the
+        // per-rep pins exist -- and issue #94's runaway correction is the
+        // proof of the point, taking the count from an apparently perfect 8
+        // to 11. Two of the three added detections fall in the 15.7-22.3 s
+        // stretch that was one over-cap run, on this set's own five-second
+        // cadence, so the 8 was real reps missing and artefacts cancelling.
+        // This capture carries no cue track, so nothing here can adjudicate
+        // the remaining detections.
         val analysis = analyze("field-cablerow-static-8rep.csv")
-        assertEquals(8, analysis.reps.size, "segmented reps; the lifter performed 8")
+        assertEquals(11, analysis.reps.size, "segmented reps; the lifter performed 8")
         // Velocity loss is best rep to LAST rep. The last rep here is one of
         // the two slow ones, so the set the lifter completed as prescribed is
         // reported to them as an 81% drawdown.
-        assertEquals<Double?>(80.8, analysis.velocityLossPct, "velocity loss reported to the lifter")
+        assertEquals<Double?>(85.1, analysis.velocityLossPct, "velocity loss reported to the lifter")
     }
 
     @Test
@@ -411,17 +435,27 @@ class FieldDataRegressionTest {
         // The two rotating overhead presses used to be the two that did NOT
         // move, at 16.142 m and 16.357 m, because every anchor they had sat in
         // the first half of the capture and there was none left for a tighter
-        // rule to refuse. Issue #87 gives them anchors across the whole set and
-        // they are the largest improvement in the file: 16.142 m to -3.002 m
-        // and 16.357 m to -0.710 m against a physical truth of zero. The other
-        // five are unchanged by #87 -- none of them straddles the gate.
+        // rule to refuse. Issue #87 gave them anchors across the whole set:
+        // 16.142 m to -3.002 m and 16.357 m to -0.710 m against a physical
+        // truth of zero.
+        //
+        // Issue #94's runaway correction moves six of the seven and NOT in one
+        // direction, which is the honest reading of it. Toward zero: the
+        // rotating bench press 9.615 m to -0.409 m, the largest single
+        // improvement this figure has ever recorded, and the first overhead
+        // press -3.002 m to -1.944 m. Away from zero: the second overhead
+        // press -0.710 m to 4.312 m and the cable row -1.255 m to -1.839 m.
+        // Removing a runaway's mean sets that stretch's net travel to zero by
+        // construction, so what is left is the travel OUTSIDE the runaways,
+        // and on a capture whose runaway was cancelling an error elsewhere the
+        // total gets worse. Nothing here claims the integrator is fixed.
         val todayM =
             mapOf(
-                "field-ohp-rotating-8rep.csv" to -3.002,
-                "field-ohp-rotating-8rep-b.csv" to -0.710,
+                "field-ohp-rotating-8rep.csv" to -1.944,
+                "field-ohp-rotating-8rep-b.csv" to 4.312,
                 "field-bench-rotating-6rep-ok.csv" to -1.316,
-                "field-bench-rotating-6rep.csv" to 9.615,
-                "field-cablerow-static-8rep.csv" to -1.255,
+                "field-bench-rotating-6rep.csv" to -0.409,
+                "field-cablerow-static-8rep.csv" to -1.839,
                 "field-facepull-static-12rep.csv" to 0.709,
                 "field-pallof-static-12rep.csv" to 4.684,
             )
@@ -435,16 +469,21 @@ class FieldDataRegressionTest {
         // Physically zero per rep, for the same reason: a rep that returns to
         // where it started travels as far down as up, so the eccentric and
         // concentric path lengths are equal. Pinned as the worst asymmetry in
-        // each capture, in metres, over the reps that resolved an eccentric at
+        // Issue #94's runaway correction resolves more eccentrics on four of
+        // the seven and the worst asymmetry goes UP on three of those -- the
+        // reps it recovers are inside stretches the integrator had lost, so
+        // they are the least well reconstructed reps in each set. Recovering
+        // a rep is not the same as measuring it. Pinned as the worst asymmetry
+        // in
         // all — the count of those is pinned too, because a fix that "improves"
         // this figure by resolving fewer eccentrics has not improved anything.
         val today =
             mapOf(
-                "field-ohp-rotating-8rep.csv" to (6 to 1.035),
-                "field-ohp-rotating-8rep-b.csv" to (6 to 0.880),
+                "field-ohp-rotating-8rep.csv" to (8 to 1.164),
+                "field-ohp-rotating-8rep-b.csv" to (8 to 1.350),
                 "field-bench-rotating-6rep-ok.csv" to (6 to 0.721),
-                "field-bench-rotating-6rep.csv" to (2 to 0.068),
-                "field-cablerow-static-8rep.csv" to (5 to 1.344),
+                "field-bench-rotating-6rep.csv" to (5 to 0.978),
+                "field-cablerow-static-8rep.csv" to (8 to 1.344),
                 "field-facepull-static-12rep.csv" to (5 to 0.353),
                 "field-pallof-static-12rep.csv" to (6 to 0.239),
             )
@@ -477,17 +516,25 @@ class FieldDataRegressionTest {
         // a segmentation change, not an arithmetic one, and without the count
         // beside it the two are indistinguishable from the failure message.
         //
-        // Three of the stack-mounted captures now resolve MORE eccentrics —
-        // cable row 4 to 5, face pull 2 to 5, pallof 7 to 6 — because a slow
-        // cable eccentric is exactly the phase that was being subtracted away.
-        // Pallof falls by one because it also segments its reps differently.
+        // Three of the stack-mounted captures resolve MORE eccentrics than
+        // before the anchor accept rule — cable row 4 to 5, face pull 2 to
+        // 5, pallof 7 to 6 — because a slow cable eccentric is exactly the
+        // phase that was being subtracted away. Pallof falls by one because it
+        // also segments its reps differently.
+        //
+        // Issue #94's runaway correction moves four more: both overhead
+        // presses 6 to 8, the rotating bench press 2 to 5 and the cable row 5
+        // to 8. Every published ratio moves with them, and on the two presses
+        // it moves AWAY from the 3.0 the 3010 prescription asks for — 2.02 to
+        // 1.82 and 1.32 to 1.22. The recovered reps resolve short eccentrics,
+        // which is what a rep rebuilt out of a runaway looks like.
         val expected =
             mapOf(
-                "field-ohp-rotating-8rep.csv" to (6 to 2.02),
-                "field-ohp-rotating-8rep-b.csv" to (6 to 1.32),
+                "field-ohp-rotating-8rep.csv" to (8 to 1.82),
+                "field-ohp-rotating-8rep-b.csv" to (8 to 1.22),
                 "field-bench-rotating-6rep-ok.csv" to (6 to 3.32),
-                "field-bench-rotating-6rep.csv" to (2 to 2.11),
-                "field-cablerow-static-8rep.csv" to (5 to 3.38),
+                "field-bench-rotating-6rep.csv" to (5 to 1.16),
+                "field-cablerow-static-8rep.csv" to (8 to 3.02),
                 "field-facepull-static-12rep.csv" to (5 to 0.71),
                 "field-pallof-static-12rep.csv" to (6 to 1.48),
             )
@@ -529,21 +576,27 @@ class FieldDataRegressionTest {
         // rep 8 resolved an eccentric for the first time and it is the worst
         // one; the face pull names rep 8 of 11 rather than rep 12 of 13.
         //
-        // Two more move with issue #87, and only on the two overhead presses,
-        // because both now segment six reps rather than three and four. The
+        // Two more moved with issue #87, and only on the two overhead presses,
+        // because both then segmented six reps rather than three and four. The
         // caption follows the segmentation; nothing in the caption rule
         // changed. Note what that means for the lifter: the sentence under the
-        // eccentric chart names a DIFFERENT REP after this change, on a set
+        // eccentric chart names a DIFFERENT REP after such a change, on a set
         // where neither the old nor the new rep list has been checked against
         // what the lifter actually did.
+        //
+        // Issue #94's runaway correction moves three: the second overhead
+        // press from rep 6 to rep 8, the rotating bench press from rep 2 to
+        // rep 1, and the cable row from rep 8 to rep 7 — the cable row also
+        // LOSES its fatigue suffix, because the worst eccentric is no longer
+        // the last rep measured. That suffix is the strongest sentence this
+        // app says about a set and it turns on which reps resolved.
         val expected =
             mapOf(
                 "field-ohp-rotating-8rep.csv" to "Rep 1 eccentric 1.8 s — 1.2 s too fast.",
-                "field-ohp-rotating-8rep-b.csv" to "Rep 6 eccentric 0.5 s — 2.5 s too fast. Fatigue showing.",
+                "field-ohp-rotating-8rep-b.csv" to "Rep 8 eccentric 0.5 s — 2.5 s too fast. Fatigue showing.",
                 "field-bench-rotating-6rep-ok.csv" to "Rep 6 eccentric 4.6 s — 1.6 s too slow.",
-                "field-bench-rotating-6rep.csv" to "Rep 2 eccentric 1.5 s — 1.5 s too fast. Fatigue showing.",
-                "field-cablerow-static-8rep.csv" to
-                    "Rep 8 eccentric 1.6 s — 1.4 s too fast. Fatigue showing.",
+                "field-bench-rotating-6rep.csv" to "Rep 1 eccentric 0.8 s — 2.2 s too fast.",
+                "field-cablerow-static-8rep.csv" to "Rep 7 eccentric 0.4 s — 2.6 s too fast.",
                 "field-facepull-static-12rep.csv" to "Rep 8 eccentric 0.5 s — 2.5 s too fast.",
                 "field-pallof-static-12rep.csv" to "Rep 8 eccentric 0.7 s — 2.4 s too fast.",
             )
@@ -565,12 +618,14 @@ class FieldDataRegressionTest {
         // It does NOT separate cleanly and this pin states no threshold. The
         // face pull no longer segments a 13th rep at all, so the 0.984 that
         // rep carried is gone from the list; the pallof press still invents one
-        // and it still reads 0.940. Reps 6 and 8 of the cable row are
-        // fabricated by inference rather than by count (that set segments 8 for
-        // 8, and those are its only two reps under 0.12 m/s mean velocity);
-        // they read 0.734 and 0.954, UNCHANGED to three decimals by this
-        // change, which is the direct evidence that whatever costs those two
-        // reps their travel is not the anchor accept rule. Against that, the
+        // and it still reads 0.940. Two cable-row reps are fabricated by
+        // inference rather than by count -- they are that set's only reps
+        // under 0.12 m/s mean velocity; they read 0.734 and 0.954, UNCHANGED
+        // to three decimals both by the anchor accept rule and by issue #94's
+        // runaway correction, which is direct evidence that whatever costs
+        // those two reps their travel is neither of those. They are reps 9 and
+        // 11 of 11 since #94 resolved three more before them; the values did
+        // not move, their index did. Against that, the
         // highest reading among reps with no reason to be doubted is 0.724,
         // face pull rep 9. A gap on four
         // examples is not a rule. The reason the signal exists at all is that a
@@ -597,12 +652,15 @@ class FieldDataRegressionTest {
         // That does not hold on the full session and is retracted here.
         val today =
             mapOf(
-                "field-ohp-rotating-8rep.csv" to listOf(0.000, 0.000, 0.023, 0.000, 0.000, 0.000),
-                "field-ohp-rotating-8rep-b.csv" to listOf(0.000, 0.000, 0.105, 0.000, 0.000, 0.000),
+                "field-ohp-rotating-8rep.csv" to listOf(0.000, 0.000, 0.023, 0.000, 0.000, 0.097, 0.000, 0.067),
+                "field-ohp-rotating-8rep-b.csv" to listOf(0.000, 0.000, 0.000, 0.105, 0.000, 0.067, 0.000, 0.000),
                 "field-bench-rotating-6rep-ok.csv" to listOf(0.000, 0.000, 0.000, 0.000, 0.000, 0.000),
-                "field-bench-rotating-6rep.csv" to listOf(0.000, 0.000),
+                "field-bench-rotating-6rep.csv" to listOf(0.000, 0.000, 0.000, 0.000, 0.000),
                 "field-cablerow-static-8rep.csv" to
-                    listOf(0.000, 0.077, 0.000, 0.000, 0.000, 0.734, 0.000, 0.954),
+                    listOf(
+                        0.000, 0.077, 0.000, 0.000, 0.000, 0.000,
+                        0.000, 0.000, 0.734, 0.000, 0.954,
+                    ),
                 "field-facepull-static-12rep.csv" to
                     listOf(
                         0.503, 0.000, 0.212, 0.114, 0.137, 0.061,
@@ -994,7 +1052,7 @@ class FieldDataRegressionTest {
     private fun track(name: String) = CueTrack.read(name).map { VoiceCue(it.timestampMs, it.label) }
 
     @Test
-    fun `the corpus's first 99 Hz back squat resolves 5 of the 6 reps performed (issue 72)`() {
+    fun `the corpus's first 99 Hz back squat resolves 7 detections for 6 reps (issue 72)`() {
         val samples = load("field-backsquat-99hz-6rep.csv")
         val direction = LiftDirection(startsWith = StartPhase.ECCENTRIC)
         val analysis = SetAnalyzer.analyze(
@@ -1009,7 +1067,7 @@ class FieldDataRegressionTest {
             "metronome Down-cues, corroborating meta.json's hand count of 6",
         )
         assertEquals<Double>(99.3937495805463, analysis.sampleRateHz, "measured rate, against this set's own meta.json")
-        assertEquals(5, analysis.reps.size, "segmented reps; the lifter performed 6")
+        assertEquals(7, analysis.reps.size, "segmented reps; the lifter performed 6")
         assertEquals(0, analysis.detectionsAfterSetEndCue, "detections after Done")
         assertEquals<Double?>(16.6, analysis.velocityLossPct, "velocity loss reported to the lifter")
         // THIS NO LONGER REPRODUCES THE SHIPPED EXPORT, and that is the
@@ -1038,16 +1096,25 @@ class FieldDataRegressionTest {
         // probe, and no attempt is made here to invent a second threshold that
         // would exclude this one capture. It is recorded as a cost, not
         // repaired.
-        assertMeasured(listOf(0.604, 0.867, 0.919, 0.636, 0.601), analysis.reps.map { it.romM }, "ROM, metres")
+        // Issue #94's runaway correction adds TWO detections ahead of the
+        // five, at 0.705 m and 0.232 m, taking a set of six performed reps to
+        // seven detections. The five #87 left are unmoved to three decimals
+        // and are now reps 3 to 7; the velocity loss the lifter reads is
+        // unchanged at 16.6%.
         assertMeasured(
-            listOf(0.501, 0.284, 0.328, 0.419, 0.418),
+            listOf(0.705, 0.232, 0.604, 0.867, 0.919, 0.636, 0.601),
+            analysis.reps.map { it.romM },
+            "ROM, metres",
+        )
+        assertMeasured(
+            listOf(0.353, 0.292, 0.501, 0.284, 0.328, 0.419, 0.418),
             analysis.reps.map { it.meanConVelMps },
             "mean concentric velocity, m/s",
         )
     }
 
     @Test
-    fun `bilateral leg press resolves 2 of the 8 reps performed, the sharpest undercount in the corpus (issue 72)`() {
+    fun `bilateral leg press resolves 7 of the 8 reps performed (issue 72)`() {
         val samples = load("field-legpress-2010-8rep.csv")
         val direction = LiftDirection(startsWith = StartPhase.ECCENTRIC)
         val analysis = SetAnalyzer.analyze(
@@ -1061,35 +1128,43 @@ class FieldDataRegressionTest {
             CueTrack.calledReps("field-legpress-2010-8rep"),
             "metronome Down-cues, corroborating meta.json's hand count of 8",
         )
-        assertEquals(2, analysis.reps.size, "segmented reps; the lifter performed 8")
+        assertEquals(7, analysis.reps.size, "segmented reps; the lifter performed 8")
         assertEquals(0, analysis.detectionsAfterSetEndCue, "detections after Done")
-        // The two reps this DOES find are measured correctly: both reproduce
-        // app 0.1.40's own published repMetrics.
-        assertMeasured(listOf(0.176, 0.563), analysis.reps.map { it.romM }, "ROM, metres")
+        // Issue #94's runaway correction took this capture from 2 of 8 to 7
+        // of 8 -- the sharpest single recovery in the corpus, and the reason
+        // this test is no longer called the sharpest undercount. The two reps
+        // it always found are unmoved and still reproduce app 0.1.40's own
+        // published repMetrics: 0.176/0.563 m are now reps 1 and 7.
         assertMeasured(
-            listOf(0.243, 0.419),
+            listOf(0.176, 0.416, 0.867, 0.519, 0.319, 0.181, 0.563),
+            analysis.reps.map { it.romM },
+            "ROM, metres",
+        )
+        assertMeasured(
+            listOf(0.243, 0.373, 0.403, 0.347, 0.353, 0.269, 0.419),
             analysis.reps.map { it.meanConVelMps },
             "mean concentric velocity, m/s",
         )
-        // Rep 2's bottom pause -- see the class KDoc for why issue #93 is
-        // named beside it.
+        // Rep 2's bottom pause was 14.27 s -- the interval across five reps
+        // nothing resolved, published to the lifter as a pause they took.
+        // With those reps resolved it is 0.50 s. Issue #93's artefact on this
+        // capture is a consequence of the under-count and goes with it.
         val rep2BottomPause: Double? = analysis.reps[1].bottomPauseS
-        assertEquals<Double?>(14.27, rep2BottomPause, "rep 2's bottom pause, seconds -- issue 93")
+        assertEquals<Double?>(0.5, rep2BottomPause, "rep 2's bottom pause, seconds -- issue 93")
         // Ecc-first, so the top is the rep BOUNDARY and publishes nothing:
         // the stillness there ran on until the next drive and was rest, which
         // is the half of #93 that is removed rather than corrected.
         val tops: List<Double?> = analysis.reps.map { it.topPauseS }
-        assertEquals(listOf<Double?>(null, null), tops, "top pause, seconds -- issue 93")
-        // The last of the two resolved reps is also the faster of the two, so
-        // today's SetAnalyzer withholds velocity loss instead of publishing
-        // the degenerate 0% app 0.1.40 actually reported for this set in the
-        // field -- see the class KDoc.
+        assertEquals(List<Double?>(7) { null }, tops, "top pause, seconds -- issue 93")
+        // The last resolved rep is still the fastest of the set, so
+        // SetAnalyzer still withholds velocity loss rather than publishing the
+        // degenerate 0% app 0.1.40 reported for this set in the field.
         assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(analysis.reps))
         assertNull(analysis.velocityLossPct, "velocity loss reported to the lifter")
     }
 
     @Test
-    fun `single-leg press resolves 2 of the 8 reps performed, on the right leg (issue 72)`() {
+    fun `single-leg press resolves 7 of the 8 reps performed, on the right leg (issue 72)`() {
         val samples = load("field-legpress-single-2010-8rep.csv")
         val direction = LiftDirection(startsWith = StartPhase.CONCENTRIC)
         val analysis = SetAnalyzer.analyze(
@@ -1103,18 +1178,30 @@ class FieldDataRegressionTest {
             CueTrack.calledReps("field-legpress-single-2010-8rep"),
             "metronome Down-cues, corroborating meta.json's hand count of 8",
         )
-        assertEquals(2, analysis.reps.size, "segmented reps; the lifter performed 8")
-        assertEquals(0, analysis.detectionsAfterSetEndCue, "detections after Done")
-        assertMeasured(listOf(0.256, 0.103), analysis.reps.map { it.romM }, "ROM, metres")
+        assertEquals(7, analysis.reps.size, "segmented reps; the lifter performed 8")
+        // ONE detection now begins after the Done cue where none did before.
+        // Issue #94's correction de-trends the post-Done stretch as well as
+        // the working one, so the set-end bound has more to reject; it
+        // rejects it, which is the bound doing its job rather than a new
+        // defect reaching the lifter.
+        assertEquals(1, analysis.detectionsAfterSetEndCue, "detections after Done")
+        assertMeasured(
+            listOf(0.256, 0.103, 0.492, 0.844, 0.477, 0.260, 0.122),
+            analysis.reps.map { it.romM },
+            "ROM, metres",
+        )
         // Con-first with the drive going up, so the BOTTOM is the rep
         // boundary: what used to be published here as a bottom pause was the
-        // interval to the next drive, 0.04 and 0.05 s on these two reps, and
-        // it is not published at all now (#93). The turnaround this rep does
-        // contain is at the top.
+        // interval to the next drive, and it is not published at all now
+        // (#93). The turnaround these reps do contain is at the top.
         val bottoms: List<Double?> = analysis.reps.map { it.bottomPauseS }
-        assertEquals(listOf<Double?>(null, null), bottoms, "bottom pause, seconds -- issue 93")
-        assertMeasured(listOf(0.13, 0.03), analysis.reps.mapNotNull { it.topPauseS }, "top pause, seconds")
-        assertEquals<Double?>(5.2, analysis.velocityLossPct, "velocity loss reported to the lifter")
+        assertEquals(List<Double?>(7) { null }, bottoms, "bottom pause, seconds -- issue 93")
+        assertMeasured(
+            listOf(0.13, 0.03, 0.11, 0.11, 0.04, 0.04),
+            analysis.reps.mapNotNull { it.topPauseS },
+            "top pause, seconds",
+        )
+        assertEquals<Double?>(46.8, analysis.velocityLossPct, "velocity loss reported to the lifter")
     }
 
     @Test

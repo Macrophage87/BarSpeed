@@ -74,6 +74,16 @@ class BlankAnalysisTest {
     private fun series(fixture: String): VelocitySeries =
         VelocityEstimator.estimate(load(fixture), DspConfig(), MovementPlane.VERTICAL)
 
+    /**
+     * The series BEFORE issue #94's runaway correction. The run-structure
+     * assertions below are the diagnosis of why these captures published
+     * nothing, and that diagnosis is about the series the correction acts on;
+     * taking it off the shipped series would measure the result instead of the
+     * cause and would silently go vacuous.
+     */
+    private fun anchoredSeries(fixture: String): VelocitySeries =
+        VelocityEstimator.estimateAnchored(load(fixture), DspConfig(), MovementPlane.VERTICAL)
+
     private fun spans(fixture: String, startsWith: StartPhase): Int =
         RepSegmenter.segment(series(fixture), LiftDirection(startsWith), DspConfig()).size
 
@@ -103,8 +113,9 @@ class BlankAnalysisTest {
         val maxDisplacementM: Double,
     )
 
-    private fun rawRuns(fixture: String): RawRuns {
-        val s = series(fixture)
+    private fun rawRuns(fixture: String): RawRuns = rawRunsOf(anchoredSeries(fixture))
+
+    private fun rawRunsOf(s: VelocitySeries): RawRuns {
         val config = DspConfig()
         val v = s.velocityMps
         val n = s.size
@@ -143,44 +154,86 @@ class BlankAnalysisTest {
     fun `the captures that resolve nothing whichever phase the lift is declared to open with`() {
         // Direction-independent, so it needs no table of declared geometry: a
         // capture listed here publishes a blank analysis however the plan
-        // declares the lift. Two captures qualify at this commit.
+        // declares the lift.
+        //
+        // ONE capture qualifies at this commit, and it is the sensor that
+        // never moved. Two did before issue #94's runaway correction; the
+        // Romanian deadlift that was the other now resolves ten spans on the
+        // phase its plan declares. That is #138's exemplar leaving the corpus,
+        // and it is the strongest single statement this branch can make about
+        // the defect: no capture of a healthy stream with reps in it publishes
+        // a blank analysis any more.
         val blankBothWays = corpus.filter {
             spans(it, StartPhase.ECCENTRIC) == 0 && spans(it, StartPhase.CONCENTRIC) == 0
         }
         assertEquals(
-            listOf("field-rdl-3010-10rep-s36-set05", "field-still-0rep"),
+            listOf("field-still-0rep"),
             blankBothWays,
             "the corpus's blank-either-way captures",
         )
-        // And one more that is blank on one declaration only. Its own plan
-        // says concentric -- a press driven off the rack -- so it is not blank
-        // in the field; it is here because it is the corpus's only capture
-        // that resolves qualifying movement runs and pairs none of them, which
-        // is a different way to reach zero from the Romanian deadlift's.
-        assertEquals(0, spans("field-seated-ohp-2rep", StartPhase.ECCENTRIC), "seated OHP read as eccentric-first")
-        assertEquals(2, spans("field-seated-ohp-2rep", StartPhase.CONCENTRIC), "seated OHP as its plan declares it")
+        // The seated overhead press USED to be blank read as eccentric-first,
+        // resolving qualifying runs and pairing none of them. Since the
+        // runaway correction its 5.5-11.5 s over-cap run resolves into
+        // alternating strokes, so a DOWN exists for an UP to pair with and it
+        // resolves one. Both readings are pinned: the plan declares concentric
+        // and that is the number the lifter sees.
+        assertEquals(1, spans("field-seated-ohp-2rep", StartPhase.ECCENTRIC), "seated OHP read as eccentric-first")
+        assertEquals(3, spans("field-seated-ohp-2rep", StartPhase.CONCENTRIC), "seated OHP as its plan declares it")
+        // The one capture that IS blank on its declared phase and should be:
+        // a twenty-second rope dead hang, reps 0 in its own meta.json.
+        assertEquals(
+            0,
+            spans("field-ropedeadhang-hold20-s37-set11", StartPhase.ECCENTRIC),
+            "a hold resolves nothing, which is the right answer",
+        )
     }
 
     @Test
-    fun `what a blank analysis publishes today`() {
-        // The whole of what the lifter and the coach get: reps empty, no
-        // velocity loss, no tempo compliance, and a measured sample rate that
-        // says the stream was healthy -- which is #138's point. Nothing in
-        // this object distinguishes it from a set recorded with no sensor.
+    fun `what the capture that used to publish nothing publishes now`() {
+        // This test was `what a blank analysis publishes today` and asserted
+        // that this capture published reps: [] over a healthy 99.35 Hz stream
+        // -- #138's exemplar, and byte-identical in the export to a manual set
+        // recorded with no sensor. Issue #94's runaway correction resolves ten
+        // spans against the ten reps the lifter performed, so that assertion
+        // is not weakened here, it is INVERTED.
+        //
+        // The count landing on ten is not the reps being right. Their ROMs run
+        // 0.115 m to 0.441 m on a Romanian deadlift, a spread of nearly four
+        // to one within one set, and the velocity loss the lifter now reads is
+        // 74.2% where before they read nothing at all. A wrong figure is not
+        // better than no figure by default; what makes this the better outcome
+        // is that the set is no longer indistinguishable from an unmeasured
+        // one, and the raw stream was always recoverable either way.
         val rdl = SetAnalyzer.analyze(
             load("field-rdl-3010-10rep-s36-set05"),
             LiftDirection(StartPhase.ECCENTRIC),
             loadKg = 52.163122551154075,
         )
-        assertEquals(emptyList(), rdl.reps, "reps resolved on a 10-rep set")
-        assertNull(rdl.velocityLossPct, "velocity loss on a set with no reps")
+        assertEquals(10, rdl.reps.size, "reps resolved on a 10-rep set")
+        assertEquals(
+            listOf(0.441, 0.115, 0.325, 0.216, 0.272, 0.154, 0.345, 0.411, 0.193, 0.139),
+            rdl.reps.map { it.romM },
+            "ROM per rep, metres -- the spread this count is built out of",
+        )
+        assertEquals<Double?>(74.2, rdl.velocityLossPct, "velocity loss now reported to the lifter")
         assertNull(rdl.tempoCompliance, "tempo compliance with no target declared")
         assertNull(rdl.detectionsAfterSetEndCue, "no cue track was passed, so nothing bounded the set")
-        assertEquals(99.351, rdl.sampleRateHz, 1e-3, "measured sample rate of the stream that resolved nothing")
+        assertEquals(99.351, rdl.sampleRateHz, 1e-3, "measured sample rate, unmoved by the correction")
+        // What a genuinely blank analysis publishes, kept because the case has
+        // to stay pinned somewhere and this capture no longer provides it.
+        val still = SetAnalyzer.analyze(load("field-still-0rep"), LiftDirection(StartPhase.ECCENTRIC))
+        assertEquals(emptyList(), still.reps, "a sensor that did not move resolves nothing")
+        assertNull(still.velocityLossPct, "velocity loss on a set with no reps")
     }
 
     @Test
-    fun `why the Romanian deadlift resolves nothing - three of its four movement runs are discarded`() {
+    fun `why the Romanian deadlift used to resolve nothing - three of four runs discarded`() {
+        // MEASURED ON THE ANCHORED SERIES, before issue #94's runaway
+        // correction: this is the diagnosis of the defect, so it has to be
+        // taken on the input to the correction and not on its output. On the
+        // shipped series the same capture now has 52 movement runs, none over
+        // the cap, and resolves ten spans.
+        //
         // 67.95 s of a 10-rep hip hinge collapses into FOUR sign-runs, of
         // which three displace further than DspConfig.maxRunDisplacementM and
         // are demoted, the longest by a factor of eleven. One run survives, it
@@ -197,49 +250,72 @@ class BlankAnalysisTest {
         assertEquals(0, runs.shorterThanMinPhase, "runs too brief to count")
         assertEquals(21.93, runs.maxDisplacementM, 0.01, "the longest single run, metres")
         val qualifying =
+            RepSegmenter.classifyRuns(anchoredSeries("field-rdl-3010-10rep-s36-set05"), DspConfig())
+                .filter { it.type != RunType.STILL }
+        assertEquals(1, qualifying.size, "movement runs surviving demotion, before the correction")
+        assertEquals(RunType.DOWN, qualifying.single().type, "the one surviving run's direction")
+        // And after it, which is the differential this diagnosis predicts:
+        // the three runaways become alternating strokes, so both directions
+        // are present and pairing has something to do.
+        val corrected =
             RepSegmenter.classifyRuns(series("field-rdl-3010-10rep-s36-set05"), DspConfig())
                 .filter { it.type != RunType.STILL }
-        assertEquals(1, qualifying.size, "movement runs surviving demotion")
-        assertEquals(RunType.DOWN, qualifying.single().type, "the one surviving run's direction")
+        assertEquals(31, corrected.size, "movement runs surviving demotion, after the correction")
+        assertEquals(
+            setOf(RunType.DOWN, RunType.UP),
+            corrected.map { it.type }.toSet(),
+            "both directions present, which is what pairing needs",
+        )
     }
 
     @Test
     fun `the seated overhead press reaches zero the other way - runs survive and none pair`() {
+        // Anchored series again: this is the second way to reach zero and it
+        // is a fact about the pre-correction runs.
         val runs = rawRuns("field-seated-ohp-2rep")
         assertEquals(7, runs.movement, "raw movement runs")
         assertEquals(1, runs.overDisplacementCap, "runs past the cap -- a minority here, three of four on the deadlift")
         val qualifying =
-            RepSegmenter.classifyRuns(series("field-seated-ohp-2rep"), DspConfig())
+            RepSegmenter.classifyRuns(anchoredSeries("field-seated-ohp-2rep"), DspConfig())
                 .filter { it.type != RunType.STILL }
         assertEquals(3, qualifying.size, "movement runs surviving demotion")
         assertTrue(qualifying.all { it.type == RunType.UP }, "all three survivors are UP, so no DOWN opens a rep")
     }
 
     @Test
-    fun `the neighbouring Romanian deadlift resolves one rep of ten and is not blank`() {
+    fun `the neighbouring Romanian deadlift went from one rep of ten to ten`() {
         // field-36 set 04, committed here. Same session, exercise, tempo, load
         // and hand count as set 05, four minutes earlier, and its integrator
         // runs away FURTHER -- a single run displacing 123.64 m against set
         // 05's 21.93 m -- yet one rep survives, so its analysis is not blank.
         //
-        // This is the pin on what a blank-analysis diagnosis does NOT cover. A
-        // set can carry five times the drift of the set beside it -- 123.64 m
-        // against 21.93 m -- and still publish a summary, because a summary is
-        // published whenever ONE rep resolves. Under-resolution reaching zero
-        // is #138; under-resolution stopping at one is the same defect and
-        // nothing the export carries distinguishes it from a well-measured
-        // single.
+        // This was the pin on what a blank-analysis diagnosis does NOT cover:
+        // a set carrying five times the drift of the set beside it -- 123.64 m
+        // against 21.93 m -- published a summary anyway, because a summary is
+        // published whenever ONE rep resolves, and nothing in the export
+        // distinguished that from a well-measured single.
+        //
+        // Issue #94's runaway correction takes it from one rep to ten, against
+        // ten performed. The run-structure figures below are on the ANCHORED
+        // series and are the diagnosis, unchanged; the span count is on the
+        // shipped one. This capture has no committed cue track, so its ten is
+        // scored against meta.json's hand count and against nothing per-rep.
         val runs = rawRuns("field-rdl-3010-10rep-s36-set04")
         assertEquals(12, runs.movement, "raw movement runs")
         assertEquals(2, runs.overDisplacementCap, "runs displacing past the cap")
         assertEquals(123.64, runs.maxDisplacementM, 0.01, "the longest single run, metres")
-        assertEquals(1, spans("field-rdl-3010-10rep-s36-set04", StartPhase.ECCENTRIC), "spans, 10 reps performed")
+        assertEquals(10, spans("field-rdl-3010-10rep-s36-set04", StartPhase.ECCENTRIC), "spans, 10 reps performed")
         val analysis = SetAnalyzer.analyze(
             load("field-rdl-3010-10rep-s36-set04"),
             LiftDirection(StartPhase.ECCENTRIC),
             loadKg = 52.163122551154075,
         )
-        assertEquals(1, analysis.reps.size, "reps published to the lifter")
-        assertNull(analysis.velocityLossPct, "one rep, so no velocity loss -- absence stays absence")
+        assertEquals(10, analysis.reps.size, "reps published to the lifter")
+        // Ten reps and STILL no velocity loss, for a different reason: the
+        // last rep resolved is the fastest of the set, so VelocityLoss
+        // withholds the figure rather than publishing a negative drawdown.
+        // Absence stays absence, and it is now absence for a stated reason
+        // instead of for want of reps.
+        assertNull(analysis.velocityLossPct, "the last rep is the fastest, so no velocity loss")
     }
 }

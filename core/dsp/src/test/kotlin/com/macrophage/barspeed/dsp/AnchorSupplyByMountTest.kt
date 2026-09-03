@@ -6,7 +6,6 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -261,40 +260,43 @@ class AnchorSupplyByMountTest {
         // sets 11, 12 and 13 are rope dead hangs, and for a timed hold with
         // no reps performed an empty summary is the right answer. Counted
         // from the session's own session.json, not from these fixtures.
-        // All three of the rep sets resolved NOTHING before issue #87 and
-        // all three resolve something now -- 4, 1 and 3 against 6 performed.
-        // None of them is right. One of the three is still further from the
-        // lifter's count than from zero -- bench set05 at 1 of 6; set06 at 3 of
-        // 6 is equidistant, and the overhead press at 4 of 6 is closer to the
-        // count than to zero. This file claims only that the sets stopped
-        // publishing nothing, not that they became correct.
+        // All three of the rep sets resolved NOTHING before issue #87; #87 took
+        // them to 4, 1 and 3 against 6 performed, and issue #94's runaway
+        // correction to 9, 4 and 6. Two of the three now sit at or above the
+        // count the lifter performed, so the direction of the error has
+        // changed on this family and the ohp is over by three. This file
+        // claims only that the sets stopped publishing nothing.
         //
-        // The RDL is unchanged at 0 of 10, which is the counter-example: it
-        // does not straddle the gate, so #87 does not touch it.
-        assertEquals(4, batchReps("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC, 24.948), "ohp, 6 performed")
+        // The RDL was the counter-example at 0 of 10 -- it does not straddle
+        // the gyro gate, so #87 never reached it. #94 does reach it, because
+        // what stopped it was an over-cap run and not anchor supply, and it
+        // resolves 10 of 10. The two mechanisms are disjoint and this line is
+        // the evidence for that.
+        assertEquals(9, batchReps("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC, 24.948), "ohp, 6 performed")
         assertEquals(
-            1,
+            4,
             batchReps("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC, 47.627),
             "bench, 6 performed",
         )
         assertEquals(
-            3,
+            6,
             batchReps("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC, 49.895),
             "bench, 6 performed",
         )
-        assertEquals(0, batchReps("field-rdl-3010-10rep-s36-set05", StartPhase.ECCENTRIC, 52.163), "rdl, 10 performed")
-        // The back squat used to over-resolve, 8 detections for 6 reps, and
-        // now lands exactly on the count performed. That agreement is NOT a
-        // correctness result and is pinned below as one that is not: the
-        // velocity loss it publishes moves 26.6% to 82.3% on a set the lifter
-        // logged at RPE 1, and its last two reps read 0.293 m and 0.121 m.
+        assertEquals(10, batchReps("field-rdl-3010-10rep-s36-set05", StartPhase.ECCENTRIC, 52.163), "rdl, 10 performed")
+        // The back squat over-resolved at 8 detections for 6 reps before #87,
+        // landed on 6 after it, and over-resolves again at 8 after #94. The
+        // agreement at 6 was never a correctness result and is now visibly not
+        // one: BatchCueCoverageTest scores this capture at 4 matched windows
+        // of 6 with 2 doubled and 2 stray under both, so the total passing
+        // through the right answer said nothing about the reps.
         assertEquals(
-            6,
+            8,
             batchReps("field-backsquat-4011-6rep-s36-set01", StartPhase.ECCENTRIC, 52.163),
             "back squat, 6 performed",
         )
         assertEquals(
-            5,
+            6,
             batchReps("field-pullup-3010-8rep-s37-set09", StartPhase.CONCENTRIC, 23.4436),
             "assisted pull-up, 8 performed",
         )
@@ -316,30 +318,46 @@ class AnchorSupplyByMountTest {
         // this file must not claim the second while doing the first.
         //
         // The three field-37 sets replace `summary: {}` -- 0 reps, no ROM, no
-        // velocity loss -- with a summary. Two newly published bench reps read
-        // 1.363 m and 1.724 m against the 0.333-0.345 m bench ROM this corpus
-        // has measured, both above the 1.2 m ceiling of the plausibility window
-        // issue #74 quotes. set05's summary is computed from 1 of 6 reps and
-        // set06's from 3 of 6, so velocityLossPct is null on both: absence
-        // stays absence rather than becoming a low number.
+        // velocity loss -- with a summary. Two bench reps read 1.363 m and
+        // 1.724 m against the 0.333-0.345 m bench ROM this corpus has
+        // measured, both above the 1.2 m ceiling of the plausibility window
+        // issue #74 quotes, and issue #94's runaway correction does not fix
+        // that: it ADDS reps beside them at 0.896, 0.898, 0.143 m and 0.462,
+        // 1.045, 1.384 m. Recovering a rep and measuring it are different
+        // things and this is the clearest place in the corpus to see it.
+        //
+        // The consequence to read is the velocity loss. set05 and set06
+        // published NOTHING for it before, because a summary over one and
+        // three reps withholds the figure; both now publish -- 26.0% and 24.0%
+        // -- computed over reps whose ROM spans a factor of ten. Absence
+        // became a number, and the number is built on the same reconstruction
+        // that produced the 1.724 m rep.
         val ohp = batchAnalysis("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC, 24.948)
-        assertRoms(listOf(0.506, 1.075, 0.840, 1.092), ohp, "ohp set02 ROM, metres")
-        assertEquals<Double?>(15.4, ohp.velocityLossPct, "ohp set02 velocity loss reported to the lifter")
+        assertRoms(
+            listOf(0.506, 1.075, 0.840, 1.092, 0.567, 0.777, 0.682, 0.526, 0.773),
+            ohp,
+            "ohp set02 ROM, metres",
+        )
+        assertEquals<Double?>(55.3, ohp.velocityLossPct, "ohp set02 velocity loss reported to the lifter")
         val bench05 = batchAnalysis("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC, 47.627)
-        assertRoms(listOf(1.363), bench05, "bench set05 ROM, metres")
-        assertNull(bench05.velocityLossPct, "bench set05 velocity loss: one rep, so none")
+        assertRoms(listOf(0.896, 0.898, 0.143, 1.363), bench05, "bench set05 ROM, metres")
+        assertEquals<Double?>(26.0, bench05.velocityLossPct, "bench set05 velocity loss: four reps, so a figure")
         val bench06 = batchAnalysis("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC, 49.895)
-        assertRoms(listOf(0.691, 0.168, 1.724), bench06, "bench set06 ROM, metres")
-        assertNull(bench06.velocityLossPct, "bench set06 velocity loss: three reps of six, so none")
+        assertRoms(listOf(0.691, 0.462, 1.045, 1.384, 0.168, 1.724), bench06, "bench set06 ROM, metres")
+        assertEquals<Double?>(24.0, bench06.velocityLossPct, "bench set06 velocity loss: six reps, so a figure")
 
-        // And the back squat, whose count agreeing with 6 is the easiest figure
-        // on this branch to misread as correctness. Its velocity loss moves
-        // 26.6% to 82.3% on a set the lifter logged at RPE 1 -- the effort he
-        // recorded and the fatigue the number claims point opposite ways -- and
-        // its last two reps read 0.293 m and 0.121 m against a 0.731 m rep in
-        // the same set.
+        // And the back squat. Its velocity loss moved 26.6% to 82.3% with #87
+        // on a set the lifter logged at RPE 1 -- the effort he recorded and the
+        // fatigue the number claims point opposite ways -- and #94 leaves that
+        // figure exactly where #87 put it while adding two reps at 0.445 m and
+        // 0.163 m. The last rep, which velocity loss is measured to, is the
+        // 0.121 m one either way.
         val squat = batchAnalysis("field-backsquat-4011-6rep-s36-set01", StartPhase.ECCENTRIC, 52.163)
-        assertRoms(listOf(0.271, 0.421, 0.731, 0.553, 0.293, 0.121), squat, "back squat ROM, metres")
+        assertRoms(
+            listOf(0.271, 0.421, 0.731, 0.553, 0.293, 0.445, 0.163, 0.121),
+            squat,
+            "back squat ROM, metres",
+        )
         assertEquals<Double?>(82.3, squat.velocityLossPct, "back squat velocity loss reported to the lifter")
     }
 
@@ -393,10 +411,16 @@ class AnchorSupplyByMountTest {
         // And the spans themselves, on the strap family and one machine
         // capture from each session, named rather than left to the mask
         // argument alone.
+        // The strap capture. Unchanged by #87, and issue #94's runaway
+        // correction moves it by ONE, 5 to 6 of 8 performed: the assist strap
+        // barely rotates and its anchor supply was already 70%, so it has one
+        // over-cap run for the correction to reach. That is the smallest
+        // movement of any capture the correction touches, which is the
+        // regression guard this file carries for the strap family working.
         assertEquals(
-            5,
+            6,
             batchReps("field-pullup-3010-8rep-s37-set09", StartPhase.CONCENTRIC, 23.4436),
-            "assisted pull-up spans, 8 performed -- unchanged by #87",
+            "assisted pull-up spans, 8 performed",
         )
         assertEquals(
             10,

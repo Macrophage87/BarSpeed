@@ -209,11 +209,17 @@ class BlankAnalysisReasonTest {
     }
 
     @Test
-    fun `the census of the two captures that resolve nothing either way`() {
+    fun `the census of the capture that resolves nothing either way`() {
         // The same figures BlankAnalysisTest measures with its own inline walk
         // over the raw runs, read here off the segmenter's own counters. The
         // two agreeing is what says the counters were placed where the
         // demotion happens.
+        //
+        // The Romanian deadlift used to be the second capture here, with a
+        // census of 4 movement runs and 3 over the cap. Issue #94's runaway
+        // correction takes it to 52 movement runs, NONE over the cap, and ten
+        // spans, so its census is no longer a blank-analysis census at all and
+        // is pinned on the anchored series in BlankAnalysisTest instead.
         val rdl = RepSegmenter.segmentDetailed(
             series("field-rdl-3010-10rep-s36-set05"),
             LiftDirection(StartPhase.ECCENTRIC),
@@ -221,13 +227,13 @@ class BlankAnalysisReasonTest {
         ).census
         assertEquals(
             SegmentationCensus(
-                movementRuns = 4,
-                overDisplacementCap = 3,
-                belowStartThreshold = 0,
-                shorterThanMinPhase = 0,
-                qualifyingRuns = 1,
-                pairsBelowMinRom = 0,
-                spans = 0,
+                movementRuns = 52,
+                overDisplacementCap = 0,
+                belowStartThreshold = 16,
+                shorterThanMinPhase = 19,
+                qualifyingRuns = 31,
+                pairsBelowMinRom = 1,
+                spans = 10,
             ),
             rdl,
             "field-rdl-3010-10rep-s36-set05, eccentric-first",
@@ -244,18 +250,30 @@ class BlankAnalysisReasonTest {
             LiftDirection(StartPhase.ECCENTRIC),
             DspConfig(),
         ).census
-        assertEquals(7, ohp.movementRuns, "field-seated-ohp-2rep: raw movement runs")
-        assertEquals(1, ohp.overDisplacementCap, "field-seated-ohp-2rep: runs over the cap")
-        assertEquals(3, ohp.qualifyingRuns, "field-seated-ohp-2rep: runs surviving demotion")
+        assertEquals(10, ohp.movementRuns, "field-seated-ohp-2rep: raw movement runs")
+        assertEquals(0, ohp.overDisplacementCap, "field-seated-ohp-2rep: runs over the cap")
+        assertEquals(6, ohp.qualifyingRuns, "field-seated-ohp-2rep: runs surviving demotion")
         assertEquals(0, ohp.pairsBelowMinRom, "field-seated-ohp-2rep: pairs discarded for ROM")
+        assertEquals(1, ohp.spans, "field-seated-ohp-2rep: it pairs one now, read eccentric-first")
     }
 
     @Test
     fun `which reasons this corpus actually produces, and which it does not`() {
-        // Three of seven. Stated as a measurement, not as a claim that the
-        // other four are unreachable: the corpus is 29 captures from seven
-        // sessions, and a set emptied by its own end cue or by the minimum-ROM
-        // floor is a thing the pipeline can produce and this corpus has not.
+        // TWO of seven, down from three. Stated as a measurement, not as a
+        // claim that the other five are unreachable: the corpus is 30 captures
+        // from seven sessions, and a set emptied by its own end cue or by the
+        // minimum-ROM floor is a thing the pipeline can produce and this
+        // corpus has not.
+        //
+        // RUNS_EXCEED_DISPLACEMENT_CAP left this set with issue #94. It is not
+        // dead code: RunawayDrift.corrected iterates to a fixed point under a
+        // bound (RunawayDrift.MAX_PASSES), so a series that still carried a
+        // runaway after eight passes would reach the segmenter and produce it.
+        // No committed capture needs more than four. The enum member and its
+        // branch stay, and `every other branch of the decision, from a census
+        // that isolates it` keeps exercising it from a constructed census --
+        // which is exactly why that test builds censuses by hand instead of
+        // taking them from captures.
         val config = DspConfig()
         val produced = corpus.flatMap { fixture ->
             StartPhase.entries.mapNotNull { startsWith ->
@@ -264,7 +282,7 @@ class BlankAnalysisReasonTest {
             }
         }.toSet()
         assertEquals(
-            setOf(NoRepsReason.NO_MOVEMENT, NoRepsReason.RUNS_EXCEED_DISPLACEMENT_CAP, NoRepsReason.PHASES_UNPAIRED),
+            setOf(NoRepsReason.PHASES_UNPAIRED, NoRepsReason.NO_MOVEMENT),
             produced,
             "the reasons this corpus produces",
         )
@@ -274,10 +292,9 @@ class BlankAnalysisReasonTest {
             val detailed = RepSegmenter.segmentDetailed(series(fixture), LiftDirection(startsWith), config)
             return NoRepsReason.of(detailed.census, detailed.spans.size)
         }
-        assertEquals(
-            NoRepsReason.RUNS_EXCEED_DISPLACEMENT_CAP,
+        assertNull(
             reasonFor("field-rdl-3010-10rep-s36-set05", StartPhase.ECCENTRIC),
-            "the Romanian deadlift issue #87 could not reach",
+            "the Romanian deadlift issue #87 could not reach and issue #94 did",
         )
         assertEquals(
             NoRepsReason.NO_MOVEMENT,
@@ -286,8 +303,8 @@ class BlankAnalysisReasonTest {
         )
         assertEquals(
             NoRepsReason.PHASES_UNPAIRED,
-            reasonFor("field-seated-ohp-2rep", StartPhase.ECCENTRIC),
-            "runs survived and none paired",
+            reasonFor("field-ropedeadhang-hold20-s37-set11", StartPhase.ECCENTRIC),
+            "a rope dead hang: four runs survive the bounds and none is a rep",
         )
         // The three sets #138 named that issue #87 moved off zero now resolve
         // reps, so they carry no reason -- the key's absence is the record
@@ -320,15 +337,12 @@ class BlankAnalysisReasonTest {
         }
         assertEquals(
             listOf(
-                "field-rdl-3010-10rep-s36-set05/ECCENTRIC",
-                "field-rdl-3010-10rep-s36-set05/CONCENTRIC",
                 // A twenty-second rope dead hang, `reps: 0` in its own
                 // meta.json: nothing to resolve on the phase it declares, and
                 // this is the right answer rather than a miss. Scored
                 // concentric-first it publishes two, which is why only the
                 // eccentric pair appears here -- see BatchCueCoverageTest.
                 "field-ropedeadhang-hold20-s37-set11/ECCENTRIC",
-                "field-seated-ohp-2rep/ECCENTRIC",
                 "field-still-0rep/ECCENTRIC",
                 "field-still-0rep/CONCENTRIC",
             ),
@@ -363,13 +377,16 @@ class BlankAnalysisReasonTest {
         // checks that it hands over the right one.
         fun reasonOf(fixture: String, startsWith: StartPhase): NoRepsReason? =
             SetAnalyzer.analyze(load(fixture), LiftDirection(startsWith), loadKg = 52.163122551154075).noRepsReason
-        assertEquals(
-            NoRepsReason.RUNS_EXCEED_DISPLACEMENT_CAP,
+        // The Romanian deadlift used to be the first two rows here, both
+        // RUNS_EXCEED_DISPLACEMENT_CAP. Since issue #94's runaway correction
+        // it resolves ten spans read either way and carries no reason at all,
+        // so the null is the assertion: the key answers emptiness, and this
+        // set is not empty any more.
+        assertNull(
             reasonOf("field-rdl-3010-10rep-s36-set05", StartPhase.ECCENTRIC),
-            "the Romanian deadlift issue #87 could not reach",
+            "the Romanian deadlift issue #87 could not reach and issue #94 did",
         )
-        assertEquals(
-            NoRepsReason.RUNS_EXCEED_DISPLACEMENT_CAP,
+        assertNull(
             reasonOf("field-rdl-3010-10rep-s36-set05", StartPhase.CONCENTRIC),
             "and the same set read the other way round",
         )
@@ -380,8 +397,8 @@ class BlankAnalysisReasonTest {
         )
         assertEquals(
             NoRepsReason.PHASES_UNPAIRED,
-            reasonOf("field-seated-ohp-2rep", StartPhase.ECCENTRIC),
-            "runs survived and none paired",
+            reasonOf("field-ropedeadhang-hold20-s37-set11", StartPhase.ECCENTRIC),
+            "a rope dead hang: runs survive and none pairs",
         )
     }
 

@@ -478,10 +478,14 @@ class CuedRepCoverageTest {
                 }
             }
         }
-        assertEquals(18, outOfFamily, "counted reps the batch reference rejects")
-        assertEquals(16, outOfFamilyCalled, "of those, reps the metronome actually called")
-        assertEquals(63, inFamily, "counted reps the batch reference accepts")
-        assertEquals(58, inFamilyCalled, "of those, reps the metronome actually called")
+        // Issue #94's runaway correction moves the BATCH reference this file
+        // scores against; the live tracker is untouched by it. The figures
+        // below therefore move without any live behaviour changing, which is
+        // the standing hazard of scoring one path against the other.
+        assertEquals(17, outOfFamily, "counted reps the batch reference rejects")
+        assertEquals(15, outOfFamilyCalled, "of those, reps the metronome actually called")
+        assertEquals(64, inFamily, "counted reps the batch reference accepts")
+        assertEquals(59, inFamilyCalled, "of those, reps the metronome actually called")
     }
 
     @Test
@@ -519,9 +523,9 @@ class CuedRepCoverageTest {
         val corpusCounted = 101
         val corpusInFamily = 85
         assertEquals(37, corpusCounted - counted, "counted reps on captures with no cue track")
-        assertEquals(35, corpusInFamily - inFamily, "of those, in family by the batch reference")
+        assertEquals(34, corpusInFamily - inFamily, "of those, in family by the batch reference")
         assertEquals(
-            2,
+            3,
             (corpusCounted - corpusInFamily) - (counted - inFamily),
             "out-of-family reps that no cue track can confirm or disprove",
         )

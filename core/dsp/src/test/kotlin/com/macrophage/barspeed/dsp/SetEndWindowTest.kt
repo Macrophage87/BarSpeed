@@ -289,7 +289,11 @@ class SetEndWindowTest {
             Triple("field-backsquat-99hz-6rep", barbell, 0),
             Triple("field-rdl-3010-10rep", barbell, 1),
             Triple("field-legpress-2010-8rep", barbell, 0),
-            Triple("field-legpress-single-2010-8rep", concentricFirst, 0),
+            // 0 before issue #94's runaway correction: the post-Done stretch on
+            // this capture was one over-cap run the segmenter discarded, and
+            // de-trending it makes a detection out of it for the cue bound to
+            // reject. The bound rejecting more is the bound working.
+            Triple("field-legpress-single-2010-8rep", concentricFirst, 1),
             Triple(fixture, rearDeltFly, 1),
         )
         assertEquals(13, corpus.size, "cue-tracked captures covered here")
@@ -304,7 +308,7 @@ class SetEndWindowTest {
             },
             "detections beginning after Done, per capture",
         )
-        assertEquals(6, corpus.count { it.third > 0 }, "captures carrying at least one post-Done detection")
+        assertEquals(7, corpus.count { it.third > 0 }, "captures carrying at least one post-Done detection")
     }
 
     // ------------------------------------------------------------------
@@ -332,27 +336,60 @@ class SetEndWindowTest {
     fun `set 6's velocity loss drops thirty points once the tail is out of the set`() {
         val analysis =
             SetAnalyzer.analyze(load("$fixture.csv"), rearDeltFly, loadKg = loadKg, cues = track(fixture))
-        assertEquals(4, analysis.reps.size, "detections kept; the lifter performed 12 reps")
+        assertEquals(16, analysis.reps.size, "detections kept; the lifter performed 12 reps")
         assertEquals(1, analysis.detectionsAfterSetEndCue, "detections dropped")
+        // This asserted the kept drives IN THE EXPORT'S OWN FIGURES, which
+        // was possible while the analyzer reproduced the export. It no longer
+        // does -- see `set 6 no longer reproduces its published export` -- so
+        // the four published means are asserted to still be PRESENT among the
+        // sixteen rather than to be the whole of them. That is a weaker check
+        // and it is labelled as one: what it still catches is the kept list
+        // losing one of the drives the app actually showed the lifter.
         assertEquals(
+            listOf(0.768, 0.381, 0.654, 0.368),
             published.dropLast(1).map { it.meanConVelMps },
-            analysis.reps.map { it.meanConVelMps },
-            "the kept drives, in the export's own figures",
+            "the four drives the export published inside the set",
         )
-        assertEquals(52.1, analysis.velocityLossPct, "velocity loss over the reps of the set")
+        assertTrue(
+            analysis.reps.map { it.meanConVelMps }.containsAll(published.dropLast(1).map { it.meanConVelMps }),
+            "every drive the export published inside the set is still kept",
+        )
+        assertEquals(
+            listOf(
+                0.768, 0.561, 0.88, 1.02, 1.114, 0.381, 0.654, 0.908,
+                0.898, 0.826, 0.61, 0.104, 0.487, 0.62, 0.509, 0.368,
+            ),
+            analysis.reps.map { it.meanConVelMps },
+            "the kept drives",
+        )
+        // 82.6 uncued against 52.1 cued was the thirty points this test is
+        // named for. With issue #94's runaway correction the pair is 88.0
+        // against 67.0 -- twenty-one points, over a rep list four times as
+        // long. The drop the cue bound produces survives the correction; its
+        // size does not.
+        assertEquals(67.0, analysis.velocityLossPct, "velocity loss over the reps of the set")
     }
 
     /**
      * Every committed capture with a cue track, before and after.
      *
-     * Five are untouched, which is what says the rule is not simply deleting
-     * the last rep of every set. On the four that move, two land exactly on the
-     * count the lifter performed -- 12 for `-b`, 10 for `-10rep` -- and the peak
-     * drive velocity of three of them stops being the sensor being handled:
+     * Five were untouched by the cue-window rule, which is what says it is not
+     * simply deleting the last rep of every set. On the four that move, the
+     * peak drive velocity of three stops being the sensor being handled:
      * 1.673 to 0.737 m/s, 1.707 to 0.768, 1.261 to 0.910. That is the same
      * defect reaching `summary.peakConVel_mps` instead of `velocityLoss_pct`,
      * and it is why the rule is applied to the rep list rather than to the
      * velocity-loss calculation.
+     *
+     * SIX of the nine rep counts move with issue #94's runaway correction, and
+     * the two that used to land exactly on the count performed no longer do:
+     * `-10rep` goes 10 to 11 and the rear delt fly 4 to 16 against 12
+     * performed. `BatchCueCoverageTest` is where those are scored per rep --
+     * the rear delt fly goes from 2 of 12 marks matched to 12 of 12, with 2
+     * doubled and 3 stray, so the count overshooting and the coverage being
+     * complete are the same fact seen two ways. The three legcurl `-12rep`
+     * cases and the bench `-ok` are unmoved: none of them contains an over-cap
+     * run for the correction to reach.
      *
      * Three of the four stop reading [VelocityLoss.TerminalRepIsFastest] and
      * start reading [VelocityLoss.Measured]. That is not a reinterpretation of
@@ -384,12 +421,12 @@ class SetEndWindowTest {
             Case("field-legcurl-1030-12rep", legCurl, 12, VelocityLoss.Measured(36.5), 0.577),
             Case("field-legcurl-1030-12rep-b", legCurl, 12, VelocityLoss.Measured(34.7), 0.737),
             Case("field-legcurl-1030-12rep-c", legCurl, 9, VelocityLoss.Measured(69.1), 0.768),
-            Case("field-legcurl-1030-10rep", legCurl, 10, VelocityLoss.Measured(22.5), 0.910),
-            Case("field-ohp-rotating-8rep", barbell, 6, VelocityLoss.Measured(49.8), 1.213),
-            Case("field-ohp-rotating-8rep-b", barbell, 5, VelocityLoss.Measured(19.5), 1.113),
-            Case("field-bench-rotating-6rep", barbell, 2, VelocityLoss.Measured(7.0), 0.600),
+            Case("field-legcurl-1030-10rep", legCurl, 11, VelocityLoss.Measured(22.5), 0.910),
+            Case("field-ohp-rotating-8rep", barbell, 8, VelocityLoss.Measured(50.9), 1.213),
+            Case("field-ohp-rotating-8rep-b", barbell, 7, VelocityLoss.Measured(37.8), 1.250),
+            Case("field-bench-rotating-6rep", barbell, 5, VelocityLoss.Measured(31.5), 1.080),
             Case("field-bench-rotating-6rep-ok", barbell, 6, VelocityLoss.Measured(58.3), 0.676),
-            Case(fixture, rearDeltFly, 4, VelocityLoss.Measured(52.1), 2.085),
+            Case(fixture, rearDeltFly, 16, VelocityLoss.Measured(67.0), 2.085),
         )
         corpus.forEach { case ->
             val reps = SetAnalyzer.analyze(load("${case.name}.csv"), case.direction, cues = track(case.name)).reps
@@ -400,32 +437,51 @@ class SetEndWindowTest {
     }
 
     /**
-     * The fixture reproduces the shipped export, rep for rep.
+     * THE FIXTURE NO LONGER REPRODUCES THE SHIPPED EXPORT, and that is issue
+     * #94's cost recorded where it falls.
      *
-     * This is the pin that licenses every other claim made from this capture. It
-     * is also the analysis of an UNCUED set -- no cue track is passed -- so it
-     * states the other half of the window rule at the same time: with nothing on
-     * the record saying when the set ended, no boundary is invented and every
-     * detection is kept, including the one that is plainly post-set handling.
+     * This test asserted, rep for rep, that analysing the committed stream
+     * reproduced the five rows session 32 set 6 actually published -- the pin
+     * that licensed every other claim made from this capture. Issue #94's
+     * runaway correction resolves SEVENTEEN detections on the same stream, so
+     * the analyzer that wrote that export and the analyzer in this tree are
+     * different analyzers and no assertion can make them agree.
+     *
+     * What survives, and is asserted below, is the other half: the [published]
+     * rows stay in this file as the archive's own record of what the lifter was
+     * shown, and the fixture is still that set's stream. What is GONE is the
+     * check that the pipeline reproduces it. Nothing else in this repository
+     * replaces that, and issue #94's report says so rather than leaving it to
+     * be discovered.
+     *
+     * It is also still the analysis of an UNCUED set -- no cue track is passed
+     * -- so it states the other half of the window rule at the same time: with
+     * nothing on the record saying when the set ended, no boundary is invented
+     * and every detection is kept, including the ones that are plainly post-set
+     * handling.
      */
     @Test
-    fun `set 6 reproduces its published export rep for rep with no cue track`() {
+    fun `set 6 no longer reproduces its published export, and this is what it resolves`() {
         val analysis = SetAnalyzer.analyze(load("$fixture.csv"), rearDeltFly, loadKg = loadKg)
-        assertEquals(published.size, analysis.reps.size, "detections resolved; the lifter performed 12 reps")
-        analysis.reps.forEachIndexed { i, rep ->
-            val want = published[i]
-            assertEquals(want.eccS, rep.eccS, "rep ${i + 1} ecc_s")
-            assertEquals(want.conS, rep.conS, "rep ${i + 1} con_s")
-            assertEquals(want.meanConVelMps, rep.meanConVelMps, "rep ${i + 1} meanConVel_mps")
-            assertEquals(want.peakConVelMps, rep.peakConVelMps, "rep ${i + 1} peakConVel_mps")
-            assertEquals(want.romM, rep.romM, "rep ${i + 1} rom_m")
-            assertEquals(want.peakPowerW, rep.peakPowerW, "rep ${i + 1} peakPower_w")
-        }
-        assertEquals(82.6, analysis.velocityLossPct, "published velocityLoss_pct")
+        assertEquals(5, published.size, "the rows the app published in the field, unchanged as a record")
+        assertEquals(17, analysis.reps.size, "detections resolved; the lifter performed 12 reps")
+        // The whole rep list, so a later change to it cannot pass unnoticed
+        // now that the export comparison is gone.
+        assertEquals(
+            listOf(
+                0.918, 0.559, 0.833, 0.729, 0.829, 0.203, 1.835, 0.758, 0.768,
+                0.690, 1.000, 0.110, 0.446, 0.655, 0.368, 1.930, 0.679,
+            ),
+            analysis.reps.map { it.romM },
+            "ROM per detection, metres",
+        )
+        // 82.6% was the published figure and this file's own reproduction of
+        // it. It is now 88.0%, over a rep list three times as long.
+        assertEquals(88.0, analysis.velocityLossPct, "velocityLoss_pct, against 82.6 published")
         assertEquals(
             2.085,
             analysis.reps.maxOf { it.peakConVelMps },
-            "published summary.peakConVel_mps",
+            "peak drive velocity, unmoved: the handling spike is still the maximum",
         )
     }
 
@@ -459,24 +515,32 @@ class SetEndWindowTest {
      * stamped on. Nothing here converts through the reconstructed clock, so
      * [CueTrack.MAX_SKEW_MS] does not enter.
      *
-     * Four of five start before the cue. The fifth starts 3.479 s after it, and
-     * the fourth starts 1.829 s before it while ending 3.389 s after -- the
-     * straddling case, which is the one the rule has to make a decision about.
+     * Sixteen of seventeen start before the cue. The last starts 3.479 s after
+     * it, and the sixteenth starts 1.829 s before it while ending 3.389 s
+     * after -- the straddling case, which is the one the rule has to make a
+     * decision about. Both of those instants are unmoved by issue #94's
+     * runaway correction; what it adds is twelve detections between them.
      */
     @Test
-    fun `four of set 6's five detected drives begin before the Done cue`() {
+    fun `sixteen of set 6's seventeen detected drives begin before the Done cue`() {
         val samples = load("$fixture.csv")
         val doneMs = CueTrack.read(fixture).first { it.label == "Done" }.timestampMs
         val series = VelocityEstimator.estimate(samples, DspConfig(), rearDeltFly.measuredPlane)
             .mappedToLifter(rearDeltFly.sensorToLifter)
         val spans = RepSegmenter.segment(series, rearDeltFly, DspConfig())
         assertEquals(
-            listOf(-50247L, -33778L, -32731L, -1829L, 3479L),
+            listOf(
+                -50247L, -47069L, -42838L, -38971L, -35098L, -33778L, -32731L, -27297L,
+                -23579L, -19467L, -15808L, -13016L, -11221L, -7351L, -3449L, -1829L, 3479L,
+            ),
             spans.map { samples[it.conStartIdx].timestampMs - doneMs },
             "drive start relative to Done, ms",
         )
         assertEquals(
-            listOf(-49081L, -33237L, -29909L, 3389L, 8550L),
+            listOf(
+                -49081L, -46111L, -41909L, -38279L, -34351L, -33237L, -29909L, -26427L,
+                -22738L, -18661L, -14190L, -11939L, -10315L, -6299L, -2729L, 3389L, 8550L,
+            ),
             spans.map { samples[it.conEndIdx].timestampMs - doneMs },
             "drive end relative to Done, ms",
         )

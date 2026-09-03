@@ -74,16 +74,25 @@ class RomDispersionTest {
     @Test
     fun `the reported range of motion varies within a set by up to sixteen times (pre-fix)`() {
         val expected = mapOf(
-            "field-backsquat-10hz.csv" to 0.109,
+            // Issue #94's runaway correction moves eight of the thirteen and
+            // in BOTH directions. Down, meaning the reps within a set agree
+            // better than they did: the first overhead press 0.426 to 0.379,
+            // the second 0.674 to 0.657, the bursty press 0.645 to 0.669 is
+            // the exception. Up, sharply, on the two whose rep list was two
+            // reps long and is now five and six: the rotating bench press
+            // 0.017 to 0.607 and the 10 Hz squat 0.109 to 0.391. A CV over two
+            // reps is not a spread, and this is what it looks like when the
+            // population it is taken over becomes real.
+            "field-backsquat-10hz.csv" to 0.391,
             "field-bench-rotating-6rep-ok.csv" to 0.233,
-            "field-bench-rotating-6rep.csv" to 0.017,
-            "field-cablerow-static-8rep.csv" to 0.630,
+            "field-bench-rotating-6rep.csv" to 0.607,
+            "field-cablerow-static-8rep.csv" to 0.636,
             "field-facepull-static-12rep.csv" to 0.266,
             "field-pallof-static-12rep.csv" to 0.621,
-            "field-ohp-100hz-bursty.csv" to 0.645,
-            "field-ohp-rotating-8rep.csv" to 0.426,
-            "field-ohp-rotating-8rep-b.csv" to 0.674,
-            "field-seated-ohp-2rep.csv" to 0.278,
+            "field-ohp-100hz-bursty.csv" to 0.669,
+            "field-ohp-rotating-8rep.csv" to 0.379,
+            "field-ohp-rotating-8rep-b.csv" to 0.657,
+            "field-seated-ohp-2rep.csv" to 0.373,
             "field-legcurl-1030-12rep.csv" to 0.337,
             "field-legcurl-1030-12rep-b.csv" to 0.503,
             "field-legcurl-1030-12rep-c.csv" to 0.834,
@@ -102,8 +111,8 @@ class RomDispersionTest {
     @Test
     fun `the plausibility window issue 74 inherits is too blunt to act on (pre-fix)`() {
         val all = corpus.flatMap { (file, d, kg) -> roms(file, d, kg) }
-        assertEquals(103, all.size, "reps segmented across the corpus")
-        assertEquals(7, all.count { it < 0.05 || it > 1.2 }, "reps outside the 0.05-1.2 m window issue 74 quotes")
+        assertEquals(118, all.size, "reps segmented across the corpus")
+        assertEquals(8, all.count { it < 0.05 || it > 1.2 }, "reps outside the 0.05-1.2 m window issue 74 quotes")
         // The one capture whose travel is known independently: a seated leg
         // curl rail, 0.4 to 0.5 m. Against the machine itself HALF the reps are
         // impossible, and the inherited window passes almost all of them.
@@ -129,6 +138,13 @@ class RomDispersionTest {
         val defective = roms("field-facepull-static-12rep.csv", con(), 9.97903214022078)
         assertTrue(cv(control) < cv(defective), "CV puts the known-good control below the known-bad capture")
         assertTrue(ratio(control) > ratio(defective), "max/min inverts that ordering, which is why it is not used")
+        // The margin, stated because issue #94's runaway correction narrowed
+        // it and a bare `>` would hide that: max/min reads 2.255 against 2.213,
+        // a 2% separation, where CV reads 0.233 against 0.266. The inversion
+        // still holds and it is now close enough that one more capture could
+        // end it.
+        assertEquals(2.255, ratio(control), 5e-3, "max/min on the control")
+        assertEquals(2.213, ratio(defective), 5e-3, "max/min on the defective capture")
 
         // STABILITY, the secondary argument. Dropping any single rep moves
         // max/min far more than CV on the sets long enough for the question to
@@ -139,8 +155,14 @@ class RomDispersionTest {
             val loo = r.indices.map { i -> stat(r.filterIndexed { j, _ -> j != i }) }
             return (whole - loo.min()) / whole
         }
+        // The gap narrows with issue #94's runaway correction -- 0.27 against
+        // 0.11 becomes 0.102 against 0.087 -- because this capture's rep list
+        // goes from 8 to 11 and a leave-one-out statistic is less sensitive
+        // over a longer list. The stability argument therefore carries less
+        // weight than it did, and it was already the secondary one; the
+        // ORDERING argument above is what disqualifies max/min.
         val cable = roms("field-cablerow-static-8rep.csv", con(), 27.215542200602126)
-        assertEquals(0.27, worstSwing(cable, ::ratio), 5e-3, "max/min swing when one rep is dropped")
-        assertEquals(0.11, worstSwing(cable, ::cv), 5e-3, "CV swing when one rep is dropped")
+        assertEquals(0.102, worstSwing(cable, ::ratio), 5e-3, "max/min swing when one rep is dropped")
+        assertEquals(0.087, worstSwing(cable, ::cv), 5e-3, "CV swing when one rep is dropped")
     }
 }

@@ -308,7 +308,13 @@ class LiveDisplacementCapTest {
             demoted += disp.count { it > c.maxRunDisplacementM }
             largest = maxOf(largest, disp.lastOrNull() ?: 0.0)
         }
-        assertEquals(221, runs, "batch movement runs across the corpus")
+        // 221 before issue #94's runaway correction. The correction splits
+        // each over-cap run into the strokes inside it, so the corpus gains
+        // 37 movement runs -- and the claim this test is named for gets
+        // STRONGER rather than weaker: none of the 258 reaches the cap now,
+        // because a run that would have is de-trended before the segmenter
+        // sees it.
+        assertEquals(258, runs, "batch movement runs across the corpus")
         assertEquals(0, demoted, "batch runs demoted by maxRunDisplacementM")
         assertEquals(1.982, largest, 5e-3, "largest batch run displacement, metres")
         assertEquals(2.0, c.maxRunDisplacementM, "the cap none of them reached")
@@ -319,19 +325,28 @@ class LiveDisplacementCapTest {
         // The pair, per capture, so a change moving one path and not the other
         // is visible instead of silent. Median qualified-run displacement in
         // metres, live then batch.
+        //
+        // Issue #94's runaway correction is exactly that case and this is
+        // where it shows: every LIVE median is unchanged to three decimals,
+        // because the correction runs in VelocityEstimator.estimate and the
+        // live tracker integrates per sample without it. Six batch medians
+        // move, all of them DOWN except the cable row: 0.651 to 0.634,
+        // 0.338 to 0.337, 0.232 to 0.303, 0.556 to 0.492, 0.503 to 0.500 and
+        // 0.484 to 0.474. The live-to-batch gap this file exists to measure
+        // therefore widens on five captures and narrows on one.
         val c = DspConfig()
         val expected = mapOf(
             "field-ohp-rotating-8rep.csv" to (0.684 to 0.743),
-            "field-ohp-rotating-8rep-b.csv" to (0.864 to 0.651),
+            "field-ohp-rotating-8rep-b.csv" to (0.864 to 0.634),
             "field-bench-rotating-6rep-ok.csv" to (0.268 to 0.333),
-            "field-bench-rotating-6rep.csv" to (0.825 to 0.338),
-            "field-cablerow-static-8rep.csv" to (0.738 to 0.232),
+            "field-bench-rotating-6rep.csv" to (0.825 to 0.337),
+            "field-cablerow-static-8rep.csv" to (0.738 to 0.303),
             "field-facepull-static-12rep.csv" to (0.206 to 0.246),
             "field-pallof-static-12rep.csv" to (0.284 to 0.290),
-            "field-backsquat-10hz.csv" to (0.861 to 0.556),
+            "field-backsquat-10hz.csv" to (0.861 to 0.492),
             "field-backsquat-10hz-set5.csv" to (0.753 to 0.458),
-            "field-ohp-100hz-bursty.csv" to (1.604 to 0.503),
-            "field-seated-ohp-2rep.csv" to (1.073 to 0.484),
+            "field-ohp-100hz-bursty.csv" to (1.604 to 0.500),
+            "field-seated-ohp-2rep.csv" to (1.073 to 0.474),
             "field-still-0rep.csv" to (0.000 to 0.000),
             "field-legcurl-1030-12rep.csv" to (0.371 to 0.191),
             "field-legcurl-1030-12rep-b.csv" to (0.860 to 0.296),

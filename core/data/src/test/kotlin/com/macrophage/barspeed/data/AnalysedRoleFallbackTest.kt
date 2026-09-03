@@ -279,7 +279,12 @@ class AnalysedRoleFallbackTest {
         // extremum over this rep list, so an empty list is exactly what an
         // empty object is.
         assertTrue(analysis.reps.isNotEmpty(), "role a resolved no reps, so there would be no summary to restore")
-        assertEquals(4, analysis.reps.size, "detections; the metronome called 6 -- that under-count is #94/#138")
+        // Four detections against six called reps before issue #94's runaway
+        // correction; EIGHT after it, so the same capture crossed from
+        // under-counting to over-counting. Neither is right and this file
+        // claims neither: what it asserts is that the discarded role-a stream
+        // resolves SOMETHING, which is #207's point and is unaffected.
+        assertEquals(8, analysis.reps.size, "detections; the metronome called 6 -- that error is #94/#138")
         val meanConVel = analysis.reps.map { it.meanConVelMps }.average()
         assertTrue(meanConVel > 0.0, "mean concentric velocity is $meanConVel m/s, which is not a summary")
     }
@@ -368,14 +373,15 @@ class AnalysedRoleFallbackTest {
         val set = publish(asRecorded(mapOf(SensorRole.B to emptyList(), SensorRole.A to roleA())))
         val summary = set.getValue("summary").jsonObject
 
-        // Presence, not values. This capture under-counts -- four detections
-        // against six called reps -- so the figures are #94/#138's problem and
-        // pinning them here would read as a claim that they are trustworthy.
+        // Presence, not values. This capture mis-counts -- eight detections
+        // against six called reps since issue #94's runaway correction, four
+        // before it -- so the figures are #94/#138's problem and pinning them
+        // here would read as a claim that they are trustworthy.
         assertTrue(summary.isNotEmpty(), "the summary is still empty, which is what field-36 published")
         listOf("meanConVel_mps", "peakConVel_mps", "meanRom_m", "peakPower_w").forEach { key ->
             assertTrue(key in summary, "the restored summary has no $key: ${summary.keys}")
         }
-        assertEquals(4, set.getValue("repMetrics").jsonArray.size, "detections; the metronome called 6 (#94/#138)")
+        assertEquals(8, set.getValue("repMetrics").jsonArray.size, "detections; the metronome called 6 (#94/#138)")
     }
 
     @Test

@@ -270,7 +270,17 @@ class LiveUnderCountAttributionTest {
         }
         assertEquals(165, performed, "reps the lifter performed")
         assertEquals(101, live, "reps the live counter reports")
-        assertEquals(139, batch, "reps the batch analyzer reports")
+        // 139 before issue #94's runaway correction, 180 after it, against
+        // 165 performed. The batch path crossed from under-counting by 26 to
+        // over-counting by 15. Live is untouched at 101: the correction runs
+        // in VelocityEstimator.estimate and the live tracker does not call it.
+        //
+        // Neither number is a verdict. This issue's own record says a rep
+        // total cannot evaluate a change here because over- and under-counting
+        // cancel; BatchCueCoverageTest is where the batch path is scored per
+        // rep against the metronome, and there the same change takes matched
+        // windows from 96 of 170 to 147 of 170.
+        assertEquals(180, batch, "reps the batch analyzer reports")
         assertEquals(66, absoluteError, "absolute live error")
         assertEquals(64, performed - live, "net live deficit")
     }

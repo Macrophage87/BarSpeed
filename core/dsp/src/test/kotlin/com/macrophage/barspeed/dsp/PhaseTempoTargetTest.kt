@@ -251,22 +251,35 @@ class PhaseTempoTargetTest {
     fun `reproduces the analysis its session exported`() {
         // Provenance, not behaviour: these are the figures this set's own
         // export published, so a file that does not produce them is not this
-        // set. Nothing in this change touches any of them.
+        // set.
+        //
+        // The rep COUNT moved with issue #94's runaway correction, 11 to 12
+        // against the 10 the lifter counted. The per-rep figures asserted
+        // below are what carry the provenance and they are unmoved; the count
+        // is asserted here so the move is on the record rather than absorbed.
         val a = analysis()
-        assertEquals(11, a.reps.size, "segmented reps; the lifter counted 10")
+        assertEquals(12, a.reps.size, "segmented reps; the lifter counted 10")
+        // One detection is INSERTED, at index 6, and every other row is
+        // unmoved -- which is what says the correction added a rep here rather
+        // than re-segmenting the set. The inserted rep resolves no eccentric.
         assertEquals(
-            listOf(null, 2.67, 2.35, 2.49, null, 0.98, 1.43, 0.53, 0.66, 0.45, null),
+            listOf(null, 2.67, 2.35, 2.49, null, 0.98, null, 1.43, 0.53, 0.66, 0.45, null),
             a.reps.map { it.eccS },
             "ecc_s",
         )
         assertEquals(
-            listOf(1.98, 0.77, 1.28, 1.51, 1.1, 0.47, 1.15, 2.22, 1.2, 0.85, 1.18),
+            listOf(1.98, 0.77, 1.28, 1.51, 1.1, 0.47, 1.06, 1.15, 2.22, 1.2, 0.85, 1.18),
             a.reps.map { it.conS },
             "con_s",
         )
         val c = assertNotNull(a.tempoCompliance, "compliance")
-        assertEquals(3, c.repsFullyCompliant, "withinTolerance")
-        assertEquals(11, c.repsEvaluated, "of")
+        // The inserted rep is a 1.06 s drive against a 1 s target and no
+        // eccentric, so it grades as fully compliant on all it resolved and
+        // the ratio the lifter reads goes 3 of 11 to 4 of 12. A rep the
+        // correction recovered improving the tempo score is not evidence the
+        // tempo was better.
+        assertEquals(4, c.repsFullyCompliant, "withinTolerance")
+        assertEquals(12, c.repsEvaluated, "of")
     }
 
     @Test

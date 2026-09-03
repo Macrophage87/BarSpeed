@@ -155,7 +155,10 @@ class VelocityLossTest {
         assertNull(c.velocityLossPct, "velocity loss reported to the lifter")
 
         val d = SetAnalyzer.analyze(load("field-legcurl-1030-10rep.csv"), legCurl)
-        assertEquals(11, d.reps.size, "segmented detections; the lifter performed 10")
+        // 11 before issue #94's runaway correction. The verdict below is
+        // unchanged: the last detection is still the fastest, so the figure is
+        // still withheld rather than published as a negative drawdown.
+        assertEquals(12, d.reps.size, "segmented detections; the lifter performed 10")
         assertEquals<Double?>(1.375, d.reps.last().romM, "ROM of the extra detection, metres")
         assertEquals<Double?>(1.159, d.reps.last().meanConVelMps, "its drive velocity, m/s")
         assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(d.reps))

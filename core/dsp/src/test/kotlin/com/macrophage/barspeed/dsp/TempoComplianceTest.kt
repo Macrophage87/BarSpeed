@@ -71,21 +71,26 @@ class TempoComplianceTest {
     @Test
     fun `per-phase compliance already excludes unmeasured reps`() {
         val c = assertNotNull(fixtureA().tempoCompliance)
-        // Four of eight reps resolved an eccentric and none of the four was in
-        // tolerance. Both figures come from the measured reps only. The
-        // numerator falling from 1 of 3 to 0 of 4 is not the lift getting
-        // worse: the rep that used to be on tempo read 2.87 s against a 3 s
-        // target, and the eccentrics now measured run 0.99 to 5.01 s, so the
-        // set is graded on more of itself and likes it less. Nobody timed those
-        // phases, so neither reading is validated -- see issue #47.
-        assertEquals(4, phase(c, "eccentric").repsEvaluated, "eccentric denominator")
+        // Six of ten reps resolve an eccentric and none of the six is in
+        // tolerance. Both figures come from the measured reps only.
+        //
+        // The denominators grew twice for the same reason and neither time was
+        // the lift changing: 3 of 7 became 4 of 8 when the anchor accept rule
+        // moved, and 4 of 8 became 6 of 10 with issue #94's runaway
+        // correction. Each time the set is graded on more of itself. The
+        // numerators do not move at all -- 0 eccentrics in tolerance either
+        // way, 5 concentrics either way -- so what a reader sees change is the
+        // fraction, 0/4 to 0/6 and 5/8 to 5/10, on a set where the same five
+        // drives were on tempo throughout. Nobody timed those phases, so no
+        // reading here is validated -- see issue #47.
+        assertEquals(6, phase(c, "eccentric").repsEvaluated, "eccentric denominator")
         assertEquals(0, phase(c, "eccentric").repsWithinTolerance, "eccentric numerator")
-        assertEquals(8, phase(c, "concentric").repsEvaluated, "concentric denominator")
+        assertEquals(10, phase(c, "concentric").repsEvaluated, "concentric denominator")
         assertEquals(5, phase(c, "concentric").repsWithinTolerance, "concentric numerator")
         // Both means are taken over the reps that resolved an eccentric, and
-        // that is now four of eight rather than three of seven. The pairing is
-        // unchanged; what moved is which reps there are to pair.
-        assertEquals(1.1, c.actualEccConRatio, "measured ecc:con contrast")
+        // that is now six of ten. The pairing is unchanged; what moved is
+        // which reps there are to pair.
+        assertEquals(1.08, c.actualEccConRatio, "measured ecc:con contrast")
     }
 
     @Test
@@ -95,9 +100,9 @@ class TempoComplianceTest {
         // pinned with them; a size assertion alone would miss a dropped entry.
         assertEquals(
             listOf(
-                "High velocity loss (79.4%) — significant fatigue this set.",
-                "Tempo (eccentric): 0/4 reps on tempo; worst was 2.01 s too slow (target 3.00 s).",
-                "Tempo (concentric): 5/8 reps on tempo; worst was 2.96 s too slow (target 1.00 s).",
+                "High velocity loss (79.1%) — significant fatigue this set.",
+                "Tempo (eccentric): 0/6 reps on tempo; worst was 2.01 s too slow (target 3.00 s).",
+                "Tempo (concentric): 5/10 reps on tempo; worst was 2.96 s too slow (target 1.00 s).",
             ),
             fixtureA().verdicts,
         )
@@ -163,13 +168,13 @@ class TempoComplianceTest {
     @Test
     fun `a mixed set counts every rep that resolved a scored phase`() {
         val c = assertNotNull(fixtureA().tempoCompliance)
-        // Four of the eight reps have no eccentric but were driven within
-        // tolerance, so they are graded on the concentric alone; the other four
+        // Four of the ten reps have no eccentric but were driven within
+        // tolerance, so they are graded on the concentric alone; the other six
         // resolved both and none was in tolerance on the eccentric. That
-        // reconciles 0 of 4 eccentrics with 5 of 8 concentrics and 4 of 8 reps
-        // overall. Dropping the four unmeasured reps instead would report 0 of
-        // 4 and discard real evidence.
-        assertEquals(8, c.repsEvaluated, "every rep resolved at least one scored phase")
+        // reconciles 0 of 6 eccentrics with 5 of 10 concentrics and 4 of 10
+        // reps overall. Dropping the four unmeasured reps instead would report
+        // 0 of 6 and discard real evidence.
+        assertEquals(10, c.repsEvaluated, "every rep resolved at least one scored phase")
         assertEquals(4, c.repsFullyCompliant, "four reps were in tolerance on all they resolved")
     }
 
@@ -205,13 +210,16 @@ class TempoComplianceTest {
         // its position in the filtered list of measured eccentrics -- which is
         // what this pin exists for, and is unchanged.
         //
-        // What changed is which rep is worst. Rep 4 resolves a 5.01 s eccentric
-        // where it resolved none before, and 5.01 s against a 3 s target beats
-        // the 1.0 s that used to win. No suffix, because rep 4 of 8 is not the
-        // last rep performed. Whether a 5.01 s eccentric is what the lifter did
-        // is established by nothing here.
+        // What changed is which rep is worst, twice, and neither time was it
+        // the eccentric moving. The 5.01 s eccentric that beats the 1.0 s
+        // which used to win was rep 4 of 8 and is rep 6 of 10 since issue
+        // #94's runaway correction added two detections ahead of it. The
+        // sentence the lifter reads names a different rep for the same
+        // measurement. No suffix, because rep 6 of 10 is not the last rep
+        // performed. Whether a 5.01 s eccentric is what the lifter did is
+        // established by nothing here.
         assertEquals(
-            "Rep 4 eccentric 5.0 s — 2.0 s too slow.",
+            "Rep 6 eccentric 5.0 s — 2.0 s too slow.",
             CoachingRules.eccentricTempoInsight(fixtureA().reps, 3.0, 0.5),
         )
     }

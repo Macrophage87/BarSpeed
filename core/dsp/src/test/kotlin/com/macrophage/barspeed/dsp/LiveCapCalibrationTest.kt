@@ -243,7 +243,11 @@ class LiveCapCalibrationTest {
         // Every one, not most. The least extreme is 3.34x its own set median,
         // which no reference error of at most 1.65x can explain away.
         assertEquals(11, removedOutOfFamily, "of those, how many are out of family with their own set")
-        assertEquals(3.338, smallestRemovedRatio, 5e-3, "the least extreme removal, as a multiple of its set median")
+        // Issue #94's runaway correction moves the BATCH reference this file
+        // scores against; the live tracker is untouched by it. The figures
+        // below therefore move without any live behaviour changing, which is
+        // the standing hazard of scoring one path against the other.
+        assertEquals(4.994, smallestRemovedRatio, 5e-3, "the least extreme removal, as a multiple of its set median")
         // On field-reardeltfly-s32-set06. The largest across the earlier
         // fifteen captures was 20.376 m.
         assertEquals(127.405, largestRemovedM, 5e-3, "the largest removal, metres")
@@ -262,8 +266,12 @@ class LiveCapCalibrationTest {
             inFamilyToday += countedReps(runs, d, c, 0).count { !outOfFamily(it, ref) }
             inFamilyCapped += countedReps(runs, d, c, 1).count { !outOfFamily(it, ref) }
         }
-        assertEquals(82, inFamilyToday, "in-family counted reps today")
-        assertEquals(82, inFamilyCapped, "in-family counted reps with the bound applied")
+        // Issue #94's runaway correction moves the BATCH reference this file
+        // scores against; the live tracker is untouched by it. The figures
+        // below therefore move without any live behaviour changing, which is
+        // the standing hazard of scoring one path against the other.
+        assertEquals(83, inFamilyToday, "in-family counted reps today")
+        assertEquals(83, inFamilyCapped, "in-family counted reps with the bound applied")
     }
 
     @Test
@@ -285,11 +293,21 @@ class LiveCapCalibrationTest {
             }
         }
         // The floor: anything below this destroys a rep that looks like a rep.
-        assertEquals(1.058, largestInFamilyLive, 5e-3, "largest in-family live rep displacement, metres")
+        // Issue #94's runaway correction moves the BATCH reference this file
+        // scores against; the live tracker is untouched by it. The figures
+        // below therefore move without any live behaviour changing, which is
+        // the standing hazard of scoring one path against the other.
+        assertEquals(1.220, largestInFamilyLive, 5e-3, "largest in-family live rep displacement, metres")
         // The second floor, and the binding one: anything below this starts
         // demoting BATCH runs, because the constant is shared and the batch path
         // is the trusted one. 2.0 m clears it by 18 mm.
-        assertEquals(301, batchRuns, "batch movement runs across the corpus")
+        //
+        // 301 before issue #94's runaway correction, 403 after it: every
+        // over-cap run is de-trended into the strokes inside it before the
+        // segmenter counts runs at all. The bracket's own bound is unmoved --
+        // the largest batch run is still 1.982 m -- so the constant's room is
+        // the same and only the population it is measured over has grown.
+        assertEquals(403, batchRuns, "batch movement runs across the corpus")
         assertEquals(1.982, largestBatchRun, 5e-3, "largest batch run displacement, metres")
         assertEquals(2.0, c.maxRunDisplacementM, "the value, barely above both floors")
     }
