@@ -55,11 +55,15 @@ import kotlin.test.assertNull
  *
  * ## Red at this commit
  *
- * Eight of the fourteen tests here fail on this commit and are answered by
- * the commit that follows. The other six -- the two flat-block carries, the
- * flat block's bit-for-bit identity, the block edge, the mirror null, and the
- * empty statement -- are the behaviour the fix must not move, and they are
- * green both sides of it.
+ * ## Red, and then green
+ *
+ * Eight of the fourteen tests here failed at
+ * `b61c14f9ed714331355c573a4e4c5bd80e9bb68f`, where they were pushed with no
+ * production change, and were answered at
+ * `b3c649e71cda6313316a447387d0475682b49cff`. The other six -- the two
+ * flat-block carries, the flat block's bit-for-bit identity, the block edge,
+ * the mirror null, and the empty statement -- are the behaviour the fix does
+ * not move, and are green both sides of it.
  */
 class ProgressiveBlockCarryTest {
     /**
@@ -312,18 +316,34 @@ class ProgressiveBlockCarryTest {
 
     /**
      * THE FLAT BLOCK RETURNS THE STATEMENT ITSELF, bit for bit, rather than
-     * being put through the arithmetic. A plan declaring 175 lb freezes
-     * 79.3786647517562 on both slots, and `d + (s - d)` on doubles like those
-     * is not guaranteed to be `s`; a carry that moved the lifter's own number
-     * by an ulp would print a deviation they did not make, which is #45, the
-     * defect this object already carries a fix for. Asserted as an exact
-     * equality against a declaration chosen because it is not representable,
-     * so a refactor folding the flat case into the general one reds here.
+     * being put through `d + (s - d)`.
+     *
+     * THE VALUES HERE ARE NOT A GYM'S, and that is the finding rather than a
+     * flaw in the case. The version of this test that stood here used a plan
+     * declaring 175 lb against a statement of 79.4 kg and claimed to pin the
+     * identity; it did not, and the mutation that deletes the early return
+     * survived it with 0 failures. The two expressions agree for every
+     * realistic pair -- searched over three million random plate-step
+     * statements against declarations from 45 to 500 lb, and 200,000 kilogram
+     * pairs, with zero disagreements -- because a statement and a declaration
+     * within a factor of two of each other have an exact difference. A
+     * disagreement needs a correction of about 290 kg, which is what these
+     * two doubles are: the only shape of input that can tell the guarantee
+     * from its absence.
+     *
+     * So this pins a GUARANTEE, and says so. The flat block is where the
+     * lifter's own number has to survive untouched -- #45 is what happens when
+     * a load is quantised on a path that promised not to move it -- and a
+     * guarantee that costs one comparison is worth keeping even where no gym
+     * input can observe it. What this test defends is the comparison's
+     * continued existence, not a number any lifter will ever see.
      */
     @Test
     fun `a flat block returns the stated load unchanged rather than recomputing it`() {
-        val declared = 175 / WeightUnit.LB_PER_KG
-        val stated = 79.4
+        // Not representative and not meant to be: the identity holds for every
+        // pair a gym produces, so only a pair a gym cannot produce can red.
+        val declared = 325.46723651992687
+        val stated = 36.21814333377138
         assertEquals(
             stated,
             SetLoadPolicy.standingStatedAddedKg(
