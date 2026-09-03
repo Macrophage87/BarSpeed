@@ -175,35 +175,109 @@ class RestClockPolicyTest {
     }
 
     // ------------------------------------------------------------------
-    // Which samples the rest window holds. TODAY'S RULE, pinned for one
-    // commit so #178's change can be a differential against it, and deleted
-    // at that differential rather than reworded.
+    // Which samples the rest window holds. The differentials for #178.
+    //
+    // The two pins that stood here -- that no sample of the set ever reaches
+    // the rest window -- stated the rule this replaces and are deleted, not
+    // reworded.
     // ------------------------------------------------------------------
 
     /**
-     * The set's own capture is entirely the set's: nothing of it reaches the
-     * rest window, however long the set went on recording after the cue that
-     * called it over.
+     * The rest window opens at the instant the rest runs from, so the tail of
+     * the set's own capture is in it.
      *
-     * Field-37 set 7 is the case: `Done` at the cue, 53.06 s of further
-     * recording, and a rest-HR window that begins after all of it.
+     * Field-37 set 7 is the case this is shaped on: the set spoke `Done` and
+     * went on recording for 53.06 s, and the rest-HR window began after all of
+     * it while the countdown had already spent that time. The samples in that
+     * tail are rest, and both documents must say so.
      */
     @Test
-    fun `no sample of the set reaches the rest window`() {
-        val samples = listOf(hr(10_000L), hr(63_060L), hr(63_400L))
+    fun `the samples after the set-over instant are the rest window's`() {
+        val cue = 10_000L
+        val samples = listOf(hr(9_000L), hr(cue), hr(40_000L), hr(63_060L))
         assertEquals(
-            emptyList(),
-            RestClockPolicy.restWindowSeed(samples, startedAtMs = 10_000L),
+            listOf(hr(cue), hr(40_000L), hr(63_060L)),
+            RestClockPolicy.restWindowSeed(samples, startedAtMs = cue),
         )
     }
 
-    /** Nor on a set whose terminal cue sits at the write instant. */
+    /**
+     * A sample stamped BEFORE that instant is the set's and stays out.
+     *
+     * The window cannot reach backwards into the work: heart rate under load
+     * is a different population from heart rate at rest, and one sample of the
+     * former at the head of a rest window is what a recovery slope is fitted
+     * from.
+     */
     @Test
-    fun `no sample of a set that ended at its cue reaches the rest window either`() {
+    fun `a sample from before the set was over is not in the rest window`() {
         assertEquals(
             emptyList(),
-            RestClockPolicy.restWindowSeed(listOf(hr(27_004L)), startedAtMs = 27_004L),
+            RestClockPolicy.restWindowSeed(listOf(hr(9_999L)), startedAtMs = 10_000L),
         )
+    }
+
+    /**
+     * The boundary is inclusive: a sample stamped exactly at the instant is
+     * rest.
+     *
+     * Pinned so the choice is on the record. Either answer is defensible for
+     * one sample; an unstated one is how the two readers drifted apart in the
+     * first place.
+     */
+    @Test
+    fun `a sample stamped exactly at the set-over instant is in the rest window`() {
+        assertEquals(
+            listOf(hr(10_000L)),
+            RestClockPolicy.restWindowSeed(listOf(hr(10_000L)), startedAtMs = 10_000L),
+        )
+    }
+
+    /**
+     * A set nothing called over runs its rest from the write instant, so only
+     * what arrived at or after that instant is in the window.
+     *
+     * These are field-37's ~0 rows -- the sets that ended on `Set ended` at
+     * `endedAt_ms`, and the holds that ended on `Time` -- and the rule must
+     * leave them where they already were rather than moving a set's capture
+     * into its rest for a reason nothing measured.
+     */
+    @Test
+    fun `a set nothing called over keeps its own samples`() {
+        val samples = listOf(hr(26_500L), hr(27_003L))
+        assertEquals(
+            emptyList(),
+            RestClockPolicy.restWindowSeed(samples, startedAtMs = 27_004L),
+        )
+    }
+
+    /**
+     * The seed keeps the capture's order.
+     *
+     * It is prepended to a buffer that goes on filling from the strap, and the
+     * archive's CSV is written from that buffer in list order. A reordered
+     * seed publishes a heart-rate stream whose timestamps do not ascend, which
+     * every reader of it assumes.
+     */
+    @Test
+    fun `the seed keeps the order the samples were captured in`() {
+        val samples = listOf(hr(10_000L), hr(11_000L), hr(12_000L))
+        assertEquals(
+            listOf(10_000L, 11_000L, 12_000L),
+            RestClockPolicy.restWindowSeed(samples, startedAtMs = 10_000L).map { it.timestampMs },
+        )
+    }
+
+    /**
+     * A set that captured nothing seeds nothing.
+     *
+     * An empty window is an absence and stays one: no sample is invented for a
+     * strap that was not worn, because an empty rest-HR stream claims a window
+     * was captured and was silent, which is a different fact.
+     */
+    @Test
+    fun `a set with no capture seeds no rest window`() {
+        assertEquals(emptyList(), RestClockPolicy.restWindowSeed(emptyList(), startedAtMs = 10_000L))
     }
 
     private fun hr(tMs: Long) = HrSample(timestampMs = tMs, bpm = 120)
