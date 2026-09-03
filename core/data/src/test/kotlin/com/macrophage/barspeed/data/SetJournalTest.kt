@@ -234,7 +234,7 @@ class SetJournalTest {
                 store.open(
                     header().copy(
                         sensorRoles = listOf(SensorRole.A, SensorRole.B),
-                        analysedRole = SensorRole.A,
+                        armedRole = SensorRole.A,
                     ),
                 ),
             )
@@ -267,7 +267,7 @@ class SetJournalTest {
         val journal =
             requireNotNull(
                 store().open(
-                    header().copy(sensorRoles = listOf(SensorRole.A, SensorRole.B), analysedRole = SensorRole.A),
+                    header().copy(sensorRoles = listOf(SensorRole.A, SensorRole.B), armedRole = SensorRole.A),
                 ),
             )
         imu.forEach { journal.appendImu(it) }
@@ -290,7 +290,7 @@ class SetJournalTest {
         val journal =
             requireNotNull(
                 store.open(
-                    header().copy(sensorRoles = listOf(SensorRole.A, SensorRole.B), analysedRole = SensorRole.A),
+                    header().copy(sensorRoles = listOf(SensorRole.A, SensorRole.B), armedRole = SensorRole.A),
                 ),
             )
         journal.appendImu(imu.first())
@@ -301,7 +301,7 @@ class SetJournalTest {
         assertEquals(1, found.imuSamples.size, "the armed stream picked up the other one's rows")
         assertEquals(2, found.secondaryImuSamples.size)
         assertEquals(listOf(SensorRole.A, SensorRole.B), found.header.sensorRoles)
-        assertEquals(SensorRole.A, found.header.analysedRole)
+        assertEquals(SensorRole.A, found.header.armedRole)
     }
 
     /**
@@ -322,7 +322,7 @@ class SetJournalTest {
         assertEquals(imu.size, found.imuSamples.size)
         assertEquals(emptyList(), found.secondaryImuSamples)
         assertEquals(emptyList(), found.header.sensorRoles)
-        assertEquals(null, found.header.analysedRole)
+        assertEquals(null, found.header.armedRole)
     }
 
     /**

@@ -778,4 +778,33 @@ object SensorCapturePolicy {
      */
     fun analysable(expected: List<SensorRole>, framesByRole: Map<SensorRole, Int>): List<SensorRole> =
         expected.filter { (framesByRole[it] ?: 0) >= MIN_ANALYSABLE_FRAMES }
+
+    /**
+     * Which stream the figures come from, from the frame counts alone (#211).
+     *
+     * ONE WRITER FOR TWO READERS. [analysable] then [analysedStream] is the
+     * whole rule, and it was composed at the recording call site and nowhere
+     * else until an interrupted capture had to answer the same question about
+     * itself. Two compositions of the same two functions are two places for
+     * the order of them to drift, and the second reader is `:core:data`'s
+     * orphan store, which cannot see `:app`. So the composition is the thing
+     * that is shared, not the pieces.
+     *
+     * IT ANSWERS FROM COUNTS, NEVER FROM WHAT REACHED THE ARCHIVE. A role with
+     * no entry in [framesByRole] delivered nothing, exactly as [analysable]
+     * reads it, and a role that delivered fewer than [MIN_ANALYSABLE_FRAMES]
+     * is not a role the DSP can be pointed at however many files carry its
+     * name.
+     *
+     * THE CALLER STILL CHOOSES ITS COUNTS. The recording path counts the
+     * buffers it is about to store; the orphan store counts the rows it
+     * decoded off disk. Those are the same quantity observed at two moments,
+     * and this function is deliberately incapable of telling them apart --
+     * what it cannot do is grade one of them by a different rule.
+     */
+    fun analysedFrom(
+        armed: SensorRole?,
+        expected: List<SensorRole>,
+        framesByRole: Map<SensorRole, Int>,
+    ): AnalysedStream = analysedStream(armed, analysable(expected, framesByRole))
 }

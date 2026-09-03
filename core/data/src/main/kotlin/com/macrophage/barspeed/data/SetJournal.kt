@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.CompletableDeferred
@@ -10,8 +11,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import java.io.BufferedWriter
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -79,13 +85,32 @@ data class SetJournalHeader(
      * role.
      *
      * The role the set ARMED for analysis, which since #207 is not always the
-     * role its figures end up coming from: this header is written and closed
+     * role its figures would come from: this header is written and closed
      * before the first sample line, so it cannot know which units streamed.
-     * Nothing downstream needs it to. A recovered orphan is offered back as a
-     * zip or discarded and is never analysed, and `imu.csv` is genuinely the
-     * armed unit's capture however empty that turns out to be.
+     * `imu.csv` is genuinely the armed unit's capture however empty that turns
+     * out to be, and that is the only thing this field says.
+     *
+     * IT WAS CALLED `analysedRole` AND THE NAME WAS WRONG (#211). Not the
+     * value and not the code that read it -- the word, in the one artifact a
+     * person opens before anything else does: a lifter unzipping a recovered
+     * set whose armed unit went silent read `"analysedRole": "a"` beside an
+     * `imu.csv` holding a header and no rows, while `imu-b.csv` held the whole
+     * capture every figure would have come from. The Kotlin name is the honest
+     * one now.
+     *
+     * THE ON-DISK KEY IS DELIBERATELY UNMOVED. [SerialName] keeps it
+     * `analysedRole`, so every directory already sitting on the phone decodes
+     * unchanged and a build that predates this still derives the second
+     * stream's role from it -- the same compatibility reasoning
+     * [sensorRoles] gives for not bumping [SetJournalStore.JOURNAL_VERSION].
+     * What a person READS is corrected where the correction can be made
+     * truthfully: [SetJournalStore.zip] publishes `armedRole` in its place,
+     * beside an `analysedRole` derived from the streams that are actually in
+     * the directory. Rewriting the recorded file was refused outright -- the
+     * capture is not edited after the fact.
      */
-    val analysedRole: SensorRole? = null,
+    @SerialName(SetJournalStore.RECORDED_ROLE_KEY)
+    val armedRole: SensorRole? = null,
     /**
      * Whether the SECOND link was connected at the moment the set began, as
      * the caller observed it (#156).
@@ -128,6 +153,35 @@ data class OrphanedSet(
      * what it meant.
      */
     val secondaryImuSamples: List<ImuSample> = emptyList(),
+    /**
+     * Which role's capture the figures would be computed from, decided from
+     * the rows that are actually in this directory (#211).
+     *
+     * NOT [SetJournalHeader.armedRole], and that difference is the whole of
+     * #211. The header is written and closed before the first sample line, so
+     * it can only name the unit the set armed; on a capture whose armed unit
+     * went silent, the rows are in the other file. This is derived on read by
+     * [SensorCapturePolicy.analysedFrom] -- the same single writer the
+     * recording path decides with -- so a recovered capture and a stored set
+     * cannot disagree about which stream the analysis belongs to.
+     *
+     * NOTHING IS ANALYSED HERE. A recovered orphan is offered back as a zip or
+     * discarded; this is a statement about the capture, published so that the
+     * person holding the zip is not left to work it out from two file sizes.
+     * It is also why deriving it costs nothing that matters -- the rows have
+     * already been decoded by the time this is answered.
+     */
+    val analysedRole: SensorRole? = null,
+    /**
+     * True when [analysedRole] is not the role the set armed, for
+     * `RecordedSensors.analysedFellBack`'s reason and by its rule.
+     *
+     * The comparison is not left to the reader. "The armed unit's capture" and
+     * "the only capture there was" are different statements about what is in
+     * the zip, and on a directory holding two non-empty streams they are not
+     * separable by looking at [analysedRole] alone.
+     */
+    val analysedFellBack: Boolean = false,
 )
 
 /**
@@ -413,12 +467,17 @@ class SetJournalStore(
      * browsable, so without this the capture is safe and permanently out of
      * reach -- which is a strange thing to offer somebody whose set it is.
      *
-     * The files are copied in exactly as they lie, uncompressed and
+     * The STREAMS are copied in exactly as they lie, uncompressed and
      * unconverted. They are already the canonical CSV that
      * `core/dsp/src/test/resources/field-*.csv` fixtures are written in, so a
      * capture that exposes a defect converts into a regression fixture with no
      * transformation at all -- which is this repository's discharge ritual for
      * a hardware-found bug.
+     *
+     * `header.json` is the exception and is published rather than copied, by
+     * [publishedHeader] (#211). It is not a fixture and it is the one file in
+     * the directory a person reads first, and the recorded key naming a role
+     * says which unit was ARMED while its name said which was analysed.
      *
      * A stream that will not read is skipped rather than failing the export.
      * Some of the capture is worth more than none of it, and the whole reason
@@ -429,7 +488,8 @@ class SetJournalStore(
         ZipOutputStream(out).use { zip ->
             orphan.directory.listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }.forEach { file ->
                 runCatching {
-                    val bytes = file.readBytes()
+                    val bytes =
+                        if (file.name == HEADER_FILE) publishedHeader(orphan, file) else file.readBytes()
                     zip.putNextEntry(ZipEntry(file.name))
                     zip.write(bytes)
                     zip.closeEntry()
@@ -463,26 +523,85 @@ class SetJournalStore(
                 json.decodeFromString(SetJournalHeader.serializer(), File(dir, HEADER_FILE).readText())
             }.getOrNull() ?: return null
         if (header.journalVersion > JOURNAL_VERSION) return null
+        val imuSamples = decode(dir, SetJournal.IMU) { ImuCsv.decode(it) }
+        // The second stream's role comes from the header's own declaration
+        // rather than from whichever imu-*.csv happens to be on disk. The
+        // header is written and closed before the first sample line of any
+        // stream, so it is the one thing in the directory that cannot be a
+        // half-truth; a file scan would pick up a role this set was never
+        // armed for -- a leftover from a build, or a directory the lifter
+        // copied -- and present it as this capture's second sensor.
+        val secondaryRole = header.sensorRoles.firstOrNull { it != header.armedRole }
+        val secondarySamples =
+            secondaryRole?.let { role -> decode(dir, SetJournal.secondaryImuFile(role)) { ImuCsv.decode(it) } }
+                .orEmpty()
         return OrphanedSet(
             header = header,
-            imuSamples = decode(dir, SetJournal.IMU) { ImuCsv.decode(it) },
+            imuSamples = imuSamples,
             hrSamples = decode(dir, SetJournal.HRM) { HrCsv.decode(it) },
             cues = decode(dir, SetJournal.CUES) { CueCsv.decode(it) },
             repMarks = decode(dir, SetJournal.REPS) { line -> RepMarkCsv.decodeLine(line) },
             directory = dir,
-            // Read from the header's own declaration rather than by looking
-            // for whichever imu-*.csv happens to be on disk. The header is
-            // written and closed before the first sample line of any stream,
-            // so it is the one thing in the directory that cannot be a
-            // half-truth; a file scan would pick up a role this set was never
-            // armed for -- a leftover from a build, or a directory the lifter
-            // copied -- and present it as this capture's second sensor.
-            secondaryImuSamples =
-            header.sensorRoles.firstOrNull { it != header.analysedRole }
-                ?.let { role -> decode(dir, SetJournal.secondaryImuFile(role)) { ImuCsv.decode(it) } }
-                .orEmpty(),
+            secondaryImuSamples = secondarySamples,
+            analysedRole = header.armedRole,
+            analysedFellBack = false,
         )
     }
+
+    /**
+     * The header as a person should read it, which is not byte-for-byte what
+     * was recorded (#211).
+     *
+     * ONE KEY IS RENAMED AND TWO ARE ADDED, and nothing else is touched. The
+     * recorded `analysedRole` is published as `armedRole`, which is what it
+     * has always held -- the header is closed before the first sample line and
+     * cannot know which units streamed. `analysedRole` is then published with
+     * the answer derived from the rows that are in the directory, and
+     * `analysedFellBack` beside it when the two differ. The lifter who opens a
+     * recovered zip is trying to salvage a set; leaving them to infer which of
+     * two CSVs the figures would have come from, from a key that names the
+     * other one, is the worst moment to be told something untrue.
+     *
+     * THE FILE ON DISK IS NOT REWRITTEN. This is a publication step, on the
+     * one path out of the phone, and the capture itself is never edited after
+     * the fact. The CSV streams are copied exactly as they lie for that same
+     * reason -- they are already the canonical format a `field-*.csv`
+     * regression fixture is written in, and this file is not one.
+     *
+     * IT TRANSFORMS THE PARSED TEXT RATHER THAN RE-ENCODING THE DECODED
+     * HEADER, so a key written by a build this one has never heard of survives
+     * into the zip instead of being silently dropped by a decoder configured
+     * to ignore it. Order is preserved for the same reason. A header that will
+     * not parse at all is copied through untouched: some of the capture is
+     * worth more than none of it.
+     */
+    private fun publishedHeader(orphan: OrphanedSet, file: File): ByteArray = runCatching {
+        val recorded = json.parseToJsonElement(file.readText()).jsonObject
+        val published =
+            buildJsonObject {
+                recorded.forEach { (key, value) ->
+                    put(if (key == RECORDED_ROLE_KEY) ARMED_ROLE_KEY else key, value)
+                }
+                orphan.analysedRole?.let { put(RECORDED_ROLE_KEY, roleElement(it)) }
+                if (orphan.analysedFellBack) put(FELL_BACK_KEY, JsonPrimitive(true))
+            }
+        json.encodeToString(JsonObject.serializer(), published).toByteArray(Charsets.UTF_8)
+    }.getOrElse { file.readBytes() }
+
+    /**
+     * A role in the spelling the recorded header already uses.
+     *
+     * [SensorCapturePolicy.wireOf] is the EXPORT's vocabulary -- lowercase --
+     * and this document is not that document. Writing the published key in a
+     * spelling the neighbouring `armedRole` does not use would tell a reader
+     * the two keys are different kinds of thing.
+     *
+     * [SensorRole] carries no `@Serializable`, so kotlinx encodes it by entry
+     * name and this reproduces that rather than restating a choice. The pin
+     * that holds the two together is a published document read back and
+     * compared against the recorded one, not this line.
+     */
+    private fun roleElement(role: SensorRole) = JsonPrimitive(role.name)
 
     /**
      * Everything up to the first line that will not parse.
@@ -516,6 +635,22 @@ class SetJournalStore(
         /** Bumped when the on-disk layout stops being readable by older code. */
         const val JOURNAL_VERSION = 1
         const val HEADER_FILE = "header.json"
+
+        /**
+         * The recorded key holding [SetJournalHeader.armedRole], and the
+         * published key that says so (#211).
+         *
+         * [RECORDED_ROLE_KEY] is what is on disk and it does not move: every
+         * directory already on the phone carries it, and a build older than
+         * this one derives the second stream's role from it. [ARMED_ROLE_KEY]
+         * is what [zip] publishes in its place, and [RECORDED_ROLE_KEY] is
+         * then reused in the published document for the thing it names --
+         * which stream the figures would come from -- with [FELL_BACK_KEY]
+         * beside it when that is not the armed unit.
+         */
+        const val RECORDED_ROLE_KEY = "analysedRole"
+        const val ARMED_ROLE_KEY = "armedRole"
+        const val FELL_BACK_KEY = "analysedFellBack"
 
         /** `root/s<sessionStart>/set<n>-<ms>` sits two levels down. */
         const val WALK_DEPTH = 2

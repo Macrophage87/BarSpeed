@@ -799,4 +799,75 @@ class SensorCapturePolicyTest {
             "a role the set never armed changed the answer for one it did",
         )
     }
+
+    /**
+     * The composition is the shared thing, not the two pieces (#211).
+     *
+     * `analysable` then `analysedStream` was composed at the recording call
+     * site and nowhere else until an interrupted capture had to answer the
+     * same question about the rows in its own directory, from `:core:data`,
+     * which cannot see `:app`. This pins the composition against the pieces so
+     * that a change to either order shows up here rather than in one of the
+     * two readers.
+     */
+    @Test
+    fun `analysedFrom is analysable fed to analysedStream, and nothing else`() {
+        val expected = listOf(SensorRole.B, SensorRole.A)
+        val enough = SensorCapturePolicy.MIN_ANALYSABLE_FRAMES
+        val cases =
+            listOf(
+                mapOf(SensorRole.B to enough, SensorRole.A to enough),
+                mapOf(SensorRole.B to enough - 1, SensorRole.A to enough),
+                mapOf(SensorRole.B to 0, SensorRole.A to enough),
+                mapOf(SensorRole.B to enough, SensorRole.A to 0),
+                mapOf(SensorRole.B to enough - 1, SensorRole.A to enough - 1),
+                emptyMap(),
+            )
+        for (frames in cases) {
+            assertEquals(
+                SensorCapturePolicy.analysedStream(
+                    SensorRole.B,
+                    SensorCapturePolicy.analysable(expected, frames),
+                ),
+                SensorCapturePolicy.analysedFrom(SensorRole.B, expected, frames),
+                "the composition disagrees with its own pieces at $frames",
+            )
+        }
+    }
+
+    /**
+     * A short armed delivery beside a full partner moves the answer, and a
+     * short one beside a short one does not.
+     *
+     * The bound is `MIN_ANALYSABLE_FRAMES` and not emptiness, which is #209's
+     * rule read through this seam: seven frames is not a capture the DSP can
+     * run on, and a partner that is equally short is not somewhere to move to.
+     */
+    @Test
+    fun `analysedFrom moves off an armed unit that delivered too few frames`() {
+        val expected = listOf(SensorRole.B, SensorRole.A)
+        val enough = SensorCapturePolicy.MIN_ANALYSABLE_FRAMES
+        assertEquals(
+            AnalysedStream(SensorRole.A, fellBack = true),
+            SensorCapturePolicy.analysedFrom(
+                SensorRole.B,
+                expected,
+                mapOf(SensorRole.B to enough - 1, SensorRole.A to enough),
+            ),
+        )
+        assertEquals(
+            AnalysedStream(SensorRole.B, fellBack = false),
+            SensorCapturePolicy.analysedFrom(
+                SensorRole.B,
+                expected,
+                mapOf(SensorRole.B to enough - 1, SensorRole.A to enough - 1),
+            ),
+            "a capture with nowhere analysable to move to was reported as having moved",
+        )
+        assertEquals(
+            AnalysedStream(null, fellBack = false),
+            SensorCapturePolicy.analysedFrom(null, emptyList(), emptyMap()),
+            "a roleless capture was given a role",
+        )
+    }
 }

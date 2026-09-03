@@ -601,9 +601,15 @@ internal fun armedCaptureOf(
     // reached the archive (#209). The frame counts come from the same buffers
     // the captures are taken from, so nothing here can judge one stream and
     // publish another.
-    val analysable =
-        SensorCapturePolicy.analysable(armed?.expected.orEmpty(), byRole.mapValues { it.value.size })
-    val decision = SensorCapturePolicy.analysedStream(armed?.analysed, analysable)
+    val framesByRole = byRole.mapValues { it.value.size }
+    val analysable = SensorCapturePolicy.analysable(armed?.expected.orEmpty(), framesByRole)
+    // `analysable` then `analysedStream`, composed once in `:core:model` as
+    // `analysedFrom` (#211), because a second reader now asks the same
+    // question: `SetJournalStore` answers it for a recovered capture and
+    // cannot see `:app`. Two compositions of two functions are two places for
+    // the order to drift. `analysable` is still read here as well, because the
+    // silence words below key off the list rather than off the choice.
+    val decision = SensorCapturePolicy.analysedFrom(armed?.analysed, armed?.expected.orEmpty(), framesByRole)
     // Which armed roles delivered too few frames to analyse, and what the app
     // could see of each one's link when the set ended (#213, #209). The roles
     // come from `analysable` above and NOT from `present`, so since #209 a
@@ -1221,7 +1227,7 @@ private fun openJournal(
         // stream can be told from one that was only ever armed for one -- the
         // same reason `imuConnected` is here. Empty on every one-sensor set.
         sensorRoles = roster.expected,
-        analysedRole = roster.analysed,
+        armedRole = roster.analysed,
         // The second link's state at that same moment, for the reading
         // `imuConnected` is here for -- but only on a set actually armed for
         // two. The link is kept warm whenever two units are labelled, so an
