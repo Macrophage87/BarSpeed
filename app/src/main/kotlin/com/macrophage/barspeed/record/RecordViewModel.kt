@@ -497,6 +497,17 @@ private data class PendingSetWrite(
     val workBegan: Boolean,
     val startedAtMs: Long,
     val endedAtMs: Long,
+    /**
+     * The instant the rest AFTER this set runs from, frozen with everything
+     * else (#178).
+     *
+     * `RestClockPolicy.startedAtMs` owns the rule and is asked once, at the
+     * freeze, because two readers now take this instant: the countdown the
+     * lifter watches and the heart-rate window the archive publishes as the
+     * next set's `rest_before_hrm`. Computing it twice is how those two come
+     * to disagree, which is the defect #178 measured at 53.06 s.
+     */
+    val restStartedAtMs: Long,
     val orderIdx: Int,
     val samples: List<ImuSample>,
     val hrSamples: List<HrSample>,
@@ -3703,6 +3714,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // they stand at the end of the set.
         // Frozen here with everything else -- see captureAt (#207, #213).
         val capture = s.captureAt(armedSensors, armedSecondaryRole, imuBuffer, imuBufferB, setStartedAtMs, endedAtMs)
+        // Where the rest after this set runs from. Asked here, once, and
+        // carried on the frozen write: the countdown reads it below and the
+        // rest-HR window is seeded from it a few lines down, so the two
+        // readers cannot take different instants (#178). The rule and the
+        // fallback for a set nothing called over are RestClockPolicy's.
+        val restStartedAtMs =
+            RestClockPolicy.startedAtMs(
+                setOverCueAtMs = (SetEnd.of(cueBuffer.toList()) as? SetEnd.Cued)?.atMs,
+                endedAtMs = endedAtMs,
+            )
         pendingWrite =
             PendingSetWrite(
                 exercise = exercise,
@@ -3746,6 +3767,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 workBegan = AbandonedSetPolicy.workBegan(prepCaseForSet, workStartedAtMs),
                 startedAtMs = setStartedAtMs,
                 endedAtMs = endedAtMs,
+                restStartedAtMs = restStartedAtMs,
                 orderIdx = s.setsCompleted,
                 samples = capture.samples,
                 hrSamples = hrBuffer.toList(),
@@ -3780,6 +3802,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // and clearing it here rather than at beginSet means a retry replays
         // the frozen copy rather than a buffer that kept filling behind it.
         restHrBuffer.clear()
+        // Then seeded with whatever of this set's own capture belongs to the
+        // rest rather than to the set, by the same instant the countdown runs
+        // from (#178). The samples stay in the set's `hrm` stream as well --
+        // this reads the frozen buffer and moves nothing -- so no published
+        // figure computed over that stream changes, and a window that begins
+        // before the set stopped recording is stated by both documents rather
+        // than by neither.
+        restHrBuffer += RestClockPolicy.restWindowSeed(hrBuffer.toList(), restStartedAtMs)
         launchSetWrite()
     }
 
@@ -3952,23 +3982,17 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         journal = null
 
         val restS = p.slot?.restS ?: DEFAULT_REST_S
-        // Where the rest period started, and how much of it is left now. The
-        // instant comes off the set's own frozen cue track -- the same
-        // terminal stamp SetEnd bounds the rep window at -- so there is one
-        // instant and nothing recomputes it. A set nothing called over falls
-        // back to the instant this write froze, which is every hold and every
-        // set recorded with the voice off. #172. Since #141 a guided set the
-        // lifter ended early is no longer in that group: `endSet` speaks
-        // `SetEnd.STOPPED` before freezing the buffer, so the stamp exists.
-        // Which changes the seed by whatever passed between the two, and that
-        // is the few milliseconds of one function -- not a figure worth
-        // claiming a size for.
-        val restStartedAtMs =
-            RestClockPolicy.startedAtMs(
-                setOverCueAtMs = (SetEnd.of(p.cues) as? SetEnd.Cued)?.atMs,
-                endedAtMs = p.endedAtMs,
-            )
-        val restRemainingS = RestClockPolicy.remainingS(restS, restStartedAtMs, System.currentTimeMillis())
+        // How much of the rest is left now, against the instant frozen with
+        // the write. That instant comes off the set's own frozen cue track --
+        // the same terminal stamp SetEnd bounds the rep window at -- and a set
+        // nothing called over falls back to the instant the write froze, which
+        // is every hold and every set recorded with the voice off. #172. Since
+        // #141 a guided set the lifter ended early is no longer in that group:
+        // `endSet` speaks `SetEnd.STOPPED` before freezing the buffer, so the
+        // stamp exists. It is READ here rather than worked out again, because
+        // #178 gave it a second reader in the rest-HR window and two
+        // computations of one instant is how they came to disagree.
+        val restRemainingS = RestClockPolicy.remainingS(restS, p.restStartedAtMs, System.currentTimeMillis())
         stateFlow.value = restingState(stateFlow.value, p, analysis, failed, restS, restRemainingS)
         pendingWrite = null
         writtenSetId = null

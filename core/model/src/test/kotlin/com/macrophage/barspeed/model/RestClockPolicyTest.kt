@@ -173,4 +173,38 @@ class RestClockPolicyTest {
         assertEquals(0, RestClockPolicy.remainingS(restS = 0, startedAtMs = 1_000L, nowMs = 1_000L))
         assertEquals(0, RestClockPolicy.remainingS(restS = -30, startedAtMs = 1_000L, nowMs = 1_000L))
     }
+
+    // ------------------------------------------------------------------
+    // Which samples the rest window holds. TODAY'S RULE, pinned for one
+    // commit so #178's change can be a differential against it, and deleted
+    // at that differential rather than reworded.
+    // ------------------------------------------------------------------
+
+    /**
+     * The set's own capture is entirely the set's: nothing of it reaches the
+     * rest window, however long the set went on recording after the cue that
+     * called it over.
+     *
+     * Field-37 set 7 is the case: `Done` at the cue, 53.06 s of further
+     * recording, and a rest-HR window that begins after all of it.
+     */
+    @Test
+    fun `no sample of the set reaches the rest window`() {
+        val samples = listOf(hr(10_000L), hr(63_060L), hr(63_400L))
+        assertEquals(
+            emptyList(),
+            RestClockPolicy.restWindowSeed(samples, startedAtMs = 10_000L),
+        )
+    }
+
+    /** Nor on a set whose terminal cue sits at the write instant. */
+    @Test
+    fun `no sample of a set that ended at its cue reaches the rest window either`() {
+        assertEquals(
+            emptyList(),
+            RestClockPolicy.restWindowSeed(listOf(hr(27_004L)), startedAtMs = 27_004L),
+        )
+    }
+
+    private fun hr(tMs: Long) = HrSample(timestampMs = tMs, bpm = 120)
 }

@@ -103,4 +103,27 @@ object RestClockPolicy {
         val elapsedS = (nowMs - startedAtMs) / 1_000L
         return (restS.toLong() - elapsedS).coerceIn(0L, restS.toLong().coerceAtLeast(0L)).toInt()
     }
+
+    /**
+     * Which of a set's OWN heart-rate samples fall in the rest that followed
+     * it, given the instant [startedAtMs] the rest runs from. Issue #178.
+     *
+     * The countdown and the rest-HR window are two readers of one instant, and
+     * until this pair of commits they read different ones: the countdown runs
+     * from [startedAtMs] (#172), while the capture that becomes the archive's
+     * `rest_before_hrm` stream begins only when the app leaves the set stage,
+     * which is the write instant. Measured on field-37, that gap is 0 s on a
+     * set whose terminal cue sits at its end and 53.06 s on set 7, which spoke
+     * `Done` and kept recording.
+     *
+     * TODAY'S RULE, written here for one commit so the change can be a
+     * differential against it and deleted at that differential rather than
+     * reworded: the window opens only once the set's capture has stopped, so
+     * whatever [startedAtMs] says, the seed is empty on every set.
+     */
+    fun restWindowSeed(setHrSamples: List<HrSample>, startedAtMs: Long): List<HrSample> {
+        val afterTheSetsLastSample = (setHrSamples.maxOfOrNull { it.timestampMs } ?: startedAtMs) + 1L
+        val windowOpensAtMs = maxOf(startedAtMs, afterTheSetsLastSample)
+        return setHrSamples.filter { it.timestampMs >= windowOpensAtMs }
+    }
 }
