@@ -91,6 +91,19 @@ object BodyWeightPromptPolicy {
     }
 
     /**
+     * Is there no usable stored body weight at all?
+     *
+     * One question, asked of [stateOf] rather than of `kg` directly, so
+     * "absent" has one definition in this app: null, non-positive and
+     * non-finite are all absences, and a caller cannot accidentally accept a
+     * stored `0.0` by testing `kg == null` on its own.
+     *
+     * Deliberately takes no clock: whether anything is stored does not depend
+     * on when it was stored, and the staleness question is [stateOf]'s.
+     */
+    fun isAbsent(kg: Double?): Boolean = stateOf(kg, setAtMs = null, nowMs = 0L) == StoredBodyWeight.ABSENT
+
+    /**
      * Whole days since the stored value was written, or null when there is no
      * usable time to measure from. Truncating, so a value written 13 hours ago
      * is 0 days old rather than half a day.

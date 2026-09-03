@@ -134,6 +134,22 @@ data class ExerciseDef(
         fun seedById(id: String): ExerciseDef? = SEED.firstOrNull { it.id == id }
 
         /**
+         * The definition an AD-HOC set runs against -- one with no plan slot,
+         * resolved from the exercise picker's id alone.
+         *
+         * Lifted here from `RecordState.currentExercise`, which is a property
+         * on a data class inside `RecordViewModel.kt` that no test on the CI
+         * path can construct. As introduced this is that expression EXACTLY,
+         * defect and all: it consults [SEED] and then the bare constructor,
+         * and it does not consult [SetGeometryPolicy.bodyweightMount], so
+         * #227's body-weight seed default does not reach an ad-hoc set. A
+         * helper written correct from birth could not have redded against a
+         * wiring omission, so this one is written wrong on purpose and the
+         * differential that follows repoints its pin. #229 item 3.
+         */
+        fun resolvedById(id: String): ExerciseDef = seedById(id) ?: ExerciseDef(id, id)
+
+        /**
          * Exercise ids whose machine carries the sensor on a pin-selected
          * weight stack by construction, so an omitted `sensorOnStack` on one
          * of them is an omission rather than a declaration of "on the bar".

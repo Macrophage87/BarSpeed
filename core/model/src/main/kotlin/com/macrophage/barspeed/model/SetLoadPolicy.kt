@@ -320,6 +320,44 @@ object SetLoadPolicy {
     fun recordedPlannedLoadKg(bodyweight: Boolean, bodyWeightKg: Double?, plannedAddedKg: Double?): Double? =
         plannedAddedKg?.let { totalKg(bodyweight, bodyWeightKg, it) }
 
+    /**
+     * Must this set be refused until the lifter states a body weight? (#61)
+     *
+     * The one question [totalKg] cannot answer for itself. Given
+     * [bodyWeightKg] null it returns the added load alone, and a set with
+     * nothing added records `0.0` -- a number where the truth is that the
+     * load is unknown, and one nothing downstream can tell from a genuinely
+     * unloaded set. The honest repair is either a marker in the export that
+     * says "unmeasured", which is a published contract change, or a refusal
+     * to record the set at all. This is the refusal.
+     *
+     * WHERE IT IS ASKED IS THE WHOLE POINT: before the set runs, never after
+     * it. A gate at set END would destroy a set the lifter has already
+     * performed, which is worse than the wrong number it was trying to
+     * prevent.
+     *
+     * As introduced this returns `false` unconditionally, which is what the
+     * app does today: nothing anywhere consults the stored body weight before
+     * starting a set. It is a bug-preserving identity for the same reason
+     * [ExerciseDef.resolvedById] is one -- a function written correct from
+     * birth cannot red against the absence of a call to it -- and the
+     * differential that follows repoints its pin.
+     */
+    // Both suppressions are the identity's, not the answer's, and both come
+    // off in the commit that implements it.
+    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
+    fun blocksSetStart(bodyweight: Boolean, bodyWeightKg: Double?): Boolean = false
+
+    /**
+     * Why the app will not start this set, in the lifter's terms.
+     *
+     * Says what is missing and what happens if it is not supplied, and names
+     * no threshold: there is no threshold here, only presence or absence.
+     */
+    const val BODY_WEIGHT_REQUIRED =
+        "This set is loaded by your own body weight, and none is stored - so the app has no " +
+            "load to record it against. Enter one to start; an estimate is fine."
+
     // ---- Correcting the load of the set that has just been recorded (#205) ----
     //
     // THE SET JUST FINISHED, FROM THE REST SCREEN, AND NOTHING ELSE. Editing an

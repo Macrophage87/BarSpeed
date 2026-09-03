@@ -115,6 +115,44 @@ class BodyWeightAbsenceGateTest {
         )
     }
 
+    /**
+     * The lift of `RecordState.currentExercise`'s ad-hoc fallback, pinned as
+     * the identity it is: same answer as the expression it replaced, for a
+     * seeded id, a body-weight seeded id and an unseeded one alike.
+     */
+    @Test
+    fun `resolvedById answers exactly what the ad-hoc fallback answered`() {
+        listOf("back_squat", "dead_hang", "pull_up", "not_a_real_lift").forEach { id ->
+            assertEquals(adHocToday(id), ExerciseDef.resolvedById(id))
+        }
+    }
+
+    /** GAP, carried by the lifted function now: an ad-hoc dead hang is still not body weight. */
+    @Test
+    fun `resolvedById does not seed body weight today`() {
+        assertFalse(ExerciseDef.resolvedById("dead_hang").bodyweight)
+        assertFalse(ExerciseDef.resolvedById("pull_up").bodyweight)
+    }
+
+    /** The one new query written correct from birth: it is a reading of [stateOf], not a fifth rule. */
+    @Test
+    fun `isAbsent agrees with the ABSENT state and accepts a stored figure of any age`() {
+        assertTrue(BodyWeightPromptPolicy.isAbsent(null))
+        assertTrue(BodyWeightPromptPolicy.isAbsent(0.0))
+        assertTrue(BodyWeightPromptPolicy.isAbsent(-1.0))
+        assertTrue(BodyWeightPromptPolicy.isAbsent(Double.NaN))
+        assertFalse(BodyWeightPromptPolicy.isAbsent(82.0))
+    }
+
+    /**
+     * GAP. Nothing consults the stored body weight before a set starts, and
+     * this bug-preserving identity says so out loud.
+     */
+    @Test
+    fun `nothing blocks the start of a body-weight set today`() {
+        assertFalse(SetLoadPolicy.blocksSetStart(bodyweight = true, bodyWeightKg = null))
+    }
+
     @Test
     fun `the ask does fire on a body-weight session that has not been skipped`() {
         assertTrue(

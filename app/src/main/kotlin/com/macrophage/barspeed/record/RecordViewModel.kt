@@ -2544,9 +2544,7 @@ data class RecordState(
      * rule is one more than can be kept in agreement.
      */
     val currentExercise: ExerciseDef
-        get() = currentSlot?.exercise
-            ?: ExerciseDef.seedById(selectedExerciseId)
-            ?: ExerciseDef(selectedExerciseId, selectedExerciseId)
+        get() = currentSlot?.exercise ?: ExerciseDef.resolvedById(selectedExerciseId)
 
     /** Index of the first not-yet-done slot: during rating/rest the current one is already complete. */
     val upcomingIndex: Int
