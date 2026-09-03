@@ -210,4 +210,79 @@ class OrphanHeaderRoleTest {
         recordedFile(orphan).writeText("{not json at all")
         assertEquals("{not json at all", publishedText(orphan, store))
     }
+
+    /**
+     * The capture #211 was filed for: the armed unit put nothing in its file
+     * and the partner holds the whole set.
+     *
+     * The recovered capture must name the role the rows are in, and must say
+     * that it is not the role the set armed. Deriving it from the header alone
+     * names the empty file, at the moment somebody is trying to salvage a lost
+     * set from a zip -- the header is written and closed before the first
+     * sample line, so it can only ever name what was armed.
+     */
+    @Test
+    fun `an orphan whose armed unit never streamed publishes the role that did`() = runTest {
+        val store = store()
+        val journal = requireNotNull(store.open(header(SensorRole.A, listOf(SensorRole.A, SensorRole.B))))
+        samples(SensorCapturePolicy.MIN_ANALYSABLE_FRAMES).forEach { journal.appendSecondaryImu(it, SensorRole.B) }
+        journal.sync()
+
+        val orphan = store.orphans().single()
+        assertEquals(SensorRole.B, orphan.analysedRole, "the recovered capture names the file with no rows in it")
+        assertTrue(orphan.analysedFellBack, "the recovered capture does not say the analysed role is not the armed one")
+        val doc = published(orphan, store)
+        assertEquals("A", text(doc, "armedRole"), "the published header does not name the armed unit")
+        assertEquals("B", text(doc, "analysedRole"), "the published header names the stream with no rows in it")
+        assertEquals("true", text(doc, "analysedFellBack"), "the published header does not say the role moved: $doc")
+    }
+
+    /**
+     * A handful of frames is not a capture, and the bound is #209's.
+     *
+     * `MIN_ANALYSABLE_FRAMES` is where `VelocityEstimator.estimate` refuses
+     * outright, so an armed unit one frame short of it has a file in the
+     * directory and nothing the analysis could be pointed at. Reading presence
+     * rather than the bound is exactly what #209 corrected on the recording
+     * path, and a recovered capture must not answer it the older way.
+     */
+    @Test
+    fun `an orphan whose armed unit delivered too few frames publishes the partner`() = runTest {
+        val store = store()
+        val journal = requireNotNull(store.open(header(SensorRole.A, listOf(SensorRole.A, SensorRole.B))))
+        val enough = SensorCapturePolicy.MIN_ANALYSABLE_FRAMES
+        samples(enough - 1).forEach { journal.appendImu(it) }
+        samples(enough).forEach { journal.appendSecondaryImu(it, SensorRole.B) }
+        journal.sync()
+
+        val orphan = store.orphans().single()
+        assertEquals(enough - 1, orphan.imuSamples.size, "the armed stream is not the short one this pins")
+        assertEquals(SensorRole.B, orphan.analysedRole, "a short armed delivery was read as a capture")
+        assertTrue(orphan.analysedFellBack)
+        assertEquals("B", text(published(orphan, store), "analysedRole"))
+    }
+
+    /**
+     * Two short streams is not a fallback, and nor is one short stream alone.
+     *
+     * There is nowhere analysable to move to, so the armed role stands and the
+     * flag stays absent. A capture whose figures come from nothing must not be
+     * published as one whose figures came from the other unit.
+     */
+    @Test
+    fun `an orphan with nothing analysable keeps the armed role and claims no fallback`() = runTest {
+        val store = store()
+        val journal = requireNotNull(store.open(header(SensorRole.A, listOf(SensorRole.A, SensorRole.B))))
+        val short = SensorCapturePolicy.MIN_ANALYSABLE_FRAMES - 1
+        samples(short).forEach { journal.appendImu(it) }
+        samples(short).forEach { journal.appendSecondaryImu(it, SensorRole.B) }
+        journal.sync()
+
+        val orphan = store.orphans().single()
+        assertEquals(SensorRole.A, orphan.analysedRole, "a capture with nothing analysable moved anyway")
+        assertFalse(orphan.analysedFellBack)
+        val doc = published(orphan, store)
+        assertEquals("A", text(doc, "analysedRole"))
+        assertNull(doc["analysedFellBack"], "a capture that could not move published the flag: $doc")
+    }
 }
