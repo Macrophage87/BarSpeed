@@ -188,6 +188,96 @@ class ArmedCaptureTest {
     }
 
     /**
+     * DIFFERENTIAL, issue #209. The set this issue was filed for: the armed
+     * unit delivered SEVEN frames and its partner delivered a full capture.
+     *
+     * Seven is not zero, so every rule written for #207 answered "the armed
+     * unit streamed" and the app kept the armed role -- and then the analysis
+     * refused the buffer, because `VelocityEstimator.estimate` will not run
+     * under `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES`. The published outcome
+     * is #207's exactly: an empty summary over a capture the app is holding,
+     * on the narrower population where the armed unit sent a handful of frames
+     * rather than none.
+     *
+     * SEVEN RATHER THAN ONE. One frame would pass under any bound above zero,
+     * so it cannot tell a fix at eight from a fix at two; seven is the largest
+     * delivery that still fails, so it is the only fixture that goes red again
+     * if the bound is ever lowered.
+     *
+     * NO FIELD CAPTURE OF THIS POPULATION EXISTS. Field sessions 36 and 37
+     * each produced a unit that delivered NOTHING, not a unit that delivered a
+     * handful; this fixture is constructed from the source, as #209's own body
+     * says its claims are, and no archive in this repo shows a 1-7 frame
+     * stream. Whether a real WT901 that half-connects produces one is [Field].
+     */
+    @Test
+    fun `an armed unit delivering seven frames is not what the partner's full capture is passed over for`() {
+        val sevenFrames = stream(7)
+        val fullCapture = stream(400)
+
+        val capture = armedCaptureOf(armed(SensorRole.A, SensorRole.B), SensorRole.B, sevenFrames, fullCapture)
+
+        assertSame(fullCapture, capture.samples, "the analysis was left pointed at a buffer the estimator refuses")
+        val sensors = assertNotNull(capture.sensors, "a set that fell back must still record what it armed")
+        assertEquals(SensorRole.B, sensors.analysed, "the row names the armed role over the one that could be analysed")
+        assertTrue(sensors.analysedFellBack, "the row does not say the analysed role is not the armed one")
+        assertEquals(SensorRole.A, capture.secondary?.role, "the second capture does not name the seven-frame unit")
+        assertEquals(sevenFrames, capture.secondary?.samples, "the seven frames were dropped rather than archived")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #209. The stored half: the seven-frame unit gets the
+     * silence word, so the record says which unit the analysis moved off.
+     *
+     * #213 and #225 shipped the word and #209 is the population they left out:
+     * seven frames is a non-empty buffer, so `present` named the role and the
+     * word was filtered away before it could be stored. The word itself is
+     * still the LINK reading and still whatever the app could see -- nothing
+     * here invents one -- and `ArmedSilencePolicy.silent` still drops a role
+     * reading `DELIVERING`, which is a set whose last of those seven frames
+     * arrived inside the three-second window ending when the set ended.
+     */
+    @Test
+    fun `the seven-frame unit's silence word reaches the row`() {
+        val capture =
+            armedCaptureOf(
+                armed(SensorRole.A, SensorRole.B),
+                SensorRole.B,
+                stream(7),
+                stream(400),
+                deliveryByRole = mapOf(SensorRole.A to ArmedDelivery.LINKED_SILENT),
+            )
+
+        val sensors = assertNotNull(capture.sensors, "a set that fell back must still record what it armed")
+        assertEquals(
+            mapOf(SensorRole.A to ArmedDelivery.LINKED_SILENT),
+            sensors.silent,
+            "the row says nothing about the unit whose handful of frames the analysis could not use",
+        )
+    }
+
+    /**
+     * DIFFERENTIAL, issue #209, the NEAR NEIGHBOUR: the same shortfall on a
+     * set whose single stream carries no role.
+     *
+     * One bar sensor is the owner's habitual configuration, and #224 gave that
+     * set `soleSilent` on the buffer being EMPTY. Seven frames is not empty,
+     * so such a set publishes "No sensor data recorded." with no word beside
+     * it -- the same defect one shape over, and the same predicate fixes it.
+     * There is no partner to move onto here; what changes is only that the
+     * record can say the link went quiet.
+     */
+    @Test
+    fun `a one-sensor set whose unit delivered seven frames stores the word for it`() {
+        val capture =
+            armedCaptureOf(null, null, stream(7), emptyList(), soleDelivery = ArmedDelivery.LINKED_SILENT)
+
+        val sensors = assertNotNull(capture.sensors, "the one armed unit sent too little to analyse and said nothing")
+        assertEquals(ArmedDelivery.LINKED_SILENT, sensors.soleSilent, "the word never reached the row")
+        assertEquals(emptyList(), sensors.expected, "a role was invented for a stream that carries none")
+    }
+
+    /**
      * DIFFERENTIAL, issue #224. The set this issue was filed for: ONE armed bar
      * sensor, no role, and nothing came down the link.
      *
