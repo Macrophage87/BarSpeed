@@ -52,7 +52,10 @@ import kotlin.test.assertEquals
  *  - the least extreme artefact it catches on the live path sits at 3.34x its
  *    own set's batch median rep ROM, and the largest carries 127.405 m;
  *  - the largest live rep displacement that is IN FAMILY with its own set is
- *    1.058 m, on field-ohp-rotating-8rep-b.
+ *    1.058 m, on field-backsquat-10hz. field-ohp-rotating-8rep-b's own largest
+ *    in-family live rep is 0.890 m: issue #87 LOWERED that set's batch median
+ *    rep ROM reference from 1.105 m to 0.486 m, so the 1.675 m rep that used
+ *    to be its maximum is still counted and is now out of family.
  *
  * So the admissible range is narrow: 2.0 m clears the largest legitimate rep by
  * 1.89x. That multiple read 1.19x while this figure was 1.675 m; issue #87

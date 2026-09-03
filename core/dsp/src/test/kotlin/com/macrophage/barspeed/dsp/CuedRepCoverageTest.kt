@@ -334,8 +334,10 @@ class CuedRepCoverageTest {
         // by the field-37 assisted pull-up at -229 ms. The third early stray is
         // NOT that shape -- field-backsquat-4011-6rep-s36-set01 is
         // eccentric-first, and its -241 ms detection is on a capture that
-        // over-resolves generally, 8 detections for 6 reps, pinned in
-        // [AnchorSupplyByMountTest]. All three are recorded rather than fixed:
+        // over-resolves on the live path, where [AnchorSupplyByMountTest]
+        // pins seven counted reps against six performed; its BATCH count
+        // over-resolved at eight before issue #87 and is pinned at six after.
+        // All three are recorded rather than fixed:
         // changing the windowing model moves figures on every capture, and
         // neither issue #93 nor issue #87 asked for that.
         val c = DspConfig()

@@ -20,7 +20,36 @@ data class DspConfig(
     val minStationaryS: Double = 0.30,
     /** Acc-magnitude band around 1 g for quiet detection (g). */
     val stationaryAccBandG: Double = 0.05,
-    /** Gyro magnitude limit for quiet detection (deg/s). */
+    /**
+     * Gyro magnitude limit for quiet detection (deg/s).
+     *
+     * ONE CONSTANT, THREE JOBS. Since issue #87 this value is read at three
+     * places that answer different questions, and a change to it moves all
+     * three at once:
+     *
+     *  1. **The live per-sample quiet clause.** [VelocityEstimator.isQuietSample]
+     *     -- which is [VelocityEstimator.isAnchorCandidate] with the gate
+     *     always on -- rejects a sample whose gyro magnitude reaches this,
+     *     and [StreamingSetTracker] calls it once per arriving sample with no
+     *     distribution to consult. Raising this admits more live ZUPT anchors
+     *     on every set; lowering it admits fewer.
+     *  2. **The batch clause, on the sets where the gate is kept.**
+     *     [VelocityEstimator.quietMask] passes the same threshold through
+     *     `isAnchorCandidate`, but only where
+     *     [VelocityEstimator.gyroGateApplies] returned true. On the sets it
+     *     returns false for, this value plays no part in candidacy at all.
+     *  3. **BOTH probes of the straddle test** in
+     *     [VelocityEstimator.gyroGateApplies], which decides job 2. The
+     *     median of the set's gyro magnitude is compared against this value
+     *     and so is its tenth percentile; there is no second threshold.
+     *
+     * So this is not only a per-sample filter -- it is also the reference the
+     * per-set POLICY is chosen against. Moving it re-partitions the corpus
+     * into gate-kept and gate-dropped sets before it changes a single sample
+     * verdict, and jobs 1 and 2 then move in opposite directions on the sets
+     * that cross over. `GyroGateTest` pins the partition and both probes on
+     * every capture; nothing pins the consequence to a lifter-facing figure.
+     */
     val stationaryGyroBandDps: Double = 10.0,
     /**
      * The slowest sustained phase the drift correction promises not to erase

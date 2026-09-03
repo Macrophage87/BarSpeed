@@ -263,6 +263,28 @@ object VelocityEstimator {
      * is pinned in [GyroGateTest]; how long the lifter left the sensor running
      * is therefore part of what selects the policy, and nothing here bounds it.
      *
+     * That is not a hypothetical margin. The buffer this function is handed is
+     * everything `RecordViewModel.runSetWrite` froze into the pending write,
+     * and its own cue-track comment measures the stream running on past the
+     * terminal cue at 4.3 to 13.7 s across the eleven sets of session 32 that
+     * carry both a cue and a stream. All three flip points above -- 4.54, 8.03
+     * and 11.80 s -- lie inside that range, so on those captures the length of
+     * the post-Done tail, which is tap latency and nothing else, is of the same
+     * order as the margin selecting the policy. A slower tap can restore the
+     * gyro clause, and with it the empty summary those sets used to publish.
+     *
+     * [Field] UNVERIFIED, and the direction is not measured. The flips above
+     * were produced by appending STILL samples, gyro zeroed; a real tail is the
+     * sensor being HANDLED, whose gyro distribution nothing here has measured
+     * and which could move either probe either way. Answering it needs a
+     * session that records tap-to-stop latency per set and keeps the raw stream:
+     * for each set, read the terminal-cue instant off the cue track, measure the
+     * tail to the last sample, and re-run `gyroGateApplies` on the buffer
+     * truncated at the cue and on the full buffer. Pass criterion: the two agree
+     * on all eleven sets. Any disagreement is a set whose published summary
+     * depends on how fast the lifter reached the phone. Issue #87 carries the
+     * protocol.
+     *
      * The two halves say different things and both are needed.
      *
      * Above the median, the clause is no longer discriminating. It rejects the
@@ -295,8 +317,11 @@ object VelocityEstimator {
      * a retuned band it cannot produce a third, unstudied regime, and the 21
      * captures the gate still holds on are bit-identical either way -- not
      * because their whole distribution sits under the gate
-     * (`field-legcurl-1030-12rep-c` peaks at 585 deg/s) but because their
-     * MEDIAN does. Nine of the 21 are bar- or hand-held.
+     * (`field-legcurl-1030-12rep-c` peaks at 585 deg/s) but because on twenty
+     * of the twenty-one the MEDIAN does, and on `field-reardeltfly-s32-set06`
+     * -- median 62.87 deg/s -- the tenth percentile is above the gate too,
+     * which is the low probe doing its job. Nine of the 21 are bar- or
+     * hand-held.
      *
      * Not verified: whether a sample admitted here is one where the implement
      * was actually at rest. Nothing in this repository can answer that; only a

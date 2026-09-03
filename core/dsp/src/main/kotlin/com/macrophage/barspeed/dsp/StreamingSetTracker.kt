@@ -188,10 +188,13 @@ class StreamingSetTracker(
                 // ANCHOR STARVATION (no anchor for many seconds — residual drift
                 // may have outrun the caps) the next flat window re-anchors, or
                 // the tracker locks into a phantom phase.
-                // The batch path applies the SAME rule via the same function, and
-                // its correction is retroactive while this one is not, so the two
-                // still disagree on a capture. What they can no longer do is
-                // disagree about which windows are anchors.
+                // The batch path builds its anchors from the same functions
+                // and its correction is retroactive while this one is not, so
+                // the two still disagree on a capture. Since issue #87 the
+                // batch path drops the gyro clause on sets whose gyro
+                // distribution straddles the gate, so on those seven captures
+                // the two paths disagree about candidacy and therefore about
+                // which windows are anchors.
                 val stable = quietWindowHi - quietWindowLo <= config.anchorStabilityBandMps
                 val elapsedS = timeS - anchorTimeS
                 val nearPrev = VelocityEstimator.anchorAcceptable(abs(rawV - anchorOffset), elapsedS, config)
