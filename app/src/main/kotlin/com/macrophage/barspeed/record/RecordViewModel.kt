@@ -2803,8 +2803,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private val hrBuffer = mutableListOf<HrSample>()
 
     /**
-     * Heart rate arriving while no set is running -- the READY window before
-     * the first set, and every rest window after one. Issue #90.
+     * Heart rate belonging to a REST rather than to a set: the READY window
+     * before the first set, and every rest window after one. Issue #90.
+     *
+     * Not "while no set is running", which is what this said until #178 and is
+     * no longer true. A rest starts when the set was CALLED OVER, and a guided
+     * set goes on recording after that -- 53.06 s after it on one measured set
+     * -- so at each freeze this buffer is seeded with the tail of the set's own
+     * capture from that instant, by `RestClockPolicy.restWindowSeed`. Those
+     * samples arrived while a set WAS running and are rest all the same. They
+     * are COPIED, not moved: the set's `hrm` stream still holds them.
      *
      * RAW. These are the notifications as received, duplicates and all, taken
      * from the sample the collector was handed rather than from the
