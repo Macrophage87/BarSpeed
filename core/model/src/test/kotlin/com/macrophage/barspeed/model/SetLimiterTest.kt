@@ -322,6 +322,46 @@ class SetLimiterTest {
     }
 
     // ---- a set-up error is its own answer (#146) -----------------------------
+    //
+    // Mutation table for the five differentials pushed red at 212a3df5 (round 1
+    // finding 2 on #146) plus one for the plan-prompt pin added afterwards --
+    // module-scoped, one mutation applied and reverted at a time, run by
+    // `./gradlew --max-workers=1 -PjvmOnly :core:model:test --rerun-tasks`
+    // against the tree at d3571b7e (1123 tests):
+    //
+    //   M1 declare SETUP after PAIN, in SetLimiter.kt's own declaration order
+    //      -- 3/1123 failed: this test below, `pain is the only welfare
+    //      answer and it follows every performance answer`, and
+    //      GuidePromptContractTest's `the plan prompt lists the set-up
+    //      answer between slip and pain, with its reading rule`
+    //   M2 map SetLimiter.SETUP to SetLimiterGroup.WELFARE in GROUPS
+    //      -- 2/1123 failed: `the set-up answer is offered on the rep page
+    //      and on the hold page` below, and `pain is the only welfare
+    //      answer and it follows every performance answer`
+    //   M3 add SetLimiter.SETUP to "Position broke down" in TIMED_LABELS
+    //      -- 2/1123 failed: `the set-up answer is offered on the rep page
+    //      and on the hold page` below (the timed=true collision it checks
+    //      for), and `a hold rewords only the two answers whose noun
+    //      changes`
+    //   M4 exclude SETUP from SetLimiter.ofStored's match
+    //      -- 2/1123 failed: `a bad set-up is its own answer, not form and
+    //      not slip` below, and `every answer stores its own lowercased
+    //      name and reads back as itself`
+    //   M5 drop "capacity" from the schema's set-up reading rule in
+    //      docs/schemas/session-export.schema.json
+    //      -- 1/1123 failed: SchemaLimiterContractTest's `the published
+    //      reason carries the set-up answer and says it is not a capacity
+    //      reading`
+    //   M6 drop the backtick `setup` token from the same schema's version
+    //      log entry for 1.18
+    //      -- 1/1123 failed: SchemaLimiterContractTest's `the 1_18 version
+    //      log names the set-up answer under the open number`
+    //
+    // Every one of the five differentials named at 212a3df5, and the sixth
+    // pin added at 578e20a6/d3571b7e, is killed by at least one mutation --
+    // none of the six is decoration. Each mutation was applied, run and
+    // reverted in turn; the tree these numbers describe is unchanged by
+    // measuring them.
 
     /**
      * The vocabulary can say the set was SET UP wrong, and that answer is
