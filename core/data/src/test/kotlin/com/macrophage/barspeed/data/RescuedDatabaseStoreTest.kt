@@ -463,7 +463,36 @@ class RescuedDatabaseStoreTest {
         assertEquals(bestSpeedZip.length(), productionZip.length(), "the production default should be BEST_SPEED")
     }
 
+    /**
+     * `read`'s `files` list is sorted, and nothing pinned that until this
+     * test -- `listFiles()`'s order is unspecified by the JDK, and the
+     * assertions above only pass because `listFiles()` happens to return
+     * names already sorted on the machines that run them. [ReversingFile]
+     * overrides `listFiles()` to hand back children in the opposite order,
+     * and the fixture asserts its own reversal first so a change to
+     * [DATABASE_NAME]'s alphabetical relationship to its sidecar cannot make
+     * this pass by accident.
+     */
+    @Test
+    fun `read reports files in sorted order even when listFiles does not`() {
+        val dir = rescueDir(1_000L)
+        File(dir, DATABASE_NAME).writeBytes(ByteArray(1))
+        File(dir, "$DATABASE_NAME-wal").writeBytes(ByteArray(1))
+
+        val rawNames = ReversingFile(dir.path).listFiles()!!.map { it.name }
+        assertTrue(rawNames != rawNames.sorted(), "the fixture's own reversal produced an already-sorted order")
+
+        val reversingStore = RescuedDatabaseStore(ReversingFile(root.path))
+        assertEquals(listOf(DATABASE_NAME, "$DATABASE_NAME-wal"), reversingStore.rescued().single().files)
+    }
+
     // ---- platform fixtures -------------------------------------------------
+
+    /** Hands back a directory's children in the reverse of whatever order the JDK gave them. */
+    private class ReversingFile(path: String) : File(path) {
+        override fun listFiles(): Array<File>? =
+            super.listFiles()?.reversed()?.map { ReversingFile(it.path) }?.toTypedArray()
+    }
 
     /**
      * Runs [block] with [file] genuinely unreadable, or returns null when no
