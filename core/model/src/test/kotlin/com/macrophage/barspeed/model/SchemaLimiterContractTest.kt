@@ -242,4 +242,30 @@ class SchemaLimiterContractTest {
         val entry = log.substring(start)
         assertTrue("`setup`" in entry, "the third 1.18 entry does not name the set-up answer: $entry")
     }
+
+    /**
+     * The version log names #191's widening under a FOURTH 1.18 entry, so a
+     * reader of the published document (not just the Kotlin KDoc it is
+     * copied from) is told that a non-null `limiter` no longer implies
+     * `failed`.
+     *
+     * The Kotlin KDoc on [SessionExport.SCHEMA_VERSION] already carries this
+     * paragraph; nothing pinned the PUBLISHED schema to it, which is why the
+     * omission there passed CI. Round 1 of #191's review found the drift.
+     */
+    @Test
+    fun `the 1_18 version log names the fourth entry and says limiter may appear on a set that did not fail`() {
+        val log = versionLog()
+        val start = log.indexOf("1.18 carries a FOURTH change")
+        assertTrue(start >= 0, "the version log carries no fourth 1.18 entry")
+        val entry = log.substring(start)
+        assertTrue(
+            "did NOT fail" in entry || "did not fail" in entry,
+            "the fourth 1.18 entry does not say limiter may appear on a set that did not fail: $entry",
+        )
+        assertTrue(
+            "#191" in entry,
+            "the fourth 1.18 entry does not name the issue that widened the question: $entry",
+        )
+    }
 }
