@@ -13,14 +13,16 @@ class SetLimiterPolicyTest {
     }
 
     /**
-     * A set that did not fail is not asked.
+     * An UNRATED set that did not fail is not asked.
      *
-     * #191 widens the question to completed sets; until it does, asking on
-     * every set is a tap on every set, paid mid-session by the only field
-     * tester there is.
+     * Renamed, because the name it carried -- `a set that did not fail is not
+     * asked` -- became false at 5cc7a31414554ec32e7d9c44a67f2babfcd0fe53: a
+     * completed set rated at the counted end is asked. The assertion is
+     * unchanged and still holds, and SetLimiterCompletedAskTest is where the
+     * widened rule is pinned.
      */
     @Test
-    fun `a set that did not fail is not asked`() {
+    fun `an unrated set that did not fail is not asked`() {
         assertFalse(SetLimiterPolicy.prompts(failed = false, rpe = null, limiter = null, dismissed = false))
     }
 
