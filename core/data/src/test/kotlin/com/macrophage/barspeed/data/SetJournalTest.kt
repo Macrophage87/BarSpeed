@@ -654,11 +654,12 @@ class SetJournalTest {
     // ---- getting it off the phone -------------------------------------------
 
     /**
-     * The zip carries the capture verbatim, because that is what makes it
-     * useful twice: once to the lifter who wants their set, and once to this
-     * repository, where a capture that exposed a defect becomes a regression
-     * fixture with no transformation. Byte equality, not "contains something
-     * plausible".
+     * The zip carries the STREAMS verbatim -- header.json is published rather
+     * than copied (#211) and this pin asserts only that it is present. The
+     * streams are what makes a capture useful twice: once to the lifter who
+     * wants their set, and once to this repository, where a capture that
+     * exposed a defect becomes a regression fixture with no transformation.
+     * Byte equality on the streams, not "contains something plausible".
      */
     @Test
     fun `an interrupted capture zips to its files, byte for byte`() = runTest {
