@@ -54,20 +54,57 @@ object LiveFeedPolicy {
      * [SensorCapturePolicy.analysable]'s answer over the frames counted SO FAR,
      * which is why the answer can change while the set runs.
      *
-     * TWO HALVES, AND ONLY ONE OF THEM IS HERE YET. The LATCH is: once the feed
-     * has left the armed stream it stays gone, so a set has at most one switch
-     * and no rep boundary is announced twice. That half is implemented and
-     * pinned. The SWITCH -- moving the feed onto a partner that is delivering
-     * while the armed unit is not -- is the behaviour change, and it is the
-     * only reader [analysable] has, so the parameter is suppressed here and the
-     * suppression goes when the switch lands. Until then this is a
-     * characterization of the shipped rule: the live path reads the armed
-     * buffer and nothing else.
+     * THE SAME PURE FUNCTION THE ANALYSIS USES, and deliberately not a second
+     * rule beside it. Which stream is worth reading is
+     * [SensorCapturePolicy.analysedStream]'s question, and asking it twice in
+     * two spellings is how the readout and the summary come to disagree about
+     * which unit the set was measured from. What this adds is the LATCH and
+     * nothing else.
+     *
+     * THE LATCH, which is the only rule here that [SensorCapturePolicy] does
+     * not already state: once the feed has left the armed stream it stays gone
+     * for the rest of the set. Without it the answer flips back the moment a
+     * recovered armed unit passes [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES],
+     * and a readout that changes stream twice mid-set is a rep counter
+     * restarting twice.
+     *
+     * WHAT THE SWITCH COSTS, stated rather than implied. The tracker is NOT
+     * rebuilt: the caller goes on handing the same tracker frames, from the
+     * other flow. So no partial count is discarded, no rep already spoken is
+     * retracted, and the count cannot go backwards. What stays folded into the
+     * tracker at the moment of the switch is whatever the armed unit did
+     * deliver, which the switch's own condition bounds at
+     * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] minus one frame. Both units'
+     * samples carry HOST arrival timestamps, so the tracker's reconstructed
+     * clock is not broken by the change of source. What no test here can show
+     * is what those few frames do to a live velocity on real hardware; that is
+     * a field question and is filed as one.
+     *
+     * IT DECIDES NOTHING ABOUT WHAT IS RECORDED. The buffers, the journals and
+     * the archived raw streams are untouched by this answer, and the set's
+     * published figures remain [SensorCapturePolicy.analysedStream]'s answer
+     * taken over the WHOLE set. The two can differ: an armed unit that is
+     * quiet long enough to lose the readout and then delivers a full capture
+     * ends the set analysable, so the summary comes from the armed stream
+     * while the readout followed the partner. That is the price of deciding
+     * live with part of the set, and it is a difference in what was SHOWN, not
+     * in what was kept.
+     *
+     * QUIET LONG ENOUGH IS EIGHT FRAMES --
+     * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]. `RecordViewModel.beginSet`
+     * clears both buffers, so on a set where both units are armed and both are
+     * streaming normally the readout can still move: it moves whenever the
+     * partner's eighth frame arrives before the armed unit's own eighth frame,
+     * roughly 80 ms at the 100 Hz WT901 output rate this app configures
+     * (`GattClients`). SHOWN and KEPT can therefore differ on a dual set where
+     * nothing is wrong with either sensor -- a field question about whether
+     * that is tolerable to read, not a defect this file can fix.
      */
-    @Suppress("UnusedParameter")
     fun liveFeed(armed: SensorRole?, fedBy: SensorRole?, analysable: List<SensorRole>): LiveFeed {
         val latched = fedBy?.takeIf { it != armed }
-        return LiveFeed(role = latched ?: armed, fellBack = latched != null, switched = false)
+        if (latched != null) return LiveFeed(role = latched, fellBack = true, switched = false)
+        val decision = SensorCapturePolicy.analysedStream(armed, analysable)
+        return LiveFeed(role = decision.role, fellBack = decision.fellBack, switched = decision.role != fedBy)
     }
 
     /**
@@ -75,11 +112,15 @@ object LiveFeedPolicy {
      *
      * A null [LiveFeed.role] means no role is in play, and the stream that
      * carries the set is then the unroled one -- so a null feed matches a null
-     * stream role and nothing else. Written that way round rather than as
-     * `feed.role != streamRole` because the failure direction matters: the
-     * loose form would let a second collector feed the tracker on a set with no
-     * roles, and the bar would appear to move twice.
+     * stream role and nothing else, which is what an equality on two nullable
+     * roles already says.
+     *
+     * CORRECTION, forward. The first version of this KDoc, in the commit that
+     * introduced this function, said the branching form was written that way
+     * round rather than as a plain equality "because the failure direction
+     * matters". That was false: the two forms agree on every input, as
+     * mutating this line to the equality and finding no test reddened showed.
+     * The branch is gone and the claim with it.
      */
-    fun feedsTracker(feed: LiveFeed, streamRole: SensorRole?): Boolean =
-        if (feed.role == null) streamRole == null else feed.role == streamRole
+    fun feedsTracker(feed: LiveFeed, streamRole: SensorRole?): Boolean = feed.role == streamRole
 }
