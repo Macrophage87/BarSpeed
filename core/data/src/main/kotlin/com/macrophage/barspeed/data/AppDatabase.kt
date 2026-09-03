@@ -432,6 +432,27 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
+         * v16: `voided` and `voidReason` on set_records -- the mark that says
+         * the lifter did not perform this set, and optionally why (#60).
+         *
+         * DECLARED EMPTY AND UNREGISTERED AT THIS COMMIT, on purpose. The
+         * differentials for the hop are written against this symbol in the
+         * commit after it, and a test naming a symbol that does not exist
+         * cannot be pushed as a red -- it is a compile error, which reds the
+         * build for a reason unrelated to the defect. So the declaration lands
+         * first, with no body and out of the chain, where it changes nothing:
+         * [DATABASE_VERSION] is still 15 here and `build` does not pass this
+         * object to `addMigrations`, so no database in the world enters it.
+         *
+         * [Migration15To16Test] is what fills in what the shape has to be and
+         * why; it does not exist yet either.
+         */
+        internal val MIGRATION_15_16 =
+            object : Migration(15, 16) {
+                override fun migrate(db: SupportSQLiteDatabase) = Unit
+            }
+
+        /**
          * Open the database, having first made sure opening it cannot destroy
          * it. Issue #101.
          *
