@@ -425,4 +425,61 @@ object SetLoadPolicy {
      * showing.
      */
     fun correctionLabel(corrected: Boolean): String = if (corrected) "Load (corrected)" else "Load recorded"
+
+    /**
+     * The finest increment the load field is re-rendered to when the kg/lb chip
+     * is tapped, named in [unit]'s own scale.
+     *
+     * A DISPLAY step, not the plate step [correctionStepKg] uses. The chip does
+     * not change the load, so this cannot be 2.5 kg / 5 lb: snapping a
+     * conversion to a plate would move the number the lifter typed by up to
+     * half a plate on an action that was supposed to move nothing. 0.25 kg and
+     * 0.5 lb are the smallest figures a gym's micro-plates can add to a bar in
+     * a pair, so a converted field never shows a load nobody could load, and
+     * they are close to the same resolution as each other -- 0.5 lb is
+     * 0.2268 kg -- so the field does not get visibly coarser or finer for
+     * having been converted.
+     *
+     * The alternative, rendering the exact conversion, puts "220.46226218" in
+     * an edit box the lifter has to read at arm's length between sets.
+     */
+    fun displayStep(unit: WeightUnit): Double = if (unit == WeightUnit.KG) 0.25 else 0.5
+
+    /**
+     * What the load field reads after the kg/lb chip is tapped, and the kg it
+     * denoted before the tap.
+     *
+     * [kg] is the load the OLD text named, parsed under the OLD unit, and null
+     * when the field named no number. It is the quantity the tap promised not
+     * to move, so it is returned rather than left implicit: the whole content
+     * of #77 is that a display action changed it.
+     */
+    data class ConvertedLoad(val text: String, val kg: Double?)
+
+    /**
+     * The load field re-rendered for a new display unit.
+     *
+     * THIS BODY IS TODAY'S BEHAVIOUR AND IS WRONG. It returns [typed]
+     * unchanged, which is exactly what the app does now: tapping the kg/lb chip
+     * leaves the text alone and re-parses it under the new unit, so a field
+     * reading `100` with a kg chip becomes 100 POUNDS -- 45.36 kg -- and that
+     * is the number the set is recorded with (#77). It is written here, as a
+     * seam, so that the differential proving the defect is an assertion failure
+     * against a real function rather than a compile error against a missing
+     * one. The fix replaces this body and this paragraph.
+     *
+     * Text in, text out, because the field is a string and the string is the
+     * declaration for an ad-hoc set. [typed] that names no number -- blank, a
+     * lone minus, a lifter mid-retype -- must pass through untouched rather
+     * than be replaced with a zero: a field stating nothing goes on stating
+     * nothing, and this function has no business finishing someone's typing.
+     * [from] equal to [to] is the identity for the same reason. Those two
+     * clauses are the parts of the contract that are already true, and they are
+     * pinned now.
+     */
+    // [to] is unread because the seam ignores it, which IS the defect; the fix
+    // deletes this suppression along with the body below.
+    @Suppress("UnusedParameter")
+    fun convertedLoad(typed: String, from: WeightUnit, to: WeightUnit): ConvertedLoad =
+        ConvertedLoad(typed, from.parseToKg(typed))
 }

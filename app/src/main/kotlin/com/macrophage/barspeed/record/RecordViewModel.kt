@@ -3039,7 +3039,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             container.settings.weightUnit.collect { unit ->
-                stateFlow.value = stateFlow.value.copy(weightUnit = unit)
+                // Every decision is [unitChangedState]'s, including the load
+                // field's -- the chip is a display action and must not change
+                // what the set records (#77).
+                stateFlow.value = unitChangedState(stateFlow.value, unit)
             }
         }
         viewModelScope.mirrorBodyWeight(container.settings, stateFlow)
