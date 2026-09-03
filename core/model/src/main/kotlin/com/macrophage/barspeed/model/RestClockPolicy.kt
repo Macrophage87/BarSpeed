@@ -108,22 +108,33 @@ object RestClockPolicy {
      * Which of a set's OWN heart-rate samples fall in the rest that followed
      * it, given the instant [startedAtMs] the rest runs from. Issue #178.
      *
-     * The countdown and the rest-HR window are two readers of one instant, and
-     * until this pair of commits they read different ones: the countdown runs
-     * from [startedAtMs] (#172), while the capture that becomes the archive's
-     * `rest_before_hrm` stream begins only when the app leaves the set stage,
-     * which is the write instant. Measured on field-37, that gap is 0 s on a
-     * set whose terminal cue sits at its end and 53.06 s on set 7, which spoke
-     * `Done` and kept recording.
+     * ONE INSTANT, TWO READERS. The countdown the lifter watches runs from
+     * [startedAtMs] (#172). The capture that becomes the archive's
+     * `rest_before_hrm` stream ran, until this, from the instant the app left
+     * the set stage instead -- so the same rest had two starts. Measured on
+     * field-37: 0 s apart on a set whose terminal cue sits at its end, 53.06 s
+     * apart on set 7, which spoke `Done` and kept recording. Neither document
+     * published which instant it used, so they could not be joined.
      *
-     * TODAY'S RULE, written here for one commit so the change can be a
-     * differential against it and deleted at that differential rather than
-     * reworded: the window opens only once the set's capture has stopped, so
-     * whatever [startedAtMs] says, the seed is empty on every set.
+     * The set-over instant wins and the window follows it, because that is the
+     * instant [startedAtMs] already owns and the one the lifter's rest
+     * actually began at. A sample stamped AT it is rest; anything earlier is
+     * the set's.
+     *
+     * NOTHING IS MOVED. The caller reads its frozen in-set capture and copies
+     * the tail forward, so the set's own `hrm` stream is unchanged and every
+     * figure computed over it -- `hr.avgBpm`, `maxBpm`, `endOfSetBpm`, the
+     * archive's `minBpm` -- means exactly what it meant before. The cost is
+     * that a set's last samples can appear in two files of one archive, which
+     * is stated in the export rather than left to be discovered.
+     *
+     * ## What this cannot check
+     *
+     * That `:app` hands in its own set's samples and its own instant, that the
+     * seed reaches the buffer before the next sample does, or that any of it
+     * runs at all. No test on the CI path reaches a coroutine, so that half is
+     * compile- and lint-gated only.
      */
-    fun restWindowSeed(setHrSamples: List<HrSample>, startedAtMs: Long): List<HrSample> {
-        val afterTheSetsLastSample = (setHrSamples.maxOfOrNull { it.timestampMs } ?: startedAtMs) + 1L
-        val windowOpensAtMs = maxOf(startedAtMs, afterTheSetsLastSample)
-        return setHrSamples.filter { it.timestampMs >= windowOpensAtMs }
-    }
+    fun restWindowSeed(setHrSamples: List<HrSample>, startedAtMs: Long): List<HrSample> =
+        setHrSamples.filter { it.timestampMs >= startedAtMs }
 }
