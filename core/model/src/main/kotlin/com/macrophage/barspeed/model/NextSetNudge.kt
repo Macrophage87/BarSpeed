@@ -86,6 +86,12 @@ data class NextSetNudge(
  *   added 10-15 lb" is a real state, and offering to add load after a missed
  *   set is the wrong question. THIS IS A FOURTH CONDITION BEYOND THE THREE
  *   #214's body names, added deliberately rather than by omission.
+ *   This keys on `failed` ALONE and reads no [SetLimiter]: a failed set the
+ *   lifter answered `setup` -- the set-up was wrong, not that the muscle
+ *   gave out (#146) -- suppresses the nudge exactly as a genuine capacity
+ *   failure does. That is the safe direction, and it is left alone here on
+ *   purpose: reading the limiter to tell those apart is a widening of what
+ *   this function decides on, not a correction to it.
  * - it was not a warm-up. Pass [WarmupMarkPolicy.effective] of the plan's
  *   declaration and the lifter's mark, never the declaration alone: a ramp set
  *   the lifter marked is still a ramp set.

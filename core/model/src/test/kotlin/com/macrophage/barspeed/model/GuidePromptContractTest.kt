@@ -286,6 +286,13 @@ class GuidePromptContractTest {
      * test's `assertEquals(listOf(...))` -- deleting the skeleton line reds
      * this, and duplicating the prose sentence reds that, and neither
      * mutation reds the other.
+     *
+     * SKELETON_VERSION matches EVERY `"schemaVersion"` occurrence in the
+     * rendered prompt, not only the plan skeleton's. PLAN_PROMPT already
+     * documents export keys in prose, so an EXPORT skeleton added later --
+     * whose version is `SessionExport.SCHEMA_VERSION`, a different constant
+     * -- would red this test on a correct prompt. The fix then is to narrow
+     * the regex to the plan skeleton, not to loosen the equality.
      */
     @Test
     fun `the plan prompt skeleton advertises the version the app accepts`() {
