@@ -535,6 +535,25 @@ class SetJournalStore(
         val secondarySamples =
             secondaryRole?.let { role -> decode(dir, SetJournal.secondaryImuFile(role)) { ImuCsv.decode(it) } }
                 .orEmpty()
+        // Which stream this capture's figures would come from, decided from
+        // the rows that are in the directory rather than from the header
+        // (#211). The header is closed before the first sample line and can
+        // only name the unit the set ARMED; on a capture whose armed unit went
+        // silent it named a file with no rows in it. The counts come from the
+        // lists decoded just above, so nothing here can judge one stream and
+        // publish another, and the rule is `SensorCapturePolicy.analysedFrom`
+        // -- the single writer the recording path decides with -- rather than
+        // a second reading of it here.
+        val analysed =
+            SensorCapturePolicy.analysedFrom(
+                armed = header.armedRole,
+                expected = header.sensorRoles,
+                framesByRole =
+                buildMap {
+                    header.armedRole?.let { put(it, imuSamples.size) }
+                    secondaryRole?.let { put(it, secondarySamples.size) }
+                },
+            )
         return OrphanedSet(
             header = header,
             imuSamples = imuSamples,
@@ -543,8 +562,8 @@ class SetJournalStore(
             repMarks = decode(dir, SetJournal.REPS) { line -> RepMarkCsv.decodeLine(line) },
             directory = dir,
             secondaryImuSamples = secondarySamples,
-            analysedRole = header.armedRole,
-            analysedFellBack = false,
+            analysedRole = analysed.role,
+            analysedFellBack = analysed.fellBack,
         )
     }
 
