@@ -4,7 +4,9 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -19,6 +21,11 @@ import kotlin.test.assertTrue
  * under [DspConfig.stationaryGyroBandDps] = 10 deg/s. The gyro term's premise,
  * written at that constant, is that a resting implement does not rotate at
  * 10 deg/s.
+ *
+ * Since issue #87 that is the LIVE predicate only. The batch mask drops the
+ * gyro clause on sets whose distribution straddles the gate, so on those seven
+ * captures candidacy is the acceleration term alone. [Supply.absoluteQuietPct]
+ * below measures the two-term predicate and is named for that reason.
  *
  * That premise is a property of the MOUNT, and this file measures it as one.
  * A sensor clamped to a barbell rotates with the lifter's wrists through the
@@ -107,9 +114,7 @@ class AnchorSupplyByMountTest {
     private fun supply(fixture: String, config: DspConfig = DspConfig()): Supply {
         val samples = load(fixture)
         val n = samples.size
-        val spanS = (samples.last().timestampMs - samples.first().timestampMs) / 1000.0
-        val dt = 1.0 / VelocityEstimator.measureSampleRate(n, spanS)
-        val timeS = DoubleArray(n) { it * dt }
+        val timeS = timeBase(samples)
         val gyro = DoubleArray(n) { FrameTransform.gyroMagnitudeDps(samples[it]) }
         gyro.sort()
         val mid = n / 2
@@ -121,30 +126,53 @@ class AnchorSupplyByMountTest {
         return Supply(median, 100.0 * absolute / n, 100.0 * mask.count { it } / n, runs)
     }
 
-    /**
-     * Anchor coverage with the gyro clause forced on or off, bypassing
-     * [VelocityEstimator.gyroGateApplies]. This is how the differential below
-     * is measured now that the shipped mask no longer always applies the
-     * clause.
-     */
-    private fun coverageWithGate(fixture: String, gyroGate: Boolean): Double {
-        val samples = load(fixture)
+    /** The uniform time base [supply] and [VelocityEstimator.quietMask] both work over. */
+    private fun timeBase(samples: List<ImuSample>): DoubleArray {
         val n = samples.size
         val spanS = (samples.last().timestampMs - samples.first().timestampMs) / 1000.0
         val dt = 1.0 / VelocityEstimator.measureSampleRate(n, spanS)
+        return DoubleArray(n) { it * dt }
+    }
+
+    /**
+     * The quiet MASK with the gyro clause forced on or off, bypassing
+     * [VelocityEstimator.gyroGateApplies]. This is how the differential below
+     * is measured now that the shipped mask no longer always applies the
+     * clause. It is the mask and not a coverage figure because the contract
+     * below asserts sample-for-sample identity, and two equal percentages are
+     * not that.
+     */
+    private fun maskWithGate(fixture: String, gyroGate: Boolean): BooleanArray {
+        val samples = load(fixture)
+        val n = samples.size
+        val timeS = timeBase(samples)
         val config = DspConfig()
         val candidate = BooleanArray(n) { VelocityEstimator.isAnchorCandidate(samples[it], config, gyroGate) }
-        var quiet = 0
+        val quiet = BooleanArray(n)
         var runStart = -1
         for (i in 0..n) {
             val inRun = i < n && candidate[i]
             if (inRun && runStart < 0) runStart = i
             if (!inRun && runStart >= 0) {
-                if ((i - 1 - runStart) * dt >= config.minStationaryS) quiet += i - runStart
+                if (timeS[i - 1] - timeS[runStart] >= config.minStationaryS) {
+                    for (j in runStart until i) quiet[j] = true
+                }
                 runStart = -1
             }
         }
-        return 100.0 * quiet / n
+        return quiet
+    }
+
+    /** Anchor coverage with the clause forced on or off, from [maskWithGate]. */
+    private fun coverageWithGate(fixture: String, gyroGate: Boolean): Double {
+        val mask = maskWithGate(fixture, gyroGate)
+        return 100.0 * mask.count { it } / mask.size
+    }
+
+    /** The mask the pipeline actually ships for this capture. */
+    private fun shippedMask(fixture: String): BooleanArray {
+        val samples = load(fixture)
+        return VelocityEstimator.quietMask(samples, timeBase(samples), DspConfig())
     }
 
     /** Every capture on the classpath, as [GyroGateTest] enumerates them. */
@@ -155,8 +183,17 @@ class AnchorSupplyByMountTest {
             .sorted()
     }
 
+    private fun batchAnalysis(fixture: String, startsWith: StartPhase, loadKg: Double): SetAnalysis =
+        SetAnalyzer.analyze(load(fixture), LiftDirection(startsWith), loadKg)
+
     private fun batchReps(fixture: String, startsWith: StartPhase, loadKg: Double): Int =
-        SetAnalyzer.analyze(load(fixture), LiftDirection(startsWith), loadKg).reps.size
+        batchAnalysis(fixture, startsWith, loadKg).reps.size
+
+    private fun assertRoms(expected: List<Double>, analysis: SetAnalysis, label: String) {
+        val actual = analysis.reps.map { it.romM }
+        assertEquals(expected.size, actual.size, "$label: number of reps")
+        expected.indices.forEach { i -> assertEquals(expected[i], actual[i], 1e-3, "$label: rep ${i + 1}") }
+    }
 
     private fun liveReps(fixture: String, startsWith: StartPhase): Int {
         val tracker = StreamingSetTracker(startsWith)
@@ -221,9 +258,11 @@ class AnchorSupplyByMountTest {
         // field-37 sets that publish `summary: {}` in the session archive,
         // which is issue #138. All three resolved NOTHING before issue #87 and
         // all three resolve something now -- 4, 1 and 3 against 6 performed.
-        // None of them is right. Two of the three are still further from the
-        // lifter's count than from zero, and this file claims only that the
-        // sets stopped publishing nothing, not that they became correct.
+        // None of them is right. One of the three is still further from the
+        // lifter's count than from zero -- bench set05 at 1 of 6; set06 at 3 of
+        // 6 is equidistant, and the overhead press at 4 of 6 is closer to the
+        // count than to zero. This file claims only that the sets stopped
+        // publishing nothing, not that they became correct.
         //
         // The RDL is unchanged at 0 of 10, which is the counter-example: it
         // does not straddle the gate, so #87 does not touch it.
@@ -240,7 +279,10 @@ class AnchorSupplyByMountTest {
         )
         assertEquals(0, batchReps("field-rdl-3010-10rep-s36-set05", StartPhase.ECCENTRIC, 52.163), "rdl, 10 performed")
         // The back squat used to over-resolve, 8 detections for 6 reps, and
-        // now lands exactly on the count performed.
+        // now lands exactly on the count performed. That agreement is NOT a
+        // correctness result and is pinned below as one that is not: the
+        // velocity loss it publishes moves 26.6% to 82.3% on a set the lifter
+        // logged at RPE 1, and its last two reps read 0.293 m and 0.121 m.
         assertEquals(
             6,
             batchReps("field-backsquat-4011-6rep-s36-set01", StartPhase.ECCENTRIC, 52.163),
@@ -259,6 +301,41 @@ class AnchorSupplyByMountTest {
         assertEquals(0, liveReps("field-rdl-3010-10rep-s36-set05", StartPhase.ECCENTRIC), "rdl live")
         assertEquals(7, liveReps("field-backsquat-4011-6rep-s36-set01", StartPhase.ECCENTRIC), "back squat live")
         assertEquals(2, liveReps("field-pullup-3010-8rep-s37-set09", StartPhase.CONCENTRIC), "assisted pull-up live")
+    }
+
+    @Test
+    fun `the lifter-facing figures the four moved captures now publish`() {
+        // Rep COUNTS are pinned above; these are the numbers the rest screen
+        // and the export actually put in front of the lifter, pinned because
+        // publishing a wrong figure is not the same as publishing none and
+        // this file must not claim the second while doing the first.
+        //
+        // The three field-37 sets replace `summary: {}` -- 0 reps, no ROM, no
+        // velocity loss -- with a summary. Two newly published bench reps read
+        // 1.363 m and 1.724 m against the 0.333-0.345 m bench ROM this corpus
+        // has measured, both above the 1.2 m ceiling of the plausibility window
+        // issue #74 quotes. set05's summary is computed from 1 of 6 reps and
+        // set06's from 3 of 6, so velocityLossPct is null on both: absence
+        // stays absence rather than becoming a low number.
+        val ohp = batchAnalysis("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC, 24.948)
+        assertRoms(listOf(0.506, 1.075, 0.840, 1.092), ohp, "ohp set02 ROM, metres")
+        assertEquals<Double?>(15.4, ohp.velocityLossPct, "ohp set02 velocity loss reported to the lifter")
+        val bench05 = batchAnalysis("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC, 47.627)
+        assertRoms(listOf(1.363), bench05, "bench set05 ROM, metres")
+        assertNull(bench05.velocityLossPct, "bench set05 velocity loss: one rep, so none")
+        val bench06 = batchAnalysis("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC, 49.895)
+        assertRoms(listOf(0.691, 0.168, 1.724), bench06, "bench set06 ROM, metres")
+        assertNull(bench06.velocityLossPct, "bench set06 velocity loss: three reps of six, so none")
+
+        // And the back squat, whose count agreeing with 6 is the easiest figure
+        // on this branch to misread as correctness. Its velocity loss moves
+        // 26.6% to 82.3% on a set the lifter logged at RPE 1 -- the effort he
+        // recorded and the fatigue the number claims point opposite ways -- and
+        // its last two reps read 0.293 m and 0.121 m against a 0.731 m rep in
+        // the same set.
+        val squat = batchAnalysis("field-backsquat-4011-6rep-s36-set01", StartPhase.ECCENTRIC, 52.163)
+        assertRoms(listOf(0.271, 0.421, 0.731, 0.553, 0.293, 0.121), squat, "back squat ROM, metres")
+        assertEquals<Double?>(82.3, squat.velocityLossPct, "back squat velocity loss reported to the lifter")
     }
 
     /** Anchor coverage this file requires bar-mounted work to clear, per cent. */
@@ -301,11 +378,10 @@ class AnchorSupplyByMountTest {
         val holding = corpus.filter { VelocityEstimator.gyroGateApplies(load(it), config) }
         assertEquals(21, holding.size, "captures the gate still applies to")
         holding.forEach { fixture ->
-            assertEquals(
-                coverageWithGate(fixture, gyroGate = true),
-                supply(fixture).coveragePct,
-                0.0,
-                "$fixture: the gate holds here, so the mask must be bit-identical",
+            assertContentEquals(
+                maskWithGate(fixture, gyroGate = true),
+                shippedMask(fixture),
+                "$fixture: the gate holds here, so the mask must be identical sample for sample",
             )
         }
 

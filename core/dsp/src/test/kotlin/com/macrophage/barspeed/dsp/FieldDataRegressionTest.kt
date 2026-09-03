@@ -271,8 +271,10 @@ class FieldDataRegressionTest {
 
     /**
      * Per rep, the fraction of its reported ROM accrued over samples the IMU
-     * itself calls still ([VelocityEstimator.quietMask]: acceleration magnitude
-     * within 0.05 g of 1 g and gyro magnitude under 10 deg/s, held for 0.3 s).
+     * itself calls still ([VelocityEstimator.quietMask]: acceleration within
+     * 0.05 g of 1 g held for 0.3 s, ANDed with gyro under 10 deg/s only on sets
+     * whose distribution does not straddle the gate -- the two rotating
+     * overhead presses pinned below are sets where it is not).
      * Distance accrued there did not happen; it is integrator drift.
      */
     private fun quietRomFractions(fs: FieldSet): List<Double> {
@@ -1015,14 +1017,19 @@ class FieldDataRegressionTest {
         // 0.606/0.599/0.562/0.561/0.458 m and 0.498/0.458/0.385/0.396/0.356
         // m/s for these five reps and this file reproduced them exactly, which
         // was the check that the geometry in the class KDoc is the geometry the
-        // set was recorded with. #87 keeps the rep COUNT at 5 and moves three
-        // of the five ROMs to 0.867, 0.919 and 0.636 m.
+        // set was recorded with. #87 keeps the rep COUNT at 5 and moves ALL
+        // FIVE ROMs -- 0.606/0.599/0.562/0.561/0.458 becomes
+        // 0.604/0.867/0.919/0.636/0.601 -- and all five mean concentric
+        // velocities with them; rep 5 alone moves 0.458 to 0.601 m.
         //
-        // Two of those are not plausible travel for this lifter's back squat:
-        // the corpus's other 99 Hz squat reads 0.458-0.606 m and #74's declared
-        // plausibility window tops out at 1.2 m, so they are inside the window
-        // and outside the lift. The velocity loss the lifter reads drops from
-        // 28.5% to 16.6% with them.
+        // Whether 0.867 m and 0.919 m are travel this lifter's squat produces
+        // cannot be settled from this corpus: it holds no independently
+        // measured back-squat ROM, and the only other 99 Hz squat,
+        // field-backsquat-4011-6rep-s36-set01, is itself re-baselined by this
+        // change to 0.121-0.731 m. #74's declared plausibility window tops out
+        // at 1.2 m, so both figures sit inside it and the window decides
+        // nothing here. The tape-measure [Field] item answers it. The velocity
+        // loss the lifter reads drops from 28.5% to 16.6% with them.
         //
         // This capture's median gyro magnitude is 11.24 deg/s, the smallest in
         // the corpus that clears the gate, and its tenth percentile is

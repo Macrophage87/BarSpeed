@@ -256,6 +256,13 @@ object VelocityEstimator {
      * below. Both probes are against the same constant; no second threshold is
      * introduced.
      *
+     * Both probes are duty-cycle statistics over the whole recorded window, so
+     * idle time inside the recording moves them. Appending still samples flips
+     * `field-backsquat-99hz-6rep` at 4.54 s, `field-ohp-rotating-8rep` at
+     * 8.03 s and `field-ohp-3010-6rep-s37-set02` at 11.80 s. The first of those
+     * is pinned in [GyroGateTest]; how long the lifter left the sensor running
+     * is therefore part of what selects the policy, and nothing here bounds it.
+     *
      * The two halves say different things and both are needed.
      *
      * Above the median, the clause is no longer discriminating. It rejects the
@@ -271,7 +278,7 @@ object VelocityEstimator {
      * reason no rest is found, and dropping it only admits samples taken while
      * the sensor was turning. `field-reardeltfly-s32-set06` is that case: it is
      * the corpus's only capture with a tenth percentile above the gate
-     * (13.19 deg/s against 2.26-4.28 on the six that straddle), and it is the
+     * (13.19 deg/s against 2.26-4.28 on the seven that straddle), and it is the
      * only capture the low probe excludes.
      *
      * BOTH CHOICES ARE CHOICES. The median is where filtering becomes vetoing;
@@ -285,10 +292,11 @@ object VelocityEstimator {
      * What IS structural is the consequence. This function selects between
      * exactly two behaviours that have both been measured over this corpus --
      * today's two-term predicate, and the acceleration term alone -- so unlike
-     * a retuned band it cannot produce a third, unstudied regime, and every set
-     * whose whole gyro distribution already sits under the gate is
-     * bit-identical either way. That is every stack-mounted, machine and strap
-     * capture in the corpus.
+     * a retuned band it cannot produce a third, unstudied regime, and the 21
+     * captures the gate still holds on are bit-identical either way -- not
+     * because their whole distribution sits under the gate
+     * (`field-legcurl-1030-12rep-c` peaks at 585 deg/s) but because their
+     * MEDIAN does. Nine of the 21 are bar- or hand-held.
      *
      * Not verified: whether a sample admitted here is one where the implement
      * was actually at rest. Nothing in this repository can answer that; only a

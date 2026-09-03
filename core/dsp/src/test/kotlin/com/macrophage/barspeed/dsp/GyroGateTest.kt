@@ -124,8 +124,8 @@ class GyroGateTest {
     fun `the tenth-percentile probe, which is the half of the rule fitted to one capture`() {
         // The low probe of the straddle test, pinned for every capture whose
         // median clears the gate -- the only captures it can decide. One of the
-        // seven sits above the gate and it is the one the probe exists to
-        // exclude; the other six sit at 2.26-4.28 deg/s, well clear.
+        // eight sits above the gate and it is the one the probe exists to
+        // exclude; the other seven sit at 2.26-4.28 deg/s, well clear.
         val expected = mapOf(
             "field-ohp-3010-6rep-s37-set02" to 3.560,
             "field-bench-3010-6rep-s37-set05" to 3.807,
@@ -159,8 +159,7 @@ class GyroGateTest {
     }
 
     @Test
-    fun `the gate holds on every non-rotating mount in the corpus and fails on the rotating ones`() {
-        // The two families, by the predicate rather than by the file name.
+    fun `the gate holds where the gyro distribution does not straddle it, and fails on the seven that do`() {
         val config = DspConfig()
         val holds = listOf(
             "field-pullup-3010-8rep-s37-set09",
@@ -205,6 +204,36 @@ class GyroGateTest {
             corpus.sorted(),
             (holds + fails).sorted(),
             "every capture in the corpus is classified exactly once",
+        )
+    }
+
+    @Test
+    fun `both probes are duty-cycle statistics, so appended idle time flips the gate`() {
+        // Neither probe is a property of the MOUNT alone. Both are statistics
+        // over the whole recorded window, so idle time inside the recording
+        // moves them and how long the lifter left the sensor running is part of
+        // what selects the policy.
+        //
+        // field-backsquat-99hz-6rep straddles the gate as recorded, 4444
+        // samples at 99.394 Hz. Appending still samples -- gyro zeroed, nothing
+        // else changed, and gyroGateApplies reads no timestamp so their arrival
+        // times are irrelevant -- drops the median under the gate and the
+        // clause comes back on. 451 of them do it; 450 do not. At that capture's
+        // own rate that is 4.54 s of extra recording.
+        val config = DspConfig()
+        val samples = load("field-backsquat-99hz-6rep")
+        val still = samples.first().copy(wxDps = 0.0, wyDps = 0.0, wzDps = 0.0)
+        assertFalse(
+            VelocityEstimator.gyroGateApplies(samples, config),
+            "as recorded, this capture straddles and the clause is dropped",
+        )
+        assertFalse(
+            VelocityEstimator.gyroGateApplies(samples + List(450) { still }, config),
+            "450 appended still samples do not flip it",
+        )
+        assertTrue(
+            VelocityEstimator.gyroGateApplies(samples + List(451) { still }, config),
+            "451 appended still samples flip the clause back on",
         )
     }
 

@@ -41,9 +41,10 @@ import kotlin.test.assertEquals
  * ## The constant has never been calibrated anywhere
  *
  * `maxRunDisplacementM` is 2.0 m and has exactly one consumer, `RepSegmentation`,
- * where across the 293 batch movement runs in this corpus it has NEVER demoted
- * anything -- the largest batch run is 1.982 m, and the eighty runs the six new
- * captures added did not raise it. Reusing it in the live path therefore meant
+ * where across the 301 batch movement runs in this corpus it has NEVER demoted
+ * anything -- the largest batch run is 1.982 m, and neither the eighty runs the
+ * six captures committed since issue 86 added nor the eight issue #87's
+ * re-segmentation added raised it. Reusing it in the live path therefore meant
  * importing a number with no evidence behind it.
  *
  * Two measurements pinned below bracket it:
@@ -54,10 +55,8 @@ import kotlin.test.assertEquals
  *    1.058 m, on field-ohp-rotating-8rep-b.
  *
  * So the admissible range is narrow: 2.0 m clears the largest legitimate rep by
- * only 1.19x, not by the 2x an earlier reading of this claimed. That earlier
- * figure, 1.058 m, was the largest in-family rep among the three sets used to
- * derive the scoring bound rather than across the whole corpus, and it is
- * corrected here.
+ * 1.89x. That multiple read 1.19x while this figure was 1.675 m; issue #87
+ * moved the batch reference and the figure is now 1.058 m.
  *
  * ## And it cannot be tightened, which is why the tail is left uncut
  *
