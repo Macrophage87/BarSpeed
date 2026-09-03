@@ -53,8 +53,13 @@ import kotlin.test.assertTrue
  * set's declared geometry, copied from the export rather than guessed at:
  * tempo 1030, concentric-first, concentric DOWN, vertical, sensor on the stack
  * and inverted, travel ratio 1, load 40.82 kg, 10 reps counted by the lifter.
- * `reproduces the analysis its session exported` checks that this file really
- * is that set.
+ * `no longer reproduces the rep count its session exported, and this is what
+ * it resolves` carries that provenance. It used to be called `reproduces the
+ * analysis its session exported` and this KDoc said it "checks that this file
+ * really is that set"; both are deleted, because issue #94's runaway
+ * correction moved the rep count from the exported 11 to 12 and a count that
+ * no longer matches cannot check identity. The eleven exported per-rep
+ * figures are still asserted, with one inserted row beside them.
  *
  * It is not the corpus's first leg curl at 1030 with a cue track beside it --
  * see [LegCurlCueTrackTest], which holds three from 2026-08-18. Those predate
@@ -248,10 +253,10 @@ class PhaseTempoTargetTest {
     }
 
     @Test
-    fun `reproduces the analysis its session exported`() {
-        // Provenance, not behaviour: these are the figures this set's own
-        // export published, so a file that does not produce them is not this
-        // set.
+    fun `no longer reproduces the rep count its session exported, and this is what it resolves`() {
+        // Provenance, not behaviour: the per-rep figures below are the ones
+        // this set's own export published. The COUNT is no longer among them,
+        // so this test no longer establishes identity on its own.
         //
         // The rep COUNT moved with issue #94's runaway correction, 11 to 12
         // against the 10 the lifter counted. The per-rep figures asserted

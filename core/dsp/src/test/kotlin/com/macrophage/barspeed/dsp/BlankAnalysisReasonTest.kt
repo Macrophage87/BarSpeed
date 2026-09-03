@@ -309,15 +309,15 @@ class BlankAnalysisReasonTest {
         // The three sets #138 named that issue #87 moved off zero now resolve
         // reps, so they carry no reason -- the key's absence is the record
         // that #87 reached them.
-        assertNull(reasonFor("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC), "ohp s37 set02, 4 of 6")
-        assertNull(reasonFor("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC), "bench s37 set05, 1 of 6")
-        assertNull(reasonFor("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC), "bench s37 set06, 3 of 6")
-        // And the neighbour that resolves 1 of 10 through 123.64 m of runaway
-        // carries none either. That is the limit, asserted rather than
-        // described: this key answers emptiness and nothing else.
+        assertNull(reasonFor("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC), "ohp s37 set02, 9 resolved")
+        assertNull(reasonFor("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC), "bench s37 set05, 4 resolved")
+        assertNull(reasonFor("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC), "bench s37 set06, 6 resolved")
+        // And the neighbour whose 123.64 m runaway issue #94 removes carries
+        // none either. That is the limit, asserted rather than described: this
+        // key answers emptiness and nothing else.
         assertNull(
             reasonFor("field-rdl-3010-10rep-s36-set04", StartPhase.ECCENTRIC),
-            "the RDL that resolves one rep of ten states no reason",
+            "the RDL that resolves ten reps of ten states no reason",
         )
     }
 
@@ -406,15 +406,15 @@ class BlankAnalysisReasonTest {
     fun `SetAnalyzer publishes no reason on a capture that resolves anything`() {
         // The other half, and the one that stops the fix being "set the field
         // unconditionally". Four captures, including the three #87 moved off
-        // zero and the neighbour that resolves 1 of 10 through 123.64 m of
-        // runaway. This test is GREEN before the wiring and must stay green
-        // after it.
+        // zero and the neighbour whose 123.64 m runaway issue #94's correction
+        // removes. This test is GREEN before the wiring and stays green after
+        // it.
         fun reasonOf(fixture: String, startsWith: StartPhase): NoRepsReason? =
             SetAnalyzer.analyze(load(fixture), LiftDirection(startsWith), loadKg = 24.948).noRepsReason
-        assertNull(reasonOf("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC), "ohp s37 set02, 4 of 6")
-        assertNull(reasonOf("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC), "bench s37 set05, 1 of 6")
-        assertNull(reasonOf("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC), "bench s37 set06, 3 of 6")
-        assertNull(reasonOf("field-rdl-3010-10rep-s36-set04", StartPhase.ECCENTRIC), "the RDL that resolves 1 of 10")
+        assertNull(reasonOf("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC), "ohp s37 set02, 9 resolved")
+        assertNull(reasonOf("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC), "bench s37 set05, 4 resolved")
+        assertNull(reasonOf("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC), "bench s37 set06, 6 resolved")
+        assertNull(reasonOf("field-rdl-3010-10rep-s36-set04", StartPhase.ECCENTRIC), "the RDL that resolves 10 of 10")
     }
 
     @Test

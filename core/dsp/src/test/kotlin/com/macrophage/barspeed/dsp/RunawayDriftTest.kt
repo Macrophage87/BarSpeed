@@ -19,10 +19,12 @@ import kotlin.test.assertTrue
  * see which captures the change is even able to touch without re-running
  * anything.
  *
- * NOTHING HERE IS WIRED INTO THE ANALYZER YET. [SetAnalyzer] does not call
- * [RunawayDrift] at this commit; every figure the pipeline publishes is
- * unchanged. That is deliberate: the symbol and its pins land before the
- * differentials that need them.
+ * [RunawayDrift] is wired in at [VelocityEstimator.estimate], so every figure
+ * the batch pipeline publishes runs through it; the corpus scoring of that
+ * change is in [BatchCueCoverageTest]. This KDoc claimed the opposite --
+ * "NOTHING HERE IS WIRED INTO THE ANALYZER YET" -- which was true when the
+ * symbol landed at 96ae49f7 and false from bf580fd9, where the wiring landed
+ * and the sentence was left standing. It is corrected here, not reworded.
  */
 class RunawayDriftTest {
     private val config = DspConfig()

@@ -269,6 +269,13 @@ class BatchCueCoverageTest {
         // captures where the right answer is zero, and two of the three carry a
         // sensor mount this corpus otherwise has one example of.
         //
+        // None of these three contains a runaway -- `RunawayDriftTest` names
+        // all three in its untouched list -- so this test is bit-identical
+        // through the correction and cannot detect a phantom this change
+        // creates. The only zero-truth case the correction touches is the
+        // constructed run in RunawayDriftTest; no committed capture provides
+        // one.
+        //
         // field-ropedeadhang-hold20-s37-set11 is session 37 set 11: rope dead
         // hang, kind "hold", reps 0, twenty seconds, sensor on a strap. It is
         // the STRAP control -- the mount AnchorSupplyByMountTest contrasts the

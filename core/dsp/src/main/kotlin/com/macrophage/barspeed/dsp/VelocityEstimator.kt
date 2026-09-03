@@ -58,7 +58,12 @@ object VelocityEstimator {
      *
      * [StreamingSetTracker] does not call this at all; it integrates per
      * arriving sample and has no set to take a mean over, so the live counter
-     * and everything the app records are untouched. See issue #94.
+     * is untouched and the raw IMU stream the app records is byte-identical.
+     * The analysis frozen into `analysisJson` at set end DOES change: the app
+     * analyses a set as it ends (`RecordViewModel` -> `SetAnalyzer.analyze` ->
+     * this function) and `SessionRepository` stores that result. Sets already
+     * on disk keep the analysis computed under the old rule; nothing re-runs
+     * the segmenter for them. See issue #94.
      */
     fun estimate(
         samples: List<ImuSample>,

@@ -81,11 +81,15 @@ data class SegmentationCensus(
  * ## What it does NOT cover
  *
  * ONLY EMPTINESS. [of] returns null the moment one rep survives, so a set
- * resolving 1 of 10 carries no reason at all -- and `field-rdl-3010-10rep-s36-set04`
- * is exactly that set, with a single movement run displacing 123.64 m and one
- * surviving rep. Under-resolution reaching zero is what this answers;
- * under-resolution stopping short is the same defect and is still unsayable.
- * `BlankAnalysisTest` pins that limit.
+ * resolving 1 of 10 carries no reason at all. Under-resolution reaching zero
+ * is what this answers; under-resolution stopping short is the same defect
+ * and is still unsayable. `BlankAnalysisTest` pins that limit.
+ *
+ * No committed capture is named here as an example of it.
+ * `field-rdl-3010-10rep-s36-set04` was, with one surviving rep against a
+ * movement run displacing 123.64 m; issue #94's runaway correction took it to
+ * ten reps against the ten the lifter counted, so the example is deleted
+ * rather than repointed at another capture.
  *
  * It also cannot be answered for a set already recorded. The value is computed
  * when the set is analysed and frozen into its stored analysis, the way

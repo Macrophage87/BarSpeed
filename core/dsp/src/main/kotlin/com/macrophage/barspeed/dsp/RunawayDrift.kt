@@ -53,8 +53,11 @@ import kotlin.math.abs
  * test corpus measuring a series the analyzer never runs on.
  *
  * [StreamingSetTracker] does not call `estimate`; it integrates per arriving
- * sample with no set to take a mean over, so nothing here reaches the live
- * counter or changes what is recorded.
+ * sample with no set to take a mean over, so the live counter is untouched
+ * and the raw IMU stream the app records is byte-identical. The analysis
+ * frozen into `analysisJson` at set end does change -- the app analyses a set
+ * as it ends and stores the result -- so sets already on disk keep the
+ * analysis computed under the old rule.
  */
 object RunawayDrift {
     /**
