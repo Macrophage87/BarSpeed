@@ -642,6 +642,27 @@ data class SessionExport(
          * the capture is copied forward rather than moved, and nothing
          * published from `hrm` changes. Not retroactive and cannot be: no
          * earlier build stored the two windows apart.
+         *
+         * 1.18 carries a SIXTH change, under the same number and for the same
+         * reason, and it adds no key to THIS document (#133): the raw
+         * archive's `rollExcursion_deg` is measured over the set's WORKING
+         * WINDOW -- `workStartedAt_ms` to the terminal cue, both already in
+         * that same document -- on a roll signal unwrapped across the +-180
+         * degree boundary, with a new `rollExcursionBasis` naming the interval
+         * used. It was `max(roll) - min(roll)` over every row of the capture
+         * file, which SATURATES, since `roll_deg` is bounded to (-180, 180]:
+         * one field session published 358.6 and 360.0 on sets whose unwrapped
+         * sweeps are 909.0 and 515.2. And the file is not the set -- a later
+         * session published 92.9 and 86.7 on working windows of 54.0 and 63.7,
+         * neither set carrying a single sample after its terminal cue, so on
+         * those two the whole excess is the PREP. Both keys are withheld
+         * together on a window of fewer than two samples: a range over one
+         * sample is 0.0 and reads as "this set did not rotate". Retroactive,
+         * unlike the other entries under 1.18 -- the figure is measured from
+         * the stored stream at export time rather than frozen into the row --
+         * so an old session re-exports under the new rule and says which bound
+         * it lacked. `RollExcursion` in `:core:dsp` is where the rule and the
+         * measurements live.
          */
         const val SCHEMA_VERSION = "1.18"
 

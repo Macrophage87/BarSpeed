@@ -1,7 +1,9 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.ImuCsv
+import com.macrophage.barspeed.dsp.RollExcursion
 import com.macrophage.barspeed.dsp.SetAnalyzer
+import com.macrophage.barspeed.dsp.SetEnd
 import com.macrophage.barspeed.dsp.VelocityEstimator
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.hrm.HrTrust
@@ -697,6 +699,20 @@ class RawExporter(
                 // Parsed from the text this loop already inflated, like every
                 // other figure the descriptor reads out of a stream.
                 var prepWindow: PrepWindow? = null
+                // The instant the app CALLED the set over, from the text this
+                // loop already inflated. `SetEnd` is asked rather than the cue
+                // track re-read here, so the boundary the raw manifest windows
+                // a roll sweep at is the same one the rep list is bounded at
+                // and the archive cannot come to hold two answers to it.
+                //
+                // The decode is inside `runCatching` for the reason the IMU
+                // decode beside it is: `CueCsv.decode` throws on a malformed
+                // row. That guard cannot be observed through this exporter
+                // today -- `SessionExporter` decodes the SAME stream unguarded
+                // when it builds `session.json`, later in this same call, so a
+                // corrupt cue row fails the whole export there. Named and left
+                // alone: it is a defect of its own and not #133's.
+                var setEnd: SetEnd = SetEnd.NotCued
                 for (stream in streams) {
                     val name = entryName(idx, record, stream)
                     val text = Gzip.decompress(stream.csvGzip)
@@ -711,6 +727,8 @@ class RawExporter(
                         }
                         RawStreamEntity.KIND_HRM -> minBpmBySet[record.id] = minBpmFrom(text)
                         RawStreamEntity.KIND_PREP -> prepWindow = PrepWindowCsv.decode(text)
+                        RawStreamEntity.KIND_CUES ->
+                            setEnd = runCatching { SetEnd.of(CueCsv.decode(text)) }.getOrDefault(SetEnd.NotCued)
                     }
                 }
                 if (record.id !in minBpmBySet) minBpmBySet[record.id] = null
@@ -719,7 +737,16 @@ class RawExporter(
                 // warm-up from a working set, and which sets were rotating
                 // enough for attitude error to matter.
                 setLines +=
-                    buildSetDescriptor(idx, record, streams, files, imuTextByRole, imuFileByRole, prepWindow)
+                    buildSetDescriptor(
+                        idx,
+                        record,
+                        streams,
+                        files,
+                        imuTextByRole,
+                        imuFileByRole,
+                        prepWindow,
+                        setEnd,
+                    )
             }
             meta.append(setLines.joinToString(",\n")).append("\n  ]\n}\n")
             zip.putNextEntry(ZipEntry("meta.json"))
@@ -766,6 +793,7 @@ class RawExporter(
         imuTextByRole: Map<String?, String>,
         imuFileByRole: Map<String?, String>,
         prepWindow: PrepWindow?,
+        setEnd: SetEnd,
     ): String {
         // The same policy the session document asks, so the two cannot
         // disagree about one set (#216).
@@ -1036,14 +1064,27 @@ class RawExporter(
         num("sampleRate_hz", (measuredRate ?: storedRate)?.takeIf { it > 0.0 })
         // Attitude excursion decides which analysis is even valid on this set:
         // a rail-guided machine barely rotates and integrates cleanly, while a
-        // barbell tumbling through 300 degrees leaks gravity into every sample.
-        rollExcursionDeg(samples)?.let { num("rollExcursion_deg", Math.round(it * 10.0) / 10.0) }
+        // mount that tumbles leaks gravity into every sample.
+        //
+        // Measured over the WORKING WINDOW and on an UNWRAPPED signal since
+        // #133; [RollExcursion] holds both decisions and argues them. What
+        // this key states therefore changed, and the basis beside it says
+        // which interval a given set's figure covers rather than leaving a
+        // reader to work it out from the presence of other keys. Both are
+        // withheld together where the window holds too little to measure --
+        // there is no basis for a figure that was not published.
+        rollExcursion(samples, prepWindow, setEnd)?.let { measured ->
+            num("rollExcursion_deg", Math.round(measured.degrees * 10.0) / 10.0)
+            str("rollExcursionBasis", measured.basis.published)
+        }
         // One entry per capture that actually arrived, each figure measured
         // from ITS OWN stream. A role that is armed and absent has no entry
         // here and appears in sensorRolesExpected only; the roles MISSING are
         // the set difference between the two, deliberately not a third key
         // that could disagree with its own inputs.
-        sensorStreamEntries(imuTextByRole, imuFileByRole)?.let { fields += "\"sensors\": $it" }
+        sensorStreamEntries(imuTextByRole, imuFileByRole, prepWindow, setEnd)?.let {
+            fields += "\"sensors\": $it"
+        }
         fields += "\"files\": [${files.joinToString(", ") { "\"$it\"" }}]"
         return "    {${fields.joinToString(", ")}}"
     }
@@ -1066,6 +1107,8 @@ class RawExporter(
     private fun sensorStreamEntries(
         imuTextByRole: Map<String?, String>,
         imuFileByRole: Map<String?, String>,
+        prepWindow: PrepWindow?,
+        setEnd: SetEnd,
     ): String? {
         val roled = imuTextByRole.entries.filter { it.key != null }
         if (roled.isEmpty()) return null
@@ -1080,7 +1123,10 @@ class RawExporter(
                         (s.last().timestampMs - s.first().timestampMs) / 1000.0,
                     )?.takeIf { it > 0.0 }?.let { parts += "\"sampleRate_hz\": $it" }
                 }
-                rollExcursionDeg(samples)?.let { parts += "\"rollExcursion_deg\": ${Math.round(it * 10.0) / 10.0}" }
+                rollExcursion(samples, prepWindow, setEnd)?.let { measured ->
+                    parts += "\"rollExcursion_deg\": ${Math.round(measured.degrees * 10.0) / 10.0}"
+                    parts += "\"rollExcursionBasis\": \"${measured.basis.published}\""
+                }
                 "{${parts.joinToString(", ")}}"
             }
         return "[${entries.joinToString(", ")}]"
@@ -1104,18 +1150,23 @@ class RawExporter(
     }
 
     /**
-     * How far the sensor's roll swept across the set, or null when the stream
-     * cannot say.
+     * How far the sensor's roll swept across the WORKING part of the set, and
+     * which interval that was, or null when the stream cannot say (#133).
      *
-     * Two samples minimum. One sample has a maximum equal to its minimum, so
-     * the range comes out 0.0 and the manifest would state that the set did not
-     * rotate -- when what happened is that nothing measured whether it did.
-     * This figure decides whether a reader trusts the integration on a set at
-     * all, and a fabricated zero is the most reassuring answer available.
+     * The arithmetic and both of its arguments are [RollExcursion]'s; the only
+     * thing decided here is which two instants the window is built from --
+     * [PrepWindow.workStartedAtMs] and the set's terminal cue -- and that a
+     * set with no stream at all is null rather than a range over nothing.
+     *
+     * This used to be `max(roll) - min(roll)` over every row in the capture
+     * file, which saturated at 360 because `roll_deg` is bounded, and which
+     * counted the seconds before the lifter began and, on a guided set, the
+     * seconds spent racking the load afterwards. Both halves were measured on
+     * the archived captures; `RollExcursion` names the sessions and figures.
      */
-    private fun rollExcursionDeg(samples: List<ImuSample>?): Double? {
-        if (samples == null || samples.size < 2) return null
-        val rolls = samples.map { it.rollDeg }
-        return rolls.max() - rolls.min()
-    }
+    private fun rollExcursion(
+        samples: List<ImuSample>?,
+        prepWindow: PrepWindow?,
+        setEnd: SetEnd,
+    ): RollExcursion.Measured? = samples?.let { RollExcursion.of(it, prepWindow?.workStartedAtMs, setEnd) }
 }
