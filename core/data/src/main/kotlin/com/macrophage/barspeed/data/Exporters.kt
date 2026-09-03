@@ -936,7 +936,8 @@ class RawExporter(
             str("sensorsShortfall", d.shortfall?.let(SensorCapturePolicy::shortfallToWire))
             // Written even when empty. An empty list is a set whose stream
             // carries no role: two paired units the app could not tell apart,
-            // or -- since #224 -- one paired unit that delivered nothing.
+            // or -- since #224 -- one paired unit that delivered nothing, or
+            // -- since #209 -- one that delivered too few frames to analyse.
             // Which of the two is sensorsShortfall and sensorsSoleSilent. An
             // absent key would read as this version not stating it.
             fields += "\"sensorRolesExpected\": " +
@@ -949,7 +950,8 @@ class RawExporter(
             // omission, which is also what every archive written before this
             // key existed says.
             flag("analysedFellBack", d.analysedFellBack)
-            // Which armed units delivered nothing, and what the app could see
+            // Which armed units delivered too few frames to analyse across
+            // the whole set (#209), and what the app could see
             // of each one's link when the set ended (#213). Written only when
             // something was silent, so an ordinary dual set's descriptor is
             // what it has always been.

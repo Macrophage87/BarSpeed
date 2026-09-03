@@ -758,6 +758,20 @@ data class SessionExport(
          * in the headroom rungs is not asked, so absence still covers
          * skipped, never asked, and recorded before the app could ask. The
          * published description of `limiter` is corrected with it.
+         *
+         * 1.19 carries a SEVENTH change, under the same number the mint above
+         * states (#209): an armed unit that delivered too few frames to
+         * analyse no longer holds the analysis and no longer reads as a
+         * unit that delivered. `analysedFellBack`, `silent` and
+         * `soleSilent` each widen from "delivered nothing at all" to
+         * "delivered fewer than
+         * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]"; `present` does not
+         * move, because the archive holds that unit's file. The consequence
+         * for a reader is that `expected` minus `present` is no longer the
+         * unit the analysis moved off and no key here publishes a frame
+         * count. The published log in
+         * `docs/schemas/session-export.schema.json` carries the full entry
+         * and is the one to read.
          */
         const val SCHEMA_VERSION = "1.19"
 
@@ -1388,8 +1402,8 @@ data class SetSensorsExport(
      *
      * Since #207 it is a role that STREAMED wherever one did -- the boundary
      * is when the set was RECORDED, not what the document's `schemaVersion`
-     * says: a set armed to analyse a unit that produced nothing is analysed
-     * from the unit that did, and [analysedFellBack] is what says the app
+     * says: a set armed to analyse a unit that delivered too few frames to
+     * analyse is analysed from the unit that delivered enough, and [analysedFellBack] is what says the app
      * moved. Read that key rather than comparing this one with [present],
      * which no longer separates the two cases.
      *
@@ -1403,7 +1417,14 @@ data class SetSensorsExport(
     val analysedRole: String? = null,
     /**
      * True when [analysedRole] is not the role the set armed for analysis,
-     * because that unit produced no stream and another one did (#207).
+     * because that unit delivered too few frames to analyse and another one
+     * delivered enough (#207, widened by #209).
+     *
+     * TOO FEW, not none. A unit that put one to seven frames in its buffer
+     * still put a file in the raw archive, so a set carrying this key can name
+     * the unit it moved off in [present], and [expected] minus [present] is no
+     * longer that unit. Nothing in this document publishes a frame count, so
+     * this key is the only statement that the move happened.
      *
      * The fact a reader cannot derive. "Analysed the preferred unit" and
      * "analysed the only unit that turned up" are different statements about
@@ -1456,9 +1477,13 @@ data class SetSensorsExport(
      */
     val shortfall: String? = null,
     /**
-     * Which ARMED roles delivered nothing for the whole set, keyed by role,
-     * with what the app could see of each one's link when the set ended
-     * (#213).
+     * Which ARMED roles delivered too few frames to analyse across the whole
+     * set, keyed by role, with what the app could see of each one's link when
+     * the set ended (#213, widened by #209).
+     *
+     * The boundary is [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES], the point
+     * below which the estimator refuses a stream outright, so a role named
+     * here may still have a file in the raw archive -- one frame is a file.
      *
      * A sibling of [shortfall] rather than a member of it, because the two
      * answer different questions about different things. [shortfall] is about
@@ -1467,10 +1492,12 @@ data class SetSensorsExport(
      * about THE SET, is observed at the end of it, and is the only statement
      * in this document about whether an armed unit actually delivered.
      *
-     * The ROLE is a key rather than a second list. Which roles were silent is
-     * [expected] minus [present] and a reader can already compute it; a second
-     * list of them would be the duplicate statement [expected]'s own
-     * description refuses. The VALUE is what is new.
+     * The ROLE is a key rather than a second list. It was [expected] minus
+     * [present] until #209, which a reader could compute; it is now [expected]
+     * minus the roles that delivered enough to analyse, which a reader holding
+     * only this document cannot. A duplicate list of them would still be the
+     * duplicate statement [expected]'s own description refuses. The VALUE is
+     * what was always new.
      *
      * Values are `notLinked`, `linkWithoutSensor`, `linkedSilent` and
      * `tooSoon`, spelled as [ArmedSilencePolicy.wireOf] spells them, and each

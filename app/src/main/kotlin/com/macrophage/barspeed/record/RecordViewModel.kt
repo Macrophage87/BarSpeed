@@ -537,9 +537,12 @@ private data class PendingSetWrite(
      * that is not analysed -- both frozen with everything else (#156).
      *
      * [samples] keeps its meaning: the ANALYSED stream. [secondary] is null on
-     * every one-sensor set, and non-null with an empty sample list when a role
-     * was armed and its unit produced nothing, which is the state the
-     * repository turns into "no row, and the declaration still names it".
+     * every one-sensor set, and non-null when a role was armed and the
+     * analysis was not pointed at it -- with an empty sample list where that
+     * unit produced nothing, which is the state the repository turns into "no
+     * row, and the declaration still names it", and with its handful of rows
+     * where it delivered too few frames to analyse (#209), which the
+     * repository archives like any other capture.
      */
     val sensors: RecordedSensors?,
     val secondary: SecondaryCapture?,
@@ -560,10 +563,20 @@ private data class PendingSetWrite(
  * The DECISION is [SensorCapturePolicy.analysedStream]'s, in `:core:model`
  * where a test runs on it. What is left here is a lookup: the roles are keys
  * and the buffers are values, so nothing on this path can pair a role with the
- * wrong capture. Which roles count as PRESENT is
- * [SensorCapturePolicy.present]'s answer and not a second reading of the same
- * question -- the export asks that same function, and a record path answering
- * it differently is how two documents come to disagree about one set.
+ * wrong capture.
+ *
+ * WHICH ROLES THE ANALYSIS MAY BE POINTED AT is
+ * [SensorCapturePolicy.analysable]'s answer and NOT [SensorCapturePolicy.present]'s
+ * (#209). Those are two questions: `present` is which roles reached the raw
+ * archive, which the export publishes and which one frame satisfies, and
+ * `analysable` is which roles delivered enough frames for
+ * `VelocityEstimator.estimate` to run at all. Between them sits the set #209
+ * was filed for -- an armed unit that delivered a handful of frames beside a
+ * partner that delivered a full capture -- which this path used to answer with
+ * `present` alone, keeping the armed role and publishing an empty summary over
+ * the capture it was holding. The export goes on asking `present`, because the
+ * archive really does hold that unit's file and a list omitting it would
+ * misdescribe the zip.
  *
  * [ArmedCapture.samples] falls back to the analysed buffer whenever no role is
  * in play at all, which is the ordinary one-sensor set and the set that met
@@ -582,9 +595,13 @@ internal fun armedCaptureOf(
         armed?.analysed?.let { put(it, analysedBuffer) }
         secondaryRole?.let { put(it, secondaryBuffer) }
     }
-    val streamed =
-        SensorCapturePolicy.present(armed?.expected.orEmpty(), byRole.filterValues { it.isNotEmpty() }.keys)
-    val decision = SensorCapturePolicy.analysedStream(armed?.analysed, streamed)
+    // Which roles the analysis CAN be pointed at, which is not which roles
+    // reached the archive (#209). The frame counts come from the same buffers
+    // the captures are taken from, so nothing here can judge one stream and
+    // publish another.
+    val analysable =
+        SensorCapturePolicy.analysable(armed?.expected.orEmpty(), byRole.mapValues { it.value.size })
+    val decision = SensorCapturePolicy.analysedStream(armed?.analysed, analysable)
     // Which armed roles put NOTHING in a buffer, and what the app could see of
     // each one's link when the set ended (#213). The roles come from the
     // BUFFERS -- the same source `present` comes from -- so the two statements
@@ -595,9 +612,13 @@ internal fun armedCaptureOf(
     // combination IS reachable and its error direction is silence: deliveryOf
     // reads a SILENT_AFTER_MS lookback ending at endedAtMs, which can reach
     // back past the set's start, so a short set can publish no word for a role
-    // that delivered nothing.
+    // that delivered nothing. Since #209 the same holds for a role that
+    // delivered a handful of frames and stopped: if the last of them landed
+    // inside that window the reading is DELIVERING, the word is dropped, and
+    // `analysedFellBack` is left as the only statement that the analysis
+    // moved off it.
     val silent =
-        ArmedSilencePolicy.silent(armed?.expected.orEmpty().filterNot { it in streamed }, deliveryByRole)
+        ArmedSilencePolicy.silent(armed?.expected.orEmpty().filterNot { it in analysable }, deliveryByRole)
     // And the same fact for the set whose single stream carries NO ROLE (#224),
     // which is one paired unit -- the ordinary configuration -- or two the app
     // cannot tell apart. `armed` is null on the first of those, so the
@@ -614,15 +635,18 @@ internal fun armedCaptureOf(
     // nothing" onto a row sitting beside a full summary and a real imu.csv,
     // and a reader of that archive has no way to tell which half to believe.
     // Round 1 of #224 found it. `analysedBuffer` is the same source
-    // `SensorCapturePolicy.present` is read from just above, so the roleless
+    // `SensorCapturePolicy.analysable` is read from just above, so the roleless
     // set is judged by the fact the role-keyed set is judged by rather than by
-    // a near neighbour of it, and it is the buffer this capture goes on to
-    // publish -- `decision.role` is null on every set that reaches here, so
-    // `samples` below IS `analysedBuffer`.
+    // a near neighbour of it -- including the SIZE of it, since #209: seven
+    // frames is not an empty buffer and is not a capture either, and a
+    // one-sensor set that delivered seven publishes "No sensor data recorded."
+    // with nothing beside it to say the link went quiet. It is the buffer this
+    // capture goes on to publish -- `decision.role` is null on every set that
+    // reaches here, so `samples` below IS `analysedBuffer`.
     val sensors =
         SensorCapturePolicy.withSoleSilence(
             armed?.copy(analysed = decision.role, analysedFellBack = decision.fellBack, silent = silent),
-            soleDelivery.takeIf { analysedBuffer.isEmpty() },
+            soleDelivery.takeIf { analysedBuffer.size < SensorCapturePolicy.MIN_ANALYSABLE_FRAMES },
         )
     return ArmedCapture(
         samples = decision.role?.let { byRole[it] } ?: analysedBuffer,
@@ -2878,8 +2902,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      *
      * [imuBuffer] is the ARMED unit's capture -- the stream of whichever
      * address the preference names -- and since #207 that is not always the
-     * stream the figures come from: where the armed unit produced nothing and
-     * this one did, [armedCaptureOf] points the analysis here and
+     * stream the figures come from: where the armed unit delivered too few
+     * frames to analyse and this one delivered enough, [armedCaptureOf] points the analysis here and
      * [RecordedSensors.analysedFellBack] records the move. This one is filled
      * by a collector that reaches the buffer and the journal and nothing else.
      */
@@ -3897,7 +3921,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 // role was armed and its unit produced nothing -- which the
                 // repository turns into no row and a declaration that still
                 // names the role, the state that makes a flat battery readable
-                // afterwards rather than invisible.
+                // afterwards rather than invisible -- and non-null with the
+                // rows it did send where a unit delivered too few frames to
+                // analyse (#209), which are archived like any other capture.
                 secondary = capture.secondary,
                 rating = rating,
                 planName = s.planName.takeIf { !s.adHoc },

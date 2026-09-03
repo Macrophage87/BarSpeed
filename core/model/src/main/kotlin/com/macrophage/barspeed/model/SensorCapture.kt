@@ -81,7 +81,16 @@ data class RecordedSensors(
     val analysed: SensorRole? = null,
     /**
      * True when [analysed] is NOT the role the set was armed to analyse, and
-     * the app moved onto it because the armed one produced nothing.
+     * the app moved onto it because the armed one delivered too few frames to
+     * analyse.
+     *
+     * TOO FEW, not none, since #209. The armed unit may have put a handful of
+     * frames in its buffer and a file in the raw archive; what it did not do
+     * is reach [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES], which is the point
+     * below which `VelocityEstimator.estimate` refuses outright. So a set
+     * carrying this flag can name the armed role in the export's `present`
+     * list, and reading `expected` against `present` no longer tells a reader
+     * which unit the analysis moved off. This flag does.
      *
      * A separate fact rather than a comparison a reader is left to make.
      * "Analysed the preferred unit" and "analysed the only unit that turned
@@ -136,8 +145,15 @@ data class RecordedSensors(
      */
     val shortfall: DualShortfall? = null,
     /**
-     * Which ARMED roles put nothing in a buffer for this whole set, and what
-     * the app could see of each one's link when the set ended (#213).
+     * Which ARMED roles delivered too few frames to analyse across this whole
+     * set, and what the app could see of each one's link when the set ended
+     * (#213, #209).
+     *
+     * TOO FEW RATHER THAN NONE since #209, and it is the same boundary the
+     * analysis uses: a role under [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]
+     * is one no summary could have been computed from. A role named here can
+     * therefore have a file in the raw archive -- one frame is a file -- so
+     * this is not a list of roles the archive is missing.
      *
      * The fact that survives beside [shortfall] rather than inside it.
      * [shortfall] describes the device ROSTER -- two paired units the app
@@ -146,9 +162,12 @@ data class RecordedSensors(
      * end of it, and is the only place in the record that says anything about
      * whether a unit that was armed actually delivered.
      *
-     * WHICH roles are silent is [expected] minus the roles that streamed, and
-     * a reader can already compute that. The role here is a KEY, not a second
-     * statement of it; what is new is the WORD, and the word is the thing
+     * The role here is a KEY, not a second statement of which units were
+     * missing. It was [expected] minus the roles that streamed until #209,
+     * which a reader could compute; it is now [expected] minus the roles that
+     * delivered enough to analyse, which a reader holding only the export
+     * cannot, because the export publishes no frame counts. What was always
+     * new is the WORD, and the word is the thing
      * field-37 had no way to record. Thirteen sets published `present: ["a"]`
      * and nothing about whether `b` was switched off, out of range, answering
      * with the wrong GATT profile, or connected and silent -- and those have
@@ -205,13 +224,15 @@ data class RecordedSensors(
      * no declaration at all and its export is byte-identical to what this app
      * has always written.
      *
-     * NULL MEANS THE SET CAPTURED SAMPLES from that one link -- or, on a set
-     * shorter than [ArmedSilencePolicy.SILENT_AFTER_MS], that its last frame
-     * arrived during the preceding rest and read as delivering -- or that the
-     * row was written by a build that could not observe an unroled link at
-     * all, so a row that says nothing here was never asked. A link that fed
-     * part of a set and then went silent is null here too: the caller refuses
-     * the word wherever the set's buffer is not empty, which is why
+     * NULL MEANS THE SET CAPTURED A STREAM THE ANALYSIS COULD USE from that
+     * one link -- at least [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] of it,
+     * since #209 -- or, on a set shorter than
+     * [ArmedSilencePolicy.SILENT_AFTER_MS], that its last frame arrived during
+     * the preceding rest and read as delivering -- or that the row was written
+     * by a build that could not observe an unroled link at all, so a row that
+     * says nothing here was never asked. A link that fed a whole set and then
+     * went silent is null here too: the caller refuses the word wherever the
+     * set's buffer holds a capture the analysis could run on, which is why
      * [SensorCapturePolicy.withSoleSilence] cannot check it and says so.
      */
     val soleSilent: ArmedDelivery? = null,
@@ -611,14 +632,19 @@ object SensorCapturePolicy {
      * one bar sensor that delivered, which is what keeps such an export exactly
      * what this app has always written.
      *
-     * [soleSilent] IS A WORD FOR A SET THAT CAPTURED NOTHING, and the caller
-     * owes that. This function is handed a reading and attaches it; it holds no
-     * buffer and cannot check. A reading of one link over a fixed window ending
-     * when the set ended says a unit that fed the whole set and dropped in its
-     * last seconds is silent, and passing THAT here writes "delivered nothing"
-     * onto a row beside a full summary and a real raw stream. `:app` gates on
-     * the analysed buffer being empty for exactly this, and #224 round 1 is
-     * where the omission was found.
+     * [soleSilent] IS A WORD FOR A SET THE ANALYSIS COULD NOT RUN ON, and the
+     * caller owes that. This function is handed a reading and attaches it; it
+     * holds no buffer and cannot check. A reading of one link over a fixed
+     * window ending when the set ended says a unit that fed the whole set and
+     * dropped in its last seconds is silent, and passing THAT here writes
+     * "delivered nothing" onto a row beside a full summary and a real raw
+     * stream. `:app` gates on the analysed buffer holding fewer than
+     * [MIN_ANALYSABLE_FRAMES] for exactly this -- on EMPTY until #209, which
+     * left the same contradiction one shape over: seven frames is not an empty
+     * buffer and is not a capture a summary can be computed from either, so
+     * such a set published "No sensor data recorded." with nothing beside it
+     * to say the link had gone quiet. #224 round 1 is where the first half was
+     * found.
      *
      * Where there IS a word, a set that declared nothing gains a declaration
      * carrying only that word beside a [RecordedSensors.count] of one. The
@@ -643,10 +669,11 @@ object SensorCapturePolicy {
     }
 
     /**
-     * Which role the DSP is pointed at once it is known which units actually
-     * streamed, and whether that is the role the set armed (#207).
+     * Which role the DSP is pointed at once it is known which units delivered
+     * a stream it can run on, and whether that is the role the set armed
+     * (#207, #209).
      *
-     * THE ANALYSED ROLE MUST BE A ROLE THAT STREAMED. [roster] decides which
+     * THE ANALYSED ROLE MUST BE A ROLE THE ANALYSIS CAN RUN ON. [roster] decides which
      * unit the app is POINTED at before a set begins, from the preferred
      * address and nothing else, and that is the right rule for arming: it
      * names the unit whose link the existing client is maintaining. It is the
@@ -661,28 +688,38 @@ object SensorCapturePolicy {
      * that archive can separate them.
      *
      * THE MOVE IS PUBLISHED rather than left to be derived. Before this, an
-     * analysed role missing from [present] was the marker for "the figures
+     * analysed role missing from the present list was the marker for "the figures
      * came from nothing"; after it, the analysed role is present in both the
      * ordinary case and the fallback, so that comparison separates nothing.
      * What remains to be said -- these figures came from the unit the app was
      * pointed at, so they are comparable with a corpus recorded the same way
      * -- is [AnalysedStream.fellBack] and is said outright.
      *
-     * NOTHING STREAMING IS NOT A FALLBACK. With no other capture to move onto,
+     * NO OTHER ANALYSABLE STREAM IS NOT A FALLBACK. With nothing to move onto,
      * the honest answer is the role the set armed: the figures are empty
-     * because there was no stream, and renaming the role would say a unit was
-     * analysed when none was. Neither is a null [armed], which is the ordinary
+     * because no stream reached the analysis, and renaming the role would say
+     * a unit was analysed when none was. That covers a set where nothing
+     * streamed at all and, since #209, one where the partner delivered a
+     * handful of frames too. Neither is a null [armed], which is the ordinary
      * one-sensor set and the set that met two paired units it could not tell
      * apart -- both record one UNROLED stream, and there is no second buffer
      * and no label to move to.
      *
-     * The candidate is the first entry of [present] that is not [armed], which
-     * with two [SensorRole] entries is the only one there can be. [present] is
-     * the roles that put samples in a buffer, in the armed order, and it is
-     * [SensorCapturePolicy.present]'s answer rather than a second reading of
-     * the same question -- the export asks that function which roles arrived,
-     * and a record path asking it differently is how the two documents come to
-     * disagree about one set.
+     * The candidate is the first entry of [analysable] that is not [armed],
+     * which with two [SensorRole] entries is the only one there can be. It is
+     * the roles that delivered enough frames for the DSP to run on, in the
+     * armed order, and it is [SensorCapturePolicy.analysable]'s answer rather
+     * than a second reading of the same question.
+     *
+     * IT IS NOT [SensorCapturePolicy.present]'s answer, and that is #209. The
+     * parameter took the roles that reached the raw ARCHIVE until then, which
+     * one frame satisfies, so an armed unit that delivered seven frames beside
+     * a partner holding a full capture kept the armed role -- and the DSP then
+     * refused the seven-frame buffer and the set published an empty summary
+     * over the capture the app was holding. The export goes on asking
+     * `present`, because the archive really does hold that unit's file; this
+     * asks the narrower question, and the two lists differ on exactly the set
+     * this fallback exists for.
      *
      * IT DECIDES NOTHING RETROACTIVELY. This runs when a set is recorded, and
      * the analysis it selects the stream for is frozen into that set's row.
@@ -691,9 +728,10 @@ object SensorCapturePolicy {
      * the other stream would put figures under a role that did not produce
      * them.
      */
-    fun analysedStream(armed: SensorRole?, present: List<SensorRole>): AnalysedStream {
-        if (armed == null || armed in present) return AnalysedStream(role = armed, fellBack = false)
-        val fallback = present.firstOrNull { it != armed } ?: return AnalysedStream(role = armed, fellBack = false)
+    fun analysedStream(armed: SensorRole?, analysable: List<SensorRole>): AnalysedStream {
+        if (armed == null || armed in analysable) return AnalysedStream(role = armed, fellBack = false)
+        val fallback =
+            analysable.firstOrNull { it != armed } ?: return AnalysedStream(role = armed, fellBack = false)
         return AnalysedStream(role = fallback, fellBack = true)
     }
 
