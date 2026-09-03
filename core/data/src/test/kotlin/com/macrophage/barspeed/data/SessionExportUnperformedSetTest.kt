@@ -242,7 +242,7 @@ class SessionExportUnperformedSetTest {
     }
 
     /**
-     * Nothing in the session document says the set was not performed.
+     * A set carrying no mark publishes no key saying it was not performed.
      *
      * The key set is asserted whole rather than key by key, because the
      * question is what a reader is given and not whether one name is missing:
@@ -256,7 +256,7 @@ class SessionExportUnperformedSetTest {
      * read finds one.
      */
     @Test
-    fun `the session document has no way to say the set was not performed`() = runTest {
+    fun `a set with no mark publishes no key saying it was not performed`() = runTest {
         val set = setObject()
         assertEquals(
             listOf(
@@ -269,7 +269,7 @@ class SessionExportUnperformedSetTest {
     }
 
     /**
-     * The raw archive's manifest has no way to say it either.
+     * The manifest publishes no such key for that set either.
      *
      * Two writers, one fact, and this file pins both from the start: the
      * session document is serialised by kotlinx and the manifest is assembled
@@ -278,7 +278,7 @@ class SessionExportUnperformedSetTest {
      * they opened.
      */
     @Test
-    fun `the raw archive's manifest has no way to say it either`() = runTest {
+    fun `the manifest publishes no such key for a set with no mark`() = runTest {
         val set = manifestSet()
         for (candidate in listOf("voided", "voidReason", "performed", "excluded")) {
             assertFalse(candidate in set, "the manifest already carries $candidate")

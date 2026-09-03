@@ -82,6 +82,14 @@ class SchemaVoidedSetContractTest {
      * boolean to filter on, and free text in that position would destroy
      * exactly that grouping -- the same separation `limiter` and `limiterNote`
      * already carry.
+     *
+     * THE CAP IS PINNED TO THE CONSTANT THE APP TRUNCATES AT, mirroring
+     * `SchemaLimiterContractTest`. The code already shares
+     * [SetLimiter.NOTE_MAX_CHARS] -- `VoidSetPolicy.reasonAsTyped` delegates
+     * to the same normaliser -- so the exposure is the DOCUMENT: a published
+     * `maxLength` a reader allocates on, or round-trips through a store with
+     * its own limit, is a promise, and nothing else checks it is the number
+     * the app enforces.
      */
     @Test
     fun `the published export declares the void reason, described as optional`() {
@@ -90,6 +98,11 @@ class SchemaVoidedSetContractTest {
             "the published export schema does not declare a voided set's reason",
         ).jsonObject
         assertEquals("string", reason["type"]!!.jsonPrimitive.content, "voidReason is not published as a string")
+        assertEquals(
+            SetLimiter.NOTE_MAX_CHARS,
+            reason["maxLength"]!!.jsonPrimitive.content.toInt(),
+            "the published void-reason cap drifted from SetLimiter.NOTE_MAX_CHARS",
+        )
         val description = reason["description"]!!.jsonPrimitive.content
         assertTrue(
             "only on a voided set" in description,
