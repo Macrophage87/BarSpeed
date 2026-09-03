@@ -66,6 +66,7 @@ import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetRepsPolicy
+import com.macrophage.barspeed.model.SetVoicePolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.SideChoicePolicy
 import com.macrophage.barspeed.model.Stage
@@ -2953,6 +2954,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var plannedRepsForSet: Int? = null
     private var announceReps = false
 
+    /**
+     * Whether the SENSOR-driven counter may speak on the set in progress.
+     *
+     * `SetVoicePolicy.guidesFor` in `:core:model` decides it, frozen here at
+     * [beginSet] as everything else about a set's arming is. It used to be
+     * `!manualSet`, read out of the state at every arriving sample -- and that
+     * flag also picks the UI branch, the counter completion is judged against
+     * and whether a rep tap is accepted, so one variable answered four
+     * questions and was wrong for this one on every timed set (#217).
+     */
+    private var sensorVoiceRuns = false
+
     init {
         viewModelScope.mirrorLinkStates(autoConnect, stateFlow)
         viewModelScope.launch {
@@ -3195,6 +3208,17 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // read from the case rather than restated, so it cannot drift from it.
         val guidedSet = prepCase == PrepCase.CUED
         if (guidedSet) manualSet = true
+        // Who speaks while the work is under way, decided in `:core:model` and
+        // pinned there. `manualSet` above still answers its other three
+        // questions and is deliberately not derived from this: they agreed
+        // only by accident, and on a timed set they disagreed (#217).
+        sensorVoiceRuns = SetVoicePolicy.sensorCounts(
+            hasTempo = guidedTempo != null,
+            isTimed = s.currentIsTimed,
+            kind = exercise.kind,
+            demoMode = s.demoMode,
+            imuConnected = s.imuConnected,
+        )
         // The word the prep of a hold or a carry ends on, at the instant the
         // set's clock starts. Non-null on every TIMED prep and on nothing else:
         // LeadInPolicy pairs the case with the word, so this is one decision
@@ -3279,7 +3303,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Manual/guided sets: the app (or the lifter) is the counter — the
         // sensor keeps recording for velocity metrics, but its phase counts and
         // rep calls must stay silent or two voices count over each other.
-        if (!stateFlow.value.manualSet) {
+        if (sensorVoiceRuns) {
             countPhaseSeconds(live.phase, live.currentPhaseElapsedS)
             announceRepMilestones(live.repCount)
         }
