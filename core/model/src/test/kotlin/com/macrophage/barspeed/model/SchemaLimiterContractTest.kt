@@ -41,21 +41,43 @@ class SchemaLimiterContractTest {
     }
 
     /**
-     * The text of ONE "1.18 carries a &lt;ORDINAL&gt; change" paragraph, bounded
-     * at the next such marker rather than run to the end of the whole log.
+     * The ONE "1.19 carries a ... change" paragraph that names [issue],
+     * bounded at the next such marker rather than run to the end of the log.
      *
-     * Unbounded, `"setup" in log.substring(start)` is satisfied by any LATER
-     * paragraph too, so a rebase that leaves two paragraphs both claiming the
-     * same ordinal -- exactly what #64's merge with `main`'s `voided` THIRD
-     * entry produced here before it was corrected -- passes silently as long
-     * as the word appears somewhere downstream. Bounding to the next marker
-     * makes the assertion about THIS paragraph and nothing after it.
+     * Anchored on the ISSUE and not on the ordinal, which is the second thing
+     * that went wrong here. Bounding came first: unbounded,
+     * `"setup" in log.substring(start)` is satisfied by any LATER paragraph
+     * too, so two paragraphs claiming one ordinal passed silently as long as
+     * the word appeared somewhere downstream. But an ordinal is a POSITION in
+     * a merged log, and a position is exactly what a rebase moves: #64's
+     * rebase onto `main` inserted #60's `voided` entry as the THIRD paragraph
+     * and pushed both of this branch's entries down one, so tests naming
+     * FOURTH and FIFTH asserted about whichever paragraph happened to sit
+     * there. An issue number is a fact about the change and no rebase moves
+     * it.
+     *
+     * The single-match assertion is load-bearing: it fails on a log that
+     * names the issue twice as well as on one that names it not at all, so
+     * the duplication a merge produces cannot pass by leaving one correct
+     * copy somewhere in the text.
      */
-    private fun paragraphAt(log: String, marker: String): String {
-        val start = log.indexOf(marker)
-        assertTrue(start >= 0, "the version log carries no entry matching \"$marker\"")
-        val next = log.indexOf("1.18 carries a", start + marker.length)
-        return if (next < 0) log.substring(start) else log.substring(start, next)
+    private fun entryNaming(log: String, issue: String): String {
+        val marker = "1.19 carries a"
+        val starts = generateSequence(log.indexOf(marker)) { prev ->
+            log.indexOf(marker, prev + marker.length).takeIf { it >= 0 }
+        }.takeWhile { it >= 0 }.toList()
+        val entries =
+            starts.mapIndexed { i, start ->
+                if (i + 1 < starts.size) log.substring(start, starts[i + 1]) else log.substring(start)
+            }
+        val naming = entries.filter { issue in it }
+        assertEquals(
+            1,
+            naming.size,
+            "the 1.19 version log should carry exactly one entry naming $issue, it carries " +
+                "${naming.size} of ${entries.size}",
+        )
+        return naming.single()
     }
 
     /**
@@ -243,30 +265,29 @@ class SchemaLimiterContractTest {
     }
 
     /**
-     * The version log names it under 1.18, the number this branch already
-     * opened and nothing has shipped.
+     * The version log names it under 1.19, the open number nothing has
+     * shipped.
      *
-     * v0.1.49 shipped 1.17, so 1.18 takes further entries rather than minting
-     * 1.19 -- the rule the 1.13, 1.15 and 1.17 entries each state. A closed
+     * v0.1.50 shipped 1.18, so 1.19 takes further entries rather than minting
+     * 1.20 -- the rule the 1.13, 1.15 and 1.17 entries each state. A closed
      * enum gaining a value is a change to the number even so: a reader
-     * validating against 1.18 as it stood before this rejects a document
-     * carrying the ninth answer.
+     * validating against 1.18 rejects a document carrying the ninth answer.
      *
-     * FOURTH, not THIRD, since #64's rebase onto `main` merged in #60's
-     * `voided`/`voidReason` entry ahead of this one -- main's own THIRD
-     * 1.18 entry is the void mark, landed there first, so this branch's
-     * set-up answer and #191's widening both shift one place down. The
-     * ordinal names the position in the merged log, not the order either
-     * branch wrote its own paragraph in.
+     * Selected by the issue it names, never by its ordinal. The paragraph has
+     * been THIRD and FOURTH under 1.18 and is FIFTH under 1.19: one rebase
+     * onto `main` merged #60's `voided`/`voidReason` entry ahead of it, and
+     * the next found 1.18 shipped in v0.1.50 and four 1.19 entries already
+     * landed. An ordinal is a position in a merged log and the next merge
+     * moves it again; `(#146)` is a fact about the change.
      */
     @Test
-    fun `the 1_18 version log names the set-up answer under the open number`() {
-        val entry = paragraphAt(versionLog(), "1.18 carries a FOURTH change")
-        assertTrue("`setup`" in entry, "the fourth 1.18 entry does not name the set-up answer: $entry")
+    fun `the 1_19 version log names the set-up answer under the open number`() {
+        val entry = entryNaming(versionLog(), "(#146)")
+        assertTrue("`setup`" in entry, "the 1.19 entry for #146 does not name the set-up answer: $entry")
     }
 
     /**
-     * The version log names #191's widening under a FIFTH 1.18 entry, so a
+     * The version log names #191's widening in its own 1.19 entry, so a
      * reader of the published document (not just the Kotlin KDoc it is
      * copied from) is told that a non-null `limiter` no longer implies
      * `failed`.
@@ -275,22 +296,20 @@ class SchemaLimiterContractTest {
      * paragraph; nothing pinned the PUBLISHED schema to it, which is why the
      * omission there passed CI. Round 1 of #191's review found the drift.
      *
-     * FIFTH, not FOURTH: #64's rebase onto `main` inserted #60's `voided`
-     * entry as the merged log's THIRD paragraph, which pushed this branch's
-     * own set-up answer to FOURTH and this widening to FIFTH. The ordinal is
-     * a position in the merged log, re-verified against the rebased tree
-     * rather than carried from the pre-rebase branch.
+     * Selected by `#191`, never by its ordinal, for the reason the entry
+     * above states: this paragraph has been FOURTH and FIFTH under 1.18 and
+     * is SIXTH under 1.19, moved by two rebases. The separate
+     * assertion that the entry names #191, which this test used to carry, is
+     * DELETED rather than kept: once the entry is selected by containing
+     * `#191` that assertion cannot fail, and an assertion that cannot fail
+     * reads as coverage.
      */
     @Test
-    fun `the 1_18 version log names the fifth entry and says limiter may appear on a set that did not fail`() {
-        val entry = paragraphAt(versionLog(), "1.18 carries a FIFTH change")
+    fun `the 1_19 version log entry for 191 says limiter may appear on a set that did not fail`() {
+        val entry = entryNaming(versionLog(), "#191")
         assertTrue(
             "did NOT fail" in entry || "did not fail" in entry,
-            "the fifth 1.18 entry does not say limiter may appear on a set that did not fail: $entry",
-        )
-        assertTrue(
-            "#191" in entry,
-            "the fifth 1.18 entry does not name the issue that widened the question: $entry",
+            "the 1.19 entry for #191 does not say limiter may appear on a set that did not fail: $entry",
         )
     }
 

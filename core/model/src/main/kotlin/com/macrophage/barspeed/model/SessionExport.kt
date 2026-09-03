@@ -730,8 +730,8 @@ data class SessionExport(
          * document carrying the ninth. It does NOT apply retroactively and
          * nothing backfills it: the answer is the lifter's own, given at the
          * set or not at all. Storage does not move -- the column is TEXT
-         * holding the answer's own name, so `DATABASE_VERSION` stays at 15
-         * and no migration is owed.
+         * holding the answer's own name, so no migration is owed and this
+         * change does not move `DATABASE_VERSION`.
          *
          * 1.19 carries a SIXTH change, under the same number and for the
          * reason the entries above state -- 1.19 is unreleased, and a number
@@ -747,8 +747,9 @@ data class SessionExport(
          * the same question the failed set has been asked since #189, and
          * stores the same answer in the same key. Additive to a validator --
          * no key changes type, no key stops being written, the closed
-         * vocabulary does not move, and `DATABASE_VERSION` stays at 15
-         * because the column has always been on every set row. NOT nothing to
+         * vocabulary does not move, and this change does not move
+         * `DATABASE_VERSION` because the column has always been on every set
+         * row. NOT nothing to
          * a READER: a consumer that inferred `failed` from the presence of
          * `limiter`, which nothing in this repository does but which the
          * published description previously invited by saying only failed sets
