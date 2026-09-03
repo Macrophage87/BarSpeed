@@ -115,13 +115,15 @@ object PlanValueCaption {
         bodyweight: Boolean,
         unit: WeightUnit,
         plannedAddedKg: Double?,
+        nextDeclaredAddedKg: Double?,
         shownAddedKg: Double?,
         standsForLaterSets: Boolean,
     ): String? {
         if (adHoc || added || shownAddedKg == null) return null
         val planned = plannedLoadText(bodyweight, unit, plannedAddedKg) ?: return null
         val shown = plannedLoadText(bodyweight, unit, shownAddedKg) ?: return null
-        return caption(planned, shown, standsForLaterSets)
+        val next = plannedLoadText(bodyweight, unit, nextDeclaredAddedKg)
+        return caption(planned, shown, standsForLaterSets, stepsAfterThis = next != null && next != planned)
     }
 
     /**
@@ -132,12 +134,14 @@ object PlanValueCaption {
         adHoc: Boolean,
         added: Boolean,
         plannedReps: Int?,
+        nextDeclaredReps: Int?,
         shownReps: Int?,
         standsForLaterSets: Boolean,
     ): String? {
         if (adHoc || added) return null
         if (plannedReps == null || shownReps == null) return null
-        return caption("$plannedReps", "$shownReps", standsForLaterSets)
+        val stepsAfterThis = nextDeclaredReps != null && nextDeclaredReps != plannedReps
+        return caption("$plannedReps", "$shownReps", standsForLaterSets, stepsAfterThis)
     }
 
     /** The caption under the hold box, in seconds, as its label is. */
@@ -145,12 +149,14 @@ object PlanValueCaption {
         adHoc: Boolean,
         added: Boolean,
         plannedDurationS: Int?,
+        nextDeclaredDurationS: Int?,
         shownDurationS: Int?,
         standsForLaterSets: Boolean,
     ): String? {
         if (adHoc || added) return null
         if (plannedDurationS == null || shownDurationS == null) return null
-        return caption("${plannedDurationS}s", "${shownDurationS}s", standsForLaterSets)
+        val stepsAfterThis = nextDeclaredDurationS != null && nextDeclaredDurationS != plannedDurationS
+        return caption("${plannedDurationS}s", "${shownDurationS}s", standsForLaterSets, stepsAfterThis)
     }
 
     /**
@@ -160,8 +166,27 @@ object PlanValueCaption {
      * The equality test is on the rendered strings for the reason [load]
      * gives, and it is written once here so that the load, the reps and the
      * hold cannot answer "has this changed" three different ways.
+     *
+     * [stepsAfterThis] IS NOT READ ON THIS COMMIT. It is whether the plan
+     * declares a different number for the set after this one, taken here
+     * ahead of the fix that will read it: the reach sentence below names a
+     * SPECIFIC number, and on a stepping block that number is only true of
+     * the very next set, not of "the rest of this exercise" the sentence
+     * claims. Every caller already passes its real value; the `when` below
+     * still answers exactly as it did before this parameter existed. #143
+     * round 2.
      */
-    private fun caption(planned: String, shown: String, standsForLaterSets: Boolean): String? = when {
+    // Suppressed for exactly one commit: [stepsAfterThis] is taken here and
+    // read by the commit that follows. The suppression goes with the `when`,
+    // so a parameter left permanently unread would fail detekt the moment the
+    // fix stopped needing it.
+    @Suppress("UnusedParameter")
+    private fun caption(
+        planned: String,
+        shown: String,
+        standsForLaterSets: Boolean,
+        stepsAfterThis: Boolean,
+    ): String? = when {
         planned == shown -> null
         standsForLaterSets -> "Plan says $planned - the rest of this exercise runs $shown unless the plan changes it"
         else -> "Plan says $planned - your change is recorded in the export"

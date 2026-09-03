@@ -1822,6 +1822,12 @@ private fun restingState(
             // differs from the finished set's only where the answer is null
             // anyway.
             bodyweight = nextSlot?.exercise?.bodyweight ?: false,
+            // The plan's own warmup declaration on each side of the pair --
+            // never lastSetWarmup or a live mark, both of which answer a
+            // question about the set that finished rather than about what the
+            // plan wrote for it.
+            finishedWarmup = p.slot?.warmup == true,
+            nextWarmup = nextSlot?.warmup == true,
         )
     // The same question about the tempo, decided by the same four boundaries.
     // plannedTempo on both sides, never tempo: the bake has already written the

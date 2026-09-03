@@ -1675,6 +1675,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
                 bodyweight = slot.exercise.bodyweight,
                 unit = state.weightUnit,
                 plannedAddedKg = slot.plannedLoadKg,
+                nextDeclaredAddedKg = after?.plannedLoadKg,
                 shownAddedKg = shownAddedKg,
                 standsForLaterSets =
                 SetLoadPolicy.standingStatedAddedKg(
@@ -1683,6 +1684,8 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
                     lastDeclaredAddedKg = slot.plannedLoadKg,
                     nextDeclaredAddedKg = after?.plannedLoadKg,
                     bodyweight = after?.exercise?.bodyweight ?: false,
+                    finishedWarmup = slot.warmup,
+                    nextWarmup = after?.warmup == true,
                 ) != null,
             ),
             if (slot.isTimed) {
@@ -1690,6 +1693,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
                     adHoc = state.adHoc,
                     added = slot.isAddedSet,
                     plannedDurationS = slot.plannedDurationS,
+                    nextDeclaredDurationS = after?.plannedDurationS,
                     shownDurationS = state.durationInput.trim().toIntOrNull(),
                     standsForLaterSets =
                     SetRepsPolicy.standingStatedDurationS(
@@ -1704,6 +1708,7 @@ private fun PlanValueCaptions(state: RecordState, slot: PlannedSlot) {
                     adHoc = state.adHoc,
                     added = slot.isAddedSet,
                     plannedReps = slot.plannedReps,
+                    nextDeclaredReps = after?.plannedReps,
                     shownReps = state.repsInput.trim().toIntOrNull(),
                     standsForLaterSets =
                     SetRepsPolicy.standingStatedReps(

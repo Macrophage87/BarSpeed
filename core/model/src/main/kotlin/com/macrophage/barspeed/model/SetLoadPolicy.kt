@@ -237,13 +237,28 @@ object SetLoadPolicy {
      * visible afterwards as a deviation on each set it reached -- which is
      * also why no export key was added for the offset: nothing is stored but
      * the load offered, and the plan's own figure is already frozen beside it.
+     *
+     * [finishedWarmup] and [nextWarmup] ARE NOT READ ON THIS COMMIT. They are
+     * whether the set just finished, and the one coming up, are the plan's own
+     * `warmup` declaration -- taken here ahead of the third direction the fix
+     * that follows names: a warm-up opener declares a load DIFFERENT from its
+     * working sets by design, not as a step in a progression, so a correction
+     * stated on it (rounding to the plates the rack has) is not a distance the
+     * working sets should be shifted by. #143 round 2.
      */
+    // Suppressed for exactly one commit: [finishedWarmup] and [nextWarmup] are
+    // taken here and read by the commit that follows. The suppression goes
+    // with the guard it stages, so a parameter left permanently unread would
+    // fail detekt the moment the fix stopped needing it.
+    @Suppress("UnusedParameter")
     fun standingStatedAddedKg(
         statedAddedKg: Double?,
         sameExerciseBlock: Boolean,
         lastDeclaredAddedKg: Double?,
         nextDeclaredAddedKg: Double?,
         bodyweight: Boolean,
+        finishedWarmup: Boolean,
+        nextWarmup: Boolean,
     ): Double? {
         if (statedAddedKg == null || !sameExerciseBlock) return null
         // Equal declarations, including both absent: the statement itself,

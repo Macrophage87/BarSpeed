@@ -534,6 +534,8 @@ class SetLoadPolicyTest {
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
                 bodyweight = false,
+                finishedWarmup = false,
+                nextWarmup = false,
             ),
         )
         // The lifter types 105 during that rest; tapping through bakes it into
@@ -561,6 +563,8 @@ class SetLoadPolicyTest {
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
                 bodyweight = false,
+                finishedWarmup = false,
+                nextWarmup = false,
             )
         assertEquals(stated, standing, "the statement still stands for set 13")
 
@@ -598,6 +602,8 @@ class SetLoadPolicyTest {
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = 0.0,
                 bodyweight = false,
+                finishedWarmup = false,
+                nextWarmup = false,
             ),
         )
     }
@@ -724,6 +730,8 @@ class SetLoadPolicyTest {
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
                 bodyweight = false,
+                finishedWarmup = false,
+                nextWarmup = false,
             ),
         )
     }
@@ -746,6 +754,8 @@ class SetLoadPolicyTest {
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
                 bodyweight = false,
+                finishedWarmup = false,
+                nextWarmup = false,
             ),
         )
     }
@@ -766,6 +776,8 @@ class SetLoadPolicyTest {
                 lastDeclaredAddedKg = 100.0,
                 nextDeclaredAddedKg = 100.0,
                 bodyweight = false,
+                finishedWarmup = false,
+                nextWarmup = false,
             ),
         )
     }
@@ -789,6 +801,8 @@ class SetLoadPolicyTest {
                 // in the file where the flag is not a formality: it is what
                 // says the negative is a band rather than a number to floor.
                 bodyweight = true,
+                finishedWarmup = false,
+                nextWarmup = false,
             ),
         )
     }
@@ -807,6 +821,8 @@ class SetLoadPolicyTest {
                 lastDeclaredAddedKg = 90 / WeightUnit.LB_PER_KG,
                 nextDeclaredAddedKg = 90 / WeightUnit.LB_PER_KG,
                 bodyweight = false,
+                finishedWarmup = false,
+                nextWarmup = false,
             ),
         )
     }
@@ -825,6 +841,8 @@ class SetLoadPolicyTest {
                 lastDeclaredAddedKg = declared,
                 nextDeclaredAddedKg = declared,
                 bodyweight = false,
+                finishedWarmup = false,
+                nextWarmup = false,
             ),
         )
     }
@@ -851,6 +869,8 @@ class SetLoadPolicyTest {
                 lastDeclaredAddedKg = null,
                 nextDeclaredAddedKg = 60.0,
                 bodyweight = false,
+                finishedWarmup = false,
+                nextWarmup = false,
             ),
         )
     }
@@ -872,6 +892,8 @@ class SetLoadPolicyTest {
                 lastDeclaredAddedKg = null,
                 nextDeclaredAddedKg = null,
                 bodyweight = false,
+                finishedWarmup = false,
+                nextWarmup = false,
             ),
         )
     }
