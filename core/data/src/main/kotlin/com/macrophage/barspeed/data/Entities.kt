@@ -251,12 +251,13 @@ data class SetRecordEntity(
      * [com.macrophage.barspeed.model.VoidSetPolicy] is where that list is
      * stated once so no reader has to remember it.
      *
-     * WHY NOT DELETE THE ROW. The only delete this app has ever had is
-     * `DELETE FROM sessions`, which takes the session and every stream in it.
-     * A per-row delete would take the only copy of what the sensors saw and
-     * would leave the sets after it sitting at indices the plan no longer
-     * matches. A voided set's samples are also the evidence for why it was
-     * voided.
+     * WHY NOT DELETE THE ROW. The only delete this app has of recorded
+     * training data is `DELETE FROM sessions` (`Daos.kt`), which takes the
+     * session and every stream in it; the one other delete, `DELETE FROM
+     * plans`, touches no recorded set. A per-row delete of a set would take
+     * the only copy of what the sensors saw and would leave the sets after
+     * it sitting at indices the plan no longer matches. A voided set's
+     * samples are also the evidence for why it was voided.
      *
      * IT IS THE LIFTER'S STATEMENT AND NOTHING DERIVES IT. The app cannot tell
      * a set that did not happen from one that failed instantly: field-37 set

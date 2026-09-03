@@ -161,7 +161,8 @@ class SchemaVoidedSetContractTest {
             "the version log does not say a void leaves the session heart rate alone: $description",
         )
         assertTrue(
-            "recomputing them from the published sets will not reproduce them" in description,
+            "recomputing them over the sets this mark tells a reader to count -- " +
+                "that is, with the voided ones dropped -- will not reproduce them" in description,
             "the version log does not warn that the published heart rate cannot be rebuilt from the sets",
         )
     }
