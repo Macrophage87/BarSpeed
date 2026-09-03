@@ -66,7 +66,12 @@ class SetLoadUnitToggleTest {
         while (kg <= 400.0) {
             for (from in WeightUnit.entries) {
                 val to = from.other()
-                val settled = SetLoadPolicy.convertedLoad("$kg", WeightUnit.KG, from).text
+                // Seeded THROUGH the renderer, both hops, so the starting
+                // text is one this function could itself have produced. A raw
+                // "$kg" is not: Kotlin writes 0.0 as `0.0` and no conversion
+                // ever emits a trailing `.0`.
+                val viaOther = SetLoadPolicy.convertedLoad("$kg", WeightUnit.KG, from.other()).text
+                val settled = SetLoadPolicy.convertedLoad(viaOther, from.other(), from).text
                 val out = SetLoadPolicy.convertedLoad(settled, from, to).text
                 val back = SetLoadPolicy.convertedLoad(out, to, from).text
                 assertEquals(settled, back, "$settled ${from.suffix} -> $out ${to.suffix} -> $back")

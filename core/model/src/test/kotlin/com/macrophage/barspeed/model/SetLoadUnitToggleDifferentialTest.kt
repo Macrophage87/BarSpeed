@@ -75,14 +75,16 @@ class SetLoadUnitToggleDifferentialTest {
 
     /**
      * NOT `WeightUnit.inputValue`, which quantises to 0.1 of the display unit
-     * and would render this 3.75 kg as `3.8`. A quarter-kilo grid needs two
-     * decimal places to survive being written down, and `inputValue` is the
-     * wrong renderer for it (#45).
+     * and cannot write a quarter at all: fed the exact conversion of 8 lb it
+     * gives `3.6`, and fed the quarter-kilo answer it gives `3.8`. Neither is
+     * 3.75. A quarter-kilo grid needs two decimal places to survive being
+     * written down, and `inputValue` is the wrong renderer for it (#45).
      */
     @Test
     fun `a quarter-kilo result is not flattened to a tenth`() {
         assertEquals("3.75", SetLoadPolicy.convertedLoad("8", WeightUnit.LB, WeightUnit.KG).text)
-        assertEquals("3.8", WeightUnit.KG.inputValue(8 / WeightUnit.LB_PER_KG))
+        assertEquals("3.6", WeightUnit.KG.inputValue(8 / WeightUnit.LB_PER_KG))
+        assertEquals("3.8", WeightUnit.KG.inputValue(3.75))
     }
 
     @Test
