@@ -36,6 +36,16 @@ package com.macrophage.barspeed.model
  * decides. A caption whose reach claim came from a second reading of the carry
  * rule could disagree with the carry.
  *
+ * REACH NAMES A NUMBER, SO IT ALSO NEEDS THE PLAN TO HOLD THAT NUMBER STEADY.
+ * A statement can outlive this set while the FIGURE the box will show does
+ * not: on a stepping block (45 / 55 / 65) a correction carries as a distance
+ * (#143), so the box after next reads a different number from the box right
+ * after this one even though both are "the statement, still standing". The
+ * reach sentence would be naming a number that goes stale the moment the next
+ * rest transition runs it, so each caller's own next-declared figure is what
+ * withholds it there in favour of the export sentence -- true regardless of
+ * how far the correction reaches. #143 round 2.
+ *
  * The export claim is not repeated in the reach sentence, and that is a
  * decision about space rather than about truth: the dialog's own subtitle
  * already says "deviations are recorded" over all of these controls, the reach
@@ -167,20 +177,17 @@ object PlanValueCaption {
      * gives, and it is written once here so that the load, the reps and the
      * hold cannot answer "has this changed" three different ways.
      *
-     * [stepsAfterThis] IS NOT READ ON THIS COMMIT. It is whether the plan
-     * declares a different number for the set after this one, taken here
-     * ahead of the fix that will read it: the reach sentence below names a
-     * SPECIFIC number, and on a stepping block that number is only true of
-     * the very next set, not of "the rest of this exercise" the sentence
-     * claims. Every caller already passes its real value; the `when` below
-     * still answers exactly as it did before this parameter existed. #143
-     * round 2.
+     * [stepsAfterThis] is whether the plan declares a different number for
+     * the set after this one. The reach sentence names a SPECIFIC number --
+     * "the rest of this exercise runs $shown" -- and that claim is only true
+     * while the plan itself holds the number steady: on a stepping block,
+     * 45 / 55 / 65 opened at 50, the sentence would read "runs 60 kg" while
+     * the set after that is actually offered 70. Rather than name a number
+     * that will not hold, [stepsAfterThis] routes to the export sentence
+     * instead -- true regardless of how far the correction reaches, because
+     * `load_kg`/`reps`/`actualDuration_s` are published beside their planned
+     * figures on every set the carry touches. #143 round 2.
      */
-    // Suppressed for exactly one commit: [stepsAfterThis] is taken here and
-    // read by the commit that follows. The suppression goes with the `when`,
-    // so a parameter left permanently unread would fail detekt the moment the
-    // fix stopped needing it.
-    @Suppress("UnusedParameter")
     private fun caption(
         planned: String,
         shown: String,
@@ -188,7 +195,8 @@ object PlanValueCaption {
         stepsAfterThis: Boolean,
     ): String? = when {
         planned == shown -> null
-        standsForLaterSets -> "Plan says $planned - the rest of this exercise runs $shown unless the plan changes it"
+        standsForLaterSets && !stepsAfterThis ->
+            "Plan says $planned - the rest of this exercise runs $shown unless the plan changes it"
         else -> "Plan says $planned - your change is recorded in the export"
     }
 }

@@ -163,14 +163,24 @@ object SetLoadPolicy {
      * plan's own differences, and the five kilos the lifter added are still
      * there. #143.
      *
-     * The two alternatives are each wrong in one direction and this is the
-     * only reading that is wrong in neither. Carrying the ABSOLUTE flattens
-     * 55 and 65 to 50, substituting numbers the lifter never asked for, which
-     * is the defect #124's boundary was drawn against. DROPPING it -- what
-     * that boundary did until now -- re-seeds the box from the plan and
-     * records the plan's number against reps done at the lifter's, with
-     * nothing on screen marking the change, which is the defect #143 was
-     * opened for.
+     * THE SENTENCE THAT STOOD HERE CLAIMED THIS WAS "THE ONLY READING THAT IS
+     * WRONG IN NEITHER" DIRECTION AND IS DELETED RATHER THAN REWORDED, #143
+     * round 2. There is a third direction: a warm-up opener declares a load
+     * DIFFERENT from its working sets BY DESIGN -- lighter, not a step in a
+     * progression -- so a correction stated on it, rounding it to the plates
+     * the rack has, is not a distance the working sets should be shifted by.
+     * [finishedWarmup] and [nextWarmup] are the guard: where the set just
+     * finished was a warm-up and the one coming up is not, this function
+     * returns null on a differing pair of declarations rather than computing
+     * a shift, so the coming set is offered its own declaration untouched
+     * ([seedAddedKg]'s answer, not this function's).
+     *
+     * Carrying the ABSOLUTE flattens 55 and 65 to 50, substituting numbers
+     * the lifter never asked for, which is the defect #124's boundary was
+     * drawn against. DROPPING it -- what that boundary did until now --
+     * re-seeds the box from the plan and records the plan's number against
+     * reps done at the lifter's, with nothing on screen marking the change,
+     * which is the defect #143 was opened for.
      *
      * IT IS ALSO THE ONLY READING CONSISTENT WITH #214'S GRID, whose tiles are
      * increments: `NextSetNudgePolicy.bumpedLoadKg` is `current +
@@ -238,19 +248,18 @@ object SetLoadPolicy {
      * also why no export key was added for the offset: nothing is stored but
      * the load offered, and the plan's own figure is already frozen beside it.
      *
-     * [finishedWarmup] and [nextWarmup] ARE NOT READ ON THIS COMMIT. They are
-     * whether the set just finished, and the one coming up, are the plan's own
-     * `warmup` declaration -- taken here ahead of the third direction the fix
-     * that follows names: a warm-up opener declares a load DIFFERENT from its
-     * working sets by design, not as a step in a progression, so a correction
-     * stated on it (rounding to the plates the rack has) is not a distance the
-     * working sets should be shifted by. #143 round 2.
+     * [finishedWarmup] and [nextWarmup] are the plan's own `warmup`
+     * declaration for the set just finished and the one coming up. They are
+     * consulted only on the branch that COMPUTES a shift: the equal-
+     * declaration and no-next-declaration branches above already carry the
+     * statement through unchanged, and a warm-up that declared the same load
+     * as the working set following it has corrected nothing to exclude. Where
+     * the finished set was a warm-up and the coming one is not, and the two
+     * declarations differ, the correction is dropped rather than shifted onto
+     * the working set -- see the paragraph above for why. A ramp of two
+     * warm-ups still steps: [nextWarmup] true is the same progression
+     * 45 / 55 / 65 is, just at lighter numbers.
      */
-    // Suppressed for exactly one commit: [finishedWarmup] and [nextWarmup] are
-    // taken here and read by the commit that follows. The suppression goes
-    // with the guard it stages, so a parameter left permanently unread would
-    // fail detekt the moment the fix stopped needing it.
-    @Suppress("UnusedParameter")
     fun standingStatedAddedKg(
         statedAddedKg: Double?,
         sameExerciseBlock: Boolean,
@@ -269,6 +278,9 @@ object SetLoadPolicy {
         if (nextDeclaredAddedKg == null) return statedAddedKg
         // Nothing for the statement to have been a correction to.
         if (lastDeclaredAddedKg == null) return null
+        // A warm-up's own correction is not a step in the plan's progression;
+        // see the KDoc's third direction above.
+        if (finishedWarmup && !nextWarmup) return null
         return correctedAddedKg(
             recordedAddedKg = nextDeclaredAddedKg,
             deltaKg = statedAddedKg - lastDeclaredAddedKg,
