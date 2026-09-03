@@ -51,8 +51,9 @@ enum class SetVoiceGuide {
  * 0.1.48. `manualSet` is false on a hold, so the sensor counter ran beside the
  * hold clock and both spoke: field-37's sets 11 and 12 carry the hold cadence
  * on the work-start grid and a stray bare-digit stream 0.774-0.836 s off it,
- * the first digit 0.186 s before `Hold`. That is issue #217;
- * `TimedHoldCueTrackTest` in `:core:dsp` measures it and this file fixes it.
+ * the first digit 0.186 s before `workStartedAt_ms` (0.184 s before the
+ * `Hold` row). That is issue #217; `TimedHoldCueTrackTest` in `:core:dsp`
+ * measures it and this file fixes it.
  *
  * ## The contract
  *

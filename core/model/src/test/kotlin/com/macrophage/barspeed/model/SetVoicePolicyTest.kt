@@ -99,8 +99,9 @@ class SetVoicePolicyTest {
      * The whole contract, over every shape: kind against tempo, timed, demo
      * and sensor. Two voices counting different quantities in overlapping
      * vocabularies is what a lifter cannot resolve -- on field-37's set 11 the
-     * bare `1` the sensor counter spoke landed 0.186 s before the `Hold` that
-     * meant the clock had started.
+     * bare `1` the sensor counter spoke landed 0.186 s before
+     * `workStartedAt_ms`, 0.184 s before the `Hold` row that meant the clock
+     * had started.
      */
     @Test
     fun `no set is guided by two voices at once`() {

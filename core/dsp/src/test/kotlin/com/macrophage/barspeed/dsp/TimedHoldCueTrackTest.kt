@@ -109,7 +109,8 @@ class TimedHoldCueTrackTest {
     }
 
     /**
-     * A bare digit is spoken 0.186 s BEFORE the word that starts the clock.
+     * A bare digit is spoken 0.186 s before `workStartedAt_ms`, and so
+     * 0.184 s before the `Hold` row that announces it.
      *
      * The defect, stated as the archive shows it: on set 11 the first thing
      * the lifter hears after `Brace` is `1`, and it arrives before `Hold`.
@@ -131,9 +132,9 @@ class TimedHoldCueTrackTest {
      * early.
      *
      * #217's body gives that offset as 0.79-0.84 s. Re-measured here against
-     * `workStartedAt_ms` the low end is 0.774 s, on set 12's second call; the
-     * issue measured against the `Hold` ROW, which sits 2 ms earlier. The
-     * figures below are the ones this test asserts.
+     * `workStartedAt_ms` the low end is 0.774 s, on set 12's second call. The
+     * issue's figure does not reproduce against either reference and is not
+     * accounted for here. The figures below are the ones this test asserts.
      */
     @Test
     fun `the stray digits run on a grid of their own and stop early`() {
