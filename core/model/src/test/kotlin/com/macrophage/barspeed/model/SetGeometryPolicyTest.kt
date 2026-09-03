@@ -373,6 +373,29 @@ class SetGeometryPolicyTest {
     }
 
     /**
+     * No exercise the app ships is inverted by construction, so there is no id
+     * table for `sensorInverted` and no inference for the import gate to name.
+     *
+     * This is the premise the `sensorInverted` third of #64 rests on, and it is
+     * pinned rather than asserted in prose because it is the thing that would
+     * go false silently. `sensorOnStack` has [ExerciseDef.STACK_MOUNTED_IDS]
+     * and `bodyweight` has [ExerciseDef.BODYWEIGHT_IDS], each with its own line
+     * at the import gate saying which way an omitted key resolved. The third
+     * flag has neither, because nothing the app defines is wired backwards --
+     * inversion is a property of how a cable machine is ROUTED, which only
+     * whoever clipped the sensor on can know.
+     *
+     * The day a seed entry does set it, this reds, and what it is asking for is
+     * a gate line beside `stackSeeded` and `bodyweightSeeded` naming that
+     * inference too.
+     */
+    @Test
+    fun `no built-in definition is inverted by construction`() {
+        val inverted = ExerciseDef.SEED.filter { it.sensorInverted }.map { it.id }
+        assertEquals(emptyList(), inverted, "these seeds are inverted, so the import gate must name that default")
+    }
+
+    /**
      * The provenance object's published shape, key by key, so a key arriving or
      * leaving is a decision somebody has to make rather than a diff nobody
      * reads. `sensorOnStack` joined it in #223 and `bodyweight` under 1.19

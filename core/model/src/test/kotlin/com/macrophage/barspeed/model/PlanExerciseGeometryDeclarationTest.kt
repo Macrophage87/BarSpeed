@@ -178,9 +178,15 @@ class PlanExerciseGeometryDeclarationTest {
         assertEquals(true, exercise("pull_up", ""","bodyweight":true""").bodyweight)
     }
 
-    /** A declared true is readable; only the false/omitted pair collapses. */
+    /**
+     * A declared true is readable.
+     *
+     * Written as an equality against `true` rather than as a truth assertion on
+     * the property itself, so that it reads the same before and after the
+     * declaration becomes nullable and cannot be satisfied by a change of type.
+     */
     @Test
     fun `a declared true on sensorInverted is readable`() {
-        assertTrue(exercise("seated_row", ""","sensorInverted":true""").sensorInverted)
+        assertEquals(true, exercise("seated_row", ""","sensorInverted":true""").sensorInverted)
     }
 }
