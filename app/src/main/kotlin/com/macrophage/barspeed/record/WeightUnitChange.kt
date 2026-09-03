@@ -21,6 +21,17 @@ import com.macrophage.barspeed.model.WeightUnit
  * can be reached by a test. This function is a plain function over
  * [RecordState] in the same arrangement `appendedState` uses, so `:app`'s test
  * source set can name it.
+ *
+ * WHAT NO TEST HERE COVERS, and what was checked on a device instead: that the
+ * Compose load field redraws from this state rather than from its own
+ * remembered text. Checked on the headless `barspeed-api35` emulator against
+ * the debug APK of `043e63d030facf7298af2b379a5097d7a7e21c0b`: typed 100 with
+ * the kg chip on the ad-hoc form, tapped the chip, and the field re-rendered
+ * as `Load (lb)` 220.5. The set recorded 100.017117587213 in `set_records`
+ * .loadKg -- read with sqlite3 on the device -- against 45.36 before the fix,
+ * and the rest screen showed it back as "Load recorded 100 kg". Tapping the
+ * chip a second time returned the field to `Load (kg)` 100. That is bench
+ * evidence at one SHA, not a gate: nothing re-runs it.
  */
 internal fun unitChangedState(s: RecordState, unit: WeightUnit): RecordState {
     val converted = SetLoadPolicy.convertedLoad(s.loadInput, s.weightUnit, unit)
