@@ -85,19 +85,36 @@ class BodyweightProvenanceTest {
     }
 
     /**
-     * GREEN at the introducing commit, and marked as such. A loaded set has
-     * nothing observable behind its false, whether a plan wrote the key or
-     * not, and DEFAULT is what that state is called.
+     * GREEN at the introducing commit, and marked as such. A loaded set with
+     * NO plan declaration has nothing observable behind its false, and
+     * DEFAULT is what that state is called.
      */
     @Test
-    fun `a loaded set publishes a default source, plan or no plan`() {
+    fun `a loaded set with no declaration publishes a default source`() {
         assertEquals(
             GeometrySource.DEFAULT,
             SetGeometryPolicy.bodyweightSource(used = false, declared = null),
         )
+    }
+
+    /**
+     * RED as of the round-1 fix for issue #178's review. `PlanExerciseDef.bodyweight`
+     * became `Boolean?` on `origin/main` (#227, "Make bodyweight nullable so an
+     * omitted key is not a silent false") after this file was first written, the
+     * same change #223 made for `sensorOnStack` earlier. [SetGeometryPolicy.stackSource]
+     * already reads a non-null [declared] as DECLARED whatever its value; this
+     * pin asks [SetGeometryPolicy.bodyweightSource] for the same rule. Before the
+     * fix, a declared `false` and an omitted key were bucketed together as
+     * DEFAULT even though the type no longer forces that -- a plan that wrote
+     * `"bodyweight": false` published a provenance word indistinguishable from
+     * one that said nothing.
+     */
+    @Test
+    fun `a declared false is DECLARED, not DEFAULT, now the plan key is nullable`() {
+        val plan = exercise("assisted_pull_up", ""","bodyweight":false""")
         assertEquals(
-            GeometrySource.DEFAULT,
-            SetGeometryPolicy.bodyweightSource(used = false, declared = exercise("back_squat").bodyweight),
+            GeometrySource.DECLARED,
+            SetGeometryPolicy.bodyweightSource(used = false, declared = plan.bodyweight),
         )
     }
 
