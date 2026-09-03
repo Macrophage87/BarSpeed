@@ -44,10 +44,10 @@ data class ArmedCapture(
  * The move changed no behaviour: the same decisions in the same order over the
  * same inputs.
  *
- * A free function rather than a member of [SensorCapturePolicy], for the
- * reason it was a free function in `:app`: it holds BUFFERS, and every rule in
- * that object answers from counts and roles alone. Keeping it outside is what
- * stops a later reader assuming the object can reach a sample.
+ * A free function rather than a member of [SensorCapturePolicy]: it holds
+ * BUFFERS, and every rule in that object answers from counts and roles alone.
+ * Keeping it outside is what stops a later reader assuming the object can
+ * reach a sample.
  *
  * The DECISION is [SensorCapturePolicy.analysedStream]'s. What is left here is
  * a lookup: the roles are keys and the buffers are values, so nothing on this
