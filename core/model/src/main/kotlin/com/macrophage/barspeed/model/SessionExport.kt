@@ -1525,7 +1525,9 @@ data class SetSensorsExport(
     val silent: Map<String, String> = emptyMap(),
     /**
      * What the app could see of the ONE armed link on a set whose stream
-     * carries no role, or absent when that link delivered (#224).
+     * carries no role, or absent when that link delivered too few frames to
+     * analyse (1.17, #224; widened from "delivered nothing" to "delivered
+     * enough to analyse" by #209).
      *
      * [silent]'s answer for the set that has no key to hang it off. A role
      * exists only where two paired units carry two different labels, so on the
@@ -1554,13 +1556,15 @@ data class SetSensorsExport(
      * carries no [shortfall] at all -- the roster is not what is wrong, the
      * preference is.
      *
-     * ABSENT MEANS THE SET CAPTURED SAMPLES from that one link -- or, on a set
-     * shorter than [ArmedSilencePolicy.SILENT_AFTER_MS], that its last frame
-     * arrived during the preceding rest and read as delivering -- or that the
-     * document was written by a build that could not observe an unroled link
-     * at all. A link that fed part of a set and then went silent publishes
-     * nothing here either: the word is refused wherever the set's buffer is
-     * not empty. Absent rather than empty on the ordinary set,
+     * ABSENT MEANS THE SET CAPTURED A STREAM THE ANALYSIS COULD RUN ON from
+     * that one link -- at least [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] of
+     * it, since #209 -- or, on a set shorter than
+     * [ArmedSilencePolicy.SILENT_AFTER_MS], that its last frame arrived during
+     * the preceding rest and read as delivering -- or that the document was
+     * written by a build that could not observe an unroled link at all. A
+     * link that fed part of a set and then went silent publishes nothing here
+     * either: the word is refused wherever the set's buffer holds a capture
+     * the analysis could run on. Absent rather than empty on the ordinary set,
      * [analysedFellBack]'s rule.
      */
     val soleSilent: String? = null,
