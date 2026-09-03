@@ -22,23 +22,23 @@ import java.io.File
  * rescued-database card -- three tiers, their titles, the discard dialog and
  * the share path -- had never been reachable outside a test. Ten was the first
  * value that could make that card appear; every value above it, this build's
- * sixteen included, is simply the next such value, and the first-time claim
+ * seventeen included, is simply the next such value, and the first-time claim
  * that used to stand here is history rather than something these bumps repeat.
  *
- * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 16 writes the
- * file, then any build carrying 15 or less opens it. A forward install runs
+ * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 17 writes the
+ * file, then any build carrying 16 or less opens it. A forward install runs
  * the migration chain and never enters the rescue at all, so an ordinary
  * upgrade sees none of it.
  *
- * The version has moved before -- thirteen times, shipped in v0.1.5, v0.1.10,
+ * The version has moved before -- thirteen SHIPPED times, in v0.1.5, v0.1.10,
  * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, once in v0.1.42,
  * twice in v0.1.44, once in v0.1.45 and once in v0.1.49 -- every one read off
  * `git show <tag>:core/data/.../AppDatabase.kt` rather than remembered. What
  * was new at 11 was that a committed baseline existed for the
  * version below it, so for the first time in this repository a migration had a
  * document to be read against; 12 was the second such bump, 13 the third,
- * 14 the fourth, 15 the fifth and 16 the sixth, with `15.json` as its
- * baseline.
+ * 14 the fourth, 15 the fifth, 16 the sixth and 17 the seventh, with
+ * `16.json` as its baseline.
  *
  * A CORRECTION TO WHAT STOOD HERE, named rather than reworded around. This
  * paragraph read "BOTH bumps of this cluster reach the emulator in the SAME
@@ -53,47 +53,32 @@ import java.io.File
  * not v0.1.43, which carries 10.
  *
  * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read rather than carried
- * forward: v0.1.49 is the newest tag and
+ * forward: v0.1.49 is still the newest tag and
  * `git show v0.1.49:core/data/.../AppDatabase.kt` reads
- * `DATABASE_VERSION = 14`, so 13 -> 14 has now shipped too and an install
- * upgrading to this build runs 14 -> 15 -> 16, neither of which has shipped
- * in any tag. A phone still on v0.1.44 runs 12 -> 13 -> 14 -> 15 -> 16 in one
- * open, which is why the emulator exercise
- * installs the older release first and upgrades over it rather than starting
+ * `DATABASE_VERSION = 14`, so 14 -> 15, 15 -> 16 and 16 -> 17 have all NOT
+ * SHIPPED. An install upgrading from v0.1.49 to this build runs
+ * 14 -> 15 -> 16 -> 17 in one open, and a phone still on v0.1.44 runs
+ * 12 -> 13 -> 14 -> 15 -> 16 -> 17, which is why the emulator exercise
+ * installs an older release first and upgrades over it rather than starting
  * empty. The sentence above about v0.1.48 carrying 13 was true when it was
  * written and is not now; it is replaced rather than kept beside this one.
  *
- * SIXTEEN IS NOT SETTLED UNTIL THIS LANDS, and the check belongs at the
- * landing rather than here. `origin/claude/v0150-export-truth-2`, read at
- * `0d07c2319d9f58e8b6e73e4648ecba40b9b552da` by
- * `git ls-remote --heads origin refs/heads/claude/v0150-export-truth-2` on
- * 2026-09-03, still declaring `DATABASE_VERSION = 16` at its line 66 and
- * still unlanded -- `git merge-base --is-ancestor 0d07c231 origin/main`
- * fails -- also declares its own hop. Two unlanded lanes
- * cannot both be 16, and whichever lands second is the one that must move: an
- * install that ran the other lane's 16 would find this schema under the same
- * number and Room would either skip the hop or fail its `TableInfo` check.
- *
- * SO, BEFORE LANDING: re-read `origin/main`'s `DATABASE_VERSION`. If it is
- * still 15, land as is. If it is 16, renumber this hop to `MIGRATION_16_17`
- * with `Migration(16, 17)` and this constant to 17, move the newest-hop
- * equality in `Migration15To16Test` with it, REGENERATE `17.json` by running
- * Room's schema export rather than renaming `16.json`, delete the `16.json`
- * this branch adds, and re-run the emulator upgrade exercise -- the hop being
- * verified would be a different hop.
- *
- * THAT PIN IS RE-READ EVERY ROUND AND NEVER CARRIED FORWARD, and every
- * value it has held so far has gone stale before the next round read it:
- * `80f813bd` in an earlier commit body, `2a954f11` in the round-3 verdict,
- * `bde6a114` in the sentence this one replaces, and `74819226` in the
- * round-4 verdict. `bde6a114` was rewritten off that branch rather than
- * landed -- it is an ancestor of neither the tip above nor `origin/main`.
- * `74819226` is a real ancestor of the tip above but is no longer the tip.
- * Every one of them was true when written. That is the point: this SHA is
- * re-read from the remote at the moment of use and never quoted from a
- * verdict, a commit body or this comment.
+ * SEVENTEEN IS WHAT #60 TOLD THIS LANE TO USE, and the collision it warned
+ * about happened. The paragraph that stood here said sixteen was not settled
+ * until #60 landed, named `claude/v0150-export-truth-2` as the other unlanded
+ * lane declaring its own sixteenth hop, and set the rule: whichever lands
+ * second moves. #60 landed first, at `e74d4e61` on `origin/main`, so THIS is
+ * the lane that moved. `MIGRATION_15_16` below is #60's `voided`/`voidReason`
+ * hop, untouched; this lane's body-weight hop is `MIGRATION_16_17`, `17.json`
+ * was REGENERATED by Room's schema export rather than renamed from the
+ * `16.json` this branch used to add, and the newest-hop equality moved out of
+ * `Migration15To16Test` into `Migration16To17Test` with it. Those instructions
+ * are discharged rather than repeated, and the branch-tip pin they carried is
+ * deleted rather than refreshed: it was a pin on a collision that no longer
+ * exists, and every value it ever held went stale before the next round read
+ * it.
  */
-const val DATABASE_VERSION = 16
+const val DATABASE_VERSION = 17
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -511,17 +496,35 @@ abstract class AppDatabase : RoomDatabase() {
          * `bodyWeightKg` on set_records: the body weight the load arithmetic
          * used for this set (#220).
          *
-         * EMPTY AND UNREGISTERED AT THIS COMMIT, and [DATABASE_VERSION] is
-         * still 16. It is declared so [Migration16To17Test]'s differentials
-         * compile and fail on the answer rather than on the build --
-         * [MIGRATION_15_16] was introduced the same way, one hop earlier.
+         * [MIGRATION_14_15]'s shape -- a nullable append with no default --
+         * and for a reason of its own. A REAL zero is a state the app reaches
+         * today: `SetLoadPolicy.totalKg` treats a null body weight as 0 kg
+         * (#61), so a body-weight set recorded before any weight was entered
+         * has a genuine 0 kg term. A defaulted 0 would make that
+         * indistinguishable from a row nobody captured, and would assert of
+         * the whole archive that the lifter had no mass.
+         *
+         * ONE COLUMN, and the added load is deliberately not a second: it is
+         * `loadKg - bodyWeightKg` wherever this is present, exactly, from the
+         * two figures the row already holds.
+         *
+         * NO BACKFILL. The settings store's body weight is today's figure with
+         * no history; copying it across the archive would state that every
+         * past body-weight set was recorded at the lifter's current mass --
+         * the false reading the missing key already invites, written into the
+         * database where it could no longer be doubted.
          *
          * This hop was written as 15 -> 16 and REBASED onto #60's landed
          * 15 -> 16, which took that number first; it is 16 -> 17 here.
+         *
+         * [Migration16To17Test] pins the statement, the baseline difference
+         * and the refusal.
          */
         internal val MIGRATION_16_17 =
             object : Migration(16, 17) {
-                override fun migrate(db: SupportSQLiteDatabase) = Unit
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN bodyWeightKg REAL")
+                }
             }
 
         /**
@@ -547,8 +550,8 @@ abstract class AppDatabase : RoomDatabase() {
          * was deleted there rather than reworded. A crash with the data
          * recoverable beats a clean start with it gone.
          *
-         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 16
-         * here, so a rollback from this build to any build carrying 15 or less
+         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 17
+         * here, so a rollback from this build to any build carrying 16 or less
          * enters the rescue; the first version at which that was true of a
          * stock install was 10, and what it exposes on screen is stated at the
          * constant, with issue #118. An ordinary forward install runs the
@@ -581,6 +584,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_13_14,
                     MIGRATION_14_15,
                     MIGRATION_15_16,
+                    MIGRATION_16_17,
                 )
                 .build()
         }

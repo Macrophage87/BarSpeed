@@ -95,6 +95,31 @@ data class SetRecordEntity(
     val exerciseName: String,
     val loadKg: Double,
     val plannedLoadKg: Double? = null,
+    /**
+     * The body weight the load arithmetic USED for this set, in kilograms
+     * (v17, #220).
+     *
+     * `SetLoadPolicy.totalKg` returns `bodyWeightKg + addedKg` on body-weight
+     * work, so on such a set this is the largest term in [loadKg] and the
+     * added or assisting load is `loadKg - bodyWeightKg`. Stored rather than
+     * looked up later because the app holds exactly one body weight and it
+     * moves: at export time the current figure would be attributed to a set
+     * recorded months ago.
+     *
+     * PER SET rather than per session, for the same reason -- the lifter can
+     * change the figure between two sets, and this is a fact about one set's
+     * arithmetic.
+     *
+     * NULL means no body-weight term went into [loadKg]. Three cases share
+     * that answer and the row cannot separate them: ordinary loaded work,
+     * which has no body in the load path; a body-weight set recorded before
+     * v17, which no build stored; and a body-weight set recorded while the app
+     * held no body weight at all, where `totalKg` used 0 kg (#61) and writing
+     * a 0 here would be indistinguishable from a lifter who weighs nothing.
+     * The first is readable from the geometry beside it; the other two are not
+     * separable and nothing here pretends otherwise.
+     */
+    val bodyWeightKg: Double? = null,
     val actualReps: Int,
     /** True when actualReps was entered or corrected by the lifter, not the sensor. */
     val repsManual: Boolean = false,

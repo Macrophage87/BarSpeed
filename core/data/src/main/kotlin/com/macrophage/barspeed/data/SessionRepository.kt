@@ -27,6 +27,12 @@ data class CompletedSet(
     val exerciseName: String,
     val loadKg: Double,
     val plannedLoadKg: Double?,
+    /**
+     * The body weight [loadKg] was computed with, or null where no body-weight
+     * term went into it (#220). [SetRecordEntity.bodyWeightKg] states the three
+     * cases null covers; this is the object that fills it.
+     */
+    val bodyWeightKg: Double? = null,
     val plannedReps: Int?,
     /** Lifter-counted reps for sensorless sets; overrides the analysis count. */
     val manualReps: Int? = null,
@@ -394,6 +400,11 @@ class SessionRepository(
                 exerciseName = set.exerciseName,
                 loadKg = set.loadKg,
                 plannedLoadKg = set.plannedLoadKg,
+                // What the caller says the load arithmetic used, never a
+                // lookup made here: the app holds one body weight and it
+                // moves, so a reading taken at write time would already be a
+                // different fact from the one totalKg added (#220).
+                bodyWeightKg = set.bodyWeightKg,
                 actualReps = set.manualReps ?: set.analysis.reps.size,
                 repsManual = set.manualReps != null,
                 plannedReps = set.plannedReps,

@@ -426,6 +426,16 @@ private data class PendingSetWrite(
     val plannedLoadKg: Double?,
     val addedKg: Double,
     /**
+     * The body weight [loadKg] was computed with, frozen at the moment the set
+     * ended, or null on a set with no body-weight term (#220).
+     *
+     * Frozen with everything else and never re-read: the app holds ONE body
+     * weight and the lifter can change it between sets, so a figure read at
+     * write time or at export time would be attributed to arithmetic it took
+     * no part in.
+     */
+    val bodyWeightKg: Double?,
+    /**
      * The rep count the PLAN prescribed, frozen from `PlannedSlot.plannedReps`
      * and never the lifter's edit. This is the figure the set is RECORDED
      * against and the one the export publishes as `plannedReps`; until #174 it
@@ -752,6 +762,7 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
         exerciseName = p.exercise.displayName,
         loadKg = p.loadKg,
         plannedLoadKg = p.plannedLoadKg,
+        bodyWeightKg = p.bodyWeightKg,
         plannedReps = p.plannedReps,
         manualReps = p.manualReps,
         actualDurationS = p.actualDurationS,
@@ -3705,6 +3716,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 loadKg = loadKg,
                 plannedLoadKg = plannedLoadKg,
                 addedKg = addedKg,
+                // The term totalKg above actually added, and null where it
+                // added none -- on loaded work there is no body in the load
+                // path, and on a body-weight set recorded before any body
+                // weight was entered totalKg used 0 kg (#61) with nothing
+                // observed to record. Absence rather than a 0, which would
+                // read as a lifter who weighs nothing.
+                bodyWeightKg = s.bodyWeightKg?.takeIf { exercise.bodyweight },
                 plannedReps = plannedReps,
                 targetReps = targetReps,
                 manualReps = manualReps,
