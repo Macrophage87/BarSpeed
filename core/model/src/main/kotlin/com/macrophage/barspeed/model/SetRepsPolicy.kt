@@ -56,9 +56,16 @@ object SetRepsPolicy {
      * drops a set from 8 to 6 because the bar was heavier than the plan thought
      * had to say so again on every remaining set. #174.
      *
-     * FOUR BOUNDARIES, INHERITED FROM [SetLoadPolicy.standingStatedAddedKg] AND
-     * NOT REDESIGNED. Read that function for the reasoning; what follows is
-     * what each one means for a count.
+     * FOUR BOUNDARIES, TAKEN FROM [SetLoadPolicy.standingStatedAddedKg] AS IT
+     * STOOD AT #174 AND NOT REDESIGNED. Read that function for the reasoning
+     * behind the first three; what follows is what each one means for a count.
+     * THE FOURTH HAS SINCE DIVERGED THERE AND NOT HERE: #143 made a load
+     * carry across a plan's step as a distance, and a count does not. A rep
+     * scheme is a prescription rather than a quantity on a bar, the numbers
+     * are small enough that a correction of -4 on 10 / 8 / 6 would ask for two
+     * reps and then none, and the descending scheme below is exactly what the
+     * yield protects. So a plan declaring a different count for the next set
+     * is still offered as written.
      *
      * [statedReps] is the statement as it stood when the set that just finished
      * was written: what the lifter typed for it, null when they typed nothing

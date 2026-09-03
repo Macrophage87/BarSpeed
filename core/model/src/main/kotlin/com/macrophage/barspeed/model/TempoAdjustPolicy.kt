@@ -273,9 +273,18 @@ object TempoAdjustPolicy {
      * The tempo the lifter ADJUSTED that still stands for the set coming up, or
      * null when that set is offered whatever its own slot declares.
      *
-     * The same expression as [SetLoadPolicy.standingStatedAddedKg], with the
-     * same four boundaries and for the same reasons; read that function for the
-     * long form. A lifter who slows the eccentric on set 1 of an exercise did
+     * The expression [SetLoadPolicy.standingStatedAddedKg] carried until #143,
+     * with the same four boundaries and for the same reasons; read that
+     * function for the long form of the first three. THE FOURTH NOW DIFFERS,
+     * deliberately: where the plan declares a different value for the set
+     * coming up, the load carries the lifter's correction as a distance onto
+     * the plan's own next number, and a tempo does not. A tempo is a
+     * prescription rather than a quantity on a bar -- there is no sense in
+     * which a plan stepping 3-0-1 to 4-0-1 is asking for "one more than
+     * whatever you did" -- so a plan that changes the tempo is offered as
+     * written, and the statement drops. Unchanged by #143 and stated here
+     * because the sentence that used to point at that function for all four
+     * boundaries is no longer true of the fourth. A lifter who slows the eccentric on set 1 of an exercise did
      * not mean it for set 1 alone, any more than one who moved up in weight
      * did, and the alternative re-offers the plan's tempo on every later set
      * and paces the lifter against it.

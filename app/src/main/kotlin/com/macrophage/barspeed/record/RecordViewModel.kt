@@ -1767,9 +1767,13 @@ private fun recordedTimedSeconds(
  * [RecordState.statedLoadKg] is re-decided rather than cleared. What the lifter
  * said about the load holds for the rest of the exercise block, and
  * [SetLoadPolicy.standingStatedAddedKg] is what says whether it still holds
- * here -- at the exercise boundary it does not, nor where the plan declares a
- * different load for the set coming up, and in both cases the field is
- * re-seeded from the plan exactly as it always was. #124.
+ * here. At the exercise boundary it does not, and the field is re-seeded from
+ * the plan exactly as it always was (#124). Where the plan declares a
+ * DIFFERENT load for the set coming up it now holds as a distance rather than
+ * as a number -- the coming set's own declaration shifted by the correction --
+ * so a progressive block keeps stepping and keeps the correction (#143). The
+ * sentence that stood here said the statement was dropped in that case; it was
+ * true when written and is deleted rather than reworded.
  *
  * [RecordState.statedTempo] is re-decided by the same rule on the same
  * boundaries, so a tempo the lifter set on the wheels holds for the rest of the

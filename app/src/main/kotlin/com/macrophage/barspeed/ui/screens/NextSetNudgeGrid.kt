@@ -51,16 +51,22 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  * two, which hold it for the rest of the exercise block and drop it at the
  * boundary.
  *
- * **THAT INHERITS #143 AND DOES NOT FIX IT.** On a plan declaring a DIFFERENT
- * load for each set of one exercise -- a progressive 60 / 80 / 100 block --
- * `standingStatedAddedKg` compares the two slots' frozen declarations, finds
- * them unequal, and drops the statement, so the set after next re-seeds to the
- * plan's own next number with nothing on screen marking that the addition went
- * away. The tile's effect on the immediately following set is unaffected;
- * what is lost is the carry past it. That is #143's open defect and it is left
- * alone deliberately here rather than fixed as a side effect of a grid change:
- * the carry rule is read by four other controls, and changing it under this
- * one would be a change to all of them.
+ * **THE PARAGRAPH THAT STOOD HERE SAID THE TILE'S ADDITION VANISHED AT THE
+ * NEXT STEP OF A PROGRESSIVE BLOCK, AND IT IS DELETED RATHER THAN REWORDED:
+ * #143 fixed the carry it described.** `standingStatedAddedKg` no longer
+ * requires the two slots' frozen declarations to be equal. Where they differ
+ * it carries the DISTANCE between the statement and the declaration it was
+ * made on, so on a 60 / 80 / 100 block a tile tapped for +10 reaches 90 and
+ * then 110: the block still steps by the plan's own differences and the ten
+ * pounds stay on. That is the reading this grid was always making -- its tiles
+ * are increments, and `NextSetNudgePolicy.bumpedLoadKg` is `current +
+ * nudge.amount` -- so the tile now means the same thing on a stepping block as
+ * on a flat one.
+ *
+ * The carry itself is still `SetLoadPolicy.standingStatedAddedKg`'s answer and
+ * not this file's, and the reps and hold tiles are unchanged: they go on
+ * yielding to a plan that declares a different count for the next set, which
+ * is what keeps a 10 / 8 / 6 scheme descending.
  *
  * ## Why a tap closes the grid
  *

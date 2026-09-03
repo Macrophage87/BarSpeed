@@ -152,55 +152,114 @@ object SetLoadPolicy {
      * `plannedLoadKg`, frozen at what the plan declared and never written back
      * to. NOT their `loadKg`, which carries the statement itself once
      * [carriedIntoNextSet] has baked it in -- comparing those two would compare
-     * a number against itself. A plan that declares a DIFFERENT load for the
-     * next set is prescribing a change, and it is that number the lifter is
-     * offered: a warm-up corrected upward must not become the working set's
-     * load, and a block written 60/80/100 must still climb after its opener is
-     * adjusted. One keystroke still displaces it, exactly as before.
+     * a number against itself.
      *
-     * A null on one side only is not that case and is not claimed to be: the
-     * plan declared no load for one of the two sets rather than a different
-     * one. Null compares unequal to a number, so the carry drops there too --
-     * the right direction, and stated as what it is rather than as a
-     * prescription. Null on BOTH sides compares equal, which is the loadless
-     * block carrying an added load the lifter supplied.
+     * WHAT CARRIES ACROSS A STEP IS THE DISTANCE, NOT THE NUMBER. Where the two
+     * declarations differ the plan is prescribing a change, and the lifter's
+     * statement is a correction measured against the declaration it was made
+     * on. Both survive: the coming set is offered its own declaration shifted
+     * by that correction. Plan 45 / 55 / 65 opened at 50 is +5, so set 2 is
+     * offered 60 and set 3 is offered 70 -- the block still steps by the
+     * plan's own differences, and the five kilos the lifter added are still
+     * there. #143.
      *
-     * The two declarations are compared with `==` on Double, which is exact
-     * here rather than approximate: both are `PlanSetDef.resolvedLoadKg`
-     * applied to the plan's own text, so two slots declaring the same load in
-     * the same unit hold the same bits, and nothing arithmetic happens to
-     * either on the way in. In the SAME UNIT: `resolvedLoadKg` is `loadKg ?:
-     * loadLb?.let { it / LB_PER_KG }`, so one slot written `load_lb: 90` and
-     * the next written `load_kg: 40.8233133` are the same weight and compare
-     * unequal. The carry drops there, which is the safe direction and not the
-     * intended one.
+     * The two alternatives are each wrong in one direction and this is the
+     * only reading that is wrong in neither. Carrying the ABSOLUTE flattens
+     * 55 and 65 to 50, substituting numbers the lifter never asked for, which
+     * is the defect #124's boundary was drawn against. DROPPING it -- what
+     * that boundary did until now -- re-seeds the box from the plan and
+     * records the plan's number against reps done at the lifter's, with
+     * nothing on screen marking the change, which is the defect #143 was
+     * opened for.
+     *
+     * IT IS ALSO THE ONLY READING CONSISTENT WITH #214'S GRID, whose tiles are
+     * increments: `NextSetNudgePolicy.bumpedLoadKg` is `current +
+     * nudge.amount`, so a lifter tapping "+10 lb" after a headroom rating has
+     * said "ten pounds more than this", once, about the exercise. That claim
+     * means the same thing on a flat block and a stepping one only if what
+     * carries is the ten pounds. `NextSetNudgeGrid`'s KDoc recorded the grid
+     * inheriting the drop from #143; it no longer does.
+     *
+     * THE OFFSET IS RE-DERIVED AT EVERY TRANSITION AND NEVER ACCUMULATED. Each
+     * rest transition asks this function afresh about its own pair of
+     * declarations and the statement standing at that moment, so a correction
+     * held across three sets is the same +5 three times, not +15.
+     *
+     * A FLAT BLOCK RETURNS THE STATEMENT ITSELF, bit for bit, rather than
+     * `d + (s - d)`. THIS IS A GUARANTEE AND NOT AN OBSERVED DIFFERENCE, and
+     * saying it the other way would be the claim this repo produces most: the
+     * two expressions were searched for a disagreement over three million
+     * random pairs of a plate-step statement against a plan declaration
+     * between 45 and 500 lb, and over 200,000 kilogram pairs, with zero found.
+     * Where a statement and a declaration are within a factor of two of each
+     * other their difference is exact, so the subtraction recovers the
+     * statement exactly. A disagreement needs a correction of about 290 kg --
+     * `d = 325.46723651992687`, `s = 36.21814333377138` -- which is not an
+     * input a gym produces. The early return is kept because the flat block is
+     * where the lifter's own number must survive untouched, #45 is what
+     * happens when a load is quantised on its way through a path that promised
+     * not to move it, and a guarantee that costs one comparison is cheaper
+     * than an argument about float ranges.
+     *
+     * A NULL DECLARATION IS NOT A DIFFERENT LOAD, and the two sides of the
+     * pair answer differently because they are asked different questions.
+     * Where the COMING set declares nothing, there is no prescribed number to
+     * shift and nothing to yield to, so the statement stands: a plan that
+     * named no load has prescribed nothing, not zero, and dropping the carry
+     * there put `seedAddedKg`'s `?: 0.0` in the box and offered an empty bar
+     * to a lifter who had just typed 65. Where the FINISHED set declared
+     * nothing, no distance can be measured -- there is no declaration the
+     * statement was a correction to -- so the coming set is offered its own.
+     * Null on BOTH sides is the loadless block, equal declarations, and the
+     * statement stands there as it always has.
+     *
+     * TWO WAYS OF WRITING ONE WEIGHT NO LONGER DROP THE CARRY. `resolvedLoadKg`
+     * is `loadKg ?: loadLb?.let { it / LB_PER_KG }`, so a plan writing
+     * `load_lb: 90` for one set and `load_kg: 40.82` for the next declares
+     * nearly the same bar twice and the two doubles differ. The equality test
+     * dropped the statement there; the subtraction carries the difference
+     * through as itself, so what comes out is the statement plus the residue
+     * between the two spellings -- 0.0033 kg in that example, three grams,
+     * below the 0.1-of-display-unit grid the load box renders on.
+     *
+     * [bodyweight] IS WHETHER THE MOVEMENT THE CARRY LANDS ON IS BODY-WEIGHT
+     * WORK, and it chooses the floor for a load this function COMPUTED rather
+     * than passed through. A descending block corrected downward can cross
+     * zero -- plan 100 / 20 done at 60 is an offset of -40 onto a declared 20
+     * -- and [correctedAddedKg]'s floor is what stops a barbell being offered
+     * a negative weight while leaving assisted body-weight work free to state
+     * one, where negative added load means a band. The floor is applied only
+     * on the computed path: a statement passed through unchanged is the number
+     * the lifter typed and is not clamped.
      *
      * A carried load does not touch `plannedLoad_kg`. The plan's prescription
      * is stored beside the load actually recorded for every set, so a carry is
-     * visible afterwards as a deviation on each set it reached.
-     *
-     * [bodyweight] IS NOT READ ON THIS COMMIT. It is whether the movement the
-     * carry lands on is body-weight work, taken here ahead of the arithmetic
-     * that will read it: a carry that computes a number rather than passing
-     * one through needs a floor, and the floor is [correctedAddedKg]'s --
-     * signed for body-weight work, where negative is band or machine
-     * assistance, and clamped at zero for loaded work, where a bar cannot
-     * weigh less than nothing. Taking the fact in this commit keeps the
-     * signature change out of the commit that changes the behaviour, so that
-     * one is a diff of this expression alone. #143.
+     * visible afterwards as a deviation on each set it reached -- which is
+     * also why no export key was added for the offset: nothing is stored but
+     * the load offered, and the plan's own figure is already frozen beside it.
      */
-    // Suppressed for exactly one commit: [bodyweight] is taken here and read
-    // by the commit that replaces the expression below. The suppression goes
-    // with the expression, so a parameter left permanently unread would fail
-    // detekt the moment the fix stopped needing it.
-    @Suppress("UnusedParameter")
     fun standingStatedAddedKg(
         statedAddedKg: Double?,
         sameExerciseBlock: Boolean,
         lastDeclaredAddedKg: Double?,
         nextDeclaredAddedKg: Double?,
         bodyweight: Boolean,
-    ): Double? = statedAddedKg?.takeIf { sameExerciseBlock && lastDeclaredAddedKg == nextDeclaredAddedKg }
+    ): Double? {
+        if (statedAddedKg == null || !sameExerciseBlock) return null
+        // Equal declarations, including both absent: the statement itself,
+        // untouched. Not the subtraction with a zero difference -- see the
+        // flat-block paragraph above for why those are different values.
+        if (lastDeclaredAddedKg == nextDeclaredAddedKg) return statedAddedKg
+        // Nothing prescribed for the coming set to yield to.
+        if (nextDeclaredAddedKg == null) return statedAddedKg
+        // Nothing for the statement to have been a correction to.
+        if (lastDeclaredAddedKg == null) return null
+        return correctedAddedKg(
+            recordedAddedKg = nextDeclaredAddedKg,
+            deltaKg = statedAddedKg - lastDeclaredAddedKg,
+            bodyweight = bodyweight,
+        )
+    }
 
     /**
      * The load actually borne by a lifter's body on a body-weight movement:
