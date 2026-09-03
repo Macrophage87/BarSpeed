@@ -148,9 +148,9 @@ data class OrphanedSet(
      *
      * [imuSamples] keeps its meaning -- the ARMED unit's stream, whatever it
      * turned out to hold -- so nothing that already reads this type sees a
-     * different number. Defaulted last for the same reason: a positional
-     * constructor call in a test or a screen keeps compiling and keeps meaning
-     * what it meant.
+     * different number. Defaulted for the same reason, as are the two fields
+     * added after it: a positional constructor call in a test or a screen
+     * keeps compiling and keeps meaning what it meant.
      */
     val secondaryImuSamples: List<ImuSample> = emptyList(),
     /**
