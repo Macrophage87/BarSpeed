@@ -624,6 +624,24 @@ data class SessionExport(
          * #94's runaway correction took that capture to ten reps of ten
          * performed. The example is deleted rather than repointed, exactly as
          * `NoRepsReason`'s own KDoc deletes it.
+         *
+         * 1.18 carries a SEVENTH change, under the same number and for the same
+         * reason, and it adds no key and changes no key's type or value
+         * (#178): `rest_s` gains the description it never had, stating the
+         * instant a rest is counted from. Published because the INSTANT
+         * changed rather than as a documentation pass -- the raw archive's
+         * `rest_before_hrm` window used to open when a set's capture stopped
+         * and now opens when the set was CALLED OVER, the instant the
+         * countdown has run from since v0.1.44 (#172). On one field session
+         * the two disagreed by up to 53.06 s on a guided set that spoke `Done`
+         * and kept recording, and by nothing on a set that ended at its
+         * terminal cue, so the archive's two documents could not be joined
+         * without knowing which instant each had used and neither said. What
+         * moves is a STREAM in the raw archive, not a key here; a set's final
+         * `hrm` samples can appear in the next set's rest window too, because
+         * the capture is copied forward rather than moved, and nothing
+         * published from `hrm` changes. Not retroactive and cannot be: no
+         * earlier build stored the two windows apart.
          */
         const val SCHEMA_VERSION = "1.18"
 
@@ -1068,6 +1086,17 @@ data class SetExport(
      */
     @SerialName("plannedPrep_s") val plannedPrepS: Int? = null,
     @SerialName("prep_s") val prepS: Int? = null,
+    /**
+     * The rest PRESCRIBED after this set, in whole seconds -- never a
+     * measurement of how long the lifter rested (#76).
+     *
+     * From 1.18 the published description states which instant it is counted
+     * FROM, and `RestClockPolicy` owns that instant: the terminal cue on the
+     * set's own cue track, or the set's end instant where nothing called it
+     * over. The countdown and the archive's `rest_before_hrm` window both
+     * begin there (#178); until 1.18 the window began when the set's capture
+     * stopped instead, up to 53.06 s later on one measured set.
+     */
     @SerialName("rest_s") val restS: Int? = null,
     val tempoPrescribed: String? = null,
     val tempoCompliance: TempoComplianceExport? = null,
