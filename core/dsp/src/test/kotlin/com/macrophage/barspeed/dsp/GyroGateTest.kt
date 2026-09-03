@@ -30,6 +30,9 @@ class GyroGateTest {
 
     /** Every capture in the corpus, so no fixture is silently outside this check. */
     private val corpus = listOf(
+        "field-assistedpullup-3010-s37-set08",
+        "field-assistedpullup-3010-s37-set09",
+        "field-assistedpullup-3010-s37-set10",
         "field-backsquat-10hz",
         "field-backsquat-10hz-set5",
         "field-backsquat-4011-6rep-s36-set01",
@@ -176,6 +179,12 @@ class GyroGateTest {
     fun `the gate holds where the gyro distribution does not straddle it, and fails on the ten that do`() {
         val config = DspConfig()
         val holds = listOf(
+            // Field-37 sets 8 to 10, committed on this branch for issue 96.
+            // The gate holds on all three, asserted below rather than
+            // predicted from a median quoted here.
+            "field-assistedpullup-3010-s37-set08",
+            "field-assistedpullup-3010-s37-set09",
+            "field-assistedpullup-3010-s37-set10",
             "field-pullup-3010-8rep-s37-set09",
             "field-rdl-3010-10rep-s36-set04",
             "field-rdl-3010-10rep-s36-set05",

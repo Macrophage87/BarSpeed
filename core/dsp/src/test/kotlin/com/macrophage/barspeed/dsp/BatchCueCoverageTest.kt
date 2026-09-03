@@ -143,6 +143,9 @@ class BatchCueCoverageTest {
      *   the assertion that matters for it.
      */
     private val notScored = listOf(
+        "field-assistedpullup-3010-s37-set08",
+        "field-assistedpullup-3010-s37-set09",
+        "field-assistedpullup-3010-s37-set10",
         "field-backsquat-10hz",
         "field-backsquat-10hz-set5",
         "field-cablerow-static-8rep",

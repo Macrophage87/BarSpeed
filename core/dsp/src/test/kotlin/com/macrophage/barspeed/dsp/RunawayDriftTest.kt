@@ -181,7 +181,7 @@ class RunawayDriftTest {
         }
         assertEquals(4, passesNeeded.values.max(), "the most passes any committed capture needs")
         assertEquals(
-            mapOf(0 to 11, 1 to 19, 2 to 2, 3 to 1, 4 to 1),
+            mapOf(0 to 13, 1 to 20, 2 to 2, 3 to 1, 4 to 1),
             passesNeeded.values.groupingBy { it }.eachCount().toSortedMap(),
             "captures by passes needed",
         )
@@ -212,6 +212,8 @@ class RunawayDriftTest {
         }
         assertEquals(
             listOf(
+                "field-assistedpullup-3010-s37-set08",
+                "field-assistedpullup-3010-s37-set10",
                 "field-backsquat-10hz-set5",
                 "field-bench-rotating-6rep-ok",
                 "field-facepull-static-12rep",

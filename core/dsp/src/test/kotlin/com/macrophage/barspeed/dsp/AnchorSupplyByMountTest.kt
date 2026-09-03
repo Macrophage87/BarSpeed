@@ -434,7 +434,7 @@ class AnchorSupplyByMountTest {
         // covers every strap, rope, stack and machine capture at once.
         val config = DspConfig()
         val holding = corpus.filter { VelocityEstimator.gyroGateApplies(load(it), config) }
-        assertEquals(24, holding.size, "captures the gate still applies to")
+        assertEquals(27, holding.size, "captures the gate still applies to")
         holding.forEach { fixture ->
             assertContentEquals(
                 maskWithGate(fixture, gyroGate = true),

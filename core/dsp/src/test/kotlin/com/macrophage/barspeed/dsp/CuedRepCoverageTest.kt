@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  *
  * ## What the corpus says today
  *
- * Twenty-five of the thirty-four committed captures carry a cue track, and
+ * Twenty-five of the thirty-seven committed captures carry a cue track, and
  * the twenty in [cueTracked] are scored here. Across them the metronome called
  * 170 reps; 74 produce a counted rep and 96 produce none. Seven counted reps
  * land outside every cued window. All four figures are pinned below.
@@ -39,7 +39,7 @@ import kotlin.test.assertTrue
  *
  * ## What this does NOT say
  *
- * It does not say the counter no longer invents reps. Nine captures carry no
+ * It does not say the counter no longer invents reps. Twelve captures carry no
  * cue track, and previously identified survivors are in that group --
  * field-ohp-100hz-bursty keeps runs of 1.553, 1.604 and 1.892 m against a
  * 0.766 m median, all UNPINNED figures quoted in [LiveCapCalibrationTest].
@@ -175,8 +175,8 @@ class CuedRepCoverageTest {
     )
 
     /**
-     * The ten this file does not score, nine of which carry no cue track at
-     * all.
+     * The thirteen this file does not score, twelve of which carry no cue
+     * track at all.
      *
      * `field-rdl-3010-10rep-s36-set04` is here by choice and the choice is
      * worth stating: the capture HAS a cue track in its session archive and it
@@ -186,8 +186,23 @@ class CuedRepCoverageTest {
      * triples -- and every one of those re-baselines a claim about rep
      * counting that issue #138 is not about. The set's hand count comes from
      * its own `meta.json` instead; see `BlankAnalysisTest`.
+     *
+     * The three field-37 assisted pull-ups are here DELIBERATELY, and their
+     * cue tracks were left in the session archive rather than committed. A
+     * capture only earns a place in [cueTracked] with a [LiftDirection] beside
+     * it, and those three sets were recorded with the sensor on an assist
+     * stack under a plan that declared the bar (issue 96,
+     * [StackMountGeometryTest]). Which declaration is right is not settled by
+     * any committed byte, so listing them above would have to state a geometry
+     * this corpus cannot support, and every window figure derived from it
+     * would inherit the guess. Committing the cue tracks without listing them
+     * would trip this file's own converse assertion, which is the honest
+     * outcome and the reason they are absent.
      */
     private val notCueTracked = listOf(
+        "field-assistedpullup-3010-s37-set08",
+        "field-assistedpullup-3010-s37-set09",
+        "field-assistedpullup-3010-s37-set10",
         "field-backsquat-10hz",
         "field-backsquat-10hz-set5",
         "field-cablerow-static-8rep",
@@ -473,7 +488,7 @@ class CuedRepCoverageTest {
             )
         }
         assertEquals(20, cueTracked.size, "captures with a cue track")
-        assertEquals(10, notCueTracked.size, "captures with no track that calls a rep")
+        assertEquals(13, notCueTracked.size, "captures with no track that calls a rep")
         assertEquals(4, notRepCorpus.size, "captures committed for something other than rep coverage")
         notRepCorpus.forEach { fixture ->
             assertTrue(
