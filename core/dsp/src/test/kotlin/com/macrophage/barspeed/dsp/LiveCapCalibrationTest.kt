@@ -18,10 +18,20 @@ import kotlin.test.assertEquals
  * Six captures committed since issue 86 landed are included here. Every figure
  * in this file is over those twenty-one, and figures quoted against the earlier
  * fifteen -- seven reps removed, 63 in family, 213 batch runs -- are that
- * corpus and not this one. Issue #87 then moved the BATCH reference this file
- * classifies against, so its in-family count reads 82 rather than 85 and its
- * largest in-family live displacement 1.058 m rather than 1.675 m. The live
- * counter itself is untouched: 101 reps before and after.
+ * corpus and not this one.
+ *
+ * WHY THIS KDOC NO LONGER CARRIES THE NUMBERS. Issue #87 moved the BATCH
+ * reference this file classifies against, and issue #94's runaway correction
+ * moved it again and much further -- it re-forms the runs the reference is
+ * taken over. Three rounds of review found narrated copies of those figures
+ * stale while the assertions in this same file were right, so every figure an
+ * assertion here pins is now NAMED BY ITS ASSERTION rather than repeated in
+ * prose. Figures nothing pins are marked UNPINNED where they survive.
+ *
+ * The live counter is untouched by both issues, structurally and not by
+ * measurement: #87 keeps `isQuietSample` bit-identical, which `GyroGateTest`
+ * asserts, and `RunawayDrift` runs inside `VelocityEstimator.estimate` on the
+ * batch path only. No live rep total is quoted here.
  *
  * A TWENTY-SECOND capture is committed and is deliberately NOT in this file's
  * list: field-legpress-single-2011-8rep-s36-set07, landed for issue #93. It is
@@ -40,42 +50,49 @@ import kotlin.test.assertEquals
  *
  * ## The constant has never been calibrated anywhere
  *
- * `maxRunDisplacementM` is 2.0 m and has exactly one consumer, `RepSegmentation`,
- * where across the 301 batch movement runs in this corpus it has NEVER demoted
- * anything -- the largest batch run is 1.982 m, and neither the eighty runs the
- * six captures committed since issue 86 added nor the eight issue #87's
- * re-segmentation added raised it. Reusing it in the live path therefore meant
- * importing a number with no evidence behind it.
+ * `maxRunDisplacementM` is 2.0 m and has THREE consumers: `StreamingSetTracker`
+ * on the live path, `RepSegmentation` on the batch path, and -- since issue
+ * #94 -- `RunawayDrift.runaways`, which de-trends every run beyond it before
+ * the segmenter classifies. In `RepSegmentation` it has never demoted anything
+ * across the batch movement runs in this corpus; `the bracket the constant has
+ * to sit inside (pre-fix)` asserts both that run population and the largest
+ * run in it. Reusing the constant in the live path therefore meant importing a
+ * number with no evidence behind it.
  *
- * Two measurements pinned below bracket it:
+ * Two measurements pinned below bracket it, each named by the assertion that
+ * holds it rather than repeated as a figure:
  *
- *  - the least extreme artefact it catches on the live path sits at 3.34x its
- *    own set's batch median rep ROM, and the largest carries 127.405 m;
- *  - the largest live rep displacement that is IN FAMILY with its own set is
- *    1.058 m, on field-backsquat-10hz. field-ohp-rotating-8rep-b's own largest
- *    in-family live rep is 0.890 m: issue #87 LOWERED that set's batch median
- *    rep ROM reference from 1.105 m to 0.486 m, so the 1.675 m rep that used
- *    to be its maximum is still counted and is now out of family.
+ *  - the least extreme artefact it catches on the live path, as a multiple of
+ *    its own set's batch median rep ROM, and the largest removal in metres --
+ *    both in `every counted rep the bound removes is far outside its own set
+ *    (pre-fix)`;
+ *  - the largest live rep displacement that is IN FAMILY with its own set, in
+ *    `the bracket the constant has to sit inside (pre-fix)`. That figure is
+ *    1.220 m at this commit, quoted here only because the ratio below is
+ *    computed from it; it moved because #94 shifted the batch reference this
+ *    file scores against, not because any live behaviour changed.
  *
- * So the admissible range is narrow: 2.0 m clears the largest legitimate rep by
- * 1.89x. That multiple read 1.19x while this figure was 1.675 m; issue #87
- * moved the batch reference and the figure is now 1.058 m.
+ * So the admissible range is narrow: 2.0 m clears the largest legitimate rep
+ * by 1.64x.
  *
  * ## And it cannot be tightened, which is why the tail is left uncut
  *
  * Lowering the bound as far as field-ohp-100hz-bursty's surviving runs -- 1.553,
  * 1.604 and 1.892 m, all three UNPINNED, quoted from a one-off measurement with
- * no assertion behind them -- would demote batch runs, because the largest batch
- * run is 1.982 m (pinned below). That degrades the path WITH retroactive drift
+ * no assertion behind them -- would degrade the path WITH retroactive drift
  * correction in order to improve the one without it. Tightening therefore
  * requires splitting one constant into two, which is a new tunable rather than
  * a reused one.
  *
- * Taken together the two floors leave almost no room at all. A shared constant
- * must clear 1.058 m to keep every in-family live rep and 1.982 m to demote no
- * batch run, so 2.0 m is very nearly the SMALLEST admissible value rather than
- * a comfortable one. The surviving out-of-family reps are a consequence of that,
- * not of conservatism.
+ * SINCE #94 THE BATCH FLOOR IS NOT INDEPENDENT EVIDENCE, and this section used
+ * to argue as though it were. `RunawayDrift.corrected` iterates until no
+ * same-sign run exceeds the cap, forming runs and measuring displacement
+ * exactly as `RepSegmentation` does, so the largest batch run is bounded BY
+ * this constant and falls with it. Lowering the cap de-trends more; it does
+ * not demote a batch run. What remains binding is the LIVE floor alone: a
+ * shared constant must clear the largest in-family live rep, and the margin
+ * over it is the 1.64x above. The surviving out-of-family reps are a
+ * consequence of that, not of conservatism.
  *
  * ## Scoring caveat, stated because the numbers here depend on it
  *
@@ -87,9 +104,12 @@ import kotlin.test.assertEquals
  * from a retroactively corrected one, and the live-to-batch scale ratio spans
  * 0.30x to 1.65x across the sets we most trust, so the verdict is unreliable
  * for MARGINAL reps in both directions. It is not pinned as a metric anywhere
- * and it should not be. It is used here only to separate artefacts that sit
- * 3.3x to 27x from their set median, which no reference error of 1.65x can
- * explain away.
+ * and it should not be. It is used here only to separate artefacts that sit at
+ * least 4.99x from their set median -- the multiple asserted in `every counted
+ * rep the bound removes is far outside its own set (pre-fix)` -- which no
+ * reference error of 1.65x can explain away. The upper end of that spread was
+ * narrated here as 27x, which nothing pinned; it is deleted rather than
+ * re-derived.
  */
 class LiveCapCalibrationTest {
     private fun load(n: String) = ImuCsv.decode(
@@ -240,8 +260,9 @@ class LiveCapCalibrationTest {
             }
         }
         assertEquals(11, removed, "counted reps the bound removes")
-        // Every one, not most. The least extreme is 3.34x its own set median,
-        // which no reference error of at most 1.65x can explain away.
+        // Every one, not most. The least extreme is the multiple asserted
+        // three lines below, and no reference error of at most 1.65x can
+        // explain it away.
         assertEquals(11, removedOutOfFamily, "of those, how many are out of family with their own set")
         // Issue #94's runaway correction moves the BATCH reference this file
         // scores against; the live tracker is untouched by it. The figures
@@ -298,18 +319,20 @@ class LiveCapCalibrationTest {
         // below therefore move without any live behaviour changing, which is
         // the standing hazard of scoring one path against the other.
         assertEquals(1.220, largestInFamilyLive, 5e-3, "largest in-family live rep displacement, metres")
-        // The second floor, and the binding one: anything below this starts
-        // demoting BATCH runs, because the constant is shared and the batch path
-        // is the trusted one. 2.0 m clears it by 18 mm.
-        //
-        // 301 before issue #94's runaway correction, 403 after it: every
-        // over-cap run is de-trended into the strokes inside it before the
-        // segmenter counts runs at all. The bracket's own bound is unmoved --
-        // the largest batch run is still 1.982 m -- so the constant's room is
-        // the same and only the population it is measured over has grown.
+        // The batch run population and its largest member. This USED to be
+        // read here as a second, binding floor -- "anything below this starts
+        // demoting BATCH runs" -- and since issue #94 that reading is wrong.
+        // RunawayDrift.corrected iterates until no same-sign run exceeds the
+        // cap, forming runs and measuring displacement exactly as
+        // RepSegmentation does, so the largest batch run is bounded BY the
+        // constant and falls with it. Lowering the cap de-trends more; it
+        // demotes nothing. These two numbers are characterization, not a
+        // floor: 301 runs before the correction and 403 after it, because
+        // every over-cap run is de-trended into the strokes inside it before
+        // the segmenter counts runs at all.
         assertEquals(403, batchRuns, "batch movement runs across the corpus")
         assertEquals(1.982, largestBatchRun, 5e-3, "largest batch run displacement, metres")
-        assertEquals(2.0, c.maxRunDisplacementM, "the value, barely above both floors")
+        assertEquals(2.0, c.maxRunDisplacementM, "the value, barely above the live floor")
     }
 
     @Test

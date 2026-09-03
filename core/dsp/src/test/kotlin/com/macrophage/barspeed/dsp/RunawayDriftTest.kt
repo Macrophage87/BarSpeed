@@ -191,8 +191,10 @@ class RunawayDriftTest {
         // The other half of the blast-radius contract. A capture with no
         // runaway is bit-identical through the correction, so this list is
         // exactly the set of captures any figure can move on. Measured on the
-        // vertical series, which is the plane every capture in this corpus but
-        // none is measured in.
+        // vertical series, which is the plane every capture here IS measured
+        // in: LiftDirection.measuredPlane returns VERTICAL for each, either
+        // because the capture declares a vertical plane or because it is
+        // stack-mounted, which forces vertical whatever plane is declared.
         val untouched = corpus.filter { fixture ->
             val series = VelocityEstimator.estimateAnchored(load(fixture), config, MovementPlane.VERTICAL)
             RunawayDrift.runaways(series.velocityMps, series.timeS, config).isEmpty()

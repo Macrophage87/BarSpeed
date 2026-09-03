@@ -51,6 +51,20 @@ import kotlin.math.abs
  * `BatchCueCoverageTest` scores them window by window. Magnitude is a separate
  * defect and issue #115 is where it lives.
  *
+ * AND THE PREMISE IS EXACTLY WRONG FOR ONE-WAY TRAVEL. "Over a stretch
+ * spanning whole reps the bar returns to where it started" holds for cycling
+ * and fails for a walkout, a re-rack carried across the floor, or a loaded
+ * carry: there the mean IS the movement, and removing it manufactures strokes
+ * out of a single traverse. No committed capture provides a zero-truth
+ * runaway to test that on -- `RunawayDriftTest`'s untouched list holds all
+ * three of this corpus's zero-rep controls, so the correction cannot touch
+ * them.
+ *
+ * [Field] UNVERIFIED. Record a set, leave the stream running, and make ONE
+ * continuous one-way movement over 2 m under load -- walk the bar out and
+ * away, or carry it back to the rack -- then end the set and re-analyse.
+ * Pass criterion: the published rep count for that set does not grow.
+ *
  * ## Where it runs
  *
  * In [VelocityEstimator.estimate], as the stage after the ZUPT anchor pass.
@@ -81,6 +95,14 @@ object RunawayDrift {
      * field-36 comment calls the failure family. The bound is twice the largest
      * number anyone has needed and is a termination guarantee, not a tuning
      * knob; `RunawayDriftTest` pins the distribution.
+     *
+     * WHAT HAPPENS AT THE BOUND IS UNRECORDED. [corrected] exits after this
+     * many passes and returns whatever it has, so a set still carrying a
+     * runaway after eight passes is published from a PARTLY corrected series
+     * -- and nothing in the analysis, the stored row or the export says the
+     * loop did not reach a fixed point. No committed capture reaches the
+     * bound and no test drives past it, so the case is unstudied rather than
+     * known safe.
      */
     const val MAX_PASSES = 8
 

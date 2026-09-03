@@ -235,9 +235,10 @@ class BatchCueCoverageTest {
             s.fixture to listOf(windows(s.fixture).size, spans(s).size, c.matched, c.empty, c.doubled, c.stray)
         }
         assertEquals(expected, actual, "marks, spans, matched, empty, doubled, stray")
-        // matched + empty is the mark count, on every row. Not decoration: it
-        // is what makes an unexplained change in the table impossible to read
-        // as a scoring bug rather than a segmentation one.
+        // matched + empty is the mark count by construction -- both are counts
+        // over one hits array sized from the same windows() call -- so this
+        // assertion CANNOT FAIL. It is a readability aid for the table above,
+        // not a guard, and it was described as one until issue #94's round 3.
         actual.forEach { (fixture, row) ->
             assertEquals(row[0], row[2] + row[3], "$fixture: matched + empty must be the mark count")
         }
@@ -335,15 +336,30 @@ class BatchCueCoverageTest {
         // disagree with" the end rule. That was measured on the LIVE tracker,
         // where a counted rep is an instant. It is FALSE of the batch path,
         // where a span is a run seconds long: the three rules disagree
-        // per-capture on nine of the twenty captures here, and on
-        // field-bench-3010-6rep-s37-set05 the single detection is a 4.26 s run
-        // that starts inside its window and reaches its midpoint after the
-        // window closes.
+        // per-capture on SEVENTEEN of the twenty captures here -- "disagree"
+        // meaning the (matched, empty, doubled, stray) tuple is not identical
+        // under all three -- measured at this commit by running the three
+        // rules over `scored` and comparing the tuples. The nine this note
+        // used to claim was measured on a corpus that has since moved, and is
+        // withdrawn.
+        //
+        // field-bench-3010-6rep-s37-set05 is the clearest single case. It
+        // resolves FOUR detections, not the one this note used to claim, and
+        // the longest of them runs 4.29 s. Its drive starts inside the last
+        // window; its midpoint falls 209 ms past that window's close, which
+        // WINDOW_TOLERANCE_MS of 150 ms does not cover, and there is no
+        // window after it -- so the start rule matches it and the midpoint
+        // rule scores it a stray. Measured at this commit from the span
+        // timestamps and the window bounds this file computes.
         //
         // What survives is the corpus figure, which is what the issue quotes:
-        // the three rules put the matched total within four windows of each
-        // other, 2.4% of 170. So no claim in this file turns on the choice, and
-        // the start rule is used because a rep begins when the drive begins.
+        // the three rules put the matched total within TWELVE windows of each
+        // other -- 147, 141 and 135 in the map below, and the assertTrue bound
+        // beneath it reads <= 12 -- which is 7.1% of 170. That is a real
+        // spread and not the 2.4% this note used to claim, so the choice of
+        // rule is stated rather than waved away: the start rule is used
+        // because a rep begins when the drive begins, and every figure in this
+        // file is under it.
         val byRule = mapOf(
             "start" to scored.map { s -> cover(s) { it.conStartIdx } },
             "midpoint" to scored.map { s -> cover(s) { (it.conStartIdx + it.conEndIdx) / 2 } },

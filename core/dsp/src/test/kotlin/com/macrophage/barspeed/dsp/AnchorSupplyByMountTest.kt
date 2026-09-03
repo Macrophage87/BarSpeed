@@ -339,15 +339,24 @@ class AnchorSupplyByMountTest {
         // records, both above the 1.2 m ceiling of the plausibility window
         // issue #74 quotes, and nothing rejects it -- 1.724 m is below
         // maxRunDisplacementM = 2.0, so the pipeline publishes it. Issue
-        // #94's runaway correction does not fix that either: it ADDS reps beside them at 0.896, 0.898, 0.143 m and 0.462,
-        // 1.045, 1.384 m. Recovering a rep and measuring it are different
-        // things and this is the clearest place in the corpus to see it.
+        // #94's runaway correction does not fix that either: it ADDS reps
+        // beside them at 0.896, 0.898, 0.143 m and 0.462, 1.045, 1.384 m.
+        // Recovering a rep and measuring it are different things and this is
+        // the clearest place in the corpus to see it.
         //
         // The consequence to read is the velocity loss. set05 and set06
-        // published NOTHING for it before, because a summary over one and
-        // three reps withholds the figure; both now publish -- 26.0% and 24.0%
-        // -- computed over reps whose ROM spans 0.143 m to 1.724 m against the
-        // 0.333-0.345 m bench. Absence became a number the lifter reads, and
+        // published NOTHING for it before, and the REP COUNT IS NOT THE
+        // PUBLICATION RULE -- this comment used to say it was.
+        // `VelocityLoss.of` withholds on three grounds, only one of which is
+        // a count. Measured at 7a1fc5ef093c7ea5ac29b97bc9556ae21762afc2, the
+        // commit before issue #94's runaway correction: set05 resolved ONE
+        // rep and its basis was `notEnoughReps`, which is the count ground;
+        // set06 resolved THREE and its basis was `terminalRepIsFastest` --
+        // its last rep, at 0.452 m/s, was the fastest of the three -- which
+        // is not a count ground at all. Both now publish: 26.0% over set05's
+        // four reps, spanning 0.143 m to 1.363 m, and 24.0% over set06's six,
+        // spanning 0.168 m to 1.724 m, against the 0.333-0.345 m bench issue
+        // #87 records. Absence became a number the lifter reads, and
         // the number is built on the same reconstruction that produced the
         // 1.724 m rep. Issue #234 holds the publication rule; this file only
         // pins what the two sets now say.
@@ -360,10 +369,10 @@ class AnchorSupplyByMountTest {
         assertEquals<Double?>(55.3, ohp.velocityLossPct, "ohp set02 velocity loss reported to the lifter")
         val bench05 = batchAnalysis("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC, 47.627)
         assertRoms(listOf(0.896, 0.898, 0.143, 1.363), bench05, "bench set05 ROM, metres")
-        assertEquals<Double?>(26.0, bench05.velocityLossPct, "bench set05 velocity loss: four reps, so a figure")
+        assertEquals<Double?>(26.0, bench05.velocityLossPct, "bench set05 velocity loss reported to the lifter")
         val bench06 = batchAnalysis("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC, 49.895)
         assertRoms(listOf(0.691, 0.462, 1.045, 1.384, 0.168, 1.724), bench06, "bench set06 ROM, metres")
-        assertEquals<Double?>(24.0, bench06.velocityLossPct, "bench set06 velocity loss: six reps, so a figure")
+        assertEquals<Double?>(24.0, bench06.velocityLossPct, "bench set06 velocity loss reported to the lifter")
 
         // And the back squat. Its velocity loss moved 26.6% to 82.3% with #87
         // on a set the lifter logged at RPE 1 -- the effort he recorded and the

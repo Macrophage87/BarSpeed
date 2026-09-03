@@ -134,9 +134,28 @@ data class DspConfig(
      */
     val minRomM: Double = 0.10,
     /**
-     * No real barbell phase displaces more than this (m); movement runs beyond
-     * it are unanchored integration drift (typically end-of-set re-rack and
-     * bar handling with no quiet window to re-anchor on) and are discarded.
+     * No real barbell phase displaces more than this (m); a movement run
+     * beyond it is read as unanchored integration drift -- typically
+     * end-of-set re-rack and bar handling with no quiet window to re-anchor
+     * on.
+     *
+     * THREE CONSUMERS, and what each does with a run beyond it differs.
+     * Moving this value moves all three.
+     *
+     *  1. [StreamingSetTracker] rejects the run on the LIVE path and latches
+     *     `countTrusted` false with it.
+     *  2. [RepSegmenter] demotes the run to STILL on the batch path, which
+     *     both pairing rules skip.
+     *  3. Since issue #94, [RunawayDrift] SELECTS on it: `runaways` returns
+     *     every same-sign run beyond this value and `corrected` removes each
+     *     one's MEAN and re-classifies, so on the batch path such a run is no
+     *     longer discarded -- it is de-trended into the strokes inside it.
+     *
+     * So this is not only a gate. It is also the trigger for the batch drift
+     * correction, and because `corrected` iterates until no run exceeds it,
+     * the largest surviving batch run is bounded BY this value and falls with
+     * it. `LiveCapCalibrationTest` records what that does to the calibration
+     * argument this constant used to rest on.
      */
     val maxRunDisplacementM: Double = 2.0,
 )
