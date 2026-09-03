@@ -74,6 +74,14 @@ data class GeometrySources(
     val kind: GeometrySource,
     val travelRatio: GeometrySource,
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val sensorOnStack: GeometrySource = GeometrySource.DEFAULT,
+    /**
+     * NEUTRAL AT THIS COMMIT and not yet written by [SetGeometryPolicy.describe]
+     * -- introduced so `BodyweightProvenanceTest` compiles and fails on the
+     * answer rather than on the build. It carries no annotation yet either, so
+     * the pin that a defaulted word survives `encodeDefaults = false` reds
+     * here too. Both are the fix's job.
+     */
+    val bodyweight: GeometrySource = GeometrySource.DEFAULT,
 )
 
 /**
@@ -246,6 +254,16 @@ object SetGeometryPolicy {
      * an ad-hoc set has no plan. Reading the resolved value is what keeps the
      * two halves of one published fact from disagreeing.
      */
+    /**
+     * Provenance for `bodyweight`, on [stackSource]'s rule and NEUTRAL AT THIS
+     * COMMIT: it answers [GeometrySource.DEFAULT] for every input, which is
+     * what makes `BodyweightProvenanceTest`'s differentials red rather than
+     * uncompilable. The reasoning for the answers it will give is written
+     * there.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun bodyweightSource(used: Boolean, declared: Boolean?): GeometrySource = GeometrySource.DEFAULT
+
     private fun stackSource(used: Boolean, declared: Boolean?): GeometrySource = when {
         declared != null -> GeometrySource.DECLARED
         used -> GeometrySource.SEEDED
