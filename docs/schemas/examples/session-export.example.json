@@ -242,6 +242,25 @@
           "summary": { "meanConVel_mps": 0.34, "peakConVel_mps": 0.58, "meanEcc_s": 2.1, "meanCon_s": 1.2, "meanRom_m": 0.42 }
         }
       ]
+    },
+    {
+      "exercise": "rope_dead_hang",
+      "sets": [
+        {
+          "load_kg": 0,
+          "load_lb": 0,
+          "reps": 0,
+          "duration_s": 0,
+          "plannedDuration_s": 20,
+          "failed": true,
+          "plannedPrep_s": 12,
+          "prep_s": 12,
+          "rest_s": 120,
+          "voided": true,
+          "voidReason": "the app re-armed a slot I had already finished; I never hung on this one",
+          "summary": {}
+        }
+      ]
     }
   ]
 }

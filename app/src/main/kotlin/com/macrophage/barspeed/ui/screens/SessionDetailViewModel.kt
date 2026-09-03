@@ -60,6 +60,24 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
 
     fun decodeAnalysis(record: SetRecordEntity) = repository.decodeAnalysis(record)
 
+    /**
+     * Mark a recorded set as one the lifter did not perform, or take the mark
+     * back (#60).
+     *
+     * NOT A DELETE, and it sits beside one that is. The row keeps its place,
+     * its gzipped IMU, heart-rate and cue streams stay in the archive, and
+     * both export documents go on carrying the set -- marked.
+     * [com.macrophage.barspeed.model.VoidSetPolicy] states what the mark
+     * excludes and what it keeps; the repository normalizes the reason and
+     * clears it on un-void, so nothing here has to.
+     *
+     * The screen re-reads through observeSets, so no explicit refresh is
+     * needed and none is done.
+     */
+    fun setVoided(setId: Long, voided: Boolean, reason: String?) {
+        viewModelScope.launch { repository.setVoided(setId, voided, reason) }
+    }
+
     /** Permanently deletes the session (sets and raw streams cascade). */
     fun deleteSession(onDeleted: () -> Unit) {
         viewModelScope.launch {

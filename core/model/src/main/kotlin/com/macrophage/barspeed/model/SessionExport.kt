@@ -558,6 +558,33 @@ data class SessionExport(
          * separate them: it is an optional answer to a different question,
          * absent on every set nobody was asked. Absent on a set that did not
          * fail and on every set recorded before database v15.
+         *
+         * 1.18 carries a THIRD change, under the same number because 1.18 is
+         * unreleased, and it IS additive (#60): a set may carry
+         * [SetExport.voided] and [SetExport.voidReason], the lifter's own
+         * statement that they did not perform a recorded set, and optionally
+         * why.
+         *
+         * WHY IT RIDES ON 1.18 RATHER THAN MINTING 1.19. 1.17 shipped in
+         * v0.1.49 -- read by `git show v0.1.49:core/model/.../SessionExport.kt`
+         * rather than assumed -- so extending it would redefine a number a
+         * consumer has already been handed. 1.18 is minted, landed on `main`
+         * and unreleased, which is exactly the state that takes further
+         * entries. THIS PARAGRAPH REPLACES ONE THAT SAID 1.18 WAS BEING
+         * MINTED BY AN UNLANDED LANE AND THAT THIS BRANCH MUST NOT LAND
+         * AHEAD OF IT: that was true when it was written and is not now, and
+         * it is deleted rather than reworded.
+         *
+         * Additive on the terms 1.2 and 1.3 were: no key changes type, none
+         * stops being written, and a set that is not voided publishes neither
+         * key -- so a 1.17 reader works unchanged against a document carrying
+         * them. It does NOT apply retroactively: the mark is a column that
+         * exists from database v16 on, absent on every set recorded before
+         * it, and nothing backfills one.
+         *
+         * WHAT DOES NOT MOVE IS THE POINT. A voided set is published with its
+         * load, its reps or hold, its prescription, its summary and its raw
+         * streams intact. The mark is a reading instruction, not a redaction.
          */
         const val SCHEMA_VERSION = "1.18"
 
@@ -801,6 +828,50 @@ data class SetExport(
      * escaped differently by each.
      */
     val limiterNote: String? = null,
+    /**
+     * True when the LIFTER says they did not perform this set (#60). Omitted
+     * when false.
+     *
+     * THE SET IS STILL HERE, WITH EVERYTHING IT ALWAYS CARRIED. Its load, its
+     * reps or hold, its prescription, its summary and its raw streams in the
+     * companion archive are all exactly as they were recorded. This key is
+     * what tells a reader not to read any of them as work that happened: the
+     * figures describe a row, not a performance. A voided set must be dropped
+     * from volume, from a set count and from any progression read.
+     *
+     * PUBLISHED RATHER THAN WITHHELD, and that is the decision this key
+     * embodies. Removing the set from the document would make the export
+     * disagree with the app's own history and would make a set that was
+     * recorded and not performed indistinguishable from one that was never
+     * recorded -- a gap this document cannot represent. A reader can see the
+     * row was there and was not performed; that is strictly more than it could
+     * ever say before.
+     *
+     * ABSENT MEANS NOT MARKED, which on a set recorded before database v16
+     * also means the app could not ask. Those two are not distinguishable here
+     * and no attempt is made to distinguish them, for [sessionRpe]'s reason:
+     * both mean the lifter never said.
+     *
+     * NOT DERIVED, EVER. The app cannot tell a set that did not happen from
+     * one that failed instantly, and no reader should try: a 0-second failed
+     * timed set is the shape of the fabricated row this key was added for
+     * (#195) AND the shape of an unrack-and-fail. Only the lifter's own mark
+     * appears here.
+     */
+    val voided: Boolean = false,
+    /**
+     * The lifter's own words for why the set was not performed, present only
+     * on a voided set (#60).
+     *
+     * Beside [voided] and never inside it, the way [limiterNote] sits beside
+     * [limiter]: a reader grouping unperformed sets needs a boolean to filter
+     * on, and free text in that position would destroy exactly that grouping.
+     *
+     * Absent on a voided set the lifter had nothing to add about, which is the
+     * ordinary case. Cleared when a set is un-voided, so this key never
+     * survives beside a set the lifter says they DID perform.
+     */
+    val voidReason: String? = null,
     /**
      * True when this set was preparatory -- a ramp set, a warm-up. Omitted
      * when false.

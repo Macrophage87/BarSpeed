@@ -18,6 +18,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,6 +39,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
@@ -118,10 +120,20 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
             session?.let { s ->
                 val formatter = DateTimeFormatter.ofPattern("EEE d MMM yyyy, HH:mm")
                 val started = Instant.ofEpochMilli(s.startedAtMs).atZone(ZoneId.systemDefault())
+                // The count a lifter reads as "what I did today", so it is the
+                // PERFORMED count and not sets.size: a voided set stays in the
+                // list below with its mark, and counting it here would put the
+                // number this change exists to correct at the top of the very
+                // screen the mark is applied from (#60).
+                val performed = VoidSetPolicy.performed(sets) { it.voided }
                 val parts =
                     listOfNotNull(
                         formatter.format(started),
-                        "${sets.size} sets",
+                        if (performed.size == sets.size) {
+                            "${sets.size} sets"
+                        } else {
+                            "${performed.size} sets · ${sets.size - performed.size} not performed"
+                        },
                         s.hrAvgBpm?.let { "♥ $it avg / ${s.hrMaxBpm} max" },
                         s.hrvRmssdMs?.let { "HRV ${it.toInt()} ms" },
                     )
@@ -204,6 +216,12 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             SetCardHeader(record, unit)
+            // OUTSIDE the analysis block below, deliberately. Every other chip
+            // on this card is drawn only where a stored analysis decodes, and
+            // a set that did not happen is exactly the set whose analysis is
+            // most likely to be empty or unreadable -- drawing the mark in
+            // there would hide it on the rows it matters most for.
+            VoidRow(record, viewModel)
             analysis?.let { a ->
                 SetChips(record, a)
                 // What the ratio in the chip above does not cover. History
@@ -231,6 +249,79 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
             }
         }
     }
+}
+
+/**
+ * The mark that says the lifter did not perform this set, and the control that
+ * puts it on or takes it off (#60).
+ *
+ * REVERSIBLE, AND ASYMMETRIC ON PURPOSE. Voiding asks for confirmation and
+ * offers a reason; un-voiding is one tap with no dialog. The confirmation is
+ * not there because the act is dangerous -- it is not, nothing is deleted --
+ * but because this screen's OTHER control deletes the session and every raw
+ * stream in it, and a lifter who has learned to fear one button on a screen
+ * needs telling that this one is different. [VoidSetPolicy.confirmation] is
+ * the text, and it says what is kept, what stops counting and that it can be
+ * undone.
+ *
+ * The reason is optional and stays optional. A lifter who knows the set did
+ * not happen has nothing more to say about it, and an empty field is stored as
+ * no reason rather than as an empty string.
+ */
+@Composable
+private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel) {
+    var asking by remember { mutableStateOf(false) }
+    var reason by remember { mutableStateOf("") }
+
+    if (asking) {
+        AlertDialog(
+            onDismissRequest = { asking = false },
+            title = { Text("Not performed?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(VoidSetPolicy.confirmation(record.exerciseName, record.orderIdx + 1))
+                    OutlinedTextField(
+                        value = reason,
+                        // Sanitized on every keystroke rather than at save, so
+                        // the characters the lifter sees are the characters
+                        // stored: the raw archive's manifest escapes nothing.
+                        onValueChange = { reason = VoidSetPolicy.reasonAsTyped(it) },
+                        label = { Text("Why (optional)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        asking = false
+                        viewModel.setVoided(record.id, voided = true, reason = reason)
+                        reason = ""
+                    },
+                ) { Text("Mark not performed") }
+            },
+            dismissButton = { TextButton(onClick = { asking = false }) { Text("Cancel") } },
+        )
+    }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (record.voided) {
+            VerdictChip(VoidSetPolicy.CHIP, ChipTone.WARN)
+            record.voidReason?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+            }
+        }
+    }
+    TextButton(
+        onClick = {
+            if (record.voided) {
+                viewModel.setVoided(record.id, voided = false, reason = null)
+            } else {
+                asking = true
+            }
+        },
+    ) { Text(VoidSetPolicy.label(record.voided), color = BarColors.Sub) }
 }
 
 @Composable

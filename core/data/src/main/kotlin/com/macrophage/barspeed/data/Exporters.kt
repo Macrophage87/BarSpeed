@@ -25,6 +25,7 @@ import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetSensorsExport
 import com.macrophage.barspeed.model.SetSummaryExport
 import com.macrophage.barspeed.model.TempoComplianceExport
+import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
 import kotlinx.coroutines.CoroutineDispatcher
@@ -263,6 +264,13 @@ class SessionExporter(
             // or the note is orphaned from the answer it belongs to.
             limiter = record.publishedLimiter,
             limiterNote = record.publishedLimiterNote,
+            // The lifter's statement that they did not perform this set, and
+            // their words for it (#60). Both, and the reason only where the
+            // mark stands beside it -- [publishedVoidReason]'s gate, so a
+            // reason left on a row by some other path can never be published
+            // beside a set the lifter says they DID perform.
+            voided = record.voided,
+            voidReason = record.publishedVoidReason,
             // The plan's declaration and the lifter's mark, composed (#194).
             // WarmupMarkPolicy owns which wins; reading either column raw here
             // would put that rule in a second place and let the two writers
@@ -537,6 +545,28 @@ private val SetRecordEntity.publishedLimiterNote: String?
     get() = SetLimiter.normalizeNote(limiterNote)?.takeIf { publishedLimiter != null }
 
 /**
+ * The void reason as it may be PUBLISHED: only where the mark stands beside
+ * it (#60).
+ *
+ * One definition, read by both export writers, for [publishedLimiterNote]'s
+ * reason and against the same failure: the session document is serialised by
+ * kotlinx while the raw archive's manifest is assembled as text, and a rule
+ * written twice is a rule that drifts.
+ *
+ * NORMALIZED AGAIN ON THE WAY OUT, which matters more than the gate. The
+ * manifest escapes nothing, so one stored backslash does not corrupt one
+ * reason -- it makes that whole document unparseable for every set in the
+ * session. `SessionRepository.setVoided` normalizes on the way in as well;
+ * this pass is what makes the claim true of a row this build did not write.
+ *
+ * The gate is the mark, because a reason without one is words a reader can
+ * neither group nor attribute, and the published schema promises it is not
+ * there.
+ */
+private val SetRecordEntity.publishedVoidReason: String?
+    get() = VoidSetPolicy.reason(voidReason)?.takeIf { voided }
+
+/**
  * Builds the raw-data zip: per-set CSVs (device-frame IMU + HRM), the FULL
  * detailed session analysis (session.json — everything the JSON export has,
  * including per-rep velocity/power, tempo compliance, RPE, sides, durations,
@@ -773,6 +803,18 @@ class RawExporter(
         // for every archive already written, and a `false` here would change
         // the bytes of every past session's manifest for no gain (#177).
         flag("added", record.added)
+        // The lifter's statement that they did not perform this set, in the
+        // archive's manifest as well as in the session document. Two writers,
+        // one fact: a mark wired into only one of them publishes half a
+        // record, and which half depends on which file the coach opened.
+        //
+        // [flag], never [bool]: absence must go on reading as "performed, or
+        // recorded before the app could ask" for every archive already
+        // written, and a `false` here would change the bytes of every past
+        // session's manifest for no gain -- the rule `added` follows one line
+        // above.
+        flag("voided", record.voided)
+        str("voidReason", record.publishedVoidReason)
         flag("repsManual", record.repsManual)
         str("tempoPrescribed", record.tempo)
         // The prep, both halves. [num] drops a null, which is right -- a set

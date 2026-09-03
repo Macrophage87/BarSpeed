@@ -8,6 +8,8 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.data.SessionEntity
+import com.macrophage.barspeed.model.VoidSetPolicy
+import com.macrophage.barspeed.model.VolumeSet
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.ShareUtil
 import kotlinx.coroutines.CancellationException
@@ -29,6 +31,11 @@ import java.util.concurrent.TimeUnit
 /** One history row: session summary plus a per-set mean-velocity sparkline. */
 data class HistoryRow(
     val session: SessionEntity,
+    /**
+     * Sets the lifter PERFORMED, which since #60 is not the number of rows the
+     * session holds: a set marked as not performed stays in the session and in
+     * the export and is excluded here.
+     */
     val setCount: Int,
     val sparkline: List<Double>,
 )
@@ -353,12 +360,27 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val history =
             sessions.take(HISTORY_LIMIT).map { session ->
                 val sets = sessionRepository.sets(session.id)
+                // THE THREE READS BELOW ARE THE THREE #60 NAMES, and each one
+                // asks VoidSetPolicy rather than testing the flag itself, so
+                // the rule lives in one place that a test on the CI path can
+                // reach. A set the lifter says they did not perform is still
+                // in `sets` -- it is still in their history and still in the
+                // export -- and must appear in none of these.
+                val performed = VoidSetPolicy.performed(sets) { it.voided }
                 if (session.startedAtMs >= weekStartMs) {
                     weekSessions++
-                    weekVolumeKg += sets.sumOf { it.loadKg * it.actualReps }
+                    // Not `performed.sumOf { … }`: volume asks its own
+                    // question of VoidedSetEffects, because a 0 kg voided set
+                    // moves no tonnage at all and a policy that only guarded
+                    // this figure would have looked right while leaving the
+                    // count below it wrong.
+                    weekVolumeKg +=
+                        VoidSetPolicy.volumeKg(
+                            sets.map { VolumeSet(loadKg = it.loadKg, reps = it.actualReps, voided = it.voided) },
+                        )
                 }
                 val spark =
-                    sets.mapNotNull { set ->
+                    performed.mapNotNull { set ->
                         sessionRepository.decodeAnalysis(set)
                             ?.reps
                             ?.takeIf { it.isNotEmpty() }
@@ -366,7 +388,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                             ?.average()
                             ?.takeIf { it.isFinite() }
                     }
-                HistoryRow(session, sets.size, spark)
+                HistoryRow(session, performed.size, spark)
             }
 
         return HomeState(
