@@ -139,6 +139,34 @@ class SchemaVoidedSetContractTest {
     }
 
     /**
+     * The version log says a void does NOT re-derive the session's heart rate.
+     *
+     * `heartRate.avgBpm` and `maxBpm` are written once, by `endSession`, over
+     * every set row of the session, and voiding a set does not touch them.
+     * A reader who drops voided sets and recomputes the pair will not get the
+     * published figures back. Without this sentence that difference reads as a
+     * corrupt document rather than as the contract, and the substrings below
+     * are the ones that carry the meaning: `heartRate`, `avgBpm`, `maxBpm`,
+     * `frozen` and `re-derived` were ALL already somewhere in this 49 kB log
+     * before it was written, so asserting on any of them alone would have
+     * passed against a log that never mentions voiding at all.
+     */
+    @Test
+    fun `the version log says a void does not re-derive the session heart rate`() {
+        val description =
+            schema("session-export.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
+                .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "NOT re-derived by a void" in description,
+            "the version log does not say a void leaves the session heart rate alone: $description",
+        )
+        assertTrue(
+            "recomputing them from the published sets will not reproduce them" in description,
+            "the version log does not warn that the published heart rate cannot be rebuilt from the sets",
+        )
+    }
+
+    /**
      * The published example carries a voided set, and it still carries its own
      * figures.
      *
