@@ -91,9 +91,11 @@ import kotlin.test.assertEquals
  * The first attempt at that check assigned reps to cue windows by the END of
  * the completing run and appeared to show alternating double- and
  * under-counting. That was an artefact of reps completing near a window
- * boundary. Assigning by the run START and by its MIDPOINT agree with each
- * other and disagree with it, so the pin below uses the stable rule. The
- * assignment was tested rather than trusted.
+ * boundary. The pin below assigns by the run START. Measured at this commit
+ * over the three leg-curl captures it loops: START and MIDPOINT give the same
+ * per-window counts on two of them and differ on `field-legcurl-1030-12rep-c`,
+ * whose closing window holds two runs by start and one by midpoint. END
+ * differs from both on all three.
  *
  * Separately, and confirmed by reading the constructor: StreamingSetTracker
  * takes startsWith, config, a sample rate, velocityScale and driveIsPositive.

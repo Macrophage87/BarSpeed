@@ -66,9 +66,10 @@ import kotlin.test.assertTrue
  * their DRIVE STARTS on. Issue #94 records an earlier pass that assigned by the
  * END of the completing run and produced a striking alternating pattern of
  * double- and under-counting -- an artefact of reps completing near a window
- * boundary. `the assignment rule is stable under a second rule` asserts that
- * the start rule and the midpoint rule agree window for window, so the figures
- * here do not rest on one arbitrary choice.
+ * boundary. `the headline does not rest on which end of a detection is
+ * assigned` scores the corpus under the start, midpoint and end rules. The
+ * three disagree per-capture on seventeen of the twenty captures here, and the
+ * matched total moves twelve windows of 170 across them.
  *
  * Arrival timestamps, not the DSP's reconstructed clock: `VelocityEstimator`
  * places sample i at `i * dt`, which drifts from arrival by up to
@@ -334,7 +335,7 @@ class BatchCueCoverageTest {
         // and produced a tidy-looking alternation that was an artefact. The
         // defence is to score under every rule and publish the spread.
         //
-        // A CORRECTION THIS FILE OWES THAT MEASUREMENT. Its method note says
+        // A CORRECTION THIS FILE OWES THAT MEASUREMENT. Its method note said
         // the start rule and the midpoint rule "agree with each other and
         // disagree with" the end rule. That was measured on the LIVE tracker,
         // where a counted rep is an instant. It is FALSE of the batch path,
