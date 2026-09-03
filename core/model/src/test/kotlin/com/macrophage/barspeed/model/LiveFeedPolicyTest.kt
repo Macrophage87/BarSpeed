@@ -25,6 +25,13 @@ import kotlin.test.assertTrue
  * both before and after the margin rule lands, which is why they are here and
  * not in the red commit.
  *
+ * THE THREE MARGIN CASES ADDED HERE ARE RED at this commit and are the
+ * whole of it. `liveFeed` moves the readout the instant the armed unit is
+ * under [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] and any partner is over
+ * it, so armed 7 / partner 8 -- a lead of ONE frame, roughly 10 ms at the
+ * 100 Hz this app configures -- currently returns role B, fellBack true and
+ * switched true, and all three assertions fail on each of the three.
+ *
  * The seam is why this file can exist. The decision runs inside `:app`'s sample
  * handlers, which no test on the CI path reaches.
  */
@@ -124,6 +131,30 @@ class LiveFeedPolicyTest {
         assertEquals(SensorRole.B, feed.role)
         assertTrue(feed.fellBack)
         assertTrue(feed.switched)
+    }
+
+    @Test
+    fun `an armed unit one frame behind its partner keeps the readout`() {
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, BOTH, frames(7, 8))
+        assertEquals(SensorRole.A, feed.role)
+        assertFalse(feed.fellBack)
+        assertFalse(feed.switched)
+    }
+
+    @Test
+    fun `a partner seven frames ahead is not far enough ahead to take the readout`() {
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.A, SensorRole.A, BOTH, frames(7, 14))
+        assertEquals(SensorRole.A, feed.role)
+        assertFalse(feed.fellBack)
+        assertFalse(feed.switched)
+    }
+
+    @Test
+    fun `the margin holds in either direction`() {
+        val feed = LiveFeedPolicy.liveFeed(SensorRole.B, SensorRole.B, BOTH, frames(9, 2))
+        assertEquals(SensorRole.B, feed.role)
+        assertFalse(feed.fellBack)
+        assertFalse(feed.switched)
     }
 
     private companion object {
