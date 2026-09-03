@@ -32,12 +32,22 @@ class SetLoadUnitToggleTest {
         }
     }
 
+    /**
+     * NOT A NO-OP CASE TO SKIP OVER. The settings flow replays the current unit
+     * to every new subscriber, so `RecordViewModel`'s collector runs this on
+     * launch with `from` equal to `to` -- and if the identity were left to fall
+     * out of the arithmetic instead of being stated, opening the app would snap
+     * whatever the lifter had typed onto the step grid and strip their spacing.
+     * Hence the off-grid `102.3` and the padded string rather than a value the
+     * conversion would have returned unchanged anyway.
+     */
     @Test
     fun `converting to the unit already shown changes nothing`() {
         for (unit in WeightUnit.entries) {
-            val c = SetLoadPolicy.convertedLoad("102.5", unit, unit)
-            assertEquals("102.5", c.text)
-            assertEquals(unit.toKg(102.5), c.kg)
+            val c = SetLoadPolicy.convertedLoad("102.3", unit, unit)
+            assertEquals("102.3", c.text)
+            assertEquals(unit.toKg(102.3), c.kg)
+            assertEquals("  60  ", SetLoadPolicy.convertedLoad("  60  ", unit, unit).text)
         }
     }
 
