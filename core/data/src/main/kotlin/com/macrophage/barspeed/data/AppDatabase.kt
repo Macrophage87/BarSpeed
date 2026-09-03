@@ -62,6 +62,29 @@ import java.io.File
  * installs the older release first and upgrades over it rather than starting
  * empty. The sentence above about v0.1.48 carrying 13 was true when it was
  * written and is not now; it is replaced rather than kept beside this one.
+ *
+ * SIXTEEN IS NOT SETTLED UNTIL THIS LANDS, and the check belongs at the
+ * landing rather than here. `origin/claude/v0150-export-truth-2`, read at
+ * `bde6a114228e888fd8944918692a25bb159f4e4d` on 2026-09-03 and confirmed
+ * unlanded by `git merge-base --is-ancestor bde6a114 origin/main` failing,
+ * also declares `DATABASE_VERSION = 16` with its own hop. Two unlanded lanes
+ * cannot both be 16, and whichever lands second is the one that must move: an
+ * install that ran the other lane's 16 would find this schema under the same
+ * number and Room would either skip the hop or fail its `TableInfo` check.
+ *
+ * SO, BEFORE LANDING: re-read `origin/main`'s `DATABASE_VERSION`. If it is
+ * still 15, land as is. If it is 16, renumber this hop to `MIGRATION_16_17`
+ * with `Migration(16, 17)` and this constant to 17, move the newest-hop
+ * equality in `Migration15To16Test` with it, REGENERATE `17.json` by running
+ * Room's schema export rather than renaming `16.json`, delete the `16.json`
+ * this branch adds, and re-run the emulator upgrade exercise -- the hop being
+ * verified would be a different hop.
+ *
+ * THAT PIN IS RE-READ EVERY ROUND AND NEVER CARRIED FORWARD. An earlier
+ * round's commit body gave that lane's tip as `80f813bd` and the round-3
+ * verdict gave it as `2a954f11`; both were true when written and both are
+ * stale, which is the whole reason the SHA is re-read here rather than
+ * quoted from either.
  */
 const val DATABASE_VERSION = 16
 

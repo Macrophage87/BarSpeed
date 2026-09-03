@@ -322,6 +322,27 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * WHEN THESE FIGURES RECOMPUTE, and what does not invalidate them.
+     *
+     * The only Room source in this combine is `sessionRepository.sessions`,
+     * whose query is `SELECT * FROM sessions` (`Daos.kt`). The per-set reads
+     * below -- the sets of each session, and the analysis decoded from each
+     * set -- are suspend calls made INSIDE the transform, not flows, so
+     * nothing observes `set_records`. An edit confined to that table does not
+     * make Room re-emit here: the week tonnage, the week set count and the
+     * sparkline keep the values they were last built with until the sessions
+     * table itself changes or this flow restarts, which
+     * `WhileSubscribed(5_000)` does five seconds after the last collector
+     * goes away -- returning to this screen from the session detail screen
+     * is past that in ordinary use, and is what makes a void visible here.
+     *
+     * PRE-EXISTING AND NOT INTRODUCED BY THE VOID MARK (#60): editing a set
+     * rpe or a set's load has always had the same bound, and voiding is one
+     * more write to the same table. It is stated here because a stale figure
+     * that is CORRECT once the screen is revisited reads exactly like a
+     * guard that does not work.
+     */
     val state =
         combine(
             sessionRepository.sessions,

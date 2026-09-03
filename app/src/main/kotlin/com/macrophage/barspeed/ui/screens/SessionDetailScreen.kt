@@ -267,6 +267,20 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
  * The reason is optional and stays optional. A lifter who knows the set did
  * not happen has nothing more to say about it, and an empty field is stored as
  * no reason rather than as an empty string.
+ *
+ * EVERY PATH OUT OF THE DIALOG CLEARS THE FIELD, not only the one that
+ * submits. `reason` outlives the dialog -- it is remembered on the row, not
+ * inside the dialog -- so a reason typed and then abandoned used to be
+ * pre-filled the next time the dialog opened, and the next tap of the confirm
+ * button would publish it as the lifter's own words for a different set. The
+ * lifter is the only source of this text, so text they backed out of is not
+ * theirs.
+ *
+ * Both states are `remember` rather than `rememberSaveable`, so a process
+ * death or a rotation mid-dialog drops the typed reason and closes the
+ * dialog. That is deliberate and is the same direction of failure: nothing
+ * recorded is lost, and no text reaches an export that the lifter did not
+ * confirm.
  */
 @Composable
 private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel) {
@@ -275,7 +289,10 @@ private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel) 
 
     if (asking) {
         AlertDialog(
-            onDismissRequest = { asking = false },
+            onDismissRequest = {
+                asking = false
+                reason = ""
+            },
             title = { Text("Not performed?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -301,7 +318,14 @@ private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel) 
                     },
                 ) { Text("Mark not performed") }
             },
-            dismissButton = { TextButton(onClick = { asking = false }) { Text("Cancel") } },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        asking = false
+                        reason = ""
+                    },
+                ) { Text("Cancel") }
+            },
         )
     }
 

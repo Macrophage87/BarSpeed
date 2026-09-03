@@ -26,6 +26,17 @@ enum class SetPlace {
  * near-neighbour failure this repository keeps producing is a flag wired into
  * the first consumer and not the last, and the only defence that scales is to
  * make the consumers read one object. Every field is asked, never assumed.
+ *
+ * WHAT IS NOT ON THIS LIST, DECIDED RATHER THAN OVERLOOKED: a SESSION. The
+ * week's session count on the home screen is unguarded on purpose, so a
+ * session every set of which is voided still counts as one session. Voiding
+ * says a SET did not happen; it does not say the lifter was never there, and
+ * a session exists because it was started. The figures that describe WORK --
+ * tonnage, set counts, the per-set sparkline and any progression read -- are
+ * the ones the mark removes work from, and each of them asks a field above.
+ * There is no `countsAsASession` field because nothing should read one; if a
+ * later round decides a fully-voided session should stop counting, it is a
+ * new field here and not a fifth boolean at the call site.
  */
 data class VoidedSetEffects(
     /**
