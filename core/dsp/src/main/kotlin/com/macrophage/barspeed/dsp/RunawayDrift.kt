@@ -30,8 +30,17 @@ import kotlin.math.abs
  *
  * The two thresholds read here -- [DspConfig.maxRunDisplacementM] for what
  * counts as a runaway and [DspConfig.pauseBandMps] for what counts as
- * same-sign motion -- are the two the segmenter already reads. Nothing here
- * introduces a tunable.
+ * same-sign motion -- are the same two constants the segmenter reads. Nothing
+ * here introduces a tunable.
+ *
+ * They are not read in the same FRAME, though. [VelocityEstimator.estimate]
+ * runs this correction, and `SetAnalyzer.analyze` applies
+ * `mappedToLifter(sensorToLifter)` to the result AFTER that call returns. So
+ * this pass judges both thresholds against sensor-frame velocity while the
+ * segmenter judges them against a copy scaled by `travelRatio`; the two
+ * coincide only where that ratio is 1.0. Every capture in this corpus declares
+ * 1.0 -- the one inverted mount flips sign only, which both thresholds are
+ * symmetric under -- so no fixture here can show the difference. Issue #233.
  *
  * ## What it does NOT claim
  *
@@ -106,8 +115,12 @@ object RunawayDrift {
      * The index ranges of same-sign runs displacing beyond the cap.
      *
      * Same-sign is judged against [DspConfig.pauseBandMps], the dead band
-     * [RepSegmenter.classifyRunsDetailed] classifies with, so a run here is the
-     * same object the segmenter would form and reject.
+     * [RepSegmenter.classifyRunsDetailed] classifies with -- the same constant,
+     * read in a different frame. This pass runs inside
+     * [VelocityEstimator.estimate]; `SetAnalyzer.analyze` applies
+     * `mappedToLifter(sensorToLifter)` to the returned series, so the segmenter
+     * classifies velocities scaled by `travelRatio` and this function does not.
+     * The two agree only at ratio 1.0. Issue #233.
      */
     internal fun runaways(velocity: DoubleArray, timeS: DoubleArray, config: DspConfig): List<IntRange> {
         val n = velocity.size

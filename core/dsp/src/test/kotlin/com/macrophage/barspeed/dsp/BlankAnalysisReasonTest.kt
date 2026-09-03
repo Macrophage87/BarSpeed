@@ -322,11 +322,14 @@ class BlankAnalysisReasonTest {
     }
 
     @Test
-    fun `a blank analysis on a healthy stream is one capture in this corpus, not the norm`() {
+    fun `no capture with reps in it publishes a blank analysis, and the two that do performed none`() {
         // #138's ask, as a contract: a healthy stream publishing nothing must
         // be the exception. Measured over every capture under its declared
         // start phase where one is known and under both where it is not, this
-        // counts the (capture, phase) pairs that segment to zero.
+        // counts the (capture, phase) pairs that segment to zero. The list is
+        // three pairs over TWO captures, and both of them performed zero reps
+        // -- a twenty-second hold and a still-sensor control -- so no capture
+        // in this corpus with a rep in it publishes a blank analysis.
         val config = DspConfig()
         val blank = corpus.flatMap { fixture ->
             StartPhase.entries.mapNotNull { startsWith ->

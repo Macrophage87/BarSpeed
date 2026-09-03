@@ -34,12 +34,19 @@ import kotlin.test.assertTrue
  * can degrade the total and a candidate that improves the total can do it by
  * adding junk. Issue #94 records that finding at length. So every row carries:
  *
- * - **matched** -- windows with at least one detection. Reps the lifter did and
- *   the analyzer found.
- * - **empty** -- windows with none. Reps the lifter did and the analyzer missed.
+ * - **matched** -- windows with a detection in them.
+ * - **empty** -- windows with none.
  * - **doubled** -- detections beyond the first inside one window. One rep
  *   reported twice.
  * - **stray** -- detections inside no window at all.
+ *
+ * A mark is a rep the metronome CALLED, which is not always a rep the lifter
+ * performed. `field-ohp-3010-6rep-s37-set02` is a failed set: the metronome
+ * called the planned 8 against 6 performed -- `CuedRepCoverageTest` pins
+ * `cued = 8` beside `performed = 6` -- and this file scores 8 marks for it.
+ * 168 of this corpus's 170 marks have a performed rep behind them; those two
+ * do not. So an empty window is one the analyzer published nothing in, which
+ * on every mark but those two is also a rep it missed.
  *
  * `matched + empty` is always the mark count. `spans` is what the lifter's
  * screen and the export show, and it is deliberately NOT the headline: a set
@@ -126,7 +133,7 @@ class BatchCueCoverageTest {
      * Captures with no per-rep truth for this file to score against, each for a
      * stated reason. Nothing is here because it was inconvenient.
      *
-     * - no `-cues.csv` is committed beside the capture at all: the first eight.
+     * - no `-cues.csv` is committed beside the capture at all: the first nine.
      * - `field-ropedeadhang-hold20-s37-set11` HAS a committed track, and the
      *   track calls no reps -- it is a twenty-second hold, `kind: "hold"`,
      *   `reps: 0` in its own `meta.json`. There is no `Down`, so there is no
@@ -260,7 +267,7 @@ class BatchCueCoverageTest {
         assertEquals(170, actual.values.sumOf { it[0] }, "metronome marks across the twenty scored captures")
         assertEquals(178, actual.values.sumOf { it[1] }, "spans the batch analyzer publishes over them")
         assertEquals(147, actual.values.sumOf { it[2] }, "marks with at least one detection")
-        assertEquals(23, actual.values.sumOf { it[3] }, "marks with none -- reps performed and not published")
+        assertEquals(23, actual.values.sumOf { it[3] }, "marks with none -- called and not published")
     }
 
     @Test

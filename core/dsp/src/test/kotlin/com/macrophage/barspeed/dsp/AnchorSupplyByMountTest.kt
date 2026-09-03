@@ -329,9 +329,11 @@ class AnchorSupplyByMountTest {
         // The consequence to read is the velocity loss. set05 and set06
         // published NOTHING for it before, because a summary over one and
         // three reps withholds the figure; both now publish -- 26.0% and 24.0%
-        // -- computed over reps whose ROM spans a factor of ten. Absence
-        // became a number, and the number is built on the same reconstruction
-        // that produced the 1.724 m rep.
+        // -- computed over reps whose ROM spans 0.143 m to 1.724 m against the
+        // 0.333-0.345 m bench. Absence became a number the lifter reads, and
+        // the number is built on the same reconstruction that produced the
+        // 1.724 m rep. Issue #234 holds the publication rule; this file only
+        // pins what the two sets now say.
         val ohp = batchAnalysis("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC, 24.948)
         assertRoms(
             listOf(0.506, 1.075, 0.840, 1.092, 0.567, 0.777, 0.682, 0.526, 0.773),
