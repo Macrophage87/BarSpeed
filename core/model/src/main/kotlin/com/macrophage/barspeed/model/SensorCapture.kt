@@ -193,8 +193,8 @@ data class RecordedSensors(
     val silent: Map<SensorRole, ArmedDelivery> = emptyMap(),
     /**
      * What the app could see of the ONE armed link on a set whose stream
-     * carries no role, or null when that link delivered or there was none
-     * (#224).
+     * carries no role, or null when that link delivered a stream the
+     * analysis could run on or there was none (#224, bar widened by #209).
      *
      * [silent]'s answer for the set that has no key to hang it off. A role
      * exists only where two paired units carry two different labels, so on one
@@ -220,9 +220,9 @@ data class RecordedSensors(
      *
      * Null on every ordinary set and absent from the encoded JSON when null,
      * since the repository encodes with kotlinx's default
-     * `encodeDefaults = false`. So a one-sensor set whose unit delivered stores
-     * no declaration at all and its export is byte-identical to what this app
-     * has always written.
+     * `encodeDefaults = false`. So a one-sensor set whose unit delivered a
+     * stream the analysis could run on stores no declaration at all and its
+     * export is byte-identical to what this app has always written.
      *
      * NULL MEANS THE SET CAPTURED A STREAM THE ANALYSIS COULD USE from that
      * one link -- at least [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] of it,

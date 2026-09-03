@@ -45,7 +45,7 @@ data class ArmedCapture(
  * same inputs.
  *
  * A free function rather than a member of [SensorCapturePolicy]: it holds
- * BUFFERS, and every rule in that object answers from counts and roles alone.
+ * BUFFERS, and nothing in that object takes or returns an [ImuSample].
  * Keeping it outside is what stops a later reader assuming the object can
  * reach a sample.
  *

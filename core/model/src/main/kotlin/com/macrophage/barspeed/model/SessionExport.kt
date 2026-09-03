@@ -1525,9 +1525,9 @@ data class SetSensorsExport(
     val silent: Map<String, String> = emptyMap(),
     /**
      * What the app could see of the ONE armed link on a set whose stream
-     * carries no role, or absent when that link delivered too few frames to
-     * analyse (1.17, #224; widened from "delivered nothing" to "delivered
-     * enough to analyse" by #209).
+     * carries no role, or absent when that link delivered a stream the
+     * analysis could run on (1.17, #224; the bar moved from "any frames at
+     * all" to "enough frames to analyse" by #209).
      *
      * [silent]'s answer for the set that has no key to hang it off. A role
      * exists only where two paired units carry two different labels, so on the

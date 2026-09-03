@@ -125,7 +125,8 @@ class SchemaShortDeliveryContractTest {
      * anything at all.
      *
      * The near neighbour of the other two: it is [silent]'s own vocabulary for
-     * the set that has no role to key it by, and c10d9e52 widened
+     * the set that has no role to key it by, and the commit that moved the
+     * analysis off a unit that delivered too little to analyse widened
      * `analysedFellBack`, `silent` and the schema's `present` without touching
      * this key's own published description, so a reader of the document alone
      * would still read a one-sensor set that delivered a handful of frames as

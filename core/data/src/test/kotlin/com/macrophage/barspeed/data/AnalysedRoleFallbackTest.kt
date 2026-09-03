@@ -307,8 +307,9 @@ class AnalysedRoleFallbackTest {
      * The record path's own composition, mirrored rather than executed.
      *
      * `armedCaptureOf` -- in `ArmedCapture.kt` in `:core:model` since #212, and
-     * in `RecordViewModel.kt` before that -- builds the same four decisions,
-     * in the same order, from a copy of this code rather than from this code:
+     * in `RecordViewModel.kt` before that -- builds four decisions in the same
+     * order, three of them the same way, from a copy of this code rather than
+     * from this code:
      * the armed roles keyed to their buffers, the analysable roles by
      * [SensorCapturePolicy.analysable] (#209) -- which this mirror does NOT
      * do: it still calls [SensorCapturePolicy.present], so it mirrors a rule
