@@ -625,6 +625,31 @@ data class SessionExport(
          * performed. The example is deleted rather than repointed, exactly as
          * `NoRepsReason`'s own KDoc deletes it.
          *
+         * 1.18 carries a FIFTH change, under the same number and for the same
+         * reason -- 1.18 is unreleased, minted by #216 -- and it IS additive
+         * (#220): [GeometrySourceExport] gains a seventh key, `bodyweight`, so
+         * the flag deciding whether the lifter's own mass is a term in
+         * [SetExport.loadKg] says who supplied it. `source` is a CLOSED
+         * object, so a reader validating against 1.17 or earlier rejects a
+         * 1.18 document on this key exactly as it would on `sensorOnStack`;
+         * nothing published stops being published or changes meaning. A set
+         * recorded before this shipped re-exports `default` whatever its plan
+         * said, permanently -- no earlier build stored the answer.
+         *
+         * 1.18 carries a SIXTH change, under the same number and for the same
+         * reason, and it IS additive (#220): a set may carry
+         * [SetExport.bodyWeightKg], the body weight [SetExport.loadKg] was
+         * computed with. On the six of field-37's thirteen sets that are
+         * body-weight work the lifter's own mass is the LARGEST term in
+         * `load_kg` and no key named it, so cross-session comparison of an
+         * assisted pull-up mixed body-weight drift with assistance changes
+         * invisibly. `load_kg` and `plannedLoad_kg` are unchanged and still
+         * the sums they always were. Optional and absent on loaded work, on
+         * every set recorded before database v17, and on a body-weight set
+         * the app held no body weight for -- the last two indistinguishable,
+         * permanently, since nothing recorded what the lifter weighed on a
+         * past date.
+         *
          * 1.18 carries a SEVENTH change, under the same number and for the same
          * reason, and it adds no key and changes no key's type or value
          * (#178): `rest_s` gains the description it never had, stating the
@@ -643,8 +668,8 @@ data class SessionExport(
          * published from `hrm` changes. Not retroactive and cannot be: no
          * earlier build stored the two windows apart.
          *
-         * 1.18 carries a SIXTH change, under the same number and for the same
-         * reason, and it adds no key to THIS document (#133): the raw
+         * 1.18 carries an EIGHTH change, under the same number and for the
+         * same reason, and it adds no key to THIS document (#133): the raw
          * archive's `rollExcursion_deg` is measured over the set's WORKING
          * WINDOW -- `workStartedAt_ms`, which that document already carries,
          * to the terminal cue in the set's own cue-track CSV in the same
