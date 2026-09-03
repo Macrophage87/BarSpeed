@@ -381,6 +381,26 @@ class SessionExporter(
                 romSpreadPct = SetAnalyzer.romSpreadPct(reps),
                 peakPowerW = reps.mapNotNull { it.peakPowerW }.maxOrNull(),
                 meanConPowerW = reps.mapNotNull { it.meanConPowerW }.averageOrNull()?.round1(),
+                // Why every key above is absent, when they all are. Schema
+                // 1.18, issue #138: a healthy stream can segment to nothing,
+                // and a `summary: {}` carrying no reason is byte-identical to
+                // a manual set recorded with no sensor at all.
+                //
+                // READ off the stored analysis, never recomputed. The
+                // judgement needs the sample series, not the rep list, so it
+                // is not answerable here the way velocityLossBasis above is;
+                // re-running the segmenter would mean inflating this set's IMU
+                // stream at export time, which this class deliberately does not
+                // do. The consequence is stated rather than hidden: every set
+                // recorded before 1.18 keeps publishing an empty summary with
+                // no reason, permanently, and no later export fills it in.
+                //
+                // Gated on the REPS, not on whether the analysis carries a
+                // word, for the reason repMetricsComplete gives at its own call
+                // site -- and not on the export mode either, because the
+                // summary reader is exactly the reader who most needs to be
+                // told the figures are absent rather than zero.
+                noRepsReason = analysis?.noRepsReason?.wireName?.takeIf { reps.isEmpty() },
             ),
         )
     }

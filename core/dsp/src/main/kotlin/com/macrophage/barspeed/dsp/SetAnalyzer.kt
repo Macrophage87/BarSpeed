@@ -201,7 +201,8 @@ object SetAnalyzer {
     ): SetAnalysis {
         val raw = VelocityEstimator.estimate(samples, config, direction.measuredPlane)
         val series = orient(raw, direction, config).mappedToLifter(direction.sensorToLifter)
-        val spans = RepSegmenter.segment(series, direction, config)
+        val segmentation = RepSegmenter.segmentDetailed(series, direction, config)
+        val spans = segmentation.spans
         // The sample's OWN arrival stamp, not a time off the reconstructed
         // clock the series runs on: the series is built index-parallel to the
         // sample list, so this is exact, and comparing it against a cue costs
@@ -232,6 +233,20 @@ object SetAnalyzer {
         val tempoCompliance =
             targets.tempo?.let { complianceFor(it, targets.toleranceS, reps, direction) }
         val verdicts = CoachingRules.verdicts(reps, velocityLoss, tempoCompliance, targets)
+        // Why the list above is empty, when it is. Issue #138: a healthy
+        // stream can segment to nothing, and until this the analysis said so
+        // only by omission -- indistinguishable from a set nobody measured.
+        //
+        // Taken from the census the segmentation pass ABOVE produced, not from
+        // a second one: the counts describe the run that produced these very
+        // spans. `within` rather than `spans` is the second argument because
+        // the cue bound has already been applied by then, and a set whose
+        // detections were all excluded by its own end cue is a different fact
+        // from one the segmenter could not resolve.
+        //
+        // Null the moment one rep survives, which is [NoRepsReason.of]'s own
+        // first test rather than a condition repeated here.
+        val noRepsReason = NoRepsReason.of(segmentation.census, within.size)
         return SetAnalysis(
             reps,
             series.sampleRateHz,
@@ -239,6 +254,7 @@ object SetAnalyzer {
             tempoCompliance,
             verdicts,
             setEnd.detectionsAfter(driveStartMs),
+            noRepsReason,
         )
     }
 
