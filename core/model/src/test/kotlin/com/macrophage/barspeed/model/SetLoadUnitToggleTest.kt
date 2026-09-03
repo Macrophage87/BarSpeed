@@ -9,8 +9,9 @@ import kotlin.test.assertNull
  * the set records does not (#77).
  *
  * These are the clauses of [SetLoadPolicy.convertedLoad]'s contract that hold
- * before the fix as well as after -- the pass-through cases and the step
- * table. The clauses that do NOT hold before the fix are pinned separately in
+ * before the fix as well as after -- the pass-through cases, the step table,
+ * and double-tap stability, which the identity seam satisfies trivially. The
+ * clauses that do NOT hold before the fix are pinned separately in
  * `SetLoadUnitToggleDifferentialTest`, which is red at its own commit.
  */
 class SetLoadUnitToggleTest {
@@ -47,5 +48,30 @@ class SetLoadUnitToggleTest {
             100.0 / WeightUnit.LB_PER_KG,
             SetLoadPolicy.convertedLoad("100", WeightUnit.LB, WeightUnit.KG).kg,
         )
+    }
+
+    /**
+     * The hazard #77 named: the chip is one tap and the lifter can tap it
+     * twice. Converting a value this function itself produced, out and back,
+     * must return the identical string -- otherwise a lifter checking the other
+     * unit and changing their mind is charged for the look.
+     *
+     * A hand-typed value that is not on the new unit's step lattice IS
+     * quantised, once, on the first tap. That is the bounded loss the test
+     * above pins. From the second tap onward there is none.
+     */
+    @Test
+    fun `toggling twice returns the same text, exhaustively`() {
+        var kg = 0.0
+        while (kg <= 400.0) {
+            for (from in WeightUnit.entries) {
+                val to = from.other()
+                val settled = SetLoadPolicy.convertedLoad("$kg", WeightUnit.KG, from).text
+                val out = SetLoadPolicy.convertedLoad(settled, from, to).text
+                val back = SetLoadPolicy.convertedLoad(out, to, from).text
+                assertEquals(settled, back, "$settled ${from.suffix} -> $out ${to.suffix} -> $back")
+            }
+            kg += 0.25
+        }
     }
 }
