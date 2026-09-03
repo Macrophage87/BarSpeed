@@ -499,7 +499,10 @@ class ProgressiveBlockCarryTest {
     }
 
     /**
-     * RED before the fix. The guard is scoped to the warm-up-TO-working
+     * Green before the fix and after it, characterizing the guard's scope.
+     * 72b991b3 left [SetLoadPolicy.standingStatedAddedKg]'s finishedWarmup
+     * and nextWarmup parameters unread, so 32.0 was already returned before
+     * the guard existed; the guard is scoped to the warm-up-TO-working
      * transition specifically, not to "a warm-up is involved" -- a ramp of
      * two warm-up sets before the working weight is a progression in exactly
      * the sense 45 / 55 / 65 is, and a correction stated on the first warm-up

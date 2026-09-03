@@ -1648,9 +1648,15 @@ private fun loadFieldLabel(slot: PlannedSlot?, unit: WeightUnit): String = Bodyw
  * caption is drawn at all, because a caption is drawn only when the box's
  * rendered text differs from the plan's and an untouched box is re-seeded from
  * that same declaration. So the sentence and the behaviour cannot disagree: on
- * the last set of a block, and wherever the plan prescribes a different number
- * next, the answer is null and the caption says the change is recorded rather
- * than claiming a reach it does not have.
+ * the last set of a block, the answer is null for all three boxes. Reps and
+ * hold also answer null wherever the plan prescribes a different number next
+ * -- SetRepsPolicy stops the carry there. The load does not: since b3c649e7
+ * it carries a correction across a stepping plan as a distance rather than
+ * stopping, so [SetLoadPolicy.standingStatedAddedKg] stays non-null there
+ * too. What withholds the load's reach sentence is not a policy null but
+ * [nextDeclaredAddedKg], passed to [PlanValueCaption.load] separately and
+ * compared against the planned figure inside it -- the caption says the
+ * change is recorded rather than claiming a reach it does not have.
  *
  * The PLANNED side is the FROZEN declaration and the SHOWN side is the box, so
  * the caption names the plan's prescription and the lifter's standing

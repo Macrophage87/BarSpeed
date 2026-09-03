@@ -30,11 +30,14 @@ package com.macrophage.barspeed.model
  * sentences above name the plan's number explicitly as the plan's, so neither
  * can be read as attributing the shown value to the plan; the reach sentence
  * additionally says whose the shown value is and how far it goes. So the reach
- * sentence is used wherever the statement will outlive this set, and the
- * export sentence wherever it will not, and [standsForLaterSets] -- computed
- * by the carry policy itself at the call site, never guessed here -- is what
- * decides. A caption whose reach claim came from a second reading of the carry
- * rule could disagree with the carry.
+ * sentence is used wherever the statement will outlive this set AND the plan
+ * holds the shown figure steady over that reach, the export sentence
+ * otherwise -- and TWO facts decide together: [standsForLaterSets], computed
+ * by the carry policy itself at the call site, never guessed here, and
+ * whether the plan's own next declaration differs from this set's, taken by
+ * the caller as [stepsAfterThis]. Either one false routes to the export
+ * sentence. A caption whose reach claim came from a second reading of either
+ * fact could disagree with the carry.
  *
  * REACH NAMES A NUMBER, SO IT ALSO NEEDS THE PLAN TO HOLD THAT NUMBER STEADY.
  * A statement can outlive this set while the FIGURE the box will show does

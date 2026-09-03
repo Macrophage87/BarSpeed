@@ -1823,9 +1823,12 @@ private fun restingState(
             // anyway.
             bodyweight = nextSlot?.exercise?.bodyweight ?: false,
             // The plan's own warmup declaration on each side of the pair --
-            // never lastSetWarmup or a live mark, both of which answer a
-            // question about the set that finished rather than about what the
-            // plan wrote for it.
+            // never s.lastSetWarmup, which this same function wrote into the
+            // RETURNED state on the transition before this one, so read here
+            // it still describes the set BEFORE p.slot rather than p.slot
+            // itself; p.slot?.warmup is asked directly instead.
+            // lastSetWarmupMark is excluded for the other reason: it is the
+            // lifter's own live statement, not the plan's declaration.
             finishedWarmup = p.slot?.warmup == true,
             nextWarmup = nextSlot?.warmup == true,
         )
