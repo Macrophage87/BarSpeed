@@ -468,6 +468,7 @@ class RawExporterTest {
                 "endedAt_ms",
                 "sampleRate_hz",
                 "rollExcursion_deg",
+                "rollExcursionBasis",
                 "files",
             ),
             manifest.set(0).keys,
