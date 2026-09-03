@@ -38,23 +38,8 @@ enum class GeometrySource {
 
 /**
  * Provenance for the six geometry values whose resolution has more than one
- * possible source.
- *
- * `sensorInverted` is absent on purpose, not by oversight: it is a non-nullable
- * `Boolean` on [PlanExerciseDef], so a plan that declared `false` and a plan
- * that said nothing decode to the same value and there is nothing left to
- * observe. Reporting a source for it would mean inventing one.
- *
- * `sensorOnStack` and `bodyweight` used to be listed beside it and are not any
- * more, for two different reasons. `sensorOnStack` is `Boolean?` on
- * [PlanExerciseDef] as of #223, an omitted key is a distinct state, and the
- * app publishes a source for it here. `bodyweight` is ALSO `Boolean?` as of
- * #227 -- an omitted key is observable at the type level too -- but no source
- * is published for it: doing so would add a seventh required key to the
- * published `geometrySource` object, which is an export contract change this
- * fix deliberately does not take (session-export schema stays 1.17). The
- * sentence that said all three were unobservable is deleted rather than
- * reworded, because it is false for two of them now.
+ * possible source. [GeometrySourceExport]'s KDoc is the one statement of
+ * which values carry a source and why -- read it there, not here.
  *
  * `sensorOnStack` defaults to [GeometrySource.DEFAULT] rather than being
  * required, and that default is load-bearing rather than decorative: this

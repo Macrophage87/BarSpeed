@@ -152,7 +152,7 @@ class PlanExerciseGeometryDeclarationTest {
      * reworded: `sensorOnStack` is `Boolean?` as of #223 and `bodyweight` is
      * `Boolean?` as of #227, an omitted key on either is a distinct state, and
      * the export publishes a source for `sensorOnStack` (not `bodyweight` --
-     * see [SetGeometryPolicy]'s `GeometrySources` KDoc for why).
+     * see [GeometrySourceExport]'s KDoc for why).
      */
     @Test
     fun `one geometry flag cannot tell a declared false from an omitted key`() {
