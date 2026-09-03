@@ -37,8 +37,17 @@ data class SegmentationCensus(
     /** Movement runs surviving all three demotion terms. */
     val qualifyingRuns: Int,
     /**
-     * Phase pairs the pairing walk formed and then discarded because the
-     * DRIVE displaced less than [DspConfig.minRomM].
+     * Drives the pairing walk reached and rejected because the drive
+     * displaced less than [DspConfig.minRomM].
+     *
+     * THE NAME SAYS "PAIRS" AND ON ONE OF THE TWO WALKS THERE IS NO PAIR. On
+     * the eccentric-first walk the matching drive has already been found when
+     * the ROM test runs, so a pair was formed and then discarded. On the
+     * concentric-first walk THE DRIVE ALONE IS THE REP: `RepSegmenter` tests
+     * the drive run's displacement before it searches for a following
+     * eccentric, so the rejection precedes any pair and none is formed. Both
+     * increments land in this one count, and the field name overstates the
+     * second case.
      *
      * See that constant's own KDoc: the floor filters on reconstruction
      * quality while claiming to filter on rep size, so a set emptied here is
@@ -117,7 +126,10 @@ enum class NoRepsReason(val wireName: String) {
     @SerialName("runsExceedDisplacementCap")
     RUNS_EXCEED_DISPLACEMENT_CAP("runsExceedDisplacementCap"),
 
-    /** No movement run survived demotion, and more of them failed on peak speed than on duration. */
+    /**
+     * No movement run survived demotion, and at least as many failed on peak
+     * speed as on duration -- a tie reads as too slow.
+     */
     @SerialName("runsBelowStartThreshold")
     RUNS_BELOW_START_THRESHOLD("runsBelowStartThreshold"),
 
@@ -133,7 +145,7 @@ enum class NoRepsReason(val wireName: String) {
     @SerialName("phasesUnpaired")
     PHASES_UNPAIRED("phasesUnpaired"),
 
-    /** Pairs formed and every one was discarded for a drive under [DspConfig.minRomM]. */
+    /** Every drive the pairing walk reached displaced less than [DspConfig.minRomM]. */
     @SerialName("driveBelowMinRom")
     DRIVE_BELOW_MIN_ROM("driveBelowMinRom"),
     ;

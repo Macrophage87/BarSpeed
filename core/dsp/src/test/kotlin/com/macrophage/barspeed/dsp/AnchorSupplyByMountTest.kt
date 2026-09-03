@@ -255,8 +255,13 @@ class AnchorSupplyByMountTest {
     @Test
     fun `what the two families resolve, against the counts performed`() {
         // field-ohp-...-set02, -bench-...-set05 and -set06 are the three
-        // field-37 sets that publish `summary: {}` in the session archive,
-        // which is issue #138. All three resolved NOTHING before issue #87 and
+        // field-37 sets that PERFORMED REPS -- six each -- and publish
+        // `summary: {}` in the session archive, which is issue #138. Six of
+        // that session's thirteen sets publish an empty summary, not three:
+        // sets 11, 12 and 13 are rope dead hangs, and for a timed hold with
+        // no reps performed an empty summary is the right answer. Counted
+        // from the session's own session.json, not from these fixtures.
+        // All three of the rep sets resolved NOTHING before issue #87 and
         // all three resolve something now -- 4, 1 and 3 against 6 performed.
         // None of them is right. One of the three is still further from the
         // lifter's count than from zero -- bench set05 at 1 of 6; set06 at 3 of

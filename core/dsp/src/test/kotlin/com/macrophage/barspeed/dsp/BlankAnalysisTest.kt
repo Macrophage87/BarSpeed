@@ -223,11 +223,12 @@ class BlankAnalysisTest {
         // 05's 21.93 m -- yet one rep survives, so its analysis is not blank.
         //
         // This is the pin on what a blank-analysis diagnosis does NOT cover. A
-        // set can carry two orders of magnitude more drift than the set beside
-        // it and still publish a summary, because a summary is published
-        // whenever ONE rep resolves. Under-resolution reaching zero is #138;
-        // under-resolution stopping at one is the same defect and nothing the
-        // export carries distinguishes it from a well-measured single.
+        // set can carry five times the drift of the set beside it -- 123.64 m
+        // against 21.93 m -- and still publish a summary, because a summary is
+        // published whenever ONE rep resolves. Under-resolution reaching zero
+        // is #138; under-resolution stopping at one is the same defect and
+        // nothing the export carries distinguishes it from a well-measured
+        // single.
         val runs = rawRuns("field-rdl-3010-10rep-s36-set04")
         assertEquals(12, runs.movement, "raw movement runs")
         assertEquals(2, runs.overDisplacementCap, "runs displacing past the cap")

@@ -130,7 +130,7 @@ class BlankAnalysisReasonTest {
         assertEquals(
             NoRepsReason.DRIVE_BELOW_MIN_ROM,
             NoRepsReason.of(empty.copy(movementRuns = 6, qualifyingRuns = 6, pairsBelowMinRom = 3), 0),
-            "pairs formed and every drive fell under the floor",
+            "every drive the pairing walk reached fell under the floor",
         )
     }
 
@@ -252,10 +252,10 @@ class BlankAnalysisReasonTest {
 
     @Test
     fun `which reasons this corpus actually produces, and which it does not`() {
-        // Two of seven. Stated as a measurement, not as a claim that the other
-        // five are unreachable: the corpus is 29 captures from seven sessions,
-        // and a set emptied by its own end cue or by the minimum-ROM floor is a
-        // thing the pipeline can produce and this corpus has not.
+        // Three of seven. Stated as a measurement, not as a claim that the
+        // other four are unreachable: the corpus is 29 captures from seven
+        // sessions, and a set emptied by its own end cue or by the minimum-ROM
+        // floor is a thing the pipeline can produce and this corpus has not.
         val config = DspConfig()
         val produced = corpus.flatMap { fixture ->
             StartPhase.entries.mapNotNull { startsWith ->
