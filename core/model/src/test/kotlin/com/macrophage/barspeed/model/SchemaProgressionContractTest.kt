@@ -57,7 +57,7 @@ class SchemaProgressionContractTest {
     // in PlanGeometryNullabilityContractTest, beside the mint that moved it.
 
     @Test
-    fun `the import gate accepts both 1_10 and the freshly minted 1_11`() {
+    fun `the import gate still accepts both 1_10 and 1_11`() {
         assertContains(PlanFile.SUPPORTED_SCHEMA_VERSIONS, "1.10")
         assertContains(PlanFile.SUPPORTED_SCHEMA_VERSIONS, "1.11")
     }

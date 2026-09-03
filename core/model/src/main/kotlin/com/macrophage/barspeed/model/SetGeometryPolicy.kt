@@ -150,7 +150,7 @@ data class StackMount(val onStack: Boolean, val source: GeometrySource)
  * This lived in `app/.../PlanQueue.kt`, inside a suspend extension on
  * `SessionRepository` that no test on the CI path calls, so nothing could run
  * against it. [resolve] is that code, moved here and since changed at its
- * `sensorOnStack` line; [describe] is new and reads its values off the
+ * `sensorOnStack`, `bodyweight` and `sensorInverted` lines; [describe] is new and reads its values off the
  * definition that was actually used, never recomputing them -- so what gets
  * published cannot drift from what the DSP was handed, whatever else changes
  * upstream.
