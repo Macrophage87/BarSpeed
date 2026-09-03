@@ -42,9 +42,19 @@ import kotlin.math.abs
  * `BatchCueCoverageTest` scores them window by window. Magnitude is a separate
  * defect and issue #115 is where it lives.
  *
- * It runs in [SetAnalyzer] and nowhere else. [StreamingSetTracker] integrates
- * per arriving sample with no set to take a mean over, so nothing here reaches
- * the live counter or changes what is recorded.
+ * ## Where it runs
+ *
+ * In [VelocityEstimator.estimate], as the stage after the ZUPT anchor pass.
+ * This KDoc said "in [SetAnalyzer] and nowhere else" when the symbol landed;
+ * that was the plan and it is wrong for the code, so it is corrected rather
+ * than reworded. SetAnalyzer would have been the narrower call site and it was
+ * the wrong one: every test that builds a series builds it through
+ * `estimate`, so a correction applied downstream of that would leave the whole
+ * test corpus measuring a series the analyzer never runs on.
+ *
+ * [StreamingSetTracker] does not call `estimate`; it integrates per arriving
+ * sample with no set to take a mean over, so nothing here reaches the live
+ * counter or changes what is recorded.
  */
 object RunawayDrift {
     /**

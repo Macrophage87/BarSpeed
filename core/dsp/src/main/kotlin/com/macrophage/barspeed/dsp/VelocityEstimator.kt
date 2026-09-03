@@ -46,15 +46,25 @@ data class VelocitySeries(
  */
 object VelocityEstimator {
     /**
-     * The series every consumer gets. Identical to [estimateAnchored] today;
-     * the split exists so a second drift stage has a named BEFORE to be
-     * measured against rather than a reconstruction of one. See issue #94.
+     * The series every consumer gets: [estimateAnchored] with [RunawayDrift]
+     * applied after it.
+     *
+     * The second stage is here rather than in [SetAnalyzer] on purpose. Every
+     * test that builds a series builds it through this function, so putting
+     * the correction anywhere downstream would leave those tests measuring a
+     * series the analyzer does not run on -- the drift issue #94's own record
+     * documents, where four files scored a `StreamingSetTracker` construction
+     * the app had stopped building and stayed green throughout.
+     *
+     * [StreamingSetTracker] does not call this at all; it integrates per
+     * arriving sample and has no set to take a mean over, so the live counter
+     * and everything the app records are untouched. See issue #94.
      */
     fun estimate(
         samples: List<ImuSample>,
         config: DspConfig = DspConfig(),
         plane: MovementPlane = MovementPlane.VERTICAL,
-    ): VelocitySeries = estimateAnchored(samples, config, plane)
+    ): VelocitySeries = RunawayDrift.corrected(estimateAnchored(samples, config, plane), config)
 
     /**
      * Velocity with the ZUPT anchor pass applied and nothing after it.
