@@ -57,6 +57,7 @@ class GyroGateTest {
         "field-rdl-3010-10rep-s36-set04",
         "field-rdl-3010-10rep-s36-set05",
         "field-reardeltfly-s32-set06",
+        "field-ropedeadhang-hold20-s37-set11",
         "field-seated-ohp-2rep",
         "field-still-0rep",
     )
@@ -178,6 +179,7 @@ class GyroGateTest {
             "field-legpress-single-2010-8rep",
             "field-legpress-single-2011-8rep-s36-set07",
             "field-still-0rep",
+            "field-ropedeadhang-hold20-s37-set11",
             "field-backsquat-10hz",
             "field-backsquat-10hz-set5",
             "field-bench-rotating-6rep",

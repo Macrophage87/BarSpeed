@@ -187,6 +187,11 @@ class CuedRepCoverageTest {
         "field-ohp-100hz-bursty",
         "field-pallof-static-12rep",
         "field-rdl-3010-10rep-s36-set04",
+        // Committed WITH its cue track, and still here: the track is a
+        // twenty-second hold's, so it carries no `Down` and calls no rep.
+        // There is no window to open and nothing per-rep to score. Its
+        // zero-rep guard is in `BatchCueCoverageTest`.
+        "field-ropedeadhang-hold20-s37-set11",
         "field-seated-ohp-2rep",
         "field-still-0rep",
     )
@@ -420,14 +425,20 @@ class CuedRepCoverageTest {
                 "$fixture must carry a cue track",
             )
         }
+        // The condition is no track that CALLS A REP, which is weaker than no
+        // track at all and is the honest form of it: a hold's track is
+        // committed (field-ropedeadhang-hold20-s37-set11) and calls nothing,
+        // so it belongs here, while a track with `Down` rows on it could not
+        // be parked here to avoid re-baselining a figure.
         notCueTracked.forEach { fixture ->
             assertTrue(
-                javaClass.getResourceAsStream("/$fixture-cues.csv") == null,
-                "$fixture must NOT carry a cue track",
+                javaClass.getResourceAsStream("/$fixture-cues.csv") == null ||
+                    CueTrack.calledReps(fixture) == 0,
+                "$fixture must NOT carry a cue track that calls a rep",
             )
         }
         assertEquals(20, cueTracked.size, "captures with a cue track")
-        assertEquals(9, notCueTracked.size, "captures without one")
+        assertEquals(10, notCueTracked.size, "captures with no track that calls a rep")
         assertTrue("field-ohp-100hz-bursty" in notCueTracked, "the survivors' capture has no truth")
     }
 

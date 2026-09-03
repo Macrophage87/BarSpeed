@@ -322,6 +322,12 @@ class BlankAnalysisReasonTest {
             listOf(
                 "field-rdl-3010-10rep-s36-set05/ECCENTRIC",
                 "field-rdl-3010-10rep-s36-set05/CONCENTRIC",
+                // A twenty-second rope dead hang, `reps: 0` in its own
+                // meta.json: nothing to resolve on the phase it declares, and
+                // this is the right answer rather than a miss. Scored
+                // concentric-first it publishes two, which is why only the
+                // eccentric pair appears here -- see BatchCueCoverageTest.
+                "field-ropedeadhang-hold20-s37-set11/ECCENTRIC",
                 "field-seated-ohp-2rep/ECCENTRIC",
                 "field-still-0rep/ECCENTRIC",
                 "field-still-0rep/CONCENTRIC",
