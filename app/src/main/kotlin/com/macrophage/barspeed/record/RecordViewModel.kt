@@ -4254,8 +4254,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 // one session and cannot be read as a standing preference.
                 bodyWeightPromptSkipped = false,
                 // A refusal is a fact about a set that was never started, and
-                // this session has no more sets. Left set, it would draw its
-                // dialog over the finished screen (#61).
+                // this session has no more sets. The dialog draws only on
+                // READY -- the stage dispatch sends FINISHED to
+                // `FinishedStage`, which never calls `BodyWeightRefusal` --
+                // so this clear is defensive: it stops a flag about a set
+                // that was never started from outliving the session that
+                // refused it (#61).
                 bodyWeightRequiredForSet = false,
             )
     }

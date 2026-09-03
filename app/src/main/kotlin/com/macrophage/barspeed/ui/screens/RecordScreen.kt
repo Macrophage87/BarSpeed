@@ -532,17 +532,19 @@ private fun BodyWeightRefusal(state: RecordState, viewModel: RecordViewModel) {
  * NOT [BodyWeightPromptDialog], and the difference is the whole point. That
  * one is an ASK raised before a session, it has a SKIP, and skipping starts
  * the session anyway (#181). This one is a REFUSAL raised by
- * `RecordViewModel.beginSet`, and its second button is CANCEL: it takes the
- * lifter back to the screen they were on with no set started, because there is
- * no answer that would let the app record a load it does not have.
+ * `RecordViewModel.beginSet`, and its second button is CANCEL: no set starts
+ * and nothing durable is written. On the START-button door the lifter is left
+ * where they were. On the rest-screen door `startNextSet` has already
+ * advanced the queue and cancelled the rest clock, so CANCEL leaves them on
+ * READY for the next set.
  *
  * SAVE is disabled until the box parses to a positive number, so the one
  * control that ends the refusal cannot end it with another absence.
  *
- * The two sentences that explain the refusal come from
- * [SetLoadPolicy.BODY_WEIGHT_REQUIRED] and [BodyWeightPromptPolicy.WHY_IT_MATTERS],
- * so a test on the CI path runs on that wording. The title, the field label
- * and both button words are written here and nothing tests them.
+ * [BodyWeightPromptPolicy.WHY_IT_MATTERS] is pinned on the CI path by
+ * `BodyWeightStalenessTest`; [SetLoadPolicy.BODY_WEIGHT_REQUIRED] is pinned by
+ * nothing. The title, the field label and both button words are written here
+ * and nothing tests them.
  */
 @Composable
 private fun BodyWeightRequiredDialog(

@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
  * entered a body weight (#61), and with an ad-hoc set against a body-weight
  * movement (#229 item 3).
  *
- * Started as characterization; seven assertions are now DIFFERENTIALS and are
+ * Started as characterization; three tests are now DIFFERENTIALS and are
  * marked RED in their own KDoc. They fail at the commit that introduces them
  * and the commit after it is what makes them pass.
  *
