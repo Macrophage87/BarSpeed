@@ -6,6 +6,7 @@ import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -202,6 +203,38 @@ class WalStaleVersionTest {
 
         File(db.path + "-wal").writeBytes(ByteArray(0))
         assertEquals(16, DatabaseRescue.storedVersion(db), "an empty wal changed the answer")
+    }
+
+    /**
+     * A MAIN FILE THIS CODE CANNOT READ STAYS UNREADABLE, whatever the `-wal`
+     * beside it says.
+     *
+     * Issue #101 set the rule and this does not reopen it: a database whose own
+     * header will not parse is never acted on, because moving one aside on the
+     * strength of a guess is the destructive direction. The `-wal` raises a
+     * version the main file declared; it does not supply one in place of a main
+     * file that declared nothing.
+     *
+     * The shape is reachable -- a torn in-place reinstall can leave a
+     * half-written main file beside an intact log. Green before the fix, for
+     * the trivial reason that nothing reads the log yet; it is here so that
+     * wiring the log in cannot quietly widen what gets rescued.
+     */
+    @Test
+    fun `an unreadable main file is not given a version by its wal`() {
+        val db = fixture()
+        val walBytes = File(db.path + "-wal").readBytes()
+
+        db.writeText("this is not a database".repeat(20))
+        File(db.path + "-wal").writeBytes(walBytes)
+        assertNull(DatabaseRescue.storedVersion(db), "a wal supplied a version for a file that has none")
+        assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(db, File(root, DatabaseRescue.RESCUE_DIR), 16))
+        assertTrue(db.isFile, "a file this code cannot read was moved on the strength of its wal")
+
+        db.delete()
+        File(db.path + "-wal").writeBytes(walBytes)
+        assertNull(DatabaseRescue.storedVersion(db), "an absent database was given a version by an orphan wal")
+        assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(db, File(root, DatabaseRescue.RESCUE_DIR), 16))
     }
 
     /**
