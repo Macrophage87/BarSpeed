@@ -11,22 +11,28 @@ import kotlin.test.assertTrue
  * entered a body weight (#61), and with an ad-hoc set against a body-weight
  * movement (#229 item 3).
  *
- * CHARACTERIZATION ONLY. Every assertion here states the answer at the commit
- * that introduced this file; several of them state a defect. The ones that do
- * are marked GAP, and the differential commit repoints exactly those.
+ * Started as characterization; seven assertions are now DIFFERENTIALS and are
+ * marked RED in their own KDoc. They fail at the commit that introduces them
+ * and the commit after it is what makes them pass.
  *
- * The two facts this file exists to hold still are:
+ * What they require:
  *
- * 1. [SetLoadPolicy.totalKg] renders an absent body weight as `0.0` and adds
- *    it, so a pull-up with nothing added records `loadKg = 0.0` -- the "absence
- *    rendered as a value" class, and indistinguishable in the row and the
- *    export from a set that genuinely carried no load.
- * 2. The seed default #227 landed reaches the PLAN path only.
- *    `RecordState.currentExercise` resolves an ad-hoc set as
- *    `seedById(id) ?: ExerciseDef(id, id)`, which never consults
- *    [SetGeometryPolicy.bodyweightMount], so an ad-hoc dead hang -- the one
- *    [ExerciseDef.BODYWEIGHT_IDS] member the picker actually offers -- is not
- *    body weight at all as far as the recorded load is concerned.
+ * 1. [SetLoadPolicy.blocksSetStart] must refuse to start a body-weight set
+ *    while nothing usable is stored, and must refuse nothing else. Without a
+ *    refusal, [SetLoadPolicy.totalKg] renders the absence as `0.0` and adds
+ *    it, so a pull-up with nothing added records `loadKg = 0.0` -- the
+ *    "absence rendered as a value" class, and indistinguishable in the row and
+ *    the export from a set that genuinely carried no load.
+ * 2. [ExerciseDef.resolvedById] must seed body weight the way
+ *    [SetGeometryPolicy.bodyweightMount] already does for a plan. #227's seed
+ *    default reaches the PLAN path only, so an ad-hoc dead hang -- the one
+ *    [ExerciseDef.BODYWEIGHT_IDS] member the exercise picker actually offers
+ *    -- is not body weight at all as far as the recorded load is concerned.
+ *    #229 item 3.
+ *
+ * The pins on [SetLoadPolicy.totalKg] itself stay as they are and stay green:
+ * this change does not give the export a way to say "unmeasured", it stops the
+ * set that would have needed one. Naming that marker is remaining work.
  */
 class BodyWeightAbsenceGateTest {
     private val nowMs = 1_700_000_000_000L
@@ -38,12 +44,6 @@ class BodyWeightAbsenceGateTest {
         ]}]}
         """.trimIndent(),
     ).plan!!.sessions[0]
-
-    /**
-     * The exact expression `RecordState.currentExercise` falls back to for an
-     * ad-hoc set, restated here so a differential has something to point at.
-     */
-    private fun adHocToday(id: String): ExerciseDef = ExerciseDef.seedById(id) ?: ExerciseDef(id, id)
 
     @Test
     fun `pull-up is body weight by construction and dead hang is too`() {
@@ -58,17 +58,10 @@ class BodyWeightAbsenceGateTest {
         assertTrue(SetGeometryPolicy.bodyweightMount("dead_hang", base = false, declared = null))
     }
 
-    /** GAP. The picker offers `dead_hang`; its seed entry says the body is not the load. */
+    /** `pull_up` has no seed entry at all, so an ad-hoc one starts from the bare constructor. */
     @Test
-    fun `an ad-hoc dead hang resolves today to a definition that is not body weight`() {
-        assertFalse(adHocToday("dead_hang").bodyweight)
-    }
-
-    /** GAP. `pull_up` has no seed entry at all, so an ad-hoc one is a bare constructor call. */
-    @Test
-    fun `an ad-hoc pull-up resolves today to a bare definition that is not body weight`() {
+    fun `pull-up carries no seed entry`() {
         assertNull(ExerciseDef.seedById("pull_up"))
-        assertFalse(adHocToday("pull_up").bodyweight)
     }
 
     /**
@@ -116,22 +109,40 @@ class BodyWeightAbsenceGateTest {
     }
 
     /**
-     * The lift of `RecordState.currentExercise`'s ad-hoc fallback, pinned as
-     * the identity it is: same answer as the expression it replaced, for a
-     * seeded id, a body-weight seeded id and an unseeded one alike.
+     * RED. An ad-hoc set against a body-weight movement must resolve to a
+     * body-weight definition, the same answer a planned one already gets
+     * through [SetGeometryPolicy.resolve]. #229 item 3, and half of #61's
+     * population.
      */
     @Test
-    fun `resolvedById answers exactly what the ad-hoc fallback answered`() {
-        listOf("back_squat", "dead_hang", "pull_up", "not_a_real_lift").forEach { id ->
-            assertEquals(adHocToday(id), ExerciseDef.resolvedById(id))
+    fun `resolvedById seeds body weight for the ids that are body weight by construction`() {
+        ExerciseDef.BODYWEIGHT_IDS.forEach { id ->
+            assertTrue(ExerciseDef.resolvedById(id).bodyweight, "$id should resolve as body weight")
         }
     }
 
-    /** GAP, carried by the lifted function now: an ad-hoc dead hang is still not body weight. */
+    /**
+     * A body-weight set is the only thing that changes. An ad-hoc back squat
+     * is loaded work and stays loaded work.
+     */
     @Test
-    fun `resolvedById does not seed body weight today`() {
-        assertFalse(ExerciseDef.resolvedById("dead_hang").bodyweight)
-        assertFalse(ExerciseDef.resolvedById("pull_up").bodyweight)
+    fun `resolvedById leaves an ordinary lift alone`() {
+        assertFalse(ExerciseDef.resolvedById("back_squat").bodyweight)
+        assertFalse(ExerciseDef.resolvedById("not_a_real_lift").bodyweight)
+    }
+
+    /**
+     * The rest of the seed entry survives. A fix that reached for
+     * `ExerciseDef(id, id, bodyweight = true)` would set the flag and throw
+     * away the display name, the kind and the barbell answer with it.
+     */
+    @Test
+    fun `resolvedById keeps everything else a seed entry declared`() {
+        val hang = ExerciseDef.resolvedById("dead_hang")
+        assertEquals("Dead Hang", hang.displayName)
+        assertEquals(ExerciseKind.HOLD, hang.kind)
+        assertFalse(hang.usesBarbell)
+        assertEquals("Back Squat", ExerciseDef.resolvedById("back_squat").displayName)
     }
 
     /** The one new query written correct from birth: it is a reading of [stateOf], not a fifth rule. */
@@ -145,12 +156,45 @@ class BodyWeightAbsenceGateTest {
     }
 
     /**
-     * GAP. Nothing consults the stored body weight before a set starts, and
-     * this bug-preserving identity says so out loud.
+     * RED, and the refusal #61 asks for: a body-weight set with nothing
+     * stored may not start, because the only load it could record is a
+     * fabricated one.
      */
     @Test
-    fun `nothing blocks the start of a body-weight set today`() {
-        assertFalse(SetLoadPolicy.blocksSetStart(bodyweight = true, bodyWeightKg = null))
+    fun `a body-weight set with no stored body weight may not start`() {
+        assertTrue(SetLoadPolicy.blocksSetStart(bodyweight = true, bodyWeightKg = null))
+    }
+
+    /**
+     * RED. A stored `0.0` is an absence dressed as a number and must refuse
+     * the set exactly as a null does; so must a negative and a NaN.
+     */
+    @Test
+    fun `a stored zero negative or NaN body weight refuses a body-weight set too`() {
+        assertTrue(SetLoadPolicy.blocksSetStart(bodyweight = true, bodyWeightKg = 0.0))
+        assertTrue(SetLoadPolicy.blocksSetStart(bodyweight = true, bodyWeightKg = -5.0))
+        assertTrue(SetLoadPolicy.blocksSetStart(bodyweight = true, bodyWeightKg = Double.NaN))
+    }
+
+    /**
+     * The refusal must be narrow. A lifter who has stated a body weight is
+     * never stopped, however old the figure -- staleness is the prompt's
+     * question and it stays skippable (#181).
+     */
+    @Test
+    fun `a stated body weight lets the set start whatever its age`() {
+        assertFalse(SetLoadPolicy.blocksSetStart(bodyweight = true, bodyWeightKg = 82.0))
+    }
+
+    /**
+     * And a barbell set is never stopped, because nothing about it depends on
+     * the lifter's mass. This is the assertion that keeps the refusal from
+     * becoming a wall in front of every session.
+     */
+    @Test
+    fun `a loaded set starts with no body weight stored at all`() {
+        assertFalse(SetLoadPolicy.blocksSetStart(bodyweight = false, bodyWeightKg = null))
+        assertFalse(SetLoadPolicy.blocksSetStart(bodyweight = false, bodyWeightKg = 0.0))
     }
 
     @Test
