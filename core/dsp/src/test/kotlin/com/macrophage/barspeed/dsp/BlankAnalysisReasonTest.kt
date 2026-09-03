@@ -194,6 +194,16 @@ class BlankAnalysisReasonTest {
                     detailed.census.qualifyingRuns <= detailed.census.movementRuns,
                     "$fixture $startsWith: more runs survived demotion than existed",
                 )
+                // A span needs a qualifying run and a qualifying run needs a
+                // movement run, so no set can have spans and no movement. That
+                // implication is why the order of NoRepsReason.of's
+                // AFTER_SET_END_CUE and NO_MOVEMENT tests is unobservable, and
+                // it is asserted rather than argued: swapping those two lines
+                // reds nothing, and this is what says that is a property of the
+                // pipeline rather than a hole in the pins.
+                if (detailed.census.movementRuns == 0) {
+                    assertEquals(0, detailed.census.spans, "$fixture $startsWith: spans without movement")
+                }
             }
         }
     }
@@ -414,5 +424,32 @@ class BlankAnalysisReasonTest {
         )
         assertEquals(11, unbounded.reps.size, "the same stream unbounded")
         assertNull(unbounded.noRepsReason, "the unbounded set states a reason for reps it published")
+    }
+
+    @Test
+    fun `the minimum-ROM pair count, on the captures that exercise it`() {
+        // FOUND BY MUTATION TESTING, not by reading. Deleting both
+        // `belowMinRom++` sites in RepSegmenter left the whole suite green:
+        // every capture the reason tests reach carries 0 there, so the counter
+        // that drives DRIVE_BELOW_MIN_ROM was decoration. It reds now.
+        //
+        // The captures below are the ones where the pairing walk formed a pair
+        // and the DspConfig.minRomM floor discarded it. None of them resolves
+        // ZERO reps, so none of them publishes DRIVE_BELOW_MIN_ROM -- what is
+        // pinned is the COUNT reaching the census correctly, on both pairing
+        // walks. The eccentric-first and concentric-first walks each keep
+        // their own counter and each is covered.
+        val config = DspConfig()
+        fun rejects(fixture: String, startsWith: StartPhase): Int =
+            RepSegmenter.segmentDetailed(series(fixture), LiftDirection(startsWith), config).census.pairsBelowMinRom
+        assertEquals(2, rejects("field-legcurl-1030-12rep", StartPhase.ECCENTRIC), "leg curl, ecc-first walk")
+        assertEquals(6, rejects("field-legcurl-1030-12rep", StartPhase.CONCENTRIC), "leg curl, con-first walk")
+        assertEquals(2, rejects("field-backsquat-4011-6rep-s36-set01", StartPhase.ECCENTRIC), "squat, ecc-first")
+        assertEquals(4, rejects("field-backsquat-4011-6rep-s36-set01", StartPhase.CONCENTRIC), "squat, con-first")
+        assertEquals(1, rejects("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC), "bench s37 set05, ecc-first")
+        // And the captures that form no rejected pair at all, so the count is
+        // not simply "some number that grows with the set".
+        assertEquals(0, rejects("field-rdl-3010-10rep", StartPhase.ECCENTRIC), "the 2026-08 RDL rejects none")
+        assertEquals(0, rejects("field-still-0rep", StartPhase.ECCENTRIC), "a sensor that did not move")
     }
 }

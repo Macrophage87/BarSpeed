@@ -277,4 +277,26 @@ class SessionExportNoRepsReasonTest {
             "a set nothing analysed was given a segmentation reason",
         )
     }
+
+    @Test
+    fun `a stored analysis that carries both reps and a reason publishes only the reps`() = runTest {
+        // FOUND BY MUTATION TESTING, not by reading. Deleting
+        // `.takeIf { reps.isEmpty() }` from the exporter left the whole suite
+        // green, because every fixture with reps happened to carry a null
+        // reason -- so the gate that keeps the two facts from contradicting
+        // each other was decoration.
+        //
+        // SetAnalyzer cannot produce this row today: NoRepsReason.of returns
+        // null the moment a span survives the cue bound. A STORED row can,
+        // and that is the point -- analysisJson is frozen text written by
+        // whatever version recorded the set, and a later change to the
+        // analyzer that set the field before checking the reps would put a
+        // reason on a set with figures in it. The reps win: a document saying
+        // both "here are your reps" and "there were no reps" is worse than one
+        // saying either.
+        val contradiction = oneRep.copy(noRepsReason = NoRepsReason.NO_MOVEMENT)
+        val summary = setObject(contradiction).summary()
+        assertNull(summary["noRepsReason"], "a set with a rep published a reason for having none")
+        assertTrue("meanRom_m" in summary.keys, "the set stopped publishing the figures it does have")
+    }
 }
