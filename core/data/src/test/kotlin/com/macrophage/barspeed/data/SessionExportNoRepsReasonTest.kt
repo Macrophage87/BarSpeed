@@ -90,6 +90,10 @@ class SessionExportNoRepsReasonTest {
 
         override suspend fun updateWarmupMark(setId: Long, warmupMark: Boolean?) = Unit
 
+        // Conformance only: SessionDao grew this member for #60 on main and
+        // Kotlin requires it. Nothing in this file calls it.
+        override suspend fun updateVoided(setId: Long, voided: Boolean, reason: String?) = Unit
+
         override suspend fun overrideReps(setId: Long, reps: Int) = Unit
 
         override suspend fun overrideLoad(setId: Long, loadKg: Double) = Unit
@@ -126,9 +130,13 @@ class SessionExportNoRepsReasonTest {
     )
 
     /**
-     * A set that resolved one rep, which is the state `field-rdl-3010-10rep-s36-set04`
-     * is in -- 123.64 m of runaway and one surviving rep. It carries no reason
-     * and must publish none.
+     * A set that resolved one rep. It carries no reason and must publish none.
+     *
+     * This KDoc named `field-rdl-3010-10rep-s36-set04` as the capture in that
+     * state -- 123.64 m of runaway and one surviving rep -- and issue #94's
+     * runaway correction took it to ten reps of ten performed, so no committed
+     * capture is in that state any more. The fixture below is hand-built and
+     * always was; nothing here depends on a capture matching it.
      */
     private val oneRep = SetAnalysis(
         reps = listOf(

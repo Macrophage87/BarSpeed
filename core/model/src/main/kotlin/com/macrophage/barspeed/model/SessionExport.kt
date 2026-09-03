@@ -617,9 +617,13 @@ data class SessionExport(
          * AND IT SAYS NOTHING ABOUT AN UNDER-RESOLVED SET. It is written only
          * when the rep list is EMPTY. A set resolving 1 of 10 performed reps
          * publishes a full summary computed from that one rep and carries no
-         * `noRepsReason` at all -- the corpus holds such a capture, with a
-         * single movement run displacing 123.64 m. Reading the key's absence
-         * as "the reps are trustworthy" is wrong.
+         * `noRepsReason` at all. Reading the key's absence as "the reps are
+         * trustworthy" is wrong. NO COMMITTED CAPTURE IS NAMED AS AN EXAMPLE:
+         * this paragraph named `field-rdl-3010-10rep-s36-set04`, with a single
+         * movement run displacing 123.64 m and one surviving rep, and issue
+         * #94's runaway correction took that capture to ten reps of ten
+         * performed. The example is deleted rather than repointed, exactly as
+         * `NoRepsReason`'s own KDoc deletes it.
          */
         const val SCHEMA_VERSION = "1.18"
 

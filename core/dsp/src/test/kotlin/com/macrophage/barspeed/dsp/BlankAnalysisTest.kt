@@ -15,9 +15,12 @@ import kotlin.test.assertTrue
  *
  * #138's shape is a HEALTHY stream -- contiguous `sample_idx`, no interval
  * over 100 ms, the full set window covered -- that yields `reps: []` and a
- * `summary` object with every key absent. The export says so only by
- * omission, and a set whose integrator ran away is then byte-identical to a
- * manual set recorded with no sensor at all.
+ * `summary` object with every key absent. The export said so only by
+ * omission, and a set whose integrator ran away WAS byte-identical to a
+ * manual set recorded with no sensor at all -- until the commit "Say why a
+ * set resolved nothing instead of publishing an empty summary" on this
+ * branch published `noRepsReason`. That key is what tells them apart now,
+ * and it is asserted below rather than described here.
  *
  * These are CHARACTERIZATION pins. They record what the pipeline does at this
  * commit; none of them says the result is right. In particular the
@@ -224,6 +227,14 @@ class BlankAnalysisTest {
         val still = SetAnalyzer.analyze(load("field-still-0rep"), LiftDirection(StartPhase.ECCENTRIC))
         assertEquals(emptyList(), still.reps, "a sensor that did not move resolves nothing")
         assertNull(still.velocityLossPct, "velocity loss on a set with no reps")
+        // The field that stops this being byte-identical to a manual set. It
+        // is asserted, not narrated in the KDoc, so the claim cannot go stale
+        // if the enumeration moves.
+        assertEquals(
+            NoRepsReason.NO_MOVEMENT,
+            still.noRepsReason,
+            "the reason a blank analysis publishes for a sensor that did not move",
+        )
     }
 
     @Test

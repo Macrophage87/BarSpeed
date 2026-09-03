@@ -85,6 +85,13 @@ data class SegmentationCensus(
  * is what this answers; under-resolution stopping short is the same defect
  * and is still unsayable. `BlankAnalysisTest` pins that limit.
  *
+ * IT ALSO CANNOT BE REACHED BY A SET THE ANALYZER NEVER SAW.
+ * `RecordViewModel.runSetWrite` builds a placeholder `SetAnalysis` for a
+ * timed set and for any set carrying fewer than eight samples, and that
+ * object's `noRepsReason` is the default null. So a DYNAMIC set that captured
+ * 1-7 samples still publishes an empty summary with no reason, which is the
+ * same absence #138 is about arriving by a different route.
+ *
  * No committed capture is named here as an example of it.
  * `field-rdl-3010-10rep-s36-set04` was, with one surviving rep against a
  * movement run displacing 123.64 m; issue #94's runaway correction took it to
@@ -149,7 +156,17 @@ enum class NoRepsReason(val wireName: String) {
     @SerialName("phasesUnpaired")
     PHASES_UNPAIRED("phasesUnpaired"),
 
-    /** Every drive the pairing walk reached displaced less than [DspConfig.minRomM]. */
+    /**
+     * At least one drive the pairing walk reached displaced less than
+     * [DspConfig.minRomM], and nothing paired.
+     *
+     * THIS IS A PRESENCE TEST, unlike [RUNS_EXCEED_DISPLACEMENT_CAP] above
+     * it, which was deliberately made a MAJORITY so that a minority cause
+     * would not be named as the reason. The asymmetry is not derived: one
+     * rejected drive among several merely unpaired ones is enough to report
+     * this. No capture in this corpus reaches this value at all, so nothing
+     * measures whether a majority would read better here too.
+     */
     @SerialName("driveBelowMinRom")
     DRIVE_BELOW_MIN_ROM("driveBelowMinRom"),
     ;
