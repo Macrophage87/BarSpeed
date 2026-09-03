@@ -180,10 +180,13 @@ object SetGeometryPolicy {
     /**
      * Whether the lifter's own body was the load for this set.
      *
-     * The same three-way precedence [stackMount] uses, without a paired
-     * [GeometrySource]: no source is published for `bodyweight` in the export
-     * (see [GeometrySources]'s KDoc for why), so there is nothing here for a
-     * caller to read besides the resolved boolean.
+     * The same three-way precedence [stackMount] uses, WITHOUT a paired
+     * [GeometrySource] returned from here: this function answers what the set
+     * used, and [bodyweightSource] answers what the export publishes beside
+     * it, kept apart because the source is read off [describe]'s [used]
+     * rather than re-decided from [id] here -- [bodyweightSource]'s own KDoc
+     * says why. A source IS published for `bodyweight` in the export, since
+     * 1.18 (#220); it does not come from this function.
      *
      * 1. [declared] non-null -- the plan said so, either way. A declared
      *    `false` wins over the seed: a plan may genuinely mean a pull-up
