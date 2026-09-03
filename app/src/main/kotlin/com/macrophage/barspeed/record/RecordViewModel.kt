@@ -951,12 +951,18 @@ private fun CoroutineScope.mirrorSensorSettings(
 /**
  * The collect job for the accelerometer that is not the ARMED one.
  *
- * Deliberately not routed through `onSample`. That function feeds the tracker,
- * the live readout and the rep announcements, and a second stream reaching
- * them unconditionally would make the bar appear to move twice. So the sample
- * is OFFERED to [onLive] rather than fed: whether the tracker takes it is
- * [LiveFeedPolicy]'s answer and never this collector's, and on every set where
- * the armed unit is delivering the answer is no.
+ * Deliberately not routed through `onSample`. That function asks
+ * [LiveFeedPolicy] the same question about the ARMED unit's frames and, when
+ * the answer is yes, feeds the tracker, the live readout and the rep
+ * announcements; a second stream reaching them unconditionally would make the
+ * bar appear to move twice. So this sample is OFFERED to [onLive] rather than
+ * fed: whether the tracker takes it is [LiveFeedPolicy]'s answer and never
+ * this collector's, and once the armed unit has delivered
+ * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] frames first, the answer is no
+ * for the rest of the set. AN EARLIER VERSION SAID "on every set where the
+ * armed unit is delivering the answer is no", which is wrong about the start
+ * of a set -- before either unit has eight frames nothing is analysable and
+ * the armed role holds the readout by default, not because it is delivering.
  *
  * The buffer is written BEFORE the offer, because the decision is taken over
  * frame counts and this frame is one of them.
@@ -1038,8 +1044,8 @@ private fun CoroutineScope.mirrorLinkStates(autoConnect: AutoConnectManager, sta
     //
     // `AutoConnectManager` coalesces these to at most one write per half
     // second per link, so this is nothing like a per-sample write onto the
-    // screen state -- `onSample` already does one of those at 100 Hz during a
-    // set.
+    // screen state -- `feedTracker` already does one of those at 100 Hz during
+    // a set, from whichever collector the live feed is pointed at (#210).
     launch {
         combine(
             autoConnect.imuFrameAtMs,

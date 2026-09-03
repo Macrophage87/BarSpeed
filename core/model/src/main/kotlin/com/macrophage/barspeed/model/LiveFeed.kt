@@ -55,21 +55,26 @@ object LiveFeedPolicy {
      * while the set runs.
      *
      * IT TAKES COUNTS RATHER THAN [SensorCapturePolicy.analysable]'S ANSWER,
-     * as of this commit, and takes [expected] with them so it can ask that
-     * question itself. The caller used to ask it and hand the list down. No
-     * behaviour moves: the same call is made on the same inputs, one frame
-     * later in the stack. The counts are here because the next commit's rule
-     * needs a MARGIN between two of them, which a list of roles cannot state.
+     * and takes [expected] with them so it can ask that question itself; the
+     * caller used to ask it and hand the list down. The counts are here
+     * because the MARGIN below is a difference between two of them, which a
+     * list of roles cannot state.
      *
-     * THE SAME PURE FUNCTION THE ANALYSIS USES, and deliberately not a second
-     * rule beside it. Which stream is worth reading is
-     * [SensorCapturePolicy.analysedStream]'s question, and asking it twice in
-     * two spellings is how the readout and the summary come to disagree about
-     * which unit the set was measured from. What this adds is the LATCH and
-     * nothing else.
+     * IT CALLS THE PURE FUNCTIONS THE ANALYSIS USES AND ADDS TWO RULES OF ITS
+     * OWN. [SensorCapturePolicy.analysable] and
+     * [SensorCapturePolicy.analysedStream] decide which streams are worth
+     * reading and which one to read, exactly as they do at set end, and they
+     * are not re-spelled here. What is added is the LATCH and the MARGIN, and
+     * both exist because this question is asked mid-set on a partial capture
+     * while the analysis asks it once on a whole one. A PREVIOUS VERSION OF
+     * THIS PARAGRAPH SAID THIS WAS "THE SAME PURE FUNCTION THE ANALYSIS USES"
+     * AND THAT WHAT IT ADDED WAS "THE LATCH AND NOTHING ELSE": true when it
+     * was written, made false by the margin, and deleted rather than reworded.
+     * The set-end rule is deliberately NOT given a margin -- the whole set is
+     * in by then and there is no race to lose.
      *
-     * THE LATCH, which is the only rule here that [SensorCapturePolicy] does
-     * not already state: once the feed has left the armed stream it stays gone
+     * THE LATCH, the first of the two rules here that [SensorCapturePolicy]
+     * does not state: once the feed has left the armed stream it stays gone
      * for the rest of the set. Without it the answer flips back the moment a
      * recovered armed unit passes [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES],
      * and a readout that changes stream twice mid-set is a rep counter
@@ -97,15 +102,37 @@ object LiveFeedPolicy {
      * live with part of the set, and it is a difference in what was SHOWN, not
      * in what was kept.
      *
-     * QUIET LONG ENOUGH IS EIGHT FRAMES --
-     * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]. `RecordViewModel.beginSet`
-     * clears both buffers, so on a set where both units are armed and both are
-     * streaming normally the readout can still move: it moves whenever the
-     * partner's eighth frame arrives before the armed unit's own eighth frame,
-     * roughly 80 ms at the 100 Hz WT901 output rate this app configures
-     * (`GattClients`). SHOWN and KEPT can therefore differ on a dual set where
-     * nothing is wrong with either sensor -- a field question about whether
-     * that is tolerable to read, not a defect this file can fix.
+     * THE MARGIN, the second rule [SensorCapturePolicy] does not state, and
+     * the answer to a defect this file DID have. Two conditions now, not one:
+     * the armed unit must be under [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]
+     * -- unchanged -- AND the unit taking the readout must have delivered at
+     * least [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] MORE frames than it.
+     * Eight frames is roughly 80 ms at the 100 Hz WT901 output rate this app
+     * configures (`GattClients`), so what the margin asks is that the armed
+     * link be most of a tenth of a second behind rather than one frame behind.
+     *
+     * WITHOUT IT THE READOUT MOVED ON A HEALTHY DUAL SET. `RecordViewModel`
+     * clears both buffers at `beginSet`, so the two units race from zero, and
+     * the rule as first written moved the readout whenever the partner's
+     * EIGHTH frame arrived before the armed unit's own eighth -- a lead of one
+     * frame -- and then latched it for the rest of the set. THIS PARAGRAPH
+     * REPLACES ONE THAT DESCRIBED THAT RACE AND CALLED IT "a field question
+     * about whether that is tolerable to read, not a defect this file can
+     * fix". It was a defect this file could fix, it is fixed here, and the
+     * sentence is deleted rather than reworded (#210, round 3).
+     *
+     * WHAT THE MARGIN DOES NOT FIX, and the remainder is not small. The race
+     * is narrowed, not removed: an armed link whose FIRST frame arrives eight
+     * frames after its partner's -- one that connects late, or drops its
+     * opening burst -- still loses the readout and still latches. What the
+     * margin buys is that a link merely interleaving unluckily with its
+     * partner keeps the readout, and that once the armed unit is analysable at
+     * all the readout cannot move for the rest of the set. WHICH OF THOSE TWO
+     * POPULATIONS A REAL DUAL SESSION PRODUCES HAS NOT BEEN MEASURED: no
+     * capture in this repository holds a dual set with both units streaming,
+     * so the frame this rule is tuned against is reasoned from the configured
+     * output rate and not observed. It is a field question and is raised as
+     * one.
      */
     fun liveFeed(
         armed: SensorRole?,
@@ -116,7 +143,13 @@ object LiveFeedPolicy {
         val latched = fedBy?.takeIf { it != armed }
         if (latched != null) return LiveFeed(role = latched, fellBack = true, switched = false)
         val analysable = SensorCapturePolicy.analysable(expected, framesByRole)
-        val decision = SensorCapturePolicy.analysedStream(armed, analysable)
+        val armedFrames = framesByRole[armed] ?: 0
+        val ahead =
+            analysable.filter {
+                (framesByRole[it] ?: 0) - armedFrames >= SensorCapturePolicy.MIN_ANALYSABLE_FRAMES
+            }
+        val candidates = if (armed != null && armed in analysable) analysable else ahead
+        val decision = SensorCapturePolicy.analysedStream(armed, candidates)
         return LiveFeed(role = decision.role, fellBack = decision.fellBack, switched = decision.role != fedBy)
     }
 
