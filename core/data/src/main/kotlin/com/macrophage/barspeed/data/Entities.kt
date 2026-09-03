@@ -325,10 +325,11 @@ data class SetRecordEntity(
      * Why the set ended, from a closed vocabulary, or null (#189).
      *
      * A NULLABLE COLUMN ON EVERY SET ROW, deliberately not a field keyed off
-     * [failed]. Only a failed set is asked today, so in practice every
-     * non-null value sits on one; #191 widens the question to completed sets,
-     * and storing it per-failure would have made that a migration instead of
-     * a screen change. The column is therefore named for what it holds -- the
+     * [failed]. A failed set and a completed set the lifter rated at the
+     * counted end are both asked (#189, #191), so a non-null value here does
+     * not mean the set failed -- read [failed] for that. Storing the answer
+     * per-failure would have made the widening a migration instead of a
+     * screen change. The column is therefore named for what it holds -- the
      * thing that limited the set -- and not `failure_reason`, so a released
      * field never has to be renamed.
      *
