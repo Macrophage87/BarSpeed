@@ -54,6 +54,7 @@ class GyroGateTest {
         "field-pallof-static-12rep",
         "field-pullup-3010-8rep-s37-set09",
         "field-rdl-3010-10rep",
+        "field-rdl-3010-10rep-s36-set04",
         "field-rdl-3010-10rep-s36-set05",
         "field-reardeltfly-s32-set06",
         "field-seated-ohp-2rep",
@@ -102,6 +103,7 @@ class GyroGateTest {
             "field-bench-3010-6rep-s37-set05" to 23.923,
             "field-bench-3010-6rep-s37-set06" to 32.318,
             "field-backsquat-4011-6rep-s36-set01" to 15.497,
+            "field-rdl-3010-10rep-s36-set04" to 5.809,
             "field-rdl-3010-10rep-s36-set05" to 6.423,
             "field-pullup-3010-8rep-s37-set09" to 0.936,
             "field-ohp-rotating-8rep" to 12.061,
@@ -163,6 +165,7 @@ class GyroGateTest {
         val config = DspConfig()
         val holds = listOf(
             "field-pullup-3010-8rep-s37-set09",
+            "field-rdl-3010-10rep-s36-set04",
             "field-rdl-3010-10rep-s36-set05",
             "field-cablerow-static-8rep",
             "field-facepull-static-12rep",

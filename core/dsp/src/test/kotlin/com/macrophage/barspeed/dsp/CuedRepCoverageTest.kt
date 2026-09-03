@@ -167,7 +167,18 @@ class CuedRepCoverageTest {
         "field-backsquat-4011-6rep-s36-set01",
     )
 
-    /** The eight that do not, which is where the surviving artefacts live. */
+    /**
+     * The nine that do not, which is where the surviving artefacts live.
+     *
+     * `field-rdl-3010-10rep-s36-set04` is here by choice and the choice is
+     * worth stating: the capture HAS a cue track in its session archive and it
+     * is deliberately not committed. Enrolling it would move six aggregate
+     * figures in this file -- the cued-rep total, the counted total, the
+     * drive-up total, the batch-rejected total and both tolerance-sweep
+     * triples -- and every one of those re-baselines a claim about rep
+     * counting that issue #138 is not about. The set's hand count comes from
+     * its own `meta.json` instead; see `BlankAnalysisTest`.
+     */
     private val notCueTracked = listOf(
         "field-backsquat-10hz",
         "field-backsquat-10hz-set5",
@@ -175,6 +186,7 @@ class CuedRepCoverageTest {
         "field-facepull-static-12rep",
         "field-ohp-100hz-bursty",
         "field-pallof-static-12rep",
+        "field-rdl-3010-10rep-s36-set04",
         "field-seated-ohp-2rep",
         "field-still-0rep",
     )
@@ -415,7 +427,7 @@ class CuedRepCoverageTest {
             )
         }
         assertEquals(20, cueTracked.size, "captures with a cue track")
-        assertEquals(8, notCueTracked.size, "captures without one")
+        assertEquals(9, notCueTracked.size, "captures without one")
         assertTrue("field-ohp-100hz-bursty" in notCueTracked, "the survivors' capture has no truth")
     }
 

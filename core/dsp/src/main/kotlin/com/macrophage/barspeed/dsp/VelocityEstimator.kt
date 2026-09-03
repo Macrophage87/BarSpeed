@@ -314,14 +314,17 @@ object VelocityEstimator {
      * What IS structural is the consequence. This function selects between
      * exactly two behaviours that have both been measured over this corpus --
      * today's two-term predicate, and the acceleration term alone -- so unlike
-     * a retuned band it cannot produce a third, unstudied regime, and the 21
+     * a retuned band it cannot produce a third, unstudied regime, and the 22
      * captures the gate still holds on are bit-identical either way -- not
      * because their whole distribution sits under the gate
-     * (`field-legcurl-1030-12rep-c` peaks at 585 deg/s) but because on twenty
-     * of the twenty-one the MEDIAN does, and on `field-reardeltfly-s32-set06`
-     * -- median 62.87 deg/s -- the tenth percentile is above the gate too,
-     * which is the low probe doing its job. Nine of the 21 are bar- or
-     * hand-held.
+     * (`field-legcurl-1030-12rep-c` peaks at 585 deg/s) but because on
+     * twenty-one of the twenty-two the MEDIAN does, and on
+     * `field-reardeltfly-s32-set06` -- median 62.87 deg/s -- the tenth
+     * percentile is above the gate too, which is the low probe doing its job.
+     * Ten of the 22 are bar- or hand-held. (It read 21, twenty of twenty-one
+     * and nine before `field-rdl-3010-10rep-s36-set04` was committed for issue
+     * #138; that capture's median is 5.81 deg/s, so it holds the gate and is
+     * bar-mounted.)
      *
      * Not verified: whether a sample admitted here is one where the implement
      * was actually at rest. Nothing in this repository can answer that; only a
