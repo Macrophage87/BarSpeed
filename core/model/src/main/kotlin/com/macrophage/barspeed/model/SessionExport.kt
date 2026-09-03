@@ -1268,13 +1268,20 @@ data class GeometryExport(
 /**
  * Declared, seeded, inferred or default, per value.
  *
- * Two of [GeometryExport]'s eight values are missing here. `sensorInverted`
- * is a non-nullable boolean in the plan format, so a declared `false` and an
- * omitted key are the same value and no source can be told apart there --
- * stating one would be an invention. `bodyweight` is `Boolean?` as of #227
- * (c5dd4688), so it COULD carry a source the same way the six published
- * values do; none is published for it because that would add a seventh
- * required key to this object for a value no consumer reads yet.
+ * CANONICAL. This KDoc is the one statement of which geometry values carry a
+ * provenance and why. `SchemaContractTest` and `SessionExporterTest` point
+ * here instead of restating it: three copies of the rule drifted, and two
+ * review rounds running corrected them one file at a time.
+ *
+ * Two of [GeometryExport]'s eight values are missing here, for two DIFFERENT
+ * reasons. `sensorInverted` is a non-nullable boolean in the plan format, so
+ * a declared `false` and an omitted key are the same value and no source can
+ * be told apart there -- stating one would be an invention. `bodyweight` is
+ * not in that case: its plan key is `Boolean?` as of #227 ("Make bodyweight
+ * nullable so an omitted key is not a silent false"), so it COULD carry a
+ * source the same way the six published values do; none is published for it
+ * because that would add a seventh required key to this object for a value no
+ * consumer reads yet.
  *
  * `sensorOnStack` was a third bare-boolean exclusion until #223 made the plan
  * key nullable. The sentence naming three is deleted rather than reworded: it

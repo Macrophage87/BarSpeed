@@ -1750,7 +1750,8 @@ private fun PerImplementEcho(state: RecordState, slot: PlannedSlot?) {
  * DUMB, and drawn on exactly the sets whose box accepts a negative:
  * [BodyweightLoadDisplay.fieldHint] answers null for loaded work, and a null
  * here draws nothing rather than an empty line holding space open. The
- * population is every `bodyweight: true` exercise with no subset -- the same
+ * population is every exercise that RESOLVES to body-weight work, declared
+ * or seeded, with no subset -- the same
  * population `PlanFile.validate` already passes `allowNegativeLoad` for -- so
  * a dead hang can be assisted and a push-up can take a plate whether or not
  * the plan declared a load for them. #160.

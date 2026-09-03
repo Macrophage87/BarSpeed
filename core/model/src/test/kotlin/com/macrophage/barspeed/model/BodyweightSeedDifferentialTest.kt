@@ -5,14 +5,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Differentials for #61's population, filed as #227 item 2: a plan running
- * pull-ups, dips, push-ups, chin-ups or a dead hang without declaring
- * `"bodyweight"` records `loadKg` as the ADDED load alone, because no
- * built-in [ExerciseDef] sets `bodyweight = true` and
- * [SetGeometryPolicy.resolve] takes the flag only from the plan.
+ * Differentials for #61's population, filed as #227 item 2. Before the commit
+ * "Seed pull-ups, dips, push-ups, chin-ups and dead hangs as body weight", a
+ * plan running pull-ups, dips, push-ups, chin-ups or a dead hang without
+ * declaring `"bodyweight"` recorded `loadKg` as the ADDED load alone, because
+ * no built-in [ExerciseDef] set `bodyweight = true` and
+ * [SetGeometryPolicy.resolve] took the flag only from the plan.
  *
- * Four assertions were RED at the commit that introduced them (d9e4a0d6).
- * Before ab12bbbc's fix, `resolve` assigned `declared.bodyweight ?: false`
+ * Four assertions were RED at the commit that introduced them, "Red the
+ * pull-up shape: absent bodyweight key, no seed, silent gate". Before the
+ * seed fix, `resolve` assigned `declared.bodyweight ?: false`
  * unconditionally over whatever the built-in definition said,
  * [BodyWeightPromptPolicy.sessionNeedsBodyWeight] read the same raw,
  * un-seeded flag, and the import gate said nothing. The green ones are
@@ -57,7 +59,8 @@ class BodyweightSeedDifferentialTest {
     }
 
     /**
-     * GREEN, both before and after ab12bbbc's fix: a declared false wins over
+     * GREEN, both before and after the seed fix named above: a declared false
+     * wins over
      * the seed either way, since [SetGeometryPolicy.bodyweightMount] returns
      * [declared] unconditionally whenever it is non-null and never reaches
      * the seed at all in that case. Kept beside the red cases as the
@@ -113,10 +116,10 @@ class BodyweightSeedDifferentialTest {
 
     /**
      * RED. The validation consequence: an assisted dead hang recorded with a
-     * negative load (an assist band taking weight off) is refused today,
-     * because `allowNegativeLoad` reads the same un-seeded flag `resolve`
-     * does. Once the seed applies, the omitted key is body-weight work and
-     * the negative load is a legitimate assist figure.
+     * negative load (an assist band taking weight off) was refused before the
+     * fix, because `allowNegativeLoad` read the same un-seeded flag `resolve`
+     * did. With the seed applied, the omitted key is body-weight work and the
+     * negative load is a legitimate assist figure.
      */
     @Test
     fun `an assisted dead hang with a negative load and no declared key validates`() {
