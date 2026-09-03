@@ -3,6 +3,7 @@ package com.macrophage.barspeed.model
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -307,6 +308,47 @@ class GuidePromptContractTest {
             prompt.contains("full $VERSION_TOKEN contract"),
             "the plan prompt's prose spells its version out instead of interpolating " +
                 "PlanFile.SCHEMA_VERSION, so a bump can leave it behind",
+        )
+    }
+
+    /**
+     * The prompt lists a NINTH answer to why a set ended: the set was set up
+     * wrong (#146). #189 shipped eight answers and none of them is the one
+     * the owner's own motivating set needed -- "stopped early on the first
+     * set as I was in a bad position. Will correct next time." `SetLimiter`
+     * gained a `SETUP` member for exactly that reason and
+     * `SchemaLimiterContractTest` already pins the published schema to it;
+     * this is the prompt's own copy of the same contract, and it is the only
+     * one a plan-writing LLM ever reads, so a key absent here is a key no
+     * conversation about a bad set-up will ever produce.
+     *
+     * The vocabulary is read off [SetLimiter.entries] rather than a literal
+     * list, so a future member added, removed or reordered there fails this
+     * test instead of leaving the prompt to drift silently behind the enum
+     * the way this one drifted behind #189's eight.
+     */
+    @Test
+    fun `the plan prompt lists the set-up answer between slip and pain, with its reading rule`() {
+        val limiterLine =
+            assertNotNull(
+                prompt.lineSequence().firstOrNull { "\"limiter\" = why the set ended" in it },
+                "the plan prompt no longer states why a set ended",
+            )
+        val enumeratedStart = limiterLine.indexOf("in my own answer: ") + "in my own answer: ".length
+        val enumeratedEnd = limiterLine.indexOf('.', enumeratedStart)
+        val vocabulary = limiterLine.substring(enumeratedStart, enumeratedEnd).split(", ").map { it.trim() }
+        assertEquals(
+            SetLimiter.entries.map { it.stored },
+            vocabulary,
+            "the plan prompt's limiter vocabulary drifted from SetLimiter: $vocabulary",
+        )
+        assertTrue(
+            "\"setup\" means the set was set up wrong" in prompt,
+            "the plan prompt never explains what the set-up answer means",
+        )
+        assertTrue(
+            "not a capacity reading" in prompt.lowercase(),
+            "the plan prompt never says the set-up answer's numbers are not a capacity reading",
         )
     }
 
