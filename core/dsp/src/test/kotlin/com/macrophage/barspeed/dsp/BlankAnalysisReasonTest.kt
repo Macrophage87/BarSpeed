@@ -86,6 +86,45 @@ class BlankAnalysisReasonTest {
         )
     }
 
+    /**
+     * The head-of-stream twin (#245), and the branch that has to sit ABOVE the
+     * cue bound's.
+     *
+     * A GREEN pin on a value the wiring commit introduced. What it guards is a
+     * false statement, not a missing one: with only two arguments the same
+     * census answers `afterSetEndCue`, which says the set ended before its
+     * detections did -- the opposite of what happened -- and dropping the
+     * branch entirely answers null, which is issue #138's defect on a new
+     * population.
+     *
+     * The default third argument is what keeps every other caller answering
+     * exactly what it answered before: a caller that offers one count is a
+     * caller with no head bound, and the two counts are then the same number.
+     */
+    @Test
+    fun `a set emptied by its work-start bound says so, and not that its end cue did it`() {
+        val census = empty.copy(movementRuns = 8, qualifyingRuns = 6, spans = 4)
+        assertEquals(
+            NoRepsReason.BEFORE_WORK_START,
+            NoRepsReason.of(census, spansWithinSetEnd = 4, spansWithinWindow = 0),
+            "the cue kept four and every one of them finished before the work began",
+        )
+        assertEquals(
+            NoRepsReason.AFTER_SET_END_CUE,
+            NoRepsReason.of(census, spansWithinSetEnd = 0, spansWithinWindow = 0),
+            "the cue kept none, so the head bound had nothing to do with it",
+        )
+        assertNull(
+            NoRepsReason.of(census, spansWithinSetEnd = 4, spansWithinWindow = 1),
+            "one detection survives both bounds, so the set has reps and no reason",
+        )
+        assertEquals(
+            NoRepsReason.of(census, spansWithinSetEnd = 0),
+            NoRepsReason.of(census, spansWithinSetEnd = 0, spansWithinWindow = 0),
+            "the default third argument is the second, so no existing caller moves",
+        )
+    }
+
     @Test
     fun `every other branch of the decision, from a census that isolates it`() {
         assertEquals(

@@ -111,7 +111,7 @@ class SessionExportRefusedDetectionTest {
      * cannot recompute them, because the rep list it holds is the list after
      * the refusal and so cannot say how many were removed to produce it.
      */
-    private fun analysisOf(reps: Int, refused: Int?, reason: String?) = SetAnalysis(
+    private fun analysisOf(reps: Int, refused: Int?, reason: String?, beforeWorkStart: Int? = null) = SetAnalysis(
         reps = (0 until reps).map { rep(it) },
         sampleRateHz = 100.0,
         velocityLossPct = null,
@@ -119,6 +119,7 @@ class SessionExportRefusedDetectionTest {
         verdicts = emptyList(),
         refusedDetections = refused,
         refusedDetectionReason = reason,
+        detectionsBeforeWorkStart = beforeWorkStart,
     )
 
     private fun exporter(analysis: SetAnalysis): SessionExporter {
@@ -177,5 +178,48 @@ class SessionExportRefusedDetectionTest {
 
         val none = text(analysisOf(reps = 3, refused = null, reason = null))
         assertTrue("refusedDetections" !in none, "expected no key at all, got: $none")
+    }
+
+    /**
+     * The head-of-stream count (#245), on the same wire and under the same
+     * three-state contract. A GREEN pin on a key the wiring commit introduced
+     * rather than a differential.
+     *
+     * Published on the SUMMARY export for `refusedDetections`' reason: it
+     * qualifies the same three figures.
+     */
+    @Test
+    fun `a set that resolved detections before its work began publishes the count`() = runTest {
+        val t = text(analysisOf(reps = 4, refused = 0, reason = null, beforeWorkStart = 3))
+        assertTrue("\"detectionsBeforeWorkStart\": 3" in t, "expected the count in the wire form, got: $t")
+    }
+
+    /**
+     * The two counts are INDEPENDENT, which is the reason they are two keys.
+     *
+     * A three-detection set with a known work-start instant publishes a
+     * head-of-stream count and NO `refusedDetections`: no range bound could be
+     * derived from three detections, and that absence is a fact about the set
+     * that a single merged count could not have carried alongside the 1.
+     */
+    @Test
+    fun `a small set can carry one count and not the other`() = runTest {
+        val t = text(analysisOf(reps = 3, refused = null, reason = null, beforeWorkStart = 1))
+        assertTrue("\"detectionsBeforeWorkStart\": 1" in t, "expected the head count, got: $t")
+        assertTrue("refusedDetections" !in t, "no range bound could be derived, so no key, got: $t")
+    }
+
+    /**
+     * Zero and absent, the same pair `refusedDetections` carries. Absent here
+     * means the set has no work-start instant, which is every ad-hoc set and
+     * every set recorded before database v15 (#216).
+     */
+    @Test
+    fun `a head-of-stream zero is published and an absent instant stays absent`() = runTest {
+        val zero = text(analysisOf(reps = 4, refused = 0, reason = null, beforeWorkStart = 0))
+        assertTrue("\"detectionsBeforeWorkStart\": 0" in zero, "expected the zero, got: $zero")
+
+        val none = text(analysisOf(reps = 4, refused = 0, reason = null, beforeWorkStart = null))
+        assertTrue("detectionsBeforeWorkStart" !in none, "expected no key at all, got: $none")
     }
 }

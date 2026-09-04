@@ -222,6 +222,37 @@ class PrepDetectionFieldTest {
     }
 
     /**
+     * The corpus sweep: what the head bound does to every OTHER committed
+     * capture that carries a work-start instant.
+     *
+     * Only four captures carry a `-prep.csv` at all, and a capture without one
+     * offers no instant, so `WorkStart.Unknown` bounds nothing and the other
+     * thirty-six are unchanged by construction rather than by luck. The two
+     * that are not this issue's resolve NOTHING before their own instant --
+     * field-37 was recorded with the sensor already in position -- so their
+     * published figures do not move, and this is what says so rather than a
+     * sentence claiming it.
+     *
+     * `field-ohp-prepinflated-s37-set03`'s and `-set04`'s velocity losses are
+     * read from `SetAnalyzer` twice, with and without the instant, rather than
+     * quoted: a quoted figure would go stale the next time anything upstream
+     * of the analyzer moved.
+     */
+    @Test
+    fun `the other two captures carrying a prep instant resolve nothing before it`() {
+        listOf("field-ohp-prepinflated-s37-set03", "field-ohp-prepinflated-s37-set04").forEach { f ->
+            val d = LiftDirection(startsWith = StartPhase.CONCENTRIC)
+            val kg = 22.67961850050177
+            val unbounded = analyse(f, d, kg)
+            val withInstant = bounded(f, d, kg)
+            assertEquals(0, withInstant.detectionsBeforeWorkStart, "$f: detections before work start")
+            assertEquals(unbounded.reps, withInstant.reps, "$f: the rep list moved")
+            assertEquals(unbounded.velocityLossPct, withInstant.velocityLossPct, "$f: velocityLoss_pct moved")
+            assertEquals(unbounded.noRepsReason, withInstant.noRepsReason, "$f: noRepsReason moved")
+        }
+    }
+
+    /**
      * Both sets are bounded at the TAIL and neither is bounded at the head,
      * which is the asymmetry issue #245 is about, stated as a measurement
      * rather than as prose.
