@@ -28,11 +28,13 @@ import kotlin.test.assertTrue
  * Leaving those sentences standing would publish four false claims in the one
  * document a downstream reader is pointed at.
  *
- * NO VERSION NUMBER IS ASSERTED HERE, deliberately. The mint of 1.18 belongs
- * to another branch and this change is a further entry under it; asserting a
+ * NO VERSION NUMBER IS ASSERTED HERE, deliberately. The mint belongs to
+ * another branch and this change is a further entry under it; asserting a
  * digit would pin this file to a landing order it does not control, and the
- * digit is the one thing a rebase moves. What is asserted is that the log SAYS
- * the change, in words no rebase renumbers.
+ * digit is the one thing a rebase moves. It moved: this paragraph named 1.18
+ * until the rebase onto the `main` that carries v0.1.50, and the entry is the
+ * fifth under 1.19 now. What is asserted is that the log SAYS the change, in
+ * words no rebase renumbers.
  */
 class SchemaShortDeliveryContractTest {
     private fun schema() = Json.parseToJsonElement(
