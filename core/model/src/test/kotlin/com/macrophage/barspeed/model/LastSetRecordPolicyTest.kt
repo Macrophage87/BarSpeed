@@ -2,6 +2,7 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -10,11 +11,20 @@ import kotlin.test.assertTrue
  *
  * Two halves. [LastSetRecordPolicy.values] is pinned as a CONTRACT: the strike
  * pairs a rest-screen correction against the figure the row was written with,
- * and every case below is a set the lifter can actually produce. The GAP-marked
- * cases are CHARACTERIZATIONS of the seam [LastSetRecordPolicy.status] is at
- * this commit -- it says the effort and nothing else -- and they are deleted by
- * the differential rather than reworded, because #237 asks for the limiter word
- * and the warm-up mark beside it.
+ * and every case below is a set the lifter can actually produce.
+ *
+ * [LastSetRecordPolicy.status] is where this commit's DIFFERENTIAL is. The seam
+ * says the effort and nothing else, so the ten cases from "a failed set says
+ * why it ended" down all fail here, and the commit after this one is what makes
+ * them pass. 60ac18d5's two GAP characterizations are DELETED rather than
+ * reworded: they stated the silence as today's answer, and the differential is
+ * what ends it.
+ *
+ * The clauses are joined by " · " and the limiter one carries a COLON
+ * after its label. Both are deliberate. The separator is the one every row on
+ * this screen already uses; the colon is what stops "Failed · Ended
+ * · Not given" reading as three peers when the middle two are one
+ * statement.
  */
 class LastSetRecordPolicyTest {
     private fun repValues(
@@ -131,20 +141,69 @@ class LastSetRecordPolicyTest {
     }
 
     @Test
-    fun `GAP a limiter answer is nowhere in the status`() {
+    fun `a failed set says why it ended beside how it was rated`() {
+        assertEquals("Failed · Ended: Muscle failure", status(failed = true, limiter = SetLimiter.MUSCLE))
+    }
+
+    @Test
+    fun `an unanswered failure names the gap rather than dropping it`() {
         assertEquals(
-            EffortCorrectionPolicy.FAILED,
+            "Failed · Ended: ${SetLimiterPolicy.NOT_GIVEN}",
             status(failed = true),
-            "the box cannot yet say why the set ended; #237's differential removes this",
+            "the row this box replaces draws SAY WHY in amber; the gap has to survive the move",
         )
     }
 
     @Test
-    fun `GAP a warm-up mark is nowhere in the status`() {
+    fun `a set nobody would be asked about carries no limiter clause at all`() {
+        assertEquals("Hard · RPE 8", status(rated = "Hard · RPE 8", rpe = 5))
+    }
+
+    @Test
+    fun `a completed set rated at the counted end says what limited it`() {
         assertEquals(
-            "Hard · RPE 8",
-            status(rated = "Hard · RPE 8"),
-            "the box cannot yet say the set was preparatory; #237's differential removes this",
+            "Hard · RPE 8 · Limited by: Grip was the limit",
+            status(rated = "Hard · RPE 8", rpe = 8, limiter = SetLimiter.GRIP),
+        )
+    }
+
+    @Test
+    fun `the lifter's own words are the limiter clause wherever they typed any`() {
+        assertEquals(
+            "Failed · Ended: rack was taken",
+            status(failed = true, limiter = SetLimiter.OTHER, note = "rack was taken"),
+        )
+    }
+
+    @Test
+    fun `a hold reads the hold wording for the answer, never the rep wording`() {
+        assertEquals(
+            "Failed · Ended: Could not hold it any longer",
+            status(failed = true, limiter = SetLimiter.MUSCLE, timed = true),
+        )
+    }
+
+    @Test
+    fun `a warm-up says so`() {
+        assertEquals("Hard · RPE 8 · Warm-up", status(rated = "Hard · RPE 8", declared = true))
+    }
+
+    @Test
+    fun `the lifter's mark beats the plan in both directions`() {
+        assertEquals("Hard · RPE 8 · Warm-up", status(rated = "Hard · RPE 8", mark = true))
+        assertEquals("Hard · RPE 8", status(rated = "Hard · RPE 8", declared = true, mark = false))
+    }
+
+    @Test
+    fun `a working set says nothing about warming up`() {
+        assertFalse(status(rated = "Hard · RPE 8").contains("Warm-up"))
+    }
+
+    @Test
+    fun `every clause a set has to say is said at once, in one order`() {
+        assertEquals(
+            "Failed · Ended: Pain, or something felt wrong · Warm-up",
+            status(failed = true, limiter = SetLimiter.PAIN, declared = true),
         )
     }
 
