@@ -113,30 +113,41 @@ object LastSetRecordPolicy {
      * The words under the figures: how the set was rated, why it ended, and
      * what it was for.
      *
-     * SEAM ONLY AT THIS COMMIT: it returns the effort clause and nothing else.
-     * Every argument below the first two is accepted and NOT READ, so that the
-     * differential which reds the missing clauses is a test-only commit rather
-     * than a signature change dressed as one -- 16cf78ba's two-argument seam
-     * could only have been red against #237's ask by failing to compile, which
-     * is not evidence about behaviour. The commit after the differential reads
-     * them.
+     * THREE CLAUSES, JOINED BY " · ", AND EVERY ONE OF THEM IS A STRING
+     * A ROW ON THIS SCREEN ALREADY DRAWS. Nothing is authored here: the effort
+     * wording is [EffortCorrectionPolicy.lineText]'s, the reason is
+     * [SetLimiterPolicy.lineLabel] and [SetLimiterPolicy.lineText]'s, and the
+     * warm-up word is the one [WarmupMarkPolicy] already decides the truth of.
+     * The box replaces those rows and must not reword them on the way.
+     *
+     * THE COLON AFTER THE REASON LABEL IS THE ONE MARK THIS ADDS, and it earns
+     * its place: the label and its answer are ONE statement, and joined with
+     * the same " · " as their neighbours, "Failed · Ended ·
+     * Not given" reads as three peers instead of two.
+     *
+     * THE EFFORT CLAUSE IS ALWAYS SAID, including its named absence. An unrated
+     * set is not an RPE of zero, and a blank there reads as the app having lost
+     * the rating -- the reason [EffortCorrectionPolicy.NOT_RATED] exists.
+     *
+     * THE REASON CLAUSE FOLLOWS [SetLimiterPolicy.offersCorrection] AND NOT THE
+     * PRESENCE OF AN ANSWER, which is why [rpe] is taken beside the wording of
+     * it. An unanswered failure is exactly the set the lifter still has
+     * something to do about, and the row this box replaces says so in amber
+     * with SAY WHY beside it; dropping the clause because the answer is missing
+     * would take an actionable gap off the screen. A set nobody would be asked
+     * about carries no clause at all rather than an empty one.
+     *
+     * THE WARM-UP WORD IS SAID ONLY WHERE THE SET WAS ONE. "Working set" is the
+     * ordinary case and stating it on every set would spend a third of the line
+     * on the absence of news; the popup behind the Correct button states both
+     * readings, and states the plan's declaration beside the lifter's mark
+     * where the two disagree. [warmupDeclared] and [warmupMark] are taken as
+     * the two facts [WarmupMarkPolicy] keeps apart, never pre-composed by the
+     * caller.
      *
      * [ratedDescription] is the gym-facing wording of whichever effort tile the
-     * lifter's own rating lit, or null for a set carrying no rating at all --
-     * the same argument [EffortCorrectionPolicy.lineText] takes, and it is that
-     * function's answer that is returned, so the box and the effort row cannot
-     * word one set two ways.
-     *
-     * [rpe] is the stored rating itself, beside the wording of it, because the
-     * two answer different questions: the wording is what the box PRINTS, and
-     * the number is what decides whether a limiter clause is offered at all
-     * ([SetLimiterPolicy.offersCorrection] reads the rung, not the words).
-     *
-     * [warmupDeclared] is the plan's declaration and [warmupMark] the lifter's
-     * own statement, passed as the two facts [WarmupMarkPolicy] keeps apart and
-     * never pre-composed by the caller.
+     * lifter's own rating lit, or null for a set carrying no rating at all.
      */
-    @Suppress("UNUSED_PARAMETER")
     fun status(
         ratedDescription: String?,
         rpe: Int?,
@@ -146,5 +157,24 @@ object LastSetRecordPolicy {
         timed: Boolean,
         warmupDeclared: Boolean,
         warmupMark: Boolean?,
-    ): String = EffortCorrectionPolicy.lineText(ratedDescription, failed)
+    ): String {
+        val clauses = mutableListOf(EffortCorrectionPolicy.lineText(ratedDescription, failed))
+        if (SetLimiterPolicy.offersCorrection(failed, rpe, limiter)) {
+            val label = SetLimiterPolicy.lineLabel(failed)
+            clauses += "$label: ${SetLimiterPolicy.lineText(limiter, limiterNote, timed, failed)}"
+        }
+        if (WarmupMarkPolicy.effective(warmupDeclared, warmupMark)) clauses += WARM_UP
+        return clauses.joinToString(SEPARATOR)
+    }
+
+    /**
+     * What the box calls a set the lifter did preparatory work in.
+     *
+     * The word [WarmupMarkRow] draws, so a set that reads "Warm-up" in the box
+     * reads "Warm-up" in the popup that changes it.
+     */
+    const val WARM_UP = "Warm-up"
+
+    /** The separator every row on this screen already uses between a label and its answer. */
+    private const val SEPARATOR = " · "
 }
