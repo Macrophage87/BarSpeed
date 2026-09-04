@@ -45,7 +45,7 @@ import kotlin.test.assertTrue
  * performed. `field-ohp-3010-6rep-s37-set02` is a failed set: the metronome
  * called the planned 8 against 6 performed -- `CuedRepCoverageTest` pins
  * `cued = 8` beside `performed = 6` -- and this file scores 8 marks for it.
- * 168 of this corpus's 170 marks have a performed rep behind them; those two
+ * 188 of this corpus's 190 marks have a performed rep behind them; those two
  * do not. So an empty window is one the analyzer published nothing in, which
  * on every mark but those two is also a rep it missed.
  *
@@ -79,7 +79,23 @@ import kotlin.test.assertTrue
  */
 class BatchCueCoverageTest {
     /** The training families a gap is reported per; see `the gap per family`. */
-    private enum class Family { BARBELL_UPPER, BARBELL_LOWER, MACHINE_LOWER, ACCESSORY, BODYWEIGHT_UPPER }
+    private enum class Family {
+        BARBELL_UPPER,
+        BARBELL_LOWER,
+        MACHINE_LOWER,
+        ACCESSORY,
+        BODYWEIGHT_UPPER,
+
+        /**
+         * Stack-mounted upper-body pulling. Added with session 38's lat
+         * pulldown rather than folded into ACCESSORY: issue #72 is a
+         * statement about the MOUNT, and the corpus's only other
+         * stack-mounted captures with cue tracks are the four leg curls, so
+         * one more accessory row would have hidden a second stack exercise
+         * inside a family whose other members are all the same machine.
+         */
+        MACHINE_UPPER,
+    }
 
     private data class Scored(val fixture: String, val direction: LiftDirection, val family: Family)
 
@@ -99,14 +115,40 @@ class BatchCueCoverageTest {
     /** Session 32 set 6's exported geometry block, as [CuedRepCoverageTest] reads it. */
     private val rearDeltFly = LiftDirection(startsWith = StartPhase.CONCENTRIC)
 
+    /** Session 38 set 14's declared geometry: lat pulldown, drive DOWN, on the stack. */
+    private val latPulldown = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = false,
+        sensorInverted = true,
+        plane = MovementPlane.VERTICAL,
+        sensorOnStack = true,
+    )
+
     private val eccFirst = LiftDirection(startsWith = StartPhase.ECCENTRIC)
 
     private val conFirst = LiftDirection(startsWith = StartPhase.CONCENTRIC)
 
     /**
-     * The twenty captures carrying a cue track with rep calls on it, with the
-     * geometry each set declared. The directions are [CuedRepCoverageTest]'s,
-     * read from the same session archives.
+     * The twenty-two captures carrying a cue track with rep calls on it, with
+     * the geometry each set declared. The directions are
+     * [CuedRepCoverageTest]'s, read from the same session archives.
+     *
+     * The last two are session 38 (2026-09-04, app 0.1.50, WitMotion
+     * WT901BLECL), added for issue #72 because that issue is a claim about the
+     * MOUNT and no committed session held both mounts. Every field below is
+     * read from that session's own `meta.json`:
+     *
+     * - `field-ohp-3010-8rep-s38-set04` -- set 4, seated_overhead_press, tempo
+     *   3010, 13.607771100301063 kg (30.0 lb), 8 performed of 8 planned,
+     *   RPE 7, concentric-first, drive up, `sensorOnStack` false,
+     *   `travelRatio` 1.0, 4988 samples at 99.36242279338514 Hz, roll
+     *   excursion 360.0 deg, `analysedRole` a. This is the exercise issue #72
+     *   is named after.
+     * - `field-latpulldown-1120-12rep-s38-set14` -- set 14, lat_pulldown, tempo
+     *   1120, 34.019427750752655 kg (75.0 lb), 12 performed of 12 planned,
+     *   RPE 6, concentric-first, drive DOWN, `sensorOnStack` and
+     *   `sensorInverted` both true, `travelRatio` 1.0, 6404 samples at
+     *   99.36374922408443 Hz, roll excursion 1.3 deg, `analysedRole` a.
      */
     private val scored = listOf(
         Scored("field-ohp-rotating-8rep", eccFirst, Family.BARBELL_UPPER),
@@ -129,6 +171,8 @@ class BatchCueCoverageTest {
         Scored("field-legcurl-1030-10rep", legCurl, Family.ACCESSORY),
         Scored("field-reardeltfly-s32-set06", rearDeltFly, Family.ACCESSORY),
         Scored("field-pullup-3010-8rep-s37-set09", conFirst, Family.BODYWEIGHT_UPPER),
+        Scored("field-ohp-3010-8rep-s38-set04", conFirst, Family.BARBELL_UPPER),
+        Scored("field-latpulldown-1120-12rep-s38-set14", latPulldown, Family.MACHINE_UPPER),
     )
 
     /**
@@ -267,6 +311,8 @@ class BatchCueCoverageTest {
             "field-legcurl-1030-10rep" to listOf(10, 12, 8, 2, 2, 2),
             "field-reardeltfly-s32-set06" to listOf(12, 17, 12, 0, 2, 3),
             "field-pullup-3010-8rep-s37-set09" to listOf(8, 6, 4, 4, 0, 2),
+            "field-ohp-3010-8rep-s38-set04" to listOf(8, 9, 8, 0, 0, 1),
+            "field-latpulldown-1120-12rep-s38-set14" to listOf(12, 14, 10, 2, 2, 2),
         )
         val actual = scored.associate { s ->
             val c = coverage(s)
@@ -289,11 +335,12 @@ class BatchCueCoverageTest {
         // which kind of training is served. Rows are
         // (marks, spans, matched, empty, doubled, stray).
         val expected = mapOf(
-            Family.BARBELL_UPPER to listOf(48, 47, 43, 5, 1, 3),
+            Family.BARBELL_UPPER to listOf(56, 56, 51, 5, 1, 4),
             Family.BARBELL_LOWER to listOf(32, 38, 31, 1, 2, 5),
             Family.MACHINE_LOWER to listOf(24, 25, 22, 2, 1, 2),
             Family.ACCESSORY to listOf(58, 65, 50, 8, 8, 7),
             Family.BODYWEIGHT_UPPER to listOf(8, 6, 4, 4, 0, 2),
+            Family.MACHINE_UPPER to listOf(12, 14, 10, 2, 2, 2),
         )
         val actual = scored.groupBy { it.family }.mapValues { (_, group) ->
             val marks = group.sumOf { windows(it.fixture).size }
@@ -303,10 +350,10 @@ class BatchCueCoverageTest {
         assertEquals(expected, actual, "per family: marks, spans, matched, empty, doubled, stray")
         // And the corpus, which is the one figure issue #94's field-36 and
         // field-37 comments quote.
-        assertEquals(170, actual.values.sumOf { it[0] }, "metronome marks across the twenty scored captures")
-        assertEquals(181, actual.values.sumOf { it[1] }, "spans the batch analyzer publishes over them")
-        assertEquals(150, actual.values.sumOf { it[2] }, "marks with at least one detection")
-        assertEquals(20, actual.values.sumOf { it[3] }, "marks with none -- called and not published")
+        assertEquals(190, actual.values.sumOf { it[0] }, "metronome marks across the twenty-two scored captures")
+        assertEquals(204, actual.values.sumOf { it[1] }, "spans the batch analyzer publishes over them")
+        assertEquals(168, actual.values.sumOf { it[2] }, "marks with at least one detection")
+        assertEquals(22, actual.values.sumOf { it[3] }, "marks with none -- called and not published")
     }
 
     @Test
@@ -412,12 +459,13 @@ class BatchCueCoverageTest {
         // file too: start and midpoint differ on
         // field-legcurl-1030-12rep-c. It is more wrong here, where a span is
         // a run seconds long rather than an instant: the three rules disagree
-        // per-capture on SEVENTEEN of the twenty captures here -- "disagree"
-        // meaning the (matched, empty, doubled, stray) tuple is not identical
-        // under all three -- measured at this commit by running the three
-        // rules over `scored` and comparing the tuples. The nine this note
-        // used to claim was measured on a corpus that has since moved, and is
-        // withdrawn.
+        // per-capture on NINETEEN of the twenty-two captures here --
+        // "disagree" meaning the (matched, empty, doubled, stray) tuple is not
+        // identical under all three -- measured at this commit by running the
+        // three rules over `scored` and comparing the tuples. The nine this
+        // note used to claim was measured on a corpus that has since moved and
+        // is withdrawn; so is the SEVENTEEN that replaced it, which was true
+        // over the twenty captures scored before session 38's two arrived.
         //
         // field-bench-3010-6rep-s37-set05 is the clearest single case. It
         // resolves FOUR detections, not the one this note used to claim, and
@@ -429,10 +477,13 @@ class BatchCueCoverageTest {
         // timestamps and the window bounds this file computes.
         //
         // What survives is the corpus figure, which is what the issue quotes:
-        // the three rules put the matched total within FOURTEEN windows of each
-        // other -- 150, 144 and 136 in the map below, and the assertTrue bound
-        // beneath it reads <= 14 -- which is 8.2% of 170. That is a real
-        // spread and not the 2.4% this note used to claim, so the choice of
+        // the three rules put the matched total within THIRTEEN windows of
+        // each other -- 168, 163 and 155 in the map below, and the assertTrue
+        // bound beneath it reads <= 14 -- which is 6.8% of 190. It was exactly
+        // 14 of 170 before session 38's two captures arrived; the bound is
+        // left where it was rather than tightened onto the new measurement.
+        // That is a real spread and not the 2.4% this note used to claim, so
+        // the choice of
         // rule is stated rather than waved away: the start rule is used
         // because a rep begins when the drive begins, and every figure in this
         // file is under it.
@@ -443,9 +494,9 @@ class BatchCueCoverageTest {
         ).mapValues { (_, rows) -> rows.reduce(Coverage::plus) }
         assertEquals(
             mapOf(
-                "start" to Coverage(150, 20, 12, 19),
-                "midpoint" to Coverage(144, 26, 15, 22),
-                "end" to Coverage(136, 34, 22, 23),
+                "start" to Coverage(168, 22, 14, 22),
+                "midpoint" to Coverage(163, 27, 17, 24),
+                "end" to Coverage(155, 35, 24, 25),
             ),
             byRule,
             "corpus coverage under each assignment rule",
@@ -570,15 +621,16 @@ class BatchCueCoverageTest {
     @Test
     fun `every empty window is attributed to a mechanism`() {
         // The census that makes the empty column actionable. A total says a
-        // candidate moved 23; this says WHICH of the five it moved, and three
-        // of the five are not reachable from the segmenter at all.
+        // candidate moved the empty column by N; this says WHICH of the five
+        // it moved, and three of the five are not reachable from the
+        // segmenter at all.
         //
         // CHARACTERIZATION: these are the mechanisms at this commit and no
         // claim that any of them is the right answer.
         val expected = mapOf(
-            Loss.PAIRING to 5,
+            Loss.PAIRING to 6,
             Loss.BELOW_MIN_ROM to 8,
-            Loss.NO_DRIVE_RUN to 4,
+            Loss.NO_DRIVE_RUN to 5,
             Loss.DEMOTED to 3,
         )
         val actual = scored.flatMap { losses(it) }.groupingBy { it }.eachCount()
@@ -619,6 +671,7 @@ class BatchCueCoverageTest {
             "field-legcurl-1030-10rep" to listOf(Loss.BELOW_MIN_ROM, Loss.DEMOTED),
             "field-pullup-3010-8rep-s37-set09" to
                 listOf(Loss.BELOW_MIN_ROM, Loss.DEMOTED, Loss.NO_DRIVE_RUN, Loss.NO_DRIVE_RUN),
+            "field-latpulldown-1120-12rep-s38-set14" to listOf(Loss.PAIRING, Loss.NO_DRIVE_RUN),
         )
         val actual = scored.associate { it.fixture to losses(it) }.filterValues { it.isNotEmpty() }
         assertEquals(expected, actual, "empty windows per capture, in window order")
@@ -636,32 +689,64 @@ class BatchCueCoverageTest {
         // The split is read from `sensorOnStack`, which is the geometry each
         // set DECLARED, not a judgement made here about where the sensor was.
         // Rows are (marks, matched).
+        //
+        // THE SPLIT THE ISSUE NAMED HAS INVERTED, and session 38 is what makes
+        // that sayable: it is the first committed session holding both mounts,
+        // recorded the same day by the same lifter on the same sensor. The bar
+        // half matches 120 of 132 marks, 90.9%; the stack half matches 48 of
+        // 58, 82.8%. The direction of the gap is now the opposite of the one
+        // the issue was filed on. What remains is a gap, and it is on the
+        // STACK.
+        //
+        // This says nothing about over-detection, which these two rows cannot
+        // see: `spans against the metronome's marks` is where the bar half's
+        // 142 detections against 132 marks are readable, and the empty column
+        // is the only thing measured here.
         val expected = mapOf(
-            false to listOf(124, 112),
-            true to listOf(46, 38),
+            false to listOf(132, 120),
+            true to listOf(58, 48),
         )
         val actual = scored.groupBy { it.direction.sensorOnStack }.mapValues { (_, group) ->
             listOf(group.sumOf { windows(it.fixture).size }, group.sumOf { coverage(it).matched })
         }
         assertEquals(expected, actual, "by sensorOnStack: marks, matched")
-        // And the two captures the issue's headline is about. It reported 17
-        // of 32 reps found across four seated-overhead-press sets, 53%. The
-        // two of those four this corpus holds match 15 of the 16 marks the
-        // metronome called on them: set 1 matches all 8, set 4 matches 7 and
-        // leaves one window empty. Not the whole of the reported loss -- the
-        // other two sets of that four are not committed here -- but the
-        // captures that are committed no longer show it.
+        // And the exercise the issue's headline is about, named rather than
+        // matched by prefix. It reported 17 of 32 reps found across four
+        // seated-overhead-press sets, 53%. This corpus now holds four
+        // seated-overhead-press captures of its own -- two from session 26,
+        // one from field-37 and one from session 38 -- and they carry 32
+        // marks, the same total by coincidence of arithmetic and not the same
+        // sets. 30 of those 32 marks carry a detection.
         //
+        // 30 of 32 IS NOT DIRECTLY COMPARABLE TO 17 of 32. A mark is a rep the
+        // metronome called and `field-ohp-3010-6rep-s37-set02` is a failed set
+        // whose metronome called 8 against 6 performed, so two of these 32
+        // marks have no rep behind them at all. The comparable statement is
+        // narrower and is the one that matters: on the seated overhead press
+        // this corpus can see, the analyzer is no longer publishing nothing
+        // for half the reps.
+        val seatedPress = listOf(
+            "field-ohp-rotating-8rep",
+            "field-ohp-rotating-8rep-b",
+            "field-ohp-3010-6rep-s37-set02",
+            "field-ohp-3010-8rep-s38-set04",
+        )
+        val headline = scored.filter { it.fixture in seatedPress }
+        assertEquals(4, headline.size, "the seated overhead press captures")
+        assertEquals(32, headline.sumOf { windows(it.fixture).size }, "marks across them")
+        assertEquals(30, headline.sumOf { coverage(it).matched }, "marks matched across them")
+        // Session 38's set, on its own: every mark matched. It is the newest
+        // capture of the exercise the issue is named after and it is the only
+        // one of the four with no empty window.
+        val s38 = scored.single { it.fixture == "field-ohp-3010-8rep-s38-set04" }
+        assertEquals(8, windows(s38.fixture).size, "marks the metronome called on session 38 set 4")
+        assertEquals(8, coverage(s38).matched, "marks matched on session 38 set 4")
         // THIS FIGURE DOES NOT MOVE with the slow-eccentric fallback, and a
-        // draft of that change's red asserted that it would. Set 4's empty
-        // window is a PAIRING loss the fallback does not reach: `where each
-        // mechanism costs its reps` keeps this capture in its map after the
-        // change. The three windows the fallback recovers are on the bench,
-        // the Romanian deadlift and the back squat, none of them here.
-        val headline = scored.filter { it.fixture.startsWith("field-ohp-rotating-") }
-        assertEquals(2, headline.size, "the rotating overhead-press captures")
-        assertEquals(16, headline.sumOf { windows(it.fixture).size }, "marks across them")
-        assertEquals(15, headline.sumOf { coverage(it).matched }, "marks matched across them")
+        // draft of that change's red asserted that it would. The rotating
+        // set's empty window is a PAIRING loss the fallback does not reach:
+        // `where each mechanism costs its reps` keeps that capture in its map
+        // after the change. The three windows the fallback recovers are on the
+        // bench, the Romanian deadlift and the back squat, none of them here.
     }
 
     @Test

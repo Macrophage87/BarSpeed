@@ -16,11 +16,9 @@ import kotlin.test.assertTrue
  * ## What the corpus says today
  *
  * Twenty-seven of the forty committed captures carry a cue track, and the
- * twenty in [cueTracked] are scored here. It read "twenty-five of the
- * thirty-seven" before issue #245 committed two more cue-tracked captures,
- * and the thirty-seven was already one short of the thirty-eight then on the
- * classpath; both digits are re-counted here rather than adjusted. Across them the metronome called
- * 170 reps; 74 produce a counted rep and 96 produce none. Seven counted reps
+ * twenty-two in [cueTracked] are scored here. Across them the metronome
+ * called 190 reps; 79 produce a counted rep and 111 produce none. Eight
+ * counted reps
  * land outside every cued window. All four figures are pinned below.
  *
  * The resource directory holds MORE captures than the corpus does. Four
@@ -31,15 +29,18 @@ import kotlin.test.assertTrue
  * in the sentence above moves with every such commit and is re-read from the
  * resource directory rather than carried forward.
  *
- * They have moved twice. They read 118 / 62 / 56 / 2 over thirteen captures,
- * then 126 / 67 / 59 / 5 over fourteen once
- * field-legpress-single-2011-8rep-s36-set07 was committed for issue #93, and
- * they now read 170 / 74 / 96 / 7 over twenty with the six field-36 and
- * field-37 captures committed for issue #87. The rate got WORSE rather than
- * staying flat: 47% of cued reps produced nothing over fourteen captures and
- * 56% do over twenty, because five of the six new captures are bar-mounted and
- * four of those five produce almost nothing at all. That population was
- * under-represented in the corpus until these were committed.
+ * They have moved three times. They read 118 / 62 / 56 / 2 over thirteen
+ * captures, then 126 / 67 / 59 / 5 over fourteen once
+ * field-legpress-single-2011-8rep-s36-set07 was committed for issue #93, then
+ * 170 / 74 / 96 / 7 over twenty with the six field-36 and field-37 captures
+ * committed for issue #87, and they now read 190 / 79 / 111 / 8 over
+ * twenty-two with session 38's seated overhead press and lat pulldown
+ * committed for issue #72. The rate got WORSE rather than staying flat: 47% of
+ * cued reps produced nothing over fourteen captures, 56% over twenty and 58%
+ * over twenty-two. Both of the captures added last are ones the LIVE tracker
+ * counts poorly; what the BATCH path resolves on them is a different figure
+ * and is in [BatchCueCoverageTest], where the seated overhead press matches
+ * all eight of its marks.
  *
  * ## What this does NOT say
  *
@@ -64,7 +65,7 @@ import kotlin.test.assertTrue
  *
  * ## The width comes from each track, never from a constant
  *
- * The twenty tracks carry nine distinct cycle widths from 3.003 s to
+ * The twenty-two tracks carry nine distinct cycle widths from 3.003 s to
  * 6.008 s, pinned in `window width is read from the track, not from a
  * constant`. The four session-26 barbell captures and the three 12-rep leg
  * curls were
@@ -90,6 +91,9 @@ class CuedRepCoverageTest {
          * barbell against and burying it would hide that contrast in a total.
          */
         BODYWEIGHT_UPPER,
+
+        /** Stack-mounted upper-body pulling; see BatchCueCoverageTest's Family. */
+        MACHINE_UPPER,
     }
 
     private data class Cued(
@@ -131,11 +135,20 @@ class CuedRepCoverageTest {
         sensorOnStack = false,
     )
 
+    /** Session 38 set 14's declared geometry: lat pulldown, drive DOWN, on the stack. */
+    private val latPulldown = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = false,
+        sensorInverted = true,
+        plane = MovementPlane.VERTICAL,
+        sensorOnStack = true,
+    )
+
     private val eccFirst = LiftDirection(startsWith = StartPhase.ECCENTRIC)
 
     private val conFirst = LiftDirection(startsWith = StartPhase.CONCENTRIC)
 
-    /** The twenty captures carrying a cue track, with the count the lifter performed. */
+    /** The twenty-two captures carrying a cue track, with the count the lifter performed. */
     private val cueTracked = listOf(
         Cued("field-ohp-rotating-8rep", eccFirst, 8, TrainingClass.BARBELL_UPPER),
         Cued("field-ohp-rotating-8rep-b", eccFirst, 8, TrainingClass.BARBELL_UPPER),
@@ -157,6 +170,8 @@ class CuedRepCoverageTest {
         Cued("field-pullup-3010-8rep-s37-set09", conFirst, 8, TrainingClass.BODYWEIGHT_UPPER),
         Cued("field-rdl-3010-10rep-s36-set05", eccFirst, 10, TrainingClass.BARBELL_LOWER),
         Cued("field-backsquat-4011-6rep-s36-set01", eccFirst, 6, TrainingClass.BARBELL_LOWER),
+        Cued("field-ohp-3010-8rep-s38-set04", conFirst, 8, TrainingClass.BARBELL_UPPER),
+        Cued("field-latpulldown-1120-12rep-s38-set14", latPulldown, 12, TrainingClass.MACHINE_UPPER),
     )
 
     /**
@@ -177,6 +192,8 @@ class CuedRepCoverageTest {
         "field-rdl-3010-10rep-s36-set05",
         "field-backsquat-4011-6rep-s36-set01",
         "field-ohp-3010-8rep-s37-set01",
+        "field-ohp-3010-8rep-s38-set04",
+        "field-latpulldown-1120-12rep-s38-set14",
     )
 
     /**
@@ -382,13 +399,13 @@ class CuedRepCoverageTest {
             counted += reps.size
             called += reps.size - uncalled(fixture, d, c, tol).size
         }
-        assertEquals(81, counted, "counted reps across the twenty cue-tracked captures")
-        assertEquals(74, called, "of those, reps landing inside a cued rep window")
+        assertEquals(88, counted, "counted reps across the twenty-two cue-tracked captures")
+        assertEquals(80, called, "of those, reps landing inside a cued rep window")
     }
 
     @Test
     fun `the counted reps nobody called are outside the cue track, not inside it`() {
-        // Seven counted reps land in no cued window: four late, three early.
+        // Eight counted reps land in no cued window: five late, three early.
         // The four LATE ones are the same shape:
         // they complete after the last window closed, in the tail that keeps
         // recording past the metronome's last call -- the population
@@ -424,10 +441,11 @@ class CuedRepCoverageTest {
         val strays = cueTracked.flatMap { (fixture, d, _) ->
             uncalled(fixture, d, c, tol).map { fixture to it }
         }
-        assertEquals(7, strays.size, "counted reps outside every cued window")
+        assertEquals(8, strays.size, "counted reps outside every cued window")
         assertEquals(
             listOf(
                 "field-backsquat-4011-6rep-s36-set01",
+                "field-latpulldown-1120-12rep-s38-set14",
                 "field-legpress-single-2010-8rep",
                 "field-legpress-single-2011-8rep-s36-set07",
                 "field-legpress-single-2011-8rep-s36-set07",
@@ -439,7 +457,7 @@ class CuedRepCoverageTest {
             "the captures they are on",
         )
         val late = strays.filter { (fixture, rep) -> rep.endMs >= windows(fixture).last().second }
-        assertEquals(4, late.size, "strays completing after the last cued window closed")
+        assertEquals(5, late.size, "strays completing after the last cued window closed")
         val early = strays.filter { (fixture, rep) -> rep.endMs < windows(fixture).first().first }
         assertEquals(3, early.size, "strays completing before the first cued window opened")
         assertEquals(
@@ -502,7 +520,7 @@ class CuedRepCoverageTest {
                 "$fixture must NOT carry a cue track that calls a rep",
             )
         }
-        assertEquals(20, cueTracked.size, "captures with a cue track")
+        assertEquals(22, cueTracked.size, "captures with a cue track")
         // 13 until issue #125 committed field-ohp-3010-8rep-s37-set01,
         // whose archived cue track is deliberately not committed beside it.
         assertEquals(14, notCueTracked.size, "captures with no track that calls a rep")
@@ -570,10 +588,10 @@ class CuedRepCoverageTest {
         // the drive alone, whose ROM is one phase where a paired rep's is the
         // drive too -- so the reference median it is compared against shifts
         // under it as well, and one more live rep falls outside the family.
-        assertEquals(18, outOfFamily, "counted reps the batch reference rejects")
-        assertEquals(16, outOfFamilyCalled, "of those, reps the metronome actually called")
-        assertEquals(63, inFamily, "counted reps the batch reference accepts")
-        assertEquals(58, inFamilyCalled, "of those, reps the metronome actually called")
+        assertEquals(20, outOfFamily, "counted reps the batch reference rejects")
+        assertEquals(17, outOfFamilyCalled, "of those, reps the metronome actually called")
+        assertEquals(68, inFamily, "counted reps the batch reference accepts")
+        assertEquals(63, inFamilyCalled, "of those, reps the metronome actually called")
     }
 
     @Test
@@ -638,29 +656,31 @@ class CuedRepCoverageTest {
             cuedByClass[k] = (cuedByClass[k] ?: 0) + h.size
             emptyByClass[k] = (emptyByClass[k] ?: 0) + h.count { it == 0 }
         }
-        assertEquals(170, cued, "cued reps the metronome called across the twenty")
-        assertEquals(96, empty, "cued reps that produced no counted rep")
+        assertEquals(190, cued, "cued reps the metronome called across the twenty-two")
+        assertEquals(111, empty, "cued reps that produced no counted rep")
         // Per class, because the owner's calibration order is barbell first and
         // accessory last, and the loss is not distributed the way that order
         // would suggest.
         assertEquals(
             mapOf(
-                TrainingClass.BARBELL_UPPER to 48,
+                TrainingClass.BARBELL_UPPER to 56,
                 TrainingClass.BARBELL_LOWER to 32,
                 TrainingClass.MACHINE_LOWER to 24,
                 TrainingClass.ACCESSORY to 58,
                 TrainingClass.BODYWEIGHT_UPPER to 8,
+                TrainingClass.MACHINE_UPPER to 12,
             ),
             cuedByClass,
             "cued reps per training class",
         )
         assertEquals(
             mapOf(
-                TrainingClass.BARBELL_UPPER to 34,
+                TrainingClass.BARBELL_UPPER to 42,
                 TrainingClass.BARBELL_LOWER to 16,
                 TrainingClass.MACHINE_LOWER to 12,
                 TrainingClass.ACCESSORY to 27,
                 TrainingClass.BODYWEIGHT_UPPER to 7,
+                TrainingClass.MACHINE_UPPER to 7,
             ),
             emptyByClass,
             "of those, the ones that produced nothing",
@@ -695,9 +715,9 @@ class CuedRepCoverageTest {
                 driveDownDoubled += h.count { it > 1 }
             }
         }
-        assertEquals(46, driveDownCued, "cued reps on drive-down lifts")
-        assertEquals(124, driveUpCued, "cued reps on drive-up lifts")
-        assertEquals(0, driveDownDoubled, "cued reps counted twice on drive-down lifts, since issue 102")
+        assertEquals(58, driveDownCued, "cued reps on drive-down lifts")
+        assertEquals(132, driveUpCued, "cued reps on drive-up lifts")
+        assertEquals(1, driveDownDoubled, "cued reps counted twice on drive-down lifts")
         assertEquals(0, driveUpDoubled, "and none at all on drive-up lifts")
     }
 
@@ -724,13 +744,13 @@ class CuedRepCoverageTest {
             return Triple(called, empty, doubled)
         }
         // The shipped tolerance and zero agree exactly.
-        assertEquals(Triple(74, 96, 0), tally(0L), "at 0 ms")
-        assertEquals(Triple(74, 96, 0), tally(CueTrack.WINDOW_TOLERANCE_MS.toLong()), "at 150 ms")
+        assertEquals(Triple(80, 111, 1), tally(0L), "at 0 ms")
+        assertEquals(Triple(80, 111, 1), tally(CueTrack.WINDOW_TOLERANCE_MS.toLong()), "at 150 ms")
         // Three reps are re-attributed at 300 ms and one of the three goes
         // back at 600, which is why neither is a better tolerance than the
         // shipped one -- they are noisier, not stricter.
-        assertEquals(Triple(76, 97, 3), tally(300L), "at 300 ms three reps are re-attributed")
-        assertEquals(Triple(76, 96, 2), tally(600L), "at 600 ms one of the three goes back")
+        assertEquals(Triple(82, 112, 4), tally(300L), "at 300 ms three reps are re-attributed")
+        assertEquals(Triple(82, 111, 3), tally(600L), "at 600 ms one of the three goes back")
     }
 
     @Test
@@ -746,6 +766,6 @@ class CuedRepCoverageTest {
         val widths = cueTracked.map { row -> windows(row.fixture).first().let { it.second - it.first } }
         assertEquals(3_003L, widths.min(), "narrowest window in the corpus, ms -- a 2010 leg press")
         assertEquals(6_008L, widths.max(), "widest, ms -- a 4011 back squat")
-        assertEquals(9, widths.toSortedSet().size, "distinct widths across the twenty tracks")
+        assertEquals(9, widths.toSortedSet().size, "distinct widths across the twenty-two tracks")
     }
 }

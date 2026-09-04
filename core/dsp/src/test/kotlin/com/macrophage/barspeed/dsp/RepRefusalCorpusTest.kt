@@ -36,6 +36,15 @@ class RepRefusalCorpusTest {
         sensorOnStack = true,
     )
 
+    /** Session 38 set 14's declared geometry: lat pulldown, drive DOWN, on the stack. */
+    private val latPulldown = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = false,
+        sensorInverted = true,
+        plane = MovementPlane.VERTICAL,
+        sensorOnStack = true,
+    )
+
     /**
      * Every committed capture with the geometry it declared, taken from
      * `BatchCueCoverageTest`, `StackMountGeometryTest` and
@@ -62,6 +71,7 @@ class RepRefusalCorpusTest {
         Triple("field-cablerow-static-8rep", con, 27.215542200602126),
         Triple("field-facepull-static-12rep", con, 9.97903214022078),
         Triple("field-inclinepress-3010-12rep-s38-set02", ecc, 27.215542200602126),
+        Triple("field-latpulldown-1120-12rep-s38-set14", latPulldown, 34.019427750752655),
         Triple("field-legcurl-1030-10rep", legCurl, 40.8),
         Triple("field-legcurl-1030-12rep", legCurl, 40.8),
         Triple("field-legcurl-1030-12rep-b", legCurl, 40.8),
@@ -72,6 +82,7 @@ class RepRefusalCorpusTest {
         Triple("field-ohp-100hz-bursty", ecc, 20.4),
         Triple("field-ohp-3010-6rep-s37-set02", con, 24.94758035055195),
         Triple("field-ohp-3010-8rep-s37-set01", con, 20.411656650451594),
+        Triple("field-ohp-3010-8rep-s38-set04", con, 13.607771100301063),
         Triple("field-ohp-3010-8rep-s38-set05", con, 13.607771100301063),
         Triple("field-ohp-prepinflated-s37-set03", con, 22.67961850050177),
         Triple("field-ohp-prepinflated-s37-set04", con, 22.67961850050177),
