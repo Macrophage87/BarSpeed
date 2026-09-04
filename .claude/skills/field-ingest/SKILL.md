@@ -1,6 +1,6 @@
 ---
 name: field-ingest
-description: Ingest a field session export — durable copy first, measured analysis against the raw streams, issue updates with field evidence, and the next plan. Use every time the owner hands over a session zip; the captures are irreplaceable and the analysis is the app's real test suite.
+description: Ingest a field session export — durable copy first, measured analysis against the raw streams, issue updates with field evidence, and a report to the owner. Use every time the owner hands over a session zip; the captures are irreplaceable and the analysis is the app's real test suite.
 ---
 
 # /field-ingest <zip-or-dir>
@@ -49,20 +49,7 @@ release gets a did-it-work lens per shipped feature). Standing rules for every l
   fixture with no assertion is inert and reads as coverage — lift it with a case pinning it, in
   the same commit.
 
-## 3. The next plan
-
-Generate against the schema the **installed build** accepts — `git show
-v0.1.NN:docs/schemas/plan.schema.json`, where the tag comes from the capture's own `meta.json`
-`appVersion` (verified present: field-32/meta.json carries "appVersion": "0.1.41"). Not the
-working tree, and not `origin/main`, either of which can carry a schema bump the released APK
-refuses. Fold in what the session taught: loads the owner adjusted (the export's planned/actual
-pairs are the record), exercises flagged weak, sequencing requests. Validate with
-`npx --yes -p ajv-cli@5 -p ajv-formats@2 ajv validate -c ajv-formats --spec=draft2020
--s docs/schemas/plan.schema.json -d <the-generated-plan>.json`, with the `-s` schema taken from
-the same tag the plan was generated against, before sending. Send the plan file and, when the
-contract moved, the regenerated prompt.
-
-## 4. Report to the owner
+## 3. Report to the owner
 
 Lead with what the capture uniquely established (did the release's features work), then defects
 that fired in the field, then corrections to anything previously told them that the capture
