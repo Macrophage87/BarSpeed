@@ -75,7 +75,6 @@ import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.DualSensorSetup
 import com.macrophage.barspeed.model.EffortClaim
-import com.macrophage.barspeed.model.EffortCorrectionPolicy
 import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
@@ -1415,7 +1414,7 @@ private fun cardPrep(state: RecordState, slot: PlannedSlot): SetCardValue? = if 
  * reads as "not this, that". The words around a figure are outside both spans
  * and drawn once.
  */
-private fun struckLine(lead: String, values: List<SetCardValue>): AnnotatedString = buildAnnotatedString {
+internal fun struckLine(lead: String, values: List<SetCardValue>): AnnotatedString = buildAnnotatedString {
     append(lead)
     values.forEachIndexed { index, value ->
         if (index > 0) append(" · ")
@@ -2756,11 +2755,12 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * and [SessionCloseControls] becomes the filled, primary control below instead
  * (#195); adding a set through [AddSetSection] brings START back to this row,
  * since there is a slot to run again.
- * Almost everything about the set that had just finished -- the effort line,
- * the reason row, the warm-up row, the rep- and hold-correction rows and a
- * rep-quality card carrying a 64dp chart -- sits below the next-set block, in
- * [LastSetDetail]. TWO things do not, and both are drawn above it for the same
- * reason. The first is the reason page the app opens BY
+ * Everything about the set that had just finished -- what it was, and every
+ * correction to it -- sits below the next-set block, in [LastSetDetail]. Since
+ * #237 that is a BOX stating the record in one line, a Correct button, and a
+ * rep-quality card carrying a 64dp chart; the six inline correction rows that
+ * stood there are inside the popup the button opens. TWO things are still drawn
+ * above it, and both for the same reason. The first is the reason page the app opens BY
  * ITSELF, drawn here under the header: the screen scrolls to 0 on entering
  * RESTING, so a question drawn below the fold is a question the lifter starts
  * the next set without seeing. See [SetLimiterPagePlacement]. The field report for v0.1.37 is
@@ -2812,8 +2812,15 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // and the row stays reachable either way because
     // [SetLimiterPolicy.offersCorrection] never reads it.
     var dismissed by remember(state.setsCompleted) { mutableStateOf(false) }
-    var changing by remember(state.setsCompleted) { mutableStateOf(false) }
     val timed = state.lastFeedback?.actualDurationS != null
+    // `changing` is passed FALSE and no longer exists as state (#237). It was
+    // the lifter's own tap on the reason ROW, and the row is gone: every
+    // correction, the reason among them, is now behind the Correct button's
+    // popup, which draws its own tiles rather than asking this screen to place
+    // a page under a row. So SetLimiterPagePlacement.CORRECTION is unreachable
+    // from here. The member and the policy that returns it are LEFT ALONE
+    // rather than deleted -- SetLimiterPolicy.placement is pinned in
+    // :core:model and moving a pinned policy is not this change.
     val placement =
         if (state.lastFeedback != null &&
             SetLimiterPolicy.offersCorrection(
@@ -2827,7 +2834,7 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
                 rpe = state.lastSetRpe,
                 limiter = state.lastSetLimiter,
                 dismissed = dismissed,
-                changing = changing,
+                changing = false,
             )
         } else {
             SetLimiterPagePlacement.NONE
@@ -2853,7 +2860,10 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // scroll contract, not measured -- the bench performed no rep correction
     // across the planned count.
     if (placement == SetLimiterPagePlacement.PROMPT) {
-        LimiterPage(state, timed, viewModel, onSkip = { dismissed = true }) { changing = false }
+        // onDone is a no-op since #237: it closed the reason page the lifter
+        // had opened from the row, and the row is gone. This is the page the
+        // app opened BY ITSELF, which closes on the stored answer.
+        LimiterPage(state, timed, viewModel, onSkip = { dismissed = true }) {}
         Spacer(Modifier.height(10.dp))
     }
     // Sets two onwards start from here, not from READY, and this is the screen
@@ -2878,9 +2888,10 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // The move changes which side of this row its own inputs sit on, and that
     // is the part worth reading twice. Four of them are written by rest-screen
     // controls, and since #236 ALL FOUR are drawn BELOW it: the warm-up
-    // toggle, the effort re-rating and the rep and duration corrections inside
-    // LastSetDetail, and AddSetSection inside the NextSetBlock call on the
-    // line after this one. AddSetSection was ABOVE before. Appending a set is
+    // toggle, the effort re-rating and the rep and duration corrections, all
+    // four now one tap further away behind LastSetDetail's Correct button
+    // rather than inline under it (#237), and AddSetSection inside the
+    // NextSetBlock call on the line after this one. AddSetSection was ABOVE before. Appending a set is
     // the case that turns on: on the last set of an exercise this row draws
     // nothing, because setsLeftInExercise is 0 and nextSlot may be null, and
     // the append gives it both -- so the row now appears ABOVE the button that
@@ -2894,15 +2905,7 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     NextSetBlock(state, viewModel)
     SessionCloseControls(state, viewModel)
     Spacer(Modifier.height(16.dp))
-    LastSetDetail(
-        state = state,
-        viewModel = viewModel,
-        placement = placement,
-        timed = timed,
-        onChangeLimiter = { changing = !changing },
-        onSkipLimiter = { dismissed = true },
-        onLimiterDone = { changing = false },
-    )
+    LastSetDetail(state = state, viewModel = viewModel, timed = timed)
 }
 
 /** What happens next: the prescription with the changes struck into it, and the way in. */
@@ -3194,104 +3197,13 @@ private fun rpeColor(rpe: Int): Color = when {
     else -> BarColors.Amber
 }
 
-/**
- * Correction grid on the rest screen, for a mistapped effort rating.
- *
- * What is pre-lit is [EffortCorrectionPolicy]'s decision, not this file's. The
- * rule is a decision about attribution -- whose verdict a lit tile claims to be
- * -- and it lives in `:core:model` where a test runs on it every push; no test
- * on the CI path reaches a Compose screen.
- */
-@Composable
-internal fun RpeSelector(state: RecordState, viewModel: RecordViewModel, onPicked: () -> Unit) {
-    val feedback = state.lastFeedback
-    val options =
-        rpeOptions(
-            timed = feedback?.actualDurationS != null,
-            explosive = feedback?.explosive == true,
-            unit = state.weightUnit,
-        )
-    // lastSetFailed is the OR of both facts, so the derived one is recovered by
-    // subtracting the tap. Where BOTH are true this hands the policy false for
-    // derivedFailed, which is a value the policy cannot act on differently: its
-    // only use of the argument is `derivedFailed && !tappedFailed`, false in
-    // that case either way.
-    val selection =
-        EffortCorrectionPolicy.selection(
-            rpe = state.lastSetRpe,
-            tappedFailed = state.lastSetTappedFailed,
-            derivedFailed = state.lastSetFailed && !state.lastSetTappedFailed,
-        )
-    SectionCaption("Change the effort logged for that set")
-    if (selection.derivedShortfall) {
-        // Without this the grid can pre-light nothing at all, which reads as
-        // the app having lost the rating. It is true of the code beneath it:
-        // SetRatingTracker.rate ORs the derived flag back in on every
-        // correction, so no tap here can clear the shortfall.
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "This set is already recorded as short of target. Rating it does not change that.",
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Sub,
-        )
-    }
-    Spacer(Modifier.height(6.dp))
-    options.chunked(2).forEach { row ->
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        ) {
-            row.forEach { option ->
-                // One tile per fact, and EffortSelection guarantees at most one
-                // fact is set -- otherwise two tiles light up at once and say
-                // two contradictory things about one set.
-                val selected =
-                    when {
-                        option.failed -> selection.failed
-                        else -> selection.rpe != null && option.rpe == selection.rpe
-                    }
-                RpeTile(option, selected, modifier = Modifier.weight(1f)) {
-                    viewModel.rateLastSet(option.rpe, failed = option.failed)
-                    onPicked()
-                }
-            }
-            if (row.size == 1) Spacer(Modifier.weight(1f))
-        }
-    }
-}
-
-/** What the rest screen says the set ended for, and the way back into it. */
-@Composable
-internal fun LimiterLine(state: RecordState, timed: Boolean, onChange: () -> Unit) {
-    // The wording is SetLimiterPolicy's, including the named absence: a blank
-    // here would read as the app having lost the answer rather than as a
-    // question nobody has answered.
-    val text =
-        SetLimiterPolicy.lineText(
-            state.lastSetLimiter,
-            state.lastSetLimiterNote,
-            timed,
-            state.lastSetFailed,
-        )
-    val unanswered = state.lastSetLimiter == null
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        SectionCaption(
-            "${SetLimiterPolicy.lineLabel(state.lastSetFailed)} · $text",
-            // Amber for an unanswered failure, as the unrated effort line is:
-            // nothing is wrong, but there is something the lifter can do and
-            // the rest period is the only window it can be done in.
-            color = if (unanswered) BarColors.Amber else BarColors.Sub,
-            modifier = Modifier.weight(1f),
-        )
-        TextButton(onClick = onChange) {
-            Text(
-                SetLimiterPolicy.lineAction(state.lastSetFailed, state.lastSetLimiter),
-                color = BarColors.Sub,
-            )
-        }
-    }
-    Spacer(Modifier.height(4.dp))
-}
+// RpeSelector and LimiterLine are DELETED here (#237). They were the effort
+// correction grid and the reason row of the inline stack, and both wrote to
+// the view-model on the tap. The popup behind the Correct button draws the
+// same tiles from the same tables and writes on its own confirm instead;
+// leaving these standing would have left a second, unbuffered write path for
+// the two facts the popup drafts. SetLimiterPolicy.lineAction, which only
+// LimiterLine called, keeps its pins in :core:model and is left alone.
 
 /**
  * The tiles themselves, grouped, with pain drawn apart from the performance
@@ -3404,7 +3316,7 @@ internal fun LimiterPage(
  * assembled as text and escapes nothing.
  */
 @Composable
-private fun LimiterWords(words: String, onWords: (String) -> Unit, onSave: () -> Unit, onBack: () -> Unit) {
+internal fun LimiterWords(words: String, onWords: (String) -> Unit, onSave: () -> Unit, onBack: () -> Unit) {
     OutlinedTextField(
         value = words,
         onValueChange = { onWords(SetLimiter.sanitizeForTyping(it)) },
@@ -3421,7 +3333,7 @@ private fun LimiterWords(words: String, onWords: (String) -> Unit, onSave: () ->
 
 /** One reason tile. Welfare answers are drawn in red; the rest are not. */
 @Composable
-private fun LimiterTile(tile: SetLimiterTile, onClick: () -> Unit) {
+internal fun LimiterTile(tile: SetLimiterTile, onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     // A colour is not a fact about a reason, so it is chosen here rather than
     // carried on the tile -- but WHICH answers are set apart is carried, as
@@ -3448,7 +3360,7 @@ private fun LimiterTile(tile: SetLimiterTile, onClick: () -> Unit) {
 }
 
 @Composable
-private fun RpeTile(option: RpeOption, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+internal fun RpeTile(option: RpeOption, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -105,9 +105,10 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  * `setsLeftInExercise` is counted off.
  *
  * ALL FOUR of those controls are drawn BELOW this row since #236. Three are
- * inside `LastSetDetail`: the warm-up toggle (`WarmupMarkRow`), the effort
- * re-rating (`RpeSelector`, opened from `LoggedEffortLine`) and the rep and
- * duration corrections (`RepCorrectionRow`, `HoldCorrectionRow`). The fourth,
+ * inside `LastSetDetail` and, since #237, one tap further down still: the
+ * warm-up toggle, the effort re-rating and the rep and duration corrections
+ * are all inside the popup the Correct button opens, so acting on any of them
+ * now costs a tap to reach and a confirm to apply. The fourth,
  * `AddSetSection`, is inside `NextSetBlock`, which `RestingStage` now calls
  * AFTER this row rather than before it. Acting on any of them can move the
  * next target under the finger that acted.

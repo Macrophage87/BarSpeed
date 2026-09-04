@@ -1,12 +1,16 @@
-// The rest screen's finished-set correction surface, lifted out of
-// RecordScreen.kt by #208: the block below the next-set block that says how
-// the set just finished went and lets the lifter correct it -- effort, why it
-// ended, warm-up mark, load (#205), rep count, held seconds, and the per-rep
-// chart. Split out so those additions had somewhere to go; of the three, only
-// #205 landed here. The move itself changed no behaviour -- the
-// widened visibility of the helpers it still calls in RecordScreen.kt
-// (private -> internal) was the only edit it needed -- and the load
-// correction is the first thing added here since that did.
+// The rest screen's finished-set surface, lifted out of RecordScreen.kt by
+// #208 and turned inside out by #237.
+//
+// It was a stack of six inline correction rows -- effort, reason, warm-up
+// mark, load (#205), rep count, held seconds -- each with its own caption and
+// its own buttons, plus a display-only rep-quality card. Every correction was
+// one tap away at all times, which made the set just finished read as a FORM;
+// what was lifted, for how many and how it went was spread across the rows
+// instead of stated once. It is now a BOX in the shape of the "Up next" card
+// stating the record in one line, one Correct button, and a popup holding the
+// six corrections. What a correction DOES is unchanged: the popup's confirm
+// calls the same RecordViewModel methods the rows called, and
+// LastSetCorrections.kt is untouched.
 package com.macrophage.barspeed.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
@@ -16,8 +20,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,10 +37,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.EffortCorrectionPolicy
-import com.macrophage.barspeed.model.SetLimiterPagePlacement
+import com.macrophage.barspeed.model.LastSetRecordPolicy
+import com.macrophage.barspeed.model.SetLimiter
+import com.macrophage.barspeed.model.SetLimiterGroup
 import com.macrophage.barspeed.model.SetLimiterPolicy
+import com.macrophage.barspeed.model.SetLimiterScale
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
@@ -42,369 +55,518 @@ import com.macrophage.barspeed.record.carryBlock
 import com.macrophage.barspeed.record.standingAddedKg
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.SectionCaption
+import com.macrophage.barspeed.ui.components.SideArrow
 
 /**
- * How the set just finished went: the effort logged for it, the rep count and
- * the per-rep chart.
+ * The set that just finished, stated once, with one way to correct it (#237).
  *
- * Below the next-set block rather than above it. The one-line summary of all
- * three is already at the top of the screen in [RestHeader] -- the exercise, the
- * rep count and the load in words, the tempo ratio, the velocity loss and the
- * heart rate as chips -- so what moves down here is the detail behind a summary
- * that stays above the fold, not the summary itself.
+ * THE BOX IS THE SHAPE OF THE "Up next" CARD ON PURPOSE. The two are the
+ * before and the after of the same rest period, and reading as one another is
+ * the whole point: the same words for a count, a hold and a load, the same
+ * separator, the same strike drawn by the same `struckLine`. What each card
+ * PAIRS differs and [LastSetRecordPolicy] says why -- the card strikes the
+ * plan's prescription against the lifter's change, this strikes what the row
+ * was written with against the correction standing over it.
  *
- * The corrections stay one scroll away for the whole rest period rather than
- * being hidden: `changingEffort` moved down with the line it belongs to, still
- * keyed on `setsCompleted`, so an open effort grid closes when the next set ends
- * rather than carrying a stale set's selection into the following rest.
+ * THE CORRECTIONS ARE BEHIND ONE BUTTON, NOT SIX ROWS. What each one does is
+ * unchanged; where it is has moved. Two things follow that are worth reading
+ * as consequences rather than as decoration:
+ *
+ *  - A popup does not reflow the column under the lifter's finger. The inline
+ *    reason page did -- see [RestingStage]'s note on #137's stacked-target
+ *    hazard -- and a dialog cannot, because it is drawn over the screen rather
+ *    than inserted into it.
+ *  - Every correction is now one tap further away. The rest period is the only
+ *    window in which a set can be corrected at all, and nothing anywhere can
+ *    edit a stored set once this screen is gone, so a control moved behind a
+ *    tap is a control some lifters will not reach. The trade is the owner's
+ *    ask; it is stated here rather than assumed away.
+ *
+ * [RepQualityCard] STAYS OUTSIDE THE POPUP, below the button. It is display
+ * only, and the popup is a thing whose confirm APPLIES -- a read-only 64dp
+ * chart inside it would read as something the confirm does. It is also the one
+ * item on this surface the lifter reads rather than acts on, and the rest
+ * period is when it is read; behind a tap it would be read never.
+ *
+ * `changingEffort` is gone with the effort row. The popup's own open flag is
+ * keyed on `setsCompleted` in its place, so a popup left open when the next set
+ * ends closes rather than carrying a stale set's draft into the following rest.
  */
 @Composable
-internal fun LastSetDetail(
-    state: RecordState,
-    viewModel: RecordViewModel,
-    placement: SetLimiterPagePlacement,
-    timed: Boolean,
-    onChangeLimiter: () -> Unit,
-    onSkipLimiter: () -> Unit,
-    onLimiterDone: () -> Unit,
-) {
-    // The effort tile is tapped mid-workout to end the set, so give a mistap
-    // somewhere to go rather than baking it into the record.
-    var changingEffort by remember(state.setsCompleted) { mutableStateOf(false) }
-    LoggedEffortLine(state) { changingEffort = !changingEffort }
-    if (changingEffort) {
-        RpeSelector(state, viewModel) { changingEffort = false }
+internal fun LastSetDetail(state: RecordState, viewModel: RecordViewModel, timed: Boolean) {
+    val feedback = state.lastFeedback ?: return
+    var correcting by remember(state.setsCompleted) { mutableStateOf(false) }
+    LastSetCard(state, feedback)
+    OutlinedButton(onClick = { correcting = true }, modifier = Modifier.fillMaxWidth()) {
+        Text("CORRECT", color = BarColors.Sub)
     }
-    LimiterCorrection(
-        state = state,
-        viewModel = viewModel,
-        placement = placement,
-        timed = timed,
-        onChange = onChangeLimiter,
-        onSkip = onSkipLimiter,
-        onDone = onLimiterDone,
-    )
-    WarmupMarkRow(state, viewModel)
-    LoadCorrectionRow(state, viewModel)
-    state.lastFeedback?.let { RepCorrectionRow(it, viewModel) }
-    state.lastFeedback?.let { HoldCorrectionRow(it, viewModel) }
+    if (correcting) {
+        CorrectionDialog(state, feedback, viewModel, timed) { correcting = false }
+    }
     Spacer(Modifier.height(6.dp))
-    state.lastFeedback?.let { RepQualityCard(it) }
+    RepQualityCard(feedback)
 }
 
 /**
- * Rest-screen reminder of the effort recorded for the finished set.
+ * The record as it stands: the figures on one line, the words under them.
  *
- * When an effort tile was tapped, its own label is shown, with "short of
- * target" appended if the set also fell short by rep count or duration -- both
- * are real, distinct facts and neither replaces the other.
+ * WHAT IT SAYS IS [LastSetRecordPolicy]'S DECISION and not this file's, for
+ * the reason every other rule on this screen has been lifted out for: `:app`
+ * has no reachable test seam for a composable, so a rule written here is a rule
+ * nothing on the CI path can fail.
  *
- * When none was tapped, [RecordState.lastSetRpe] is null: the lifter tapped
- * the grid's own "Failed the set" tile, tapped the standalone failure control
- * (#186), was offered the grid and declined it via [EndSetEarlyButton], left
- * during the set's lead-in, or had the set auto-ended by its clock (#168).
- * [RecordState.lastSetTappedFailed] tells a tapped failure from a derived one;
- * this line still prints the shared word "Failed" for both, by #139's
- * deliberate choice, not because the state is incapable.
- *
- * [RecordState.lastSetWarmup] is NOT one of those flags any more. There is no
- * warm-up tile since #187 -- `EffortScaleTest` pins its absence -- and the
- * flag is the plan's declaration about the set, frozen at the write, so it is
- * routinely true on a set carrying no rating at all. The lifter's own mark,
- * added by #194, is not one of them either and for the same reason: it says
- * what the set was FOR, this line says how it went, and [WarmupMarkRow] draws
- * the first one row below.
- *
- * Issue #137 makes the declined case the common one and the tapped-tile case
- * rarer, because the failed tile is no longer drawn on a short set at all. This
- * line gets more conservative, not less.
+ * The effort WORDING comes from [rpeOptions], which is `:app`'s own table, so
+ * the tile description is resolved here and handed over; everything the policy
+ * decides from it is the policy's.
  */
 @Composable
-private fun LoggedEffortLine(state: RecordState, onChange: () -> Unit) {
-    val feedback = state.lastFeedback ?: return
-    // No early return for a set carrying no rating, since #168. A hold now
-    // ends on its clock rather than on a tap of the effort grid, so every
-    // timed set that meets its target arrives here unrated -- and this line is
-    // what carries the "Change" button that is the only way into the grid.
-    // Returning early took that button with it, so the lifter saw no effort
-    // and had nothing to tap to supply one. RPE is captured once, at set end,
-    // and no reprocessing of the stream rebuilds how hard a hold felt.
-    val options =
-        rpeOptions(feedback.actualDurationS != null, feedback.explosive, state.weightUnit)
-    // The warm-up branch this used to open with is gone with the tile (#187).
-    // A warm-up set carries an ordinary rating and reads as one; that it was a
-    // ramp is a separate fact, and since #194 it is shown and editable one row
-    // down, in [WarmupMarkRow], rather than being absent from the record flow
-    // altogether. The sentence that stood here said the lifter is never told
-    // mid-session that the set was declared preparatory and called the in-app
-    // toggle missing; both were true until #194 and are deleted rather than
-    // reworded, because the row below now says it and can change it.
-    val tapped = options.firstOrNull { !it.failed && it.rpe == state.lastSetRpe }?.description
-    // The wording is EffortCorrectionPolicy's, including the named absence for
-    // a set with nothing logged; `:app` cannot test a composable, so the
-    // decision lives one module over where every case is a literal in a test.
-    val text = EffortCorrectionPolicy.lineText(tapped, state.lastSetFailed)
-    val unrated = text == EffortCorrectionPolicy.NOT_RATED
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        SectionCaption(
-            "Effort · $text",
-            color =
-            when {
-                state.lastSetFailed -> BarColors.Red
-                // Amber rather than Volt: nothing is wrong, but there is
-                // something for the lifter to do, and the rest period is the
-                // only window in which it can be done.
-                unrated -> BarColors.Amber
-                else -> BarColors.Volt
-            },
-            modifier = Modifier.weight(1f),
+private fun LastSetCard(state: RecordState, feedback: SetFeedback) {
+    val options = rpeOptions(feedback.actualDurationS != null, feedback.explosive, state.weightUnit)
+    val rated = options.firstOrNull { !it.failed && it.rpe == state.lastSetRpe }?.description
+    val values =
+        LastSetRecordPolicy.values(
+            kind = feedback.kind,
+            bodyweight = feedback.bodyweight,
+            unit = state.weightUnit,
+            side = feedback.side,
+            recordedAddedKg = feedback.addedKg,
+            correctedAddedKg = feedback.loadOverrideAddedKg,
+            countedReps = feedback.analysis.reps.size,
+            correctedReps = feedback.repsOverride,
+            recordedDurationS = feedback.actualDurationS,
+            correctedDurationS = feedback.durationOverrideS,
         )
-        TextButton(onClick = onChange) { Text(if (unrated) "Rate" else "Change", color = BarColors.Sub) }
+    val status =
+        LastSetRecordPolicy.status(
+            ratedDescription = rated,
+            rpe = state.lastSetRpe,
+            failed = state.lastSetFailed,
+            limiter = state.lastSetLimiter,
+            limiterNote = state.lastSetLimiterNote,
+            timed = feedback.actualDurationS != null,
+            warmupDeclared = state.lastSetWarmup,
+            warmupMark = state.lastSetWarmupMark,
+        )
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.padding(14.dp)) {
+            SectionCaption("Last set")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(vertical = 4.dp),
+            ) {
+                // The rest screen can hold two arrows at once -- this one and
+                // "Up next" -- so colour separates last from next, exactly as
+                // RestHeader's does.
+                SideArrow(feedback.side, Modifier.padding(end = 8.dp), color = BarColors.Text)
+                Text(
+                    struckLine("${feedback.exerciseName} — ", values),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            Text(
+                status,
+                style = MaterialTheme.typography.bodySmall,
+                // Red for a failure, amber where there is something for the
+                // lifter to do and the rest period is the only window to do it
+                // in, which is the colouring the two rows this replaces used.
+                color =
+                when {
+                    state.lastSetFailed -> BarColors.Red
+                    status.contains(EffortCorrectionPolicy.NOT_RATED) ||
+                        status.contains(SetLimiterPolicy.NOT_GIVEN) -> BarColors.Amber
+                    else -> BarColors.Sub
+                },
+            )
+        }
     }
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(6.dp))
 }
 
 /**
- * Why the set ended: the page after a fail, and the row that corrects it
- * afterwards (#189).
+ * Every correction the rest screen can make to the set just finished, drafted
+ * and then applied together (#237).
  *
- * WHEN IT OPENS BY ITSELF IS [SetLimiterPolicy]'S DECISION, not this file's,
- * and so is what the row reads. No test on the CI path reaches a composable,
- * so a rule written beside its caller here is a rule nothing enforces; one
- * module over, every case is a literal in a test.
+ * THE DRAFT IS LOCAL AND DIES WITH THE POPUP. Nothing here is in
+ * [RecordState]; cancel discards by returning without calling anything, which
+ * is the owner's ask and the reason a draft exists at all. Dismissal by tapping
+ * outside is turned OFF -- a set can only be corrected while this screen is up,
+ * and a stray tap on the scrim throwing away corrections the lifter had just
+ * dialled in would be the expensive direction to fail. Back still dismisses.
  *
- * WHERE IT IS DRAWN IS ALSO [SetLimiterPolicy]'S DECISION, and it is not one
- * place. The page the app opens by ITSELF is drawn by [RestingStage] at the
- * top of the rest screen; this function draws only the page the lifter opened
- * from the row below, under that row. Both are the same composable and the
- * same tiles -- see [SetLimiterPagePlacement] for why the two cases are an
- * enum rather than a pair of booleans.
+ * CONFIRM CALLS THE SAME METHODS THE ROWS CALLED, in a named order: load, then
+ * the warm-up mark, then the reason, then the count or the hold, then the
+ * rating. The first three write columns nobody else here writes and cannot
+ * collide with anything. THE LAST TWO BOTH WRITE THE RATING ROW, and that is a
+ * real and unmeasured hazard when the lifter changes BOTH the count and the
+ * rating in one confirm: `applyRepCorrection` reads `lastSetRpe` out of the
+ * state at launch and `applyRating` publishes its new rating only after Room
+ * returns, so the two `rateSet` writes carry different rpe values and Room's
+ * default query executor is a pool that does not order them. The row may keep
+ * the count correction's earlier rating while this screen shows the new one.
+ * It is the same unordered window `applyLoadCorrection` and `applyWarmupMark`
+ * already document for two fast taps -- what changes is that a confirm reaches
+ * it in one frame rather than at human tapping speed. Not fixed here: fixing it
+ * means making the corrections awaitable, which is a change to
+ * LastSetCorrections.kt that #237 puts out of scope. Read from source; never
+ * observed on a device.
  *
- * THE ROW SURVIVES THE SKIP. Once the page has been offered it does not offer
- * itself again for the same set, but the row below stays, with SAY WHY on it,
- * for the whole rest period -- the same arrangement the effort line has for
- * exactly the same reason: a mark given in the moment is what gets revised ten
- * seconds later.
+ * A correction is issued ONLY where the draft differs from what stands, so a
+ * confirm that changed nothing spends no Room write and a confirm that changed
+ * one thing issues one call.
  */
 @Composable
-private fun LimiterCorrection(
+private fun CorrectionDialog(
     state: RecordState,
+    feedback: SetFeedback,
     viewModel: RecordViewModel,
-    placement: SetLimiterPagePlacement,
     timed: Boolean,
-    onChange: () -> Unit,
-    onSkip: () -> Unit,
-    onDone: () -> Unit,
+    onClose: () -> Unit,
 ) {
-    if (state.lastFeedback == null) return
-    if (!SetLimiterPolicy.offersCorrection(
-            state.lastSetFailed,
-            state.lastSetRpe,
-            state.lastSetLimiter,
-        )
-    ) {
-        return
-    }
-    LimiterLine(state, timed, onChange)
-    // Under the row that opened it. A page the lifter asked for belongs
-    // beside the finger that asked; only the automatic offer goes to the top.
-    if (placement == SetLimiterPagePlacement.CORRECTION) {
-        LimiterPage(state, timed, viewModel, onSkip = onSkip, onDone = onDone)
-    }
+    val standingWarmup = WarmupMarkPolicy.effective(state.lastSetWarmup, state.lastSetWarmupMark)
+    var rpe by remember { mutableStateOf(state.lastSetRpe) }
+    var tappedFailed by remember { mutableStateOf(state.lastSetTappedFailed) }
+    var addedKg by remember { mutableStateOf(feedback.effectiveAddedKg) }
+    var reps by remember { mutableStateOf(feedback.effectiveReps) }
+    var seconds by remember { mutableStateOf(feedback.effectiveDurationS) }
+    var warmup by remember { mutableStateOf(standingWarmup) }
+    var limiter by remember { mutableStateOf(state.lastSetLimiter) }
+    var note by remember { mutableStateOf(state.lastSetLimiterNote ?: "") }
+    AlertDialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(dismissOnClickOutside = false),
+        title = { Text("Correct that set", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                DraftLoadRow(state, feedback, addedKg) { addedKg = it }
+                val held = seconds
+                if (timed && held != null) {
+                    DraftHoldRow(held) { seconds = it }
+                } else if (!timed) {
+                    DraftRepsRow(reps) { reps = it }
+                }
+                DraftWarmupRow(state, warmup) { warmup = it }
+                DraftEffortSection(state, feedback, rpe, tappedFailed) { pickedRpe, pickedFailed ->
+                    rpe = pickedRpe
+                    tappedFailed = pickedFailed
+                }
+                DraftLimiterSection(state, timed, limiter, note, { limiter = it }) { note = it }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                applyDraft(
+                    state = state,
+                    feedback = feedback,
+                    viewModel = viewModel,
+                    timed = timed,
+                    standingWarmup = standingWarmup,
+                    addedKg = addedKg,
+                    reps = reps,
+                    seconds = seconds,
+                    warmup = warmup,
+                    limiter = limiter,
+                    note = note,
+                    rpe = rpe,
+                    tappedFailed = tappedFailed,
+                )
+                onClose()
+            }) { Text("SAVE CORRECTIONS") }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text("CANCEL", color = BarColors.Sub) } },
+    )
 }
 
 /**
- * What the set was FOR, and the one tap that changes it (#194).
+ * The draft applied, in the order [CorrectionDialog]'s KDoc names and for the
+ * reasons it gives.
  *
- * WHY IT IS NOT A TILE. #187 removed the warm-up tile from the effort grid
- * because a set's purpose and its effort are orthogonal, and the tile recorded
- * `warmup = true` and `rpe = null` together -- discarding the effort by
- * construction. A seventh tile here would rebuild that coupling in a new
- * place. This is a row of its own and touches nothing about the rating.
- *
- * WHOSE ANSWER IS DRAWN IS [WarmupMarkPolicy]'S DECISION, not this file's. The
- * plan declares, the lifter may mark, the lifter wins where both exist -- and
- * the row says out loud when the two disagree, so a lifter who takes a set off
- * the plan's ramp list can see that the app knows the plan said otherwise
- * rather than finding the plan's word quietly gone.
+ * Not a composable: it is called from a click and reads nothing that
+ * recomposes. Every call here is the one the row it replaces made, unchanged.
  */
-@Composable
-private fun WarmupMarkRow(state: RecordState, viewModel: RecordViewModel) {
-    if (state.lastFeedback == null) return
-    val declared = state.lastSetWarmup
-    val mark = state.lastSetWarmupMark
-    val warmup = WarmupMarkPolicy.effective(declared, mark)
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        SectionCaption(
-            if (warmup) "Purpose \u00b7 Warm-up" else "Purpose \u00b7 Working set",
-            color = if (warmup) BarColors.Sub else BarColors.Volt,
-            modifier = Modifier.weight(1f),
-        )
-        TextButton(onClick = viewModel::toggleLastSetWarmup) {
-            Text(if (warmup) "Not a warm-up" else "Warm-up", color = BarColors.Sub)
+private fun applyDraft(
+    state: RecordState,
+    feedback: SetFeedback,
+    viewModel: RecordViewModel,
+    timed: Boolean,
+    standingWarmup: Boolean,
+    addedKg: Double,
+    reps: Int,
+    seconds: Int?,
+    warmup: Boolean,
+    limiter: SetLimiter?,
+    note: String,
+    rpe: Int?,
+    tappedFailed: Boolean,
+) {
+    // A DELTA, because addLastSetLoad takes one and SetLoadPolicy.correctedAddedKg
+    // is what produced every figure the draft stepped through. The delta from
+    // what stands to a value that function already returned re-derives that
+    // same value, so the two steppings cannot disagree.
+    if (addedKg != feedback.effectiveAddedKg) viewModel.addLastSetLoad(addedKg - feedback.effectiveAddedKg)
+    // One tap, not a value: toggleLastSetWarmup flips whatever stands, and
+    // WarmupMarkPolicy.toggled never returns to null, so one call moves the
+    // effective answer to the draft's and a second would move it back.
+    if (warmup != standingWarmup) viewModel.toggleLastSetWarmup()
+    val storedNote = if (limiter == SetLimiter.OTHER) SetLimiter.normalizeNote(note) else null
+    if (limiter != state.lastSetLimiter || storedNote != state.lastSetLimiterNote) {
+        viewModel.limitLastSet(limiter, note)
+    }
+    val heldNow = feedback.effectiveDurationS
+    if (timed) {
+        if (seconds != null && heldNow != null && seconds != heldNow) {
+            viewModel.addLastSetSeconds(seconds - heldNow)
         }
+    } else if (reps != feedback.effectiveReps) {
+        viewModel.overrideLastSetReps(reps)
     }
-    if (WarmupMarkPolicy.disagrees(declared, mark)) {
-        SectionCaption(
-            if (declared) {
-                "The plan called this a warm-up \u00b7 your mark stands"
-            } else {
-                "The plan did not call this a warm-up \u00b7 your mark stands"
-            },
-        )
+    if (rpe != state.lastSetRpe || tappedFailed != state.lastSetTappedFailed) {
+        viewModel.rateLastSet(rpe, failed = tappedFailed)
     }
-    Spacer(Modifier.height(4.dp))
 }
 
 /**
- * Put a different weight on the bar than the app had? State it here (#205).
+ * Put a different weight on the bar than the app had? State it here (#205),
+ * now inside the popup.
  *
- * THE SET JUST FINISHED. Every other row on this surface corrects the set that
- * has been written, and so does this one; the caption says so in words, from
- * [SetLoadPolicy.correctionCaption], because #188 is the neighbouring control
- * that named the upcoming exercise when it meant the finished one. Editing an
- * arbitrary past set from the history screen is a larger and different thing
- * and is deliberately not here.
- *
- * DRAWN ON EVERY SET, unlike [RepCorrectionRow] and [HoldCorrectionRow], which
- * are mutually exclusive on whether the set was timed. A weighted carry has a
- * load and so does a squat, and a body-weight set with nothing added is
- * exactly the case where the lifter clipped a plate on and the app never knew.
- *
- * THE FIGURE IS THE ADDED LOAD. On body-weight work that is #160's notation --
- * "BW + 10 kg", "BW - 50 kg" for assistance, bare "BW" for nothing added --
- * so the number cannot be read as the whole load, and the steppers move it
- * signed. On loaded work the added load and the total are the same number and
- * it renders as any other load does. The implement split the header draws
- * ("2 x 20 kg") is not repeated here: what is being edited is one figure.
- *
- * The corrected figure is amber and the label says corrected, the same way a
- * corrected rep count and a corrected hold are.
+ * Everything the inline row decided it still decides. The figure is the ADDED
+ * load in #160's notation on body-weight work, so it cannot be read as the
+ * whole load, and the steppers move it signed. The caption is
+ * [SetLoadPolicy.correctionCaption]'s answer to whether the correction also
+ * moves what the next set is offered, and it is computed against the SAME
+ * operands the confirm will use -- `feedback.effectiveAddedKg`, not the draft
+ * -- because that is what `applyLoadCorrection` reads at the tap.
  */
 @Composable
-private fun LoadCorrectionRow(state: RecordState, viewModel: RecordViewModel) {
-    val feedback = state.lastFeedback ?: return
-    val added = feedback.effectiveAddedKg
-    val corrected = feedback.loadOverrideAddedKg != null
+private fun DraftLoadRow(state: RecordState, feedback: SetFeedback, addedKg: Double, onDraft: (Double) -> Unit) {
     val step = SetLoadPolicy.correctionStepKg(state.weightUnit)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            SetLoadPolicy.correctionLabel(corrected),
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Sub,
-        )
-        TextButton(onClick = { viewModel.addLastSetLoad(-step) }) {
-            Text("\u2212", style = MaterialTheme.typography.titleMedium)
-        }
-        Text(
-            if (feedback.bodyweight) {
-                BodyweightLoadDisplay.label(added, state.weightUnit)
-            } else {
-                state.weightUnit.format(added)
-            },
-            style = MaterialTheme.typography.titleMedium,
-            color = if (corrected) BarColors.Amber else BarColors.Text,
-        )
-        TextButton(onClick = { viewModel.addLastSetLoad(step) }) {
-            Text("+", style = MaterialTheme.typography.titleMedium)
-        }
-    }
-    // Whether the tap also moves what the set coming up is offered is
-    // SetLoadPolicy's decision, taken against what is standing right now, and
-    // this caption is that answer said out loud. A control that quietly
-    // changes a second thing is worse than one that changes nothing.
+    val corrected = addedKg != feedback.addedKg
+    Stepper(
+        label = SetLoadPolicy.correctionLabel(corrected),
+        figure = if (feedback.bodyweight) {
+            BodyweightLoadDisplay.label(addedKg, state.weightUnit)
+        } else {
+            state.weightUnit.format(addedKg)
+        },
+        corrected = corrected,
+        onDown = { onDraft(SetLoadPolicy.correctedAddedKg(addedKg, -step, feedback.bodyweight)) },
+        onUp = { onDraft(SetLoadPolicy.correctedAddedKg(addedKg, step, feedback.bodyweight)) },
+    )
     SectionCaption(
         SetLoadPolicy.correctionCaption(
             SetLoadPolicy.carryFollowsCorrection(
                 standingAddedKg(state),
-                added,
+                feedback.effectiveAddedKg,
                 state.weightUnit,
                 carryBlock(state),
             ),
         ),
     )
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(6.dp))
 }
 
-/** Sensor miscount (or manual set)? Adjust the recorded rep count with − / +. */
+/** Sensor miscount (or manual set)? Adjust the drafted rep count with - / +. */
 @Composable
-private fun RepCorrectionRow(feedback: SetFeedback, viewModel: RecordViewModel) {
-    if (feedback.actualDurationS != null) return
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            if (feedback.repsOverride != null) "Reps (corrected)" else "Reps counted",
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Sub,
-        )
-        TextButton(onClick = { viewModel.overrideLastSetReps(feedback.effectiveReps - 1) }) {
-            Text("−", style = MaterialTheme.typography.titleMedium)
-        }
-        Text(
-            "${feedback.effectiveReps}",
-            style = MaterialTheme.typography.titleMedium,
-            color = if (feedback.repsOverride != null) BarColors.Amber else BarColors.Text,
-        )
-        TextButton(onClick = { viewModel.overrideLastSetReps(feedback.effectiveReps + 1) }) {
-            Text("+", style = MaterialTheme.typography.titleMedium)
-        }
-    }
+private fun DraftRepsRow(reps: Int, onDraft: (Int) -> Unit) {
+    Stepper(
+        label = "Reps counted",
+        figure = "$reps",
+        corrected = false,
+        // Floored at zero, the bound applyRepCorrection enforces on the way in:
+        // a draft it would silently drop is a draft the lifter watched change.
+        onDown = { onDraft((reps - 1).coerceAtLeast(0)) },
+        onUp = { onDraft(reps + 1) },
+    )
+    Spacer(Modifier.height(6.dp))
 }
 
 /**
  * Held it longer than the app stopped you at? State it here (#168).
  *
- * A hold or a carry now ends when its clock reaches the seconds it was
- * working to, so the recorded figure is the announced one and the
- * phone-retrieval walk is no
- * longer inside it. The rare genuine overage -- the lifter deliberately
- * carrying on past the word -- is stated on the rest screen and nowhere else,
- * because the owner does not look at the phone mid-set: "There are rare
- * instances I even look at the phone mid set." A mid-set control would be
- * exercised never, and the rest screen is already where every other post-set
- * correction lives.
- *
- * The mirror of [RepCorrectionRow], and exactly one of the two is ever drawn:
- * that one returns for a timed set, this one for anything else. The step is
- * [TimedSetEndPolicy.CORRECTION_STEP_S] rather than one second, because what
- * is being added is a walk back to the phone.
- *
- * The corrected figure is amber and labelled as corrected, the same way a
- * corrected rep count is: what is stored is no longer what was measured, and
- * the screen has to say which it is showing. What the EXPORT cannot say is the
- * same thing -- `set_records` has `repsManual` for reps and no such column for
- * seconds -- and that gap is named in the commit body rather than papered
- * over here.
+ * The step is [TimedSetEndPolicy.CORRECTION_STEP_S] rather than one second,
+ * because what is being added is a walk back to the phone, and the floor is
+ * [TimedSetEndPolicy.adjustedSeconds]'s so the draft cannot show a figure the
+ * write would clamp.
  */
 @Composable
-private fun HoldCorrectionRow(feedback: SetFeedback, viewModel: RecordViewModel) {
-    val seconds = feedback.effectiveDurationS ?: return
-    val corrected = feedback.durationOverrideS != null
+private fun DraftHoldRow(seconds: Int, onDraft: (Int) -> Unit) {
+    Stepper(
+        label = "Held",
+        figure = "${seconds}s",
+        corrected = false,
+        onDown = { onDraft(TimedSetEndPolicy.adjustedSeconds(seconds, -TimedSetEndPolicy.CORRECTION_STEP_S)) },
+        onUp = { onDraft(TimedSetEndPolicy.adjustedSeconds(seconds, TimedSetEndPolicy.CORRECTION_STEP_S)) },
+    )
+    Spacer(Modifier.height(6.dp))
+}
+
+/**
+ * What the set was FOR, and the one tap that changes it (#194).
+ *
+ * Still not a tile on the effort grid, for #187's reason: a set's purpose and
+ * its effort are orthogonal, and a seventh tile would rebuild the coupling that
+ * discarded one to record the other. The disagreement between the plan's
+ * declaration and the lifter's mark is still said out loud.
+ */
+@Composable
+private fun DraftWarmupRow(state: RecordState, warmup: Boolean, onDraft: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        SectionCaption(
+            if (warmup) "Purpose · Warm-up" else "Purpose · Working set",
+            color = if (warmup) BarColors.Sub else BarColors.Volt,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = { onDraft(!warmup) }) {
+            Text(if (warmup) "Not a warm-up" else "Warm-up", color = BarColors.Sub)
+        }
+    }
+    // Against the DRAFT rather than the stored mark, so the sentence answers
+    // the state the lifter is looking at. A draft equal to the plan's word is
+    // no disagreement even where a stored mark disagreed a moment ago.
+    if (warmup != state.lastSetWarmup) {
+        SectionCaption(
+            if (state.lastSetWarmup) {
+                "The plan called this a warm-up · your mark stands"
+            } else {
+                "The plan did not call this a warm-up · your mark stands"
+            },
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+}
+
+/**
+ * The effort grid, selecting into the draft rather than writing on the tap.
+ *
+ * Which tile is lit is [EffortCorrectionPolicy.selection]'s decision, read
+ * against the DRAFT's rating and tapped-failure, so a tile the lifter has just
+ * chosen lights before anything is stored. `derivedFailed` is the shortfall the
+ * app worked out for itself and is read from the STORED state, because no tap
+ * here changes it -- and correcting the rep count in the same popup may move it
+ * on confirm, which is exactly why the sentence below the grid says a rating
+ * cannot clear a shortfall.
+ */
+@Composable
+private fun DraftEffortSection(
+    state: RecordState,
+    feedback: SetFeedback,
+    rpe: Int?,
+    tappedFailed: Boolean,
+    onDraft: (Int?, Boolean) -> Unit,
+) {
+    val options = rpeOptions(feedback.actualDurationS != null, feedback.explosive, state.weightUnit)
+    val selection =
+        EffortCorrectionPolicy.selection(
+            rpe = rpe,
+            tappedFailed = tappedFailed,
+            derivedFailed = state.lastSetFailed && !state.lastSetTappedFailed,
+        )
+    SectionCaption("Effort")
+    if (selection.derivedShortfall) {
+        Text(
+            "This set is already recorded as short of target. Rating it does not change that.",
+            style = MaterialTheme.typography.bodySmall,
+            color = BarColors.Sub,
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+    options.chunked(2).forEach { row ->
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        ) {
+            row.forEach { option ->
+                val selected =
+                    when {
+                        option.failed -> selection.failed
+                        else -> selection.rpe != null && option.rpe == selection.rpe
+                    }
+                RpeTile(option, selected, modifier = Modifier.weight(1f)) {
+                    onDraft(option.rpe, option.failed)
+                }
+            }
+            if (row.size == 1) Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+/**
+ * Why the set ended, drafted (#189).
+ *
+ * WHETHER IT IS OFFERED AT ALL IS [SetLimiterPolicy.offersCorrection]'S
+ * decision, unchanged: a failure, a completed set rated at the counted end, or
+ * a set already carrying an answer. It is read against the STORED rating rather
+ * than the draft's, so the section does not appear and disappear under the
+ * finger while the lifter is still picking a rung.
+ *
+ * The free-text arm keeps the shape [LimiterWords] already had: it is reachable
+ * only behind Other, so the ordinary answer never costs a keyboard, and the box
+ * is seeded from what is STORED so a lifter correcting an answer sees the words
+ * they are correcting. Its SAVE closes the typing arm into the draft rather
+ * than into Room; the popup's own confirm is what writes.
+ *
+ * There is no SKIP and no CLEAR foot. Leaving by CANCEL is the skip, and the
+ * confirm's "only where it differs" rule already spells both correctly.
+ */
+@Composable
+private fun DraftLimiterSection(
+    state: RecordState,
+    timed: Boolean,
+    limiter: SetLimiter?,
+    note: String,
+    onLimiter: (SetLimiter?) -> Unit,
+    onNote: (String) -> Unit,
+) {
+    if (!SetLimiterPolicy.offersCorrection(state.lastSetFailed, state.lastSetRpe, state.lastSetLimiter)) return
+    var typing by remember { mutableStateOf(false) }
+    SectionCaption(SetLimiterPolicy.pageTitle(state.lastSetFailed))
+    Spacer(Modifier.height(6.dp))
+    if (typing) {
+        LimiterWords(
+            words = note,
+            onWords = onNote,
+            onSave = {
+                onLimiter(SetLimiter.OTHER)
+                typing = false
+            },
+            onBack = { typing = false },
+        )
+        return
+    }
+    var group: SetLimiterGroup? = null
+    for (tile in SetLimiterScale.tiles(timed, state.lastSetFailed)) {
+        // A gap between groups, so pain is drawn apart from the performance
+        // answers, which #189 asks for in as many words.
+        if (group != null && tile.group != group) Spacer(Modifier.height(10.dp))
+        group = tile.group
+        LimiterTile(tile) {
+            if (tile.limiter == SetLimiter.OTHER) typing = true else onLimiter(tile.limiter)
+        }
+    }
+    // What the draft currently answers, because a page of tiles cannot show a
+    // selection and the lifter has to be able to see what they have picked
+    // before confirming it.
+    SectionCaption(
+        SetLimiterPolicy.lineLabel(state.lastSetFailed) + ": " +
+            SetLimiterPolicy.lineText(limiter, note, timed, state.lastSetFailed),
+    )
+    Spacer(Modifier.height(6.dp))
+}
+
+/** One label, one figure, and a minus and a plus either side of it. */
+@Composable
+private fun Stepper(label: String, figure: String, corrected: Boolean, onDown: () -> Unit, onUp: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+        TextButton(onClick = onDown) { Text("−", style = MaterialTheme.typography.titleMedium) }
         Text(
-            if (corrected) "Held (corrected)" else "Held",
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Sub,
-        )
-        TextButton(onClick = { viewModel.addLastSetSeconds(-TimedSetEndPolicy.CORRECTION_STEP_S) }) {
-            Text("−", style = MaterialTheme.typography.titleMedium)
-        }
-        Text(
-            "${seconds}s",
+            figure,
             style = MaterialTheme.typography.titleMedium,
             color = if (corrected) BarColors.Amber else BarColors.Text,
         )
-        TextButton(onClick = { viewModel.addLastSetSeconds(TimedSetEndPolicy.CORRECTION_STEP_S) }) {
-            Text("+", style = MaterialTheme.typography.titleMedium)
-        }
+        TextButton(onClick = onUp) { Text("+", style = MaterialTheme.typography.titleMedium) }
     }
 }
 

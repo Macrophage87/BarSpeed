@@ -357,6 +357,23 @@ data class SetFeedback(
     val bodyweight: Boolean,
     /** The plan's declared implement count for the set just finished, if any. */
     val implementCount: Int?,
+    /**
+     * What kind of movement the set was, frozen with the rest of the write
+     * (#237).
+     *
+     * Carried so the rest screen's record line can say "45s carry" for a
+     * farmer's walk and "30s hold" for a plank -- the same two words the "Up
+     * next" card uses, which is the whole point of the two reading as one
+     * another. Nothing on this screen could tell the two apart before, and the
+     * hold correction's "Held" label still cannot; that label is a near
+     * neighbour of this change and is left alone rather than folded in.
+     *
+     * [explosive] is the SAME fact narrowed to one member and is deliberately
+     * left standing rather than re-derived here: it has four call sites on this
+     * screen and turning it into a computed property is a refactor #237 did not
+     * ask for. That the two can drift is named, not fixed.
+     */
+    val kind: ExerciseKind,
     val analysis: SetAnalysis,
     val plannedReps: Int?,
     val tempo: String?,
@@ -1923,6 +1940,9 @@ private fun restingState(
             // already the movement coming up.
             bodyweight = p.exercise.bodyweight,
             implementCount = p.slot?.implementCount,
+            // Off the pending write's own exercise, beside `explosive` one
+            // field below, which reads the same declaration.
+            kind = p.exercise.kind,
             analysis = analysis,
             // The WORKING targets, not the plan's frozen prescription. This
             // feedback is about the set just finished -- what it was trying to
