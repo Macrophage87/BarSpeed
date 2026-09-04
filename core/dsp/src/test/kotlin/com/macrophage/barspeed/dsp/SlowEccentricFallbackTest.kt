@@ -7,8 +7,19 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 /**
- * The four conditions [RepSegmenter]'s eccentric-first drive-alone fallback
- * requires, one constructed case each. Issue #72.
+ * The conditions [RepSegmenter]'s eccentric-first drive-alone fallback
+ * requires, one constructed case each, plus the two shapes that make it fire.
+ * Issue #72.
+ *
+ * ## The two firing shapes, and which one the corpus holds
+ *
+ * A drive is orphaned either because its lowering was DEMOTED -- too slow to
+ * clear `startThresholdMps` -- or because the lowering qualified and was
+ * CONSUMED by a pair the `minRomM` floor then discarded. Both reach the
+ * fallback. Only the second is in the committed corpus, on all four captures
+ * the fallback moves; the first is constructed here and nowhere else, and
+ * `RepSegmenter` records that a draft of its own note had the two the wrong
+ * way round.
  *
  * ## Why these are constructed and not captured
  *
@@ -75,6 +86,28 @@ class SlowEccentricFallbackTest {
         assertNull(reps.single().turnaroundPauseS, "a turnaround between one phase and nothing")
         assertEquals(reps.single().conEndIdx, reps.single().eccStartIdx, "the placeholder eccentric span")
         assertEquals(reps.single().conEndIdx, reps.single().eccEndIdx, "the placeholder eccentric span")
+    }
+
+    @Test
+    fun `a drive whose lowering was spent on an under-floor fragment is a rep`() {
+        // THE SHAPE THE CORPUS ACTUALLY HOLDS, and the reason the case above
+        // is not the whole story. On all four captures the fallback moves, the
+        // lowering QUALIFIED as a phase; what orphaned the drive was the pair
+        // that consumed it, whose drive side was a fragment under `minRomM`
+        // (0.096, 0.046, 0.025 and 0.064 m). The lifter's real drive is the
+        // next run, and by then the lowering is spent.
+        //
+        // -0.30 m/s for 1 s travels 0.297 m and clears every phase gate, so
+        // unlike `slowLowering` it is in the CLASSIFIED list. 0.15 m/s for
+        // 0.4 s clears `startThresholdMps` and `minPhaseS` and travels
+        // 0.0585 m, so it pairs with that lowering and the pair is discarded
+        // by the floor. Then the real drive.
+        val reps = spans(
+            series(0.0 to 1.0, -0.30 to 1.0, 0.0 to 0.3, 0.15 to 0.4, 0.0 to 0.3, goodDrive, 0.0 to 1.0),
+        )
+        assertEquals(1, reps.size, "reps from a qualifying lowering, an under-floor fragment and a drive")
+        assertFalse(reps.single().hasEccentric, "the eccentric was spent on the discarded pair, not on this rep")
+        assertNull(reps.single().turnaroundPauseS, "a turnaround between one phase and nothing")
     }
 
     @Test
