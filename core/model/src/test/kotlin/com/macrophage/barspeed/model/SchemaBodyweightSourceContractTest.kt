@@ -147,8 +147,8 @@ class SchemaBodyweightSourceContractTest {
 
     /**
      * RED. Each key minted under 1.19 names 1.19 in the description PUBLISHED
-     * beside it, so a mint cannot move the constant and leave the prose on the
-     * released number.
+     * beside it and names 1.18 nowhere in it, so a mint cannot move the
+     * constant and leave the prose on the released number.
      *
      * The literal 1.19 rather than [SessionExport.SCHEMA_VERSION], which is
      * what round 1's finding 12 asked for. Measured at this SHA: the
@@ -156,6 +156,12 @@ class SchemaBodyweightSourceContractTest {
      * correctly saying so -- fails, its description reading `(1.18, #216,
      * #169)` against a constant of 1.19. A key names the number it was minted
      * under and keeps naming it.
+     *
+     * THE 1.18 HALF IS HERE BECAUSE A MUTATION SURVIVED WITHOUT IT. Reverting
+     * `rest_s`'s `From 1.19 the instant it is counted FROM` to 1.18 and
+     * leaving its second mention alone left this test GREEN: `1.19 in
+     * description` is satisfied by any one mention, and the description
+     * carries two. Measured, then fixed forward rather than reworded.
      */
     @Test
     fun `each key minted under 1_19 names 1_19 in its published description`() {
@@ -163,12 +169,16 @@ class SchemaBodyweightSourceContractTest {
             "bodyWeight_kg" to setProperty("bodyWeight_kg"),
             "rest_s" to setProperty("rest_s"),
             "geometrySource" to source,
-        )
-        val silent = published.filterValues { "1.19" !in it["description"]!!.jsonPrimitive.content }.keys
+        ).mapValues { (_, node) -> node["description"]!!.jsonPrimitive.content }
         assertEquals(
             emptySet(),
-            silent,
+            published.filterValues { "1.19" !in it }.keys,
             "published descriptions minted under 1.19 that do not name it",
+        )
+        assertEquals(
+            emptySet(),
+            published.filterValues { "1.18" in it }.keys,
+            "published descriptions minted under 1.19 that still file the key under 1.18",
         )
     }
 
