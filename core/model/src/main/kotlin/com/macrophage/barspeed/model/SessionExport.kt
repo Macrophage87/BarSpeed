@@ -548,28 +548,29 @@ data class SessionExport(
          * `abandonedInPrep` is what makes that zero readable, and removing it
          * is tracked separately rather than folded in here.
          *
-         * 1.18 carries a SECOND change, under the same number because 1.18 is
-         * unreleased, and it IS additive (#216, #169): a failed set may carry
-         * [SetExport.failedByLifter], saying whether the lifter called the
-         * failure or the app derived it. The two facts have always been held
-         * apart in `SetRatingTracker` and OR-ed, with only the OR published,
-         * so a set the lifter called a grinder and one the app marked short
-         * of its prescription reach a reader identical. `limiter` cannot
-         * separate them: it is an optional answer to a different question,
-         * absent on every set nobody was asked. Absent on a set that did not
-         * fail and on every set recorded before database v15.
+         * 1.18 carries a SECOND change, under the same number because 1.18 was
+         * unreleased when that change landed, and it IS additive (#216,
+         * #169): a failed set may carry [SetExport.failedByLifter], saying
+         * whether the lifter called the failure or the app derived it. The
+         * two facts have always been held apart in `SetRatingTracker` and
+         * OR-ed, with only the OR published, so a set the lifter called a
+         * grinder and one the app marked short of its prescription reach a
+         * reader identical. `limiter` cannot separate them: it is an optional
+         * answer to a different question, absent on every set nobody was
+         * asked. Absent on a set that did not fail and on every set recorded
+         * before database v15.
          *
-         * 1.18 carries a THIRD change, under the same number because 1.18 is
-         * unreleased, and it IS additive (#60): a set may carry
-         * [SetExport.voided] and [SetExport.voidReason], the lifter's own
-         * statement that they did not perform a recorded set, and optionally
-         * why.
+         * 1.18 carries a THIRD change, under the same number because 1.18 was
+         * unreleased when that change landed, and it IS additive (#60): a
+         * set may carry [SetExport.voided] and [SetExport.voidReason], the
+         * lifter's own statement that they did not perform a recorded set,
+         * and optionally why.
          *
          * WHY IT RIDES ON 1.18 RATHER THAN MINTING 1.19. 1.17 shipped in
          * v0.1.49 -- read by `git show v0.1.49:core/model/.../SessionExport.kt`
          * rather than assumed -- so extending it would redefine a number a
-         * consumer has already been handed. 1.18 is minted, landed on `main`
-         * and unreleased, which is exactly the state that takes further
+         * consumer has already been handed. 1.18 was minted, landed on `main`
+         * and unreleased then, which is exactly the state that takes further
          * entries. THIS PARAGRAPH REPLACES ONE THAT SAID 1.18 WAS BEING
          * MINTED BY AN UNLANDED LANE AND THAT THIS BRANCH MUST NOT LAND
          * AHEAD OF IT: that was true when it was written and is not now, and
@@ -593,9 +594,9 @@ data class SessionExport(
          * that is, with the voided ones dropped -- will not reproduce them.
          *
          * 1.18 carries a FOURTH change, under the same number for the same
-         * reason the second and third are: 1.18 is UNRELEASED. It is additive
-         * (#138): a set's `summary` may carry `noRepsReason`, a single word
-         * saying why the set resolved no reps. A healthy IMU stream --
+         * reason the second and third are: 1.18 was unreleased then. It is
+         * additive (#138): a set's `summary` may carry `noRepsReason`, a
+         * single word saying why the set resolved no reps. A healthy IMU stream --
          * contiguous `sample_idx`, no gap over 100 ms, the whole set window
          * covered -- can segment to nothing, and until now the document said
          * so only by OMISSION: `reps: []`, `summary: {}`, no
@@ -818,7 +819,7 @@ data class SetExport(
     @SerialName("load_lb") val loadLb: Double? = null,
     @SerialName("plannedLoad_kg") val plannedLoadKg: Double? = null,
     /**
-     * The body weight [loadKg] was computed with, kilograms (1.18, #220).
+     * The body weight [loadKg] was computed with, kilograms (1.19, #220).
      *
      * On body-weight work `SetLoadPolicy.totalKg` returns this plus the added
      * load, which may be negative for band or machine assistance -- so this is
@@ -1164,11 +1165,11 @@ data class SetExport(
      * The rest PRESCRIBED after this set, in whole seconds -- never a
      * measurement of how long the lifter rested (#76).
      *
-     * From 1.18 the published description states which instant it is counted
+     * From 1.19 the published description states which instant it is counted
      * FROM, and `RestClockPolicy` owns that instant: the terminal cue on the
      * set's own cue track, or the set's end instant where nothing called it
      * over. The countdown and the archive's `rest_before_hrm` window both
-     * begin there (#178); until 1.18 the window began when the set's capture
+     * begin there (#178); until 1.19 the window began when the set's capture
      * stopped instead, up to 53.06 s later on one measured set. `rest_after_hrm`
      * -- the window a session close writes onto the LAST set, when there is no
      * next set to carry `rest_before_hrm` forward -- follows the same instant
@@ -1556,7 +1557,7 @@ data class GeometryExport(
  * omitted key on a machine the app seeds is answered from
  * [ExerciseDef.STACK_MOUNTED_IDS] and published as `seeded`.
  *
- * `bodyweight` was a third until 1.18 (#220), which publishes it. `#227`
+ * `bodyweight` was a third until 1.19 (#220), which publishes it. `#227`
  * ("Make bodyweight nullable so an omitted key is not a silent false") made
  * `PlanExerciseDef.bodyweight` a `Boolean?`, the same change #223 made for
  * `sensorOnStack`, so a declared `false` and an omitted key are two distinct

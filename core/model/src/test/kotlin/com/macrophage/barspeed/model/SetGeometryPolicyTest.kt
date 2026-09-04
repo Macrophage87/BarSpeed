@@ -375,7 +375,7 @@ class SetGeometryPolicyTest {
     /**
      * The provenance object's published shape, key by key, so a key arriving or
      * leaving is a decision somebody has to make rather than a diff nobody
-     * reads. `sensorOnStack` joined it in #223 and `bodyweight` under 1.18
+     * reads. `sensorOnStack` joined it in #223 and `bodyweight` under 1.19
      * (#220); this test's name has moved with each of them.
      *
      * It caught the second arrival, which is what it is for -- and it did so

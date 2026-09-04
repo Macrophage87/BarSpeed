@@ -76,11 +76,11 @@ data class GeometrySources(
     val travelRatio: GeometrySource,
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val sensorOnStack: GeometrySource = GeometrySource.DEFAULT,
     /**
-     * Where `bodyweight` came from (1.18, #220), on the same terms
+     * Where `bodyweight` came from (1.19, #220), on the same terms
      * `sensorOnStack` is stored and defaulted under.
      *
      * The default is load-bearing for the same reason: every row written by a
-     * build up to and including v0.1.49 holds a `sources` object without this
+     * build up to and including v0.1.50 holds a `sources` object without this
      * key, and without a default, decoding one throws `MissingFieldException`
      * -- a stored set becomes unreadable the moment this ships. The default
      * cannot recover what those builds never captured; such a row re-exports
@@ -186,7 +186,7 @@ object SetGeometryPolicy {
      * it, kept apart because the source is read off [describe]'s [used]
      * rather than re-decided from [id] here -- [bodyweightSource]'s own KDoc
      * says why. A source IS published for `bodyweight` in the export, since
-     * 1.18 (#220); it does not come from this function.
+     * 1.19 (#220); it does not come from this function.
      *
      * 1. [declared] non-null -- the plan said so, either way. A declared
      *    `false` wins over the seed: a plan may genuinely mean a pull-up
@@ -278,6 +278,12 @@ object SetGeometryPolicy {
      * an ad-hoc set has no plan. Reading the resolved value is what keeps the
      * two halves of one published fact from disagreeing.
      */
+    private fun stackSource(used: Boolean, declared: Boolean?): GeometrySource = when {
+        declared != null -> GeometrySource.DECLARED
+        used -> GeometrySource.SEEDED
+        else -> GeometrySource.DEFAULT
+    }
+
     /**
      * Provenance for the `bodyweight` value [used] already carries (#220).
      *
@@ -306,12 +312,6 @@ object SetGeometryPolicy {
      *    seeded.
      */
     fun bodyweightSource(used: Boolean, declared: Boolean?): GeometrySource = when {
-        declared != null -> GeometrySource.DECLARED
-        used -> GeometrySource.SEEDED
-        else -> GeometrySource.DEFAULT
-    }
-
-    private fun stackSource(used: Boolean, declared: Boolean?): GeometrySource = when {
         declared != null -> GeometrySource.DECLARED
         used -> GeometrySource.SEEDED
         else -> GeometrySource.DEFAULT

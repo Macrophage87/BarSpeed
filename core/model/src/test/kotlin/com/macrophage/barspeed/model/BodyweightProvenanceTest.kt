@@ -137,7 +137,7 @@ class BodyweightProvenanceTest {
      * throwing, and reads as DEFAULT.
      *
      * [GeometrySources] is stored as JSON in `SetRecordEntity.geometryJson`,
-     * and every row up to and including v0.1.49 carries a `sources` object
+     * and every row up to and including v0.1.50 carries a `sources` object
      * without this key. Without a Kotlin default, decoding one throws
      * `MissingFieldException` and a stored set becomes unreadable the moment
      * this ships -- the trap `sensorOnStack` documented one version earlier.
