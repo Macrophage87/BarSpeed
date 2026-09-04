@@ -170,6 +170,58 @@ class PrepDetectionFieldTest {
     }
 
     /**
+     * THE DIFFERENTIAL. What set 5 publishes once the detections that finished
+     * before its work began are not reps of it.
+     *
+     * Every figure here is the published one recomputed over the surviving
+     * detections and nothing else: `velocityLoss_pct` 62.1 -> 40.3, because the
+     * 1.26 m/s drive it divided by happened during the countdown and the
+     * fastest survivor runs 0.801; `summary.peakPower_w` 402.5 -> 320.1, a 25.7%
+     * overstatement of the set's peak. The last rep is unchanged at 0.478 m/s,
+     * so what moves is the BASIS and not the athlete's last effort.
+     *
+     * Ten detections rather than thirteen, and the lifter counted eight by hand.
+     * The rule does not claim to fix the count -- three of the ten still range
+     * over 0.8 m on a seated dumbbell overhead press -- only to stop the
+     * countdown setting the headline. Under-counting and over-segmentation on
+     * this session are not this issue.
+     */
+    @Test
+    fun `set 5 stops publishing the countdown as its fastest and most powerful rep`() {
+        val a = bounded(ohp, ohpDirection, ohpKg)
+        assertEquals(10, a.reps.size, "detections that are reps of the set")
+        assertEquals(40.3, a.velocityLossPct!!, 1e-12, "velocityLoss_pct")
+        assertEquals(320.1, a.reps.mapNotNull { it.peakPowerW }.max(), 1e-12, "summary.peakPower_w")
+        assertEquals(
+            listOf(1.274, 0.461, 0.202, 0.35, 0.415, 0.813, 0.61, 1.405, 0.533, 0.683),
+            a.reps.map { it.romM },
+            "rom_m of the survivors, renumbered from zero",
+        )
+        assertEquals(0.478, a.reps.last().meanConVelMps, 1e-12, "the last rep does not move")
+        assertEquals(0.801, a.reps.maxOf { it.meanConVelMps }, 1e-12, "the fastest survivor is the new basis")
+    }
+
+    /**
+     * The same differential on set 2, where one detection is at stake rather
+     * than three and it is the FIRST.
+     *
+     * 27.4 -> 11.6. Set 2's `summary.peakPower_w` does not move -- its 584.0 is
+     * on the tenth detection, performed -- which is what makes the pair worth
+     * having: the rule moves the loss basis on both sets and the peak power on
+     * only one, so a test that passed by moving every figure at once would be
+     * wrong here.
+     */
+    @Test
+    fun `set 2 stops dividing its velocity loss by a drive from the countdown`() {
+        val a = bounded(press, pressDirection, pressKg)
+        assertEquals(10, a.reps.size, "detections that are reps of the set")
+        assertEquals(11.6, a.velocityLossPct!!, 1e-12, "velocityLoss_pct")
+        assertEquals(584.0, a.reps.mapNotNull { it.peakPowerW }.max(), 1e-12, "summary.peakPower_w does not move")
+        assertEquals(0.658, a.reps.maxOf { it.meanConVelMps }, 1e-12, "the fastest survivor is the new basis")
+        assertEquals(0.582, a.reps.last().meanConVelMps, 1e-12, "the last rep does not move")
+    }
+
+    /**
      * Both sets are bounded at the TAIL and neither is bounded at the head,
      * which is the asymmetry issue #245 is about, stated as a measurement
      * rather than as prose.
