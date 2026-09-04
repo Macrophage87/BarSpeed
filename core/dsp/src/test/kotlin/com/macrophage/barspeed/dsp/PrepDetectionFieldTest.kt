@@ -253,9 +253,10 @@ class PrepDetectionFieldTest {
     }
 
     /**
-     * Both sets are bounded at the TAIL and neither is bounded at the head,
-     * which is the asymmetry issue #245 is about, stated as a measurement
-     * rather than as prose.
+     * Analysed with no work-start instant, both sets are bounded at the TAIL
+     * and at neither head -- the asymmetry issue #245 was filed on, kept as a
+     * measurement of what the cue bound alone does. `SetAnalyzer` bounds the
+     * head from #245 on; this pin deliberately withholds the instant.
      *
      * Set 5's cue track ends the set two detections before the stream does; set
      * 2's ends it with nothing after.

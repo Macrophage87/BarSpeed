@@ -5,12 +5,13 @@ package com.macrophage.barspeed.dsp
  * enough not to be reps of it. The head-of-stream mirror of [SetEnd].
  *
  * A set records from the lifter's tap, and a prep runs between that tap and the
- * work: a countdown, a `Ready` and a `Brace`, and on a timed set the clock the
- * set is actually measured over. What the lifter does in those seconds is
- * ordinary handling -- settling into the seat, cleaning a pair of dumbbells to
- * the shoulders, one practice stroke -- and it segments like any other
- * movement, so it arrives in the rep list as a rep and sets whatever the rep
- * list decides. Issue #245.
+ * work: a countdown, a `Ready` and a `Brace`. On a `PrepCase.TIMED` set
+ * `PrepWindow.workStartedAtMs` IS the instant the set's own clock starts, so
+ * the clock the set is measured over is the WORK and not part of the prep.
+ * What the lifter does in the prep's seconds is ordinary handling -- settling
+ * into the seat, cleaning a pair of dumbbells to the shoulders, one practice
+ * stroke -- and it segments like any other movement, so it arrives in the rep
+ * list as a rep and sets whatever the rep list decides. Issue #245.
  *
  * ## What was measured, on field session 38
  *
