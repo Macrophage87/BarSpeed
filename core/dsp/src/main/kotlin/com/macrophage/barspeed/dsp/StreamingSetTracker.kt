@@ -270,8 +270,11 @@ class StreamingSetTracker(
     }
 
     /**
-     * The run in progress has carried past [DspConfig.maxRunDisplacementM] —
-     * the same bound the qualification gate above uses to throw the run away.
+     * The run in progress has carried past the CONVERTED displacement cap read
+     * from [thresholds] — [DspConfig.maxRunDisplacementM] scaled by
+     * `abs(velocityScale)`, not that constant direct — which is the same bound
+     * the qualification gate above uses to throw the run away. At a declared
+     * `travelRatio` of 1.0 the two are the same number.
      *
      * Tested WHILE the run accumulates rather than when it ends, because a
      * runaway run may not end. On `field-reardeltfly-s32-set06` one run carries
