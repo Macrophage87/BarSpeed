@@ -46,7 +46,7 @@ class RepRefusalCorpusTest {
      * do not depend on the load.
      */
     private val corpus = listOf(
-        Triple("field-assistedpullup-3010-s37-set08", con, 23.443564147942737),
+        Triple("field-assistedpullup-3010-s37-set08", con, 30.25),
         Triple("field-assistedpullup-3010-s37-set09", con, 23.443564147942737),
         Triple("field-assistedpullup-3010-s37-set10", con, 23.443564147942737),
         Triple("field-backsquat-10hz", ecc, 60.0),

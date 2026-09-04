@@ -79,7 +79,7 @@ class ArtefactRefusalWiringTest {
      * Sets 1 and 3 have nothing above the bound, so not one of their figures
      * moves. Both are analysed UNCUED -- so set 1 carries the detection its
      * archived `Done` would exclude, and the rule leaves that one alone too.
-     * Its range ratio is 1.00x.
+     * Its range ratio is 2.00x.
      */
     @Test
     fun `set 1 is untouched by the refusal rule`() {

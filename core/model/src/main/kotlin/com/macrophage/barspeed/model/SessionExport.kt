@@ -826,7 +826,7 @@ data class SessionExport(
          * `RepRefusal`'s KDoc names a detection on the same session that is
          * not refused and publishes 507.0 W, and a second on the neighbouring
          * set that is kept because it resolved both its phases and publishes
-         * 315.7 W from one corrupt sample.
+         * 407.4 W from one corrupt sample.
          *
          * Additive on the terms 1.2 and 1.3 were: no key changes type, none
          * stops being written, and a reader that ignores both keys reads a

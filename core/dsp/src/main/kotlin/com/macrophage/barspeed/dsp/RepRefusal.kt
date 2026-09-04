@@ -23,26 +23,35 @@ package com.macrophage.barspeed.dsp
  * and the four that remain carry the same ranges the refusal keeps. Two
  * corrupt samples did not inflate a rep, they manufactured one.
  *
- * THE SAME EXPERIMENT ON THE NEIGHBOURING SET IS WHY THIS RULE HAS TWO
- * CLAUSES. `field-assistedpullup-3010-s37-set08.csv` carries one sample above
- * 4 g, reading 14.982 g at `sample_idx` 4079, and its detection 6 has the
- * same silhouette as set 10's phantom -- the last detection, the largest
- * range, the largest power. Substitute that one sample and re-run and the set
- * still resolves **seven** detections; detection 6 survives and only its
- * figures collapse, `rom_m` 0.878 -> 0.230 and `peakPower_w` 315.7 -> 53.8.
- * Set 8's is a real rep whose numbers a corrupt sample inflated. Set 10's is
- * not a rep. The two are told apart by whether the detection resolved an
- * eccentric partner -- set 8's did, at `ecc_s` 1.68; set 10's did not -- and
- * that is clause 1 below, corroborated by an experiment run over the SAMPLES
- * rather than by the rule itself.
+ * THE SAME EXPERIMENT ON THE NEIGHBOURING SET SEPARATES A MANUFACTURED
+ * DETECTION FROM AN INFLATED REAL ONE.
+ * `field-assistedpullup-3010-s37-set08.csv` carries one sample above 4 g,
+ * reading 14.982 g at `sample_idx` 4079, and its detection 6 has the same
+ * silhouette as set 10's phantom -- the last detection, the largest range,
+ * the largest power. Substitute that one sample and re-run and the set still
+ * resolves **seven** detections; detection 6 survives and only its figures
+ * collapse, `rom_m` 0.878 -> 0.230 and `peakPower_w` 407.4 -> 69.4. Set 8's
+ * is a real rep whose numbers a corrupt sample inflated. Set 10's is not a
+ * rep.
+ *
+ * THAT PAIR DOES NOT SHOW CLAUSE 1 IS LOAD-BEARING, AND THIS PARAGRAPH USED
+ * TO SAY IT DID. Set 8's detection 6 is kept by BOTH clauses at once: it
+ * resolved an eccentric partner at `ecc_s` 1.68, and at 4.46x the median
+ * range of its set's other detections it is also UNDER [RANGE_RATIO_BOUND],
+ * so clause 2 alone already keeps it and the pair separates either way. The
+ * case that shows clause 1 carrying weight on its own is
+ * `field-ohp-prepinflated-s37-set04` rep 4, which reaches 4.82x with both
+ * phases resolved -- above the bound, kept by clause 1 and by nothing else
+ * -- and is recorded as [MAX_PAIRED_RANGE_RATIO_OBSERVED].
  *
  * **This rule is deliberately not the sample-level fix.** Refusing the SAMPLE
  * changes the velocity series and therefore re-partitions the whole set:
  * measured over the committed corpus, every capture but five carries at least
- * one sample above 4 g, and on `field-ohp-prepinflated-s37-set03` the
- * resolved detection count moves 11 -> 7 -> 9 -> 8 as a magnitude bound is
- * swept from 8 g down to 3 g. A rule at the sample level is a change to the
- * MEASUREMENT and moves the published figures of most of the corpus at once.
+ * one sample above 4 g, and `field-ohp-prepinflated-s37-set03` resolves 11
+ * detections untouched, 7 with every sample above 8 g or above 7 g replaced
+ * by the last in-range reading, 9 at 6 g, 5 g and 4 g, and 8 at 3 g. A rule
+ * at the sample level is a change to the MEASUREMENT and moves the published
+ * figures of most of the corpus at once.
  * This one is a change to a DECISION over an already-computed rep list, it is
  * a pure function of that list, and it refuses exactly one detection anywhere
  * in the committed corpus under declared geometry. The sample-level defect is
@@ -72,8 +81,8 @@ package com.macrophage.barspeed.dsp
  * The earlier text read "no detection that resolved both phases reaches 4.5x
  * anywhere in the corpus, the largest being 4.16x, so removing clause 1
  * refuses the same one detection". That was measured over 33 captures and is
- * false over the corpus as it stands: `RepRefusalTest` walks every committed
- * capture and finds the largest two-phase ratio at
+ * false over the corpus as it stands: `RepRefusalCorpusTest` walks every
+ * committed capture and finds the largest two-phase ratio at
  * [MAX_PAIRED_RANGE_RATIO_OBSERVED], ABOVE [RANGE_RATIO_BOUND], so removing
  * clause 1 would refuse a detection that resolved both its phases.
  * `GeometryFallbackTest`'s direction-only case says the same thing from the
@@ -86,8 +95,8 @@ package com.macrophage.barspeed.dsp
  *
  * [RANGE_RATIO_BOUND] is 4.5 and it is FITTED, to the corpus this repository
  * holds. It is not derived from physics and nothing here claims it is. What
- * is measured, and what `RepRefusalTest` re-measures on every push, is the
- * gap it sits in:
+ * is measured, and what `RepRefusalCorpusTest` re-measures on every push, is
+ * the gap it sits in:
  *
  * - the largest ratio reached by any DRIVE-ONLY detection this rule KEEPS is
  *   [MAX_UNPAIRED_KEPT_RANGE_RATIO_OBSERVED], so the bound clears the nearest
@@ -109,9 +118,10 @@ package com.macrophage.barspeed.dsp
  * HOLDS, which is not the same as stated in full. On the same field-37
  * session, set 3's largest drive-only detection reaches 2.29x and is not
  * refused: it goes on publishing 507.0 W from a range of 1.223 m on a seated
- * overhead press. Set 1's largest drive-only detection reaches only 1.00x and
- * is nowhere near any bound. A tighter bound reaches set 3's and starts
- * taking paired detections with it.
+ * overhead press. Set 1's largest drive-only detection reaches 2.00x --
+ * `rom_m` 1.232 against a median-of-others 0.617 -- and is still nowhere
+ * near any bound. A tighter bound reaches set 3's and starts taking paired
+ * detections with it.
  *
  * ## Fewer than [MIN_DETECTIONS] and the null the count carries
  *
@@ -132,8 +142,8 @@ package com.macrophage.barspeed.dsp
  * `rom_m` 0.533 and `meanConPower_w` 135.1 -- ordinary for that set -- and
  * `peakPower_w` **783.2**, from an 11.601 g sample inside its drive. On
  * `field-assistedpullup-3010-s37-set08`, detection 6 publishes `peakPower_w`
- * 315.7 against a set whose other six run 37.7 to 53.5, and the substitution
- * experiment above says that figure is 53.8 without the one corrupt sample.
+ * 407.4 against a set whose other six run 48.7 to 69.1, and the substitution
+ * experiment above says that figure is 69.4 without the one corrupt sample.
  * Nothing in this file touches either. They need the sample-level refusal
  * this rule deliberately is not, and that is raised as an adjacent defect
  * rather than folded in.
@@ -173,9 +183,10 @@ object RepRefusal {
     /**
      * Every word [reason] can answer. Mirrored by
      * `SessionExport.VALID_REFUSED_DETECTION_REASONS`, which this module
-     * cannot see -- the dependency runs the other way -- and
-     * `RefusedDetectionMirrorTest` asserts the two are equal from the side
-     * that can see both.
+     * cannot see -- the dependency runs the other way. The equality IS
+     * pinned: `RefusedDetectionAnalysisTest`'s "the refusal words are the
+     * ones the export publishes" asserts it, from this module's own test
+     * source set, which is the only place both sides are visible at once.
      */
     val REASONS = setOf(UNPAIRED_RANGE_OUTLIER)
 
@@ -261,9 +272,12 @@ object RepRefusal {
      * The range ratio [refusedIndices] judges the detection at [index] on:
      * its range over the median range of the set's OTHER detections.
      *
-     * Public because the corpus walk in `RepRefusalTest` measures the three
-     * constants above with it, and a walk that recomputed the ratio itself
-     * could measure a different quantity from the one the rule applies.
+     * Public because the corpus walk in `RepRefusalCorpusTest` measures the
+     * two constants above with it -- [MAX_PAIRED_RANGE_RATIO_OBSERVED] and
+     * [MAX_UNPAIRED_KEPT_RANGE_RATIO_OBSERVED]. [RANGE_RATIO_BOUND] is the
+     * fitted bound and the walk does not measure it. A walk that recomputed
+     * the ratio itself could measure a different quantity from the one the
+     * rule applies.
      * Null when the set is too small for a bound to be derived from it.
      */
     fun rangeRatio(reps: List<RepAnalysis>, index: Int): Double? =

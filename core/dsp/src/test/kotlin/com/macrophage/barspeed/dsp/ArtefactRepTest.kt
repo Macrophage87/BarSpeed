@@ -10,19 +10,20 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The three field-37 captures issue #125 was REOPENED on, and what the
+ * The four field-37 captures issue #125 was REOPENED on, and what the
  * analyzer publishes for each.
  *
- * ## Provenance, and why only one capture is added here
+ * ## Provenance, and why only one capture was added for them
  *
- * Two of the three sets are ALREADY committed, under names given by the
+ * Three of the four sets are ALREADY committed, under names given by the
  * issues that first needed them, and this file uses those rather than
  * committing second copies:
  *
  * - set 3 is `field-ohp-prepinflated-s37-set03.csv`
+ * - set 8 is `field-assistedpullup-3010-s37-set08.csv`
  * - set 10 is `field-assistedpullup-3010-s37-set10.csv`
- * - set 1 is `field-ohp-3010-8rep-s37-set01.csv`, added by this commit
- *   because no test held it
+ * - set 1 is `field-ohp-3010-8rep-s37-set01.csv`, added at
+ *   `b8e28058e02247aec77e18359a2ea0dfd8a1025d` because no test held it
  *
  * Session 37's own `meta.json` says: `epoch` 2026-09-02T09:20:45.365Z,
  * `timeZoneId` America/New_York, `appVersion` **0.1.48**, `sensorModel`
@@ -38,29 +39,49 @@ import kotlin.test.assertTrue
  * - set 3 -- same exercise and geometry, 50.0 lb / 22.67961850050177 kg,
  *   **7 reps performed**, `failed: true`, `limiter: "muscle"`. 3,852 samples
  *   at 99.43453226264556 Hz.
+ * - set 8 -- `assisted_pull_up`, 66.7 lb / 30.25 kg of ASSISTANCE,
+ *   `bodyweight: true`, concentric-first, drive up, vertical, sensor on the
+ *   bar, travel ratio 1.0, **5 reps performed** (`repsManual: true`) of a
+ *   planned 8, `failed: true`, `limiter: "muscle"`. 4,552 samples at
+ *   99.4123943292776 Hz.
  * - set 10 -- `assisted_pull_up`, 51.7 lb / 23.443564147942737 kg of
  *   ASSISTANCE, `bodyweight: true`, concentric-first, drive up, vertical,
  *   sensor on the bar, **6 reps performed**, `failed: true`,
  *   `limiter: "pace"`. 4,060 samples at 99.40732758620689 Hz.
  *
+ * SET 8 IS ANALYSED AT SET 8'S OWN LOAD, 30.25 kg, AND WAS NOT. Every set-8
+ * figure below used to be computed against set 10's 23.443564147942737 kg of
+ * assistance -- the wrong operand, which moves every power figure and no
+ * range. At 30.25 kg the analyzer reproduces this session's published set-8
+ * summary to the last digit: `meanConVel_mps` 0.163, `peakConVel_mps` 0.719,
+ * `meanRom_m` 0.300, `romSpread_pct` 80.4, `peakPower_w` 407.4,
+ * `meanConPower_w` 48.5.
+ *
  * ## The licence for using them
  *
  * Run against the SHIPPED analyzer at tag `v0.1.48`
- * (`fca343da4f62b17bed05b4f3b3aa9a612da2d1dd`), all three reproduce their
- * session's published `repMetrics` and `summary` to the last published digit
- * -- set 1's 1.356 m / 1.091 m/s / 228.0 W, set 3's 1.219 m / 1.263 m/s /
- * 309.4 W, set 10's 1.746 m / 1.044 m/s / 552.4 W. The fixtures carry the
- * defect the issue reported.
+ * (`fca343da4f62b17bed05b4f3b3aa9a612da2d1dd`), sets 1, 3 and 10 reproduce
+ * their session's published `repMetrics` and `summary` to the last published
+ * digit -- set 1's 1.356 m / 1.091 m/s / 228.0 W, set 3's 1.219 m /
+ * 1.263 m/s / 309.4 W, set 10's 1.746 m / 1.044 m/s / 552.4 W. The fixtures
+ * carry the defect the issue reported.
+ *
+ * Set 8's licence is measured at the SHA named below rather than at
+ * v0.1.48: at that SHA, at set 8's own load, the analyzer publishes the
+ * session's own `peakPower_w` 407.4, `peakConVel_mps` 0.719 and `meanRom_m`
+ * 0.300 from the same seven detections. Since those are the figures v0.1.48
+ * wrote into the archive, that one run licences the fixture and says the set
+ * has not moved, in the same measurement.
  *
  * **THEY DO NOT ALL STILL CARRY IT, AND THAT IS THE FIRST FINDING HERE.**
  * Between v0.1.48 and this commit the DSP family for issues #87 and #138
- * landed, and it moved two of the three outright. Set 1 now resolves eleven
+ * landed, and it moved two of the four outright. Set 1 now resolves eleven
  * detections where it resolved three, its phantom now begins 2.241 s AFTER
  * the `Done` cue and is excluded by the set-end bound that already exists,
  * and the set publishes `velocityLoss_pct` where it published none. Set 3 now
  * resolves eleven where it resolved three, and its published `peakPower_w`
- * went from 309.4 W to **783.2 W** -- the same defect class, larger. Only set
- * 10 is unchanged, to every digit. The figures below are measured at
+ * went from 309.4 W to **783.2 W** -- the same defect class, larger. Sets 8
+ * and 10 are unchanged, to every digit. The figures below are measured at
  * `41c0c96bbc3be29cc7d705bf3d74c7196a0d12de`, and none of them is quoted from
  * the session archive.
  */
@@ -68,7 +89,7 @@ class ArtefactRepTest {
     private fun load(fixture: String): List<ImuSample> =
         ImuCsv.decode(javaClass.getResourceAsStream("/$fixture.csv")!!.readBytes().decodeToString())
 
-    /** Concentric-first, drive up, sensor on the bar -- all three sets' declared geometry. */
+    /** Concentric-first, drive up, sensor on the bar -- all four sets' declared geometry. */
     private val conFirst = LiftDirection(startsWith = StartPhase.CONCENTRIC, concentricUp = true)
 
     private fun analyse(fixture: String, loadKg: Double) =
@@ -76,12 +97,15 @@ class ArtefactRepTest {
 
     private fun round3(x: Double) = Math.round(x * 1000.0) / 1000.0
 
+    private fun round2(x: Double) = Math.round(x * 100.0) / 100.0
+
     private fun peakPower(a: SetAnalysis) = a.reps.mapNotNull { it.peakPowerW }.maxOrNull()
 
     private fun meanRom(a: SetAnalysis) = round3(a.reps.map { it.romM }.average())
 
     private val set01 = "field-ohp-3010-8rep-s37-set01"
     private val set03 = "field-ohp-prepinflated-s37-set03"
+    private val set08 = "field-assistedpullup-3010-s37-set08"
     private val set10 = "field-assistedpullup-3010-s37-set10"
 
     private companion object {
@@ -191,11 +215,16 @@ class ArtefactRepTest {
             ten.reps.map { round3(it.romM) },
             "and they are the four the refusal keeps",
         )
+        // Without this line the pin cannot tell "the fifth ceases to exist"
+        // from "the fifth is still detected and then refused": the
+        // UNSUBSTITUTED capture returns these same four ranges through this
+        // same call, with refusedDetections 1.
+        assertEquals(0, ten.refusedDetections, "four spans, not five with one refused")
 
-        val eight = analyseWithInRangeAccel("field-assistedpullup-3010-s37-set08", 23.443564147942737)
+        val eight = analyseWithInRangeAccel(set08, 30.25)
         assertEquals(7, eight.reps.size, "set 8 resolves seven either way")
         assertEquals(0.23, round3(eight.reps[6].romM), "its detection 6 survives, ranging this far")
-        assertEquals(53.8, eight.reps[6].peakPowerW, "with this peak power, against the 315.7 W it publishes")
+        assertEquals(69.4, eight.reps[6].peakPowerW, "with this peak power, against the 407.4 W it publishes")
         assertNotNull(eight.reps[6].eccS, "and it resolved both phases either way")
     }
 
@@ -204,17 +233,20 @@ class ArtefactRepTest {
      * result is read against what the capture publishes untouched.
      */
     @Test
-    fun `set 8 publishes seven detections and 315_7 W from the one that carries the corrupt sample`() {
-        val a = analyse("field-assistedpullup-3010-s37-set08", 23.443564147942737)
+    fun `set 8 publishes seven detections and 407_4 W from the one that carries the corrupt sample`() {
+        val a = analyse(set08, 30.25)
         assertEquals(7, a.reps.size, "detections")
         assertEquals(0.878, round3(a.reps[6].romM), "detection 6 rom_m")
-        assertEquals(1.68, round3(a.reps[6].eccS!!), "and it resolved an eccentric partner, so clause 1 keeps it")
-        assertEquals(315.7, a.reps[6].peakPowerW, "detection 6 peakPower_w, against 37.7-53.5 for the other six")
+        assertEquals(
+            1.68,
+            round3(a.reps[6].eccS!!),
+            "and it resolved an eccentric partner; at 4.46x it is also under the bound, so both clauses keep it",
+        )
+        assertEquals(4.46, round2(RepRefusal.rangeRatio(a.reps, 6)!!), "detection 6's range ratio, under the 4.5 bound")
+        assertEquals(407.4, a.reps[6].peakPowerW, "detection 6 peakPower_w, against 48.7-69.1 for the other six")
         assertEquals(
             listOf(4079),
-            load("field-assistedpullup-3010-s37-set08").indices.filter {
-                mag(load("field-assistedpullup-3010-s37-set08")[it]) > 4.0
-            },
+            load(set08).indices.filter { mag(load(set08)[it]) > 4.0 },
             "the whole set's samples above 4 g, by index",
         )
     }

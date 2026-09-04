@@ -222,8 +222,8 @@ class GyroGateTest {
         )
         val fails = listOf(
             "field-ohp-3010-6rep-s37-set02",
-            // The same seated overhead press one set earlier: a hand-held
-            // bar rotates throughout.
+            // The same seated overhead press one set earlier, and its gyro
+            // magnitude exceeds the gate for the same reason set02's does.
             "field-ohp-3010-8rep-s37-set01",
             "field-bench-3010-6rep-s37-set05",
             "field-bench-3010-6rep-s37-set06",

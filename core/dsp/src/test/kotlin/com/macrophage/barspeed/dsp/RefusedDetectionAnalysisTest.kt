@@ -55,7 +55,7 @@ class RefusedDetectionAnalysisTest {
 
     @Test
     fun `a capture the bound ran on and refused nothing answers zero and no word`() {
-        val a = analyse("field-assistedpullup-3010-s37-set08", con, 23.443564147942737)
+        val a = analyse("field-assistedpullup-3010-s37-set08", con, 30.25)
         assertEquals(0, a.refusedDetections, "a bound ran and refused nothing")
         assertNull(a.refusedDetectionReason)
     }
