@@ -5,9 +5,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Differentials for the provenance half of #220: `geometry.source` publishes a
- * word for six of the eight values and nothing for `bodyweight`, the flag that
- * decides whether the lifter's own mass is a term in `load_kg`.
+ * Differentials for the provenance half of #220. When these differentials were
+ * written, geometry.source published a word for six of the eight values and
+ * nothing for bodyweight. Since #220 it publishes seven, bodyweight included.
+ * That flag decides whether the lifter's own mass is a term in `load_kg`.
  *
  * Measured on field-37, app 0.1.48, export 1.16: six of its thirteen sets are
  * body-weight work, every one of them publishes `"bodyweight": true` under
