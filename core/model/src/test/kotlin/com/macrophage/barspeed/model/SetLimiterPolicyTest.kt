@@ -43,8 +43,8 @@ class SetLimiterPolicyTest {
     }
 
     /**
-     * The row stays reachable after a skip, so a skip is not a door that
-     * locks.
+     * The correction stays reachable after a skip, so a skip is not a door
+     * that locks.
      */
     @Test
     fun `the correction row is offered on any failed set and on any set carrying an answer`() {
@@ -124,9 +124,9 @@ class SetLimiterPolicyTest {
     /**
      * A page the lifter opened is drawn where they opened it.
      *
-     * The reason row is at the foot of the rest screen beside the effort line,
-     * and a page that answered a tap somewhere else is a page the tapping
-     * finger cannot see.
+     * The reason row WAS at the foot of the rest screen beside the effort
+     * line, and a page that answered a tap somewhere else is a page the
+     * tapping finger cannot see. #237 deleted the row.
      */
     @Test
     fun `the lifter's own tap draws the page under the row they tapped`() {
@@ -180,7 +180,7 @@ class SetLimiterPolicyTest {
      * is the differential.
      *
      * The rest screen scrolls to 0 on entering RESTING and the reason row
-     * comes after the header, the permission banner, the whole next-set
+     * CAME after the header, the permission banner, the whole next-set
      * block and the session-close controls. A question drawn there is a
      * question the lifter starts the next set without ever seeing, and
      * starting the next set resets the stored answer to null, so it is not

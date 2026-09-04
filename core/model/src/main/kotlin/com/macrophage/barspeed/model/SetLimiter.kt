@@ -373,13 +373,15 @@ object SetLimiterScale {
  * WHERE the reason page is drawn, which is not the same question as whether it
  * is drawn at all.
  *
- * The rest screen has two places it can appear and they answer to different
- * events. [PROMPT] is the page the app opened by itself, and it belongs at the
- * top of the rest screen, because the screen scrolls to 0 on entering RESTING
- * and a question below the fold is a question the lifter starts the next set
- * without seeing. [CORRECTION] is the page the lifter opened by tapping the
- * reason row, and it belongs immediately under that row -- adjacent to the
- * finger that asked for it.
+ * [PROMPT] is the page the app opened by itself, and it belongs at the top of
+ * the rest screen, because the screen scrolls to 0 on entering RESTING and a
+ * question below the fold is a question the lifter starts the next set without
+ * seeing.
+ *
+ * [CORRECTION] WAS the page the lifter opened by tapping the reason row, drawn
+ * immediately under that row. #237 deleted the row, and `RestingStage`, the
+ * only `:app` caller of [SetLimiterPolicy.placement], passes `changing =
+ * false`. The member is left standing and SetLimiterPolicyTest still pins it.
  *
  * An enum rather than two booleans, so that "both at once" is not a state the
  * caller can construct. Two copies of the page on one screen is the failure
@@ -392,7 +394,7 @@ enum class SetLimiterPagePlacement {
     /** Drawn high, where a lifter entering the rest period is already looking. */
     PROMPT,
 
-    /** Drawn under the reason row, where the lifter tapped to open it. */
+    /** Drawn under the reason row. No caller has returned it since #237. */
     CORRECTION,
 }
 
@@ -429,7 +431,7 @@ object SetLimiterPolicy {
      *   not re-ask; the page is one tap to leave and the lifter is standing
      *   over a bar.
      *
-     * The row itself stays reachable afterwards either way -- see
+     * The correction stays reachable afterwards either way -- see
      * [offersCorrection] -- so a skip is not a door that locks.
      */
     fun prompts(failed: Boolean, rpe: Int?, limiter: SetLimiter?, dismissed: Boolean): Boolean =
@@ -455,13 +457,13 @@ object SetLimiterPolicy {
     fun ratedNearFailure(rpe: Int?): Boolean = rpe != null && rpe >= EffortScale.PROXIMITY_FLOOR_RPE
 
     /**
-     * Whether the rest screen offers the reason row at all for the set just
-     * stored.
+     * Whether the rest screen offers a reason correction at all for the set
+     * just stored.
      *
      * Any set that would be asked -- a failure, or a completed set rated at
      * the counted end -- or any set already carrying an answer whatever it was
      * rated. The last clause is not redundant twice over: a lifter who answers
-     * and then wants to change it must still reach the row, and a set whose
+     * and then wants to change it must still reach it, and a set whose
      * rating is corrected downward after an answer was given must not have the
      * answer become unreachable.
      */
@@ -488,7 +490,8 @@ object SetLimiterPolicy {
     fun lineLabel(failed: Boolean): String = if (failed) "Ended" else "Limited by"
 
     /**
-     * The wording on the button that opens the page from the reason row.
+     * The wording on the button that opened the page from the reason row.
+     * No `:app` caller since #237.
      *
      * "Say why" is the failure wording and stays exactly as it shipped. A
      * completed set is not being asked why it ended, so it reads "Answer";
@@ -525,10 +528,11 @@ object SetLimiterPolicy {
     /**
      * Where the reason page is drawn for the set just stored, if anywhere.
      *
-     * [changing] is the lifter's own tap on the reason row and it WINS over an
-     * automatic offer, for two reasons that point the same way: the page they
-     * asked for must appear where they asked for it, and a page drawn in both
-     * places at once is two pages.
+     * [changing] WAS the lifter's own tap on the reason row and it WINS over
+     * an automatic offer, for two reasons that point the same way: the page
+     * they asked for must appear where they asked for it, and a page drawn in
+     * both places at once is two pages. The only `:app` caller passes it false
+     * since #237.
      *
      * Lifted out of the rest screen rather than written as an `if` beside the
      * two call sites, which is the whole point: the placement is the defect
