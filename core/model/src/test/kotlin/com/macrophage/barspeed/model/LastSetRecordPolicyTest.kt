@@ -113,6 +113,27 @@ class LastSetRecordPolicyTest {
     }
 
     @Test
+    fun `a carry states its seconds as a carry, never as a hold`() {
+        val values =
+            LastSetRecordPolicy.values(
+                kind = ExerciseKind.CARRY,
+                bodyweight = false,
+                unit = WeightUnit.KG,
+                side = null,
+                recordedAddedKg = 40.0,
+                correctedAddedKg = null,
+                countedReps = 0,
+                correctedReps = null,
+                recordedDurationS = 30,
+                correctedDurationS = 45,
+            )
+        assertEquals("45s carry · 40 kg", SetCardValues.plain(values))
+        val seconds = values.first { it.suffix == "carry" }
+        assertEquals("30s", seconds.planned, "a corrected carry strikes the seconds the row was written with")
+        assertTrue(values.none { it.suffix == "hold" }, "a farmer's walk is not a plank")
+    }
+
+    @Test
     fun `the arm the set was worked is stated and never struck`() {
         val side = repValues(side = "left").first()
         assertEquals("Left", side.stated)

@@ -170,8 +170,8 @@ object LastSetRecordPolicy {
     /**
      * What the box calls a set the lifter did preparatory work in.
      *
-     * The word [WarmupMarkRow] draws, so a set that reads "Warm-up" in the box
-     * reads "Warm-up" in the popup that changes it.
+     * The word the correction popup's own warm-up row draws, so a set that
+     * reads "Warm-up" in the box reads "Warm-up" in the popup that changes it.
      */
     const val WARM_UP = "Warm-up"
 
