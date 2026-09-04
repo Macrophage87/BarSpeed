@@ -575,7 +575,7 @@ class SetJournalTest {
      *
      * The sensor records what the bar did; it never records what the lifter
      * decided a rep was worth. A spoken cue is not evidence of one either --
-     * the guide says "Rep 1" on a schedule, whether or not anybody moved.
+     * the guide says "Rep 2" on a schedule, whether or not anybody moved.
      */
     @Test
     fun `a rep the lifter counted is recoverable as a mark with its own clock`() = runTest {

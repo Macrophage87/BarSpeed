@@ -139,7 +139,7 @@ private val SECTIONS =
                 "the app calls the whole cadence, counting only the seconds strictly inside each " +
                 "stroke — a 3-second stroke calls '1, 2', never its own length — and the rep " +
                 "number rides into the NEXT stroke's word rather than standing on its own: on a " +
-                "bench 3010 that's 'Down, 1, 2, Up… Down, Rep 1, 2, Up…', not 'Up… Rep one'. " +
+                "bench 3010 that's 'Down, 1, 2, Up… Down, Rep 2, 2, Up…', not 'Up… Rep one'. " +
                 "There's a lead-in first so you can get set on the bar — 5 seconds unless the " +
                 "plan says otherwise or you change it on the rest screen — and the app counts " +
                 "the reps for you. " +

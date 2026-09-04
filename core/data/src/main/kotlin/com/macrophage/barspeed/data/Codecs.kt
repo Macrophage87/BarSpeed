@@ -69,7 +69,7 @@ object CueCsv {
  * stream can rebuild.
  *
  * A separate document from the cue track, and the separation is the point. A
- * cue is what the app SAID -- the guide speaks "Rep 1" on a schedule whether or
+ * cue is what the app SAID -- the guide speaks "Rep 2" on a schedule whether or
  * not anybody moved -- and a mark is what was COUNTED. Sharing a file would
  * make the two indistinguishable on read-back.
  *

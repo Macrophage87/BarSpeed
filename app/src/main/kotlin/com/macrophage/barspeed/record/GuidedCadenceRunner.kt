@@ -57,8 +57,8 @@ class GuidedCadenceRunner(
      * the words that go on the set's cue track, which is a persisted format
      * every cue-track consumer parses. The second is the UTTERANCE actually
      * spoken. One utterance can carry two words the record wants kept apart:
-     * a merged rep call is spoken as `"Down, Rep 1"` and recorded as `Down`
-     * and `Rep 1`, because renaming the `Down` row would break every consumer
+     * a merged rep call is spoken as `"Down, Rep 2"` and recorded as `Down`
+     * and `Rep 2`, because renaming the `Down` row would break every consumer
      * that matches it while dropping the call would lose what the app said.
      * All rows of one call share one instant, so the caller stamps them once.
      *

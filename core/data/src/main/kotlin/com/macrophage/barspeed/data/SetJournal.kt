@@ -303,7 +303,7 @@ class SetJournal internal constructor(
      * A rep was counted at [timestampMs], by the lifter or by the guide.
      *
      * Its own stream rather than a line in the cue track. A cue is something
-     * the app SAID -- the guide speaks "Rep 1" on a schedule whether or not
+     * the app SAID -- the guide speaks "Rep 2" on a schedule whether or not
      * anybody moved -- and a mark is something the lifter DID. Sharing a file
      * would make the two indistinguishable on read-back, and the second is the
      * only fact in a set that no reprocessing of any stream can rebuild.

@@ -53,7 +53,9 @@ import kotlin.test.assertTrue
  * built on it would misread both.
  *
  * The guided half is observed as well as derived -- all 28 committed
- * `*-cues.csv` fixtures from a rep-based set carry `Down` and `Up`. The
+ * `*-cues.csv` fixtures from a rep-based set in `core/dsp/src/test/resources`
+ * carry `Down` and `Up`, and so does the one outside it,
+ * `core/data/.../field-backsquat-4011-6rep-s36-set02-cues.csv`. The
  * UNGUIDED half is derived from source only: no committed fixture is an
  * unguided-counter track, so what is pinned here is the policy's own output
  * vocabulary and not a capture anyone has replayed.
