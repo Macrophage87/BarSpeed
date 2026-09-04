@@ -33,14 +33,14 @@ import kotlin.math.abs
  * same-sign motion -- are the same two constants the segmenter reads. Nothing
  * here introduces a tunable.
  *
- * They are not read in the same FRAME, though. [VelocityEstimator.estimate]
- * runs this correction, and `SetAnalyzer.analyze` applies
- * `mappedToLifter(sensorToLifter)` to the result AFTER that call returns. So
- * this pass judges both thresholds against sensor-frame velocity while the
- * segmenter judges them against a copy scaled by `travelRatio`; the two
- * coincide only where that ratio is 1.0. Every capture in this corpus declares
- * 1.0 -- the one inverted mount flips sign only, which both thresholds are
- * symmetric under -- so no fixture here can show the difference. Issue #233.
+ * They are read in the same FRAME the segmenter reads them in, and since
+ * issue #70 that is because the segmenter converts.
+ * [VelocityEstimator.estimate] runs this correction on the unmapped series,
+ * and `SetAnalyzer.analyze` applies `mappedToLifter(sensorToLifter)` to the
+ * result AFTER that call returns; [RepSegmenter.segmentDetailed] then takes
+ * its own copies from [RunThresholds.forSeriesMappedToLifter], which scales
+ * both of these by the magnitude of that same factor. So this pass and the
+ * segmenter judge the same sensor-frame speed at every declared ratio.
  *
  * ## What it does NOT claim
  *
@@ -137,12 +137,13 @@ object RunawayDrift {
      * The index ranges of same-sign runs displacing beyond the cap.
      *
      * Same-sign is judged against [DspConfig.pauseBandMps], the dead band
-     * [RepSegmenter.classifyRunsDetailed] classifies with -- the same constant,
-     * read in a different frame. This pass runs inside
-     * [VelocityEstimator.estimate]; `SetAnalyzer.analyze` applies
-     * `mappedToLifter(sensorToLifter)` to the returned series, so the segmenter
-     * classifies velocities scaled by `travelRatio` and this function does not.
-     * The two agree only at ratio 1.0. Issue #233.
+     * [RepSegmenter.classifyRunsDetailed] classifies with, and since issue #70
+     * the segmenter converts it into the frame of the series it is handed:
+     * [RepSegmenter.segmentDetailed] takes its limits from
+     * [RunThresholds.forSeriesMappedToLifter], which scales the band by the
+     * magnitude of `sensorToLifter`, while this pass runs inside
+     * [VelocityEstimator.estimate] on the series before that mapping. So the
+     * two judge the same sensor-frame speed at every ratio.
      */
     internal fun runaways(velocity: DoubleArray, timeS: DoubleArray, config: DspConfig): List<IntRange> {
         val n = velocity.size
