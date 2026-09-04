@@ -142,6 +142,36 @@ class SchemaBodyweightSourceContractTest {
         )
     }
 
+    private fun setProperty(name: String) = schema("session-export.schema.json")["\$defs"]!!
+        .jsonObject["set"]!!.jsonObject["properties"]!!.jsonObject[name]!!.jsonObject
+
+    /**
+     * RED. Each key minted under 1.19 names 1.19 in the description PUBLISHED
+     * beside it, so a mint cannot move the constant and leave the prose on the
+     * released number.
+     *
+     * The literal 1.19 rather than [SessionExport.SCHEMA_VERSION], which is
+     * what round 1's finding 12 asked for. Measured at this SHA: the
+     * SCHEMA_VERSION form applied to `failedByLifter` -- minted under 1.18 and
+     * correctly saying so -- fails, its description reading `(1.18, #216,
+     * #169)` against a constant of 1.19. A key names the number it was minted
+     * under and keeps naming it.
+     */
+    @Test
+    fun `each key minted under 1_19 names 1_19 in its published description`() {
+        val published = mapOf(
+            "bodyWeight_kg" to setProperty("bodyWeight_kg"),
+            "rest_s" to setProperty("rest_s"),
+            "geometrySource" to source,
+        )
+        val silent = published.filterValues { "1.19" !in it["description"]!!.jsonPrimitive.content }.keys
+        assertEquals(
+            emptySet(),
+            silent,
+            "published descriptions minted under 1.19 that do not name it",
+        )
+    }
+
     /**
      * DELETED, not reworded. The sentence named a reader "validating against
      * 1.17 or earlier" as the one that rejects the document; the rejecting
