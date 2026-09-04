@@ -117,24 +117,24 @@ class LastSetRecordPolicyTest {
 
     @Test
     fun `a rated set reads the wording of the tile the lifter lit`() {
-        assertEquals("Hard · RPE 8", LastSetRecordPolicy.status("Hard · RPE 8", failed = false))
+        assertEquals("Hard · RPE 8", status(rated = "Hard · RPE 8"))
     }
 
     @Test
     fun `an unrated set names the absence rather than going blank`() {
-        assertEquals(EffortCorrectionPolicy.NOT_RATED, LastSetRecordPolicy.status(null, failed = false))
+        assertEquals(EffortCorrectionPolicy.NOT_RATED, status())
     }
 
     @Test
     fun `a failed set says so`() {
-        assertEquals(EffortCorrectionPolicy.FAILED, LastSetRecordPolicy.status(null, failed = true))
+        assertEquals(EffortCorrectionPolicy.FAILED, status(failed = true))
     }
 
     @Test
     fun `GAP a limiter answer is nowhere in the status`() {
         assertEquals(
             EffortCorrectionPolicy.FAILED,
-            LastSetRecordPolicy.status(null, failed = true),
+            status(failed = true),
             "the box cannot yet say why the set ended; #237's differential removes this",
         )
     }
@@ -143,8 +143,28 @@ class LastSetRecordPolicyTest {
     fun `GAP a warm-up mark is nowhere in the status`() {
         assertEquals(
             "Hard · RPE 8",
-            LastSetRecordPolicy.status("Hard · RPE 8", failed = false),
+            status(rated = "Hard · RPE 8"),
             "the box cannot yet say the set was preparatory; #237's differential removes this",
         )
     }
+
+    private fun status(
+        rated: String? = null,
+        rpe: Int? = null,
+        failed: Boolean = false,
+        limiter: SetLimiter? = null,
+        note: String? = null,
+        timed: Boolean = false,
+        declared: Boolean = false,
+        mark: Boolean? = null,
+    ) = LastSetRecordPolicy.status(
+        ratedDescription = rated,
+        rpe = rpe,
+        failed = failed,
+        limiter = limiter,
+        limiterNote = note,
+        timed = timed,
+        warmupDeclared = declared,
+        warmupMark = mark,
+    )
 }

@@ -110,20 +110,41 @@ object LastSetRecordPolicy {
     }
 
     /**
-     * The words under the figures.
+     * The words under the figures: how the set was rated, why it ended, and
+     * what it was for.
      *
-     * SEAM ONLY AT THIS COMMIT: it returns the effort clause and nothing else,
-     * which is what the box would say if it were built today out of the one row
-     * that already has a policy behind it. #237 asks for the limiter word and
-     * the warm-up mark beside it; the differential that reds their absence is
-     * the commit after this one, and the commit after that adds them.
+     * SEAM ONLY AT THIS COMMIT: it returns the effort clause and nothing else.
+     * Every argument below the first two is accepted and NOT READ, so that the
+     * differential which reds the missing clauses is a test-only commit rather
+     * than a signature change dressed as one -- 16cf78ba's two-argument seam
+     * could only have been red against #237's ask by failing to compile, which
+     * is not evidence about behaviour. The commit after the differential reads
+     * them.
      *
      * [ratedDescription] is the gym-facing wording of whichever effort tile the
      * lifter's own rating lit, or null for a set carrying no rating at all --
      * the same argument [EffortCorrectionPolicy.lineText] takes, and it is that
      * function's answer that is returned, so the box and the effort row cannot
      * word one set two ways.
+     *
+     * [rpe] is the stored rating itself, beside the wording of it, because the
+     * two answer different questions: the wording is what the box PRINTS, and
+     * the number is what decides whether a limiter clause is offered at all
+     * ([SetLimiterPolicy.offersCorrection] reads the rung, not the words).
+     *
+     * [warmupDeclared] is the plan's declaration and [warmupMark] the lifter's
+     * own statement, passed as the two facts [WarmupMarkPolicy] keeps apart and
+     * never pre-composed by the caller.
      */
-    fun status(ratedDescription: String?, failed: Boolean): String =
-        EffortCorrectionPolicy.lineText(ratedDescription, failed)
+    @Suppress("UNUSED_PARAMETER")
+    fun status(
+        ratedDescription: String?,
+        rpe: Int?,
+        failed: Boolean,
+        limiter: SetLimiter?,
+        limiterNote: String?,
+        timed: Boolean,
+        warmupDeclared: Boolean,
+        warmupMark: Boolean?,
+    ): String = EffortCorrectionPolicy.lineText(ratedDescription, failed)
 }
