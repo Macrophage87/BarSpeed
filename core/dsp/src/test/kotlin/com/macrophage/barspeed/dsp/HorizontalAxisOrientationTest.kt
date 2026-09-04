@@ -168,6 +168,29 @@ class HorizontalAxisOrientationTest {
     }
 
     @Test
+    fun `the axis is oriented in the sensor's frame, whatever ratio is declared`() {
+        // orient() classifies the series BEFORE mappedToLifter is applied, so
+        // it is the one place in the segmenter that must keep the run limits
+        // unconverted. Issue #70's fix converts them for the two callers that
+        // see a MAPPED series and leaves this one alone; nothing pinned that
+        // until mutation M9 converted it here too and the whole suite stayed
+        // green.
+        //
+        // The differential is the twitch. At `travelRatio` 3.0 a converted
+        // startThresholdMps would be 0.30 m/s, above the 0.03 m settle's peak,
+        // so the settle would stop deciding the orientation and the set would
+        // come out the right way round -- a correct-looking answer produced by
+        // reading the wrong frame. The set is inverted here and must STAY
+        // inverted at every ratio.
+        listOf(0.25, 0.5, 1.0, 2.0, 3.0).forEach { ratio ->
+            val a = SetAnalyzer.analyze(sixReps(0.03), horizontalHandle.copy(travelRatio = ratio), loadKg = 50.0)
+            assertEquals(6, a.reps.size, "ratio $ratio: reps segmented")
+            assertEquals(1.87, a.reps.map { it.conS }.average(), 5e-3, "ratio $ratio: drive seconds hold the return")
+            assertEquals(0.96, a.reps.first().eccS!!, 5e-3, "ratio $ratio: return seconds hold the drive")
+        }
+    }
+
+    @Test
     fun `a stack-mounted horizontal exercise is measured vertically, which disarms this`() {
         // The reason the defect is hard to reach: declaring the plane honestly
         // for real cable work also declares the mount, and the mount wins.
