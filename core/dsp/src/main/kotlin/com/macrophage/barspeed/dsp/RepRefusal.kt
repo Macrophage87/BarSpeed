@@ -38,11 +38,12 @@ package com.macrophage.barspeed.dsp
  * TO SAY IT DID. Set 8's detection 6 is kept by BOTH clauses at once: it
  * resolved an eccentric partner at `ecc_s` 1.68, and at 4.46x the median
  * range of its set's other detections it is also UNDER [RANGE_RATIO_BOUND],
- * so clause 2 alone already keeps it and the pair separates either way. The
- * case that shows clause 1 carrying weight on its own is
- * `field-ohp-prepinflated-s37-set04` rep 4, which reaches 4.82x with both
- * phases resolved -- above the bound, kept by clause 1 and by nothing else
- * -- and is recorded as [MAX_PAIRED_RANGE_RATIO_OBSERVED].
+ * so clause 2 alone already keeps it and the pair separates either way. Two
+ * cases show clause 1 carrying weight on its own, both above the bound with
+ * both phases resolved and kept by clause 1 and by nothing else:
+ * `field-ohp-prepinflated-s37-set04` rep 4 at 4.82x, and
+ * `field-bench-3010-6rep-s37-set05` rep 4 at 4.90x, which is the larger and
+ * is recorded as [MAX_PAIRED_RANGE_RATIO_OBSERVED].
  *
  * **This rule is deliberately not the sample-level fix.** Refusing the SAMPLE
  * changes the velocity series and therefore re-partitions the whole set:
@@ -197,11 +198,33 @@ object RepRefusal {
      * across the committed corpus, under each capture's declared geometry.
      *
      * IT IS ABOVE [RANGE_RATIO_BOUND], on
-     * `field-ohp-prepinflated-s37-set04` rep 4 -- `rom_m` 1.688 against a
-     * median-of-others 0.35, with `ecc_s` 0.60. Clause 1 is the only thing
+     * `field-bench-3010-6rep-s37-set05` rep 4 -- `rom_m` 1.363 against a
+     * median-of-others 0.278, with `ecc_s` 2.03. Clause 1 is the only thing
      * that keeps it, which is why this figure is recorded and pinned.
+     *
+     * IT READ 4.82, ON `field-ohp-prepinflated-s37-set04` rep 4, and that
+     * measurement was true of the tree it was taken on. It is not a figure
+     * about one detection: it is a figure about the corpus, and issue #72's
+     * eccentric-first drive-alone fallback moved the corpus. On the bench set
+     * the fallback publishes a fifth detection, a 0.278 m drive with no
+     * eccentric partner. That detection becomes the lower median of the
+     * OTHERS for the set's largest rep, whose ratio goes from 1.52 to 4.90 --
+     * so what moved this figure is not a rep the fallback added but a rep it
+     * never touched, judged against a population it joined.
+     * `FallbackRefusalInteractionTest` measures that coupling in both
+     * directions, and `field-ohp-prepinflated-s37-set04` rep 4 still reaches
+     * 4.82 and is still kept by clause 1 alone.
+     *
+     * The direction of the coupling is worth stating because it is not
+     * symmetric: a SMALL added detection drags the median down and lifts
+     * every other detection's ratio toward the bound. Nothing in the
+     * committed corpus is refused because of it -- measured with the fallback
+     * and with the same lists judged on their paired detections alone -- and
+     * the only thing standing between the mechanism and a refused real rep is
+     * clause 1. Excluding drive-only detections from the median population is
+     * a change to this rule and is not made here.
      */
-    const val MAX_PAIRED_RANGE_RATIO_OBSERVED = 4.82
+    const val MAX_PAIRED_RANGE_RATIO_OBSERVED = 4.90
 
     /**
      * The largest range ratio any DRIVE-ONLY detection reaches without being
