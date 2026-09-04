@@ -166,17 +166,20 @@ class BatchCueCoverageTest {
      * Committed for a purpose other than cue coverage, so out of every figure
      * above rather than scored badly by it.
      *
-     * These four arrived with issue #133 for a rotation measure that reads
-     * roll only. They carry cue tracks, so `notScored` would be a false
-     * statement about them -- that list's own reason is "no track, or a track
-     * that calls no rep" -- and scoring them would silently move the corpus
-     * totals #87 and #94 measured. [CuedRepCoverageTest] holds the same four
-     * in its own `notRepCorpus` for the same reason; the two lists exist so
+     * Four arrived with issue #133 for a rotation measure that reads roll
+     * only, and two with issue #245 for a head-of-stream bound. All six
+     * carry cue tracks, so `notScored` would be a false statement about them
+     * -- that list's own reason is "no track, or a track that calls no rep"
+     * -- and scoring them would silently move the corpus totals #87 and #94
+     * measured. [CuedRepCoverageTest] holds the same six in its own
+     * `notRepCorpus` for the same reason; the two lists exist so
      * the classpath partition stays TOTAL, which is what makes the coverage
      * guard below able to catch the next capture nobody classified.
      */
     private val notRepCorpus = listOf(
         "field-backsquat-wrapping-s36-set01",
+        "field-inclinepress-3010-12rep-s38-set02",
+        "field-ohp-3010-8rep-s38-set05",
         "field-ohp-prepinflated-s37-set03",
         "field-ohp-prepinflated-s37-set04",
         "field-rdl-wrapping-s36-set05",

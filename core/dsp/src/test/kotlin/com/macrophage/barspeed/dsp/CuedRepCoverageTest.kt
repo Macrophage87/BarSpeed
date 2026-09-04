@@ -15,14 +15,18 @@ import kotlin.test.assertTrue
  *
  * ## What the corpus says today
  *
- * Twenty-five of the thirty-seven committed captures carry a cue track, and
- * the twenty in [cueTracked] are scored here. Across them the metronome called
+ * Twenty-seven of the forty committed captures carry a cue track, and the
+ * twenty in [cueTracked] are scored here. It read "twenty-five of the
+ * thirty-seven" before issue #245 committed two more cue-tracked captures,
+ * and the thirty-seven was already one short of the thirty-eight then on the
+ * classpath; both digits are re-counted here rather than adjusted. Across them the metronome called
  * 170 reps; 74 produce a counted rep and 96 produce none. Seven counted reps
  * land outside every cued window. All four figures are pinned below.
  *
  * The resource directory holds MORE captures than the corpus does. Four
- * arrived with issue #133 for a rotation measure, carry cue tracks nobody has
- * counted reps against, and are named in `notRepCorpus` so the partition stays
+ * arrived with issue #133 for a rotation measure and two with issue #245 for
+ * a head-of-stream bound; all six carry cue tracks nobody has counted reps
+ * against, and all six are named in `notRepCorpus` so the partition stays
  * total without their being read as covered. The count of committed captures
  * in the sentence above moves with every such commit and is re-read from the
  * resource directory rather than carried forward.
@@ -230,10 +234,12 @@ class CuedRepCoverageTest {
      * Captures committed for something other than rep coverage, named here so
      * the partition below stays total.
      *
-     * These four carry cue tracks and are deliberately NOT in [cueTracked].
-     * They arrived with issue #133, which is about how far the sensor's ROLL
+     * These six carry cue tracks and are deliberately NOT in [cueTracked].
+     * Four arrived with issue #133, which is about how far the sensor's ROLL
      * swept over a set -- `RollExcursionFieldTest` is what reads them -- and
-     * nothing has counted their reps against their tracks. Folding them into
+     * two with issue #245, which is about where the analysed window OPENS;
+     * `PrepDetectionFieldTest` is what reads those. Nothing has counted any
+     * of their reps against their tracks. Folding them into
      * the corpus would move every figure this file pins for a reason that has
      * nothing to do with rep counting, and would state a coverage result
      * nobody measured.
@@ -245,6 +251,8 @@ class CuedRepCoverageTest {
      */
     private val notRepCorpus = listOf(
         "field-backsquat-wrapping-s36-set01",
+        "field-inclinepress-3010-12rep-s38-set02",
+        "field-ohp-3010-8rep-s38-set05",
         "field-ohp-prepinflated-s37-set03",
         "field-ohp-prepinflated-s37-set04",
         "field-rdl-wrapping-s36-set05",
@@ -498,7 +506,7 @@ class CuedRepCoverageTest {
         // 13 until issue #125 committed field-ohp-3010-8rep-s37-set01,
         // whose archived cue track is deliberately not committed beside it.
         assertEquals(14, notCueTracked.size, "captures with no track that calls a rep")
-        assertEquals(4, notRepCorpus.size, "captures committed for something other than rep coverage")
+        assertEquals(6, notRepCorpus.size, "captures committed for something other than rep coverage")
         notRepCorpus.forEach { fixture ->
             assertTrue(
                 javaClass.getResourceAsStream("/$fixture-cues.csv") != null,

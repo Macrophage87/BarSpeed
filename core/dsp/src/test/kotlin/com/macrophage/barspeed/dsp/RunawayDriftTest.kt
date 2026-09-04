@@ -181,14 +181,16 @@ class RunawayDriftTest {
         }
         assertEquals(4, passesNeeded.values.max(), "the most passes any committed capture needs")
         // 37 captures read {0=13, 1=20, 2=2, 3=1, 4=1}. Issue #125 committed
-        // field-ohp-3010-8rep-s37-set01 and it needs one pass, so the only
-        // bucket that moved is 1.
+        // field-ohp-3010-8rep-s37-set01 and it needs one pass; issue #245
+        // committed field-ohp-3010-8rep-s38-set05 and
+        // field-inclinepress-3010-12rep-s38-set02 and each needs one too, so
+        // the only bucket that has moved since is 1.
         assertEquals(
-            mapOf(0 to 13, 1 to 21, 2 to 2, 3 to 1, 4 to 1),
+            mapOf(0 to 13, 1 to 23, 2 to 2, 3 to 1, 4 to 1),
             passesNeeded.values.groupingBy { it }.eachCount().toSortedMap(),
             "captures by passes needed",
         )
-        assertEquals(38, passesNeeded.size, "committed captures walked")
+        assertEquals(40, passesNeeded.size, "committed captures walked")
         assertEquals(
             mapOf(
                 "field-ohp-prepinflated-s37-set03" to 3,

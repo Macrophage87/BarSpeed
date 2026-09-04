@@ -237,7 +237,7 @@ class SetEndWindowTest {
     }
 
     /**
-     * Eighteen of the twenty-five committed captures that carry a cue track
+     * Eighteen of the twenty-seven committed captures that carry a cue track
      * over their own base IMU stream -- that population is the only one this
      * analyzer call can run over at all -- and how many of each one's
      * detections begin after the set was called over. The seven it does not
@@ -266,6 +266,9 @@ class SetEndWindowTest {
      * captures are committed, 25 of them carry a cue track, and this corpus
      * covers 18. SEVEN are outside it, and the "no base stream" reason is
      * true of exactly ONE of them. The claim is deleted rather than reworded.
+     * Counted again at the tree that added issue #245's two captures: 40
+     * base captures, 27 of them cue-tracked, this corpus still covers 18,
+     * and NINE are outside it.
      *
      * `field-ropedeadhang-hold20-s37-set11` is the one it stays true of in
      * spirit: it has a base stream, but its track calls no rep -- a
@@ -278,14 +281,19 @@ class SetEndWindowTest {
      * `field-ropedeadhang-hold30-s37-set12` -- are not base captures at all
      * and were never in the population this KDoc's first sentence names.)
      *
-     * The other SIX are a real gap and are named as one rather than papered
-     * over: `field-backsquat-4011-6rep-s36-set01`,
+     * The other EIGHT are a real gap and are named as one rather than papered
+     * over. Six of them predate this branch:
+     * `field-backsquat-4011-6rep-s36-set01`,
      * `field-bench-3010-6rep-s37-set05`, `field-bench-3010-6rep-s37-set06`,
      * `field-ohp-3010-6rep-s37-set02`, `field-pullup-3010-8rep-s37-set09`
      * and `field-rdl-3010-10rep-s36-set05` each carry a base stream and a
      * cue track and are not scored here. They were committed on `main` for
-     * issue #87 while this branch was in flight, so nothing on either side
-     * asked this question of them. Extending the corpus to them needs each
+     * issue #87 while that branch was in flight, so nothing on either side
+     * asked this question of them. The other two are
+     * `field-ohp-3010-8rep-s38-set05` and
+     * `field-inclinepress-3010-12rep-s38-set02`, committed for issue #245:
+     * `PrepDetectionFieldTest` asks this question of both and pins the
+     * answers, 2 and 0, so they are covered there rather than here. Extending the corpus to them needs each
      * one's `LiftDirection` read off its own session's archive -- the
      * provenance rule the five rows added below already follow -- which is
      * its own task and is raised rather than folded into this one.

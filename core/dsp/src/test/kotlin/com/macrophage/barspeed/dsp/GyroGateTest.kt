@@ -44,6 +44,7 @@ class GyroGateTest {
         "field-bench-rotating-6rep-ok",
         "field-cablerow-static-8rep",
         "field-facepull-static-12rep",
+        "field-inclinepress-3010-12rep-s38-set02",
         "field-legcurl-1030-10rep",
         "field-legcurl-1030-12rep",
         "field-legcurl-1030-12rep-b",
@@ -54,6 +55,7 @@ class GyroGateTest {
         "field-ohp-100hz-bursty",
         "field-ohp-3010-6rep-s37-set02",
         "field-ohp-3010-8rep-s37-set01",
+        "field-ohp-3010-8rep-s38-set05",
         "field-ohp-prepinflated-s37-set03",
         "field-ohp-prepinflated-s37-set04",
         "field-ohp-rotating-8rep",
@@ -120,6 +122,9 @@ class GyroGateTest {
             "field-reardeltfly-s32-set06" to 62.870,
             "field-cablerow-static-8rep" to 1.099,
             "field-still-0rep" to 0.0,
+            // The two committed for issue #245.
+            "field-ohp-3010-8rep-s38-set05" to 20.972,
+            "field-inclinepress-3010-12rep-s38-set02" to 19.462,
         )
         expected.forEach { (fixture, median) ->
             assertEquals(
@@ -135,8 +140,10 @@ class GyroGateTest {
     fun `the tenth-percentile probe, which is the half of the rule fitted to one capture`() {
         // The low probe of the straddle test, pinned for every capture whose
         // median clears the gate -- the only captures it can decide. One of the
-        // eleven sits above the gate and it is the one the probe exists to
-        // exclude; the other ten sit at 2.26-5.63 deg/s, well clear. It read
+        // THIRTEEN sits above the gate and it is the one the probe exists to
+        // exclude; the other twelve sit at 0.06-5.81 deg/s, well clear. It read
+        // eleven and 2.26-5.63 until issue #245 committed two more clearing
+        // captures, whose tenth percentiles are 5.809 and 0.061. It read
         // "one of the eight ... the other seven ... 2.26-4.28" until the three
         // clearing captures issue #133 committed were measured into it; the
         // claim to cover EVERY capture whose median clears the gate is what
@@ -153,6 +160,8 @@ class GyroGateTest {
             "field-backsquat-wrapping-s36-set01" to 2.308,
             "field-ohp-prepinflated-s37-set03" to 5.633,
             "field-ohp-prepinflated-s37-set04" to 3.613,
+            "field-ohp-3010-8rep-s38-set05" to 5.809,
+            "field-inclinepress-3010-12rep-s38-set02" to 0.061,
         )
         expected.forEach { (fixture, p10) ->
             assertEquals(
@@ -237,6 +246,10 @@ class GyroGateTest {
             "field-backsquat-wrapping-s36-set01",
             "field-ohp-prepinflated-s37-set03",
             "field-ohp-prepinflated-s37-set04",
+            // The two committed for issue #245. Both straddle: medians 20.97
+            // and 19.47 deg/s against tenth percentiles of 5.81 and 0.06.
+            "field-ohp-3010-8rep-s38-set05",
+            "field-inclinepress-3010-12rep-s38-set02",
         )
         holds.forEach { assertTrue(VelocityEstimator.gyroGateApplies(load(it), config), "$it: gate should hold") }
         fails.forEach { assertFalse(VelocityEstimator.gyroGateApplies(load(it), config), "$it: gate should fail") }

@@ -40,7 +40,8 @@ class RepRefusalCorpusTest {
      * Every committed capture with the geometry it declared, taken from
      * `BatchCueCoverageTest`, `StackMountGeometryTest` and
      * `FieldDataRegressionTest` for the captures they carry and from the
-     * session's own `meta.json` for the one added for issue #125. Loads are
+     * session's own `meta.json` for the one added for issue #125 and the two
+     * added for issue #245. Loads are
      * approximate where a capture's own load is not recorded in this
      * repository; power is not asserted here, and range and phase resolution
      * do not depend on the load.
@@ -60,6 +61,7 @@ class RepRefusalCorpusTest {
         Triple("field-bench-rotating-6rep-ok", ecc, 43.091275150953365),
         Triple("field-cablerow-static-8rep", con, 27.215542200602126),
         Triple("field-facepull-static-12rep", con, 9.97903214022078),
+        Triple("field-inclinepress-3010-12rep-s38-set02", ecc, 27.215542200602126),
         Triple("field-legcurl-1030-10rep", legCurl, 40.8),
         Triple("field-legcurl-1030-12rep", legCurl, 40.8),
         Triple("field-legcurl-1030-12rep-b", legCurl, 40.8),
@@ -70,6 +72,7 @@ class RepRefusalCorpusTest {
         Triple("field-ohp-100hz-bursty", ecc, 20.4),
         Triple("field-ohp-3010-6rep-s37-set02", con, 24.94758035055195),
         Triple("field-ohp-3010-8rep-s37-set01", con, 20.411656650451594),
+        Triple("field-ohp-3010-8rep-s38-set05", con, 13.607771100301063),
         Triple("field-ohp-prepinflated-s37-set03", con, 22.67961850050177),
         Triple("field-ohp-prepinflated-s37-set04", con, 22.67961850050177),
         Triple("field-ohp-rotating-8rep", ecc, 20.411656650451594),
@@ -108,7 +111,7 @@ class RepRefusalCorpusTest {
             .map { it.removeSuffix(".csv") }
             .sorted()
         assertEquals(onDisk, corpus.map { it.first }.sorted())
-        assertEquals(38, corpus.size, "captures this file walks")
+        assertEquals(40, corpus.size, "captures this file walks")
     }
 
     /**

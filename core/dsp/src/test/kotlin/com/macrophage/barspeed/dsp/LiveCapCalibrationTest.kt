@@ -33,16 +33,19 @@ import kotlin.test.assertEquals
  * asserts, and `RunawayDrift` runs inside `VelocityEstimator.estimate` on the
  * batch path only. No live rep total is quoted here.
  *
- * NINE committed captures are deliberately NOT in this file's list. They are
- * excluded so this file's series stays comparable with the figures already
- * published against the twenty-one; the corpus-wide phrasing in this file
- * means these twenty-one, not every file on the classpath.
- * `CuedRepCoverageTest.outsideCorpusTotals` names seven of those nine and is
- * what keeps its reconciliation arithmetic true;
+ * Committed captures that are NOT in this file's list are deliberately
+ * outside it, so this file's series stays comparable with the figures
+ * already published against the twenty-one; the corpus-wide phrasing in
+ * this file means these twenty-one, not every file on the classpath.
+ * `CuedRepCoverageTest.outsideCorpusTotals` names seven of them and is what
+ * keeps its reconciliation arithmetic true;
  * field-rdl-3010-10rep-s36-set04 and field-ropedeadhang-hold20-s37-set11 are
- * the other two.
+ * two more. THE COUNT THAT USED TO STAND HERE IS DELETED RATHER THAN
+ * REWORDED: this said NINE, which was already false by eight at the tree
+ * that wrote it -- 38 captures were committed against a list of 21 -- and
+ * issue #245's two captures would only have made it falser. Read the list.
  *
- * One of the nine is field-legpress-single-2011-8rep-s36-set07, landed for
+ * One of those outside is field-legpress-single-2011-8rep-s36-set07, landed for
  * issue #93. Its live TOTAL matches the count performed, eight against eight,
  * but by cancellation rather than by resolution: three of its eight cued reps
  * produce no counted rep, and three of its eight counted reps land in no cued
