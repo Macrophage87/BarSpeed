@@ -2796,21 +2796,13 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  */
 @Composable
 internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
-    // Both keyed on setsCompleted, as `changingEffort` is: an open page must
-    // close when the next set ends rather than carrying a stale set's answer
-    // into the following rest.
-    //
-    // Hoisted to the STAGE rather than kept beside the row it used to sit in,
-    // because the page has two places it can be drawn -- see
-    // [SetLimiterPagePlacement] -- and a copy of `dismissed` in each would be
-    // two answers to one question.
+    // Keyed on setsCompleted: an open page must close when the next set ends
+    // rather than carrying a stale set's answer into the following rest.
     //
     // `dismissed` is not in RecordState, and the distinction is the one #189
     // turns on: it is not a fact about the set, it is whether this screen has
     // already offered the page. A skip stores nothing -- absence is already
-    // what the row carries -- so there is nothing for the record to remember,
-    // and the row stays reachable either way because
-    // [SetLimiterPolicy.offersCorrection] never reads it.
+    // what the row carries -- so there is nothing for the record to remember.
     var dismissed by remember(state.setsCompleted) { mutableStateOf(false) }
     val timed = state.lastFeedback?.actualDurationS != null
     // `changing` is passed FALSE and no longer exists as state (#237). It was
@@ -3287,9 +3279,7 @@ internal fun LimiterPage(
     } else {
         // Dismissed as well as cleared. Without it the set is failed and
         // unanswered again the instant the write lands, so the page the lifter
-        // just left would reopen at the top of the screen and ask again. The
-        // row stays, with SAY WHY on it, because offersCorrection never reads
-        // the dismissal.
+        // just left would reopen at the top of the screen and ask again.
         OutlinedButton(
             onClick = {
                 viewModel.limitLastSet(null)

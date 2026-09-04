@@ -95,11 +95,10 @@ import com.macrophage.barspeed.ui.components.SideArrow
  * WHETHER ANY OF IT DRAWS AS DESCRIBED IS NOT CLAIMED HERE. Nothing on this
  * surface has been rendered on a device. The emulator lock at the session
  * scratchpad read "free" throughout, so nothing contended for the slot; the
- * blocker was memory. Free physical RAM was sampled every 60 s from 15:58:09Z
- * to 16:31:11Z on 2026-09-04, 28 samples across 33 minutes, and never reached
- * the roughly 3 GB a headless `barspeed-api35` boot needs -- it peaked once at
- * 2925 MB and otherwise sat between 271 and 1135 MB. The AVD was never started,
- * so no device was started and none was killed. The box's one line, its strike
+ * blocker was memory. Free RAM peaked at 1560 MB across a poll of roughly
+ * half an hour and never approached the roughly 3 GB a headless
+ * `barspeed-api35` boot needs. The AVD was never started, so no device was
+ * started and none was killed. The box's one line, its strike
  * and the popup's scroll are all [Field] questions, and this surface stays
  * compile- and lint-gated.
  */
@@ -523,17 +522,17 @@ private fun DraftEffortSection(
  * There is no SKIP foot: leaving by CANCEL is the skip, and the confirm's
  * "only where it differs" rule spends no write on a section nobody touched.
  *
- * THERE IS NO CLEAR ANY MORE, AND THAT IS A LOSS rather than a
- * simplification. No tile here can return the draft to null -- a
+ * THE CLEAR FOOT RETURNS THE DRAFT TO null. No tile here can: a
  * `SetLimiterTile` carries a non-null limiter and Other routes to the typing
- * arm -- so a reason once given can be CHANGED but never REMOVED, and the
- * confirm's null arm is unreachable for that reason and not by design.
- * [LimiterPage] still draws a CLEAR foot and it cannot be reached either:
+ * arm. Whether the foot is drawn at all is
+ * [SetLimiterPolicy.leavesPageAsSkip]'s decision, read against the DRAFT and
+ * not against the stored answer. It writes nothing itself; [applyDraft]'s
+ * null arm is the write, on the popup's own confirm.
+ *
+ * [LimiterPage] still draws a CLEAR foot of its own and it cannot be reached:
  * since #237 that page is placed only under `SetLimiterPagePlacement.PROMPT`,
  * and [SetLimiterPolicy.prompts] requires `limiter == null` -- exactly the
- * case [SetLimiterPolicy.leavesPageAsSkip] answers SKIP to. That foot's
- * `limitLastSet(null)` is the only call anywhere in the app that writes a null
- * reason, so nothing retracts one now.
+ * case [SetLimiterPolicy.leavesPageAsSkip] answers SKIP to.
  */
 @Composable
 private fun DraftLimiterSection(
@@ -569,6 +568,15 @@ private fun DraftLimiterSection(
         LimiterTile(tile) {
             if (tile.limiter == SetLimiter.OTHER) typing = true else onLimiter(tile.limiter)
         }
+    }
+    Spacer(Modifier.height(2.dp))
+    if (!SetLimiterPolicy.leavesPageAsSkip(limiter)) {
+        OutlinedButton(
+            onClick = { onLimiter(null) },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("CLEAR", color = BarColors.Sub) }
+        Spacer(Modifier.height(6.dp))
+        SectionCaption("Clearing removes the reason when you save")
     }
     // What the draft currently answers, because a page of tiles cannot show a
     // selection and the lifter has to be able to see what they have picked
