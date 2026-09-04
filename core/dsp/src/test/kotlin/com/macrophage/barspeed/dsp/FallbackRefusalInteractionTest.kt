@@ -134,18 +134,26 @@ class FallbackRefusalInteractionTest {
      * resolves four paired detections without the fallback and five with it,
      * so a bound is derivable either way and `refusedCount` is 0 rather than
      * null on both sides.
+     *
+     * The visited count is asserted because without it this test passes
+     * vacuously on a tree where the fallback fires on nothing -- measured, not
+     * feared: disabling the fallback and re-running reds twenty other pins in
+     * this module and left this one green until the count was added.
      */
     @Test
     fun `no capture the fallback moves refuses a detection, with the fallback or without it`() {
+        var visited = 0
         for ((name, loadKg) in eccFirstCorpus) {
             val reps = analyse(name, loadKg)
             if (reps.none { it.eccS == null }) continue
+            visited++
             val paired = pairedOnly(reps)
             assertEquals(emptyList(), RepRefusal.refusedIndices(reps), "$name refuses nothing as published")
             assertEquals(emptyList(), RepRefusal.refusedIndices(paired), "$name refuses nothing without the fallback")
             assertEquals(0, RepRefusal.refusedCount(reps), "$name refusedCount as published")
             assertEquals(0, RepRefusal.refusedCount(paired), "$name refusedCount without the fallback")
         }
+        assertEquals(5, visited, "captures carrying a fallback-added detection, so the loop asserted something")
     }
 
     /**
