@@ -580,8 +580,8 @@ class SessionExporterTest {
 
     /**
      * Where each value came from: a consumer treats a guess and a declaration
-     * differently. Six carry a source; `sensorInverted` and `bodyweight` do
-     * not, for the one reason stated once at
+     * differently. Seven carry a source; `sensorInverted` does not, for the
+     * one reason stated once at
      * [com.macrophage.barspeed.model.GeometrySourceExport]'s KDoc.
      */
     @Test
@@ -594,6 +594,12 @@ class SessionExporterTest {
         assertEquals("inferred", g.source.kind)
         assertEquals("declared", g.source.travelRatio)
         assertEquals("seeded", g.source.sensorOnStack)
+        // `declaredSources` omits `bodyweight`, so this reads GeometrySources'
+        // own `DEFAULT` -- measured off a run, not predicted. It shares the
+        // string with `plane` above, so it cannot distinguish those two
+        // fields; swapping the exporter to read `sensorOnStack` here does red
+        // it.
+        assertEquals("default", g.source.bodyweight)
     }
 
     /**
