@@ -13,9 +13,10 @@ import kotlin.test.assertTrue
  * The key lives in the raw zip's `meta.json`, which has no published schema of
  * its own, so the two places a reader is told what it means are the
  * `schemaVersion` changelog in `session-export.schema.json` -- the archive's
- * only versioned document -- and the analysis prompt in `GuideScreen.kt`, which
- * is what the READ SESSION PROMPT button puts on the clipboard and therefore
- * the copy an analysis actually receives.
+ * only versioned document -- and the analysis-prompt half of `PLAN_PROMPT`,
+ * the one prompt constant `GuideScreen.kt` declares, which the COPY PLAN
+ * PROMPT button copies whole to the clipboard and therefore the copy an
+ * analysis actually receives.
  *
  * Both statements are wrong once the figure is windowed and unwrapped, and the
  * prompt's is wrong in a way that matters: it tells the reader that "hundreds"
