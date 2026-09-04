@@ -111,7 +111,7 @@ class BodyWeightAbsenceGateTest {
     /**
      * RED. An ad-hoc set against a body-weight movement must resolve to a
      * body-weight definition, the same answer a planned one already gets
-     * through [SetGeometryPolicy.resolve]. #229 item 3, and half of #61's
+     * through [SetGeometryPolicy.resolve]. #229 item 3, and part of #61's
      * population.
      */
     @Test

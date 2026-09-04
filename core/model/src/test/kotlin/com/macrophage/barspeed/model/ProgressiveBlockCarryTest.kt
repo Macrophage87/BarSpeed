@@ -102,13 +102,13 @@ import kotlin.test.assertNull
  * lock was free and free physical memory was polled once a minute for
  * thirty minutes against the 3 GB floor `bench-test` sets: first sample
  * 1206 MB, last 594 MB, highest 1544 MB. It never cleared, so the run was
- * not attempted rather than attempted badly. The scenario it owes: a plan block declaring
- * 45 / 55 / 65 on one exercise, set 1 opened at 50 and recorded, then read
- * the load box and the caption offered for set 2 -- the box should hold 60
- * and the caption should be the export sentence, not the reach one -- and
- * again for set 3, which should hold 70. Everything above is pinned in this
- * module; what the emulator would add is that the numbers reach the screen
- * the lifter reads.
+ * not attempted rather than attempted badly. The scenario it owes: a plan
+ * block declaring 45 / 55 / 65 on one exercise, set 1 opened at 50 and
+ * recorded, then read the load box and the caption offered for set 2 -- the
+ * box should hold 60 and the caption should be the export sentence, not the
+ * reach one -- and again for set 3, which should hold 70. Everything above
+ * is pinned in this module; what the emulator would add is that the numbers
+ * reach the screen the lifter reads.
  */
 class ProgressiveBlockCarryTest {
     /**
