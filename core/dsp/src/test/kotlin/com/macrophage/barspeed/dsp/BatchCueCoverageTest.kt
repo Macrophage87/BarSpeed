@@ -176,6 +176,11 @@ class BatchCueCoverageTest {
      * `notRepCorpus` for the same reason; the two lists exist so
      * the classpath partition stays TOTAL, which is what makes the coverage
      * guard below able to catch the next capture nobody classified.
+     *
+     * Being out of every figure above does not make them unaffected: the
+     * slow-eccentric fallback moves ONE of the four, and
+     * `the notRepCorpus capture the fallback moves is a duplicate of a scored
+     * one` is what keeps that from being an unpinned claim in a commit body.
      */
     private val notRepCorpus = listOf(
         "field-backsquat-wrapping-s36-set01",
@@ -356,6 +361,41 @@ class BatchCueCoverageTest {
                 "$fixture scored on the phase it does not declare",
             )
         }
+    }
+
+    @Test
+    fun `the notRepCorpus capture the fallback moves is a duplicate of a scored one`() {
+        // Issue #72 round 1 finding 4. This branch was 66 commits behind main
+        // when its figures were measured, and main had added four captures the
+        // figures above deliberately exclude. One of them, and only one, is
+        // moved by the slow-eccentric fallback -- and it is moved because it
+        // is the SAME BYTES as a capture the cost table already accounts for.
+        //
+        // The three others do not move: both `field-ohp-prepinflated-*` sets
+        // are recorded concentric-first in their own session archive
+        // (SetEndWindowTest reads the same directions off it), so
+        // `pairEccentricFirst` is never reached on them, and
+        // `field-backsquat-wrapping-s36-set01` is eccentric-first and resolves
+        // no orphan drive at all.
+        //
+        // Byte equality rather than a matching rep count: two files that
+        // happen to agree today would let the duplicate silently diverge, and
+        // the claim being pinned is that there is nothing new here to
+        // adjudicate.
+        val duplicate = load("field-rdl-wrapping-s36-set05")
+        val scoredTwin = load("field-rdl-3010-10rep-s36-set05")
+        assertEquals(scoredTwin, duplicate, "the two files are the same capture under two names")
+        // And what each resolves, eccentric-first, which is the phase both
+        // declare. 11 against a hand count of 10 -- the eleventh is the
+        // detection the cost table names on the twin.
+        val spans = RepSegmenter.segment(
+            VelocityEstimator.estimate(duplicate, DspConfig(), eccFirst.measuredPlane)
+                .mappedToLifter(eccFirst.sensorToLifter),
+            eccFirst,
+            DspConfig(),
+        )
+        assertEquals(11, spans.size, "spans on the duplicate")
+        assertEquals(spans.size, spans(Scored("field-rdl-3010-10rep-s36-set05", eccFirst, Family.BARBELL_LOWER)).size)
     }
 
     @Test

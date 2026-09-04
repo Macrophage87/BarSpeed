@@ -295,23 +295,35 @@ object RepSegmenter {
      * drive whose lowering was MEASURED but never qualified as a phase.
      *
      * The pair requirement is what kills walkout and re-rack bumps, and it is
-     * kept. What it also killed was a whole class of real rep: a controlled
-     * eccentric ramps through the dead band slowly, and this object's own
-     * KNOWN LIMITATION note measures the clipping growing with the prescribed
-     * duration -- so on slow tempo work the lowering can fail
-     * [RunThresholds.startThresholdMps] outright and leave nothing for the
-     * drive to pair with. The rep was then deleted, with no marker, while the
-     * SAME rep under [pairConcentricFirst] is published on the drive alone.
-     * Which of the two happened was decided by nothing but the phase the plan
-     * declared the set opens with.
+     * kept. What it also killed was a whole class of real rep, and the shape
+     * that produces one is MEASURED, not reasoned. On all four captures this
+     * fallback moves, the lowering QUALIFIED as a phase and was consumed by a
+     * pair whose DRIVE fell under [RunThresholds.minRomM] -- 0.096, 0.046,
+     * 0.025 and 0.064 m against a 0.10 m floor. The run the lifter's real
+     * drive is in comes AFTER that fragment, and its lowering is already
+     * spent, so there is nothing left to pair it with. The rep was then
+     * deleted, with no marker, while the SAME rep under [pairConcentricFirst]
+     * is published on the drive alone. Which of the two happened was decided
+     * by nothing but the phase the plan declared the set opens with.
+     *
+     * A lowering DEMOTED for failing [RunThresholds.startThresholdMps]
+     * outright reaches this branch by the same route, and NO COMMITTED
+     * CAPTURE SHOWS THAT SHAPE. An earlier draft of this note gave it as the
+     * mechanism, and named a prescribed 3 s or 4 s lowering as where it bites,
+     * on the strength of this object's KNOWN LIMITATION note measuring
+     * dead-band clipping grow with the prescribed duration. That clipping is
+     * real and it is not what fires here; the claim is withdrawn rather than
+     * softened. `SlowEccentricFallbackTest` constructs BOTH shapes, and says
+     * which of the two the corpus holds.
      *
      * The fallback closes that asymmetry without inheriting the phantom that
      * comes with it. A drive alone is a rep only when the lifter demonstrably
      * lowered first: [loweredSince] asks the PRE-DEMOTION runs whether an
      * eccentric-sign stretch since the last counted rep travelled at least
-     * [RunThresholds.minRomM]. Drift and hand movement on a rack or a hold
-     * produce drive-sign runs with no such lowering behind them, which is why
-     * the three zero-truth captures resolve exactly what they resolved before.
+     * [RunThresholds.minRomM]. The three zero-truth captures resolve exactly
+     * what they resolved before, which `BatchCueCoverageTest` pins -- a
+     * measurement over three captures, and not a statement about what drift
+     * or a hand on a rack does in general.
      *
      * NO NEW CONSTANT. The gate reuses `minRomM` and the dead band; there is
      * nothing here fitted to this corpus.
