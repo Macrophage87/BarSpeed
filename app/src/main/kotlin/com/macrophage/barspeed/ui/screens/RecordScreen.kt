@@ -545,6 +545,10 @@ private fun BodyWeightRefusal(state: RecordState, viewModel: RecordViewModel) {
  * `BodyWeightStalenessTest`; [SetLoadPolicy.BODY_WEIGHT_REQUIRED] is pinned by
  * nothing. The title, the field label and both button words are written here
  * and nothing tests them.
+ *
+ * [BodyWeightPromptPolicy.WHY_IT_MATTERS] IS THE STALENESS ASK'S SENTENCE,
+ * reused here for the cost it names; its "out-of-date figure" clause does not
+ * apply on this door, where nothing is stored at all.
  */
 @Composable
 private fun BodyWeightRequiredDialog(

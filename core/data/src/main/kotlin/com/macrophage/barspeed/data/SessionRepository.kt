@@ -756,10 +756,11 @@ class SessionRepository(
      * finding 7). But this is the PLAN path only: its only caller is
      * `PlanQueue.kt`'s `flattenPlan`. A set started from the exercise
      * picker with no plan at all does not reach this method --
-     * `RecordState.currentExercise` resolves it instead, falling back to
-     * `ExerciseDef.seedById(…) ?: ExerciseDef(selectedExerciseId,
-     * selectedExerciseId)`, a bare constructor call whose `sensorOnStack` is
-     * the plain `false` default, never [ExerciseDef.ridesStack]. So an
+     * `RecordState.currentExercise` resolves it instead, through
+     * [ExerciseDef.resolvedById], which seeds `bodyweight` from
+     * [SetGeometryPolicy.bodyweightMount] (#61, #229 item 3) and nothing
+     * else: `sensorOnStack` is still the plain `false` default, never
+     * [ExerciseDef.ridesStack]. So an
      * ad-hoc set on a stack machine still records bar-mounted today. This is
      * unreachable in practice rather than merely uncovered:
      * `RecordState.exerciseOptions` is `ExerciseDef.SEED`, and no id in

@@ -3262,9 +3262,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun beginSet() {
         // Before anything this function arms. NOT before the bake on the
         // rest-screen door: startNextSet has already run advancedState and
-        // cancelled the rest clock, so a refusal there leaves the queue
-        // advanced with no rest countdown. Nothing durable is written. Why it
-        // refuses at all is SetLoadPolicy.blocksSetStart's KDoc (#61).
+        // cancelled the rest clock, so a refusal there is reached with the
+        // planned queue already advanced -- or, on an ad-hoc session, with
+        // statedLoadKg, statedTempo, statedReps, statedDurationS and
+        // statedSide already cleared -- and the rest clock already stopped.
+        // Nothing durable is written on either branch. Why it refuses at all
+        // is SetLoadPolicy.blocksSetStart's KDoc (#61).
         //
         // Here rather than on the START button, because the button is not the
         // only door: `startNextSet` writes READY and calls this in the same
