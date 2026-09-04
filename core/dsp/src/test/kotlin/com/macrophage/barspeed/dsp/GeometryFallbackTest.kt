@@ -136,6 +136,13 @@ class GeometryFallbackTest {
         // cancelling pair.
         assertEquals(listOf(12, 13, 11), batch(declared).map { it.reps.size }, "both halves declared")
         assertEquals(listOf(12, 13, 11), batch(fallback).map { it.reps.size }, "neither declared")
-        assertEquals(listOf(5, 5, 7), batch(directionOnly).map { it.reps.size }, "direction only")
+        // 5, 5, 7 until issue #125. Two of those detections are refused by
+        // RepRefusal, which is the only pin in this file that rule moves, and
+        // it moves it in the direction this test is about: the degraded
+        // geometry produces a reconstruction whose ranges disagree with each
+        // other by more than 4.5x, and the collapse this test names is what
+        // produces them. The declared and fallback figures above are
+        // untouched, which is the claim that matters here.
+        assertEquals(listOf(4, 4, 7), batch(directionOnly).map { it.reps.size }, "direction only")
     }
 }

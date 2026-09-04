@@ -136,14 +136,27 @@ class StackMountGeometryTest {
      * The shipped bar declaration, reproduced to the published digit.
      *
      * `session.json` publishes `repMetrics` for set 8 in full (7 entries) and
-     * for set 10 in full (5), and those are the values below. Set 9 is not
-     * pinned per rep here because its export carries only four entries, fewer
-     * than the analyzer returns at this tree.
+     * for set 10 in full (5). Set 8's seven are the values below. Set 10's
+     * five are NOT: issue #125's `RepRefusal` refuses the fifth, so the set
+     * publishes four here where v0.1.48 published five, and the four below
+     * are v0.1.48's first four unchanged. Set 9 is not pinned per rep because
+     * its export carries only four entries, fewer than the analyzer returns
+     * at `41c0c96bbc3be29cc7d705bf3d74c7196a0d12de`.
+     *
+     * THE 5 IN THE TRIPLE BELOW WAS THE ANALYZER'S, NEVER THE LIFTER'S. The
+     * hand counts are the OTHER three numbers, 5, 8 and 6, from that
+     * session's `meta.json` `reps` for sets 8, 9 and 10. The analyzer over-
+     * resolved set 8 by two and under-resolved set 10 by one before this
+     * change and by two after it; refusing set 10's fifth detection moves the
+     * automatic count away from the lifter's 6 and to exactly the number a
+     * stream without that capture's two out-of-range samples produces, which
+     * `ArtefactRepTest` measures by substituting them. The under-count is a
+     * counting defect (#94) that #125 neither causes nor repairs.
      */
     @Test
     fun `the bar declaration reproduces field-37's published rep metrics`() {
         val a = batch(asShipped)
-        assertEquals(listOf(7, 6, 5), a.map { it.reps.size }, "reps resolved, against 5, 8 and 6 counted by hand")
+        assertEquals(listOf(7, 6, 4), a.map { it.reps.size }, "reps resolved, against 5, 8 and 6 counted by hand")
         assertEquals(
             listOf(0.259, 0.265, 0.197, 0.192, 0.107, 0.200, 0.878),
             a[0].reps.map { round3(it.romM) },
@@ -154,9 +167,9 @@ class StackMountGeometryTest {
             a[0].reps.map { round3(it.meanConVelMps) },
             "set 8 meanConVel_mps",
         )
-        assertEquals(listOf(0.471, 0.330, 0.481, 0.334, 1.746), a[2].reps.map { round3(it.romM) }, "set 10 rom_m")
+        assertEquals(listOf(0.471, 0.330, 0.481, 0.334), a[2].reps.map { round3(it.romM) }, "set 10 rom_m")
         assertEquals(
-            listOf(0.243, 0.166, 0.238, 0.149, 0.522),
+            listOf(0.243, 0.166, 0.238, 0.149),
             a[2].reps.map { round3(it.meanConVelMps) },
             "set 10 meanConVel_mps",
         )
