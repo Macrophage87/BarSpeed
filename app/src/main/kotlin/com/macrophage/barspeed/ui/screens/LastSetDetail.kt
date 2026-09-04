@@ -91,6 +91,17 @@ import com.macrophage.barspeed.ui.components.SideArrow
  * `changingEffort` is gone with the effort row. The popup's own open flag is
  * keyed on `setsCompleted` in its place, so a popup left open when the next set
  * ends closes rather than carrying a stale set's draft into the following rest.
+ *
+ * WHETHER ANY OF IT DRAWS AS DESCRIBED IS NOT CLAIMED HERE. Nothing on this
+ * surface has been rendered on a device. The emulator lock at the session
+ * scratchpad read "free" throughout, so nothing contended for the slot; the
+ * blocker was memory. Free physical RAM was sampled every 60 s from 15:58:09Z
+ * to 16:31:11Z on 2026-09-04, 28 samples across 33 minutes, and never reached
+ * the roughly 3 GB a headless `barspeed-api35` boot needs -- it peaked once at
+ * 2925 MB and otherwise sat between 271 and 1135 MB. The AVD was never started,
+ * so no device was started and none was killed. The box's one line, its strike
+ * and the popup's scroll are all [Field] questions, and this surface stays
+ * compile- and lint-gated.
  */
 @Composable
 internal fun LastSetDetail(state: RecordState, viewModel: RecordViewModel, timed: Boolean) {
