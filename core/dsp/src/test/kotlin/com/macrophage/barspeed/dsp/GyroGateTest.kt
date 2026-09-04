@@ -45,6 +45,7 @@ class GyroGateTest {
         "field-cablerow-static-8rep",
         "field-facepull-static-12rep",
         "field-inclinepress-3010-12rep-s38-set02",
+        "field-latpulldown-1120-12rep-s38-set14",
         "field-legcurl-1030-10rep",
         "field-legcurl-1030-12rep",
         "field-legcurl-1030-12rep-b",
@@ -55,6 +56,7 @@ class GyroGateTest {
         "field-ohp-100hz-bursty",
         "field-ohp-3010-6rep-s37-set02",
         "field-ohp-3010-8rep-s37-set01",
+        "field-ohp-3010-8rep-s38-set04",
         "field-ohp-3010-8rep-s38-set05",
         "field-ohp-prepinflated-s37-set03",
         "field-ohp-prepinflated-s37-set04",
@@ -228,6 +230,10 @@ class GyroGateTest {
             // it would only admit samples taken mid-rotation. The low probe of
             // the straddle test is what keeps this one out.
             "field-reardeltfly-s32-set06",
+            // Session 38 set 14, committed for issue #72: a lat pulldown
+            // measured off the stack, 1.3 deg of roll excursion in its own
+            // meta.json, so nothing rotates and the gate holds.
+            "field-latpulldown-1120-12rep-s38-set14",
         )
         val fails = listOf(
             "field-ohp-3010-6rep-s37-set02",
@@ -244,6 +250,10 @@ class GyroGateTest {
             // straddles: medians 15.34, 25.62 and 21.27 deg/s against tenth
             // percentiles of 2.31, 5.63 and 3.61.
             "field-backsquat-wrapping-s36-set01",
+            // Session 38 set 4, committed for issue #72: the same seated
+            // overhead press this issue is named after, bar-mounted, 360 deg
+            // of roll excursion, and its distribution straddles.
+            "field-ohp-3010-8rep-s38-set04",
             "field-ohp-prepinflated-s37-set03",
             "field-ohp-prepinflated-s37-set04",
             // The two committed for issue #245. Both straddle: medians 20.97
