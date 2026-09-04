@@ -250,8 +250,12 @@ class LastRepWarningTest {
     fun `the numbered call names the rep now due, and keeps its place, late or not`() {
         // Issue #147 gave these plans their only spoken count and #243 fixed
         // which rep it names. A set of twelve hears eleven things: ten numbers,
-        // "Rep 2" through "Rep 11", each during the rep it names, and then the
-        // word for the twelfth.
+        // "Rep 2" through "Rep 11", then the word for the twelfth. On THIS
+        // plan each of them is spoken during the rep it names, because 1120
+        // merges the call into a stroke. That is not true of every schedule and
+        // this comment used to read as though it were: a plan with a closing
+        // pause speaks the call in the PREVIOUS rep's tail -- CueTrackOriginTest
+        // holds both shapes.
         val p = plan("1120", pushdown)
         assertEquals("Rep 2", p.announcementFor(2, 12))
         assertEquals("Rep 11", p.announcementFor(11, 12))
@@ -265,8 +269,11 @@ class LastRepWarningTest {
         // The change is not free and the cost is a row. A carrying stroke gives
         // up its first tempo count only when an announcement actually rides it,
         // so speaking the warning takes back the count #173's suppression had
-        // returned to the final rep. On the two plans that suppressed it, the
-        // second that carried a `1` carries the call instead.
+        // returned to the final rep. On a 1120 pushdown the second that carried
+        // a `1` falls silent, and the call rides the stroke word one second
+        // earlier -- the rows below are the measurement: `Up` and the warning
+        // both at 46, nothing at 47, where rep 1 of the same plan still counts
+        // `1` at its own offset 3.
         //
         // These are the three session-33 plans, at the second of the cadence
         // each row lands on, from the start of the final rep.
