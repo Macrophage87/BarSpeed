@@ -247,12 +247,12 @@ class BatchCueCoverageTest {
             "field-bench-rotating-6rep-ok" to listOf(6, 6, 6, 0, 0, 0),
             "field-bench-rotating-6rep" to listOf(6, 5, 5, 1, 0, 0),
             "field-ohp-3010-6rep-s37-set02" to listOf(8, 9, 7, 1, 0, 2),
-            "field-bench-3010-6rep-s37-set05" to listOf(6, 4, 4, 2, 0, 0),
+            "field-bench-3010-6rep-s37-set05" to listOf(6, 5, 5, 1, 0, 0),
             "field-bench-3010-6rep-s37-set06" to listOf(6, 6, 5, 1, 0, 1),
             "field-backsquat-99hz-6rep" to listOf(6, 7, 6, 0, 0, 1),
             "field-rdl-3010-10rep" to listOf(10, 11, 10, 0, 0, 1),
-            "field-rdl-3010-10rep-s36-set05" to listOf(10, 10, 9, 1, 0, 1),
-            "field-backsquat-4011-6rep-s36-set01" to listOf(6, 8, 4, 2, 2, 2),
+            "field-rdl-3010-10rep-s36-set05" to listOf(10, 11, 10, 0, 0, 1),
+            "field-backsquat-4011-6rep-s36-set01" to listOf(6, 9, 5, 1, 2, 2),
             "field-legpress-2010-8rep" to listOf(8, 7, 7, 1, 0, 0),
             "field-legpress-single-2010-8rep" to listOf(8, 8, 7, 1, 1, 0),
             "field-legpress-single-2011-8rep-s36-set07" to listOf(8, 10, 8, 0, 0, 2),
@@ -284,8 +284,8 @@ class BatchCueCoverageTest {
         // which kind of training is served. Rows are
         // (marks, spans, matched, empty, doubled, stray).
         val expected = mapOf(
-            Family.BARBELL_UPPER to listOf(48, 46, 42, 6, 1, 3),
-            Family.BARBELL_LOWER to listOf(32, 36, 29, 3, 2, 5),
+            Family.BARBELL_UPPER to listOf(48, 47, 43, 5, 1, 3),
+            Family.BARBELL_LOWER to listOf(32, 38, 31, 1, 2, 5),
             Family.MACHINE_LOWER to listOf(24, 25, 22, 2, 1, 2),
             Family.ACCESSORY to listOf(58, 65, 50, 8, 8, 7),
             Family.BODYWEIGHT_UPPER to listOf(8, 6, 4, 4, 0, 2),
@@ -299,9 +299,9 @@ class BatchCueCoverageTest {
         // And the corpus, which is the one figure issue #94's field-36 and
         // field-37 comments quote.
         assertEquals(170, actual.values.sumOf { it[0] }, "metronome marks across the twenty scored captures")
-        assertEquals(178, actual.values.sumOf { it[1] }, "spans the batch analyzer publishes over them")
-        assertEquals(147, actual.values.sumOf { it[2] }, "marks with at least one detection")
-        assertEquals(23, actual.values.sumOf { it[3] }, "marks with none -- called and not published")
+        assertEquals(181, actual.values.sumOf { it[1] }, "spans the batch analyzer publishes over them")
+        assertEquals(150, actual.values.sumOf { it[2] }, "marks with at least one detection")
+        assertEquals(20, actual.values.sumOf { it[3] }, "marks with none -- called and not published")
     }
 
     @Test
@@ -389,9 +389,9 @@ class BatchCueCoverageTest {
         // timestamps and the window bounds this file computes.
         //
         // What survives is the corpus figure, which is what the issue quotes:
-        // the three rules put the matched total within TWELVE windows of each
-        // other -- 147, 141 and 135 in the map below, and the assertTrue bound
-        // beneath it reads <= 12 -- which is 7.1% of 170. That is a real
+        // the three rules put the matched total within FOURTEEN windows of each
+        // other -- 150, 144 and 136 in the map below, and the assertTrue bound
+        // beneath it reads <= 14 -- which is 8.2% of 170. That is a real
         // spread and not the 2.4% this note used to claim, so the choice of
         // rule is stated rather than waved away: the start rule is used
         // because a rep begins when the drive begins, and every figure in this
@@ -403,16 +403,16 @@ class BatchCueCoverageTest {
         ).mapValues { (_, rows) -> rows.reduce(Coverage::plus) }
         assertEquals(
             mapOf(
-                "start" to Coverage(147, 23, 12, 19),
-                "midpoint" to Coverage(141, 29, 15, 22),
-                "end" to Coverage(135, 35, 20, 23),
+                "start" to Coverage(150, 20, 12, 19),
+                "midpoint" to Coverage(144, 26, 15, 22),
+                "end" to Coverage(136, 34, 22, 23),
             ),
             byRule,
             "corpus coverage under each assignment rule",
         )
         val matched = byRule.values.map { it.matched }
         assertTrue(
-            matched.max() - matched.min() <= 12,
+            matched.max() - matched.min() <= 14,
             "the assignment rule moves the matched total by ${matched.max() - matched.min()} windows of 170",
         )
     }
@@ -536,7 +536,7 @@ class BatchCueCoverageTest {
         // CHARACTERIZATION: these are the mechanisms at this commit and no
         // claim that any of them is the right answer.
         val expected = mapOf(
-            Loss.PAIRING to 8,
+            Loss.PAIRING to 5,
             Loss.BELOW_MIN_ROM to 8,
             Loss.NO_DRIVE_RUN to 4,
             Loss.DEMOTED to 3,
@@ -568,10 +568,9 @@ class BatchCueCoverageTest {
             "field-ohp-rotating-8rep-b" to listOf(Loss.PAIRING),
             "field-bench-rotating-6rep" to listOf(Loss.BELOW_MIN_ROM),
             "field-ohp-3010-6rep-s37-set02" to listOf(Loss.NO_DRIVE_RUN),
-            "field-bench-3010-6rep-s37-set05" to listOf(Loss.PAIRING, Loss.PAIRING),
+            "field-bench-3010-6rep-s37-set05" to listOf(Loss.PAIRING),
             "field-bench-3010-6rep-s37-set06" to listOf(Loss.BELOW_MIN_ROM),
-            "field-rdl-3010-10rep-s36-set05" to listOf(Loss.PAIRING),
-            "field-backsquat-4011-6rep-s36-set01" to listOf(Loss.PAIRING, Loss.PAIRING),
+            "field-backsquat-4011-6rep-s36-set01" to listOf(Loss.PAIRING),
             "field-legpress-2010-8rep" to listOf(Loss.PAIRING),
             "field-legpress-single-2010-8rep" to listOf(Loss.BELOW_MIN_ROM),
             "field-legcurl-1030-12rep" to listOf(Loss.BELOW_MIN_ROM, Loss.DEMOTED, Loss.BELOW_MIN_ROM),
@@ -598,7 +597,7 @@ class BatchCueCoverageTest {
         // set DECLARED, not a judgement made here about where the sensor was.
         // Rows are (marks, matched).
         val expected = mapOf(
-            false to listOf(124, 109),
+            false to listOf(124, 112),
             true to listOf(46, 38),
         )
         val actual = scored.groupBy { it.direction.sensorOnStack }.mapValues { (_, group) ->
@@ -615,7 +614,7 @@ class BatchCueCoverageTest {
         val headline = scored.filter { it.fixture.startsWith("field-ohp-rotating-") }
         assertEquals(2, headline.size, "the rotating overhead-press captures")
         assertEquals(16, headline.sumOf { windows(it.fixture).size }, "marks across them")
-        assertEquals(15, headline.sumOf { coverage(it).matched }, "marks matched across them")
+        assertEquals(16, headline.sumOf { coverage(it).matched }, "marks matched across them")
     }
 
     @Test

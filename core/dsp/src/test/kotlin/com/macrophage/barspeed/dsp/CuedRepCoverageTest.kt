@@ -553,10 +553,14 @@ class CuedRepCoverageTest {
             }
         }
         // Issue #94's runaway correction moves the BATCH reference this file
-        // scores against; the live tracker is untouched by it. The figures
-        // below therefore move without any live behaviour changing, which is
-        // the standing hazard of scoring one path against the other.
-        assertEquals(17, outOfFamily, "counted reps the batch reference rejects")
+        // scores against, and so does issue #72's slow-eccentric fallback; the
+        // live tracker is untouched by both. The figures below therefore move
+        // without any live behaviour changing, which is the standing hazard of
+        // scoring one path against the other. #72's fallback publishes reps on
+        // the drive alone, whose ROM is one phase where a paired rep's is the
+        // drive too -- so the reference median it is compared against shifts
+        // under it as well, and one more live rep falls outside the family.
+        assertEquals(18, outOfFamily, "counted reps the batch reference rejects")
         assertEquals(15, outOfFamilyCalled, "of those, reps the metronome actually called")
         assertEquals(64, inFamily, "counted reps the batch reference accepts")
         assertEquals(59, inFamilyCalled, "of those, reps the metronome actually called")

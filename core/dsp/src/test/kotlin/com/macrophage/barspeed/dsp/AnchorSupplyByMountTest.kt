@@ -293,7 +293,7 @@ class AnchorSupplyByMountTest {
         // the evidence for that.
         assertEquals(9, batchReps("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC, 24.948), "ohp, 6 performed")
         assertEquals(
-            4,
+            5,
             batchReps("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC, 47.627),
             "bench, 6 performed",
         )
@@ -302,7 +302,7 @@ class AnchorSupplyByMountTest {
             batchReps("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC, 49.895),
             "bench, 6 performed",
         )
-        assertEquals(10, batchReps("field-rdl-3010-10rep-s36-set05", StartPhase.ECCENTRIC, 52.163), "rdl, 10 performed")
+        assertEquals(11, batchReps("field-rdl-3010-10rep-s36-set05", StartPhase.ECCENTRIC, 52.163), "rdl, 10 performed")
         // The back squat over-resolved at 8 detections for 6 reps before #87,
         // landed on 6 after it, and over-resolves again at 8 after #94. The
         // agreement at 6 was never a correctness result and is now visibly not
@@ -310,7 +310,7 @@ class AnchorSupplyByMountTest {
         // of 6 with 2 doubled and 2 stray under both, so the total passing
         // through the right answer said nothing about the reps.
         assertEquals(
-            8,
+            9,
             batchReps("field-backsquat-4011-6rep-s36-set01", StartPhase.ECCENTRIC, 52.163),
             "back squat, 6 performed",
         )
@@ -372,7 +372,7 @@ class AnchorSupplyByMountTest {
         )
         assertEquals<Double?>(55.3, ohp.velocityLossPct, "ohp set02 velocity loss reported to the lifter")
         val bench05 = batchAnalysis("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC, 47.627)
-        assertRoms(listOf(0.896, 0.898, 0.143, 1.363), bench05, "bench set05 ROM, metres")
+        assertRoms(listOf(0.278, 0.896, 0.898, 0.143, 1.363), bench05, "bench set05 ROM, metres")
         assertEquals<Double?>(26.0, bench05.velocityLossPct, "bench set05 velocity loss reported to the lifter")
         val bench06 = batchAnalysis("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC, 49.895)
         assertRoms(listOf(0.691, 0.462, 1.045, 1.384, 0.168, 1.724), bench06, "bench set06 ROM, metres")
@@ -386,7 +386,7 @@ class AnchorSupplyByMountTest {
         // 0.121 m one either way.
         val squat = batchAnalysis("field-backsquat-4011-6rep-s36-set01", StartPhase.ECCENTRIC, 52.163)
         assertRoms(
-            listOf(0.271, 0.421, 0.731, 0.553, 0.293, 0.445, 0.163, 0.121),
+            listOf(0.271, 0.421, 0.731, 0.553, 0.293, 0.313, 0.445, 0.163, 0.121),
             squat,
             "back squat ROM, metres",
         )
