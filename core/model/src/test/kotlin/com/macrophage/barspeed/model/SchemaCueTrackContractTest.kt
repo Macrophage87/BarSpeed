@@ -165,6 +165,70 @@ class SchemaCueTrackContractTest {
     }
 
     /**
+     * The published documents say WHEN a call is spoken, not only which rep it
+     * names.
+     *
+     * Round 2 of #243 found the two sentences that landed with 1.19 stronger
+     * than the schedule under them. Both said a call is heard during the rep it
+     * names -- the version log as "each during the rep it names", `voiceCues`
+     * as "'Last rep' on the final rep itself" -- and that is true of the two
+     * schedules that MERGE the call into a stroke and false of the one that
+     * hands it a closing pause, where it rides the PREVIOUS rep's tail. The
+     * version log said so itself four sentences later, so the document
+     * contradicted itself on the one fact a consumer aligns rows by.
+     *
+     * `CueTrackOriginTest` in `:core:dsp` pins the behaviour; this pins that
+     * the published document states it. A reader who takes the stronger reading
+     * puts every call on a 4011 back squat one rep late.
+     */
+    @Test
+    fun `the published documents say a paused schedule speaks the call before the rep`() {
+        val schema = schema("session-export.schema.json")
+        val versionLog = schema["properties"]!!.jsonObject["schemaVersion"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+        val voiceCues = schema["\$defs"]!!.jsonObject["set"]!!
+            .jsonObject["properties"]!!.jsonObject["voiceCues"]!!.jsonObject["description"]!!
+            .jsonPrimitive.content
+        assertTrue(
+            "previous rep's closing pause" in versionLog,
+            "the 1.19 entry says every call is heard during the rep it names, false on a paused plan",
+        )
+        assertTrue(
+            "previous rep's closing pause" in voiceCues,
+            "voiceCues puts Last rep on the final rep itself, which is false on a paused plan",
+        )
+    }
+
+    /**
+     * The published vocabulary says how a consumer tells the two counters
+     * apart.
+     *
+     * Also round 2 of #243, and a gap this change opened rather than found. The
+     * guided call and the unguided counter's call are the same two strings, and
+     * before 1.19 they named the same rep, so a consumer reading `Rep 4` got
+     * the same answer whichever wrote it. From 1.19 they name different reps
+     * and nothing in a row says which one is speaking.
+     *
+     * The discriminator is the stroke words, and the schema has to carry it
+     * because it is the only thing in the track that separates them.
+     * `CueTrackOriginTest` verifies it holds; this verifies it is published.
+     */
+    @Test
+    fun `the published vocabulary says how to tell the guided track from the unguided one`() {
+        val voiceCues = schema("session-export.schema.json")["\$defs"]!!.jsonObject["set"]!!
+            .jsonObject["properties"]!!.jsonObject["voiceCues"]!!.jsonObject["description"]!!
+            .jsonPrimitive.content
+        assertTrue(
+            "which counter spoke it" in voiceCues,
+            "nothing tells a reader the two counters are indistinguishable row by row",
+        )
+        assertTrue(
+            "no stroke word" in voiceCues,
+            "the vocabulary does not name the stroke words as the discriminator",
+        )
+    }
+
+    /**
      * The published vocabulary names the word an abandoned set now ends on.
      *
      * `voiceCues` is the one place a reader is told what a cue row can say. A
