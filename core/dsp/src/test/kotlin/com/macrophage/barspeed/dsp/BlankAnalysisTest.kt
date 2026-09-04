@@ -74,6 +74,13 @@ class BlankAnalysisTest {
         javaClass.getResourceAsStream("/$n.csv")!!.readBytes().decodeToString(),
     )
 
+    /**
+     * The run limits unconverted. Every fixture here is declared at
+     * `travelRatio` 1.0, so this names the frame these series are in rather
+     * than changing any number.
+     */
+    private val sensorFrame = RunThresholds.sensorFrame(DspConfig())
+
     private fun series(fixture: String): VelocitySeries =
         VelocityEstimator.estimate(load(fixture), DspConfig(), MovementPlane.VERTICAL)
 
@@ -264,7 +271,7 @@ class BlankAnalysisTest {
         assertEquals(0, runs.shorterThanMinPhase, "runs too brief to count")
         assertEquals(21.93, runs.maxDisplacementM, 0.01, "the longest single run, metres")
         val qualifying =
-            RepSegmenter.classifyRuns(anchoredSeries("field-rdl-3010-10rep-s36-set05"), DspConfig())
+            RepSegmenter.classifyRuns(anchoredSeries("field-rdl-3010-10rep-s36-set05"), sensorFrame)
                 .filter { it.type != RunType.STILL }
         assertEquals(1, qualifying.size, "movement runs surviving demotion, before the correction")
         assertEquals(RunType.DOWN, qualifying.single().type, "the one surviving run's direction")
@@ -272,7 +279,7 @@ class BlankAnalysisTest {
         // the three runaways become alternating strokes, so both directions
         // are present and pairing has something to do.
         val corrected =
-            RepSegmenter.classifyRuns(series("field-rdl-3010-10rep-s36-set05"), DspConfig())
+            RepSegmenter.classifyRuns(series("field-rdl-3010-10rep-s36-set05"), sensorFrame)
                 .filter { it.type != RunType.STILL }
         assertEquals(31, corrected.size, "movement runs surviving demotion, after the correction")
         assertEquals(
@@ -290,7 +297,7 @@ class BlankAnalysisTest {
         assertEquals(7, runs.movement, "raw movement runs")
         assertEquals(1, runs.overDisplacementCap, "runs past the cap -- a minority here, three of four on the deadlift")
         val qualifying =
-            RepSegmenter.classifyRuns(anchoredSeries("field-seated-ohp-2rep"), DspConfig())
+            RepSegmenter.classifyRuns(anchoredSeries("field-seated-ohp-2rep"), sensorFrame)
                 .filter { it.type != RunType.STILL }
         assertEquals(3, qualifying.size, "movement runs surviving demotion")
         assertTrue(qualifying.all { it.type == RunType.UP }, "all three survivors are UP, so no DOWN opens a rep")

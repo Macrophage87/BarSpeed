@@ -149,8 +149,12 @@ object RepSegmenter {
         direction: LiftDirection = LiftDirection(),
         config: DspConfig = DspConfig(),
     ): Segmentation {
-        val classified = classifyRunsDetailed(series, config)
-        val paired = pairRuns(classified.runs, series, direction, config)
+        // The limits travel as a [RunThresholds] so the frame they are in is
+        // stated rather than assumed. Sensor frame at this commit, which is
+        // what the segmenter has always applied. Issue #70.
+        val thresholds = RunThresholds.sensorFrame(config)
+        val classified = classifyRunsDetailed(series, thresholds)
+        val paired = pairRuns(classified.runs, series, direction, thresholds)
         return Segmentation(
             paired.spans,
             SegmentationCensus(
@@ -174,17 +178,17 @@ object RepSegmenter {
         val shorterThanMinPhase: Int,
     )
 
-    internal fun classifyRuns(series: VelocitySeries, config: DspConfig): List<Run> =
-        classifyRunsDetailed(series, config).runs
+    internal fun classifyRuns(series: VelocitySeries, thresholds: RunThresholds): List<Run> =
+        classifyRunsDetailed(series, thresholds).runs
 
-    internal fun classifyRunsDetailed(series: VelocitySeries, config: DspConfig): ClassifiedRuns {
+    internal fun classifyRunsDetailed(series: VelocitySeries, thresholds: RunThresholds): ClassifiedRuns {
         val v = series.velocityMps
         val n = series.size
         val rawTypes =
             IntArray(n) {
                 when {
-                    v[it] > config.pauseBandMps -> 1
-                    v[it] < -config.pauseBandMps -> -1
+                    v[it] > thresholds.pauseBandMps -> 1
+                    v[it] < -thresholds.pauseBandMps -> -1
                     else -> 0
                 }
             }
@@ -223,11 +227,11 @@ object RepSegmenter {
                     val duration = series.timeS[run.endIdx] - series.timeS[run.startIdx]
                     val peak = (run.startIdx..run.endIdx).maxOf { abs(v[it]) }
                     val disp = displacement(series, run.startIdx, run.endIdx)
-                    if (peak < config.startThresholdMps) belowStartThreshold++
-                    if (duration < config.minPhaseS) shorterThanMinPhase++
-                    if (disp > config.maxRunDisplacementM) overDisplacementCap++
-                    if (peak < config.startThresholdMps || duration < config.minPhaseS ||
-                        disp > config.maxRunDisplacementM
+                    if (peak < thresholds.startThresholdMps) belowStartThreshold++
+                    if (duration < thresholds.minPhaseS) shorterThanMinPhase++
+                    if (disp > thresholds.maxRunDisplacementM) overDisplacementCap++
+                    if (peak < thresholds.startThresholdMps || duration < thresholds.minPhaseS ||
+                        disp > thresholds.maxRunDisplacementM
                     ) {
                         run.copy(type = RunType.STILL)
                     } else {
@@ -248,18 +252,18 @@ object RepSegmenter {
         return ClassifiedRuns(merged, movementRuns, overDisplacementCap, belowStartThreshold, shorterThanMinPhase)
     }
 
-    /** [pairRuns]'s result: the spans, and how many pairs the [DspConfig.minRomM] floor discarded. */
+    /** [pairRuns]'s result: the spans, and how many pairs the [RunThresholds.minRomM] floor discarded. */
     private data class Paired(val spans: List<RepSpan>, val pairsBelowMinRom: Int)
 
     private fun pairRuns(
         runs: List<Run>,
         series: VelocitySeries,
         direction: LiftDirection,
-        config: DspConfig,
+        thresholds: RunThresholds,
     ): Paired = if (direction.startsWith == StartPhase.ECCENTRIC) {
-        pairEccentricFirst(runs, series, direction, config)
+        pairEccentricFirst(runs, series, direction, thresholds)
     } else {
-        pairConcentricFirst(runs, series, direction, config)
+        pairConcentricFirst(runs, series, direction, thresholds)
     }
 
     /** Ecc-first lifts: a rep is a qualifying eccentric+concentric pair (kills walkout/re-rack bumps). */
@@ -267,7 +271,7 @@ object RepSegmenter {
         runs: List<Run>,
         series: VelocitySeries,
         direction: LiftDirection,
-        config: DspConfig,
+        thresholds: RunThresholds,
     ): Paired {
         val reps = mutableListOf<RepSpan>()
         var belowMinRom = 0
@@ -287,7 +291,7 @@ object RepSegmenter {
             }
             val second = runs[j]
             val turnaroundPauseS = series.timeS[second.startIdx] - series.timeS[first.endIdx]
-            if (displacement(series, second.startIdx, second.endIdx) >= config.minRomM) {
+            if (displacement(series, second.startIdx, second.endIdx) >= thresholds.minRomM) {
                 reps += RepSpan(
                     first.startIdx,
                     first.endIdx,
@@ -315,7 +319,7 @@ object RepSegmenter {
         runs: List<Run>,
         series: VelocitySeries,
         direction: LiftDirection,
-        config: DspConfig,
+        thresholds: RunThresholds,
     ): Paired {
         val reps = mutableListOf<RepSpan>()
         var belowMinRom = 0
@@ -326,7 +330,7 @@ object RepSegmenter {
                 i++
                 continue
             }
-            if (displacement(series, con.startIdx, con.endIdx) < config.minRomM) {
+            if (displacement(series, con.startIdx, con.endIdx) < thresholds.minRomM) {
                 belowMinRom++
                 i++
                 continue

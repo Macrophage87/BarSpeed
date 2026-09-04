@@ -64,6 +64,13 @@ class StreamingSetTracker(
     /** +1 when the drive moves up, -1 when it moves down. */
     private val driveSign: Double = if (driveIsPositive) 1.0 else -1.0
 
+    /**
+     * The run limits [updateRuns] applies, carried in a type that states which
+     * frame they are in. Sensor frame at this commit, which is what the tracker
+     * has always applied. Issue #70.
+     */
+    private val thresholds: RunThresholds = RunThresholds.sensorFrame(config)
+
     private var filter = Biquad.lowPass(config.lowPassCutoffHz, expectedSampleRateHz)
 
     // The sensor samples uniformly, but two things make arrival timestamps
@@ -215,8 +222,8 @@ class StreamingSetTracker(
     private fun updateRuns(v: Double, timeS: Double) {
         val type =
             when {
-                v > config.pauseBandMps -> 1
-                v < -config.pauseBandMps -> -1
+                v > thresholds.pauseBandMps -> 1
+                v < -thresholds.pauseBandMps -> -1
                 else -> 0
             }
         if (type == runType) {
@@ -235,10 +242,10 @@ class StreamingSetTracker(
         if (runType != 0) {
             val duration = timeS - runStartS
             val qualified =
-                runPeak >= config.startThresholdMps &&
-                    duration >= config.minPhaseS &&
-                    runDisplacement >= config.minRomM &&
-                    runDisplacement <= config.maxRunDisplacementM
+                runPeak >= thresholds.startThresholdMps &&
+                    duration >= thresholds.minPhaseS &&
+                    runDisplacement >= thresholds.minRomM &&
+                    runDisplacement <= thresholds.maxRunDisplacementM
             if (qualified) onQualifiedRun(runType)
         }
         runType = type
@@ -268,7 +275,7 @@ class StreamingSetTracker(
      * the set.
      */
     private fun noteRunaway() {
-        if (runDisplacement > config.maxRunDisplacementM) countTrusted = false
+        if (runDisplacement > thresholds.maxRunDisplacementM) countTrusted = false
     }
 
     private fun onQualifiedRun(direction: Int) {
