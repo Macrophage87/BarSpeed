@@ -34,30 +34,35 @@ enum class ProgressionKind {
      * The phrase a full-session view puts on this exercise's header, before
      * the session starts (#235).
      *
-     * DELIBERATELY STILL SAYING NOTHING. The empty string is what every
-     * full-session view says about progression today: the key is read at
-     * flatten time into each queued set and drawn only by the post-set grid,
-     * so a lifter reading the preview before START cannot tell an exercise
-     * that steps up by reps from one that holds its load. Written wrong from
-     * birth on purpose -- a helper written correct here would have nothing to
-     * red against, which is 6c5fd478's rule -- and the differential commit
-     * after the red is what gives each kind its words.
+     * Four kinds, four phrases, drawn on the exercise header and never on a
+     * set line -- what an exercise steps up on is declared on the exercise.
+     * The record screen's session preview and the plan detail screen both
+     * call this and nothing else, so the two cannot describe one plan two
+     * ways.
+     *
+     * [NONE] says "holds load" rather than saying nothing, and it is the case
+     * this function exists for: an exercise declared `"none"` shows no
+     * post-set grid by design, so before this its dimension was unreadable at
+     * every moment of the session rather than merely until the first rating.
      *
      * It answers for the KIND, not for the declaration, and that is the whole
      * of how the omitted case is handled: [ofPlan] resolves an omitted key to
      * [WEIGHT] before this is ever called, so an exercise whose plan said
-     * nothing reads exactly as one that said `"weight"`. The lifter can still
-     * tell an omission from a declared [NONE], which is what #235 asks for;
-     * they cannot tell an omission from a declared `"weight"`, which is what
-     * the two mean.
+     * nothing reads exactly as one that said `"weight"`. That is what the
+     * omission MEANS -- every plan written against schema 1.10 or earlier
+     * says weight by saying nothing -- so the pair a lifter can tell apart
+     * before lifting is an omission and a declared [NONE], which is what #235
+     * asks for, and not an omission and a declared `"weight"`.
      *
-     * The detekt suppression carries the stub and comes off with it: without
-     * it `:core:model:detekt` fails with
-     * `FunctionOnlyReturningConstant - [phrase]`, measured on this branch by
-     * `./gradlew -PjvmOnly :core:model:detekt`.
+     * The words are the owner's with one stem un-elided; `ProgressionPhraseTest`
+     * carries the reasoning and pins every case.
      */
-    @Suppress("FunctionOnlyReturningConstant")
-    fun phrase(): String = ""
+    fun phrase(): String = when (this) {
+        WEIGHT -> "steps up by weight"
+        REPS -> "steps up by reps"
+        TIME -> "steps up by time"
+        NONE -> "holds load"
+    }
 
     companion object {
         /**

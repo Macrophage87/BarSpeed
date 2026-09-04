@@ -687,12 +687,33 @@ private fun previewSummary(preview: SessionPreview): String {
     return parts.joinToString(" · ")
 }
 
-/** One exercise block of the preview: its name, then every set of it in order. */
+/**
+ * One exercise block of the preview: its name, which dimension it steps up on,
+ * then every set of it in order.
+ *
+ * THE DIMENSION IS ON THE HEADER AND NOT ON A SET LINE (#235). `progression`
+ * is declared on the exercise, so every slot of a block carries the same
+ * value; repeating it per set would state one fact three times and read as
+ * three facts. `ProgressionKind.phrase` is the only thing that turns the kind
+ * into words, here and on the plan detail screen both, so the session the
+ * lifter approves and the session they are about to run cannot be described
+ * two ways.
+ *
+ * An exercise whose plan omitted the key reads "steps up by weight", which is
+ * what the omission means; the pair this makes readable before START is an
+ * omitted key against a declared "none", which shows no post-set grid and so
+ * could not be read at any point of the session before.
+ */
 @Composable
 private fun PreviewBlockCard(block: PreviewBlock, unit: WeightUnit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(block.exerciseName, style = MaterialTheme.typography.titleSmall)
+            Text(
+                block.progression.phrase(),
+                style = MaterialTheme.typography.bodySmall,
+                color = BarColors.Sub,
+            )
             block.sets.forEach { set ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

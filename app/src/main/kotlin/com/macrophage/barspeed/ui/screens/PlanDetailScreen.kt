@@ -49,6 +49,7 @@ import com.macrophage.barspeed.model.PlanNoteDisplay
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PlanSetDef
 import com.macrophage.barspeed.model.PlanStartDecision
+import com.macrophage.barspeed.model.ProgressionKind
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
@@ -274,6 +275,23 @@ private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
                     color = BarColors.Sub,
                 )
             }
+            // Which dimension this exercise steps up on (#235), said ONCE on
+            // the header for the reason the implement-count line below is said
+            // once: `progression` is declared on the exercise and there is no
+            // per-set override to resolve, so a per-set repeat would state one
+            // fact as many facts.
+            //
+            // ProgressionKind.ofPlan is the same resolution flattenPlan
+            // performs, and ProgressionKind.phrase the same words the record
+            // screen's preview draws -- this screen is the approval gate, so
+            // a plan approved here saying one thing and running as another is
+            // exactly the disagreement it exists to catch. An omitted key
+            // reads "steps up by weight", which is what the omission means.
+            Text(
+                ProgressionKind.ofPlan(exercise.progression).phrase(),
+                style = MaterialTheme.typography.bodySmall,
+                color = BarColors.Sub,
+            )
             // Split by the same function the rest screen splits by, and now
             // drawn by the same component: what the lifter reads at a glance,
             // and what one labelled tap reveals. This screen used to draw both
