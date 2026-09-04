@@ -53,10 +53,13 @@ package com.macrophage.barspeed.dsp
  * `summary.peakPower_w` on every one of them, including the four the issue
  * names. They differ only in how many detections they exclude, 19 against 14,
  * and the five that differ are drives straddling the instant on sets 5, 12, 13,
- * 14 and 16 -- none of which is the fastest or the most powerful detection of
- * its set. So the rule is chosen on the direction it errs in, not on a figure
- * it moves, and it errs the way `RepRefusal`'s bound errs: toward admitting a
- * phantom rather than refusing a rep.
+ * 14 and 16. None of the five is the fastest detection of its set. On peak
+ * power the claim is narrower and is stated narrowly: set 5 is the only one of
+ * the five whose set publishes `peakPower_w` at all -- 12, 13, 14 and 16 are
+ * stack-mounted cable work on which no detection carries the key -- and set 5's
+ * straddler is not its most powerful. So the rule is chosen on the direction it
+ * errs in, not on a figure it moves, and it errs the way `RepRefusal`'s bound
+ * errs: toward admitting a phantom rather than refusing a rep.
  *
  * Inclusive at the boundary, like [SetEnd.startedWithinSet]: a drive ending on
  * the same millisecond work began was still under way when it began.
