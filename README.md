@@ -46,7 +46,7 @@ the code; when the two disagree, that one is right.
 > days/week, equipment, current working weights or estimated 1RMs].
 >
 > Reply with ONLY a JSON document (no prose, no code fences) conforming exactly to
-> this schema: top level `{"schemaVersion": "1.11", "planName": string,
+> this schema: top level `{"schemaVersion": "1.12", "planName": string,
 > "sessions": [...]}`. Each session is `{"name": string, "exercises": [...]}`.
 > Each exercise is `{"exercise": snake_case_id, "sets": [...]}` plus an optional
 > `"description"` string (the form cue I read between sets without touching the
