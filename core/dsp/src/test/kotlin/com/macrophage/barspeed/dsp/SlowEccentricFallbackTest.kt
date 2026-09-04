@@ -146,6 +146,44 @@ class SlowEccentricFallbackTest {
         assertEquals(0, reps.size, "reps from a drift run and a drive")
     }
 
+    /**
+     * As [series], but at 4 Hz so every quantity is an exact binary fraction.
+     *
+     * The case below turns on a displacement being EQUAL to
+     * `maxRunDisplacementM`, and at 100 Hz it cannot be: `displacement` sums
+     * `|v| * dt` term by term, `1/100` is not representable, and the total
+     * lands a few ulps either side of the cap for reasons that have nothing to
+     * do with the rule under test. `dt` of 0.25 s and `|v|` of 0.0625 m/s make
+     * each term exactly 0.015625, so 128 of them are exactly 2.0.
+     */
+    private fun exactSeries(vararg segments: Pair<Double, Int>): VelocitySeries {
+        val dt = 0.25
+        val v = mutableListOf<Double>()
+        segments.forEach { (velocity, samples) -> repeat(samples) { v += velocity } }
+        val n = v.size
+        return VelocitySeries(DoubleArray(n) { it * dt }, DoubleArray(n), v.toDoubleArray(), 1.0 / dt)
+    }
+
+    @Test
+    fun `a lowering sitting exactly on the drift cap still licenses a drive`() {
+        // The other side of `an over-cap drift run does not license a drive`,
+        // and the reason the cap is asked for inclusively.
+        // `classifyRunsDetailed` demotes on a strict `disp >
+        // maxRunDisplacementM`, so a run sitting exactly on the cap was never
+        // called drift; readmitting it here is what makes the two agree. With
+        // an exclusive test this case resolves 0 and the two disagree about
+        // one run in a way no other test can see -- which is what a mutation
+        // run found after the fix landed.
+        //
+        // 129 samples at -0.0625 m/s: 128 intervals of exactly 0.015625 m, so
+        // exactly 2.0 m. Under `startThresholdMps` so the classifier demotes
+        // it for SLOWNESS, which is the readmission this gate exists for, and
+        // over `pauseBandMps` so it is a run at all.
+        val reps = spans(exactSeries(0.0 to 2, -0.0625 to 129, 0.0 to 2, 0.40 to 3, 0.0 to 2))
+        assertEquals(1, reps.size, "reps from a lowering exactly on the cap and a drive")
+        assertFalse(reps.single().hasEccentric, "a drive-only rep claims an eccentric")
+    }
+
     @Test
     fun `a drive that travelled under minRomM is not a rep however it was lowered`() {
         // 0.12 m/s for 0.6 s clears startThresholdMps and minPhaseS and
