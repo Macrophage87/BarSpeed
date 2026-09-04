@@ -486,9 +486,10 @@ object SensorCapturePolicy {
      * nothing else does. The analysed stream is whichever unit the existing
      * client is maintaining; declaring some other preference would state that
      * the DSP looked at a stream it did not look at. THAT IS AN ARMING
-     * DECISION AND IS NOT THE LAST WORD, since #207: nothing here has seen a
-     * sample, so where the preferred unit turns out to produce none,
-     * [analysedStream] moves the analysis onto the role that did and
+     * DECISION AND IS NOT THE LAST WORD, since #207, widened by #209: nothing
+     * here has seen a sample, so where the preferred unit delivers fewer than
+     * [MIN_ANALYSABLE_FRAMES] frames, [analysedStream] moves the analysis onto
+     * a role that delivered enough IF THERE IS ONE, and
      * [RecordedSensors.analysedFellBack] records that it moved. This function
      * is unchanged by that, deliberately -- what it answers is which link to
      * hold, which is knowable before a set begins and is not the same

@@ -12,7 +12,10 @@ import kotlin.test.assertTrue
  * the real document in `docs/schemas/` exactly as [SchemaContractTest],
  * [SchemaSensorContractTest] and [SchemaAnalysedFallbackContractTest] are.
  *
- * DIFFERENTIALS. Every assertion here fails at the commit that introduces it.
+ * DIFFERENTIALS. Every assertion here fails at the commit that introduces
+ * it, apart from `the shipped prompt no longer says the analysis moves off
+ * any short unit`, which lands in the same commit as the sentence it pins;
+ * that commit's body records the mutation run against it.
  *
  * The behaviour change is small and the CONTRACT change is the whole risk.
  * Three published keys stop meaning what they say: `analysedFellBack` said the
@@ -253,6 +256,31 @@ class SchemaShortDeliveryContractTest {
         assertTrue(
             "every unit that streamed sent fewer than eight frames" in shippedPrompt,
             "the shipped prompt stopped naming the case that contradicts the deleted clause",
+        )
+    }
+
+    /**
+     * ROUND 3 FINDING 2. The shipped plan prompt states the fallback's
+     * condition, not a universal.
+     *
+     * `PLAN_PROMPT` read "the app moves the analysis off any unit that sent
+     * fewer than eight". [SensorCapturePolicy.analysedStream] returns the
+     * armed role with `fellBack = false` when `analysable` holds no other
+     * role, so a short unit whose partner was also short keeps the analysis.
+     * The three other copies of this rule -- `SensorCapture.kt`,
+     * `SessionExport.kt` and the published `analysedRole` description --
+     * already carry the condition.
+     */
+    @Test
+    fun `the shipped prompt no longer says the analysis moves off any short unit`() {
+        assertFalse(
+            "moves the analysis off any unit that sent fewer than eight" in shippedPrompt,
+            "the shipped prompt still moves the analysis off every short unit",
+        )
+        assertTrue(
+            "moves the analysis off a unit that sent fewer than eight only when another unit " +
+                "sent eight or more" in shippedPrompt,
+            "the shipped prompt stopped stating the condition the move needs",
         )
     }
 }
