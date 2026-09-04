@@ -10,12 +10,14 @@ import kotlin.test.assertEquals
  *
  * `SetAnalyzer.analyze` maps the velocity series into the lifter's frame with
  * `mappedToLifter(direction.sensorToLifter)`, and `StreamingSetTracker`
- * multiplies each live sample by the same factor. Both then classify the
+ * multiplies each live sample by the same factor. Both then classified the
  * result against `DspConfig.pauseBandMps`, `startThresholdMps`, `minRomM` and
  * `maxRunDisplacementM` -- four numbers fitted on captures where the sensor
- * travelled 1:1 with the load. Nothing converts them into the frame the series
- * is now in, so `travelRatio` moves the limits relative to the signal and a
- * pure GEOMETRY declaration decides how many reps there were.
+ * travelled 1:1 with the load. Nothing converted them into the frame the
+ * series was in, so `travelRatio` moved the limits relative to the signal and
+ * a pure GEOMETRY declaration decided how many reps there were. Since
+ * bf40202d both callers convert through `RunThresholds`, and this file pins
+ * that they do.
  *
  * The two captures below are the corpus's barbell case and its cable-stack
  * case, declared exactly as the rest of the corpus declares them:
