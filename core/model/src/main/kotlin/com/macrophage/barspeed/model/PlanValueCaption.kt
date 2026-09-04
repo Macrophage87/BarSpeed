@@ -34,9 +34,11 @@ package com.macrophage.barspeed.model
  * holds the shown figure steady over that reach, the export sentence
  * otherwise -- and TWO facts decide together: [standsForLaterSets], computed
  * by the carry policy itself at the call site, never guessed here, and
- * whether the plan's own next declaration differs from this set's, taken by
- * the caller as [stepsAfterThis]. Either one false routes to the export
- * sentence. A caption whose reach claim came from a second reading of either
+ * whether the plan's own next declaration differs from this set's, which
+ * [load], [reps] and [hold] each derive from the caller's own next-declared
+ * figure -- `nextDeclaredAddedKg`, `nextDeclaredReps`,
+ * `nextDeclaredDurationS` -- and pass to the private caption chooser. Either
+ * one false routes to the export sentence. A caption whose reach claim came from a second reading of either
  * fact could disagree with the carry.
  *
  * REACH NAMES A NUMBER, SO IT ALSO NEEDS THE PLAN TO HOLD THAT NUMBER STEADY.
@@ -190,6 +192,14 @@ object PlanValueCaption {
      * instead -- true regardless of how far the correction reaches, because
      * `load_kg`/`reps`/`actualDuration_s` are published beside their planned
      * figures on every set the carry touches. #143 round 2.
+     *
+     * ON BODY-WEIGHT WORK [plannedLoadText] answers "BW" rather than null for
+     * an absent declaration, so a null next declaration is not distinguishable
+     * from a declared BW and [stepsAfterThis] is true wherever this set
+     * declares an added load and the next declares none. The reach sentence is
+     * withheld there even though the carry holds the number -- the export
+     * sentence is still true, so this loses information rather than stating a
+     * falsehood, and it is accepted.
      */
     private fun caption(
         planned: String,

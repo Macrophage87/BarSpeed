@@ -44,11 +44,13 @@ import kotlin.test.assertNull
  *
  * The alternative #143 raises is to keep the absolute, yield to the plan's
  * next step, and make the yield VISIBLE -- tell the lifter the load changed
- * instead of silently re-seeding. Rejected on two grounds. It needs a Compose
- * surface no test on this repo's CI path can reach, so the fix would be
- * compile-gated only; and it answers a lifter who has just corrected the load
- * with a notification rather than with the load, leaving the correction to be
- * retyped on every remaining set.
+ * instead of silently re-seeding. Only the DRAWING of a yield notice is out
+ * of reach. Its wording and the condition it appears under would be a pure
+ * function in `:core:model`, as [PlanValueCaption.load] and
+ * [SetLoadPolicy.correctionCaption] already are, both pinned on the CI path.
+ * The ground for choosing the offset is that a notice answers a lifter who
+ * has just corrected the load with words instead of with the load, leaving
+ * the correction to be retyped on every remaining set.
  *
  * THE SENTENCE THAT STOOD HERE CLAIMED "VISIBILITY IS NOT LOST BY CHOOSING
  * THE OFFSET" AND IS DELETED RATHER THAN REWORDED, #143 round 2. It was true
@@ -63,17 +65,21 @@ import kotlin.test.assertNull
  * mid-set. `PlanValueCaptionContractTest`'s stepping-block differentials are
  * where that is fixed.
  *
- * ## Red at this commit
- *
  * ## Red, and then green
  *
- * Eight of the fourteen tests here failed at
- * `b61c14f9ed714331355c573a4e4c5bd80e9bb68f`, where they were pushed with no
- * production change, and were answered at
- * `b3c649e71cda6313316a447387d0475682b49cff`. The other six -- the two
+ * Eight of the fourteen tests this class held then failed at `Red the
+ * correction that should ride the plan's own steps`, where they were pushed
+ * with no production change, and were answered at `Carry a load correction
+ * across the plan's own steps as a distance`. The other six -- the two
  * flat-block carries, the flat block's bit-for-bit identity, the block edge,
  * the mirror null, and the empty statement -- are the behaviour the fix does
- * not move, and are green both sides of it.
+ * not move, and are green both sides of it. The class holds seventeen now:
+ * the three added at `Red the stepping caption and the warm-up carry, round
+ * 1's two findings` are round 2's, and one of the fourteen, the flat-block
+ * identity test, was rewritten at `Kill the mutation the flat-block pin was
+ * not catching` after the fix and is green on both sides of it. Commits are
+ * named by subject rather than by SHA: this branch has been rebased twice and
+ * every SHA a body wrote down went stale.
  *
  * ## Round 2: the warm-up opener is not a step (#143)
  *

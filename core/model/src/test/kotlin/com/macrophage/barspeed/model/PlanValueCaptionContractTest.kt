@@ -205,6 +205,34 @@ class PlanValueCaptionContractTest {
     }
 
     /**
+     * THE INFORMATION THIS DESIGN LOSES, pinned rather than left to be
+     * rediscovered (#143 round 2 finding 10). On body-weight work
+     * `plannedLoadText` answers "BW" for an absent declaration, so a set that
+     * declares an added load followed by one that declares none renders
+     * "BW + 10 kg" against "BW": unequal, and `stepsAfterThis` is therefore
+     * true where a loaded block would have read null and kept the reach
+     * sentence. The export sentence is used instead. It is still true -- the
+     * change is published beside `plannedLoad_kg` on every set the carry
+     * reaches -- so what is lost is the reach, not the accuracy.
+     */
+    @Test
+    fun `a body-weight block whose next set declares no load loses the reach sentence`() {
+        assertEquals(
+            "Plan says BW + 10 kg - your change is recorded in the export",
+            PlanValueCaption.load(
+                adHoc = false,
+                added = false,
+                bodyweight = true,
+                unit = WeightUnit.KG,
+                plannedAddedKg = 10.0,
+                nextDeclaredAddedKg = null,
+                shownAddedKg = 15.0,
+                standsForLaterSets = true,
+            ),
+        )
+    }
+
+    /**
      * Green before the fix and after it. Loaded work with the weight left to
      * the lifter has no prescription to name, and "Plan says 0 kg" would invent
      * one.

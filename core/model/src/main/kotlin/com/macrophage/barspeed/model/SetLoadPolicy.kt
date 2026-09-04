@@ -259,6 +259,13 @@ object SetLoadPolicy {
      * the working set -- see the paragraph above for why. A ramp of two
      * warm-ups still steps: [nextWarmup] true is the same progression
      * 45 / 55 / 65 is, just at lighter numbers.
+     *
+     * THE NO-NEXT-DECLARATION BRANCH IS NOT COVERED BY THAT ARGUMENT. A
+     * warm-up opener corrected from 20 to 22.5 whose working set declares no
+     * load returns 22.5, so the working set is offered the warm-up's weight
+     * and records it if the box is left alone. It is left that way
+     * deliberately -- the alternative is `seedAddedKg`'s empty bar, which is
+     * not better -- and it is named here rather than implied.
      */
     fun standingStatedAddedKg(
         statedAddedKg: Double?,
@@ -429,6 +436,16 @@ object SetLoadPolicy {
      * SetGeometryPolicy.bodyweightMount(...)` -- the seeded answer, not the
      * raw declaration -- on exactly this population, and clamping it at zero
      * would make assistance unsayable.
+     *
+     * A CLAMPED ZERO IS NOT ONLY OFFERED, IT IS RECORDED. The zero goes into
+     * the load box, and a lifter who leaves it there records it as this set's
+     * `load_kg` -- [resolve] treats zero as a real measurement -- which also
+     * suppresses that set's bar-power figure: `SetAnalyzer`'s effective load
+     * is `loadKg?.takeIf { it > 0 && ... }`, so a zero drops power for the
+     * whole set. The alternative considered was offering the coming set's own
+     * declaration unshifted; that re-offers the plan's number to a lifter who
+     * has already moved off it, and the choice between the two was made on
+     * that reading rather than on any measurement.
      *
      * There is no ceiling on either. Nothing here knows what a plate rack
      * holds, and a bound invented from nothing would reject a real set.

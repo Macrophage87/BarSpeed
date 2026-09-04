@@ -1812,9 +1812,11 @@ private fun recordedTimedSeconds(
  * sentence that stood here said the statement was dropped in that case; it was
  * true when written and is deleted rather than reworded.
  *
- * [RecordState.statedTempo] is re-decided by the same rule on the same
- * boundaries, so a tempo the lifter set on the wheels holds for the rest of the
- * block and no further. #148.
+ * [RecordState.statedTempo] is re-decided on the same boundaries but, since
+ * #143, NOT by the same rule: [TempoAdjustPolicy.standingAdjustedTempo] drops
+ * the adjustment wherever the two declarations differ, where the load carries
+ * it as a distance, and it has no warm-up guard. A tempo the lifter set on the
+ * wheels holds for the rest of the block, and no further. #148.
  *
  * [restS] is the whole prescribed period and [restRemainingS] is what is left
  * of it at the moment this state is built. TWO arguments rather than one, and
@@ -1869,7 +1871,10 @@ private fun restingState(
             finishedWarmup = p.slot?.warmup == true,
             nextWarmup = nextSlot?.warmup == true,
         )
-    // The same question about the tempo, decided by the same four boundaries.
+    // The same question about the tempo, and since #143 NOT by the same rule:
+    // TempoAdjustPolicy.standingAdjustedTempo drops the adjustment wherever the
+    // two declarations differ, where the load carries it as a distance, and it
+    // has no warm-up guard.
     // plannedTempo on both sides, never tempo: the bake has already written the
     // adjustment into the slot's own tempo, so comparing those would compare a
     // value against itself and the carry would never stop.
@@ -1881,11 +1886,13 @@ private fun restingState(
             nextDeclaredTempo = nextSlot?.plannedTempo,
         )
     // The same question again for the rep count and the hold, bounded by the
-    // same block and decided by the same rule. The two slots' FROZEN
-    // declarations on both sides, never their live reps/durationS: the bake
-    // writes the statement into those, so comparing them would compare a
-    // number against itself and a descending 10 / 8 / 6 would flatten to
-    // 12 / 12 / 12 the moment set one was changed. #174.
+    // same block and decided by SetRepsPolicy's rule, which is the tempo's:
+    // standingStatedReps and standingStatedDurationS both drop the statement
+    // wherever the two declarations differ, and neither has a warm-up guard.
+    // The two slots' FROZEN declarations on both sides, never their live
+    // reps/durationS: the bake writes the statement into those, so comparing
+    // them would compare a number against itself and a descending 10 / 8 / 6
+    // would flatten to 12 / 12 / 12 the moment set one was changed. #174.
     val standingReps =
         SetRepsPolicy.standingStatedReps(
             statedReps = s.statedReps,
