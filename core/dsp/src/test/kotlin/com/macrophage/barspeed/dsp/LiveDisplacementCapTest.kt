@@ -216,7 +216,7 @@ class LiveDisplacementCapTest {
 
     private fun batchRunDisplacements(file: String, d: LiftDirection, c: DspConfig): List<Double> {
         val s = VelocityEstimator.estimate(load(file), c, d.measuredPlane).mappedToLifter(d.sensorToLifter)
-        return RepSegmenter.classifyRuns(s, c)
+        return RepSegmenter.classifyRuns(s, RunThresholds.sensorFrame(c))
             .filter { it.type != RunType.STILL }
             .map { RepSegmenter.displacement(s, it.startIdx, it.endIdx) }
             .sorted()

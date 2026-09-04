@@ -399,7 +399,8 @@ object SetAnalyzer {
     private fun orient(series: VelocitySeries, direction: LiftDirection, config: DspConfig): VelocitySeries {
         if (direction.measuredPlane != MovementPlane.HORIZONTAL) return series
         val firstMove =
-            RepSegmenter.classifyRuns(series, config).firstOrNull { it.type != RunType.STILL } ?: return series
+            RepSegmenter.classifyRuns(series, RunThresholds.sensorFrame(config))
+                .firstOrNull { it.type != RunType.STILL } ?: return series
         val expected =
             if (direction.startsWith == StartPhase.CONCENTRIC) direction.concentricRun else direction.eccentricRun
         return if (firstMove.type == expected) series else series.mappedToLifter(-1.0)

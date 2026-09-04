@@ -316,7 +316,8 @@ class LiveCapCalibrationTest {
                 .forEach { largestInFamilyLive = maxOf(largestInFamilyLive, it.displacementM) }
             val series = VelocityEstimator.estimate(load(file), c, d.measuredPlane)
                 .mappedToLifter(d.sensorToLifter)
-            RepSegmenter.classifyRuns(series, c).filter { it.type != RunType.STILL }.forEach {
+            val thresholds = RunThresholds.sensorFrame(c)
+            RepSegmenter.classifyRuns(series, thresholds).filter { it.type != RunType.STILL }.forEach {
                 batchRuns++
                 largestBatchRun = maxOf(largestBatchRun, RepSegmenter.displacement(series, it.startIdx, it.endIdx))
             }

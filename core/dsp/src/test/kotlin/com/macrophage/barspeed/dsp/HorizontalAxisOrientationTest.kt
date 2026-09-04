@@ -162,7 +162,7 @@ class HorizontalAxisOrientationTest {
             )
 
             val raw = VelocityEstimator.estimate(samples, c, MovementPlane.HORIZONTAL)
-            val moves = RepSegmenter.classifyRuns(raw, c).count { it.type != RunType.STILL }
+            val moves = RepSegmenter.classifyRuns(raw, RunThresholds.sensorFrame(c)).count { it.type != RunType.STILL }
             assertEquals(0, moves, "$fixture: movement runs found on the horizontal axis")
         }
     }

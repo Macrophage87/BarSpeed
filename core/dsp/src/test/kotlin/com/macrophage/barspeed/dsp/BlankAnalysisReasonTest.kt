@@ -228,7 +228,8 @@ class BlankAnalysisReasonTest {
                     "$fixture $startsWith: the census miscounts its own spans",
                 )
                 assertEquals(
-                    RepSegmenter.classifyRuns(s, config).count { it.type != RunType.STILL },
+                    RepSegmenter.classifyRuns(s, RunThresholds.sensorFrame(config))
+                        .count { it.type != RunType.STILL },
                     detailed.census.qualifyingRuns,
                     "$fixture $startsWith: the census miscounts qualifying runs",
                 )
