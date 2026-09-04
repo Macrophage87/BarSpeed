@@ -146,13 +146,16 @@ data class ExerciseDef(
          *
          * It now runs the result through [SetGeometryPolicy.bodyweightMount],
          * which is what a PLAN slot has always got via
-         * [SetGeometryPolicy.resolve]: an ad-hoc pull-up, chin-up, dip,
-         * push-up or dead hang is body-weight work whether or not a plan
-         * declared it. There is no plan here to declare anything, so
-         * `declared` is null and the seed default decides. #229 item 3, and
-         * part of #61's population. Only `dead_hang` of the five is in
-         * [SEED], which is `RecordState.exerciseOptions`, so it is the only
-         * one the picker can reach today.
+         * [SetGeometryPolicy.resolve]: an ad-hoc set against any id in
+         * [BODYWEIGHT_IDS] is body-weight work whether or not a plan declared
+         * it. There is no plan here to declare anything, so `declared` is null
+         * and the seed default decides. #229 item 3, and part of #61's
+         * population. Only `dead_hang` of the eight is in [SEED], which is
+         * `RecordState.exerciseOptions`, so it is the only one the picker can
+         * reach today -- #239's three are not seed entries, so widening the
+         * table changed nothing an ad-hoc set can currently exercise; it is
+         * this call that makes the seed follow if the picker ever reaches
+         * one.
          *
          * `copy` rather than a fresh constructor call, deliberately: the seed
          * entry for `dead_hang` carries a display name, a HOLD kind and
@@ -269,9 +272,24 @@ data class ExerciseDef(
          * those three ids are already seeded stack-mounted by
          * [STACK_MOUNTED_IDS] -- a different fact about a different id.
          *
-         * `rope_dead_hang` has no entry here for [STACK_MOUNTED_IDS]'s own
-         * reason: it is genuinely body-weight work too, and is not tracked
-         * anywhere; for the owner to decide whether it is.
+         * `muscle_up`, `inverted_row` and `rope_dead_hang` were added by
+         * #239. On all three the lifter's own body IS the load, and until
+         * they were named here a plan that left the key out recorded the
+         * set's `loadKg` as the ADDED load alone -- so a hang with nothing
+         * added was written as `0.0`, which is the load being unknown dressed
+         * as the load being nothing. `rope_dead_hang` was not hypothetical:
+         * field-37 recorded three sets of it (sets 11, 12 and 13). Those rows
+         * stay exactly as recorded, because nothing here rewrites a stored
+         * set; what tells a reader they carry no body-weight term is the
+         * ABSENCE of `bodyWeight_kg` beside their `load_kg` in the export
+         * (1.19, #220), which is the signal that split exists to give.
+         *
+         * `rope_dead_hang` is in THIS table and still deliberately absent from
+         * [STACK_MOUNTED_IDS], and the two are not in tension. The id names
+         * the grip implement, so it cannot tell a rope tied off on a fixed rig
+         * from one running over an assist machine's cable, and the MOUNT
+         * therefore stays undeclared -- but a hang is the lifter's own body
+         * either way, so the LOAD does not.
          *
          * The commit "Seed pull-ups, dips, push-ups, chin-ups and dead hangs
          * as body weight" left a follow-up list naming PlanDetailScreen and
@@ -281,12 +299,15 @@ data class ExerciseDef(
          * [SetGeometryPolicy.bodyweightMount], so a set started from the
          * exercise picker gets the same answer a plan slot gets. #229 item 3.
          *
-         * The two sites named in that list are still open and are still
-         * #229's items 1 and 2. Four of the five ids here carry no SEED entry,
-         * and `dead_hang`'s SEED entry does not set `bodyweight = true`, so
-         * both the seed lookup and the bare constructor still need the mount
-         * policy on top -- which is exactly what [resolvedById] does rather
-         * than editing the five entries.
+         * Of the two sites that list named, GuideScreen's `PLAN_PROMPT` now
+         * enumerates the ids this table holds and moves with it; the approval
+         * screen still reads the raw plan declaration and is still #229 item
+         * 1, so a plan that omits the key on one of these ids displays there
+         * as loaded work while recording as body-weight work. Seven of the
+         * eight ids here carry no SEED entry, and `dead_hang`'s SEED entry
+         * does not set `bodyweight = true`, so both the seed lookup and the
+         * bare constructor still need the mount policy on top -- which is
+         * exactly what [resolvedById] does rather than editing SEED.
          */
         val BODYWEIGHT_IDS: Set<String> =
             setOf(
@@ -295,6 +316,9 @@ data class ExerciseDef(
                 "dip",
                 "push_up",
                 "dead_hang",
+                "muscle_up",
+                "inverted_row",
+                "rope_dead_hang",
             )
 
         /** Whether the app ships a body-weight default for this exact id. */
