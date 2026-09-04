@@ -911,15 +911,12 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         // and calls beginSet in the same frame -- so this is set one's only
         // chance to say anything, and until this button it could say only the
         // load.
-        ChangeSetButton(state, viewModel, slot, next = false)
-        // Kept in place and NOT moved into the dialog: it is one line, it
-        // opens a chooser of its own, and a dialog inside a dialog is a shape
-        // this app has never used. It already reached READY, which is half of
-        // what the owner asked for when every rack is busy on arrival; the
-        // other half is the button above.
-        SwitchExerciseSection(state, viewModel)
-        AddSetSection(state, viewModel)
-        RemoveSetSection(state, viewModel)
+        // Switch exercise is kept OUT of the dialog: it opens a chooser of
+        // its own, and a dialog inside a dialog is a shape this app has never
+        // used. It already reached READY, which is half of what the owner
+        // asked for when every rack is busy on arrival; the other half is the
+        // change button beside it.
+        NextSetControlsRow(state, viewModel, slot, next = false)
     } else {
         AdHocForm(state, viewModel)
         // Plan sets take their prep from the dialog. The ad-hoc layout keeps
@@ -1436,6 +1433,48 @@ internal fun struckLine(lead: String, values: List<SetCardValue>): AnnotatedStri
 }
 
 /**
+ * The three controls that change what happens next, in one row (#238).
+ *
+ * The owner's ask, from the rest screen in a session: "Switch exercise and add
+ * a set should be buttons." They were text links stacked under the one real
+ * button, and the report is that they read as afterthoughts and were hard to
+ * find and hit between sets.
+ *
+ * A [FlowRow], not a [Row] of weighted thirds. Three equal thirds would have
+ * to be measured against a label the width of "SWITCH EXERCISE" at whatever
+ * font scale the phone is set to, and nothing here can measure that; a flow
+ * row puts them side by side where they fit and wraps to a second line where
+ * they do not, which is what #238 asks for in as many words.
+ *
+ * WHAT EACH ONE DOES IS UNCHANGED. Every one binds to the handler it bound to
+ * as a link: [ChangeSetButton] opens the same dialog, [SwitchExerciseSection]
+ * the same chooser, [AddSetSection] calls the same
+ * [RecordViewModel.addSetOfCurrentExercise].
+ *
+ * [RemoveSetSection] stays below the row and stays a text control -- see its
+ * own KDoc for why.
+ *
+ * NOT RENDERED. No device or emulator has drawn this row; whether three
+ * buttons fit one line on the phone is a [Field] question and is written up as
+ * one.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun NextSetControlsRow(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot, next: Boolean) {
+    Spacer(Modifier.height(8.dp))
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ChangeSetButton(state, viewModel, slot, next, Modifier)
+        SwitchExerciseSection(state, viewModel, Modifier)
+        AddSetSection(state, viewModel, Modifier)
+    }
+    AddSetCaption(state)
+    RemoveSetSection(state, viewModel)
+}
+
+/**
  * The one control that reaches every upcoming-set change, and the dialog it
  * opens.
  *
@@ -1460,12 +1499,20 @@ internal fun struckLine(lead: String, values: List<SetCardValue>): AnnotatedStri
  * buttons is how a thumb picks the wrong one. A
  * mis-tap here opens a dialog and costs one tap to close; a mis-tap on START
  * begins a set that can only be ended by recording it.
+ *
+ * Since #238 it is the first of three buttons in [NextSetControlsRow] and
+ * takes its width from the caller. The spacer above it moved there with it.
  */
 @Composable
-private fun ChangeSetButton(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot, next: Boolean) {
+private fun ChangeSetButton(
+    state: RecordState,
+    viewModel: RecordViewModel,
+    slot: PlannedSlot,
+    next: Boolean,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+) {
     var open by remember(state.queueIndex, state.stage) { mutableStateOf(false) }
-    Spacer(Modifier.height(8.dp))
-    OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+    OutlinedButton(onClick = { open = true }, modifier = modifier) {
         Text(if (next) "CHANGE NEXT SET" else "CHANGE THIS SET")
     }
     if (open) {
@@ -1579,10 +1626,12 @@ internal fun ChangeSetDialog(
  * exercise coming up -- the wrong name, and the wrong set -- at the exact
  * moment the lifter is thinking about the one they just did. Where the two
  * differ [AddSetControl.label] says where the added set lands, and that is the
- * only case where it says so.
+ * only case where it says so. Since #238 those words are [AddSetCaption]
+ * under the row rather than the button's own label.
  *
  * Drawn on the last-set branch of [NextSetBlock] as well, so the session's
- * final set has the control too.
+ * final set has the control too. There it keeps the full width the row does
+ * not give it.
  *
  * BESIDE "Equipment busy? Switch exercise" and in the same form, on BOTH
  * surfaces, which is #152's consolidated change surface: the rest screen and
@@ -1598,39 +1647,65 @@ internal fun ChangeSetDialog(
  * is unchanged, and the appended
  * set is a set the plan does not contain rather than a change to a set it does.
  *
- * A TextButton, not an OutlinedButton, for [SwitchExerciseSection]'s reason:
- * START is the only filled button on either screen while a set is queued --
- * after the last planned set START is withheld and FINISH SESSION takes the
- * filled place (#195) -- and this line sits beside one that already looks
- * like this. A mis-tap here used to be survivable only because the plan's
+ * AN OUTLINED BUTTON SINCE #238 and never a filled one: START is the only
+ * filled button on either screen while a set is queued -- after the last
+ * planned set START is withheld and FINISH SESSION takes the filled place
+ * (#195). A mis-tap here used to be survivable only because the plan's
  * remaining sets are dropped whenever a session is finished early; since #206
- * it is survivable directly, because [RemoveSetSection] -- called immediately
- * below this at all three of the sites that call it, and drawn on the two
- * where an appended set of the block can still be queued -- takes the set
- * back out again.
+ * it is survivable directly, because [RemoveSetSection] -- called below this
+ * on all three surfaces that offer it, and drawn on the two where an
+ * appended set of the block can still be queued -- takes the set back out
+ * again.
  *
  * Repeatable: every tap appends one more, and nothing here or in
  * [RecordViewModel.addSetOfCurrentExercise] assumes at most one.
  */
 @Composable
-private fun AddSetSection(state: RecordState, viewModel: RecordViewModel) {
-    if (state.adHoc) return
-    val anchor = state.currentSlot ?: return
-    TextButton(onClick = viewModel::addSetOfCurrentExercise) {
-        Text(
-            AddSetControl.label(anchor.exercise.displayName, state.upcomingSlot?.exercise?.displayName),
-            color = BarColors.Blue,
-        )
+private fun AddSetSection(
+    state: RecordState,
+    viewModel: RecordViewModel,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+) {
+    if (addSetLabel(state) == null) return
+    OutlinedButton(onClick = viewModel::addSetOfCurrentExercise, modifier = modifier) {
+        Text("ADD SET")
     }
+}
+
+/**
+ * The words the add control dropped when it became a button (#238).
+ *
+ * [AddSetControl.label] names the exercise the added set belongs to, and
+ * where the anchor and the upcoming exercise differ it names where the set
+ * lands. A third of a row does not hold that sentence. Dropping it instead
+ * would leave "ADD SET" naming no exercise on the one surface where two are
+ * in play.
+ */
+@Composable
+private fun AddSetCaption(state: RecordState) {
+    SectionCaption(addSetLabel(state) ?: return)
+}
+
+/**
+ * The add control's words, or null where no add control is drawn.
+ *
+ * One function for the button's guard and the caption's, so the two cannot
+ * disagree about whether the control exists.
+ */
+private fun addSetLabel(state: RecordState): String? {
+    if (state.adHoc) return null
+    val anchor = state.currentSlot ?: return null
+    return AddSetControl.label(anchor.exercise.displayName, state.upcomingSlot?.exercise?.displayName)
 }
 
 /**
  * "Remove the set you added" -- #177's named remainder, and the other half of
  * the pair (#206).
  *
- * CALLED IMMEDIATELY BELOW [AddSetSection], at all three of the sites that
- * call it: the rest screen's next-set block, the rest screen's last-set
- * branch, and READY. Only the first and the third ever DRAW it. In the
+ * CALLED BELOW [AddSetSection] on all three surfaces that offer it, from
+ * two call sites since #238: [NextSetControlsRow], which the rest screen's
+ * next-set block and READY both go through, and the rest screen's last-set
+ * branch. Only the first two ever DRAW it. In the
  * last-set branch [RecordState.nextSlot] is null, so
  * [RecordState.upcomingIndex] -- `queueIndex + 1` throughout rest -- is
  * already past the queue's last index; every candidate
@@ -1639,8 +1714,8 @@ private fun AddSetSection(state: RecordState, viewModel: RecordViewModel) {
  * empty, [RecordState.removeSetTarget] is always null on that branch, and
  * this function returns before drawing anything. The call stays there
  * anyway: the moment [AddSetSection] appends a set, [RecordState.nextSlot]
- * stops being null and the same state renders through the next-set block's
- * copy of this call instead, where the set just added is eligible. #206
+ * stops being null and the same state renders through [NextSetControlsRow]
+ * instead, where the set just added is eligible. #206
  * requirement 3 asks the pair to read as one decision rather than two
  * unrelated controls; on the two surfaces where this can render, calling it
  * directly under the add is what makes that true.
@@ -1658,9 +1733,14 @@ private fun AddSetSection(state: RecordState, viewModel: RecordViewModel) {
  * anchor's block the label says it takes the LAST, because "remove the set you
  * added" is ambiguous the moment there are two.
  *
- * A TextButton for [AddSetSection]'s reason. This one is not destructive of
- * anything recorded, so it takes no confirmation: the set it removes has not
- * happened, and the lifter can add it again with the button above.
+ * STILL A TEXT CONTROL after #238 made its pair a button, which #238 asks to
+ * be decided and stated. It is drawn only when there is something to remove,
+ * so in the row it would change the row's arity between renders and move the
+ * other buttons under a finger already reaching for one -- the stacked-target
+ * hazard #137 removed elsewhere on this screen. It is also the destructive
+ * half of the pair. Not destructive of anything RECORDED, so it still takes
+ * no confirmation: the set it removes has not happened, and the lifter can
+ * add it again with the button above.
  */
 @Composable
 private fun RemoveSetSection(state: RecordState, viewModel: RecordViewModel) {
@@ -1678,19 +1758,29 @@ private fun RemoveSetSection(state: RecordState, viewModel: RecordViewModel) {
     }
 }
 
-/** Equipment busy? Offer the session's other remaining exercises out of order. */
+/**
+ * Offer the session's other remaining exercises out of order.
+ *
+ * A BUTTON SINCE #238, where it was a text link reading "Equipment busy?
+ * Switch exercise". The "Equipment busy?" framing is not dropped: it moves
+ * to the chooser's title, which is what the tap opens.
+ */
 @Composable
-private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel) {
+private fun SwitchExerciseSection(
+    state: RecordState,
+    viewModel: RecordViewModel,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+) {
     val choices = state.exerciseChoices
     if (choices.isEmpty()) return
     var showChooser by remember { mutableStateOf(false) }
-    TextButton(onClick = { showChooser = true }) {
-        Text("Equipment busy? Switch exercise", color = BarColors.Blue)
+    OutlinedButton(onClick = { showChooser = true }, modifier = modifier) {
+        Text("SWITCH EXERCISE")
     }
     if (showChooser) {
         AlertDialog(
             onDismissRequest = { showChooser = false },
-            title = { Text("Do another exercise next") },
+            title = { Text("Equipment busy? Do another exercise next") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
@@ -2935,10 +3025,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
         // The change is IN the card above, not under it. It has to be
         // readable without a tap, because the box that used to reconcile the
         // plan's number with the lifter's is now behind this button.
-        ChangeSetButton(state, viewModel, next, next = true)
-        SwitchExerciseSection(state, viewModel)
-        AddSetSection(state, viewModel)
-        RemoveSetSection(state, viewModel)
+        NextSetControlsRow(state, viewModel, next, next = true)
     } else if (state.adHoc) {
         AdHocForm(state, viewModel)
         PrepAdjuster(state, viewModel)
@@ -2957,7 +3044,9 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
         // on this screen until a set is appended (#195), and the append is
         // what gives it a slot to run: the queue has a next slot again and
         // START comes back on the same pass.
+        Spacer(Modifier.height(8.dp))
         AddSetSection(state, viewModel)
+        AddSetCaption(state)
         RemoveSetSection(state, viewModel)
     }
 }
