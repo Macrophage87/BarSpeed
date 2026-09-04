@@ -3,6 +3,7 @@ package com.macrophage.barspeed.dsp
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
 import java.io.File
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -414,6 +415,207 @@ class BatchCueCoverageTest {
             matched.max() - matched.min() <= 12,
             "the assignment rule moves the matched total by ${matched.max() - matched.min()} windows of 170",
         )
+    }
+
+    // ------------------------------------------------------------------
+    // Why each empty window is empty, and where the mount split went.
+    // Issue #72.
+    // ------------------------------------------------------------------
+
+    /**
+     * The movement runs the dead band alone cuts, BEFORE the peak, duration
+     * and displacement gates demote any of them.
+     *
+     * Rebuilt here rather than read off [RepSegmenter], because the shipped
+     * classifier returns only what survived and the question below is about
+     * what did not. It is the same three-way comparison against
+     * [RunThresholds.pauseBandMps] and nothing else, so the only way it can
+     * drift from the shipped one is if that comparison changes -- in which
+     * case `every empty window is attributed to a mechanism` stops
+     * reproducing the empty column and says so.
+     */
+    private fun rawMovementRuns(series: VelocitySeries, t: RunThresholds): List<Run> {
+        val v = series.velocityMps
+        val sign = IntArray(series.size) {
+            when {
+                v[it] > t.pauseBandMps -> 1
+                v[it] < -t.pauseBandMps -> -1
+                else -> 0
+            }
+        }
+        val runs = mutableListOf<Run>()
+        var start = 0
+        for (i in 1..series.size) {
+            if (i == series.size || sign[i] != sign[start]) {
+                if (sign[start] != 0) {
+                    runs += Run(if (sign[start] == 1) RunType.UP else RunType.DOWN, start, i - 1)
+                }
+                start = i
+            }
+        }
+        return runs
+    }
+
+    /**
+     * Why one window of the metronome's track carries no detection.
+     *
+     * Five outcomes, in the order the pipeline reaches them, so the name says
+     * how far the rep got before it was lost:
+     *
+     * - [Loss.NO_DRIVE_RUN] -- nothing of the drive's sign is in the window at
+     *   all. The velocity series never showed the lifter driving. Upstream of
+     *   every gate; a segmenter change cannot reach it.
+     * - [Loss.DEMOTED] -- a drive-sign run is there and `classifyRuns` demoted
+     *   it to stillness for failing [RunThresholds.startThresholdMps] or
+     *   [RunThresholds.minPhaseS].
+     * - [Loss.BELOW_MIN_ROM] -- the drive run cleared every gate and then
+     *   displaced less than [RunThresholds.minRomM]. `DspConfig.minRomM`'s own
+     *   KDoc says what these are: reps whose displacement RECONSTRUCTION
+     *   failed, not reps that were small. Lowering the floor to admit them
+     *   publishes velocities taken from the same broken reconstruction, so
+     *   this bucket is not addressable in the segmenter either.
+     * - [Loss.PAIRING] -- a fully qualifying drive run of a rep's size sits in
+     *   the window and the segmenter published nothing for it. The only bucket
+     *   where the signal is good and the loss is a rule.
+     * - [Loss.UNATTRIBUTED] -- none of the above matched. Zero is the pinned
+     *   value; any other is this classifier having gone stale against the
+     *   pipeline.
+     */
+    private enum class Loss { NO_DRIVE_RUN, DEMOTED, BELOW_MIN_ROM, PAIRING, UNATTRIBUTED }
+
+    private fun qualifies(s: VelocitySeries, t: RunThresholds, r: Run): Boolean {
+        val peak = (r.startIdx..r.endIdx).maxOf { abs(s.velocityMps[it]) }
+        val duration = s.timeS[r.endIdx] - s.timeS[r.startIdx]
+        val disp = RepSegmenter.displacement(s, r.startIdx, r.endIdx)
+        return peak >= t.startThresholdMps && duration >= t.minPhaseS && disp <= t.maxRunDisplacementM
+    }
+
+    /** [Loss] per empty window of one capture, in window order. */
+    private fun losses(s: Scored): List<Loss> {
+        val config = DspConfig()
+        val samples = load(s.fixture)
+        val series = VelocityEstimator.estimate(samples, config, s.direction.measuredPlane)
+            .mappedToLifter(s.direction.sensorToLifter)
+        val t = RunThresholds.forSeriesMappedToLifter(config, s.direction)
+        val raws = rawMovementRuns(series, t)
+        val w = windows(s.fixture)
+        val tolerance = CueTrack.WINDOW_TOLERANCE_MS.toLong()
+        val hits = IntArray(w.size)
+        spans(s).forEach { span ->
+            val at = samples[span.conStartIdx].timestampMs
+            val k = w.indexOfFirst { (a, b) -> at >= a - tolerance && at < b + tolerance }
+            if (k >= 0) hits[k]++
+        }
+        return w.indices.filter { hits[it] == 0 }.map { k ->
+            val (a, b) = w[k]
+            // A run belongs to the window its FIRST sample arrived in -- the
+            // same start rule `coverage` assigns detections by, so a window
+            // and its runs are read on one convention.
+            val drives = raws.filter {
+                it.type == s.direction.concentricRun &&
+                    samples[it.startIdx].timestampMs >= a - tolerance &&
+                    samples[it.startIdx].timestampMs < b + tolerance
+            }
+            val survivors = drives.filter { qualifies(series, t, it) }
+            when {
+                drives.isEmpty() -> Loss.NO_DRIVE_RUN
+                survivors.isEmpty() -> Loss.DEMOTED
+                survivors.all { RepSegmenter.displacement(series, it.startIdx, it.endIdx) < t.minRomM } ->
+                    Loss.BELOW_MIN_ROM
+                else -> Loss.PAIRING
+            }
+        }
+    }
+
+    @Test
+    fun `every empty window is attributed to a mechanism`() {
+        // The census that makes the empty column actionable. A total says a
+        // candidate moved 23; this says WHICH of the five it moved, and three
+        // of the five are not reachable from the segmenter at all.
+        //
+        // CHARACTERIZATION: these are the mechanisms at this commit and no
+        // claim that any of them is the right answer.
+        val expected = mapOf(
+            Loss.PAIRING to 8,
+            Loss.BELOW_MIN_ROM to 8,
+            Loss.NO_DRIVE_RUN to 4,
+            Loss.DEMOTED to 3,
+        )
+        val actual = scored.flatMap { losses(it) }.groupingBy { it }.eachCount()
+        assertEquals(expected, actual, "empty windows by mechanism")
+        // The attribution has to add up to the empty column of the table
+        // above, or it is describing a different run of the pipeline. This is
+        // NOT the tautology `matched + empty == marks` that this file already
+        // labels as unable to fail: `losses` rebuilds the run classification
+        // from the velocity series and `coverage` does not, so the two agree
+        // only while the rebuild still matches the shipped classifier.
+        assertEquals(
+            scored.sumOf { coverage(it).empty },
+            actual.values.sum(),
+            "attributed windows against the empty column",
+        )
+        assertEquals(0, actual[Loss.UNATTRIBUTED] ?: 0, "empty windows no mechanism claims")
+    }
+
+    @Test
+    fun `where each mechanism costs its reps, capture by capture`() {
+        // The per-capture detail, so a change that moves one capture from
+        // PAIRING to BELOW_MIN_ROM cannot hide inside an unchanged total.
+        // Captures with no empty window are omitted rather than mapped to an
+        // empty list: absent means "nothing was lost here", which is a
+        // different statement from "something was lost and it is nothing".
+        val expected = mapOf(
+            "field-ohp-rotating-8rep-b" to listOf(Loss.PAIRING),
+            "field-bench-rotating-6rep" to listOf(Loss.BELOW_MIN_ROM),
+            "field-ohp-3010-6rep-s37-set02" to listOf(Loss.NO_DRIVE_RUN),
+            "field-bench-3010-6rep-s37-set05" to listOf(Loss.PAIRING, Loss.PAIRING),
+            "field-bench-3010-6rep-s37-set06" to listOf(Loss.BELOW_MIN_ROM),
+            "field-rdl-3010-10rep-s36-set05" to listOf(Loss.PAIRING),
+            "field-backsquat-4011-6rep-s36-set01" to listOf(Loss.PAIRING, Loss.PAIRING),
+            "field-legpress-2010-8rep" to listOf(Loss.PAIRING),
+            "field-legpress-single-2010-8rep" to listOf(Loss.BELOW_MIN_ROM),
+            "field-legcurl-1030-12rep" to listOf(Loss.BELOW_MIN_ROM, Loss.DEMOTED, Loss.BELOW_MIN_ROM),
+            "field-legcurl-1030-12rep-b" to listOf(Loss.PAIRING),
+            "field-legcurl-1030-12rep-c" to listOf(Loss.BELOW_MIN_ROM, Loss.NO_DRIVE_RUN),
+            "field-legcurl-1030-10rep" to listOf(Loss.BELOW_MIN_ROM, Loss.DEMOTED),
+            "field-pullup-3010-8rep-s37-set09" to
+                listOf(Loss.BELOW_MIN_ROM, Loss.DEMOTED, Loss.NO_DRIVE_RUN, Loss.NO_DRIVE_RUN),
+        )
+        val actual = scored.associate { it.fixture to losses(it) }.filterValues { it.isNotEmpty() }
+        assertEquals(expected, actual, "empty windows per capture, in window order")
+    }
+
+    @Test
+    fun `the gap by sensor mount, which is what issue 72 named`() {
+        // Issue #72's title is a mount split: 53% of the reps found on
+        // bar-mounted seated overhead press against 104% on a stack. This
+        // measures the same split on the corpus that exists now, scored per
+        // window rather than as a ratio of totals -- 104% was a total that
+        // cancelled misses against inventions, and the issue's own thread
+        // records that being found out.
+        //
+        // The split is read from `sensorOnStack`, which is the geometry each
+        // set DECLARED, not a judgement made here about where the sensor was.
+        // Rows are (marks, matched).
+        val expected = mapOf(
+            false to listOf(124, 109),
+            true to listOf(46, 38),
+        )
+        val actual = scored.groupBy { it.direction.sensorOnStack }.mapValues { (_, group) ->
+            listOf(group.sumOf { windows(it.fixture).size }, group.sumOf { coverage(it).matched })
+        }
+        assertEquals(expected, actual, "by sensorOnStack: marks, matched")
+        // And the two captures the issue's headline is about. It reported 17
+        // of 32 reps found across four seated-overhead-press sets, 53%. The
+        // two of those four this corpus holds now match 15 of the 16 marks
+        // the metronome called on them: set 1 matches all 8, set 4 matches 7
+        // and leaves one window empty. Not the whole of the reported loss --
+        // the other two sets of that four are not committed here -- but the
+        // captures that are committed no longer show it.
+        val headline = scored.filter { it.fixture.startsWith("field-ohp-rotating-") }
+        assertEquals(2, headline.size, "the rotating overhead-press captures")
+        assertEquals(16, headline.sumOf { windows(it.fixture).size }, "marks across them")
+        assertEquals(15, headline.sumOf { coverage(it).matched }, "marks matched across them")
     }
 
     @Test
