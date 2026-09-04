@@ -181,9 +181,11 @@ class StackMountGeometryTest {
         // Issue 223 seeds sensorOnStack for assisted_pull_up. On a vertical
         // exercise that only re-picks an axis already vertical, so field-37's
         // other three mis-declared sets are rope dead hangs, and
-        // rope_dead_hang is in neither ExerciseDef.STACK_MOUNTED_IDS nor
-        // BODYWEIGHT_IDS (#228), so issue 223's seed does not reach them at
-        // all.
+        // rope_dead_hang is not in ExerciseDef.STACK_MOUNTED_IDS (#228), so
+        // issue 223's stack seed does not reach them at all. It IS in
+        // BODYWEIGHT_IDS as of #239, which the sentence this replaces denied;
+        // that seed decides the set's LOAD and no geometry the analyzer
+        // reads, so it moves no number here either.
         assertSameAnalysis(seededStack, asShipped, "sensorOnStack alone on a vertical lift")
         assertEquals(MovementPlane.VERTICAL, asShipped.measuredPlane, "already vertical without the seed")
         // sensorInverted is what would actually move them, and it is not seeded.
