@@ -94,13 +94,14 @@ import com.macrophage.barspeed.ui.components.SideArrow
  *
  * WHETHER ANY OF IT DRAWS AS DESCRIBED IS NOT CLAIMED HERE. Nothing on this
  * surface has been rendered on a device. The emulator lock at the session
- * scratchpad read "free" throughout, so nothing contended for the slot; the
- * blocker was memory. Free RAM peaked at 1560 MB across a poll of roughly
- * half an hour and never approached the roughly 3 GB a headless
- * `barspeed-api35` boot needs. The AVD was never started, so no device was
- * started and none was killed. The box's one line, its strike
- * and the popup's scroll are all [Field] questions, and this surface stays
- * compile- and lint-gated.
+ * scratchpad read "free" at both ends of every poll, so nothing contended for
+ * the slot; the blocker was memory. TWO polls, each 30 samples about a minute
+ * apart, both on 2026-09-04: 17:08:03Z to 17:37:10Z, peak 1560 MB, floor
+ * 221 MB; and 18:35:47Z to 19:04:15Z, peak 2907 MB, floor 182 MB. A headless
+ * `barspeed-api35` boot needs roughly 3 GB and neither poll held it. The AVD
+ * was never started, so no device was started and none was killed. The box's
+ * one line, its strike and the popup's scroll are all [Field] questions, and
+ * this surface stays compile- and lint-gated.
  */
 @Composable
 internal fun LastSetDetail(
