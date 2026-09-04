@@ -46,8 +46,11 @@ import kotlin.test.assertTrue
  * come. The withholding is therefore deleted rather than narrowed: it was the
  * right answer to a question the schedule stopped asking.
  *
- * The audio of the final rep on these plans is what 0.1.43 played, to the
- * second. What is not the same is the eleven calls before it, and that is the
+ * The audio of the final rep on these plans is 0.1.43's again, which is
+ * measured on two of session 33's thirteen -- `MergedCallCueTrackTest` compares
+ * the scripted window against sets 5 and 13's own tracks -- and derived from
+ * the rule on the other eleven, whose tracks nobody has replayed against this
+ * schedule. What is not the same is the eleven calls before it, and that is the
  * whole of the argument. Whether the lifter hears it that way is a `[Field]`
  * question and is named as one in the commit that made this change; the cue
  * track records what was said, so the next capture answers it.

@@ -119,12 +119,16 @@ data class CadenceBeat(
  * `1110` have a word in every second of their cycle and still say nothing, on
  * the last rep as on every other.
  *
- * The audio of the final rep on the thirteen is what 0.1.43 played, second for
- * second. What is not the same is the eleven calls before it, and that is the
- * whole of the argument. Whether the lifter hears the difference is a `[Field]`
- * question -- the cue track records what was said, so the next capture answers
- * it -- and this file does not settle it in advance, which is the mistake the
- * deleted sentence above made.
+ * The audio of the final rep is 0.1.43's again on the plans that had it
+ * withheld. That is MEASURED on two of the thirteen and DERIVED on the rest:
+ * `MergedCallCueTrackTest` compares the scripted final rep against sets 5 and
+ * 13's own tracks, second by second, and the other eleven are the same rule
+ * applied to plans read from the same `meta.json` rather than tracks anyone has
+ * replayed. What is not the same on any of them is the eleven calls before it,
+ * and that is the whole of the argument. Whether the lifter hears the
+ * difference is a `[Field]` question -- the cue track records what was said, so
+ * the next capture answers it -- and this file does not settle it in advance,
+ * which is the mistake the deleted sentence above made.
  *
  * One cost is a row, and it runs the other way from #173's one gain: a carrying
  * stroke gives up its first tempo count only when an announcement actually
