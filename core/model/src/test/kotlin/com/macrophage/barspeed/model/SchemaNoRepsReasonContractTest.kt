@@ -19,13 +19,19 @@ import kotlin.test.assertTrue
  *
  * THE KEY DOES NOT MINT A NUMBER. It rides as a FURTHER entry under 1.18,
  * which issue #216 had already minted on `main` for `abandonedInPrep` and
- * then extended for `failedByLifter`, and which no tag carries -- v0.1.49
- * shipped 1.17. A branch written against 1.17 minted its own 1.18 for this
- * key; that was a collision with #216's, and the paragraph claiming this was
- * "the first mint by release rather than by accident" is DELETED rather than
- * reworded. One number now covers all three keys. What is asserted below is
- * what that leaves true: the constant reads 1.18, 1.18 is accepted and
- * published, and 1.17 is still readable.
+ * then extended for `failedByLifter`. A branch written against 1.17 minted
+ * its own 1.18 for this key; that was a collision with #216's, and the
+ * paragraph claiming this was "the first mint by release rather than by
+ * accident" is DELETED rather than reworded. One number covers all three
+ * keys.
+ *
+ * 1.18 IS RELEASED NOW -- v0.1.50 shipped it, read by `git show
+ * v0.1.50:core/model/.../SessionExport.kt`. The clause "which no tag
+ * carries" above is deleted for that reason, and the assertion below no
+ * longer reads the exporter's constant as 1.18: `bodyweight`, `bodyWeight_kg`,
+ * the rest instant and the roll window mint 1.19 on top of it. What is
+ * asserted is what that leaves true for THIS key: it is filed under 1.18,
+ * 1.18 is accepted and published, and 1.17 is still readable.
  */
 class SchemaNoRepsReasonContractTest {
     private fun schema(name: String) = Json.parseToJsonElement(
@@ -45,13 +51,18 @@ class SchemaNoRepsReasonContractTest {
         .map { it.jsonObject }
 
     @Test
-    fun `the key rides under the unreleased 1_18 and 1_17 is still accepted`() {
-        // Not a mint. #216 minted 1.18 and no tag carries it, so a further
-        // entry under it is free -- the rule every "1.17 is UNRELEASED" entry
-        // in SessionExport's log applied while 1.17 was in that state.
-        assertEquals("1.18", SessionExport.SCHEMA_VERSION, "the number this key rides under moved")
-        assertTrue("1.18" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
-        assertTrue("1.18" in exportVersionEnum(), "the published enum does not accept the version written")
+    fun `the key rides under 1_18, which v0_1_50 shipped, and 1_17 is still accepted`() {
+        // Not a mint. #216 minted 1.18 and this key rode under it while no tag
+        // carried it. v0.1.50 carries it now, so the exporter's own constant
+        // has moved past it: `assertEquals("1.18", SCHEMA_VERSION)` stood here
+        // and is DELETED rather than reworded, since it asserted the number
+        // this key is filed under by reading a constant that no longer means
+        // that. Which number the key is filed under is asserted below, off the
+        // log entry itself; the constant is pinned in
+        // SchemaBodyweightSourceContractTest.
+        assertEquals("1.19", SessionExport.SCHEMA_VERSION, "1.18 is released, so the exporter must be past it")
+        assertTrue("1.18" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the number this key rides under is refused")
+        assertTrue("1.18" in exportVersionEnum(), "the published enum dropped the number this key rides under")
         assertTrue("1.17" in exportVersionEnum(), "1.17 stopped being readable, so this is not additive")
     }
 
@@ -115,7 +126,10 @@ class SchemaNoRepsReasonContractTest {
         // published copy of SessionExport's; both must carry the entry.
         val log = schema("session-export.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
             .jsonObject["description"]!!.jsonPrimitive.content
-        val entry = log.substringAfterLast("1.18:")
+        // Bounded at the 1.19 mint. Without the second hop this reads every
+        // entry after the last "1.18:" INCLUDING 1.19's four, and would pass on
+        // a log that filed noRepsReason under the newer number.
+        val entry = log.substringAfterLast("1.18:").substringBefore("1.19:")
         assertTrue("noRepsReason" in entry, "the 1.18 log entry never names noRepsReason")
         assertTrue(
             "under-resolved" in entry.lowercase() || "1 of 10" in entry,
