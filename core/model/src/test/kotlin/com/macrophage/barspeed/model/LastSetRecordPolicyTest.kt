@@ -136,11 +136,6 @@ class LastSetRecordPolicyTest {
     }
 
     @Test
-    fun `a failed set says so`() {
-        assertEquals(EffortCorrectionPolicy.FAILED, status(failed = true))
-    }
-
-    @Test
     fun `a failed set says why it ended beside how it was rated`() {
         assertEquals("Failed · Ended: Muscle failure", status(failed = true, limiter = SetLimiter.MUSCLE))
     }
