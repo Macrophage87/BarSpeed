@@ -60,7 +60,9 @@ data class CadenceBeat(
  *    spoken count at all, which is issue 147 and a complaint from the gym.
  * 4. **Not spoken.** The rep number stays on screen, driven by `onRepCounted`,
  *    and that on-screen number is the metronome's own count rather than the
- *    sensor's.
+ *    sensor's -- and it counts FINISHED reps, so it reads one lower than the
+ *    voice on every plan that speaks. See "The SCREEN still counts finished
+ *    reps" below; it is stated once, there.
  *
  * The behaviour before issue 106 was a fifth option: insert a one-second beat
  * the prescription did not ask for.
@@ -134,7 +136,37 @@ data class CadenceBeat(
  * stroke gives up its first tempo count only when an announcement actually
  * rides it, so speaking the warning takes back the count the suppression had
  * handed the final rep. On a `1120` pushdown the second that carried a `1`
- * carries the call instead.
+ * falls silent, and the call rides the stroke word one second earlier: from
+ * the start of the final rep, `Up` and the warning both at second 46 with
+ * nothing at 47, against rep 1 of the same plan which still counts `1` at its
+ * own offset 3. An earlier version of this paragraph said that second
+ * "carries the call instead", which is false by one second and is deleted
+ * rather than softened -- the call is not where the count was.
+ *
+ * ## The SCREEN still counts finished reps, and #243 did not move it
+ *
+ * `RecordScreen.GuidedSetStage` draws `"rep N of M"` from `RecordState
+ * .manualReps`, which `GuidedCadenceRunner` sets from `onRepCounted(rep)` --
+ * fired at [repCompleteAfterBeat], with the rep just FINISHED. Nothing in
+ * `:core:dsp` decides that and this change did not touch it.
+ *
+ * The consequence is a mismatch that runs for the whole set. The lifter in
+ * their seventh rep of twelve now hears `"Rep 7"` and reads `rep 6 of 12` on
+ * the ring. Before #243 the two agreed, because the voice counted finished
+ * reps too; the voice moved and the screen did not, so a change that removed
+ * one off-by-one created a second one between two things the lifter can see
+ * and hear at once.
+ *
+ * That is stated here rather than fixed here on purpose: the screen is `:app`,
+ * where no test on the CI path reaches it, and the right answer is not obvious.
+ * Making the ring read the rep now due would put `rep 1 of 12` on screen before
+ * a single rep is done. **Whether the mismatch reads as the app losing count is
+ * a `[Field]` question and this file does not answer it in advance.** On the
+ * next guided set, on any tempo: read the ring while the voice speaks a number,
+ * and say whether the two disagreeing by one is confusing, invisible, or worse
+ * than the miscount #243 was filed for. The set's `_cues.csv` records what was
+ * SAID and its instant, so the spoken half is recoverable from the capture; the
+ * screen leaves no trace and only the lifter can report it.
  *
  * Rep 1 is announced on no plan, and that is the schedule rather than an
  * omission. A call rides a beat of the rep it names on cases 2 and 3 and the
@@ -149,7 +181,10 @@ data class CadenceBeat(
  * `"Rep N"` counts FINISHED reps and its `"Last rep"` lands as rep
  * `plannedReps - 1` completes, with the whole final rep still ahead. The two
  * cannot speak on one set: `SetVoicePolicy.guidesFor` returns at most one guide
- * and excludes the sensor counter on a cued set.
+ * and excludes the sensor counter on a cued set. They are not distinguishable
+ * from a cue ROW either, which matters from export 1.19 because the two now
+ * name different reps; the discriminator is the stroke words this file places,
+ * published in `voiceCues` and pinned by `CueTrackOriginTest`.
  *
  * ## What stays uncarryable, and what was rejected
  *
