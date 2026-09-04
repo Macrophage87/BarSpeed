@@ -60,7 +60,7 @@ enum class GeometrySource {
  * unless a config says otherwise. Without the annotation, a NEWLY recorded
  * set whose provenance genuinely resolves to [GeometrySource.DEFAULT] would
  * have the key silently DROPPED rather than published as `"default"` --
- * `geometry.source` is a closed six-key required object, so a dropped key is
+ * `geometry.source` is a closed seven-key required object, so a dropped key is
  * not a smaller export, it is an invalid one. Caught by
  * `StackSeedDifferentialTest`'s `an id nothing seeds still publishes a
  * default stack mount`, which reds without this annotation even though the
@@ -90,7 +90,7 @@ data class GeometrySources(
      * `geometry.source` is a closed required object, so a key dropped by
      * `encodeDefaults = false` makes the document invalid rather than smaller.
      *
-     * This field carried LESS than the five above it when it was written:
+     * This field carried LESS than the six above it when it was written:
      * `PlanExerciseDef.bodyweight` was a non-nullable `Boolean`, so a declared
      * `false` and an omitted key were one value and both published
      * [GeometrySource.DEFAULT]. `#227` made the plan key `Boolean?`, the same
