@@ -14,8 +14,17 @@ import com.macrophage.barspeed.model.WeightUnit
  * through DataStore. Four other view models also observe
  * `container.settings.weightUnit` -- `HomeViewModel`, `PlansViewModel`,
  * `PlanDetailViewModel` and `SessionDetailViewModel` -- and none holds a typed
- * load: they format an already-recorded `loadKg` or a derived volume, not text
- * a lifter is mid-typing. `RecordScreen`'s "Units:" chip and `HomeScreen`'s
+ * load. `PlansViewModel`'s unit does reach text a lifter is mid-typing:
+ * `PlansScreen.kt:57` collects it and passes it at `:149` to
+ * `BodyWeightDialog`, whose field is `remember`-seeded once from
+ * `unit.inputValue` and saved back through `unit.parseToKg`
+ * (`BodyWeightDialog.kt:39`, `:60`). `RecordScreen`'s own
+ * `BodyWeightPromptDialog` does the same with `rememberSaveable`
+ * (`RecordScreen.kt:472`, parsed back at `:503`). Both are modal and no unit
+ * toggle is reachable while either is on screen, so neither is fixed here and
+ * neither is claimed to be; that reachability was read from source, not
+ * observed on a device. The other three format an already-recorded `loadKg`
+ * or a derived volume. `RecordScreen`'s "Units:" chip and `HomeScreen`'s
  * "kg -> lb" button both call a `toggleWeightUnit` that writes
  * `container.settings`, and fixing this one observer fixes both taps; fixing
  * either toggle would fix only one (#77).
@@ -37,16 +46,17 @@ import com.macrophage.barspeed.model.WeightUnit
  * evidence at one SHA, not a gate: nothing re-runs it.
  *
  * `043e63d030facf7298af2b379a5097d7a7e21c0b` IS NOT AN ANCESTOR OF THIS
- * BRANCH -- the branch was rebased onto `e74d4e61` after this run, and
- * `git merge-base --is-ancestor 043e63d0 HEAD` fails, as it does for the red
- * CI run named in `SetLoadPolicy.kt`'s history too. The bench evidence still
- * applies: this file and `SetLoadPolicy.kt` are byte-identical across the
- * rebase (`git diff --stat 043e63d0 ce07d6a3 --
- * app/src/main/kotlin/com/macrophage/barspeed/record/WeightUnitChange.kt
- * core/model/src/main/kotlin/com/macrophage/barspeed/model/SetLoadPolicy.kt`
- * is empty), and `git diff --name-only 043e63d0 ce07d6a3` names four other
- * `app/` files that did change -- `GuideScreen`, `HomeViewModel`,
+ * BRANCH -- it has been rebased twice since that run, most recently onto
+ * `Cut version 0.1.50` -- and `git merge-base --is-ancestor 043e63d0 HEAD`
+ * fails. The bench evidence still applies: this file and `SetLoadPolicy.kt`
+ * were byte-identical between that run and `Convert the typed load when the
+ * kg/lb chip is tapped`, the commit carrying the fix, measured by
+ * `git diff --stat 043e63d0 <that commit> --` over the two paths and empty.
+ * `git diff --name-only` over the same pair, restricted to `app/`, names five
+ * other files -- `app/build.gradle.kts`, `GuideScreen`, `HomeViewModel`,
  * `SessionDetailScreen`, `SessionDetailViewModel` -- none on the load path.
+ * The SHA of that commit is not written here: it moves on every rebase, and
+ * two rebases have already made one copy of it false.
  */
 internal fun unitChangedState(s: RecordState, unit: WeightUnit): RecordState {
     val converted = SetLoadPolicy.convertedLoad(s.loadInput, s.weightUnit, unit)

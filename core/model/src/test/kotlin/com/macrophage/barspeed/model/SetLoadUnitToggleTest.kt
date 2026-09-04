@@ -111,6 +111,10 @@ class SetLoadUnitToggleTest {
      * tap 2 gives `105.5`, and tap 4 repeats tap 2. So the LB text drifts
      * once more after the tap that looked, from the KG side, already settled
      * -- two taps to a fixed point, not one.
+     *
+     * ONE WORKED VALUE, NOT A SWEEP. The general property -- every LB-lattice
+     * text reaches a fixed point by tap 2 -- was checked offline at this SHA
+     * over 0-900 lb by 0.5 (1801 values, 0 fail) and is not pinned here.
      */
     @Test
     fun `a value seeded directly on the lb lattice settles by the second tap, not the first`() {

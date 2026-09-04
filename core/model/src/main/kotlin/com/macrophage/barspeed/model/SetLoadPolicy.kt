@@ -629,6 +629,17 @@ object SetLoadPolicy {
      * nothing, and this function has no business finishing someone's typing.
      * [from] equal to [to] is the identity for the same reason.
      *
+     * THAT LIST NAMES THREE CASES AND IS NOT THE WHOLE SET. `toDoubleOrNull`
+     * accepts more than a plate weight, and this function renders what it
+     * returns: `NaN` comes out as `0`, `Infinity` as `2147483647`,
+     * `-Infinity` as `-2147483648`, `1e12` as `2147483647` -- `Math.round`
+     * saturates at `Long.MAX_VALUE` and `Double.toInt` clamps -- all four
+     * measured offline at this SHA through this function. The READY form's
+     * load box sets no `keyboardOptions` at all and the in-rest plan-set box
+     * sets `KeyboardType.Decimal`, a soft-keyboard hint rather than a filter,
+     * so neither rules the strings out. Nothing guards this and no test
+     * covers it.
+     *
      * NOTHING HERE WRITES A STATED LOAD. [ConvertedLoad.kg] is reported so a
      * caller can name the quantity the tap promised not to move; it is not a
      * value to seed `statedLoadKg` with. That field means "the lifter said
@@ -641,24 +652,29 @@ object SetLoadPolicy {
      * converting to kg, at most 0.25 lb (0.113 kg) converting to lb. That is
      * the same kind of lossiness `WeightUnit.inputValue` already has at every
      * other seed site and that `WeightUnitTest` pins (#45); what changed is
-     * its size, from a factor of 2.2 to a tenth of a kilo. The alternative,
-     * rendering the exact conversion, puts `220.46226218` in an edit box the
-     * lifter reads at arm's length between sets.
+     * its size, from a factor of 2.2 to at most a quarter kilo. The two taps
+     * quantise separately, so the settled text can name a kg up to 0.238 kg
+     * from the one typed: 37.988 kg taps to `83.5` lb, then `37.75` kg, and
+     * stays there. The largest gap found is 0.2383 kg, at 37.9883 kg, swept
+     * offline at this SHA over 0-450 kg by 0.0001 through this function.
+     * The alternative, rendering the exact conversion, puts `220.46226218`
+     * in an edit box the lifter reads at arm's length between sets.
      *
      * STABLE WITHIN TWO TAPS, NOT ONE -- the property that matters for a chip
      * the lifter can tap twice. Every text this returns lies on a step
      * lattice, but the two lattices are not the same width: 0.25 kg is 0.5512
      * lb, wider than the 0.5 lb step. A KG-lattice text IS a fixed point --
-     * converting it to lb and back always returns it, checked over 0-450 kg
-     * by 0.25 (1801 values, 0 fail) -- but an LB-lattice text need not be: 93
-     * of 1001 values checked over 0-500 lb by 0.5 do not survive
-     * lb-to-kg-to-lb. So a hand-typed value that quantises into LB on its
-     * first tap can still move again on the second: 47.7 kg taps to `105`
-     * lb, then `47.75` kg, then `105.5` lb -- three renderings a tenth of a
-     * kilo apart, not the one settled value the earlier claim here promised.
-     * From the kg side onward it is exact. `SetLoadUnitToggleTest` sweeps the
-     * kg-lattice-seeded case exhaustively and pins the lb-lattice case
-     * directly, seeded on that lattice with no kg value ever entering it.
+     * converting it to lb and back always returns it, checked offline at this
+     * SHA over 0-450 kg by 0.25 (1801 values, 0 fail); the suite's own sweep
+     * of that case in `SetLoadUnitToggleTest` runs to 400 kg. An LB-lattice
+     * text need not be: 93 of 1001 values, checked offline at this SHA over
+     * 0-500 lb by 0.5, do not survive lb-to-kg-to-lb. So a hand-typed value
+     * that quantises into LB on its first tap can still move again on the
+     * second: 47.7 kg taps to `105` lb, then `47.75` kg, then `105.5` lb --
+     * not the one settled value the earlier claim here promised. From the kg
+     * side onward it is exact. `SetLoadUnitToggleTest` pins the lb-lattice
+     * case directly, seeded on that lattice with no kg value ever entering
+     * it.
      *
      * RENDERED HERE RATHER THAN BY `WeightUnit.inputValue`, which quantises to
      * 0.1 of the display unit and so cannot write a quarter at all: 8 lb
