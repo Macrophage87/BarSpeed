@@ -78,6 +78,7 @@ import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.VoiceCue
+import com.macrophage.barspeed.model.VoiceMilestonePolicy
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.model.armedCaptureOf
 import kotlinx.coroutines.CancellationException
@@ -560,9 +561,9 @@ private data class PendingSetWrite(
  * Which stream the live readout follows right now, from what has arrived so
  * far (#210).
  *
- * A free function taking what it needs rather than a member: [RecordViewModel]
- * sits AT detekt's LargeClass limit, so a dozen lines of lookup inside it reds
- * `:app:detekt`, which is CI's first step. The three below say "for
+ * A free function taking what it needs rather than a member: detekt's
+ * `LargeClass` counts [RecordViewModel]'s lines against a default of 600, and
+ * this branch put it over -- `:app:detekt` is CI's first step. The three below say "for
  * [liveFeedOf]'s reason" and mean this paragraph; they used to name
  * `armedCaptureOf`, which since #212 lives in `:core:model` and no longer
  * carries it.
@@ -610,8 +611,8 @@ internal fun liveFeedOf(
  * silent across the whole set with what the app could see of each (#213).
  *
  * A free function taking what it needs, for [liveFeedOf]'s reason:
- * [RecordViewModel] is a class detekt measures AT its LargeClass limit, and
- * this issue's two added lines put it over. So the two answers are composed
+ * [RecordViewModel] is the class detekt's `LargeClass` counts against a
+ * default of 600, and this issue's two added lines put it over. So the two answers are composed
  * here rather than at the call site, which keeps that site the single
  * statement it already was.
  *
@@ -659,8 +660,8 @@ internal fun RecordState.captureAt(
  * the rest screen, asked at the moment they draw, and `endSet`, asked at the
  * moment the set ended -- cannot pair one link's state with the other's frame
  * instant in different ways. An extension rather than a member of
- * [RecordViewModel] for [liveFeedOf]'s reason: that class is at detekt's
- * LargeClass limit.
+ * [RecordViewModel] for [liveFeedOf]'s reason: that class is the one detekt's
+ * `LargeClass` counts.
  */
 internal fun RecordState.armedLinks(): ArmedLinks =
     ArmedLinks(imuState, imuFrameAtMs, imuArmedAtMs, imuStateB, imuFrameAtMsB, imuArmedAtMsB)
@@ -2835,6 +2836,60 @@ data class RecordState(
             ?: ExerciseKind.DYNAMIC
 }
 
+/**
+ * The three latches the in-set voice keeps, and the two calls that move them.
+ *
+ * At file scope rather than inside [RecordViewModel] for [liveFeedOf]'s
+ * reason: detekt's `LargeClass` counts that class against a default of 600 and
+ * this branch put it over. Moving these five declarations out is what brought
+ * it back under.
+ *
+ * The DECISION is [VoiceMilestonePolicy]'s, in `:core:model` where a test runs
+ * on it. What is left here is the latches and the call to [speak].
+ *
+ * THE AUDIO-CUES GATE IS THE CALLER'S. Both entry points below are asked only
+ * where cues are on, so a set recorded with the voice off leaves every latch
+ * where it was -- which is what the two functions in [RecordViewModel] did
+ * before this class took them.
+ */
+private class VoiceMilestones(private val speak: (String) -> Unit) {
+    private var announceReps = false
+    private var plannedReps: Int? = null
+    private var countedPhase: Phase = Phase.IDLE
+    private var spokenSecond = 0
+    private var announcedRep = 0
+
+    /** Clear every latch for a new set, and take the set's own two facts. */
+    fun startSet(announceReps: Boolean, plannedReps: Int?) {
+        this.announceReps = announceReps
+        this.plannedReps = plannedReps
+        countedPhase = Phase.IDLE
+        spokenSecond = 0
+        announcedRep = 0
+    }
+
+    /** One live frame: the tempo count, then the rep call. */
+    fun onLive(phase: Phase, elapsedS: Double, repCount: Int) {
+        val next = VoiceMilestonePolicy.phaseCount(phase, elapsedS, countedPhase, spokenSecond)
+        countedPhase = next.phase
+        spokenSecond = next.second
+        next.speak?.let(speak)
+        announceRep(repCount)
+    }
+
+    /**
+     * Voice at each lockout: "Rep N" as reps complete, "Last rep" going into
+     * the final planned rep, and "Done" when the count is hit. Reached from
+     * the live frame above and from the manual tap.
+     */
+    fun announceRep(repCount: Int) {
+        if (!announceReps) return
+        val cue = VoiceMilestonePolicy.repMilestone(repCount, announcedRep, plannedReps) ?: return
+        announcedRep = repCount
+        speak(cue)
+    }
+}
+
 class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private val container = (app as LiftingApp).container
     private val autoConnect = container.autoConnect
@@ -3037,11 +3092,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      */
     private var lastHrSample: HrSample? = null
     private var voice: VoiceCounter? = null
-    private var lastCountedPhase: Phase = Phase.IDLE
-    private var lastSpokenSecond = 0
-    private var lastAnnouncedRep = 0
+    private val milestones = VoiceMilestones { speakCue(it) }
     private var plannedRepsForSet: Int? = null
-    private var announceReps = false
 
     /**
      * Whether the SENSOR-driven counter may speak on the set in progress.
@@ -3289,9 +3341,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // The readout starts on the armed unit; nothing has arrived yet.
         liveFedBy = armedSensors?.analysed
         endingSet = false
-        lastCountedPhase = Phase.IDLE
-        lastSpokenSecond = 0
-        lastAnnouncedRep = 0
         plannedRepsForSet =
             if (s.currentIsTimed) {
                 null
@@ -3301,7 +3350,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 s.currentSlot?.reps
             }
         // Never announce reps on timed sets: a carry's gait can trip the rep detector.
-        announceReps = !s.currentIsTimed
+        milestones.startSet(announceReps = !s.currentIsTimed, plannedReps = plannedRepsForSet)
         // The bar sensor is RECORD-ONLY for standard lifts: the lifter (or the
         // voice guide) counts the reps, while sensor data feeds velocity/power
         // analysis. Explosive lifts stay sensor-counted (single drives, peak
@@ -3436,9 +3485,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Manual/guided sets: the app (or the lifter) is the counter — the
         // sensor keeps recording for velocity metrics, but its phase counts and
         // rep calls must stay silent or two voices count over each other.
-        if (!sensorVoiceRuns) return
-        countPhaseSeconds(live.phase, live.currentPhaseElapsedS)
-        announceRepMilestones(live.repCount)
+        if (!sensorVoiceRuns || !stateFlow.value.audioCues) return
+        milestones.onLive(live.phase, live.currentPhaseElapsedS, live.repCount)
     }
 
     /**
@@ -3591,7 +3639,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * rep announcement alongside the cue.
      */
     // An expression body for the reason toggleAudioCues above is one: detekt
-    // counts this class's lines of code and it sits on the LargeClass threshold,
+    // counts this class's lines of code against a LargeClass default of 600,
     // so #109's one new argument to closer.close had to be paid for here.
     private fun speakCue(cueText: String, utterance: String = cueText) = speakCues(listOf(cueText), utterance)
 
@@ -3642,7 +3690,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // decided a rep was worth.
         journal?.appendRepMark(System.currentTimeMillis())
         stateFlow.value = s.copy(manualReps = count)
-        announceRepMilestones(count)
+        if (s.audioCues) milestones.announceRep(count)
     }
 
     /** Rest-screen correction when the sensor miscounted (or the set was manual). */
@@ -3664,37 +3712,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * coming up.
      */
     fun addLastSetLoad(deltaKg: Double) = applyLoadCorrection(stateFlow, deltaKg, ratings, container.appScope)
-
-    /**
-     * Voice at each lockout: "Rep N" as reps complete, "Last rep" going into the
-     * final planned rep, and "Done" when the count is hit.
-     */
-    private fun announceRepMilestones(repCount: Int) {
-        if (!announceReps || !stateFlow.value.audioCues) return
-        if (repCount == lastAnnouncedRep || repCount == 0) return
-        lastAnnouncedRep = repCount
-        val planned = plannedRepsForSet
-        when {
-            planned != null && repCount == planned -> speakCue("Done")
-            planned != null && repCount == planned - 1 && planned > 1 -> speakCue("Last rep")
-            else -> speakCue("Rep $repCount")
-        }
-    }
-
-    /** Voice tempo count: speaks 1, 2, 3… through each moving phase (spec: audible 4-s eccentric). */
-    private fun countPhaseSeconds(phase: Phase, elapsedS: Double) {
-        if (!stateFlow.value.audioCues) return
-        if (phase != lastCountedPhase) {
-            lastCountedPhase = phase
-            lastSpokenSecond = 0
-        }
-        if (phase != Phase.ECCENTRIC && phase != Phase.CONCENTRIC) return
-        val second = elapsedS.toInt()
-        if (second >= 1 && second != lastSpokenSecond) {
-            lastSpokenSecond = second
-            speakCue(second.toString())
-        }
-    }
 
     /**
      * Finish the set, logging [rating] as part of the same tap: freeze
