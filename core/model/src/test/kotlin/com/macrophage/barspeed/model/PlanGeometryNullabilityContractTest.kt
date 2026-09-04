@@ -33,13 +33,13 @@ class PlanGeometryNullabilityContractTest {
      * This is the schema catching up with the code, and the gap it closes was
      * real rather than cosmetic, though not on the same date for both.
      * `sensorOnStack` (#223) has read an omitted key as undeclared since
-     * v0.1.49; `bodyweight` (#227) has done so only since it made the same
-     * change, which has shipped in no release yet. Both left this document
-     * still typing them as plain booleans, so the published contract and the
-     * running app disagreed about what an omitted key meant, and a plan
-     * spelling absence as `null` was refused by the schema and accepted by the
-     * app. `sensorInverted` is the third and is widened with them, in this
-     * same schema mint that first makes it nullable in Kotlin too.
+     * v0.1.49; `bodyweight` (#227) has done so since v0.1.50, one release
+     * later. Both left this document still typing them as plain booleans, so
+     * the published contract and the running app disagreed about what an
+     * omitted key meant, and a plan spelling absence as `null` was refused by
+     * the schema and accepted by the app. `sensorInverted` is the third and is
+     * widened with them, in this same schema mint that first makes it nullable
+     * in Kotlin too.
      *
      * `type` is asserted as the two-element list rather than by membership: a
      * bare `"boolean"` and a `["boolean", "null"]` are the whole difference
@@ -150,6 +150,41 @@ class PlanGeometryNullabilityContractTest {
         assertTrue(
             "1.12" in PlanFile.SUPPORTED_SCHEMA_VERSIONS,
             "PlanFile does not accept 1.12, so no plan can declare the contract this entry describes",
+        )
+    }
+
+    /**
+     * The 1.12 entry names the release the omitted-`bodyweight` rule shipped
+     * in, rather than claiming it has not shipped.
+     *
+     * The minted entry said the app has read an omitted `bodyweight` as
+     * undeclared "since #227, which has shipped in no release yet". That was
+     * false when it was written. "Make bodyweight nullable so an omitted key
+     * is not a silent false" -- 61779b67, the commit that made the app read
+     * it that way -- is an ancestor of tag v0.1.50 and is not an ancestor of
+     * v0.1.49, both checked with `git merge-base --is-ancestor`. So the rule
+     * had already shipped, and a plan author reading the entry was told the
+     * build in their hands could not hold it.
+     *
+     * This is the SECOND time this document has said a shipped version had
+     * not shipped -- the 1.8 entry still reads "1.8 has not shipped in any
+     * release", which the 1.9 entry corrects by naming v0.1.44 -- which is
+     * why the corrected clause is pinned here rather than only written.
+     *
+     * What is pinned is the SENTENCE, not the fact behind it. Nothing on a
+     * JVM test classpath can read a git tag, so this reds when the clause is
+     * reverted or reworded and would stay green if the tag itself ever moved.
+     * The clause is asserted whole, `#227` included, because "v0.1.50" alone
+     * would match any later entry naming that release for something else.
+     */
+    @Test
+    fun `the 1_12 entry names the release the omitted-bodyweight rule shipped in`() {
+        val description = schema("plan.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue("1.12:" in description, "the plan version log has no 1.12 entry")
+        assertTrue(
+            "since #227, which shipped in v0.1.50" in description,
+            "the 1.12 entry does not name v0.1.50 as the release the omitted-bodyweight rule shipped in",
         )
     }
 }
