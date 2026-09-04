@@ -920,6 +920,25 @@ data class SessionExport(
          * the count the lifter performed. On the capture this was written from,
          * one set keeps ten detections against eight reps counted by hand.
          * Over-segmentation is a separate defect and is not touched here.
+         *
+         * 1.19 carries an ELEVENTH change, under the same number the mint
+         * above states, and it adds no key to this document (#72): on an
+         * ECCENTRIC-FIRST set a rep may now omit `ecc_s`. The key was already
+         * nullable and already omitted on concentric-first sets, where a drive
+         * with no detectable return has always been published on the drive
+         * alone; what changes is the SET OF SETS that can emit such a rep.
+         * Before this, an eccentric-first set required both phases, so a rep
+         * whose lowering never became a phase was DELETED rather than
+         * published without one -- and which of the two a lifter got was
+         * decided by nothing but the phase the plan declared the set opens
+         * with. A reader that treats a missing `ecc_s` as "this rep had no
+         * eccentric" was already wrong on concentric-first sets and is now
+         * wrong on more sets; the right reading is "the eccentric was not
+         * measured", never zero. Not retroactive: the segmentation is frozen
+         * into the stored analysis at record time and nothing re-runs the
+         * segmenter at export time, so an old session re-exports unchanged.
+         * `RepSegmenter.pairEccentricFirst` in `:core:dsp` is where the rule
+         * lives.
          */
         const val SCHEMA_VERSION = "1.19"
 
