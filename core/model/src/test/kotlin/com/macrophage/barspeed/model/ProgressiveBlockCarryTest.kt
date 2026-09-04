@@ -95,6 +95,20 @@ import kotlin.test.assertNull
  * shift -- the equal-declaration and no-next-declaration branches above
  * already carry the statement through unchanged, and a warm-up whose own
  * declaration matches the working weight has corrected nothing to exclude.
+ *
+ * ## What has NOT been seen on a device
+ *
+ * The offset carry has never been run on the emulator. Round 4 held the
+ * bench slot's lock free and polled free physical memory once a minute for
+ * thirty minutes against the 3 GB floor `bench-test` sets; the highest
+ * reading was 1454 MB and it never cleared, so the run was not attempted
+ * rather than attempted badly. The scenario it owes: a plan block declaring
+ * 45 / 55 / 65 on one exercise, set 1 opened at 50 and recorded, then read
+ * the load box and the caption offered for set 2 -- the box should hold 60
+ * and the caption should be the export sentence, not the reach one -- and
+ * again for set 3, which should hold 70. Everything above is pinned in this
+ * module; what the emulator would add is that the numbers reach the screen
+ * the lifter reads.
  */
 class ProgressiveBlockCarryTest {
     /**
