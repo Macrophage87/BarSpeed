@@ -360,6 +360,10 @@ object SetLoadPolicy {
      * accepting a zero here would let the set through and record the very
      * number this refusal exists to prevent.
      *
+     * Sets recorded before this refusal existed still hold `loadKg = 0.0`
+     * and remain indistinguishable from a genuinely unloaded set. Nothing
+     * here marks or repairs them; `DATABASE_VERSION` is unchanged.
+     *
      * It returned `false` unconditionally when it was introduced, which was
      * what the app checked before starting a set: nothing. That identity
      * existed so a differential could red against a wiring omission, the

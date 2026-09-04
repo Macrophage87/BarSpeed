@@ -109,7 +109,7 @@ class StackMountSeedTest {
     }
 
     /**
-     * `rope_dead_hang` is deliberately excluded too (#228), decided rather
+     * `rope_dead_hang` is deliberately excluded too, decided rather
      * than merely deferred: the id names the grip implement, not the
      * equipment class, and cannot distinguish a fixed-rig rope (no stack)
      * from one riding an assist machine's cable, which is what field-37

@@ -137,9 +137,10 @@ data class ExerciseDef(
          * The definition an AD-HOC set runs against -- one with no plan slot,
          * resolved from the exercise picker's id alone.
          *
-         * Lifted here from `RecordState.currentExercise`, which is a property
-         * on a data class inside `RecordViewModel.kt` that no test on the CI
-         * path can construct. It was lifted as the bare
+         * Lifted here from `RecordState.currentExercise`, a property on a
+         * data class in `:app`. It is lifted so the decision runs in
+         * `:core:model`, which cannot see `RecordState` at all and so cannot
+         * be pinned against it. It was lifted as the bare
          * `seedById(id) ?: ExerciseDef(id, id)` that stood there, defect
          * included, so a differential had something to red against.
          *
@@ -149,7 +150,9 @@ data class ExerciseDef(
          * push-up or dead hang is body-weight work whether or not a plan
          * declared it. There is no plan here to declare anything, so
          * `declared` is null and the seed default decides. #229 item 3, and
-         * half of #61's population.
+         * part of #61's population. Only `dead_hang` of the five is in
+         * [SEED], which is `RecordState.exerciseOptions`, so it is the only
+         * one the picker can reach today.
          *
          * `copy` rather than a fresh constructor call, deliberately: the seed
          * entry for `dead_hang` carries a display name, a HOLD kind and
@@ -157,8 +160,8 @@ data class ExerciseDef(
          * would set one flag and discard those three.
          *
          * Only `bodyweight` is seeded here. `sensorOnStack` has the same gap
-         * on the same path and is #228's; deciding it belongs with that issue
-         * rather than in a body-weight fix.
+         * on the same path and is not tracked anywhere; for the owner to
+         * decide whether it is.
          */
         fun resolvedById(id: String): ExerciseDef {
             val base = seedById(id) ?: ExerciseDef(id, id)
@@ -216,7 +219,7 @@ data class ExerciseDef(
          * here has measured.
          *
          * `rope_dead_hang` is deliberately NOT here, decided rather than
-         * merely deferred (#228). Field-37 sets 11-13 (v0.1.48) were,
+         * merely deferred. Field-37 sets 11-13 (v0.1.48) were,
          * owner-confirmed, a hang on an assist machine's rope, and that rope
          * did ride the assist stack's cable that session. But the id names
          * the grip implement, not the equipment class, on the same reasoning
@@ -267,8 +270,8 @@ data class ExerciseDef(
          * [STACK_MOUNTED_IDS] -- a different fact about a different id.
          *
          * `rope_dead_hang` has no entry here for [STACK_MOUNTED_IDS]'s own
-         * reason: it is genuinely body-weight work too, and is left to #228
-         * alongside its stack-mount gap so the two are decided together.
+         * reason: it is genuinely body-weight work too, and is not tracked
+         * anywhere; for the owner to decide whether it is.
          *
          * The commit "Seed pull-ups, dips, push-ups, chin-ups and dead hangs
          * as body weight" left a follow-up list naming PlanDetailScreen and

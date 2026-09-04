@@ -98,11 +98,11 @@ import kotlin.test.assertNull
  *
  * ## What has NOT been seen on a device
  *
- * The offset carry has never been run on the emulator. Round 4 held the
- * bench slot's lock free and polled free physical memory once a minute for
- * thirty minutes against the 3 GB floor `bench-test` sets; the highest
- * reading was 1454 MB and it never cleared, so the run was not attempted
- * rather than attempted badly. The scenario it owes: a plan block declaring
+ * The offset carry has never been run on the emulator. The bench slot's
+ * lock was free and free physical memory was polled once a minute for
+ * thirty minutes against the 3 GB floor `bench-test` sets: first sample
+ * 1206 MB, last 594 MB, highest 1544 MB. It never cleared, so the run was
+ * not attempted rather than attempted badly. The scenario it owes: a plan block declaring
  * 45 / 55 / 65 on one exercise, set 1 opened at 50 and recorded, then read
  * the load box and the caption offered for set 2 -- the box should hold 60
  * and the caption should be the export sentence, not the reach one -- and
