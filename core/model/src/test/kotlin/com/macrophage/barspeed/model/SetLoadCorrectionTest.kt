@@ -188,14 +188,14 @@ class SetLoadCorrectionTest {
 
     @Test
     fun `a next slot switched during the rest is a different block`() {
-        // SWITCH EXERCISE replaces the slot coming up while
-        // the rest screen is drawn, and the load correction is tapped after
-        // that. The block answer has to be read from the slot that is next
-        // NOW, because a correction to the past may move the load of the set
-        // coming up and may never move the load of a different movement --
-        // and where the two declarations render equal, two body-weight blocks
-        // being the guaranteed pair, the carry writes both the box and the
-        // standing statement, so the next set is RECORDED at that load.
+        // SWITCH EXERCISE replaces the slot coming up while the rest screen
+        // is drawn, and the load correction is tapped after that. The block
+        // answer has to be read from the slot that is next NOW, because a
+        // correction to the past may move the load of the set coming up and
+        // may never move the load of a different movement -- and where the
+        // two declarations render equal, two body-weight blocks being the
+        // guaranteed pair, the carry writes both the box and the standing
+        // statement, so the next set is RECORDED at that load.
         assertFalse(
             SetLoadPolicy.correctionCarryBlock(
                 lastExerciseId = "back_squat",

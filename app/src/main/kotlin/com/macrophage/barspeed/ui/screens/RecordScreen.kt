@@ -1500,8 +1500,10 @@ private fun NextSetControlsRow(state: RecordState, viewModel: RecordViewModel, s
  * mis-tap here opens a dialog and costs one tap to close; a mis-tap on START
  * begins a set that can only be ended by recording it.
  *
- * Since #238 it is the first of three buttons in [NextSetControlsRow] and
- * takes its width from the caller. The spacer above it moved there with it.
+ * Since #238 it is the first button in [NextSetControlsRow] and takes its
+ * width from the caller. The spacer above it moved there with it. The
+ * `modifier` carries no default: that one call site is the only one, so a
+ * default would be dead code reading as a second rendering.
  */
 @Composable
 private fun ChangeSetButton(
@@ -1509,7 +1511,7 @@ private fun ChangeSetButton(
     viewModel: RecordViewModel,
     slot: PlannedSlot,
     next: Boolean,
-    modifier: Modifier = Modifier.fillMaxWidth(),
+    modifier: Modifier,
 ) {
     var open by remember(state.queueIndex, state.stage) { mutableStateOf(false) }
     OutlinedButton(onClick = { open = true }, modifier = modifier) {
@@ -1639,6 +1641,12 @@ internal fun ChangeSetDialog(
  * the reason that applies here unchanged -- set one is when a wrong load first
  * shows itself, and READY is the only screen set one has.
  *
+ * NOT ALWAYS BESIDE IT. [SwitchExerciseSection] returns before drawing
+ * anything when `RecordState.exerciseChoices` is empty, so on the session's
+ * last remaining exercise the row is CHANGE NEXT SET and ADD SET only, two
+ * buttons wide. Which of the three the row holds is decided per render by
+ * each one's own guard, not by the row.
+ *
  * NOT inside the change-set dialog. Everything in that dialog changes the set
  * coming up; this changes the SESSION, and folding it in would put it under a
  * subtitle reading "Adjust next set (deviations are recorded)" -- which would
@@ -1764,13 +1772,16 @@ private fun RemoveSetSection(state: RecordState, viewModel: RecordViewModel) {
  * A BUTTON SINCE #238, where it was a text link reading "Equipment busy?
  * Switch exercise". The "Equipment busy?" framing is not dropped: it moves
  * to the chooser's title, which is what the tap opens.
+ *
+ * DRAWS NOTHING when `RecordState.exerciseChoices` is empty, which is the
+ * session's last remaining exercise: there is nothing to switch to. What
+ * that leaves the row holding is stated once, in [AddSetSection].
+ *
+ * The `modifier` carries no default, for the reason [ChangeSetButton]'s does
+ * not: [NextSetControlsRow] is its only call site.
  */
 @Composable
-private fun SwitchExerciseSection(
-    state: RecordState,
-    viewModel: RecordViewModel,
-    modifier: Modifier = Modifier.fillMaxWidth(),
-) {
+private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel, modifier: Modifier) {
     val choices = state.exerciseChoices
     if (choices.isEmpty()) return
     var showChooser by remember { mutableStateOf(false) }

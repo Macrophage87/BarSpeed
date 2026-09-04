@@ -98,11 +98,12 @@ import com.macrophage.barspeed.ui.components.SideArrow
  * still reads free, released by this lane; no read was logged at the poll
  * instants themselves. The blocker was memory. TWO polls, each 30 samples
  * about a minute apart, both on 2026-09-04: 17:08:03Z to 17:37:10Z, peak
- * 1560 MB, floor 221 MB; and 18:35:47Z to 19:04:15Z, peak 2907 MB, floor 182 MB. A headless
- * `barspeed-api35` boot needs roughly 3 GB and neither poll held it. The AVD
- * was never started, so no device was started and none was killed. The box's
- * one line, its strike and the popup's scroll are all [Field] questions, and
- * this surface stays compile- and lint-gated.
+ * 1560 MB, floor 221 MB; and 18:35:47Z to 19:04:15Z, peak 2907 MB, floor
+ * 182 MB. A headless `barspeed-api35` boot needs roughly 3 GB and neither
+ * poll held it. The AVD was never started, so no device was started and
+ * none was killed. The box's one line, its strike and the popup's scroll
+ * are all [Field] questions, and this surface stays compile- and
+ * lint-gated.
  */
 @Composable
 internal fun LastSetDetail(
