@@ -65,11 +65,22 @@ class StreamingSetTracker(
     private val driveSign: Double = if (driveIsPositive) 1.0 else -1.0
 
     /**
-     * The run limits [updateRuns] applies, carried in a type that states which
-     * frame they are in. Sensor frame at this commit, which is what the tracker
-     * has always applied. Issue #70.
+     * The run limits [updateRuns] applies, converted into the frame it sees.
+     *
+     * That method is handed a velocity already multiplied by [velocityScale],
+     * while [DspConfig]'s limits are sensor-frame numbers. Applying them
+     * unconverted let a declared pulley ratio move the live rep count and flip
+     * [LiveSetState.countTrusted] on a set nothing about the lift had changed.
+     * Issue #70; the batch segmenter converts through the same type, so the
+     * two paths cannot drift apart on this.
+     *
+     * [velocityScale] rather than a ratio of its own: it IS
+     * `LiftDirection.sensorToLifter`, and [RunThresholds.forSeriesScaledBy]
+     * takes its magnitude. The KDoc above warns against folding
+     * [driveIsPositive] into it, and nothing here does -- a drive direction is
+     * not a scale and does not appear in any limit.
      */
-    private val thresholds: RunThresholds = RunThresholds.sensorFrame(config)
+    private val thresholds: RunThresholds = RunThresholds.forSeriesScaledBy(config, velocityScale)
 
     private var filter = Biquad.lowPass(config.lowPassCutoffHz, expectedSampleRateHz)
 

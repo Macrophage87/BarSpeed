@@ -149,10 +149,13 @@ object RepSegmenter {
         direction: LiftDirection = LiftDirection(),
         config: DspConfig = DspConfig(),
     ): Segmentation {
-        // The limits travel as a [RunThresholds] so the frame they are in is
-        // stated rather than assumed. Sensor frame at this commit, which is
-        // what the segmenter has always applied. Issue #70.
-        val thresholds = RunThresholds.sensorFrame(config)
+        // The limits are converted into the frame this series is actually in
+        // before any of them is applied. `SetAnalyzer.analyze` hands the
+        // segmenter a series already multiplied by `sensorToLifter`, and
+        // DspConfig's limits are sensor-frame numbers; applying them
+        // unconverted let a declared pulley ratio decide the rep count.
+        // Issue #70.
+        val thresholds = RunThresholds.forSeriesMappedToLifter(config, direction)
         val classified = classifyRunsDetailed(series, thresholds)
         val paired = pairRuns(classified.runs, series, direction, thresholds)
         return Segmentation(
