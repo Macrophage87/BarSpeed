@@ -83,23 +83,26 @@ class SchemaCueTrackContractTest {
     }
 
     /**
-     * The version log says where the warning is WITHHELD, not only where it is
-     * written down.
+     * The version log keeps the 1.13 reading rule for the versions that
+     * withheld the warning.
      *
      * #176 makes `Last rep` a row for the first time on the plans that merge
      * the call, and #173 then stops the guide speaking it on the subset of
      * those plans whose only slot for it is the beat the rep ends on. Both
-     * land under 1.13, so the two together decide what a reader may conclude
-     * from a track that names no `Last rep` -- and without this sentence they
+     * landed under 1.13, so the two together decide what a reader may conclude
+     * from a track that names no `Last rep` -- and without those sentences they
      * cannot conclude anything, because the defect #176 fixed and the
      * suppression #173 added leave the same evidence: no row.
      *
-     * That is the whole point of pinning it. An absence a reader cannot
-     * interpret is worse than a value they can question, and nothing but the
-     * published description can tell them which absence they are looking at.
+     * #243 speaks the warning again from 1.19, and that does NOT make these
+     * sentences deletable: every set recorded under 1.13 through 1.18 was
+     * recorded by an app that withheld it, and those archives are the only
+     * thing the rule was ever for. What the 1.19 entry must do instead is say
+     * that it supersedes them, which the next test asserts. A reading rule for
+     * a version that shipped is history, not a claim about the current app.
      */
     @Test
-    fun `the version log says where the last-rep warning is withheld, not only where it is written`() {
+    fun `the version log keeps the 1_13 reading rule for the versions that withheld the warning`() {
         val description =
             schema("session-export.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
                 .jsonObject["description"]!!.jsonPrimitive.content
@@ -110,6 +113,54 @@ class SchemaCueTrackContractTest {
         assertTrue(
             "absence of a Last rep row" in description,
             "nothing tells a reader whether a track with no Last rep row is by design or is the defect 176 fixed",
+        )
+    }
+
+    /**
+     * The published vocabulary says WHICH rep a call names, and that it moved.
+     *
+     * `Rep 4` and `Last rep` are the same two strings either side of 1.19 and
+     * they name different reps: until 1.19 the guided call counted FINISHED
+     * reps, so the last number of a set was `planned - 2` and `Last rep` fell
+     * on the rep before the last; from 1.19 the call names the rep now due
+     * (#243). A consumer aligning cue rows to reps is off by one across that
+     * boundary and nothing in a row says so, which is why the vocabulary has to.
+     */
+    @Test
+    fun `the published vocabulary says which rep a call names, and that it changed at 1_19`() {
+        val voiceCues = schema("session-export.schema.json")["\$defs"]!!.jsonObject["set"]!!
+            .jsonObject["properties"]!!.jsonObject["voiceCues"]!!.jsonObject
+        val description = voiceCues["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "names the rep the guide is calling for" in description,
+            "the cue vocabulary does not say which rep a call names",
+        )
+        assertTrue(
+            "before 1.19" in description,
+            "nothing tells a reader the same row named a different rep in older archives",
+        )
+    }
+
+    /**
+     * The version log names the schedule change as well as the vocabulary.
+     *
+     * Same half a reader skips at their peril as the terminal-cue entry below:
+     * this one changes what an EXISTING row means for a given session rather
+     * than adding a key, so a reader who skips it silently compares different
+     * quantities across the boundary.
+     */
+    @Test
+    fun `the 1_19 version log says the rep call moved onto the rep it calls for`() {
+        val description =
+            schema("session-export.schema.json")["properties"]!!.jsonObject["schemaVersion"]!!
+                .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "off by one across the boundary" in description,
+            "the version log never says a consumer aligning cue rows to reps is off by one across 1.19",
+        )
+        assertTrue(
+            "no longer withheld" in description,
+            "the version log does not say the last-rep warning is spoken again from 1.19",
         )
     }
 

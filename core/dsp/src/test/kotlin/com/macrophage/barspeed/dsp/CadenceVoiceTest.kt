@@ -16,9 +16,11 @@ import kotlin.test.assertNull
  * down for as long as it did (issue 176).
  *
  * The cases chosen are eccentric-first, because [CadencePlan]'s case 2 is the
- * home whose behaviour neither issue 176 nor issue 173 changes. Case 3 -- the
+ * home whose PLACEMENT neither issue 176 nor issue 173 changed. Case 3 -- the
  * call merged into the rep's OWN last stroke -- is issue 173's subject and is
- * asserted with it.
+ * asserted with it, in `LastRepWarningTest`, along with #243 reversing the
+ * answer it gave. WHICH rep a call names is #243's subject and moved on every
+ * case at once, so it is asserted here as well.
  */
 class CadenceVoiceTest {
     private val benchPress = LiftDirection(startsWith = StartPhase.ECCENTRIC, concentricUp = true)
@@ -110,11 +112,13 @@ class CadenceVoiceTest {
     }
 
     @Test
-    fun `the call counts finished reps, and warns once, and only where there is a home for it`() {
+    fun `the call names the rep now due, warns on the last, and only where there is a home`() {
+        // #243. The number is the rep the lifter is being called into, not
+        // the count of the ones behind them.
         val p = plan("3010")
-        assertEquals("Rep 1", p.announcementFor(2, plannedReps = 3), "the second is due, and one is finished")
+        assertEquals("Rep 2", p.announcementFor(2, plannedReps = 3), "the second rep is the one now due")
         assertEquals(CadencePlan.LAST_REP, p.announcementFor(3, plannedReps = 3), "the last rep is the one due")
-        assertEquals("Rep 7", p.announcementFor(8, plannedReps = null), "no target, so no last rep to warn of")
+        assertEquals("Rep 8", p.announcementFor(8, plannedReps = null), "no target, so no last rep to warn of")
         assertNull(plan("1010").announcementFor(2, plannedReps = 3), "no home, so nothing is decided")
     }
 
@@ -128,7 +132,7 @@ class CadenceVoiceTest {
                 1 to "1",
                 2 to "2",
                 3 to "Up",
-                4 to "Down, Rep 1",
+                4 to "Down, Rep 2",
                 6 to "2",
                 7 to "Up",
                 8 to "Down, Last rep",

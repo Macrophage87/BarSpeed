@@ -269,29 +269,31 @@ class MergedCallCueTrackTest {
     }
 
     @Test
-    fun `the rows the fix adds to set 1 are the nine calls it spoke and never wrote`() {
+    fun `the rows the guide now adds to set 1 are nine calls, at the nine instants it spoke`() {
         // Issue 176 against a real track rather than a constructed plan: the
         // ten-rep incline press said a rep call at the start of every rep after
         // the first, and its cue track names none of them. These are the
         // instants, on the cadence clock, that the archive is missing.
         //
-        // Set 1 is eccentric-first, so its whole set of calls is unaffected by
-        // issue 173 and can be asserted here in full.
+        // The INSTANTS are what 0.1.43 spoke on, unchanged. The WORDS are not:
+        // #243 moved the number onto the rep being called for, so where that
+        // session heard "Rep 1" at second 4 the guide now says "Rep 2" there,
+        // about the rep beginning on that second. Nine calls either way.
         val recorded = cadenceRows(set01)
         assertEquals(
             listOf(
-                4 to "Rep 1",
-                8 to "Rep 2",
-                12 to "Rep 3",
-                16 to "Rep 4",
-                20 to "Rep 5",
-                24 to "Rep 6",
-                28 to "Rep 7",
-                32 to "Rep 8",
+                4 to "Rep 2",
+                8 to "Rep 3",
+                12 to "Rep 4",
+                16 to "Rep 5",
+                20 to "Rep 6",
+                24 to "Rep 7",
+                28 to "Rep 8",
+                32 to "Rep 9",
                 36 to "Last rep",
             ),
             surplus(recorded, scriptRows(plan("3010", inclinePress), 10)),
-            "the calls set 1 spoke and did not write down",
+            "the calls the guide adds to set 1's archive",
         )
     }
 
@@ -308,51 +310,65 @@ class MergedCallCueTrackTest {
         val recorded = cadenceRows(set13)
         val finalRepStarts = 11 * plan("1120", pushdown).deliveredCycleS
         assertEquals(
-            (1..10).map { (it * 4 + 2) to "Rep $it" },
+            (1..10).map { (it * 4 + 2) to "Rep ${it + 1}" },
             surplus(recorded, scriptRows(plan("1120", pushdown), 12)).filter { it.first < finalRepStarts },
-            "the calls set 13 spoke and did not write down, before its last rep",
+            "the calls the guide adds to set 13's archive, before its last rep",
         )
     }
 
     @Test
-    fun `what issue 173 changes is readable in these tracks, as a warning gone and a count returned`() {
-        // Issue 176 makes issue 173's fix OBSERVABLE, which is the whole
-        // reason the two travel together: before it, a suppressed warning and
-        // a spoken one wrote the same cue track and no session could tell
-        // them apart.
+    fun `the final rep of every one of these plans is named now, on the beat 0_1_43 used`() {
+        // Issue 176 makes what the final rep says OBSERVABLE, which is the
+        // whole reason it travels with any change to it: before it, a
+        // suppressed warning and a spoken one wrote the same cue track and no
+        // session could tell them apart.
         //
         // Each row here is (the last rep's window in the 0.1.43 archive, the
-        // same window as the guide now scripts it). Two things change and both
-        // are rows: the `Last rep` the app spoke at the start of the final
-        // stroke is not spoken at all, and the tempo count that stroke had
-        // given up to make room for it comes back -- landing on the exact
-        // second the recorded track leaves silent.
+        // same window as the guide now scripts it). One row is added on each:
+        // the `Last rep` that 0.1.43 spoke into the final stroke and never
+        // wrote down, which #173 then withheld and #243 speaks again -- on the
+        // same second, now that the calls before it name the rep in hand
+        // rather than the one behind it. The tempo count on the second after
+        // it stays given up, exactly as the recorded track shows it was.
         listOf(
             Triple(
                 Triple(set13, plan("1120", pushdown), 12),
                 listOf(44 to "Down", 45 to "Hold", 46 to "Up", 48 to CadenceVoice.DONE),
-                listOf(44 to "Down", 45 to "Hold", 46 to "Up", 47 to "1", 48 to CadenceVoice.DONE),
+                listOf(
+                    44 to "Down",
+                    45 to "Hold",
+                    46 to "Up",
+                    46 to CadencePlan.LAST_REP,
+                    48 to CadenceVoice.DONE,
+                ),
             ),
             Triple(
                 Triple(set05, plan("3010", seatedOhp), 8),
                 listOf(28 to "Up", 29 to "Down", 31 to "2", 32 to CadenceVoice.DONE),
-                listOf(28 to "Up", 29 to "Down", 30 to "1", 31 to "2", 32 to CadenceVoice.DONE),
+                listOf(
+                    28 to "Up",
+                    29 to "Down",
+                    29 to CadencePlan.LAST_REP,
+                    31 to "2",
+                    32 to CadenceVoice.DONE,
+                ),
             ),
         ).forEach { (input, archived, scripted) ->
             val (fixture, p, reps) = input
             val finalRepStarts = (reps - 1) * p.deliveredCycleS
             assertEquals(archived, cadenceRows(fixture).filter { it.first >= finalRepStarts }, "$fixture, recorded")
             assertEquals(scripted, scriptRows(p, reps).filter { it.first >= finalRepStarts }, "$fixture, scripted")
-            assertTrue(
-                scriptRows(p, reps).none { it.second == CadencePlan.LAST_REP },
-                "$fixture: the guide warns on a set whose warning has no rep left to be about",
+            assertEquals(
+                1,
+                scriptRows(p, reps).count { it.second == CadencePlan.LAST_REP },
+                "$fixture: the set names its last rep once",
             )
         }
-        // The counter-case, and it is the reason this is not a blanket rule:
-        // set 1 is the same session and the same four digits, its call opens
-        // the final rep's FIRST stroke, and it keeps the warning. What issue
-        // 176 adds to its archive is that same warning, at second 36, where
-        // the recorded track has the bare `Down` it rode.
+        // The case that never lost the warning: set 1 is the same session and
+        // the same four digits, its call opens the final rep's FIRST stroke,
+        // and its window is untouched by #243. What issue 176 adds to its
+        // archive is that same warning, at second 36, where the recorded track
+        // has the bare `Down` it rode.
         val set01Plan = plan("3010", inclinePress)
         val finalRep = 9 * set01Plan.deliveredCycleS
         assertEquals(
