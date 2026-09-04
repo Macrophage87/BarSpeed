@@ -2980,19 +2980,19 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     //
     // The move changes which side of this row its own inputs sit on, and that
     // is the part worth reading twice. Four of them are written by rest-screen
-    // controls, and since #236 ALL FOUR are drawn BELOW it: the warm-up
-    // toggle, the effort re-rating and the rep and duration corrections, all
-    // four now one tap further away behind LastSetDetail's Correct button
-    // rather than inline under it (#237), and AddSetSection inside the
-    // NextSetBlock call on the line after this one. AddSetSection was ABOVE before. Appending a set is
-    // the case that turns on: on the last set of an exercise this row draws
-    // nothing, because setsLeftInExercise is 0 and nextSlot may be null, and
-    // the append gives it both -- so the row now appears ABOVE the button that
-    // was just tapped and pushes that button down, where before it appeared
-    // below it and moved nothing under the finger. Whether that reaches #137's
-    // stacked-target hazard is UNMEASURED and is a [Field] question, not a
-    // property claimed here; the bench never appended a set from a rest in
-    // which this row could appear.
+    // controls, and since #236 ALL FOUR are drawn BELOW it. THREE -- the
+    // warm-up toggle, the effort re-rating and the rep and duration
+    // corrections -- are inside LastSetDetail and, since #237, one tap further
+    // away behind its Correct button rather than inline under it. The FOURTH,
+    // AddSetSection, is inside NextSetBlock. Appending a set is the case that
+    // turns on: on the last set of an exercise this row draws nothing, because
+    // setsLeftInExercise is 0 and nextSlot may be null, and the append gives
+    // it both -- so the row now appears ABOVE the button that was just tapped
+    // and pushes that button down, where before it appeared below it and moved
+    // nothing under the finger. Whether that reaches #137's stacked-target
+    // hazard is UNMEASURED and is a [Field] question, not a property claimed
+    // here; the bench never appended a set from a rest in which this row could
+    // appear.
     // Decides nothing itself; see [NextSetNudgeSection].
     NextSetNudgeSection(state, viewModel)
     NextSetBlock(state, viewModel)
