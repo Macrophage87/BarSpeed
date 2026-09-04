@@ -103,7 +103,12 @@ import com.macrophage.barspeed.ui.components.SideArrow
  * compile- and lint-gated.
  */
 @Composable
-internal fun LastSetDetail(state: RecordState, viewModel: RecordViewModel, timed: Boolean) {
+internal fun LastSetDetail(
+    state: RecordState,
+    viewModel: RecordViewModel,
+    timed: Boolean,
+    onReasonRetracted: () -> Unit,
+) {
     val feedback = state.lastFeedback ?: return
     var correcting by remember(state.setsCompleted) { mutableStateOf(false) }
     LastSetCard(state, feedback)
@@ -111,7 +116,7 @@ internal fun LastSetDetail(state: RecordState, viewModel: RecordViewModel, timed
         Text("CORRECT", color = BarColors.Sub)
     }
     if (correcting) {
-        CorrectionDialog(state, feedback, viewModel, timed) { correcting = false }
+        CorrectionDialog(state, feedback, viewModel, timed, onReasonRetracted) { correcting = false }
     }
     Spacer(Modifier.height(6.dp))
     RepQualityCard(feedback)
@@ -235,6 +240,7 @@ private fun CorrectionDialog(
     feedback: SetFeedback,
     viewModel: RecordViewModel,
     timed: Boolean,
+    onReasonRetracted: () -> Unit,
     onClose: () -> Unit,
 ) {
     val standingWarmup = WarmupMarkPolicy.effective(state.lastSetWarmup, state.lastSetWarmupMark)
@@ -269,6 +275,10 @@ private fun CorrectionDialog(
         },
         confirmButton = {
             TextButton(onClick = {
+                // Both halves of a retraction, which is what bc0661c8's CLEAR
+                // foot did in one place: `limitLastSet(null)` AND `onSkip()`.
+                // Read BEFORE applyDraft issues the write.
+                val retracted = SetLimiterPolicy.retractsStoredReason(state.lastSetLimiter, limiter)
                 applyDraft(
                     state = state,
                     feedback = feedback,
@@ -284,6 +294,7 @@ private fun CorrectionDialog(
                     rpe = rpe,
                     tappedFailed = tappedFailed,
                 )
+                if (retracted) onReasonRetracted()
                 onClose()
             }) { Text("SAVE CORRECTIONS") }
         },
@@ -528,6 +539,17 @@ private fun DraftEffortSection(
  * [SetLimiterPolicy.leavesPageAsSkip]'s decision, read against the DRAFT and
  * not against the stored answer. It writes nothing itself; [applyDraft]'s
  * null arm is the write, on the popup's own confirm.
+ *
+ * THE WRITE IS ONLY HALF OF WHAT bc0661c8's FOOT DID. That foot ran
+ * `limitLastSet(null)` AND `onSkip()`, and `onSkip` set `RestingStage`'s
+ * `dismissed`. [SetLimiterPolicy.prompts] is true again for a failed set once
+ * the stored answer is null and `dismissed` is false, so the null written
+ * alone re-opens [LimiterPage] at the top of the rest screen. The confirm in
+ * [CorrectionDialog] pairs the two: [SetLimiterPolicy.retractsStoredReason]
+ * decides, and `onReasonRetracted` is `RestingStage`'s own
+ * `dismissed = true`. Where the lifter had already skipped the page this
+ * round, `dismissed` was true before the confirm and the callback changes
+ * nothing.
  *
  * [LimiterPage] still draws a CLEAR foot of its own and it cannot be reached:
  * since #237 that page is placed only under `SetLimiterPagePlacement.PROMPT`,

@@ -2897,7 +2897,16 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     NextSetBlock(state, viewModel)
     SessionCloseControls(state, viewModel)
     Spacer(Modifier.height(16.dp))
-    LastSetDetail(state = state, viewModel = viewModel, timed = timed)
+    // `onReasonRetracted` is the second half of what bc0661c8's CLEAR foot did
+    // -- it ran `limitLastSet(null)` AND `onSkip()`. Without it a confirm that
+    // clears the reason makes SetLimiterPolicy.prompts true again and re-opens
+    // the page above.
+    LastSetDetail(
+        state = state,
+        viewModel = viewModel,
+        timed = timed,
+        onReasonRetracted = { dismissed = true },
+    )
 }
 
 /** What happens next: the prescription with the changes struck into it, and the way in. */
