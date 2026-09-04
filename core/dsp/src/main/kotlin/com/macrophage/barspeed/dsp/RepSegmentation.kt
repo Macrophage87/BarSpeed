@@ -157,7 +157,7 @@ object RepSegmenter {
         // Issue #70.
         val thresholds = RunThresholds.forSeriesMappedToLifter(config, direction)
         val classified = classifyRunsDetailed(series, thresholds)
-        val paired = pairRuns(classified.runs, series, direction, thresholds)
+        val paired = pairRuns(classified.runs, classified.beforeDemotion, series, direction, thresholds)
         return Segmentation(
             paired.spans,
             SegmentationCensus(
@@ -179,6 +179,19 @@ object RepSegmenter {
         val overDisplacementCap: Int,
         val belowStartThreshold: Int,
         val shorterThanMinPhase: Int,
+        /**
+         * The movement runs as the dead band alone cut them, BEFORE any
+         * demotion -- every contiguous stretch of samples outside
+         * [RunThresholds.pauseBandMps], STILL stretches excluded.
+         *
+         * [runs] is what survived the peak, duration and displacement gates;
+         * this is what was there to survive them. [pairEccentricFirst] reads
+         * it to ask whether a lowering HAPPENED, which is a different question
+         * from whether the lowering qualified as a phase, and only this list
+         * can answer it: a demoted run is indistinguishable from stillness in
+         * [runs].
+         */
+        val beforeDemotion: List<Run>,
     )
 
     internal fun classifyRuns(series: VelocitySeries, thresholds: RunThresholds): List<Run> =
@@ -252,7 +265,14 @@ object RepSegmenter {
                 merged += run
             }
         }
-        return ClassifiedRuns(merged, movementRuns, overDisplacementCap, belowStartThreshold, shorterThanMinPhase)
+        return ClassifiedRuns(
+            merged,
+            movementRuns,
+            overDisplacementCap,
+            belowStartThreshold,
+            shorterThanMinPhase,
+            runs.filter { it.type != RunType.STILL },
+        )
     }
 
     /** [pairRuns]'s result: the spans, and how many pairs the [RunThresholds.minRomM] floor discarded. */
@@ -260,27 +280,86 @@ object RepSegmenter {
 
     private fun pairRuns(
         runs: List<Run>,
+        beforeDemotion: List<Run>,
         series: VelocitySeries,
         direction: LiftDirection,
         thresholds: RunThresholds,
     ): Paired = if (direction.startsWith == StartPhase.ECCENTRIC) {
-        pairEccentricFirst(runs, series, direction, thresholds)
+        pairEccentricFirst(runs, beforeDemotion, series, direction, thresholds)
     } else {
         pairConcentricFirst(runs, series, direction, thresholds)
     }
 
-    /** Ecc-first lifts: a rep is a qualifying eccentric+concentric pair (kills walkout/re-rack bumps). */
+    /**
+     * Ecc-first lifts: a rep is a qualifying eccentric+concentric pair, or a
+     * drive whose lowering was MEASURED but never qualified as a phase.
+     *
+     * The pair requirement is what kills walkout and re-rack bumps, and it is
+     * kept. What it also killed was a whole class of real rep: a controlled
+     * eccentric ramps through the dead band slowly, and this object's own
+     * KNOWN LIMITATION note measures the clipping growing with the prescribed
+     * duration -- so on slow tempo work the lowering can fail
+     * [RunThresholds.startThresholdMps] outright and leave nothing for the
+     * drive to pair with. The rep was then deleted, with no marker, while the
+     * SAME rep under [pairConcentricFirst] is published on the drive alone.
+     * Which of the two happened was decided by nothing but the phase the plan
+     * declared the set opens with.
+     *
+     * The fallback closes that asymmetry without inheriting the phantom that
+     * comes with it. A drive alone is a rep only when the lifter demonstrably
+     * lowered first: [loweredSince] asks the PRE-DEMOTION runs whether an
+     * eccentric-sign stretch since the last counted rep travelled at least
+     * [RunThresholds.minRomM]. Drift and hand movement on a rack or a hold
+     * produce drive-sign runs with no such lowering behind them, which is why
+     * the three zero-truth captures resolve exactly what they resolved before.
+     *
+     * NO NEW CONSTANT. The gate reuses `minRomM` and the dead band; there is
+     * nothing here fitted to this corpus.
+     *
+     * Measured over the twenty cue-tracked captures at the commit that added
+     * it: marks matched 147 -> 150 of 170, empty 23 -> 20, and doubled and
+     * stray BOTH unchanged at 12 and 19 -- every one of the three added spans
+     * lands in a window that was empty. See `BatchCueCoverageTest`.
+     *
+     * The corpus exercises this FIRING and none of its guards -- no committed
+     * capture has an orphan drive under the floor or a lowering between
+     * `minRomM` and half of it. `SlowEccentricFallbackTest` builds the cases
+     * that do, one threshold deciding each, because a guard nothing can fail
+     * reads as coverage.
+     */
     private fun pairEccentricFirst(
         runs: List<Run>,
+        beforeDemotion: List<Run>,
         series: VelocitySeries,
         direction: LiftDirection,
         thresholds: RunThresholds,
     ): Paired {
         val reps = mutableListOf<RepSpan>()
         var belowMinRom = 0
+        var lastCountedEndIdx = 0
         var i = 0
         while (i < runs.size) {
             val first = runs[i]
+            if (first.type == direction.concentricRun) {
+                // A drive with no eccentric run ahead of it to pair with.
+                if (loweredSince(beforeDemotion, series, direction, thresholds, lastCountedEndIdx, first.startIdx)) {
+                    if (displacement(series, first.startIdx, first.endIdx) >= thresholds.minRomM) {
+                        // The eccentric span is a placeholder and hasEccentric
+                        // says so: its duration is unknown, never zero.
+                        reps += RepSpan(
+                            first.endIdx,
+                            first.endIdx,
+                            first.startIdx,
+                            first.endIdx,
+                            turnaroundPauseS = null,
+                            hasEccentric = false,
+                        )
+                        lastCountedEndIdx = first.endIdx
+                    }
+                }
+                i++
+                continue
+            }
             if (first.type != direction.eccentricRun) {
                 i++
                 continue
@@ -302,12 +381,42 @@ object RepSegmenter {
                     second.endIdx,
                     turnaroundPauseS,
                 )
+                lastCountedEndIdx = second.endIdx
             } else {
                 belowMinRom++
             }
             i = j + 1
         }
         return Paired(reps, belowMinRom)
+    }
+
+    /**
+     * Did the load come back down between [fromIdx] and [toIdx]?
+     *
+     * Answered against the runs the dead band cut BEFORE the phase gates ran,
+     * because the question is whether the lowering happened at all -- a run
+     * demoted for being too slow or too brief has already been erased from the
+     * classified list, and that erasure is exactly the case this asks about.
+     *
+     * The bar is [RunThresholds.minRomM] of travel: the same floor a rep's
+     * drive must clear, applied to the return. It is deliberately a DISTANCE
+     * and not a speed, because a slow eccentric is slow by prescription and
+     * fast only by accident.
+     *
+     * `pairsBelowMinRom` is NOT incremented for a drive this rejects. That
+     * census counts pairs the floor discarded and a drive with no eccentric is
+     * not a pair.
+     */
+    private fun loweredSince(
+        beforeDemotion: List<Run>,
+        series: VelocitySeries,
+        direction: LiftDirection,
+        thresholds: RunThresholds,
+        fromIdx: Int,
+        toIdx: Int,
+    ): Boolean = beforeDemotion.any { run ->
+        run.type == direction.eccentricRun && run.startIdx >= fromIdx && run.endIdx <= toIdx &&
+            displacement(series, run.startIdx, run.endIdx) >= thresholds.minRomM
     }
 
     /**
