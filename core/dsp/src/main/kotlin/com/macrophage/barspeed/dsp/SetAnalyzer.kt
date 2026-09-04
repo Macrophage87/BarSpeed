@@ -181,6 +181,27 @@ data class SetAnalysis(
      * at export time, so an old blank set stays blank and unexplained.
      */
     val noRepsReason: NoRepsReason? = null,
+    /**
+     * Detections [RepRefusal] refused as not reps of this set, or null when no
+     * bound could be derived from the set to judge them against. Issue #125.
+     *
+     * Null and 0 are different facts, on the same doctrine as
+     * [detectionsAfterSetEndCue]: 0 means a bound ran and refused nothing,
+     * null means the set had too few detections for one to be derived. A
+     * reader cannot recover the difference from [reps] alone -- a four-rep set
+     * and a three-rep set both look like sets that resolved a few reps.
+     *
+     * A refused detection is COUNTED, never silently dropped, and the set's
+     * raw IMU stream is persisted untouched, so anything refused here can be
+     * re-derived from the archive under any other rule.
+     */
+    val refusedDetections: Int? = null,
+    /**
+     * Why, or null when nothing was refused or nothing could be. Drawn from
+     * [RepRefusal.REASONS], mirrored by
+     * `SessionExport.VALID_REFUSED_DETECTION_REASONS`.
+     */
+    val refusedDetectionReason: String? = null,
 )
 
 /** Full batch analysis of one recorded set. */
@@ -228,7 +249,22 @@ object SetAnalyzer {
         // rep's own two phases, which is bounded by that rep and cannot reach
         // an excluded movement.
         val within = spans.filterIndexed { idx, _ -> setEnd.startedWithinSet(driveStartMs[idx]) }
-        val reps = within.mapIndexed { idx, span -> repMetrics(idx, span, series, direction, loadKg, config) }
+        val detected = within.mapIndexed { idx, span -> repMetrics(idx, span, series, direction, loadKg, config) }
+        // Refused HERE, for the reason the cue bound is applied where it is:
+        // everything below reads one list, so a rule applied at any consumer
+        // would have to be applied at all of them.
+        //
+        // AFTER the cue bound and not before it. A detection the cue already
+        // excluded is not in the population a bound should be derived from --
+        // including it would let a post-set-end phantom raise the median the
+        // surviving reps are judged against, which is the defect this rule
+        // exists for helping to hide itself. Issue #125.
+        //
+        // It needs the METRICS, not the spans, because it judges on range,
+        // which nothing has computed until repMetrics has run. That is why
+        // this is a second pass over a built list rather than a filter beside
+        // the cue bound's.
+        val reps = RepRefusal.kept(detected)
         val velocityLoss = velocityLossPct(reps)
         val tempoCompliance =
             targets.tempo?.let { complianceFor(it, targets.toleranceS, reps, direction) }
@@ -246,6 +282,13 @@ object SetAnalyzer {
         //
         // Null the moment one rep survives, which is [NoRepsReason.of]'s own
         // first test rather than a condition repeated here.
+        //
+        // `within` and not `reps`, which differ once [RepRefusal] has run.
+        // The refusal cannot empty a set: it needs four detections before it
+        // derives a bound at all, and at least half of any list lies at or
+        // below its own median, so a detection at or under the median can
+        // never exceed 4.5x it. There is therefore no set whose list this
+        // emptied and which would need a word for that, and none is minted.
         val noRepsReason = NoRepsReason.of(segmentation.census, within.size)
         return SetAnalysis(
             reps,
@@ -255,6 +298,8 @@ object SetAnalyzer {
             verdicts,
             setEnd.detectionsAfter(driveStartMs),
             noRepsReason,
+            RepRefusal.refusedCount(detected),
+            RepRefusal.reason(detected),
         )
     }
 
