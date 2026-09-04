@@ -12,7 +12,20 @@ import kotlinx.serialization.Serializable
  * ran, not a second walk over the same data: there is one implementation of
  * the classification and the pairing, and this is what it observed.
  *
- * Issue #138.
+ * WHICH LIMITS THE COUNTS ARE TAKEN AGAINST. The field KDocs below name
+ * [DspConfig]'s constants because that is where the numbers come from, not
+ * because that is what a run is compared with. Since issue #70
+ * [RepSegmenter.segmentDetailed] takes them from
+ * [RunThresholds.forSeriesMappedToLifter], so four of the five -- the speeds
+ * [DspConfig.pauseBandMps] and [DspConfig.startThresholdMps] and the lengths
+ * [DspConfig.minRomM] and [DspConfig.maxRunDisplacementM] -- are scaled by
+ * `abs(LiftDirection.sensorToLifter)`. [DspConfig.minPhaseS] is a duration and
+ * is not: mapping a series into another frame does not change when a sample
+ * arrived. `sensorToLifter` is the declared `travelRatio` carrying the
+ * inversion sign and the scale takes only its magnitude, so at travelRatio 1.0
+ * all five are DspConfig's own values whichever way the sensor is mounted.
+ *
+ * Issue #138; issue #70 for the paragraph above.
  */
 data class SegmentationCensus(
     /**
