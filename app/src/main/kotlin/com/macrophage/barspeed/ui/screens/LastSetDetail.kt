@@ -131,7 +131,12 @@ private fun LastSetCard(state: RecordState, feedback: SetFeedback) {
             side = feedback.side,
             recordedAddedKg = feedback.addedKg,
             correctedAddedKg = feedback.loadOverrideAddedKg,
-            countedReps = feedback.analysis.reps.size,
+            // The count the ROW WAS WRITTEN WITH, never the DSP's count.
+            // `repsOverride` is seeded with the app's own tally at set end, so
+            // on a guided or a sensorless set it stands over an analysis that
+            // counted nothing, and this pair used to strike "0 reps" through
+            // on a set nobody had corrected (#237 round 2).
+            countedReps = feedback.recordedReps,
             correctedReps = feedback.repsOverride,
             recordedDurationS = feedback.actualDurationS,
             correctedDurationS = feedback.durationOverrideS,
@@ -504,8 +509,20 @@ private fun DraftEffortSection(
  * they are correcting. Its SAVE closes the typing arm into the draft rather
  * than into Room; the popup's own confirm is what writes.
  *
- * There is no SKIP and no CLEAR foot. Leaving by CANCEL is the skip, and the
- * confirm's "only where it differs" rule already spells both correctly.
+ * There is no SKIP foot: leaving by CANCEL is the skip, and the confirm's
+ * "only where it differs" rule spends no write on a section nobody touched.
+ *
+ * THERE IS NO CLEAR ANY MORE, AND THAT IS A LOSS rather than a
+ * simplification. No tile here can return the draft to null -- a
+ * `SetLimiterTile` carries a non-null limiter and Other routes to the typing
+ * arm -- so a reason once given can be CHANGED but never REMOVED, and the
+ * confirm's null arm is unreachable for that reason and not by design.
+ * [LimiterPage] still draws a CLEAR foot and it cannot be reached either:
+ * since #237 that page is placed only under `SetLimiterPagePlacement.PROMPT`,
+ * and [SetLimiterPolicy.prompts] requires `limiter == null` -- exactly the
+ * case [SetLimiterPolicy.leavesPageAsSkip] answers SKIP to. That foot's
+ * `limitLastSet(null)` is the only call anywhere in the app that writes a null
+ * reason, so nothing retracts one now.
  */
 @Composable
 private fun DraftLimiterSection(

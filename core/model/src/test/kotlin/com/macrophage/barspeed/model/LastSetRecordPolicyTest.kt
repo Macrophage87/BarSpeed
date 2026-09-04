@@ -72,6 +72,24 @@ class LastSetRecordPolicyTest {
         assertTrue(values.all { it.planned == null }, "nothing to strike on a set nobody corrected")
     }
 
+    /**
+     * The set-end seeding case, and the contract the box's operands lean on
+     * (#237 round 2).
+     *
+     * Every guided set and every sensorless set reaches the rest screen with
+     * its recorded count ALREADY STANDING as its own override -- `SetFeedback`
+     * is built with `repsOverride = p.manualReps` -- so the two operands
+     * arrive equal on a set nobody corrected. Equal figures are ONE figure,
+     * struck through nowhere. This is what stops the box drawing a strike
+     * against a count the lifter never touched.
+     */
+    @Test
+    fun `a count standing equal to the record is not a correction and strikes nothing`() {
+        val reps = repValues(countedReps = 5, correctedReps = 5).first { it.suffix == "reps" }
+        assertEquals("5", reps.stated)
+        assertNull(reps.planned)
+    }
+
     @Test
     fun `a corrected rep count strikes the count the row was written with`() {
         val reps = repValues(correctedReps = 6).first { it.suffix == "reps" }

@@ -375,6 +375,23 @@ data class SetFeedback(
      */
     val kind: ExerciseKind,
     val analysis: SetAnalysis,
+    /**
+     * The count the row was WRITTEN with: the tally the app kept where it kept
+     * one, and the DSP's own count where it did not (#237 round 2).
+     *
+     * Frozen here because NEITHER of the two fields the box read before can
+     * still say it once the set is over. [repsOverride] is seeded with the
+     * tally at set end -- see `restingState` -- so on a manual set it is not a
+     * correction at all; and [analysis] carries an EMPTY rep list for a set no
+     * sensor counted, so `analysis.reps.size` is 0. Striking one against the
+     * other drew "0 reps" through on every guided and every sensorless set,
+     * against a figure nobody had corrected.
+     *
+     * This is the left-hand operand of that pair, and it is EQUAL to
+     * [repsOverride] until the lifter actually corrects the count -- which is
+     * what makes an uncorrected set draw one figure rather than two.
+     */
+    val recordedReps: Int,
     val plannedReps: Int?,
     val tempo: String?,
     val actualDurationS: Int? = null,
@@ -407,7 +424,14 @@ data class SetFeedback(
      */
     val loadOverrideAddedKg: Double? = null,
 ) {
-    val effectiveReps: Int get() = repsOverride ?: analysis.reps.size
+    // Against [recordedReps] rather than the analysis, so this and the box's
+    // struck pair read the same left-hand figure. Behaviour-identical at this
+    // commit and pinned by nothing: the ONE construction site sets both
+    // `recordedReps = p.manualReps ?: analysis.reps.size` and
+    // `repsOverride = p.manualReps`, so a null override implies a null
+    // manualReps implies `recordedReps == analysis.reps.size`, and no copy
+    // site writes the override back to null.
+    val effectiveReps: Int get() = repsOverride ?: recordedReps
 
     /** The added load this set stands at now, the correction ahead of the record. */
     val effectiveAddedKg: Double get() = loadOverrideAddedKg ?: addedKg
@@ -1944,6 +1968,12 @@ private fun restingState(
             // field below, which reads the same declaration.
             kind = p.exercise.kind,
             analysis = analysis,
+            // What the row was written with, and the reason it cannot be read
+            // back off the two fields beside it: `repsOverride` one field down
+            // is seeded from the SAME tally, so on a manual set the two are
+            // equal and neither is a correction, while `analysis.reps.size` is
+            // 0 for every set no sensor counted.
+            recordedReps = p.manualReps ?: analysis.reps.size,
             // The WORKING targets, not the plan's frozen prescription. This
             // feedback is about the set just finished -- what it was trying to
             // do -- and the hold verdict beside it reads the same pair: a
