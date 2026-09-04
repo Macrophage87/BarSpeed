@@ -1633,11 +1633,11 @@ internal fun ChangeSetDialog(
  * final set has the control too. There it keeps the full width the row does
  * not give it.
  *
- * BESIDE "Equipment busy? Switch exercise" and in the same form, on BOTH
- * surfaces, which is #152's consolidated change surface: the rest screen and
- * READY. The owner required switch-exercise in both places for the reason that
- * applies here unchanged -- set one is when a wrong load first shows itself, and
- * READY is the only screen set one has.
+ * BESIDE SWITCH EXERCISE in [NextSetControlsRow] and in the same form since
+ * #238, on BOTH surfaces, which is #152's consolidated change surface: the
+ * rest screen and READY. The owner required switch-exercise in both places for
+ * the reason that applies here unchanged -- set one is when a wrong load first
+ * shows itself, and READY is the only screen set one has.
  *
  * NOT inside the change-set dialog. Everything in that dialog changes the set
  * coming up; this changes the SESSION, and folding it in would put it under a

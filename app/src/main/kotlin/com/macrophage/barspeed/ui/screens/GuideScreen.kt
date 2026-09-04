@@ -120,7 +120,7 @@ private val SECTIONS =
             "Recording",
             "Start a session from the home screen. Each set shows live bar velocity, the tempo ring, " +
                 "and per-rep bars; explosive lifts show peak velocity and cadence; holds and carries " +
-                "get a countdown. Equipment busy? 'Switch exercise' reorders the queue. Barbell sets " +
+                "get a countdown. Equipment busy? SWITCH EXERCISE reorders the queue. Barbell sets " +
                 "show which plates to load per side. The bar sensor is RECORD-ONLY on standard " +
                 "lifts: it measures velocity and power while the reps are counted by you (tap) or " +
                 "by the voice guide on tempo sets — a miscounted phase switch can't corrupt the " +

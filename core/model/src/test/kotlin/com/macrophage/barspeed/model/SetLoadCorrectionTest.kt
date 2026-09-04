@@ -188,7 +188,7 @@ class SetLoadCorrectionTest {
 
     @Test
     fun `a next slot switched during the rest is a different block`() {
-        // Equipment busy? Switch exercise replaces the slot coming up while
+        // SWITCH EXERCISE replaces the slot coming up while
         // the rest screen is drawn, and the load correction is tapped after
         // that. The block answer has to be read from the slot that is next
         // NOW, because a correction to the past may move the load of the set

@@ -451,7 +451,7 @@ data class SetFeedback(
     val effectiveDurationS: Int? get() = durationOverrideS ?: actualDurationS
 }
 
-/** One pick in the "equipment busy — switch exercise" chooser. */
+/** One pick in the chooser SWITCH EXERCISE opens. */
 data class ExerciseChoice(val exerciseId: String, val displayName: String, val setsLeft: Int)
 
 /**
@@ -1689,7 +1689,7 @@ internal fun removedState(s: RecordState): RecordState? {
 }
 
 /**
- * The state "Equipment busy? Switch exercise" leaves behind.
+ * The state SWITCH EXERCISE leaves behind.
  *
  * A free function taking what it needs, rather than a method, for the reason
  * [openSession] gives.

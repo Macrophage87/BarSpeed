@@ -374,12 +374,12 @@ class SetLoadPolicyTest {
     }
 
     /**
-     * Squat 100 kg x3 then plank x2, with the lifter tapping "Equipment busy?
-     * Switch exercise" onto the plank after squat set 1. The seed is correct
-     * before the switch — the next slot really does declare 100 — so nothing
-     * upstream is wrong; it is the switch that has to clear it. Left uncleared
-     * it is baked into the plank slot by startNextSet and read straight back as
-     * a declared load, which for an 80 kg lifter records a 180 kg plank.
+     * Squat 100 kg x3 then plank x2, with the lifter tapping SWITCH EXERCISE
+     * onto the plank after squat set 1. The seed is correct before the switch
+     * — the next slot really does declare 100 — so nothing upstream is wrong;
+     * it is the switch that has to clear it. Left uncleared it is baked into
+     * the plank slot by startNextSet and read straight back as a declared
+     * load, which for an 80 kg lifter records a 180 kg plank.
      */
     @Test
     fun `a loadless exercise switched to mid-plan does not inherit the last load`() {
