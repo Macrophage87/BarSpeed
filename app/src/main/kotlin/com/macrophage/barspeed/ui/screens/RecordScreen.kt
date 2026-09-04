@@ -2774,9 +2774,13 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * [NextSetBlock] by #236: it is one tap that acts on the rating just given,
  * and below the Up next card plus five adjustment controls it was below the
  * fold too. The owner's field report after v0.1.50 is that it got lost there.
- * That it now fits above the fold is a claim about a screen, so it is measured
- * on the bench in the commit that moved it and re-asked as a [Field] item on a
- * real phone -- not asserted here.
+ * WHETHER IT NOW FITS ABOVE THE FOLD IS NOT CLAIMED. The sentence that stood
+ * here said the move was measured on the bench in the commit that made it, and
+ * it is deleted rather than softened: no bench run happened. The emulator slot
+ * was free throughout, but this machine's free RAM never rose above 1358 MB
+ * against the roughly 3 GB the headless AVD needs, polled every 60 s across 32
+ * minutes. So the fit is a [Field] question, and the only evidence for it is
+ * the owner's report that the old order did not fit.
  *
  * The screen still scrolls: a per-rep chart and a rest countdown do not both
  * fit above the fold on a phone. What is below the fold is the detail rather
