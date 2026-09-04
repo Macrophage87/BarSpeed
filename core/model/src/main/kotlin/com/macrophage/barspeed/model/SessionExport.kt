@@ -774,6 +774,27 @@ data class SessionExport(
          * and is the one to read.
          *
          * 1.19 carries an EIGHTH change, under the same number the mint
+         * above states, and it is NOT additive (#243, "Guided rep counter
+         * announces reps only to planned minus two, says Last rep on some
+         * tempos only, and never announces the final rep"): the guided
+         * metronome's rep call names a DIFFERENT REP. Until this version the
+         * call counted FINISHED reps -- "Rep 6" spoken while the seventh was
+         * under way -- so the last number of a set was planned-2. From this
+         * version the call names the rep now due: a set of twelve says
+         * "Rep 2" through "Rep 11", then "Last rep" for the twelfth and
+         * "Done" after it. No key here changes type or stops being written
+         * and no cue row is renamed; what changes is WHICH rep a `Rep N` row
+         * names, so a consumer aligning cue rows to reps is off by one across
+         * the boundary and nothing in a row says which side of it the set was
+         * recorded on. It does NOT apply retroactively -- cue rows are stored
+         * as they are spoken -- so this document's reading rule for a set
+         * recorded before this version is the 1.13 entry above, not this one.
+         * The published log in `docs/schemas/session-export.schema.json`
+         * carries the full entry, including the last-rep warning that is no
+         * longer withheld and the one tempo count that moves with it, and is
+         * the one to read.
+         *
+         * 1.19 carries an EIGHTH change, under the same number the mint
          * above states (#125): a set may carry
          * [SetExport.refusedDetections], how many detections the analyzer
          * judged were not reps of the set, and
