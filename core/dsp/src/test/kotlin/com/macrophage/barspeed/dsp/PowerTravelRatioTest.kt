@@ -66,14 +66,18 @@ class PowerTravelRatioTest {
         assertEquals(481.8, meanPeakW(2.0), 0.05, "2:1 pulley, peak, W")
         assertEquals(481.8, meanPeakW(0.5), 0.05, "1:2 pulley, peak, W")
 
-        // Mean concentric power is not identical across ratios, and that is the
-        // segmentation shift pinned below rather than a residue of the defect:
-        // the drive span is chosen on the scaled series, so it covers slightly
-        // different samples. Within two per cent of the direct-drive figure.
-        assertEquals(297.4, meanConW(2.0), 0.05, "2:1 pulley, mean concentric, W")
-        assertEquals(306.1, meanConW(0.5), 0.05, "1:2 pulley, mean concentric, W")
+        // Mean concentric power is now identical across ratios too. It was not
+        // before issue #70: this file used to pin 297.4 at 2:1 and 306.1 at
+        // 1:2 against 300.3 at 1:1, and called the spread "the segmentation
+        // shift pinned below". That shift was the #70 defect -- the run limits
+        // were applied unconverted to the scaled series, so a declared ratio
+        // chose a different drive span and the mean was taken over different
+        // samples. With the limits converted the spans are the same samples at
+        // every ratio and the three figures collapse onto one.
+        assertEquals(300.3, meanConW(2.0), 0.05, "2:1 pulley, mean concentric, W")
+        assertEquals(300.3, meanConW(0.5), 0.05, "1:2 pulley, mean concentric, W")
         listOf(meanConW(2.0), meanConW(0.5)).forEach {
-            assertEquals(1.0, it / meanConW(1.0), 0.02, "mean power within 2% of the 1:1 figure")
+            assertEquals(meanConW(1.0), it, 1e-9, "mean power equals the 1:1 figure exactly")
         }
     }
 
@@ -84,20 +88,23 @@ class PowerTravelRatioTest {
         // as far as the stack, so these SHOULD scale. Only power mixes frames,
         // because only power brings a mass into the expression.
         //
-        // They scale to about a per cent rather than exactly, and that is not
-        // the defect either: the run gates are applied to the SCALED series, so
-        // the segmented spans shift slightly, and the published figures are
-        // rounded to two decimals before they get here.
+        // They used to scale to about a per cent rather than exactly, and this
+        // file blamed rounding and "the run gates are applied to the SCALED
+        // series, so the segmented spans shift slightly". The second half of
+        // that was the #70 defect, not a rounding residue. With the limits
+        // converted the spans are identical at every ratio and what is left is
+        // only the per-rep round to three decimals, worth about a part in
+        // 2000. The old figures were 1.1980 and 1.2108.
         val one = analyse(1.0).reps
         val two = analyse(2.0).reps
         assertEquals(0.5985, one.map { it.romM }.average(), 5e-4, "ROM at 1:1, m")
-        assertEquals(1.1980, two.map { it.romM }.average(), 5e-4, "ROM at 2:1, m")
+        assertEquals(1.19775, two.map { it.romM }.average(), 5e-4, "ROM at 2:1, m")
         assertEquals(0.6115, one.map { it.meanConVelMps }.average(), 5e-4, "mean con velocity at 1:1")
-        assertEquals(1.2108, two.map { it.meanConVelMps }.average(), 5e-4, "mean con velocity at 2:1")
+        assertEquals(1.22275, two.map { it.meanConVelMps }.average(), 5e-4, "mean con velocity at 2:1")
 
         val romRatio = two.map { it.romM }.average() / one.map { it.romM }.average()
         val velRatio = two.map { it.meanConVelMps }.average() / one.map { it.meanConVelMps }.average()
-        assertEquals(2.0, romRatio, 0.03, "ROM scales with the ratio, to within about a per cent")
-        assertEquals(2.0, velRatio, 0.03, "velocity scales with the ratio: 1.980, about a per cent short")
+        assertEquals(2.0, romRatio, 2e-3, "ROM scales with the ratio: 2.00125, rounding only")
+        assertEquals(2.0, velRatio, 2e-3, "velocity scales with the ratio: 1.99959, rounding only")
     }
 }

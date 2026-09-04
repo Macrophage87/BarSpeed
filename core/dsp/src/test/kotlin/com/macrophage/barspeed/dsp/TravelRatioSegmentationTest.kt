@@ -33,8 +33,11 @@ import kotlin.test.assertEquals
  * recorded, so this file measures a latent defect -- one no stored set has
  * been through -- and says nothing about any set already on disk.
  *
- * The counts pinned below are CHARACTERIZATION of the defect. They are what
- * the pipeline does today; none of them is a target.
+ * What is pinned below is INVARIANCE: the batch count, the live count and
+ * `countTrusted` must not move when nothing but the declared geometry does.
+ * The VALUES they hold to are still characterization -- 6 and 12 are what the
+ * pipeline resolves at 1:1 today, not what the lifter performed -- so a change
+ * that made the counts right would move them, and should.
  */
 class TravelRatioSegmentationTest {
     private fun load(n: String) = ImuCsv.decode(
@@ -77,56 +80,72 @@ class TravelRatioSegmentationTest {
     }
 
     @Test
-    fun `a declared ratio moves the batch rep count on a barbell squat`() {
+    fun `a declared ratio leaves the batch rep count alone on a barbell squat`() {
         // 5 reps were performed. The pipeline resolves 6 of them at the ratio
         // the lifter actually recorded, which is its own defect and not this
-        // one; what belongs to issue #70 is that the answer moves at all.
+        // one; what belongs to issue #70 is that the answer moved at all.
+        // Before the conversion this read 2, 5, 5, 6, 6, 5, 5.
         assertEquals(
-            listOf(2, 5, 5, 6, 6, 5, 5),
+            List(ratios.size) { 6 },
             batchCounts("field-backsquat-10hz.csv", ::barbell),
             "batch reps at ratios $ratios",
         )
     }
 
     @Test
-    fun `a declared ratio moves the batch rep count on a cable stack leg curl`() {
-        // 12 reps were performed and the metronome cue track says when. A 1:4
-        // declaration erases seven of them and a 3:1 invents five.
+    fun `a declared ratio leaves the batch rep count alone on a cable stack leg curl`() {
+        // 12 reps were performed and the metronome cue track says when. Before
+        // the conversion a 1:4 declaration erased seven of them and a 3:1
+        // invented five: 5, 10, 12, 12, 12, 13, 17. This is also the sign
+        // check -- sensorToLifter is NEGATIVE on this lift, so a conversion
+        // that used the signed factor rather than its magnitude would drive
+        // every limit negative and admit every run.
         assertEquals(
-            listOf(5, 10, 12, 12, 12, 13, 17),
+            List(ratios.size) { 12 },
             batchCounts("field-legcurl-1030-12rep.csv", ::stack),
             "batch reps at ratios $ratios",
         )
     }
 
     @Test
-    fun `a declared ratio moves the live rep count the lifter reads mid-set`() {
+    fun `a declared ratio leaves the live rep count the lifter reads mid-set alone`() {
+        // The live tracker is the same defect in the same module, and it is
+        // the half a lifter is looking at while the set is happening. Before
+        // the conversion these read 2, 4, 4, 4, 4, 3, 2 and 0, 7, 7, 8, 9, 9,
+        // 13.
         assertEquals(
-            listOf(2, 4, 4, 4, 4, 3, 2),
+            List(ratios.size) { 4 },
             live("field-backsquat-10hz.csv", ::barbell).map { it.repCount },
             "live reps at ratios $ratios, barbell",
         )
         assertEquals(
-            listOf(0, 7, 7, 8, 9, 9, 13),
+            List(ratios.size) { 8 },
             live("field-legcurl-1030-12rep.csv", ::stack).map { it.repCount },
             "live reps at ratios $ratios, stack",
         )
     }
 
     @Test
-    fun `a declared ratio decides whether the live count calls itself trusted`() {
+    fun `a declared ratio does not decide whether the live count calls itself trusted`() {
         // countTrusted is latched false when a run carries past
         // maxRunDisplacementM, and that bound is one of the four applied to the
-        // scaled series. So the app's own statement about whether it can be
-        // believed is set by a geometry declaration: the same squat is trusted
-        // at 1:1 and distrusted at 3:2, with nothing about the lift changed.
+        // scaled series. So the app's own statement about whether it could be
+        // believed was set by a geometry declaration: the same squat read
+        // trusted at 1:1 and distrusted at 3:2, with nothing about the lift
+        // changed. Before the conversion, true x4 then false x3 on the squat,
+        // and true then false x6 on the leg curl.
+        //
+        // The leg curl staying FALSE at every ratio is not a failure to fix
+        // anything. That capture's integrator does run away -- issue #94's
+        // subject -- and the flag is telling the truth about it. What #70 asks
+        // is that the answer be the lift's, not the declaration's.
         assertEquals(
-            listOf(true, true, true, true, false, false, false),
+            List(ratios.size) { true },
             live("field-backsquat-10hz.csv", ::barbell).map { it.countTrusted },
             "countTrusted at ratios $ratios, barbell",
         )
         assertEquals(
-            listOf(true, false, false, false, false, false, false),
+            List(ratios.size) { false },
             live("field-legcurl-1030-12rep.csv", ::stack).map { it.countTrusted },
             "countTrusted at ratios $ratios, stack",
         )
