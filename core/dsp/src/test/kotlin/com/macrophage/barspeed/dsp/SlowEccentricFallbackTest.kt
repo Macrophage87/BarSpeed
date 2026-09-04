@@ -129,6 +129,24 @@ class SlowEccentricFallbackTest {
     }
 
     @Test
+    fun `an over-cap drift run does not license a drive`() {
+        // Issue #72 round 1 finding 2. `loweredSince` reads the PRE-DEMOTION
+        // runs on purpose -- a lowering demoted for being too slow is exactly
+        // what it must still see -- but the dead band's runs are demoted for
+        // THREE reasons and it accepts all three back. One of them is
+        // `maxRunDisplacementM`, the gate whose whole job is to say "this is
+        // unanchored integration drift and not a lift".
+        //
+        // -1.0 m/s for 3 s travels 2.99 m, over the 2.0 m cap, so the
+        // classifier throws it out as drift; then a clean 0.396 m drive.
+        // Nothing here is a rep. Every other gate passes it: the run is
+        // eccentric-sign, it is inside the index range, and 2.99 m is far
+        // over `minRomM`, so travel alone cannot reject it.
+        val reps = spans(series(0.0 to 1.0, -1.0 to 3.0, 0.0 to 0.5, goodDrive))
+        assertEquals(0, reps.size, "reps from a drift run and a drive")
+    }
+
+    @Test
     fun `a drive that travelled under minRomM is not a rep however it was lowered`() {
         // 0.12 m/s for 0.6 s clears startThresholdMps and minPhaseS and
         // travels 0.0708 m. The floor applies to a drive-only rep exactly as
