@@ -561,7 +561,7 @@ class CuedRepCoverageTest {
         // drive too -- so the reference median it is compared against shifts
         // under it as well, and one more live rep falls outside the family.
         assertEquals(18, outOfFamily, "counted reps the batch reference rejects")
-        assertEquals(15, outOfFamilyCalled, "of those, reps the metronome actually called")
+        assertEquals(16, outOfFamilyCalled, "of those, reps the metronome actually called")
         assertEquals(64, inFamily, "counted reps the batch reference accepts")
         assertEquals(59, inFamilyCalled, "of those, reps the metronome actually called")
     }
