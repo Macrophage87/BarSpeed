@@ -30,6 +30,35 @@ enum class ProgressionKind {
     NONE,
     ;
 
+    /**
+     * The phrase a full-session view puts on this exercise's header, before
+     * the session starts (#235).
+     *
+     * DELIBERATELY STILL SAYING NOTHING. The empty string is what every
+     * full-session view says about progression today: the key is read at
+     * flatten time into each queued set and drawn only by the post-set grid,
+     * so a lifter reading the preview before START cannot tell an exercise
+     * that steps up by reps from one that holds its load. Written wrong from
+     * birth on purpose -- a helper written correct here would have nothing to
+     * red against, which is 6c5fd478's rule -- and the differential commit
+     * after the red is what gives each kind its words.
+     *
+     * It answers for the KIND, not for the declaration, and that is the whole
+     * of how the omitted case is handled: [ofPlan] resolves an omitted key to
+     * [WEIGHT] before this is ever called, so an exercise whose plan said
+     * nothing reads exactly as one that said `"weight"`. The lifter can still
+     * tell an omission from a declared [NONE], which is what #235 asks for;
+     * they cannot tell an omission from a declared `"weight"`, which is what
+     * the two mean.
+     *
+     * The detekt suppression carries the stub and comes off with it: without
+     * it `:core:model:detekt` fails with
+     * `FunctionOnlyReturningConstant - [phrase]`, measured on this branch by
+     * `./gradlew -PjvmOnly :core:model:detekt`.
+     */
+    @Suppress("FunctionOnlyReturningConstant")
+    fun phrase(): String = ""
+
     companion object {
         /**
          * The kind a plan's `progression` declaration names, or [WEIGHT] when

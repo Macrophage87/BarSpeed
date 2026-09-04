@@ -31,6 +31,7 @@ class SessionPreviewTest {
         tempo: String? = null,
         side: String? = null,
         warmup: Boolean = false,
+        progression: ProgressionKind = ProgressionKind.WEIGHT,
     ) = PreviewSet(
         exerciseName = name,
         kind = kind,
@@ -45,6 +46,7 @@ class SessionPreviewTest {
         implementCount = null,
         restS = null,
         warmup = warmup,
+        progression = progression,
     )
 
     @Test
@@ -226,6 +228,45 @@ class SessionPreviewTest {
                     "${block.sets.first().setsInExercise}",
             )
         }
+    }
+
+    /**
+     * The block's dimension is the OPENING slot's, read the same way its name
+     * is (#235). Pinned on a kind that is not the default, so a block that
+     * dropped the carry and defaulted to WEIGHT could not pass.
+     */
+    @Test
+    fun `a block takes the progression of the slot that opened it`() {
+        val preview =
+            SessionPreviewPolicy.of(
+                listOf(
+                    set(index = 0, of = 2, progression = ProgressionKind.REPS),
+                    set(index = 1, of = 2, progression = ProgressionKind.REPS),
+                ),
+            )
+        assertEquals(1, preview.blockCount)
+        assertEquals(ProgressionKind.REPS, preview.blocks[0].progression)
+    }
+
+    /**
+     * Two blocks of one movement are two `PlanExerciseDef` declarations and
+     * may name different dimensions -- a ramp that holds its load in front of
+     * working sets that step up by weight. Nothing may leak between them.
+     */
+    @Test
+    fun `two blocks of one exercise carry their own progression declarations`() {
+        val preview =
+            SessionPreviewPolicy.of(
+                listOf(
+                    set(index = 0, of = 2, warmup = true, progression = ProgressionKind.NONE),
+                    set(index = 1, of = 2, warmup = true, progression = ProgressionKind.NONE),
+                    set(index = 0, of = 1, progression = ProgressionKind.TIME),
+                ),
+            )
+        assertEquals(
+            listOf(ProgressionKind.NONE, ProgressionKind.TIME),
+            preview.blocks.map { it.progression },
+        )
     }
 
     @Test

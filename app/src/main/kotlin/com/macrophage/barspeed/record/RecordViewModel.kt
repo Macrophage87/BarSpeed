@@ -325,6 +325,11 @@ fun PlannedSlot.previewSet(): PreviewSet = PreviewSet(
     implementCount = implementCount,
     restS = restS,
     warmup = warmup,
+    // Which dimension this exercise steps up on (#235), copied off the slot
+    // like every other field here. ProgressionKind.ofPlan already resolved the
+    // plan's key at flatten time, so this is the same value the post-set grid
+    // will read -- one reading of the plan, two surfaces.
+    progression = progression,
 )
 
 data class SetFeedback(

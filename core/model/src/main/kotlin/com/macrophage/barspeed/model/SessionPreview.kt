@@ -45,6 +45,18 @@ data class PreviewSet(
     val restS: Int?,
     /** What the PLAN declared this set was for. No lifter mark exists yet; the session has not run. */
     val warmup: Boolean,
+    /**
+     * Which dimension this exercise steps up on, as the queue slot carries it
+     * (#235). Already resolved: [ProgressionKind.ofPlan] has turned an omitted
+     * key into [ProgressionKind.WEIGHT] at flatten time, so nothing downstream
+     * can tell an omission from a declared `"weight"` -- see
+     * [ProgressionKind.phrase] for why that is the intended reading and not a
+     * loss.
+     *
+     * Carried per SET because that is the shape of the queue, and read per
+     * BLOCK: [PreviewBlock.progression] is what a screen draws.
+     */
+    val progression: ProgressionKind,
 )
 
 /**
@@ -54,7 +66,23 @@ data class PreviewSet(
  * movement -- a ramp and then working sets is the ordinary case -- and they
  * carry independent set counts. See [SessionPreviewPolicy.of].
  */
-data class PreviewBlock(val exerciseName: String, val sets: List<PreviewSet>)
+data class PreviewBlock(
+    val exerciseName: String,
+    /**
+     * The dimension the block steps up on, taken from the slot that OPENED the
+     * block and never re-derived from the rest of them (#235).
+     *
+     * Read the same way [exerciseName] is, and for the same reason: a block is
+     * one `PlanExerciseDef`'s sets, `progression` is declared on the exercise
+     * and not on a set, so every slot of a block carries the same value by
+     * construction. Two blocks of the SAME movement are two declarations and
+     * may differ -- a ramp block declaring `"none"` in front of working sets
+     * that step up by weight is a plan a lifter can write -- which is why this
+     * is per block and not per session.
+     */
+    val progression: ProgressionKind,
+    val sets: List<PreviewSet>,
+)
 
 /**
  * The whole of one upcoming session, as the record flow will run it.
@@ -104,18 +132,19 @@ object SessionPreviewPolicy {
      * order, and a preview that re-ordered it would be describing a session
      * nobody is going to perform.
      *
-     * [PreviewSet.exerciseName] is read only where a block OPENS. A slot whose
-     * name differs from the open block's but whose index is not zero is
-     * appended to that block anyway, and the block keeps the first slot's
-     * name -- no queue `flattenPlan` builds can produce that shape, so the
-     * case is unreachable rather than handled, and nothing here pins it.
+     * [PreviewSet.exerciseName] and [PreviewSet.progression] are read only
+     * where a block OPENS. A slot whose name differs from the open block's but
+     * whose index is not zero is appended to that block anyway, and the block
+     * keeps the first slot's name and dimension -- no queue `flattenPlan`
+     * builds can produce that shape, so the case is unreachable rather than
+     * handled, and nothing here pins it.
      */
     fun of(sets: List<PreviewSet>): SessionPreview {
         val blocks = mutableListOf<PreviewBlock>()
         for (set in sets) {
             val open = blocks.lastOrNull()
             if (open == null || set.setIndexInExercise == 0) {
-                blocks += PreviewBlock(set.exerciseName, listOf(set))
+                blocks += PreviewBlock(set.exerciseName, set.progression, listOf(set))
             } else {
                 blocks[blocks.lastIndex] = open.copy(sets = open.sets + set)
             }
