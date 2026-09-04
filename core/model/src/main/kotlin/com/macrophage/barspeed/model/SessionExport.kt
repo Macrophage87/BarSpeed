@@ -772,6 +772,68 @@ data class SessionExport(
          * count. The published log in
          * `docs/schemas/session-export.schema.json` carries the full entry
          * and is the one to read.
+         *
+         * 1.19 carries an EIGHTH change, under the same number the mint
+         * above states (#125): a set may carry
+         * [SetExport.refusedDetections], how many detections the analyzer
+         * judged were not reps of the set, and
+         * [SetExport.refusedDetectionReason], the single word saying why.
+         *
+         * NOT A FIFTH ENTRY UNDER 1.18, which is where it was drafted:
+         * 1.18 SHIPPED in v0.1.50. `git rev-list -n1 v0.1.50` is
+         * a7dfa323a3565ed2365ac4977b7384a0bd99d98c and
+         * `git show v0.1.50:core/model/.../SessionExport.kt` declares
+         * `"1.18"`. Extending a number a consumer has already been handed
+         * redefines what they were handed, which is exactly the rule 1.18's
+         * own first entry states about 1.17. 1.19 was already open on `main`,
+         * so this is an entry under it and not a mint.
+         *
+         * THE FOUR ENTRIES ABOVE THAT CALL 1.18 UNRELEASED ARE LEFT
+         * STANDING. Each was true when it landed -- all four were present at
+         * v0.1.50 and shipped together in it, checked by `git show
+         * v0.1.50:...SessionExport.kt | grep "1.18 carries a"` -- so what
+         * expired is the premise, not the entries.
+         *
+         * The rule is `RepRefusal` in `:core:dsp`: a detection that resolved
+         * no eccentric partner and whose range exceeds 4.5x the median range
+         * of the set's OTHER detections is not a rep. Field session 37's set
+         * 10 published `peakConVel_mps` 1.044 and `peakPower_w` 552.4 from one
+         * such detection, ranging 1.746 m on an assisted pull-up whose other
+         * four ranged 0.330 to 0.481 m; the surviving four publish 0.435 and
+         * 101.6.
+         *
+         * WHY THE COUNT IS PUBLISHED AT ALL. A set that had a phantom and a
+         * set that never did are otherwise identical in this document, and
+         * they are not the same set: the first has had a figure removed and a
+         * reader comparing it against an earlier export of the same session
+         * has no way to learn that from anything else here. This is the gap
+         * `detectionsAfterSetEndCue` still has -- computed since 1.12, stored,
+         * and published nowhere -- and it is not repeated for this rule.
+         *
+         * ABSENCE IS A THIRD STATE AND STAYS ONE. `refusedDetections: 0` means
+         * a bound was derived and refused nothing. The key ABSENT means no
+         * bound could be derived, which is every set that resolved fewer than
+         * four detections, and also every set recorded before this number
+         * ships: the value is frozen into the stored analysis when the set is
+         * analysed and nothing re-runs the segmenter at export time.
+         *
+         * WHAT IT DOES NOT SAY. It is not a count of the set's phantoms. The
+         * bound is fitted, and it is fitted to err toward admitting a phantom
+         * rather than refusing a rep -- a refused real rep would move
+         * `velocityLoss_pct`, which is best rep to LAST rep, against the wrong
+         * rep. A `refusedDetections: 0` therefore means "nothing was far
+         * enough out to refuse", never "this set's figures are sound".
+         * `RepRefusal`'s KDoc names a detection on the same session that is
+         * not refused and publishes 507.0 W, and a second on the neighbouring
+         * set that is kept because it resolved both its phases and publishes
+         * 315.7 W from one corrupt sample.
+         *
+         * Additive on the terms 1.2 and 1.3 were: no key changes type, none
+         * stops being written, and a reader that ignores both keys reads a
+         * document carrying them exactly as it read one without. What DOES
+         * move for such a reader is the VALUE of `summary`, `velocityLoss_pct`,
+         * `velocityLossBasis`, `repMetrics` and `repMetricsComplete` on a set
+         * carrying a non-zero count, and these two keys are how it can tell.
          */
         const val SCHEMA_VERSION = "1.19"
 
@@ -850,6 +912,27 @@ data class SessionExport(
                 "phasesUnpaired",
                 "driveBelowMinRom",
             )
+
+        /**
+         * Why a set refused a detection, the values
+         * [SetExport.refusedDetectionReason] is drawn from. Schema 1.19,
+         * issue #125.
+         *
+         * The names are owned by `RepRefusal` in `:core:dsp`, which this
+         * module cannot see -- the dependency runs the other way. They are
+         * mirrored here so the published schema has a Kotlin constant to be
+         * pinned against, the same arrangement [VALID_NO_REPS_REASONS] uses,
+         * and `RepRefusalTest` asserts the two lists are equal from the side
+         * that can see both.
+         *
+         * One word today, and the plural is deliberate rather than
+         * aspirational: the sample-level half of the same defect -- a corrupt
+         * accelerometer reading landing INSIDE a real rep's drive, which sets
+         * that rep's `peakConVel_mps` and `peakPower_w` while leaving its
+         * range and mean ordinary -- is not refused by anything yet and would
+         * need a second word if it ever is.
+         */
+        val VALID_REFUSED_DETECTION_REASONS = setOf("unpairedRangeOutlier")
     }
 }
 
@@ -1255,6 +1338,36 @@ data class SetExport(
      * to be a statement about.
      */
     val velocityLossBasis: String? = null,
+    /**
+     * How many detections the analyzer judged were not reps of this set, or
+     * absent when no bound could be derived to judge them against. Schema
+     * 1.19, issue #125.
+     *
+     * ABSENT, 0 and a positive number are three different facts. Absent: the
+     * set resolved fewer than four detections, so there was no median of
+     * others to derive a bound from -- or the set was recorded before this
+     * number shipped, which is permanent, because the value is frozen into
+     * the stored analysis and nothing re-runs the segmenter at export time.
+     * 0: a bound ran and refused nothing. Positive: that many detections were
+     * removed from the list every figure in this set is computed over.
+     *
+     * NOT A COUNT OF THIS SET'S PHANTOMS, and reading it as one is the
+     * mistake to avoid. See [SessionExport.SCHEMA_VERSION]'s 1.19 entry for
+     * which direction the bound errs in and why.
+     *
+     * Not gated on `includeRepDetail`. It qualifies `summary`,
+     * `velocityLoss_pct` and `velocityLossBasis`, which the summary-only
+     * export publishes, so a caveat that appeared only in the detailed
+     * artifact would leave that reader holding the figures with the warning
+     * removed -- the argument `sensors` and `repMetricsComplete` are
+     * published on.
+     */
+    val refusedDetections: Int? = null,
+    /**
+     * Why, drawn from [SessionExport.VALID_REFUSED_DETECTION_REASONS], and
+     * absent whenever [refusedDetections] is absent or 0.
+     */
+    val refusedDetectionReason: String? = null,
     val hr: HrSetSummary? = null,
     /** Per-rep detail; included only when the user enables detailed export. */
     val repMetrics: List<RepMetricsExport>? = null,

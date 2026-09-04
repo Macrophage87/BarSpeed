@@ -23,6 +23,7 @@
           "tempoCompliance": { "prescribed": "4010", "tolerance_s": 0.5, "withinTolerance": 4, "of": 5 },
           "velocityLoss_pct": 14.2,
           "velocityLossBasis": "measured",
+          "refusedDetections": 0,
           "geometry": {
             "startsWith": "eccentric",
             "concentric": "up",
@@ -211,6 +212,8 @@
             "prescribedEccConRatio": 3.0
           },
           "velocityLossBasis": "terminalRepIsFastest",
+          "refusedDetections": 1,
+          "refusedDetectionReason": "unpairedRangeOutlier",
           "geometry": {
             "startsWith": "concentric",
             "concentric": "down",

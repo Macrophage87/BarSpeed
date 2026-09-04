@@ -306,6 +306,21 @@ class SessionExporter(
             },
             velocityLossPct = velocityLoss.pctOrNull,
             velocityLossBasis = velocityLoss.basis.takeIf { reps.isNotEmpty() },
+            // How many detections the analyzer refused as not reps of this
+            // set, and why (#125, schema 1.19).
+            //
+            // READ off the stored analysis, never recomputed -- the same rule
+            // and the same reason as summary.noRepsReason directly below. The
+            // rep list this class holds is the list AFTER the refusal, so it
+            // cannot say how many were removed to produce it; only the pass
+            // that removed them can, and that pass ran when the set was
+            // analysed. A set recorded before this shipped carries no answer
+            // and publishes neither key, permanently.
+            //
+            // Absence is a state and is preserved through: a null here means
+            // no bound could be derived, which is a different fact from 0.
+            refusedDetections = analysis?.refusedDetections,
+            refusedDetectionReason = analysis?.refusedDetectionReason,
             // minBpm in this list is load-bearing, not defensive padding: it is
             // computed fresh, below, from this set's raw stream, while the
             // other three are read off columns frozen at record time. Those two
