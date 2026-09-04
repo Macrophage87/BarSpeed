@@ -1204,7 +1204,14 @@ private fun askOrStartSession(
  * write alone would race that collector and hit the refusal a second time
  * with the figure already stored.
  *
- * Returns without doing anything when no set is refused.
+ * THE REFUSAL IS CLEARED BEFORE THE LAUNCH, not inside it. A second answer
+ * arriving while the settings write is still in flight reads the flag,
+ * finds it already false and returns, so one refusal cannot start two sets.
+ * Clearing it after the awaited write left a window the second tap fell
+ * into, and `answerBodyWeight` below has always cleared its own flag
+ * synchronously for this reason. The state written inside the launch is
+ * therefore `bodyWeightKg` alone; `state.value` is re-read there rather than
+ * copied from `s`, so the clear above is not undone.
  *
  * [writeBodyWeightKg] is the durable write, taken as a function rather than
  * as the [SettingsStore] that provides it: `SettingsStore` is a concrete
@@ -1223,13 +1230,11 @@ internal fun CoroutineScope.answerRefusedSet(
 ) {
     val s = state.value
     if (!s.bodyWeightRequiredForSet) return
-    if (kg == null) {
-        state.value = s.copy(bodyWeightRequiredForSet = false)
-        return
-    }
+    state.value = s.copy(bodyWeightRequiredForSet = false)
+    if (kg == null) return
     launch {
         writeBodyWeightKg(kg)
-        state.value = state.value.copy(bodyWeightKg = kg, bodyWeightRequiredForSet = false)
+        state.value = state.value.copy(bodyWeightKg = kg)
         onBegin()
     }
 }
