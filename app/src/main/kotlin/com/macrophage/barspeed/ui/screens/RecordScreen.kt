@@ -703,6 +703,16 @@ private fun previewSummary(preview: SessionPreview): String {
  * what the omission means; the pair this makes readable before START is an
  * omitted key against a declared "none", which shows no post-set grid and so
  * could not be read at any point of the session before.
+ *
+ * OBSERVED RENDERING, and the canonical record of it for both surfaces --
+ * `PlanDetailScreen.ExerciseCard` points here rather than repeating it. No
+ * test on the CI path renders a composable, so this was read off a screen:
+ * emulator `barspeed-api35`, headless, debug APK built from 9b089c88, a
+ * five-exercise plan declaring weight / reps / time / none and one omitting
+ * the key. Every header named one dimension on both screens, and the omitted
+ * key read "steps up by weight". At `font_scale 2.0` the phrase wrapped onto
+ * its own line unclipped. What that does NOT establish: nothing about a real
+ * phone's display, and nothing a lifter judged.
  */
 @Composable
 private fun PreviewBlockCard(block: PreviewBlock, unit: WeightUnit) {

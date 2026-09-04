@@ -287,6 +287,9 @@ private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
             // a plan approved here saying one thing and running as another is
             // exactly the disagreement it exists to catch. An omitted key
             // reads "steps up by weight", which is what the omission means.
+            //
+            // The bench evidence that this and the record preview both draw
+            // it is recorded once, on RecordScreen's PreviewBlockCard.
             Text(
                 ProgressionKind.ofPlan(exercise.progression).phrase(),
                 style = MaterialTheme.typography.bodySmall,
