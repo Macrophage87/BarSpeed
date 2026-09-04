@@ -35,10 +35,23 @@ kotlin {
 // null with no build error — including a field-*.csv, which is this repo's
 // discharge ritual for a hardware-found bug. Widen the include, or switch to
 // exclude("kotlin/**", "res/**"), before adding one.
+// PlanDocVersionContractTest reads the REAL README.md and PROMPTS.md for the
+// same reason (#240): both hard-code the plan schema number, both went stale at
+// the last mint, and a copy of either would drift exactly as the originals did.
+// They live at the repository root, outside every source set, so they are
+// copied by name rather than reached with a srcDir on the root directory --
+// that would make Gradle walk the whole repository, .git and every module's
+// build/ included, to find two files.
+val planDocResources by tasks.registering(Copy::class) {
+    from(rootProject.file("README.md"), rootProject.file("PROMPTS.md"))
+    into(layout.buildDirectory.dir("generated/plan-doc-resources"))
+}
+
 sourceSets["test"].resources.apply {
     srcDir(rootProject.file("docs/schemas"))
     srcDir(rootProject.file("app/src/main"))
-    include("**/*.json", "AndroidManifest.xml", "**/screens/GuideScreen.kt")
+    srcDir(planDocResources.map { it.destinationDir })
+    include("**/*.json", "AndroidManifest.xml", "**/screens/GuideScreen.kt", "README.md", "PROMPTS.md")
 }
 
 dependencies {
