@@ -75,16 +75,26 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  * two readings had happened. That holds only because the `done` flag is
  * remembered ABOVE every early return in this function; see the comment at
  * its declaration for what happens when it is not. What the change WAS stays
- * visible: the Up next card above strikes the plan's figure through and shows
- * the new one, because
+ * visible: the Up next card, drawn immediately BELOW this grid since #236,
+ * strikes the plan's figure through and shows the new one, because
  * `cardValues` reads the same `statedLoadKg` / `statedReps` / `statedDurationS`
  * the tap just wrote. Anything further goes through CHANGE NEXT SET, which is
  * also where CUSTOM leads.
  *
  * ## Placement
  *
- * Drawn from `RestingStage` directly after `NextSetBlock`, because it is about
- * the set coming up and the card it changes is the one immediately above it.
+ * Drawn from `RestingStage` directly BEFORE `NextSetBlock`, after
+ * `ArmedSilenceCard` -- so the card it changes is the one immediately below
+ * it. THE SENTENCE HERE SAID "directly after `NextSetBlock`, because ... the
+ * card it changes is the one immediately above it", AND IT IS DELETED RATHER
+ * THAN LEFT TO BE READ AROUND: #236 moved the call, and both halves of it are
+ * now false. The old order put this grid below the Up next card plus five
+ * adjustment controls, which on a phone is below the fold: the lifter who had
+ * just rated a set in the headroom range had to scroll past the thing the
+ * grid changes to reach the grid. The owner's field report after v0.1.50 is
+ * that it got lost there. Nothing about what this grid decides or when it
+ * draws changed with the move (#214's rule is untouched); only where the
+ * column puts it.
  *
  * FOUR OF ITS INPUTS ARE WRITTEN DURING REST, so this row can appear or vanish
  * part-way through one and shift what is drawn below it. `toggleLastSetWarmup`
@@ -94,19 +104,27 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  * `addSetOfCurrentExercise` writes, through `appendedState`, the queue that
  * `setsLeftInExercise` is counted off.
  *
- * THREE of those controls are drawn BELOW this row, inside `LastSetDetail`:
- * the warm-up toggle (`WarmupMarkRow`), the effort re-rating (`RpeSelector`,
- * opened from `LoggedEffortLine`) and the rep and duration corrections
- * (`RepCorrectionRow`, `HoldCorrectionRow`). Acting on one of those can move
- * the next target under the finger that acted. The FOURTH, `AddSetSection`,
- * is drawn ABOVE: it sits inside `NextSetBlock`, which `RestingStage` calls
- * before this row. So appending a set reflows what is UNDER this row rather
- * than moving the control that was tapped.
+ * ALL FOUR of those controls are drawn BELOW this row since #236. Three are
+ * inside `LastSetDetail`: the warm-up toggle (`WarmupMarkRow`), the effort
+ * re-rating (`RpeSelector`, opened from `LoggedEffortLine`) and the rep and
+ * duration corrections (`RepCorrectionRow`, `HoldCorrectionRow`). The fourth,
+ * `AddSetSection`, is inside `NextSetBlock`, which `RestingStage` now calls
+ * AFTER this row rather than before it. Acting on any of them can move the
+ * next target under the finger that acted.
+ *
+ * THE APPEND CASE CHANGED DIRECTION WITH THE MOVE, and it is the one to watch.
+ * On the last set of an exercise `setsLeftInExercise` is 0 and `nextSlot` may
+ * be null, so this row draws nothing; appending a set of the same exercise
+ * gives it both and the row appears. Under the old order it appeared BELOW
+ * `AddSetSection` and reflowed only what was under it. Under the new one it
+ * appears ABOVE `AddSetSection` and pushes that button down, so the control
+ * that was just tapped is the control that moves.
  *
  * Whether that reaches the stacked-target hazard #137 removed elsewhere on
  * this screen is UNMEASURED and is a [Field] question, not a property claimed
- * here. The bench run saw the row drawn and tapped; it never toggled a control
- * beneath it and re-read the layout.
+ * here. The bench run saw the row drawn and tapped; it never appended a set
+ * from a rest in which this row could appear, and it never toggled a control
+ * beneath the row and re-read the layout.
  */
 @Composable
 internal fun NextSetNudgeSection(state: RecordState, viewModel: RecordViewModel) {

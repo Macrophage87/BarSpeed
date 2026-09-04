@@ -2759,7 +2759,8 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * Almost everything about the set that had just finished -- the effort line,
  * the reason row, the warm-up row, the rep- and hold-correction rows and a
  * rep-quality card carrying a 64dp chart -- sits below the next-set block, in
- * [LastSetDetail]. The one exception is the reason page the app opens BY
+ * [LastSetDetail]. TWO things do not, and both are drawn above it for the same
+ * reason. The first is the reason page the app opens BY
  * ITSELF, drawn here under the header: the screen scrolls to 0 on entering
  * RESTING, so a question drawn below the fold is a question the lifter starts
  * the next set without seeing. See [SetLimiterPagePlacement]. The field report for v0.1.37 is
@@ -2768,6 +2769,14 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * has no reachable test seam for a Compose layout and nothing here has been
  * measured on a device -- see the bench-harness evidence in the commit that
  * moved START.
+ *
+ * The second is [NextSetNudgeSection], the headroom grid, moved above
+ * [NextSetBlock] by #236: it is one tap that acts on the rating just given,
+ * and below the Up next card plus five adjustment controls it was below the
+ * fold too. The owner's field report after v0.1.50 is that it got lost there.
+ * That it now fits above the fold is a claim about a screen, so it is measured
+ * on the bench in the commit that moved it and re-asked as a [Field] item on a
+ * real phone -- not asserted here.
  *
  * The screen still scrolls: a per-rep chart and a rest countdown do not both
  * fit above the fold on a phone. What is below the fold is the detail rather
@@ -2853,19 +2862,32 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // window in which switching a unit on or re-seating it still costs the
     // lifter nothing.
     ArmedSilenceCard(state)
-    NextSetBlock(state, viewModel)
-    // Directly after the card it changes, and above SessionCloseControls,
-    // which keeps its distance from START for #137's reason. Four of its
-    // inputs are written by rest-screen controls, and they are not all on the
-    // same side of it: three are BELOW, inside LastSetDetail -- the warm-up
-    // toggle, the effort re-rating, and the rep and duration corrections --
-    // while the fourth, AddSetSection, is ABOVE, inside the NextSetBlock call
-    // on the line before this one. So this row can appear or vanish part-way
-    // through a rest and shift what is under it, and an append reflows what
-    // is under the row rather than moving the control that was tapped.
-    // Whether that reaches #137's stacked-target hazard is unmeasured and is
-    // a [Field] question. Decides nothing itself; see [NextSetNudgeSection].
+    // ABOVE the card it changes, not below the whole block that carries it
+    // (#236). It used to be drawn after NextSetBlock -- the Up next card plus
+    // five adjustment controls -- so a lifter who had just rated a set in the
+    // headroom range scrolled past the thing the grid changes in order to
+    // reach the grid, and the owner's field report is that it got lost that
+    // far down. Here the column reads in the order the decision is made: that
+    // set had more in it, put it on the next set, and the next set is drawn
+    // immediately below with the change struck into it.
+    //
+    // The move changes which side of this row its own inputs sit on, and that
+    // is the part worth reading twice. Four of them are written by rest-screen
+    // controls, and since #236 ALL FOUR are drawn BELOW it: the warm-up
+    // toggle, the effort re-rating and the rep and duration corrections inside
+    // LastSetDetail, and AddSetSection inside the NextSetBlock call on the
+    // line after this one. AddSetSection was ABOVE before. Appending a set is
+    // the case that turns on: on the last set of an exercise this row draws
+    // nothing, because setsLeftInExercise is 0 and nextSlot may be null, and
+    // the append gives it both -- so the row now appears ABOVE the button that
+    // was just tapped and pushes that button down, where before it appeared
+    // below it and moved nothing under the finger. Whether that reaches #137's
+    // stacked-target hazard is UNMEASURED and is a [Field] question, not a
+    // property claimed here; the bench never appended a set from a rest in
+    // which this row could appear.
+    // Decides nothing itself; see [NextSetNudgeSection].
     NextSetNudgeSection(state, viewModel)
+    NextSetBlock(state, viewModel)
     SessionCloseControls(state, viewModel)
     Spacer(Modifier.height(16.dp))
     LastSetDetail(
