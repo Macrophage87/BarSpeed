@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -189,13 +190,27 @@ class SchemaCueTrackContractTest {
         val voiceCues = schema["\$defs"]!!.jsonObject["set"]!!
             .jsonObject["properties"]!!.jsonObject["voiceCues"]!!.jsonObject["description"]!!
             .jsonPrimitive.content
+        // The two false sentences, pinned by their absence. The positive pins
+        // below are substring checks and would have passed on a document that
+        // stated the qualification and kept the false claim beside it -- which
+        // is what the 1.19 entry already did, in its own words, four sentences
+        // after saying the opposite. A correction that adds is not a
+        // correction; these two assert the deletion.
+        assertFalse(
+            "each during the rep it names" in versionLog,
+            "the 1.19 entry still says every call is heard during the rep it names, false on a paused plan",
+        )
+        assertFalse(
+            "on the final rep itself" in voiceCues,
+            "voiceCues still puts Last rep on the final rep itself, which is false on a paused plan",
+        )
         assertTrue(
             "previous rep's closing pause" in versionLog,
-            "the 1.19 entry says every call is heard during the rep it names, false on a paused plan",
+            "the 1.19 entry does not say where a paused schedule speaks the call",
         )
         assertTrue(
             "previous rep's closing pause" in voiceCues,
-            "voiceCues puts Last rep on the final rep itself, which is false on a paused plan",
+            "voiceCues does not say where a paused schedule speaks the call",
         )
     }
 
