@@ -320,13 +320,14 @@ object RepSegmenter {
      * comes with it. A drive alone is a rep only when the lifter demonstrably
      * lowered first: [loweredSince] asks the PRE-DEMOTION runs whether an
      * eccentric-sign stretch since the last counted rep travelled at least
-     * [RunThresholds.minRomM]. The three zero-truth captures resolve exactly
+     * [RunThresholds.minRomM] and no further than
+     * [RunThresholds.maxRunDisplacementM]. The three zero-truth captures resolve exactly
      * what they resolved before, which `BatchCueCoverageTest` pins -- a
      * measurement over three captures, and not a statement about what drift
      * or a hand on a rack does in general.
      *
-     * NO NEW CONSTANT. The gate reuses `minRomM` and the dead band; there is
-     * nothing here fitted to this corpus.
+     * NO NEW CONSTANT. The gate reuses `minRomM`, `maxRunDisplacementM` and
+     * the dead band; there is nothing here fitted to this corpus.
      *
      * Measured over the twenty cue-tracked captures at the commit that added
      * it: marks matched 147 -> 150 of 170, empty 23 -> 20, and doubled and
@@ -334,10 +335,11 @@ object RepSegmenter {
      * lands in a window that was empty. See `BatchCueCoverageTest`.
      *
      * The corpus exercises this FIRING and none of its guards -- no committed
-     * capture has an orphan drive under the floor or a lowering between
-     * `minRomM` and half of it. `SlowEccentricFallbackTest` builds the cases
-     * that do, one threshold deciding each, because a guard nothing can fail
-     * reads as coverage.
+     * capture has an orphan drive under the floor, a lowering between
+     * `minRomM` and half of it, or a licensing run over
+     * `maxRunDisplacementM`; the largest is 1.809 m against a 2.0 m cap.
+     * `SlowEccentricFallbackTest` builds the cases that do, one threshold
+     * deciding each, because a guard nothing can fail reads as coverage.
      */
     private fun pairEccentricFirst(
         runs: List<Run>,
@@ -410,10 +412,28 @@ object RepSegmenter {
      * demoted for being too slow or too brief has already been erased from the
      * classified list, and that erasure is exactly the case this asks about.
      *
-     * The bar is [RunThresholds.minRomM] of travel: the same floor a rep's
-     * drive must clear, applied to the return. It is deliberately a DISTANCE
-     * and not a speed, because a slow eccentric is slow by prescription and
-     * fast only by accident.
+     * TWO of the three demotion reasons are readmitted here and the third is
+     * not. Too slow and too brief are readmitted, because a lowering can be
+     * both and still be a lowering. Over
+     * [RunThresholds.maxRunDisplacementM] is not: that gate's only job is to
+     * say the run is unanchored integration drift rather than a lift, and a
+     * run it rejected cannot be evidence that the lifter lowered anything.
+     * Travel alone will not catch it -- the further the integrator drifts the
+     * further past [RunThresholds.minRomM] the run travels -- so the cap has
+     * to be asked for by name.
+     *
+     * The lower bar is [RunThresholds.minRomM] of travel: the same floor a
+     * rep's drive must clear, applied to the return. It is deliberately a
+     * DISTANCE and not a speed, because a slow eccentric is slow by
+     * prescription and fast only by accident.
+     *
+     * The window is inclusive at the cap, matching `classifyRunsDetailed`,
+     * which demotes on a strict `disp > maxRunDisplacementM`: a run sitting
+     * exactly on the cap was never called drift and is not called drift here.
+     *
+     * CORPUS-NEUTRAL when it was added. The largest travel of any run
+     * licensing a drive anywhere in the committed corpus is 1.809 m, on
+     * `field-backsquat-4011-6rep-s36-set01`, against a 2.0 m cap.
      *
      * `pairsBelowMinRom` is NOT incremented for a drive this rejects. That
      * census counts pairs the floor discarded and a drive with no eccentric is
@@ -427,8 +447,9 @@ object RepSegmenter {
         fromIdx: Int,
         toIdx: Int,
     ): Boolean = beforeDemotion.any { run ->
+        val travel = displacement(series, run.startIdx, run.endIdx)
         run.type == direction.eccentricRun && run.startIdx >= fromIdx && run.endIdx <= toIdx &&
-            displacement(series, run.startIdx, run.endIdx) >= thresholds.minRomM
+            travel >= thresholds.minRomM && travel <= thresholds.maxRunDisplacementM
     }
 
     /**
