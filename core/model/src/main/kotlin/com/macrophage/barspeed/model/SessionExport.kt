@@ -148,10 +148,10 @@ data class SessionExport(
          * set may carry [SetExport.sensors], which says how many
          * accelerometers it was armed with, which roles they carried, which
          * of those reached the archive and which one the set's figures came
-         * from. Under 1.13 as well, and for the same reason -- the version is
-         * still unreleased. Absent on every ordinary one-sensor set, which is
-         * what keeps a single-sensor export byte-for-byte what 1.12 wrote
-         * apart from the version string itself.
+         * from. Under 1.13 as well, and for the same reason -- 1.13 was
+         * unreleased when that change landed. Absent on every ordinary
+         * one-sensor set, which is what keeps a single-sensor export
+         * byte-for-byte what 1.12 wrote apart from the version string itself.
          *
          * 1.13 carries a FOURTH change, additive on the same terms and under
          * the same version for the same reason (#159): a session may carry
@@ -161,11 +161,12 @@ data class SessionExport(
          * and on every session recorded before this version.
          *
          * 1.13 carries a FIFTH change (#176, #173) and a SIXTH (#157, #174),
-         * both under the same unreleased version for the same reason and
-         * NEITHER of them additive: `voiceCues` gains the rep call the guide
-         * merges into a stroke's own word, so an existing array's contents
-         * change; and `plannedReps` / `plannedDuration_s` publish what the plan
-         * declared, frozen at import, rather than the box the lifter left
+         * both under the same number because 1.13 was unreleased when they
+         * landed, and NEITHER of them additive: `voiceCues` gains the rep
+         * call the guide merges into a stroke's own word, so an existing
+         * array's contents change; and `plannedReps` / `plannedDuration_s`
+         * publish what the plan declared, frozen at import, rather than the
+         * box the lifter left
          * behind. The published schema's `schemaVersion` description carries
          * both arguments in full and the measured sizes; these two lines are
          * the pointer, not a second copy.
@@ -205,9 +206,10 @@ data class SessionExport(
          * means the app could not record both rather than that the lifter
          * declined to rate it.
          *
-         * 1.14 carries a SECOND change, under the same number because 1.14 is
-         * unreleased and the two are one design (#187), and it is NOT additive
-         * either: [SetExport.rpe] is a 1-to-10 scale whose rungs are anchored
+         * 1.14 carries a SECOND change, under the same number because 1.14 was
+         * unreleased when that change landed and the two are one design (#187),
+         * and it is NOT additive either: [SetExport.rpe] is a 1-to-10 scale
+         * whose rungs are anchored
          * DIFFERENTLY ALONG ITS LENGTH. 7 to 10 stay reps in reserve -- three,
          * two, one, none -- and 6, 4 and 1 are load headroom, "could have
          * added one increment / two increments / much more", asked in seconds
