@@ -467,11 +467,19 @@ class RescuedDatabaseStoreTest {
      * `read`'s `files` list is sorted, and nothing pinned that until this
      * test -- `listFiles()`'s order is unspecified by the JDK, and the
      * assertions above only pass because `listFiles()` happens to return
-     * names already sorted on the machines that run them. [ReversingFile]
-     * overrides `listFiles()` to hand back children in the opposite order,
-     * and the fixture asserts its own reversal first so a change to
-     * [DATABASE_NAME]'s alphabetical relationship to its sidecar cannot make
-     * this pass by accident.
+     * names already sorted on the machines that run them.
+     *
+     * THE FIXTURE IMPOSES A FIXED ORDER RATHER THAN PERTURBING THE JDK'S,
+     * which is the whole repair here. The first version of this test wrapped
+     * the store's root in a fixture that REVERSED whatever `listFiles()`
+     * returned and then asserted the result was unsorted -- an assertion that
+     * holds only when the JDK's order happened to be sorted already. It
+     * passed on the machine that wrote it and red CI run 33808550942 at the
+     * self-check, not at the store assertion, on a runner whose `listFiles()`
+     * order was something else. [DescendingFile] now sorts by name
+     * descending, so what the store is handed is the same on every runner and
+     * the self-check below compares against a literal rather than against
+     * whatever the platform did.
      */
     @Test
     fun `read reports files in sorted order even when listFiles does not`() {
@@ -479,19 +487,29 @@ class RescuedDatabaseStoreTest {
         File(dir, DATABASE_NAME).writeBytes(ByteArray(1))
         File(dir, "$DATABASE_NAME-wal").writeBytes(ByteArray(1))
 
-        val rawNames = ReversingFile(dir.path).listFiles()!!.map { it.name }
-        assertTrue(rawNames != rawNames.sorted(), "the fixture's own reversal produced an already-sorted order")
+        val ascending = listOf(DATABASE_NAME, "$DATABASE_NAME-wal")
+        val descending = listOf("$DATABASE_NAME-wal", DATABASE_NAME)
+        assertEquals(ascending.sorted(), ascending, "this test's own expected order is not the sorted one")
 
-        val reversingStore = RescuedDatabaseStore(ReversingFile(root.path))
-        assertEquals(listOf(DATABASE_NAME, "$DATABASE_NAME-wal"), reversingStore.rescued().single().files)
+        val rawNames = DescendingFile(dir.path).listFiles()!!.map { it.name }
+        assertEquals(descending, rawNames, "the fixture did not hand back its fixed descending order")
+        assertTrue(rawNames != ascending, "the fixture handed the store an already-sorted order")
+
+        val descendingStore = RescuedDatabaseStore(DescendingFile(root.path))
+        assertEquals(ascending, descendingStore.rescued().single().files)
     }
 
     // ---- platform fixtures -------------------------------------------------
 
-    /** Hands back a directory's children in the reverse of whatever order the JDK gave them. */
-    private class ReversingFile(path: String) : File(path) {
+    /**
+     * Hands back a directory's children sorted by name DESCENDING -- a fixed
+     * order of its own, never a perturbation of the JDK's, so every runner
+     * sees the same thing. See the sorted-order test's KDoc for the failure
+     * that made the difference matter.
+     */
+    private class DescendingFile(path: String) : File(path) {
         override fun listFiles(): Array<File>? =
-            super.listFiles()?.reversed()?.map { ReversingFile(it.path) }?.toTypedArray()
+            super.listFiles()?.map { DescendingFile(it.path) }?.sortedByDescending { it.name }?.toTypedArray()
     }
 
     /**
