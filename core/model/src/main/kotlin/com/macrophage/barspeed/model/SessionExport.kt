@@ -876,7 +876,9 @@ data class SessionExport(
          * finished before it, spread over 10 of them. On four sets one of
          * those detections is the fastest rep of the set that
          * `velocityLoss_pct` divides by: 27.4 -> 11.6, 62.1 ->
-         * 40.3, 58.3 -> 48.7 and 41.2 -> 36.1. One set's
+         * 40.3, 58.3 -> 48.7 and 41.2 -> 36.1. Two of those four sets are
+         * committed here as test fixtures; the other two are measured in that
+         * session's archive, which is not in this repository. One set's
          * `summary.peakPower_w` moves 402.5 -> 320.1, a 25.7% overstatement
          * produced during the countdown.
          *

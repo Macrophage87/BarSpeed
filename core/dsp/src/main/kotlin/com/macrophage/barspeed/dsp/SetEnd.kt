@@ -96,8 +96,9 @@ import com.macrophage.barspeed.model.VoiceCue
  * stamped in the recorder and `ImuSample` when the notification lands. The
  * caller must pass a drive-start instant read off the SAMPLE, never a time
  * converted from the DSP's reconstructed clock. That conversion costs up to
- * 105.3 ms, the worst skew measured across the committed cue tracks; reading
- * the sample's own stamp avoids it entirely.
+ * 105.3 ms, the worst skew measured across the four barbell captures
+ * `CueTrack.MAX_SKEW_MS` is derived from; reading the sample's own stamp
+ * avoids it entirely.
  */
 sealed interface SetEnd {
     /** The set announced its own end at [atMs], host arrival clock. */

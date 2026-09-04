@@ -91,6 +91,9 @@ class SchemaWorkStartBoundContractTest {
      * The zero is the case worth publishing: it is the one a reader is most
      * likely to misread as "no bound ran", and the schema's own description is
      * what says otherwise.
+     *
+     * The example's third prepped set carries no count on purpose: it is a row
+     * recorded before database v15.
      */
     @Test
     fun `the example publishes the key, including a zero`() {

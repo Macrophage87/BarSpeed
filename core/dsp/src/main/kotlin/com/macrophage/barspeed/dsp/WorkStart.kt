@@ -15,13 +15,13 @@ package com.macrophage.barspeed.dsp
  *
  * ## What was measured, on field session 38
  *
- * Nineteen of the 226 detections the analysed role resolves across that
- * session's sixteen dynamic sets have a drive that began before their own set's
- * `workStartedAt_ms`, and fourteen have one that ENDED before it. On four sets
- * one of those detections is the fastest rep of the set, and `VelocityLoss`
- * divides by the fastest rep. Dropping them and re-running the shipped rule
- * moves `velocityLoss_pct` on set 2 from 27.4 to 11.6, set 5 from 62.1 to 40.3,
- * set 9 from 58.3 to 48.7 and set 10 from 41.2 to 36.1; set 5's
+ * Nineteen of the 226 detections that survive the terminal-cue bound across
+ * that session's sixteen dynamic sets have a drive that began before their own
+ * set's `workStartedAt_ms`, and fourteen have one that ENDED before it. On four
+ * sets one of those detections is the fastest rep of the set, and
+ * `VelocityLoss` divides by the fastest rep. Dropping them and re-running the
+ * shipped rule moves `velocityLoss_pct` on set 2 from 27.4 to 11.6, set 5 from
+ * 62.1 to 40.3, set 9 from 58.3 to 48.7 and set 10 from 41.2 to 36.1; set 5's
  * `summary.peakPower_w` moves 402.5 -> 320.1, a 25.7% overstatement produced
  * during the countdown. Two of those sets are committed here as
  * `field-ohp-3010-8rep-s38-set05` and
@@ -91,9 +91,9 @@ package com.macrophage.barspeed.dsp
  * the recorder and `ImuSample.timestampMs` when the notification lands, so the
  * two are the same clock. The caller must pass a drive-end instant read off the
  * SAMPLE, never a time converted from the DSP's reconstructed clock: that
- * conversion costs up to 105.3 ms, the worst skew measured across the committed
- * cue tracks. [RollExcursion] already reads this same instant for the same
- * reason.
+ * conversion costs up to 105.3 ms, the worst skew measured across the four
+ * barbell captures `CueTrack.MAX_SKEW_MS` is derived from. [RollExcursion]
+ * already reads this same instant for the same reason.
  */
 sealed interface WorkStart {
     /** The set's work began at [atMs], host arrival clock. */

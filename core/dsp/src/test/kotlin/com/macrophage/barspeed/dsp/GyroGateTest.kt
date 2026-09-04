@@ -247,7 +247,7 @@ class GyroGateTest {
             "field-ohp-prepinflated-s37-set03",
             "field-ohp-prepinflated-s37-set04",
             // The two committed for issue #245. Both straddle: medians 20.97
-            // and 19.47 deg/s against tenth percentiles of 5.81 and 0.06.
+            // and 19.46 deg/s against tenth percentiles of 5.81 and 0.06.
             "field-ohp-3010-8rep-s38-set05",
             "field-inclinepress-3010-12rep-s38-set02",
         )
