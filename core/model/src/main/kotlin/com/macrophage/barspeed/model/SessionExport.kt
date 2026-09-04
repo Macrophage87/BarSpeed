@@ -625,19 +625,46 @@ data class SessionExport(
          * performed. The example is deleted rather than repointed, exactly as
          * `NoRepsReason`'s own KDoc deletes it.
          *
-         * 1.18 carries a FIFTH change, under the same number and for the same
-         * reason -- 1.18 is unreleased, minted by #216 -- and it IS additive
-         * (#220): [GeometrySourceExport] gains a seventh key, `bodyweight`, so
+         * 1.19: [GeometrySourceExport] gains a seventh key, `bodyweight`, so
          * the flag deciding whether the lifter's own mass is a term in
-         * [SetExport.loadKg] says who supplied it. `source` is a CLOSED
-         * object, so a reader validating against 1.17 or earlier rejects a
-         * 1.18 document on this key exactly as it would on `sensorOnStack`;
-         * nothing published stops being published or changes meaning. A set
+         * [SetExport.loadKg] says who supplied it (#220).
+         *
+         * A NEW number rather than a FIFTH change under 1.18, under the rule
+         * the 1.16 entry states and the 1.17 entries repeat: a number takes
+         * further entries until it SHIPS. 1.18 SHIPPED in v0.1.50, read by
+         * `git show v0.1.50:core/model/.../SessionExport.kt` rather than
+         * assumed, and this branch is rebased onto that tag. THIS REPLACES
+         * FOUR PARAGRAPHS THAT FILED THIS ENTRY AND THE THREE BELOW UNDER AN
+         * UNRELEASED 1.18; each was true when it was written and the tag made
+         * it false.
+         *
+         * NOT additive, and it breaks BOTH WAYS. `geometry.source` is a
+         * CLOSED object with every key required: the 1.19 schema rejects a
+         * 1.18 document on this key, and the 1.18 schema rejects a 1.19
+         * document. Measured with the ajv invocation `ci.yml` runs --
+         * v0.1.50's published example is invalid against this version's
+         * schema, `must have required property 'bodyweight'` at
+         * `/exercises/0/sets/0/geometry/source`; the same example carrying
+         * the new key is invalid against v0.1.50's schema at that path with
+         * `must NOT have additional properties`; and this version's example,
+         * declaring 1.19, is invalid against v0.1.50's schema at
+         * `/schemaVersion` on the enum, which is the first error ajv reports
+         * before it reaches the key. 1.17 shipped the same break:
+         * v0.1.50's schema rejects v0.1.48's published 1.16 example on
+         * `sensorOnStack`, measured by the same command. The published schema
+         * validates the CURRENT version's shape; its `schemaVersion` enum
+         * listing every number back to 1.0 is not a claim that a document
+         * carrying one of them validates. A sentence naming a reader
+         * "validating against 1.17 or earlier" as the rejecting one stood
+         * here and is DELETED rather than reworded -- the rejecting reader is
+         * the released 1.18.
+         *
+         * Nothing published stops being published or changes meaning. A set
          * recorded before this shipped re-exports `default` whatever its plan
          * said, permanently -- no earlier build stored the answer.
          *
-         * 1.18 carries a SIXTH change, under the same number and for the same
-         * reason, and it IS additive (#220): a set may carry
+         * 1.19 carries a SECOND change, under the same number the entry above
+         * mints, and it IS additive (#220): a set may carry
          * [SetExport.bodyWeightKg], the body weight [SetExport.loadKg] was
          * computed with. On the six of field-37's thirteen sets that are
          * body-weight work the lifter's own mass is the LARGEST term in
@@ -650,8 +677,8 @@ data class SessionExport(
          * permanently, since nothing recorded what the lifter weighed on a
          * past date.
          *
-         * 1.18 carries a SEVENTH change, under the same number and for the same
-         * reason, and it adds no key and changes no key's type or value
+         * 1.19 carries a THIRD change, under the same number the mint above
+         * states, and it adds no key and changes no key's type or value
          * (#178): `rest_s` gains the description it never had, stating the
          * instant a rest is counted from. Published because the INSTANT
          * changed rather than as a documentation pass -- the raw archive's
@@ -668,8 +695,8 @@ data class SessionExport(
          * published from `hrm` changes. Not retroactive and cannot be: no
          * earlier build stored the two windows apart.
          *
-         * 1.18 carries an EIGHTH change, under the same number and for the
-         * same reason, and it adds no key to THIS document (#133): the raw
+         * 1.19 carries a FOURTH change, under the same number the mint above
+         * states, and it adds no key to THIS document (#133): the raw
          * archive's `rollExcursion_deg` is measured over the set's WORKING
          * WINDOW -- `workStartedAt_ms`, which that document already carries,
          * to the terminal cue in the set's own cue-track CSV in the same
@@ -684,13 +711,13 @@ data class SessionExport(
          * those two the whole excess is the PREP. Both keys are withheld
          * together on a window of fewer than two samples: a range over one
          * sample is 0.0 and reads as "this set did not rotate". Retroactive,
-         * unlike the other entries under 1.18 -- the figure is measured from
+         * unlike the other entries under 1.19 -- the figure is measured from
          * the stored stream at export time rather than frozen into the row --
          * so an old session re-exports under the new rule and says which bound
          * it lacked. `RollExcursion` in `:core:dsp` is where the rule and the
          * measurements live.
          */
-        const val SCHEMA_VERSION = "1.18"
+        const val SCHEMA_VERSION = "1.19"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -700,7 +727,7 @@ data class SessionExport(
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
-                "1.16", "1.17", "1.18",
+                "1.16", "1.17", "1.18", "1.19",
             )
 
         /**
