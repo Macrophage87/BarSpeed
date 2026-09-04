@@ -794,7 +794,7 @@ data class SessionExport(
          * longer withheld and the one tempo count that moves with it, and is
          * the one to read.
          *
-         * 1.19 carries an EIGHTH change, under the same number the mint
+         * 1.19 carries a NINTH change, under the same number the mint
          * above states (#125): a set may carry
          * [SetExport.refusedDetections], how many detections the analyzer
          * judged were not reps of the set, and

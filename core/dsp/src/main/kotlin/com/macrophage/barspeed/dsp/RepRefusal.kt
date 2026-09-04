@@ -159,7 +159,9 @@ package com.macrophage.barspeed.dsp
  * count moves with it. `repMetricsComplete` compares the two and can move in
  * either direction. `stoppedEarly` and `failed` do NOT move.
  *
- * On field-37's set 10 the lifter's own count was 6, recorded manually, and
+ * On field-37's set 10 the lifter's own count was 6, recorded manually --
+ * `repsManual: true` in the session archive's own `meta.json`, which is
+ * where `ArtefactRepTest`'s set-10 bullet reads it from too -- and
  * the analyzer resolved 5 before this rule and 4 after it. The refusal takes
  * the automatic count further from the lifter's 6 -- and to exactly the
  * number a stream without the two corrupt samples produces. The set's

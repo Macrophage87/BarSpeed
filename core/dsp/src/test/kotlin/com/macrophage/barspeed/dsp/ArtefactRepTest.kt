@@ -22,8 +22,11 @@ import kotlin.test.assertTrue
  * - set 3 is `field-ohp-prepinflated-s37-set03.csv`
  * - set 8 is `field-assistedpullup-3010-s37-set08.csv`
  * - set 10 is `field-assistedpullup-3010-s37-set10.csv`
- * - set 1 is `field-ohp-3010-8rep-s37-set01.csv`, added at
- *   `b8e28058e02247aec77e18359a2ea0dfd8a1025d` because no test held it
+ * - set 1 is `field-ohp-3010-8rep-s37-set01.csv`, added by this branch's
+ *   commit "Pin what field-37's three reopening sets publish today,
+ *   phantom and all" because no test held it. Cited by subject rather
+ *   than by SHA: a branch commit's SHA moves on every rebase, and the
+ *   one written here had already gone stale
  *
  * Session 37's own `meta.json` says: `epoch` 2026-09-02T09:20:45.365Z,
  * `timeZoneId` America/New_York, `appVersion` **0.1.48**, `sensorModel`
@@ -37,8 +40,8 @@ import kotlin.test.assertTrue
  *   performed** (`repsManual: true`), RPE 6, not failed. 4,692 samples at
  *   99.4066539521085 Hz.
  * - set 3 -- same exercise and geometry, 50.0 lb / 22.67961850050177 kg,
- *   **7 reps performed**, `failed: true`, `limiter: "muscle"`. 3,852 samples
- *   at 99.43453226264556 Hz.
+ *   **7 reps performed** (`repsManual: true`), `failed: true`,
+ *   `limiter: "muscle"`. 3,852 samples at 99.43453226264556 Hz.
  * - set 8 -- `assisted_pull_up`, 66.7 lb / 30.25 kg of ASSISTANCE,
  *   `bodyweight: true`, concentric-first, drive up, vertical, sensor on the
  *   bar, travel ratio 1.0, **5 reps performed** (`repsManual: true`) of a
@@ -46,8 +49,15 @@ import kotlin.test.assertTrue
  *   99.4123943292776 Hz.
  * - set 10 -- `assisted_pull_up`, 51.7 lb / 23.443564147942737 kg of
  *   ASSISTANCE, `bodyweight: true`, concentric-first, drive up, vertical,
- *   sensor on the bar, **6 reps performed**, `failed: true`,
- *   `limiter: "pace"`. 4,060 samples at 99.40732758620689 Hz.
+ *   sensor on the bar, **6 reps performed** (`repsManual: true`),
+ *   `failed: true`, `limiter: "pace"`. 4,060 samples at
+ *   99.40732758620689 Hz.
+ *
+ * EVERY ONE of session 37's ten dynamic sets carries `repsManual: true`;
+ * only its three `rope_dead_hang` sets omit the key. The annotation stood
+ * on sets 1 and 8 and not on 3 and 10, which read as a convention saying
+ * those two counts were automatic. They were not. Read from the session
+ * archive's own `meta.json`, not inferred from a filename.
  *
  * SET 8 IS ANALYSED AT SET 8'S OWN LOAD, 30.25 kg, AND WAS NOT. Every set-8
  * figure below used to be computed against set 10's 23.443564147942737 kg of
