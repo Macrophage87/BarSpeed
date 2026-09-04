@@ -210,21 +210,33 @@ class BlankAnalysisTest {
         // spans against the ten reps the lifter performed, so that assertion
         // is not weakened here, it is INVERTED.
         //
-        // The count landing on ten is not the reps being right. Their ROMs run
-        // 0.115 m to 0.441 m on a Romanian deadlift, a spread of nearly four
-        // to one within one set, and the velocity loss the lifter now reads is
-        // 74.2% where before they read nothing at all. A wrong figure is not
-        // better than no figure by default; what makes this the better outcome
-        // is that the set is no longer indistinguishable from an unmeasured
-        // one, and the raw stream was always recoverable either way.
+        // The count landing on ten was never the reps being right, and issue
+        // #72's slow-eccentric fallback has now taken it to ELEVEN against ten
+        // performed. That is worth stating plainly rather than filing under
+        // improvement: the total moved AWAY from the hand count. What moved
+        // toward the truth is the composition. This capture carries a cue
+        // track, and BatchCueCoverageTest scores the eleventh detection into a
+        // window that was empty -- 9 matched of 10 marks with 1 stray before,
+        // 10 matched with the same 1 stray after -- so the ten was a rep the
+        // metronome called being missed while an unrelated detection outside
+        // every window made the arithmetic come out right. The new rep carries
+        // 0.228 m, inside this set's own 0.115-0.441 m spread.
+        //
+        // Their ROMs still run 0.115 m to 0.441 m on a Romanian deadlift, a
+        // spread of nearly four to one within one set, and the velocity loss
+        // the lifter reads is 74.2% where before this branch's ancestors they
+        // read nothing at all. A wrong figure is not better than no figure by
+        // default; what makes this the better outcome is that the set is no
+        // longer indistinguishable from an unmeasured one, and the raw stream
+        // was always recoverable either way.
         val rdl = SetAnalyzer.analyze(
             load("field-rdl-3010-10rep-s36-set05"),
             LiftDirection(StartPhase.ECCENTRIC),
             loadKg = 52.163122551154075,
         )
-        assertEquals(10, rdl.reps.size, "reps resolved on a 10-rep set")
+        assertEquals(11, rdl.reps.size, "reps resolved on a 10-rep set")
         assertEquals(
-            listOf(0.441, 0.115, 0.325, 0.216, 0.272, 0.154, 0.345, 0.411, 0.193, 0.139),
+            listOf(0.441, 0.115, 0.325, 0.216, 0.272, 0.154, 0.228, 0.345, 0.411, 0.193, 0.139),
             rdl.reps.map { it.romM },
             "ROM per rep, metres -- the spread this count is built out of",
         )
@@ -304,7 +316,7 @@ class BlankAnalysisTest {
     }
 
     @Test
-    fun `the neighbouring Romanian deadlift went from one rep of ten to ten`() {
+    fun `the neighbouring Romanian deadlift went from one rep of ten to eleven`() {
         // field-36 set 04, committed here. Same session, exercise, tempo, load
         // and hand count as set 05, four minutes earlier, and its integrator
         // runs away FURTHER -- a single run displacing 123.64 m against set
@@ -316,22 +328,29 @@ class BlankAnalysisTest {
         // published whenever ONE rep resolves, and nothing in the export
         // distinguished that from a well-measured single.
         //
-        // Issue #94's runaway correction takes it from one rep to ten, against
-        // ten performed. The run-structure figures below are on the ANCHORED
-        // series and are the diagnosis, unchanged; the span count is on the
-        // shipped one. This capture has no committed cue track, so its ten is
-        // scored against meta.json's hand count and against nothing per-rep.
+        // Issue #94's runaway correction took it from one rep to ten, against
+        // ten performed, and issue #72's slow-eccentric fallback takes it to
+        // ELEVEN. The run-structure figures below are on the ANCHORED series
+        // and are the diagnosis, unchanged; the span count is on the shipped
+        // one.
+        //
+        // THIS CAPTURE HAS NO CUE TRACK, so unlike its sister set 05 nothing
+        // here can say whether the eleventh detection is the rep set 05's
+        // marks show being recovered or a phantom. It carries 0.107 m, which
+        // is 0.007 m over the minRomM floor, in a set whose other ten run
+        // 0.103 m to 0.932 m. It is pinned as an unadjudicated cost of that
+        // change and not as an improvement.
         val runs = rawRuns("field-rdl-3010-10rep-s36-set04")
         assertEquals(12, runs.movement, "raw movement runs")
         assertEquals(2, runs.overDisplacementCap, "runs displacing past the cap")
         assertEquals(123.64, runs.maxDisplacementM, 0.01, "the longest single run, metres")
-        assertEquals(10, spans("field-rdl-3010-10rep-s36-set04", StartPhase.ECCENTRIC), "spans, 10 reps performed")
+        assertEquals(11, spans("field-rdl-3010-10rep-s36-set04", StartPhase.ECCENTRIC), "spans, 10 reps performed")
         val analysis = SetAnalyzer.analyze(
             load("field-rdl-3010-10rep-s36-set04"),
             LiftDirection(StartPhase.ECCENTRIC),
             loadKg = 52.163122551154075,
         )
-        assertEquals(10, analysis.reps.size, "reps published to the lifter")
+        assertEquals(11, analysis.reps.size, "reps published to the lifter")
         // Ten reps and STILL no velocity loss, for a different reason: the
         // last rep resolved is the fastest of the set, so VelocityLoss
         // withholds the figure rather than publishing a negative drawdown.

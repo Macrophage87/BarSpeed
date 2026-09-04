@@ -260,9 +260,12 @@ class BlankAnalysisReasonTest {
         //
         // The Romanian deadlift used to be the second capture here, with a
         // census of 4 movement runs and 3 over the cap. Issue #94's runaway
-        // correction takes it to 52 movement runs, NONE over the cap, and ten
-        // spans, so its census is no longer a blank-analysis census at all and
-        // is pinned on the anchored series in BlankAnalysisTest instead.
+        // correction takes it to 52 movement runs, NONE over the cap, and
+        // eleven spans since issue #72's slow-eccentric fallback, so its
+        // census is no longer a blank-analysis census at all and is pinned on
+        // the anchored series in BlankAnalysisTest instead. The run counts
+        // here are untouched by that fallback -- it changes pairing and not
+        // classification -- which is why only `spans` moves in this census.
         val rdl = RepSegmenter.segmentDetailed(
             series("field-rdl-3010-10rep-s36-set05"),
             LiftDirection(StartPhase.ECCENTRIC),
@@ -276,7 +279,7 @@ class BlankAnalysisReasonTest {
                 shorterThanMinPhase = 19,
                 qualifyingRuns = 31,
                 pairsBelowMinRom = 1,
-                spans = 10,
+                spans = 11,
             ),
             rdl,
             "field-rdl-3010-10rep-s36-set05, eccentric-first",
