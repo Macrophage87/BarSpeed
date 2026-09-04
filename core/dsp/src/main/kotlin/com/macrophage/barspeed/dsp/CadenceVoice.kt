@@ -133,8 +133,8 @@ object CadenceVoice {
                     calls += ScriptedCall(second, DONE, listOf(DONE))
                     return calls
                 }
-                pending = plan.announcementAfter(rep, plannedReps)
                 rep++
+                pending = plan.announcementFor(rep, plannedReps)
             }
         }
     }

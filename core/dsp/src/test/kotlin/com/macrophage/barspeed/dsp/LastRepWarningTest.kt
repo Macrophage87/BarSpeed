@@ -157,7 +157,7 @@ class LastRepWarningTest {
             val p = plan(row.tempo, row.direction)
             assertEquals(
                 row.expected,
-                p.announcementAfter(row.reps - 1, row.reps),
+                p.announcementFor(row.reps, row.reps),
                 "${row.describe()}: beats=${p.beats.map { it.label to it.seconds }}, " +
                     "announceOnBeat=${p.announceOnBeat}, repCompleteAfterBeat=${p.repCompleteAfterBeat}",
             )
@@ -208,8 +208,8 @@ class LastRepWarningTest {
             concFirst.beats.map { it.label to it.seconds },
             "set 5: the same three-second stroke CLOSES the rep, so the call has only it left",
         )
-        assertEquals(CadencePlan.LAST_REP, eccFirst.announcementAfter(9, 10), "set 1 still warns")
-        assertNull(concFirst.announcementAfter(7, 8), "set 5 must not")
+        assertEquals(CadencePlan.LAST_REP, eccFirst.announcementFor(10, 10), "set 1 still warns")
+        assertNull(concFirst.announcementFor(8, 8), "set 5 must not")
     }
 
     @Test
@@ -219,10 +219,10 @@ class LastRepWarningTest {
         // things -- ten counts and no warning, rather than ten counts and a
         // warning that has nothing left to warn about.
         val p = plan("1120", pushdown)
-        assertEquals("Rep 1", p.announcementAfter(1, 12))
-        assertEquals("Rep 10", p.announcementAfter(10, 12))
-        assertNull(p.announcementAfter(11, 12), "the eleventh is the one that would open the last rep's last beat")
-        assertEquals("Rep 11", p.announcementAfter(11, plannedReps = null), "an unbounded set has no last rep at all")
+        assertEquals("Rep 1", p.announcementFor(2, 12))
+        assertEquals("Rep 10", p.announcementFor(11, 12))
+        assertNull(p.announcementFor(12, 12), "the twelfth is the rep whose warning would open its own last beat")
+        assertEquals("Rep 11", p.announcementFor(12, plannedReps = null), "an unbounded set has no last rep at all")
     }
 
     @Test

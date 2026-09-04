@@ -123,8 +123,8 @@ class GuidedCadenceRunner(
                             onFinished()
                             return@launch
                         }
-                        pending = plan.announcementAfter(rep, plannedReps)
                         rep++
+                        pending = plan.announcementFor(rep, plannedReps)
                     }
                 }
             }

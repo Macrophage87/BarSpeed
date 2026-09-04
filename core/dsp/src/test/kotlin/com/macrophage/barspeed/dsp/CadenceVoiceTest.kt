@@ -112,10 +112,10 @@ class CadenceVoiceTest {
     @Test
     fun `the call counts finished reps, and warns once, and only where there is a home for it`() {
         val p = plan("3010")
-        assertEquals("Rep 1", p.announcementAfter(1, plannedReps = 3))
-        assertEquals(CadencePlan.LAST_REP, p.announcementAfter(2, plannedReps = 3), "one rep short of the target")
-        assertEquals("Rep 7", p.announcementAfter(7, plannedReps = null), "no target, so no last rep to warn of")
-        assertNull(plan("1010").announcementAfter(1, plannedReps = 3), "no home, so nothing is decided")
+        assertEquals("Rep 1", p.announcementFor(2, plannedReps = 3), "the second is due, and one is finished")
+        assertEquals(CadencePlan.LAST_REP, p.announcementFor(3, plannedReps = 3), "the last rep is the one due")
+        assertEquals("Rep 7", p.announcementFor(8, plannedReps = null), "no target, so no last rep to warn of")
+        assertNull(plan("1010").announcementFor(2, plannedReps = 3), "no home, so nothing is decided")
     }
 
     @Test
@@ -170,13 +170,13 @@ class CadenceVoiceTest {
         // in order, because a count alone passes when the right number of wrong
         // words is written.
         //
-        // It reads announcementAfter for the expected side, which is the
+        // It reads announcementFor for the expected side, which is the
         // decision, against the script's rows, which are the delivery. A plan
         // that decides to say nothing is covered too: 1010 and 1110 have no
         // home for a call, and must therefore record none.
         corpus.forEach { (tempo, direction, reps) ->
             val p = plan(tempo, direction)
-            val decided = (1 until reps).mapNotNull { p.announcementAfter(it, reps) }
+            val decided = (2..reps).mapNotNull { p.announcementFor(it, reps) }
             val recorded = CadenceVoice.script(p, reps)
                 .flatMap { it.recorded }
                 .filter { it == CadencePlan.LAST_REP || it.startsWith(CadencePlan.REP_CALL_PREFIX) }

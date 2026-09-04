@@ -110,7 +110,7 @@ data class CadenceBeat(
  * FINISHED-rep count. `"Rep 3"` reports and instructs nothing, the lifter has
  * nothing to do differently on hearing it late, and issue #147 added it to
  * exactly these plans because they had no spoken count at all. It stays, and it
- * is what [announcementAfter] returns here on every rep but the last. Whether a
+ * is what [announcementFor] returns here on every rep but the last. Whether a
  * count that lands mid-rep is followable at gym speed is still a question for a
  * session; what the session answered is the warning, and only the warning.
  *
@@ -281,26 +281,36 @@ data class CadencePlan(
         get() = announceOnBeat != null && beatsOfRepLeftWhenAnnounced <= 1
 
     /**
-     * What the guide says once rep [repsCompleted] of [plannedReps] is done, or
-     * null when it says nothing.
+     * What the guide says about rep [repNowDue] of [plannedReps], or null when
+     * it says nothing.
+     *
+     * The coordinate is the rep the call is ABOUT: the one now due, which the
+     * lifter is about to start or is already in. Every caller asks once per rep
+     * boundary, for the rep that follows it.
      *
      * The decision, not the delivery: WHERE the returned words land is
      * [announceOnBeat]'s business, and on cases 2 and 3 that is one or two
-     * strokes after this is decided.
+     * strokes into the rep this names.
      *
      * [plannedReps] is null on a set with no prescribed count, which has no
-     * last rep to warn about and so only ever counts finished ones.
+     * last rep to warn about.
+     *
+     * The NUMBER returned is the rep before [repNowDue], because the call
+     * counts FINISHED reps: a lifter starting their seventh hears `"Rep 6"`.
+     * That is the schedule as shipped, pinned against seven field cue tracks in
+     * `RepCallScheduleTest`, and whether it should stay is issue #243. This
+     * commit only moves the question into the coordinate it can be asked in.
      *
      * The [LAST_REP] warning is withheld where it would arrive with only the
      * closing stroke of its own rep left -- issue #173, and the reasoning is
      * above under "What case 3 costs". The finished-rep count is not withheld
      * there or anywhere: it reports and instructs nothing.
      */
-    fun announcementAfter(repsCompleted: Int, plannedReps: Int?): String? = when {
+    fun announcementFor(repNowDue: Int, plannedReps: Int?): String? = when {
         announceOnBeat == null -> null
-        plannedReps != null && repsCompleted == plannedReps - 1 ->
+        plannedReps != null && repNowDue == plannedReps ->
             LAST_REP.takeUnless { warningWouldOpenTheLastBeatOfItsOwnRep }
-        else -> "$REP_CALL_PREFIX$repsCompleted"
+        else -> "$REP_CALL_PREFIX${repNowDue - 1}"
     }
 
     companion object {
