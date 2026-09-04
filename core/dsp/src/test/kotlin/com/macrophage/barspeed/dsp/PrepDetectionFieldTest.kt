@@ -5,6 +5,7 @@ import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -70,6 +71,10 @@ class PrepDetectionFieldTest {
     private fun analyse(f: String, d: LiftDirection, kg: Double) =
         SetAnalyzer.analyze(load(f), d, kg, SetTargets(), DspConfig(), track(f))
 
+    /** The same set, handed the work-start instant its own `-prep.csv` carries. */
+    private fun bounded(f: String, d: LiftDirection, kg: Double) =
+        SetAnalyzer.analyze(load(f), d, kg, SetTargets(), DspConfig(), track(f), prep(f).second)
+
     @Test
     fun `set 5 reproduces every rep figure its session published`() {
         val a = analyse(ohp, ohpDirection, ohpKg)
@@ -133,6 +138,35 @@ class PrepDetectionFieldTest {
         assertEquals(1788515701922L to 1788515711934L, prep(press), "set 2 prep row")
         assertEquals(0, analyse(ohp, ohpDirection, ohpKg).refusedDetections, "set 5 refusals")
         assertEquals(0, analyse(press, pressDirection, pressKg).refusedDetections, "set 2 refusals")
+    }
+
+    /**
+     * How many detections each set resolved during its own prep countdown,
+     * counted the moment the analyzer is handed the instant.
+     *
+     * A GREEN pin on a count that did not exist before the commit adding it,
+     * not a differential. Set 5 finished three drives before its work began and
+     * set 2 one; a fourth drive on set 5 began before the instant and was still
+     * running when it passed, and [WorkStart] keeps it -- 19 detections across
+     * field-38 began early and 14 ended early, and the five that differ are
+     * straddlers of exactly this kind.
+     *
+     * Null rather than 0 when no instant is offered, which is every one of this
+     * file's other cases and every caller in this repository that has no prep
+     * row to hand.
+     */
+    @Test
+    fun `each set counts the detections that finished before its work began`() {
+        assertEquals(3, bounded(ohp, ohpDirection, ohpKg).detectionsBeforeWorkStart, "set 5")
+        assertEquals(1, bounded(press, pressDirection, pressKg).detectionsBeforeWorkStart, "set 2")
+        assertNull(
+            analyse(ohp, ohpDirection, ohpKg).detectionsBeforeWorkStart,
+            "set 5 with no instant offered",
+        )
+        assertNull(
+            analyse(press, pressDirection, pressKg).detectionsBeforeWorkStart,
+            "set 2 with no instant offered",
+        )
     }
 
     /**

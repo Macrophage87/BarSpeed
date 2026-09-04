@@ -202,6 +202,34 @@ data class SetAnalysis(
      * `SessionExport.VALID_REFUSED_DETECTION_REASONS`.
      */
     val refusedDetectionReason: String? = null,
+    /**
+     * Detections whose drive finished before the set's work began, or null when
+     * nothing on the record says when that was. See [WorkStart]. Issue #245.
+     *
+     * Null and 0 are different facts, the doctrine
+     * [detectionsAfterSetEndCue] and [refusedDetections] already carry: 0 means
+     * an instant bounded this set's head and nothing came before it, null means
+     * the set has no such instant -- an ad-hoc set that ran no prep, a set ended
+     * while its prep was still running, or any set recorded before the instant
+     * was stored at all (#216). A reader cannot recover the difference from
+     * anything else the row carries.
+     *
+     * A SEPARATE KEY FROM [refusedDetections] RATHER THAN A SECOND WORD UNDER
+     * IT, and the reason is the null. [refusedDetections] is null when the set
+     * held too few detections for a range bound to be derived from; this is
+     * null when the set has no work-start instant. A set can be in one state
+     * and not the other -- three detections and a known instant is an ordinary
+     * heavy triple -- so one nullable count cannot carry both without making
+     * one of the two facts unsayable, and `refusedDetectionReason` is a single
+     * word that could not name both rules at once either.
+     *
+     * Counted over the detections the set's own terminal cue KEPT, not over
+     * every span the segmenter resolved: a detection the cue already excluded
+     * is not one this bound removed. The two populations cannot overlap in
+     * practice -- work begins before the set is called over -- so this is a
+     * statement about what the number means rather than a correction to it.
+     */
+    val detectionsBeforeWorkStart: Int? = null,
 )
 
 /** Full batch analysis of one recorded set. */
@@ -211,6 +239,11 @@ object SetAnalyzer {
      * prescribing. Empty for a set that was not guided, and for every caller
      * that has no track to offer; [SetEnd] is where what that means is written
      * down.
+     *
+     * [workStartedAtMs] is `PrepWindow.workStartedAtMs`, the instant the set's
+     * prep ended, or null for a set that has none. [WorkStart] is where what
+     * that means is written down. It is the head-of-stream companion of
+     * [cues]: one says when the work began, the other when it was called over.
      */
     fun analyze(
         samples: List<ImuSample>,
@@ -219,6 +252,7 @@ object SetAnalyzer {
         targets: SetTargets = SetTargets(),
         config: DspConfig = DspConfig(),
         cues: List<VoiceCue> = emptyList(),
+        workStartedAtMs: Long? = null,
     ): SetAnalysis {
         val raw = VelocityEstimator.estimate(samples, config, direction.measuredPlane)
         val series = orient(raw, direction, config).mappedToLifter(direction.sensorToLifter)
@@ -249,6 +283,16 @@ object SetAnalyzer {
         // rep's own two phases, which is bounded by that rep and cannot reach
         // an excluded movement.
         val within = spans.filterIndexed { idx, _ -> setEnd.startedWithinSet(driveStartMs[idx]) }
+        // The head-of-stream bound's own instant, read off the sample the drive
+        // ENDED on for the reason driveStartMs is read off the sample the drive
+        // began on: the series is index-parallel to the sample list, so this is
+        // exact and costs none of the skew CueTrack.MAX_SKEW_MS measures.
+        // Counted over `within` rather than over every span: a detection the
+        // terminal cue already excluded is not one this bound removed.
+        // Issue #245.
+        val workStart = WorkStart.of(workStartedAtMs)
+        val detectionsBeforeWorkStart =
+            workStart.detectionsBefore(within.map { samples[it.conEndIdx].timestampMs })
         val detected = within.mapIndexed { idx, span -> repMetrics(idx, span, series, direction, loadKg, config) }
         // Refused HERE, for the reason the cue bound is applied where it is:
         // everything below reads one list, so a rule applied at any consumer
@@ -300,6 +344,7 @@ object SetAnalyzer {
             noRepsReason,
             RepRefusal.refusedCount(detected),
             RepRefusal.reason(detected),
+            detectionsBeforeWorkStart,
         )
     }
 
