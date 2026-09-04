@@ -710,9 +710,13 @@ private fun previewSummary(preview: SessionPreview): String {
  * emulator `barspeed-api35`, headless, debug APK built from 9b089c88, a
  * five-exercise plan declaring weight / reps / time / none and one omitting
  * the key. Every header named one dimension on both screens, and the omitted
- * key read "steps up by weight". At `font_scale 2.0` the phrase wrapped onto
- * its own line unclipped. What that does NOT establish: nothing about a real
- * phone's display, and nothing a lifter judged.
+ * key read "steps up by weight". At `font_scale 2.0` each phrase still
+ * renders in full on one line, neither wrapped nor clipped -- read on this
+ * screen's preview, with all four phrases on screen together. The TopAppBar
+ * title above them does clip at that scale; that is pre-existing and
+ * untouched here. What that does NOT establish: nothing at that scale on
+ * the plan detail screen, nothing about a real phone's display, and nothing
+ * a lifter judged.
  */
 @Composable
 private fun PreviewBlockCard(block: PreviewBlock, unit: WeightUnit) {
