@@ -922,8 +922,9 @@ data class SessionExport(
          * module cannot see -- the dependency runs the other way. They are
          * mirrored here so the published schema has a Kotlin constant to be
          * pinned against, the same arrangement [VALID_NO_REPS_REASONS] uses,
-         * and `RepRefusalTest` asserts the two lists are equal from the side
-         * that can see both.
+         * and `RefusedDetectionAnalysisTest`'s "the refusal words are the
+         * ones the export publishes" asserts the two lists are equal from
+         * the side that can see both.
          *
          * One word today, and the plural is deliberate rather than
          * aspirational: the sample-level half of the same defect -- a corrupt
