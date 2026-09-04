@@ -524,10 +524,20 @@ class CuedRepCoverageTest {
         // more than twice, or less than a third of, the set's BATCH median rep
         // ROM -- applied to the captures where the metronome says what
         // happened. Five of the seven reps nobody called are IN family, so the
-        // reference does not separate them either. The rejection count rose
-        // from fifteen to eighteen with issue #87, which widened the batch
-        // reference's ROM spread on seven captures without touching the live
-        // counter those reps come from.
+        // reference does not separate them either.
+        //
+        // A CLAIM DELETED HERE. This note said the rejection count "rose from
+        // fifteen to eighteen with issue #87, which widened the batch
+        // reference's ROM spread on seven captures". The assertion beneath it
+        // read SEVENTEEN until the commit that wrote this, so the prose and
+        // the pin disagreed and at most one of them described any real state.
+        // Which is not reconstructable from here, so the attribution is cut
+        // rather than reworded. What is measured: it is eighteen at this
+        // commit, it was seventeen at the parent, and issue #72's
+        // slow-eccentric fallback is what moved it -- that fallback publishes
+        // reps on the drive alone, whose ROM is one phase where a paired
+        // rep's is the drive too, so the batch median this rule is applied
+        // against shifts under it as well.
         val c = DspConfig()
         val tol = CueTrack.WINDOW_TOLERANCE_MS.toLong()
         var outOfFamily = 0
@@ -562,8 +572,8 @@ class CuedRepCoverageTest {
         // under it as well, and one more live rep falls outside the family.
         assertEquals(18, outOfFamily, "counted reps the batch reference rejects")
         assertEquals(16, outOfFamilyCalled, "of those, reps the metronome actually called")
-        assertEquals(64, inFamily, "counted reps the batch reference accepts")
-        assertEquals(59, inFamilyCalled, "of those, reps the metronome actually called")
+        assertEquals(63, inFamily, "counted reps the batch reference accepts")
+        assertEquals(58, inFamilyCalled, "of those, reps the metronome actually called")
     }
 
     @Test
