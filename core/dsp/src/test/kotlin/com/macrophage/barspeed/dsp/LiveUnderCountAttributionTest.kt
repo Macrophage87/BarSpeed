@@ -34,9 +34,11 @@ import kotlin.test.assertEquals
  * keeps its reconciliation arithmetic true;
  * field-rdl-3010-10rep-s36-set04 and field-ropedeadhang-hold20-s37-set11 are
  * two more. THE COUNT THAT USED TO STAND HERE IS DELETED RATHER THAN
- * REWORDED: this said NINE, which was already false by eight at the tree
- * that wrote it -- 38 captures were committed against a list of 21 -- and
- * issue #245's two captures would only have made it falser. Read the list.
+ * REWORDED: this said NINE, true where it was written -- thirty captures
+ * were committed at 7f1377583749c942c1935b081e781735f1443f54 against this
+ * list's twenty-one -- and stale ever since. Forty are committed at
+ * 7b65ce1a0a5c2e2251dbf0f2cf642cc880fcc04b, the tree that deleted the
+ * digit, two of them added by that same commit. Read the list.
  *
  * One of those outside is field-legpress-single-2011-8rep-s36-set07, landed for
  * issue #93. Its live TOTAL matches the count performed, eight against eight,

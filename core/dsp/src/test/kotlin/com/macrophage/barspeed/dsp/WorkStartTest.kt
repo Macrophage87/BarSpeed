@@ -30,7 +30,10 @@ class WorkStartTest {
     @Test
     fun `a drive that finished before the work began is outside the set`() {
         assertFalse(WorkStart.Known(at).withinSet(at - 1), "one millisecond early is early")
-        assertFalse(WorkStart.Known(at).withinSet(at - 8_630), "set 5's earliest detection")
+        assertFalse(
+            WorkStart.Known(at).withinSet(at - 7_788),
+            "set 5's earliest detection, whose drive ended 7.788 s before the work began",
+        )
     }
 
     /**

@@ -872,9 +872,10 @@ data class SessionExport(
          * the seat, cleaning a pair of dumbbells to the shoulders, one practice
          * stroke -- so it was segmented as reps and published as reps. On field
          * session 38, 19 of 226 detections began before their own set's
-         * `workStartedAt_ms` and 14 finished before it, spread over 14 of the
-         * 16 dynamic sets, and on four sets one of them is the fastest rep of
-         * the set that `velocityLoss_pct` divides by: 27.4 -> 11.6, 62.1 ->
+         * `workStartedAt_ms`, spread over 14 of the 16 dynamic sets, and 14
+         * finished before it, spread over 10 of them. On four sets one of
+         * those detections is the fastest rep of the set that
+         * `velocityLoss_pct` divides by: 27.4 -> 11.6, 62.1 ->
          * 40.3, 58.3 -> 48.7 and 41.2 -> 36.1. One set's
          * `summary.peakPower_w` moves 402.5 -> 320.1, a 25.7% overstatement
          * produced during the countdown.
