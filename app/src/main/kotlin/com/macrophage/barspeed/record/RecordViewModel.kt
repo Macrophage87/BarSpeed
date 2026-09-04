@@ -1204,14 +1204,20 @@ private fun askOrStartSession(
  * write alone would race that collector and hit the refusal a second time
  * with the figure already stored.
  *
- * Returns without doing anything when no set is refused, so a double tap on
- * either button cannot start two sets.
+ * Returns without doing anything when no set is refused.
  *
- * Free function taking the state flow, for [askOrStartSession]'s reason.
+ * [writeBodyWeightKg] is the durable write, taken as a function rather than
+ * as the [SettingsStore] that provides it: `SettingsStore` is a concrete
+ * class over an Android `Context`, and a `:app` unit test cannot build one.
+ * `RecordViewModel` passes `container.settings::setBodyWeightKg`.
+ *
+ * Free function taking the state flow, for [askOrStartSession]'s reason, and
+ * `internal` for `RefusedSetAnswerTest`'s -- the same arrangement
+ * `advancedState` and `unitChangedState` are in.
  */
-private fun CoroutineScope.answerRefusedSet(
+internal fun CoroutineScope.answerRefusedSet(
     state: MutableStateFlow<RecordState>,
-    settings: SettingsStore,
+    writeBodyWeightKg: suspend (Double) -> Unit,
     kg: Double?,
     onBegin: () -> Unit,
 ) {
@@ -1222,7 +1228,7 @@ private fun CoroutineScope.answerRefusedSet(
         return
     }
     launch {
-        settings.setBodyWeightKg(kg)
+        writeBodyWeightKg(kg)
         state.value = state.value.copy(bodyWeightKg = kg, bodyWeightRequiredForSet = false)
         onBegin()
     }
@@ -3158,7 +3164,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The refused set's answer, null meaning cancel; [answerRefusedSet] decides (#61). */
     fun answerBodyWeightForSet(kg: Double?) =
-        viewModelScope.answerRefusedSet(stateFlow, container.settings, kg, ::beginSet)
+        viewModelScope.answerRefusedSet(stateFlow, container.settings::setBodyWeightKg, kg, ::beginSet)
 
     /**
      * Start on the queue the lifter has just READ -- the same list `openPreview`
