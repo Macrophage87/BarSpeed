@@ -563,6 +563,22 @@ object SetLimiterPolicy {
      */
     fun leavesPageAsSkip(limiter: SetLimiter?): Boolean = limiter == null
 
+    /**
+     * Whether confirming a correction RETRACTS the answer that stood.
+     *
+     * True only where an answer stood and the draft carries none. A retraction
+     * is two writes and not one: the stored answer goes back to null, and the
+     * rest screen has to be told the page was already offered. At bc0661c8 the
+     * CLEAR foot ran `limitLastSet(null)` AND `onSkip()`, and [prompts] is true
+     * again for a failed set once [limiter] is null and `dismissed` is false --
+     * so the null written alone re-opens the page the retraction just cleared.
+     *
+     * Here rather than as an `if` at the confirm, for the reason every other
+     * rule on that screen was lifted out for: `:app` has no reachable test
+     * seam for a composable.
+     */
+    fun retractsStoredReason(stored: SetLimiter?, draft: SetLimiter?): Boolean = stored != null && draft == null
+
     /** The line's wording for a set carrying no reason at all. */
     const val NOT_GIVEN = "Not given"
 }

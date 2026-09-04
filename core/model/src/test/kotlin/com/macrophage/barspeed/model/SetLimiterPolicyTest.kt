@@ -176,6 +176,38 @@ class SetLimiterPolicyTest {
     }
 
     /**
+     * Clearing a stored reason is a retraction, and the popup's CLEAR foot is
+     * the only control that reaches it.
+     *
+     * The pairing this exists for: `prompts(failed = true, rpe = null,
+     * limiter = null, dismissed = false)` is true, so a confirm that writes
+     * the null and tells the rest screen nothing re-opens the page the lifter
+     * just cleared.
+     */
+    @Test
+    fun `clearing a stored reason is a retraction`() {
+        assertTrue(SetLimiterPolicy.retractsStoredReason(stored = SetLimiter.GRIP, draft = null))
+        assertTrue(SetLimiterPolicy.retractsStoredReason(stored = SetLimiter.OTHER, draft = null))
+        assertTrue(SetLimiterPolicy.prompts(failed = true, rpe = null, limiter = null, dismissed = false))
+    }
+
+    /**
+     * Everything else a confirm can do is NOT a retraction.
+     *
+     * A set that carried no answer and still carries none has nothing to
+     * retract, and a confirm that leaves an answer standing or swaps one
+     * answer for another must not suppress a page the lifter has not been
+     * shown.
+     */
+    @Test
+    fun `a confirm that leaves an answer standing is not a retraction`() {
+        assertFalse(SetLimiterPolicy.retractsStoredReason(stored = null, draft = null))
+        assertFalse(SetLimiterPolicy.retractsStoredReason(stored = null, draft = SetLimiter.GRIP))
+        assertFalse(SetLimiterPolicy.retractsStoredReason(stored = SetLimiter.GRIP, draft = SetLimiter.GRIP))
+        assertFalse(SetLimiterPolicy.retractsStoredReason(stored = SetLimiter.GRIP, draft = SetLimiter.OTHER))
+    }
+
+    /**
      * A page the app opened by ITSELF goes where the lifter is looking. This
      * is the differential.
      *
