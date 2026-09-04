@@ -53,6 +53,7 @@ class GyroGateTest {
         "field-legpress-single-2011-8rep-s36-set07",
         "field-ohp-100hz-bursty",
         "field-ohp-3010-6rep-s37-set02",
+        "field-ohp-3010-8rep-s37-set01",
         "field-ohp-prepinflated-s37-set03",
         "field-ohp-prepinflated-s37-set04",
         "field-ohp-rotating-8rep",
@@ -221,6 +222,9 @@ class GyroGateTest {
         )
         val fails = listOf(
             "field-ohp-3010-6rep-s37-set02",
+            // The same seated overhead press one set earlier: a hand-held
+            // bar rotates throughout.
+            "field-ohp-3010-8rep-s37-set01",
             "field-bench-3010-6rep-s37-set05",
             "field-bench-3010-6rep-s37-set06",
             "field-backsquat-4011-6rep-s36-set01",

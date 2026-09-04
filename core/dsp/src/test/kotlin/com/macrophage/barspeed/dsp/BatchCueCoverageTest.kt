@@ -156,6 +156,10 @@ class BatchCueCoverageTest {
         "field-seated-ohp-2rep",
         "field-still-0rep",
         "field-ropedeadhang-hold20-s37-set11",
+        // Committed for issue #125. Its cue track is deliberately not
+        // committed, on the terms `CuedRepCoverageTest` states for it and
+        // for field-rdl-3010-10rep-s36-set04.
+        "field-ohp-3010-8rep-s37-set01",
     )
 
     /**

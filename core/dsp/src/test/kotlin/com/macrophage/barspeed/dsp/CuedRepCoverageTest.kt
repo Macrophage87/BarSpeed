@@ -172,6 +172,7 @@ class CuedRepCoverageTest {
         "field-pullup-3010-8rep-s37-set09",
         "field-rdl-3010-10rep-s36-set05",
         "field-backsquat-4011-6rep-s36-set01",
+        "field-ohp-3010-8rep-s37-set01",
     )
 
     /**
@@ -210,6 +211,12 @@ class CuedRepCoverageTest {
         "field-ohp-100hz-bursty",
         "field-pallof-static-12rep",
         "field-rdl-3010-10rep-s36-set04",
+        // The field-37 capture committed for issue #125, here on set04's
+        // terms exactly: it HAS a cue track in its session archive and the
+        // track is not committed. Enrolling it moves six aggregates in this
+        // file, each of them a claim about rep COUNTING that #94 owns and
+        // that #125 is not about.
+        "field-ohp-3010-8rep-s37-set01",
         // Committed WITH its cue track, and still here: the track is a
         // twenty-second hold's, so it carries no `Down` and calls no rep.
         // There is no window to open and nothing per-rep to score. Its
@@ -488,7 +495,9 @@ class CuedRepCoverageTest {
             )
         }
         assertEquals(20, cueTracked.size, "captures with a cue track")
-        assertEquals(13, notCueTracked.size, "captures with no track that calls a rep")
+        // 13 until issue #125 committed field-ohp-3010-8rep-s37-set01,
+        // whose archived cue track is deliberately not committed beside it.
+        assertEquals(14, notCueTracked.size, "captures with no track that calls a rep")
         assertEquals(4, notRepCorpus.size, "captures committed for something other than rep coverage")
         notRepCorpus.forEach { fixture ->
             assertTrue(
