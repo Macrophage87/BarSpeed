@@ -18,9 +18,10 @@ import kotlin.math.abs
  * caller has to say which frame it is in rather than defaulting into one.
  * Issue #70.
  *
- * At this commit both callers still ask for [sensorFrame] and nothing is
- * converted; the type is introduced and wired first so the change that starts
- * converting is a change of one argument.
+ * Three callers, and which form each takes is the whole content of the fix:
+ * [RepSegmenter.segmentDetailed] and [StreamingSetTracker] classify a MAPPED
+ * series and convert; `SetAnalyzer.orient` classifies the UNMAPPED one and
+ * does not.
  */
 data class RunThresholds(
     /** |v| below this counts as "still". */
