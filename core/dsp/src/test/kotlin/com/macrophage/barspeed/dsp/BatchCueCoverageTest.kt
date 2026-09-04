@@ -606,15 +606,22 @@ class BatchCueCoverageTest {
         assertEquals(expected, actual, "by sensorOnStack: marks, matched")
         // And the two captures the issue's headline is about. It reported 17
         // of 32 reps found across four seated-overhead-press sets, 53%. The
-        // two of those four this corpus holds now match 15 of the 16 marks
-        // the metronome called on them: set 1 matches all 8, set 4 matches 7
-        // and leaves one window empty. Not the whole of the reported loss --
-        // the other two sets of that four are not committed here -- but the
+        // two of those four this corpus holds match 15 of the 16 marks the
+        // metronome called on them: set 1 matches all 8, set 4 matches 7 and
+        // leaves one window empty. Not the whole of the reported loss -- the
+        // other two sets of that four are not committed here -- but the
         // captures that are committed no longer show it.
+        //
+        // THIS FIGURE DOES NOT MOVE with the slow-eccentric fallback, and a
+        // draft of that change's red asserted that it would. Set 4's empty
+        // window is a PAIRING loss the fallback does not reach: `where each
+        // mechanism costs its reps` keeps this capture in its map after the
+        // change. The three windows the fallback recovers are on the bench,
+        // the Romanian deadlift and the back squat, none of them here.
         val headline = scored.filter { it.fixture.startsWith("field-ohp-rotating-") }
         assertEquals(2, headline.size, "the rotating overhead-press captures")
         assertEquals(16, headline.sumOf { windows(it.fixture).size }, "marks across them")
-        assertEquals(16, headline.sumOf { coverage(it).matched }, "marks matched across them")
+        assertEquals(15, headline.sumOf { coverage(it).matched }, "marks matched across them")
     }
 
     @Test
