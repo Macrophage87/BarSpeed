@@ -73,9 +73,9 @@ class SetLimiterCompletedAskTest {
         )
     }
 
-    /** And the row into it is there, so an answer can be given or changed later. */
+    /** And the reason correction is reachable, so an answer can be given or changed later. */
     @Test
-    fun `the reason row is reachable on a completed set rated at the counted end`() {
+    fun `the reason correction is reachable on a completed set rated at the counted end`() {
         assertTrue(SetLimiterPolicy.offersCorrection(failed = false, rpe = 9, limiter = null))
     }
 
@@ -92,7 +92,7 @@ class SetLimiterCompletedAskTest {
             )
             assertFalse(
                 SetLimiterPolicy.offersCorrection(failed = false, rpe = tier.rpe, limiter = null),
-                "a completed set rated ${tier.rpe} for $tier is offered the reason row",
+                "a completed set rated ${tier.rpe} for $tier is offered the reason correction",
             )
         }
     }
@@ -156,7 +156,7 @@ class SetLimiterCompletedAskTest {
             )
             assertTrue(
                 SetLimiterPolicy.offersCorrection(failed = true, rpe = rpe, limiter = null),
-                "a failed set rated $rpe is no longer offered the reason row",
+                "a failed set rated $rpe is no longer offered the reason correction",
             )
         }
     }

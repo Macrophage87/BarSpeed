@@ -534,8 +534,8 @@ object SetLimiterPolicy {
      * both places at once is two pages. The only `:app` caller passes it false
      * since #237.
      *
-     * Lifted out of the rest screen rather than written as an `if` beside the
-     * two call sites, which is the whole point: the placement is the defect
+     * Lifted out of the rest screen rather than written as an `if` beside its
+     * one caller, which is the whole point: the placement is the defect
      * this function exists because of, and `:app` has no composable test, so a
      * placement rule written there is a rule nothing can fail.
      */

@@ -94,10 +94,11 @@ import com.macrophage.barspeed.ui.components.SideArrow
  *
  * WHETHER ANY OF IT DRAWS AS DESCRIBED IS NOT CLAIMED HERE. Nothing on this
  * surface has been rendered on a device. The emulator lock at the session
- * scratchpad read "free" at both ends of every poll, so nothing contended for
- * the slot; the blocker was memory. TWO polls, each 30 samples about a minute
- * apart, both on 2026-09-04: 17:08:03Z to 17:37:10Z, peak 1560 MB, floor
- * 221 MB; and 18:35:47Z to 19:04:15Z, peak 2907 MB, floor 182 MB. A headless
+ * scratchpad was last written 2026-09-04T10:33:38Z, before either poll, and
+ * still reads free, released by this lane; no read was logged at the poll
+ * instants themselves. The blocker was memory. TWO polls, each 30 samples
+ * about a minute apart, both on 2026-09-04: 17:08:03Z to 17:37:10Z, peak
+ * 1560 MB, floor 221 MB; and 18:35:47Z to 19:04:15Z, peak 2907 MB, floor 182 MB. A headless
  * `barspeed-api35` boot needs roughly 3 GB and neither poll held it. The AVD
  * was never started, so no device was started and none was killed. The box's
  * one line, its strike and the popup's scroll are all [Field] questions, and
@@ -531,6 +532,13 @@ private fun DraftEffortSection(
  * they are correcting. Its SAVE closes the typing arm into the draft rather
  * than into Room; the popup's own confirm is what writes.
  *
+ * BACK RETURNS THE DRAFT WORDS TO WHAT THEY WERE WHEN THE ARM OPENED. The
+ * box is value-driven and `onWords` is the popup's own draft setter, so every
+ * keystroke is in the draft before either foot is tapped, and the confirm
+ * writes the draft. Without the restore, words the lifter backed out of
+ * reached `set_records.limiterNote` on the next SAVE CORRECTIONS wherever the
+ * draft already answered Other.
+ *
  * There is no SKIP foot: leaving by CANCEL is the skip, and the confirm's
  * "only where it differs" rule spends no write on a section nobody touched.
  *
@@ -539,7 +547,8 @@ private fun DraftEffortSection(
  * arm. Whether the foot is drawn at all is
  * [SetLimiterPolicy.leavesPageAsSkip]'s decision, read against the DRAFT and
  * not against the stored answer. It writes nothing itself; [applyDraft]'s
- * null arm is the write, on the popup's own confirm.
+ * single limitLastSet call is the write, which fires because the draft
+ * differs from the stored answer.
  *
  * THE WRITE IS ONLY HALF OF WHAT bc0661c8's FOOT DID. That foot ran
  * `limitLastSet(null)` AND `onSkip()`, and `onSkip` set `RestingStage`'s
@@ -568,6 +577,10 @@ private fun DraftLimiterSection(
 ) {
     if (!SetLimiterPolicy.offersCorrection(state.lastSetFailed, state.lastSetRpe, state.lastSetLimiter)) return
     var typing by remember { mutableStateOf(false) }
+    // What the draft answered before the typing arm opened, so BACK can put it
+    // back. Captured here rather than read from the stored note: an earlier SAVE
+    // in this same popup can have moved the draft off what Room holds.
+    var wordsBeforeTyping by remember { mutableStateOf("") }
     SectionCaption(SetLimiterPolicy.pageTitle(state.lastSetFailed))
     Spacer(Modifier.height(6.dp))
     if (typing) {
@@ -578,7 +591,10 @@ private fun DraftLimiterSection(
                 onLimiter(SetLimiter.OTHER)
                 typing = false
             },
-            onBack = { typing = false },
+            onBack = {
+                onNote(wordsBeforeTyping)
+                typing = false
+            },
         )
         return
     }
@@ -589,7 +605,12 @@ private fun DraftLimiterSection(
         if (group != null && tile.group != group) Spacer(Modifier.height(10.dp))
         group = tile.group
         LimiterTile(tile) {
-            if (tile.limiter == SetLimiter.OTHER) typing = true else onLimiter(tile.limiter)
+            if (tile.limiter == SetLimiter.OTHER) {
+                wordsBeforeTyping = note
+                typing = true
+            } else {
+                onLimiter(tile.limiter)
+            }
         }
     }
     Spacer(Modifier.height(2.dp))

@@ -47,7 +47,7 @@ class SetLimiterPolicyTest {
      * that locks.
      */
     @Test
-    fun `the correction row is offered on any failed set and on any set carrying an answer`() {
+    fun `the reason correction is offered on any failed set and on any set carrying an answer`() {
         assertTrue(SetLimiterPolicy.offersCorrection(failed = true, rpe = null, limiter = null))
         assertTrue(SetLimiterPolicy.offersCorrection(failed = true, rpe = null, limiter = SetLimiter.PAIN))
         assertTrue(SetLimiterPolicy.offersCorrection(failed = false, rpe = null, limiter = SetLimiter.PAIN))
@@ -112,7 +112,7 @@ class SetLimiterPolicyTest {
         )
     }
 
-    /** A skip leaves the page closed; the row is what stays reachable. */
+    /** A skip leaves the page closed. */
     @Test
     fun `a dismissed page is drawn nowhere`() {
         assertEquals(
@@ -122,14 +122,12 @@ class SetLimiterPolicyTest {
     }
 
     /**
-     * A page the lifter opened is drawn where they opened it.
-     *
      * The reason row WAS at the foot of the rest screen beside the effort
      * line, and a page that answered a tap somewhere else is a page the
      * tapping finger cannot see. #237 deleted the row.
      */
     @Test
-    fun `the lifter's own tap draws the page under the row they tapped`() {
+    fun `a tap to change the answer places the page at CORRECTION`() {
         assertEquals(
             SetLimiterPagePlacement.CORRECTION,
             SetLimiterPolicy.placement(
@@ -147,7 +145,7 @@ class SetLimiterPolicyTest {
      * the page being drawn twice on one screen.
      */
     @Test
-    fun `a tap on an unanswered set still draws the page under the row`() {
+    fun `a tap on an unanswered set still places the page at CORRECTION`() {
         assertEquals(
             SetLimiterPagePlacement.CORRECTION,
             SetLimiterPolicy.placement(failed = true, rpe = null, limiter = null, dismissed = false, changing = true),

@@ -3254,7 +3254,13 @@ internal fun LimiterPage(
                 typing = false
                 onDone()
             },
-            onBack = { typing = false },
+            // Back to the stored words, which is what this box is seeded from.
+            // Nothing here reaches Room without a SAVE, so what this drops is a
+            // box that reopens holding words the lifter had backed out of.
+            onBack = {
+                words = state.lastSetLimiterNote ?: ""
+                typing = false
+            },
         )
         return
     }
