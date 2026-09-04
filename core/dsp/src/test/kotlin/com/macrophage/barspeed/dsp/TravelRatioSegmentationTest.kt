@@ -15,8 +15,8 @@ import kotlin.test.assertEquals
  * `maxRunDisplacementM` -- four numbers fitted on captures where the sensor
  * travelled 1:1 with the load. Nothing converted them into the frame the
  * series was in, so `travelRatio` moved the limits relative to the signal and
- * a pure GEOMETRY declaration decided how many reps there were. Since
- * bf40202d both callers convert through `RunThresholds`, and this file pins
+ * a pure GEOMETRY declaration decided how many reps there were. Since issue
+ * #70's fix both callers convert through `RunThresholds`, and this file pins
  * that they do.
  *
  * The two captures below are the corpus's barbell case and its cable-stack
