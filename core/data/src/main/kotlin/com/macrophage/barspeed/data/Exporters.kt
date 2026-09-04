@@ -321,6 +321,14 @@ class SessionExporter(
             // no bound could be derived, which is a different fact from 0.
             refusedDetections = analysis?.refusedDetections,
             refusedDetectionReason = analysis?.refusedDetectionReason,
+            // How many detections finished before the set's work began and are
+            // therefore not reps of it (#245, schema 1.19). Read off the stored
+            // analysis for the reason the two keys above are: the rep list this
+            // class holds is the list AFTER the exclusion and cannot say how
+            // many were removed to produce it. Absence is preserved through --
+            // a null here means the set has no work-start instant, which is a
+            // different fact from 0.
+            detectionsBeforeWorkStart = analysis?.detectionsBeforeWorkStart,
             // minBpm in this list is load-bearing, not defensive padding: it is
             // computed fresh, below, from this set's raw stream, while the
             // other three are read off columns frozen at record time. Those two

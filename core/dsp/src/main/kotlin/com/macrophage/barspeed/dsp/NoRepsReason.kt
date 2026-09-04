@@ -116,6 +116,31 @@ enum class NoRepsReason(val wireName: String) {
     AFTER_SET_END_CUE("afterSetEndCue"),
 
     /**
+     * The segmenter resolved spans, the set's own end cue kept some of them,
+     * and every one it kept finished before the set's WORK began. See
+     * [WorkStart]. Issue #245.
+     *
+     * The head-of-stream twin of [AFTER_SET_END_CUE] and, like it, not a
+     * segmentation failure: the drives are real movements of a real stream,
+     * they are simply movements the lifter made during the prep countdown.
+     *
+     * A word rather than a null or a reuse of [AFTER_SET_END_CUE], because
+     * both alternatives are false statements. A null would republish issue
+     * #138's defect on a new population -- an empty rep list with nothing
+     * saying why, indistinguishable from a manual set recorded with no sensor
+     * -- and [AFTER_SET_END_CUE] would say the set ended before its detections
+     * did, which is the opposite of what happened.
+     *
+     * NO COMMITTED CAPTURE REACHES THIS. It needs a set whose every kept
+     * detection finished before its own work-start instant, which is a set the
+     * lifter handled during the countdown and then did nothing measurable in;
+     * none of the forty captures here is one, and this is written from the
+     * rule rather than from an observation.
+     */
+    @SerialName("beforeWorkStart")
+    BEFORE_WORK_START("beforeWorkStart"),
+
+    /**
      * No sample of the drift-corrected series left [DspConfig.pauseBandMps].
      * A sensor that was on and did not move, which is what
      * `field-still-0rep` is.
@@ -189,8 +214,13 @@ enum class NoRepsReason(val wireName: String) {
          * [RUNS_EXCEED_DISPLACEMENT_CAP] for the capture that forces it to be
          * a majority rather than a presence.
          */
-        fun of(census: SegmentationCensus, spansWithinSetEnd: Int): NoRepsReason? = when {
-            spansWithinSetEnd > 0 -> null
+        fun of(
+            census: SegmentationCensus,
+            spansWithinSetEnd: Int,
+            spansWithinWindow: Int = spansWithinSetEnd,
+        ): NoRepsReason? = when {
+            spansWithinWindow > 0 -> null
+            spansWithinSetEnd > 0 -> BEFORE_WORK_START
             census.spans > 0 -> AFTER_SET_END_CUE
             census.movementRuns == 0 -> NO_MOVEMENT
             2 * census.overDisplacementCap > census.movementRuns -> RUNS_EXCEED_DISPLACEMENT_CAP

@@ -857,6 +857,66 @@ data class SessionExport(
          * move for such a reader is the VALUE of `summary`, `velocityLoss_pct`,
          * `velocityLossBasis`, `repMetrics` and `repMetricsComplete` on a set
          * carrying a non-zero count, and these two keys are how it can tell.
+         *
+         * 1.19 carries a TENTH change, under the same number the mint above
+         * states and for the reason the entries above state -- a number takes
+         * further entries until it ships, and 1.19 is unreleased (#245). A set
+         * may carry [SetExport.detectionsBeforeWorkStart], how many detections
+         * finished before the set's WORK began and are therefore not reps of
+         * it, and `summary.noRepsReason` gains an eighth word,
+         * `beforeWorkStart`.
+         *
+         * The analysed window had a tail bound and no head bound. `SetEnd` has
+         * removed detections whose drive began after the terminal cue since
+         * 1.12; nothing removed movement made during the PREP -- settling into
+         * the seat, cleaning a pair of dumbbells to the shoulders, one practice
+         * stroke -- so it was segmented as reps and published as reps. On field
+         * session 38, 19 of 226 detections began before their own set's
+         * `workStartedAt_ms` and 14 finished before it, spread over 14 of the
+         * 16 dynamic sets, and on four sets one of them is the fastest rep of
+         * the set that `velocityLoss_pct` divides by: 27.4 -> 11.6, 62.1 ->
+         * 40.3, 58.3 -> 48.7 and 41.2 -> 36.1. One set's
+         * `summary.peakPower_w` moves 402.5 -> 320.1, a 25.7% overstatement
+         * produced during the countdown.
+         *
+         * The rule is `WorkStart` in `:core:dsp`: a detection whose drive ENDED
+         * before the instant the set's work began is not a rep of it. The
+         * drive's end and not its start, so a drive begun during the prep and
+         * still under way when the work started is KEPT -- the mirror of the
+         * straddling drive `SetEnd` keeps at the other end, and the direction
+         * that errs toward admitting a phantom rather than refusing a real
+         * first rep.
+         *
+         * NOT ADDITIVE, on the terms 1.4 and 1.5 were not: no key changes type
+         * and none stops being written, but `summary`, `velocityLoss_pct`,
+         * `velocityLossBasis`, `repMetrics`, `repMetricsComplete` and `reps` --
+         * where the count is the analyzer's rather than the lifter's -- are
+         * computed over a different population on any set carrying a non-zero
+         * count, and `noRepsReason` is a CLOSED enum, so a reader validating
+         * against a schema without the eighth word rejects a document carrying
+         * it.
+         *
+         * WHY A SEPARATE KEY RATHER THAN A SECOND
+         * [VALID_REFUSED_DETECTION_REASONS] WORD, which is where this was
+         * expected to go: what the two ABSENCES mean. `refusedDetections` is
+         * absent when a set resolved fewer than four detections; the new key is
+         * absent when a set has no work-start instant. A heavy triple with a
+         * known instant is in one state and not the other, so a single count
+         * could not carry both facts, and a single reason word could not name
+         * two rules at once. [VALID_REFUSED_DETECTION_REASONS] is UNCHANGED.
+         *
+         * It does NOT apply retroactively and cannot, for the reason 1.16 and
+         * the fourth 1.18 entry state twice over: the exclusion happens when
+         * the set is ANALYSED and nothing re-runs the segmenter at export time,
+         * and the instant itself is a capture fact stored only from database
+         * v15 on (#216). A set recorded before either carries no key and
+         * publishes what it always published. `DATABASE_VERSION` does not move:
+         * the instant is already stored and this reads it.
+         *
+         * WHAT IT DOES NOT SAY. It is not a claim that the surviving count is
+         * the count the lifter performed. On the capture this was written from,
+         * one set keeps ten detections against eight reps counted by hand.
+         * Over-segmentation is a separate defect and is not touched here.
          */
         const val SCHEMA_VERSION = "1.19"
 
@@ -934,6 +994,7 @@ data class SessionExport(
                 "runsTooBrief",
                 "phasesUnpaired",
                 "driveBelowMinRom",
+                "beforeWorkStart",
             )
 
         /**
@@ -1392,6 +1453,33 @@ data class SetExport(
      * absent whenever [refusedDetections] is absent or 0.
      */
     val refusedDetectionReason: String? = null,
+    /**
+     * How many detections finished before this set's WORK began and are
+     * therefore not reps of it, or absent when nothing on the record says when
+     * the work began. Schema 1.19, issue #245.
+     *
+     * ABSENT, 0 and a positive number are three different facts, the doctrine
+     * [refusedDetections] carries. Absent: the set has no work-start instant --
+     * an ad-hoc set that ran no prep, a set ended while its prep was still
+     * running, or any set recorded before that instant was stored, which is
+     * permanent. 0: an instant bounded this set's head and nothing came before
+     * it. Positive: that many detections were removed from the list every
+     * figure in this set is computed over.
+     *
+     * A SEPARATE KEY FROM [refusedDetections] RATHER THAN A SECOND WORD UNDER
+     * IT, and the reason is what each ABSENCE means. [refusedDetections] is
+     * absent when the set held too few detections for a range bound; this is
+     * absent when the set has no instant. A three-detection set with a known
+     * instant is in one state and not the other, so one key cannot carry both
+     * without making one of the two unsayable -- and
+     * [refusedDetectionReason] is a single word that could not name two rules
+     * at once either.
+     *
+     * Not gated on `includeRepDetail`, for [refusedDetections]' reason: it
+     * qualifies `summary`, `velocityLoss_pct` and `velocityLossBasis`, which
+     * the summary-only export publishes.
+     */
+    val detectionsBeforeWorkStart: Int? = null,
     val hr: HrSetSummary? = null,
     /** Per-rep detail; included only when the user enables detailed export. */
     val repMetrics: List<RepMetricsExport>? = null,

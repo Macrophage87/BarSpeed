@@ -24,6 +24,7 @@
           "velocityLoss_pct": 14.2,
           "velocityLossBasis": "measured",
           "refusedDetections": 0,
+          "detectionsBeforeWorkStart": 0,
           "geometry": {
             "startsWith": "eccentric",
             "concentric": "up",
@@ -214,6 +215,7 @@
           "velocityLossBasis": "terminalRepIsFastest",
           "refusedDetections": 1,
           "refusedDetectionReason": "unpairedRangeOutlier",
+          "detectionsBeforeWorkStart": 2,
           "geometry": {
             "startsWith": "concentric",
             "concentric": "down",

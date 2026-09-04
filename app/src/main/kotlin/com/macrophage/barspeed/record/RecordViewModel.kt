@@ -4102,7 +4102,20 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                         // with the sensor being handled, 4.3 to 13.7 s on the
                         // eleven sets of session 32 that carry both a cue and a
                         // stream. See SetEnd.
-                        SetAnalyzer.analyze(p.samples, p.exercise.liftDirection(), p.loadKg, p.targets, cues = p.cues)
+                        SetAnalyzer.analyze(
+                            p.samples,
+                            p.exercise.liftDirection(),
+                            p.loadKg,
+                            p.targets,
+                            cues = p.cues,
+                            // The instant the prep ended, so movement made
+                            // during the countdown is not a rep of the set
+                            // (#245). Already on the pending write, built by
+                            // PrepWindowPolicy, and null on every set that has
+                            // no window -- WorkStart is where that means
+                            // "bound nothing".
+                            workStartedAtMs = p.prepWindow?.workStartedAtMs,
+                        )
                     p.manualReps != null ->
                         SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))
                     else -> SetAnalysis(emptyList(), 0.0, null, null, listOf("No sensor data recorded."))

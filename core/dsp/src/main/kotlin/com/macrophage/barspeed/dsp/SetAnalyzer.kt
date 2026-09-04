@@ -282,17 +282,28 @@ object SetAnalyzer {
         // exclusion: the only pause published is the turnaround between a
         // rep's own two phases, which is bounded by that rep and cannot reach
         // an excluded movement.
-        val within = spans.filterIndexed { idx, _ -> setEnd.startedWithinSet(driveStartMs[idx]) }
+        val withinCue = spans.filterIndexed { idx, _ -> setEnd.startedWithinSet(driveStartMs[idx]) }
         // The head-of-stream bound's own instant, read off the sample the drive
         // ENDED on for the reason driveStartMs is read off the sample the drive
         // began on: the series is index-parallel to the sample list, so this is
         // exact and costs none of the skew CueTrack.MAX_SKEW_MS measures.
-        // Counted over `within` rather than over every span: a detection the
+        // Counted over `withinCue` rather than over every span: a detection the
         // terminal cue already excluded is not one this bound removed.
         // Issue #245.
         val workStart = WorkStart.of(workStartedAtMs)
         val detectionsBeforeWorkStart =
-            workStart.detectionsBefore(within.map { samples[it.conEndIdx].timestampMs })
+            workStart.detectionsBefore(withinCue.map { samples[it.conEndIdx].timestampMs })
+        // Bounded at BOTH ends here, before any figure is derived, for the
+        // reason stated above the cue bound: everything below reads one list.
+        // The head bound removes a PREFIX where the cue bound removes a
+        // suffix, so retained detections are renumbered by repMetrics'
+        // mapIndexed -- unlike the cue bound, and like RepRefusal.kept.
+        //
+        // BEFORE RepRefusal, for the reason the cue bound is before it: a
+        // detection this excluded is not in the population a range bound
+        // should be derived from, and a countdown phantom left in would raise
+        // the median the real reps are judged against. Issue #245.
+        val within = withinCue.filter { workStart.withinSet(samples[it.conEndIdx].timestampMs) }
         val detected = within.mapIndexed { idx, span -> repMetrics(idx, span, series, direction, loadKg, config) }
         // Refused HERE, for the reason the cue bound is applied where it is:
         // everything below reads one list, so a rule applied at any consumer
@@ -319,7 +330,7 @@ object SetAnalyzer {
         //
         // Taken from the census the segmentation pass ABOVE produced, not from
         // a second one: the counts describe the run that produced these very
-        // spans. `within` rather than `spans` is the second argument because
+        // spans. `withinCue` rather than `spans` is the second argument because
         // the cue bound has already been applied by then, and a set whose
         // detections were all excluded by its own end cue is a different fact
         // from one the segmenter could not resolve.
@@ -333,7 +344,12 @@ object SetAnalyzer {
         // below its own median, so a detection at or under the median can
         // never exceed 4.5x it. There is therefore no set whose list this
         // emptied and which would need a word for that, and none is minted.
-        val noRepsReason = NoRepsReason.of(segmentation.census, within.size)
+        //
+        // Both bounds are handed in separately (#245): a set emptied by the
+        // head bound must not be reported as one its end cue emptied, which is
+        // the opposite claim, and `NoRepsReason.of` is where the two are told
+        // apart.
+        val noRepsReason = NoRepsReason.of(segmentation.census, withinCue.size, within.size)
         return SetAnalysis(
             reps,
             series.sampleRateHz,
