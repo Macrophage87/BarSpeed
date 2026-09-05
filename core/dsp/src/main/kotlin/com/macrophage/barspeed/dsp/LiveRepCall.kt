@@ -50,15 +50,30 @@ sealed interface RepCall {
  * a set still in progress can do. So this runs the batch rule over a causal
  * estimate, and the two disagree wherever the estimates do.
  *
- * ## Where the announcement lands, as this commit leaves it
+ * ## Why the announcement lands at the inter-rep rest
  *
- * Nothing here has a rest detector, and issue #145 asks for the count at the
- * inter-rep rest. What this commit does instead is speak the moment the
- * segmenter's count rises for any reason, INCLUDING a span whose drive run is
- * still the open run at the end of the prefix -- a rep the detector has not
- * finished watching. That is not the rest and the difference is not cosmetic:
- * an open run can still fail the displacement cap and stop being a rep, after
- * the number has been said. [contradicted] counts how often it does.
+ * Nothing here has a rest detector, and it does not need one. A [RepSpan]
+ * ends at `conEndIdx`, the last sample of the drive, and
+ * `RepSegmenter.classifyRunsDetailed` cannot close a run until a sample of a
+ * different type arrives -- which after a completed drive is the first still
+ * sample of the rest. [countDetected] counts only spans whose drive run has
+ * closed, so the earliest prefix a rep can be spoken from is the one that has
+ * already seen the rest begin, and the announcement instant IS the detected
+ * rest instant.
+ *
+ * On a `start: top` lift that rest is at the top and on a `start: bottom`
+ * lift it is at the bottom, which is what issue #145's "the top" generalizes
+ * to. It falls out of the drive ending rather than being decided here, so
+ * there is no second rule about where the lifter is to disagree with the
+ * first.
+ *
+ * Waiting for the run to close is also what makes a spoken number final. An
+ * OPEN run can still travel past `maxRunDisplacementM` and stop being a rep;
+ * a closed one cannot, and no later sample changes an earlier pair, because
+ * `RepSegmenter`'s pairing walks forward and `loweredSince` looks only
+ * backward. [contradicted] measures that the property holds --
+ * `LiveRepCallCorpusTest` pins it at zero on all thirteen captures, against
+ * 25,967 samples before this rule.
  *
  * ## Cost
  *
@@ -105,6 +120,13 @@ class LiveRepCaller(
      * fifty samples counts fifty. The figure is a measure of how much of the
      * set was spent standing behind a number the detector had withdrawn, and
      * the only value that means anything is zero.
+     *
+     * It is zero on every committed capture and, given [countDetected]'s
+     * closed-run rule, on any stream at all -- so this field never fires and
+     * that is the point of it. Removing the increment reds nothing, which is
+     * stated here rather than left for a reader to discover; what guards the
+     * property is the pin plus the mutation that reverts the rule, not this
+     * counter on its own.
      */
     var contradicted: Int = 0
         private set
@@ -139,12 +161,19 @@ class LiveRepCaller(
     }
 
     /**
-     * How many reps the detector has resolved in the prefix so far.
+     * How many reps the detector has FINISHED resolving in the prefix so far.
      *
-     * Every span the segmenter returns, including one whose drive run is still
-     * the open run at the end of the prefix.
+     * Every span whose drive run has closed, which is every span ending before
+     * the last sample of the prefix: the run containing that last sample is
+     * still open and may yet be demoted. Excluding it is the whole difference
+     * between a number that is final when spoken and one that is not -- see
+     * the class KDoc, and `LiveRepCallCorpusTest`.
+     *
+     * Strictly `<`, not `<=`. A span ending exactly on the last sample is the
+     * open run, and admitting it admits every case this excludes.
      */
-    private fun countDetected(series: VelocitySeries): Int = RepSegmenter.segment(series, direction, config).size
+    private fun countDetected(series: VelocitySeries): Int =
+        RepSegmenter.segment(series, direction, config).count { it.conEndIdx < series.size - 1 }
 
     /**
      * The prefix's mean frame rate, `(n - 1) / elapsed`.
