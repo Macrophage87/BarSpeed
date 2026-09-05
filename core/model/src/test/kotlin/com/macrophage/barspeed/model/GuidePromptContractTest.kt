@@ -408,7 +408,8 @@ class GuidePromptContractTest {
      * fail, since #191 widened the question to a completed set rated near
      * failure.
      *
-     * `e1c2601c` edited this sentence into `GuideScreen.kt` and never touched
+     * `Ask what limited a set the lifter finished near failure` edited this
+     * sentence into `GuideScreen.kt` and never touched
      * this file, so the change had no pin at all -- round 2 of #191's review
      * found it. `SchemaLimiterContractTest` pins the same widening in the
      * published schema; this is the prompt's own copy, and the prompt is the

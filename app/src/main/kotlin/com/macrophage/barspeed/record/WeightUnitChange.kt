@@ -37,26 +37,24 @@ import com.macrophage.barspeed.model.WeightUnit
  * WHAT NO TEST HERE COVERS, and what was checked on a device instead: that the
  * Compose load field redraws from this state rather than from its own
  * remembered text. Checked on the headless `barspeed-api35` emulator against
- * the debug APK of `043e63d030facf7298af2b379a5097d7a7e21c0b`: typed 100 with
- * the kg chip on the ad-hoc form, tapped the chip, and the field re-rendered
- * as `Load (lb)` 220.5. The set recorded 100.017117587213 in `set_records`
- * .loadKg -- read with sqlite3 on the device -- against 45.36 before the fix,
- * and the rest screen showed it back as "Load recorded 100 kg". Tapping the
- * chip a second time returned the field to `Load (kg)` 100. That is bench
- * evidence at one SHA, not a gate: nothing re-runs it.
+ * the debug APK of `Convert the typed load when the kg/lb chip is tapped`:
+ * typed 100 with the kg chip on the ad-hoc form, tapped the chip, and the
+ * field re-rendered as `Load (lb)` 220.5. The set recorded 100.017117587213
+ * in `set_records.loadKg` -- read with sqlite3 on the device -- against 45.36
+ * before the fix, and the rest screen showed it back as "Load recorded 100
+ * kg". Tapping the chip a second time returned the field to `Load (kg)` 100.
+ * That is bench evidence at one commit, not a gate: nothing re-runs it.
  *
- * `043e63d030facf7298af2b379a5097d7a7e21c0b` IS NOT AN ANCESTOR OF THIS
- * BRANCH -- it has been rebased twice since that run, most recently onto
- * `Cut version 0.1.50` -- and `git merge-base --is-ancestor 043e63d0 HEAD`
- * fails. The bench evidence still applies: this file and `SetLoadPolicy.kt`
- * were byte-identical between that run and `Convert the typed load when the
- * kg/lb chip is tapped`, the commit carrying the fix, measured by
- * `git diff --stat 043e63d0 <that commit> --` over the two paths and empty.
- * `git diff --name-only` over the same pair, restricted to `app/`, names five
- * other files -- `app/build.gradle.kts`, `GuideScreen`, `HomeViewModel`,
+ * The SHA that produced that bench build IS NOT AN ANCESTOR OF THIS BRANCH --
+ * it has been rebased twice since that run, most recently onto `Cut version
+ * 0.1.50` -- so a SHA written here would already be dead. Naming the commit
+ * by its subject instead survives the rebase: this file and
+ * `SetLoadPolicy.kt` were byte-identical between the bench run and the commit
+ * now on this branch titled `Convert the typed load when the kg/lb chip is
+ * tapped`, measured by `git diff --stat` between the two SHAs over the two
+ * paths, and empty. The same diff, restricted to `app/`, names five other
+ * files -- `app/build.gradle.kts`, `GuideScreen`, `HomeViewModel`,
  * `SessionDetailScreen`, `SessionDetailViewModel` -- none on the load path.
- * The SHA of that commit is not written here: it moves on every rebase, and
- * two rebases have already made one copy of it false.
  */
 internal fun unitChangedState(s: RecordState, unit: WeightUnit): RecordState {
     val converted = SetLoadPolicy.convertedLoad(s.loadInput, s.weightUnit, unit)

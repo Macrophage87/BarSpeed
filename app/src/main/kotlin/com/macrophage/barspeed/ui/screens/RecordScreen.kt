@@ -1877,7 +1877,8 @@ private fun loadFieldLabel(slot: PlannedSlot?, unit: WeightUnit): String = Bodyw
  * that same declaration. So the sentence and the behaviour cannot disagree: on
  * the last set of a block, the answer is null for all three boxes. Reps and
  * hold also answer null wherever the plan prescribes a different number next
- * -- SetRepsPolicy stops the carry there. The load does not: since b3c649e7
+ * -- SetRepsPolicy stops the carry there. The load does not: since
+ * `Carry a load correction across the plan's own steps as a distance`
  * it carries a correction across a stepping plan as a distance rather than
  * stopping, so [SetLoadPolicy.standingStatedAddedKg] stays non-null there
  * too. What withholds the load's reach sentence is not a policy null but
