@@ -9,18 +9,17 @@ package com.macrophage.barspeed.model
  * It was one expression inside `RecordScreen.GuidedSetStage` --
  * `"rep ${state.manualReps}"` plus an optional `" of $n"` -- and
  * `state.manualReps` is written from `GuidedCadenceRunner`'s `onRepCounted`,
- * which fires when a rep FINISHES. So the ring counts finished reps.
+ * which fires when a rep FINISHES. So the ring counted finished reps.
  *
  * #243 moved every numbered call the VOICE makes onto the rep in hand: a
  * lifter starting their seventh now hears `"Rep 7"`. The screen did not move
- * with it, so for the whole of every guided set the ring reads one less than
- * the voice says, which a lifter glancing at the phone reads as a lost count
+ * with it, so for the whole of every guided set the ring read one less than
+ * the voice said, which a lifter glancing at the phone reads as a lost count
  * (#252).
  *
- * Nothing about that is fixed at THIS commit. The expression is lifted here
- * exactly as it stood, defect included, so the differentials that follow have
- * something to red against; `CadencePlan`'s own KDoc already states the
- * mismatch and says it was left for this.
+ * The rule is pure and lives here so `CadencePlan.announcementFor` and this can
+ * be pinned to name the same rep. That pin is in `:core:dsp`
+ * (`RingVoiceAgreementTest`), the only side that can see both.
  */
 object GuidedRepCaption {
     /**
@@ -29,19 +28,29 @@ object GuidedRepCaption {
      * @param finishedReps reps COMPLETED so far -- `RecordState.manualReps`,
      *   which the runner sets from `onRepCounted`. The rep in hand is one more
      *   than this, and naming the parameter for what it holds rather than for
-     *   what is displayed is the whole of the defect this will close.
+     *   what is displayed is the whole of the defect this closes.
      * @param plannedReps the count asked of the set, or null when none was.
+     *   A non-positive count is treated as no count: an ad-hoc set's rep field
+     *   is a text box, and `"0"` parses.
      * @param leadIn true while the prep countdown is running, when no rep is in
-     *   hand yet.
+     *   hand yet. The ring names how many are coming rather than claiming the
+     *   lifter is in the first one.
      * @param finished true once the cadence has called the last rep through --
-     *   `RecordState.guidedFinished`.
+     *   `RecordState.guidedFinished`. Checked FIRST: a finished set has no rep
+     *   in hand, and every other branch would invent one.
      */
-    @Suppress("UnusedParameter")
     fun forRing(finishedReps: Int, plannedReps: Int?, leadIn: Boolean, finished: Boolean): String? {
-        // The lift, verbatim. [leadIn] and [finished] are accepted and
-        // deliberately not read: the screen drew one caption for all three
-        // phases of a guided set, and that is what the next commit reds. The
-        // suppression above goes with the body it describes.
-        return "rep $finishedReps" + (plannedReps?.let { " of $it" } ?: "")
+        val planned = plannedReps?.takeIf { it > 0 }
+        val repInHand = finishedReps + 1
+        return when {
+            finished -> planned?.let { "$finishedReps of $it done" } ?: "$finishedReps done"
+            leadIn -> planned?.let { "$it reps to come" }
+            planned == null -> "rep $repInHand"
+            // `CadencePlan.LAST_REP`'s words, lower case for this line. Stated
+            // rather than imported: `:core:model` cannot see `:core:dsp`, so
+            // the agreement is pinned there instead of shared from here.
+            repInHand >= planned -> "last rep of $planned"
+            else -> "rep $repInHand of $planned"
+        }
     }
 }
