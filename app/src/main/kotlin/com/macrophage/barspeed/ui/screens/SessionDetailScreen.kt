@@ -39,6 +39,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
@@ -223,7 +224,7 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
             // there would hide it on the rows it matters most for.
             VoidRow(record, viewModel)
             analysis?.let { a ->
-                SetChips(record, a)
+                SetChips(record, a, viewModel.velocityLossRegime(record))
                 // What the ratio in the chip above does not cover. History
                 // carried no qualifier at all, so a set graded on the drive
                 // alone read as a fully compliant one. #56.
@@ -372,7 +373,7 @@ private fun SetCardHeader(record: SetRecordEntity, unit: WeightUnit) {
 }
 
 @Composable
-private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis) {
+private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis, regime: VelocityLossRegime?) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (record.failed) VerdictChip("FAILED", ChipTone.BAD)
         // The plan's declaration composed with the lifter's own mark (#194),
@@ -407,23 +408,38 @@ private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis) {
         // sets recorded before the denominator fix still show their old ratio
         // here. #56.
         tempoScoreOf(analysis)?.let { VerdictChip(it.text, it.tone.chipTone()) }
-        // Asked of the STORED reps, not of the stored velocityLossPct. History
-        // renders analyses frozen when each set was recorded, so re-asking here
-        // is what makes this rule reach sets recorded before it existed --
-        // which is all of them -- and keeps this chip agreeing with what the
-        // export publishes for the same set.
-        when (val loss = VelocityLoss.of(analysis.reps)) {
-            is VelocityLoss.Measured ->
-                VerdictChip(
-                    "−${trimNum(loss.pct)}% vel",
-                    when {
-                        loss.pct >= (record.velocityLossStopPct ?: VEL_LOSS_BAD_PCT) -> ChipTone.BAD
-                        loss.pct >= VEL_LOSS_WARN_PCT -> ChipTone.WARN
-                        else -> ChipTone.OK
-                    },
-                )
-            VelocityLoss.TerminalRepIsFastest -> VerdictChip("Vel loss n/a", ChipTone.NEUTRAL)
-            VelocityLoss.NotEnoughReps, VelocityLoss.NoReference -> Unit
+        // WHICH FIGURE LEADS FOLLOWS THE REGIME (#250). On a controlled set --
+        // one whose prescribed tempo fixed the drive's speed -- velocity loss
+        // measures how well the count was held, not how much the lifter had
+        // left, so the range-consistency figure takes the slot beside the
+        // tempo score and the loss is not drawn as a verdict. It is still
+        // PUBLISHED in the export either way; this is which number leads on
+        // the card.
+        //
+        // A null regime draws exactly what this card drew before #250 -- every
+        // set recorded before the geometry column existed is in that state,
+        // and guessing a direction for it would be inventing one.
+        if (regime == VelocityLossRegime.CONTROLLED) {
+            RangeConsistencyChip(analysis)
+        } else {
+            // Asked of the STORED reps, not of the stored velocityLossPct. History
+            // renders analyses frozen when each set was recorded, so re-asking here
+            // is what makes this rule reach sets recorded before it existed --
+            // which is all of them -- and keeps this chip agreeing with what the
+            // export publishes for the same set.
+            when (val loss = VelocityLoss.of(analysis.reps)) {
+                is VelocityLoss.Measured ->
+                    VerdictChip(
+                        "−${trimNum(loss.pct)}% vel",
+                        when {
+                            loss.pct >= (record.velocityLossStopPct ?: VEL_LOSS_BAD_PCT) -> ChipTone.BAD
+                            loss.pct >= VEL_LOSS_WARN_PCT -> ChipTone.WARN
+                            else -> ChipTone.OK
+                        },
+                    )
+                VelocityLoss.TerminalRepIsFastest -> VerdictChip("Vel loss n/a", ChipTone.NEUTRAL)
+                VelocityLoss.NotEnoughReps, VelocityLoss.NoReference -> Unit
+            }
         }
         record.hrAvgBpm?.let { VerdictChip("♥ $it", ChipTone.NEUTRAL) }
     }

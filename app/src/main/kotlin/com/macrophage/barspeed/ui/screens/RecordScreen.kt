@@ -122,6 +122,7 @@ import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TempoDigit
 import com.macrophage.barspeed.model.TimedSetEndPolicy
+import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.record.PlannedSlot
 import com.macrophage.barspeed.record.RecordState
@@ -3746,25 +3747,41 @@ private fun FeedbackChips(feedback: SetFeedback, hrBpm: Int?, hrvMs: Int? = null
         // :core:model, so this screen and the history screen cannot drift and
         // the decision is reachable by a test. #56.
         tempoScoreOf(analysis)?.let { VerdictChip(it.text, it.tone.chipTone()) }
-        // Asked of the reps rather than read off analysis.velocityLossPct, so
-        // this chip and the exported velocityLoss_pct are answered by one
-        // function and cannot drift apart.
-        when (val loss = VelocityLoss.of(analysis.reps)) {
-            is VelocityLoss.Measured ->
-                VerdictChip(
-                    "−${trim(loss.pct)}% vel",
-                    when {
-                        loss.pct >= DEFAULT_VELOCITY_LOSS_STOP_PCT -> ChipTone.BAD
-                        loss.pct >= VEL_LOSS_OK_PCT -> ChipTone.WARN
-                        else -> ChipTone.OK
-                    },
-                )
-            // Drawn, not dropped. A chip that simply vanishes is
-            // indistinguishable from a set with fewer than two reps, and this
-            // is a set the sensor DID resolve reps for: the lifter is being
-            // told the figure is unavailable, not that nothing was measured.
-            VelocityLoss.TerminalRepIsFastest -> VerdictChip("Vel loss n/a", ChipTone.NEUTRAL)
-            VelocityLoss.NotEnoughReps, VelocityLoss.NoReference -> Unit
+        // WHICH FIGURE LEADS FOLLOWS THE REGIME (#250). On a controlled set the
+        // prescribed tempo fixed the drive's speed, so velocity loss measures
+        // how well the lifter held the count and not how much they had left --
+        // and the pill that reads "-41% vel" beside a tempo score is the
+        // reading the whole issue is about. Range consistency takes the slot
+        // there. The figure is still PUBLISHED in the export on both regimes;
+        // this decides which number the lifter reads between sets.
+        //
+        // A null regime draws exactly what this row drew before #250. The
+        // decision itself is VelocityLossRegime in :core:model, where a test
+        // runs on every push -- nothing here decides anything, which is the
+        // arrangement the tempo chip above already uses (#56).
+        if (feedback.velocityLossRegime == VelocityLossRegime.CONTROLLED) {
+            RangeConsistencyChip(analysis)
+        } else {
+            // Asked of the reps rather than read off analysis.velocityLossPct, so
+            // this chip and the exported velocityLoss_pct are answered by one
+            // function and cannot drift apart.
+            when (val loss = VelocityLoss.of(analysis.reps)) {
+                is VelocityLoss.Measured ->
+                    VerdictChip(
+                        "−${trim(loss.pct)}% vel",
+                        when {
+                            loss.pct >= DEFAULT_VELOCITY_LOSS_STOP_PCT -> ChipTone.BAD
+                            loss.pct >= VEL_LOSS_OK_PCT -> ChipTone.WARN
+                            else -> ChipTone.OK
+                        },
+                    )
+                // Drawn, not dropped. A chip that simply vanishes is
+                // indistinguishable from a set with fewer than two reps, and this
+                // is a set the sensor DID resolve reps for: the lifter is being
+                // told the figure is unavailable, not that nothing was measured.
+                VelocityLoss.TerminalRepIsFastest -> VerdictChip("Vel loss n/a", ChipTone.NEUTRAL)
+                VelocityLoss.NotEnoughReps, VelocityLoss.NoReference -> Unit
+            }
         }
         hrBpm?.let { VerdictChip("♥ $it", ChipTone.NEUTRAL) }
         hrvMs?.let { VerdictChip("HRV ${it}ms", ChipTone.NEUTRAL) }

@@ -23,6 +23,7 @@
           "tempoCompliance": { "prescribed": "4010", "tolerance_s": 0.5, "withinTolerance": 4, "of": 5 },
           "velocityLoss_pct": 14.2,
           "velocityLossBasis": "measured",
+          "velocityLossRegime": "controlled",
           "refusedDetections": 0,
           "detectionsBeforeWorkStart": 0,
           "geometry": {
@@ -134,6 +135,7 @@
           "reps": 5,
           "added": true,
           "rest_s": 180,
+          "velocityLossRegime": "maxIntent",
           "geometry": {
             "startsWith": "eccentric",
             "concentric": "up",
@@ -219,6 +221,7 @@
             "prescribedEccConRatio": 3.0
           },
           "velocityLossBasis": "terminalRepIsFastest",
+          "velocityLossRegime": "controlled",
           "refusedDetections": 1,
           "refusedDetectionReason": "unpairedRangeOutlier",
           "detectionsBeforeWorkStart": 2,
@@ -305,6 +308,7 @@
           "failedByLifter": false,
           "repsManual": true,
           "rest_s": 150,
+          "velocityLossRegime": "maxIntent",
           "geometry": {
             "startsWith": "concentric",
             "concentric": "up",

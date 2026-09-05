@@ -988,6 +988,63 @@ data class SessionExport(
          * enum, so a reader validating against 1.18 rejects a document
          * carrying it. `DATABASE_VERSION` DOES move, 16 -> 17, which is the
          * unshipped hop #220's body-weight column also rides.
+         *
+         * 1.19 carries a TWELFTH change, under the same number and for the
+         * reason every entry above states -- a number takes further entries
+         * until it ships, and 1.19 is unreleased; v0.1.50 shipped 1.18, read
+         * at the tag rather than assumed (#250). A set may carry
+         * `velocityLossRegime`, either `maxIntent` or `controlled`, saying
+         * WHICH QUESTION its `velocityLoss_pct` answers.
+         *
+         * Best-rep-to-last-rep velocity loss has been published on every
+         * dynamic set and read everywhere as fatigue. That reading assumes
+         * maximal intent on every concentric. On a tempo-prescribed controlled
+         * movement the concentric speed IS the prescription -- a `2011` fly
+         * asks for a one-second stroke on every rep -- so the same figure
+         * measures how well the lifter held the count. Field-38 is a whole
+         * session of those: sixteen dynamic sets, every one tempo-prescribed,
+         * whose figures disagree between two units on ONE BAR by 2.7 against
+         * 74.1 on set 1 and 41.9 against 36.3 on set 12. Sensors on one bar
+         * cannot disagree that far about fatigue; they can easily disagree
+         * that far about a figure that is not measuring it.
+         *
+         * THE RULE, from the owner. `maxIntent` when the set has NO tempo, or
+         * its kind is `explosive`, or the prescribed tempo's CONCENTRIC digit
+         * is `X`; `controlled` otherwise. The concentric digit is read through
+         * the drive direction -- digit 3 while the drive moves up, digit 1
+         * when it moves down, on a leg curl, a lat pulldown or a pushdown --
+         * never as digit 3 blindly. The velocity TARGET plays no part.
+         *
+         * `velocityLoss_pct` IS STILL PUBLISHED IN BOTH REGIMES and no key
+         * stops being written. What changes for a reader is what to do with it:
+         * on a `controlled` set read `tempoCompliance`, `summary.romSpread_pct`
+         * and the rating as the autoregulation figures, and read
+         * `velocityLoss_pct` as compliance rather than fatigue.
+         *
+         * DERIVED, NOT STORED. All three inputs are already frozen on the
+         * set's row -- its prescription, and the drive direction and kind of
+         * its geometry -- so the word is computed at export time and
+         * `DATABASE_VERSION` does not move. A set re-exported by this build
+         * gains the word however long ago it was recorded, provided its
+         * geometry was stored.
+         *
+         * ABSENT where the regime is not decidable, and absence is a state
+         * rather than a low-confidence word: a set with no stored geometry, a
+         * hold or a carry, and a tempo string this build cannot parse. The
+         * reading rule for all three is today's behaviour rather than a guess
+         * -- read velocity loss as this document has always said to, which is
+         * `maxIntent`'s reading.
+         *
+         * A CONCENTRIC-DOWN LIFT CANNOT BE `maxIntent` WHILE CARRYING A TEMPO,
+         * and the limit is in the plan contract rather than here: the plan
+         * schema accepts `X` only in digit 3, so digit 1 is always a number
+         * and the drive of a leg curl always has a prescribed speed. Widening
+         * that pattern is #258.
+         *
+         * Additive to a reader that ignores it -- no key changes type, none
+         * stops being written -- but NOT to a validator, because the key is a
+         * CLOSED enum, so a reader validating against 1.18 rejects a document
+         * carrying it.
          */
         const val SCHEMA_VERSION = "1.19"
 
@@ -1555,6 +1612,33 @@ data class SetExport(
      * to be a statement about.
      */
     val velocityLossBasis: String? = null,
+    /**
+     * Which QUESTION [velocityLossPct] is an answer to on this set, drawn from
+     * [SessionExport.VALID_VELOCITY_LOSS_REGIMES]. Schema 1.19, #250.
+     *
+     * `maxIntent`: the lifter drove every concentric as hard as they could, so
+     * a slowing rep is a tiring lifter and the figure is fatigue. `controlled`:
+     * a tempo fixed the drive's speed, so the figure measures how well the
+     * count was held and the set is read on [tempoCompliance],
+     * `summary.romSpread_pct` and the rating instead.
+     *
+     * [velocityLossPct] IS STILL PUBLISHED IN BOTH. The word says how to read
+     * the number; it does not withhold it.
+     *
+     * DERIVED at export time from [tempoPrescribed] and the drive direction
+     * and kind of the set's frozen [geometry] -- all three already on the row,
+     * so no column and no `DATABASE_VERSION` hop. That is the opposite of
+     * [rpeScale], which records which question a lifter was SHOWN and cannot
+     * be re-derived. [VelocityLossRegime] is the one statement of the rule.
+     *
+     * ABSENT where the regime is not decidable, which is a state and not a
+     * word: a set with no stored [geometry] (every set recorded before that
+     * column existed), a hold or a carry, which has no concentric for the
+     * question to be about, and a tempo string this build cannot parse. A
+     * reader that finds no word reads the set as every reader read every set
+     * before this key existed, which is `maxIntent`'s reading.
+     */
+    val velocityLossRegime: String? = null,
     /**
      * How many detections the analyzer judged were not reps of this set, or
      * absent when no bound could be derived to judge them against. Schema

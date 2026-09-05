@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.BuildConfig
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.SetRecordEntity
+import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.model.sessionTimestamp
 import com.macrophage.barspeed.ui.ShareUtil
@@ -59,6 +60,22 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
     val exporting: StateFlow<Boolean> = _exporting.asStateFlow()
 
     fun decodeAnalysis(record: SetRecordEntity) = repository.decodeAnalysis(record)
+
+    /**
+     * Which question this set's velocity loss answers, from the geometry
+     * FROZEN on its row (#250).
+     *
+     * Off the stored row, never off the exercise definition as it stands
+     * today: a leg curl re-declared as concentric-up next month must not
+     * restate how a set recorded last month should be read. Null where the
+     * row carries no geometry, which is every set recorded before that column
+     * existed -- and null draws the card exactly as it drew before this
+     * existed, which is what makes the absence safe.
+     */
+    fun velocityLossRegime(record: SetRecordEntity): VelocityLossRegime? {
+        val geometry = repository.decodeGeometry(record)
+        return VelocityLossRegime.of(record.tempo, geometry?.concentricUp, geometry?.kind)
+    }
 
     /**
      * Mark a recorded set as one the lifter did not perform, or take the mark

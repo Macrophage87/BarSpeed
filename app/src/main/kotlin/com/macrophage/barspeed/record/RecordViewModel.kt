@@ -79,6 +79,7 @@ import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
+import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.VoiceMilestonePolicy
 import com.macrophage.barspeed.model.WeightUnit
@@ -401,6 +402,22 @@ data class SetFeedback(
     val side: String? = null,
     /** Olympic-lift style set: peak velocity is the headline metric. */
     val explosive: Boolean = false,
+    /**
+     * Which question this set's velocity loss answers, and therefore which
+     * figure the rest screen leads with (#250).
+     *
+     * Resolved once, from the geometry FROZEN on the pending write -- the same
+     * object the row stores and the export later re-derives this word from --
+     * rather than from live state or from the exercise definition as it stands
+     * when the rest screen draws. `kind` and `explosive` beside it read the
+     * pending write's ExerciseDef and could in principle disagree with the
+     * resolved geometry; that they are two facts is named at `kind` already
+     * and is not fixed here.
+     *
+     * Null where the regime is not decidable, and null draws the chips exactly
+     * as they drew before this existed.
+     */
+    val velocityLossRegime: VelocityLossRegime? = null,
     /** Manually entered/corrected rep count; overrides the sensor count when set. */
     val repsOverride: Int? = null,
     /**
@@ -2023,6 +2040,12 @@ private fun restingState(
             plannedDurationS = p.targetDurationS,
             side = p.side,
             explosive = p.exercise.kind == ExerciseKind.EXPLOSIVE,
+            // Off the FROZEN geometry, which is what the row stores and what
+            // the exporter re-derives the published word from -- so the chip
+            // the lifter reads between sets and the word the coach reads in
+            // the export are one decision applied to one object (#250).
+            velocityLossRegime =
+            VelocityLossRegime.of(p.tempoText, p.geometry.concentricUp, p.geometry.kind),
             repsOverride = p.manualReps,
             // Resolved from the FROZEN pair, not from live state, and by the
             // same call `completedSetOf` makes -- one decision, two readers

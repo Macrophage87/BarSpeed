@@ -28,6 +28,7 @@ import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetSensorsExport
 import com.macrophage.barspeed.model.SetSummaryExport
 import com.macrophage.barspeed.model.TempoComplianceExport
+import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
@@ -181,6 +182,13 @@ class SessionExporter(
         // answerable here at all; the hr block below re-asks its own question
         // of the stored raw stream for the same reason (issue #83, schema 1.9).
         val velocityLoss = VelocityLoss.of(reps)
+        // Decoded ONCE and shared with the geometry block below, so the word
+        // published here and the geometry published beside it are statements
+        // about the same stored object. Two decodes of one column would not
+        // disagree today; they are two places to change when one of them
+        // starts falling back, which is how a published provenance drifts
+        // from the value it describes.
+        val geometry = sessionRepository.decodeGeometry(record)
         // Cues are still fetched here even when RawExporter already fetched
         // this same set's streams for the zip entries -- named, not fixed:
         // RawExporter's own inflate is for the raw CSV text, this one for
@@ -312,6 +320,27 @@ class SessionExporter(
             },
             velocityLossPct = velocityLoss.pctOrNull,
             velocityLossBasis = velocityLoss.basis.takeIf { reps.isNotEmpty() },
+            // Which QUESTION the figure above answers (#250, schema 1.19).
+            //
+            // DERIVED here rather than stored, and derivable at all only
+            // because both inputs were frozen on the row when the set was
+            // recorded: its own prescription, and the drive direction and kind
+            // of its geometry. So a set recorded long before this key existed
+            // gains the word on re-export, exactly as velocityLossBasis above
+            // is re-asked of the stored reps rather than republished.
+            //
+            // Null where the regime is not decidable, and null means the key
+            // is omitted -- a set with no stored geometry, a hold or a carry,
+            // an unparseable tempo. Absence is a state here: a reader that
+            // finds no word reads the figure the way every reader read every
+            // set before this key existed. VelocityLossRegime is the one
+            // statement of the rule and the only place it may be restated.
+            velocityLossRegime =
+            VelocityLossRegime.of(
+                tempoPrescribed = record.tempo,
+                concentricUp = geometry?.concentricUp,
+                kind = geometry?.kind,
+            )?.wireName,
             // How many detections the analyzer refused as not reps of this
             // set, and why (#125, schema 1.19).
             //
@@ -375,7 +404,7 @@ class SessionExporter(
             // set recorded before this column existed is permanently in that
             // state, and a fabricated "vertical, drive up, sensor on the bar"
             // would read identically to a squat that really was measured so.
-            geometry = sessionRepository.decodeGeometry(record)?.let(::geometryExport),
+            geometry = geometry?.let(::geometryExport),
             // How many accelerometers this set was armed with (#156).
             //
             // Read off the ROW and the raw-stream ROWS, both already fetched
