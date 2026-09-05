@@ -122,7 +122,7 @@ class RepRefusalCorpusTest {
             .map { it.removeSuffix(".csv") }
             .sorted()
         assertEquals(onDisk, corpus.map { it.first }.sorted())
-        assertEquals(40, corpus.size, "captures this file walks")
+        assertEquals(42, corpus.size, "captures this file walks")
     }
 
     /**
