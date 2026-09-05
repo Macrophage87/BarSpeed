@@ -710,6 +710,19 @@ class BatchCueCoverageTest {
             listOf(group.sumOf { windows(it.fixture).size }, group.sumOf { coverage(it).matched })
         }
         assertEquals(expected, actual, "by sensorOnStack: marks, matched")
+        // RED, this commit: the comment above and [GyroGateTest] both call the
+        // not-on-stack half "bar-mounted" and its 132 marks "the bar half". If
+        // that word is accurate, every one of those 132 marks stands on a
+        // barbell. Asserted exactly as the prose states it so the corpus, not
+        // a reader, settles whether it is true.
+        val notOnStackByFamily = scored.filter { !it.direction.sensorOnStack }
+            .groupBy { it.family }
+            .mapValues { (_, g) -> g.sumOf { windows(it.fixture).size } }
+        assertEquals(
+            mapOf(Family.BARBELL_UPPER to 132),
+            notOnStackByFamily,
+            "marks in the not-on-stack half, by family",
+        )
         // And the exercise the issue's headline is about, named rather than
         // matched by prefix. It reported 17 of 32 reps found across four
         // seated-overhead-press sets, 53%. This corpus now holds four
