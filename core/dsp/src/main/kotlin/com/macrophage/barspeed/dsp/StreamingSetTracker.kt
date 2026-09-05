@@ -30,6 +30,29 @@ data class LiveSetState(
      * differently because of it; it is a capability, not a fix.
      */
     val countTrusted: Boolean = true,
+    /**
+     * The reconstructed uniform clock this sample sits on, in seconds from the
+     * first sample of the set -- the same `i * dt` time base
+     * `VelocityEstimator.estimate` builds for the batch path, accumulated one
+     * frame at a time instead of divided out of a span.
+     *
+     * NOT the arrival clock. BLE delivers frames in bursts sharing one arrival
+     * stamp, so an arrival time is not a duration; this is what the integrator
+     * above actually integrated against. Published because [LiveRepCall] needs
+     * a [VelocitySeries] and a series is a velocity and a time.
+     */
+    val elapsedS: Double = 0.0,
+    /**
+     * The bias-corrected, low-passed vertical acceleration this sample
+     * contributed, m/s^2 -- the number the integrator added, before
+     * [velocityMps]'s anchor offset and frame scaling.
+     *
+     * Published for the same reason as [elapsedS]: a [VelocitySeries] carries
+     * an acceleration and constructing one with zeros would state a
+     * measurement nothing made. Nothing in the rep decision reads it --
+     * [RepSegmenter] reads velocity and time only.
+     */
+    val accelMps2: Double = 0.0,
 )
 
 /**
@@ -164,6 +187,8 @@ class StreamingSetTracker(
                 repMeanVelocities = repVelocities.toList(),
                 repPeakVelocities = repPeaks.toList(),
                 countTrusted = countTrusted,
+                elapsedS = timeS,
+                accelMps2 = accel,
             )
         return state
     }
