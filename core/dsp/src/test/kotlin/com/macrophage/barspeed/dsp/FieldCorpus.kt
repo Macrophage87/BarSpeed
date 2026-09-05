@@ -6,7 +6,7 @@ import java.io.File
  * Every committed IMU capture on this module's test classpath, by fixture
  * name, sorted.
  *
- * Seven files walked the resource directory with their own copy of the same
+ * Eight files walked the resource directory with their own copy of the same
  * three-clause filter -- `startsWith("field-")`, `endsWith(".csv")`, and a
  * hand-kept list of sidecar suffixes to skip. `AnchorSupplyByMountTest`,
  * `BatchCueCoverageTest`, `BlankAnalysisReasonTest`, `BlankAnalysisTest`,

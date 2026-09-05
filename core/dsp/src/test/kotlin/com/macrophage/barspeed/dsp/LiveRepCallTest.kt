@@ -13,8 +13,7 @@ import kotlin.test.assertTrue
  * These pins are the ones that hold whatever the counting rule is. What the
  * thirteen mark-carrying captures actually make it say, and whether a number
  * it has said survives the rest of the set, are two different questions,
- * measured against the marks by the differentials pushed after this commit --
- * `LiveRepCallCorpusTest`, which does not exist yet.
+ * measured against the marks by [LiveRepCallCorpusTest].
  */
 class LiveRepCallTest {
     private val con = LiftDirection(startsWith = StartPhase.CONCENTRIC)

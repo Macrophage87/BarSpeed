@@ -75,7 +75,23 @@ class LiveRepCallCorpusTest {
         return Scored(calls, caller.contradicted)
     }
 
-    /** The k-th call is right when it lands in the cycle ending at the k-th mark. */
+    /**
+     * The k-th call is right when it lands in the cycle ending at the k-th
+     * mark.
+     *
+     * This scores a call by its ORDINAL, not by the number it speaks.
+     * [RepCall.Speak] carries a running total that may SKIP -- its own KDoc
+     * states that when two reps resolve between one sample and the next the
+     * later number is spoken and the earlier is never said -- so on a skipping
+     * set this credits a call against a mark it did not name. Issue #145's F1
+     * criterion is the SPOKEN number, and discharging it needs
+     * `marks[call.count - 1]`, which this file does not do.
+     *
+     * On today's corpus the two criteria cannot differ, because no capture
+     * skips: `every call speaks its own ordinal` pins that, so this KDoc's
+     * "cannot differ" is read off an assertion rather than off a memory of
+     * having checked once.
+     */
     private fun rightCount(fixture: String, calls: List<RepCall.Speak>): Int {
         val marks = RepMarks.read(fixture)
         val cycle = RepMarks.cycleMs(fixture)!!
@@ -162,14 +178,42 @@ class LiveRepCallCorpusTest {
     }
 
     /**
+     * Every call speaks its own ordinal, on all thirteen captures.
+     *
+     * [rightCount] scores by ordinal while issue #145's F1 criterion is the
+     * spoken number. The two can only diverge on a set whose running total
+     * skips, and none of these skip. Pinned rather than remembered: the day
+     * one of them skips is the day the table above starts crediting a call
+     * against a mark it did not name, and nothing else here would say so.
+     *
+     * A capture that says nothing contributes no rows, so this is a
+     * conditional property and not a coverage claim; the table above is what
+     * says how many calls there are.
+     */
+    @Test
+    fun `every call speaks its own ordinal`() {
+        val offBy = LiveRepCallCorpus.ALL.flatMap { (fixture, direction) ->
+            score(fixture, direction).calls
+                .mapIndexed { k, call -> Triple(fixture, k + 1, call.count) }
+                .filter { it.second != it.third }
+        }
+        assertEquals(emptyList(), offBy)
+    }
+
+    /**
      * What the lifter hears, spelled out, on the set where the gap is widest.
      *
      * Session 38 set 14: twelve lat pulldowns, marks every four seconds from
-     * 14.0 s. The voice says "one" at 10.5 s -- 3.5 s before the guide's first
-     * rep -- then "two" 1.29 s later, while the lifter is still inside one rep.
-     * Then nothing for 32 s. It resumes at 43.8 s with "three", by which point
-     * the lifter is finishing rep 8, and ends the set on "seven" against
-     * twelve performed.
+     * 14.015 s. The voice says "one" at 10.500 s -- 3.5 s before the guide
+     * called its first rep over -- then "two" 1.290 s later, both of them
+     * before that first mark. Then nothing for 32 s. It resumes at 43.770 s
+     * with "three", 1.725 s after the guide called rep 8 over at 42.045 s --
+     * inside the guide's ninth cycle, five reps behind the metronome -- and
+     * ends the set on "seven" against twelve marks.
+     *
+     * Every instant here is the guide's or the caller's. What the LIFTER was
+     * doing at any of them is not readable from a metronome track and is not
+     * claimed.
      *
      * That is the answer to what an undercount sounds like, and it is why a
      * skipped number is NOT recoverable here: the count never re-syncs, so
