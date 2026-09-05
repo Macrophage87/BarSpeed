@@ -183,14 +183,17 @@ class RunawayDriftTest {
         // 37 captures read {0=13, 1=20, 2=2, 3=1, 4=1}. Issue #125 committed
         // field-ohp-3010-8rep-s37-set01 and it needs one pass; issue #245
         // committed field-ohp-3010-8rep-s38-set05 and
-        // field-inclinepress-3010-12rep-s38-set02 and each needs one too, so
-        // the only bucket that has moved since is 1.
+        // field-inclinepress-3010-12rep-s38-set02 and each needs one too;
+        // issue #72 committed field-ohp-3010-8rep-s38-set04 and
+        // field-latpulldown-1120-12rep-s38-set14 and each needs one as well.
+        // So the only bucket that has moved across all five is 1, and the
+        // worst capture in the corpus is unchanged at four passes.
         assertEquals(
-            mapOf(0 to 13, 1 to 23, 2 to 2, 3 to 1, 4 to 1),
+            mapOf(0 to 13, 1 to 25, 2 to 2, 3 to 1, 4 to 1),
             passesNeeded.values.groupingBy { it }.eachCount().toSortedMap(),
             "captures by passes needed",
         )
-        assertEquals(40, passesNeeded.size, "committed captures walked")
+        assertEquals(42, passesNeeded.size, "committed captures walked")
         assertEquals(
             mapOf(
                 "field-ohp-prepinflated-s37-set03" to 3,

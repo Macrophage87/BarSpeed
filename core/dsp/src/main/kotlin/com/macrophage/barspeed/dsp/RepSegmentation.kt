@@ -329,17 +329,38 @@ object RepSegmenter {
      * NO NEW CONSTANT. The gate reuses `minRomM`, `maxRunDisplacementM` and
      * the dead band; there is nothing here fitted to this corpus.
      *
-     * Measured over the twenty cue-tracked captures at the commit that added
-     * it: marks matched 147 -> 150 of 170, empty 23 -> 20, and doubled and
-     * stray BOTH unchanged at 12 and 19 -- every one of the three added spans
-     * lands in a window that was empty. See `BatchCueCoverageTest`.
+     * Measured over the TWENTY-TWO cue-tracked captures the corpus holds
+     * after this branch was rebased onto
+     * 2f7efa5f7cbcafec9c1ffcb34afda43ef01d09f9: marks matched 165 -> 168 of
+     * 190, empty 25 -> 22, and doubled and stray BOTH unchanged at 14 and 22
+     * -- every one of the three added spans lands in a window that was empty.
+     * Both sides measured by the same scoring code in two worktrees, one at
+     * that SHA with these captures dropped onto its classpath and no code from
+     * this branch, one here. The three windows are on
+     * field-bench-3010-6rep-s37-set05, field-rdl-3010-10rep-s36-set05 and
+     * field-backsquat-4011-6rep-s36-set01. This note read "the twenty
+     * cue-tracked captures ... 147 -> 150 of 170, empty 23 -> 20, doubled and
+     * stray unchanged at 12 and 19"; that corpus is two captures smaller than
+     * this one and the figures are re-measured rather than adjusted. See
+     * `BatchCueCoverageTest`.
+     *
+     * ONE OF THE THREE CLOSES A REAL MISS AND TWO OVERSHOOT. The bench set
+     * goes 4 published against 6 counted by hand to 5 against 6; the Romanian
+     * deadlift goes 10 against 10 to 11 against 10, and the back squat 8
+     * against 6 to 9 against 6. A matched window is not a correct rep count
+     * and this fallback does not claim to fix the count.
      *
      * The corpus exercises this FIRING and none of its guards -- no committed
-     * capture has an orphan drive under the floor, a lowering between
-     * `minRomM` and half of it, or a licensing run over
-     * `maxRunDisplacementM`; the largest is 1.809 m against a 2.0 m cap.
-     * `SlowEccentricFallbackTest` builds the cases that do, one threshold
-     * deciding each, because a guard nothing can fail reads as coverage.
+     * capture has an orphan drive under the floor or a lowering between
+     * `minRomM` and half of it. On the third guard the note used to say "the
+     * largest is 1.809 m against a 2.0 m cap"; that is DELETED. Measured over
+     * all forty-two committed captures at this commit, the largest movement
+     * run of any kind is 1.982 m, on field-ohp-100hz-bursty, against the same
+     * 2.0 m cap -- an upper bound over every run rather than over licensing
+     * runs alone, so the guard is still unfired and the margin is 0.018 m and
+     * not 0.191 m. `SlowEccentricFallbackTest` builds the cases that do fire
+     * it, one threshold deciding each, because a guard nothing can fail reads
+     * as coverage.
      */
     private fun pairEccentricFirst(
         runs: List<Run>,
