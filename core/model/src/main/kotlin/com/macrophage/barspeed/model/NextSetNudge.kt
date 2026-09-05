@@ -254,6 +254,38 @@ object NextSetNudgePolicy {
     }
 
     /**
+     * Which of [options]' tiles the rung suggests first, or null when the grid
+     * is not drawn at all (#244).
+     *
+     * A DECLARED SEAM AT THIS COMMIT, returning null: nothing is suggested,
+     * which is exactly what the grid does today.
+     *
+     * IT PICKS FROM [offered] AND NEVER NARROWS IT. The owner's first two
+     * comments on #244 asked for a narrowed offer per rung and his third
+     * withdrew that outright -- *"Give the option to add more at each of the
+     * headroom intervals."* -- so every rung offers the full row and the rung
+     * decides only the default highlight. A function returning a MEMBER of the
+     * list it was handed cannot narrow it, which is why this takes the offered
+     * row rather than rebuilding one from the progression and the unit.
+     */
+    fun suggestedStep(tier: HeadroomTier?, offered: List<NextSetNudge>): NextSetNudge? {
+        val index = SUGGESTED_INDEX[tier] ?: return null
+        return offered.getOrNull(index(offered.size))
+    }
+
+    /**
+     * Which position in the offered row each rung suggests.
+     *
+     * A POSITION IN A ROW OF A GIVEN LENGTH, not a fixed index: the rows are
+     * six long for weight, three for time and two for reps, so "the middle
+     * one" is arithmetic over the length rather than a number.
+     *
+     * A DECLARED SEAM AT THIS COMMIT: empty, so [suggestedStep] answers null
+     * for every rung and the grid draws what it draws today.
+     */
+    private val SUGGESTED_INDEX: Map<HeadroomTier, (Int) -> Int> = emptyMap()
+
+    /**
      * The authored row for a unit, PICKED and never computed.
      *
      * The whole of "authored, never converted" is that this is a lookup with

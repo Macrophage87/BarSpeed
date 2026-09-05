@@ -15,9 +15,9 @@ import kotlin.test.assertTrue
  * CHARACTERIZATION, not contract. Every assertion here describes behaviour
  * that is about to move or to be joined by a sibling, and it is written down
  * first so the diff that moves it is a visible diff on a test rather than a
- * quiet reword. Three of these are expected to red in the commit that fixes
- * #244 and are corrected there; the rest are expected to survive and are here
- * so that a change which breaks them is caught rather than absorbed.
+ * quiet reword. Each is corrected forward at the commit that makes it false,
+ * naming what it used to say; none is deleted, because the thing each pins is
+ * still worth pinning after it moves.
  *
  * The defect being characterized: the headroom rungs are worded by the set's
  * KIND alone. A dynamic set is asked how much LOAD it had left whatever the
@@ -37,16 +37,21 @@ class HeadroomScaleBaselineTest {
     private fun rpeDescription() = setProperties()["rpe"]!!.jsonObject["description"]!!.jsonPrimitive.content
 
     /**
-     * The noun the rungs can be asked in is a two-value choice today, and the
-     * two values are the two the set's KIND selects between.
+     * The noun the rungs can be asked in, as an exact list.
      *
-     * Pinned as an exact list rather than a size, so widening it to carry the
-     * exercise's progression is a diff here and not an addition nothing
-     * notices.
+     * IT SAID `listOf("LOAD", "TIME")` at the characterization commit and that
+     * is now FALSE -- this commit widens the enum, which is exactly the diff
+     * the pin was written to force. Corrected forward rather than deleted: the
+     * list is still the thing worth pinning, because a fifth value is a fifth
+     * published `rpeScale` word and must not arrive unnoticed.
+     *
+     * The ORDER is asserted too, and it is the ladder's own: load and time are
+     * the two the set's kind selects between, reps and feel the two the
+     * exercise's declaration adds.
      */
     @Test
-    fun `the headroom noun has exactly two values today, both chosen by the set kind`() {
-        assertEquals(listOf("LOAD", "TIME"), EffortAsk.entries.map { it.name })
+    fun `the headroom noun has exactly four values, two by kind and two by declaration`() {
+        assertEquals(listOf("LOAD", "REPS", "TIME", "FEEL"), EffortAsk.entries.map { it.name })
     }
 
     /**
@@ -62,7 +67,7 @@ class HeadroomScaleBaselineTest {
                 "Could have gone about a minute longer",
                 "Could have gone 15-30 s longer",
             ),
-            EffortScale.tiles(timed = true, explosive = false, unit = WeightUnit.LB)
+            EffortScale.tiles(true, explosive = false, unit = WeightUnit.LB, ask = EffortAsk.TIME)
                 .filter { it.claim == EffortClaim.HEADROOM }
                 .map { it.label },
         )
@@ -79,7 +84,7 @@ class HeadroomScaleBaselineTest {
     @Test
     fun `every dynamic set is asked about load, whatever the exercise progresses on`() {
         val headroom =
-            EffortScale.tiles(timed = false, explosive = false, unit = WeightUnit.LB)
+            EffortScale.tiles(false, explosive = false, unit = WeightUnit.LB, ask = EffortAsk.LOAD)
                 .filter { it.claim == EffortClaim.HEADROOM }
         assertEquals(
             listOf(

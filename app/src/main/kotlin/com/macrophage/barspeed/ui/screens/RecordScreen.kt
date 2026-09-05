@@ -74,6 +74,7 @@ import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.DualSensorSetup
+import com.macrophage.barspeed.model.EffortAsk
 import com.macrophage.barspeed.model.EffortClaim
 import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseKind
@@ -2854,8 +2855,17 @@ private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
     // caption on a red destructive button and nothing in `:app` would catch
     // it.
     val label =
-        rpeOptions(state.currentIsTimed, currentKind(state) == ExerciseKind.EXPLOSIVE, state.weightUnit)
-            .first { it.failed }.description
+        rpeOptions(
+            state.currentIsTimed,
+            currentKind(state) == ExerciseKind.EXPLOSIVE,
+            state.weightUnit,
+            // The slot in front of the lifter: during IN_SET `currentSlot` is
+            // the set being recorded, not the one coming up. Null on an ad-hoc
+            // set, which no plan declared anything for. It changes no failure
+            // wording -- that is the set kind's -- and is passed because the
+            // parameter is not defaulted.
+            EffortScale.askFor(state.currentIsTimed, state.currentSlot?.progression),
+        ).first { it.failed }.description
     Button(
         onClick = { viewModel.endSet(SetRating(null, failed = true)) },
         modifier = Modifier.fillMaxWidth().height(64.dp),
@@ -2911,8 +2921,15 @@ internal fun EndSetEarlyButton(viewModel: RecordViewModel) {
 @Composable
 private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failedTile: Boolean) {
     val options =
-        rpeOptions(state.currentIsTimed, currentKind(state) == ExerciseKind.EXPLOSIVE, state.weightUnit)
-            .filter { failedTile || !it.failed }
+        rpeOptions(
+            state.currentIsTimed,
+            currentKind(state) == ExerciseKind.EXPLOSIVE,
+            state.weightUnit,
+            // The set being rated is the one still in front of the lifter, so
+            // its own exercise's declaration words the headroom rungs (#244).
+            // Null on an ad-hoc set, which no plan declared anything for.
+            EffortScale.askFor(state.currentIsTimed, state.currentSlot?.progression),
+        ).filter { failedTile || !it.failed }
     SectionCaption("Tap how that set felt to end it")
     Spacer(Modifier.height(6.dp))
     options.chunked(2).forEach { row ->
@@ -3354,9 +3371,16 @@ internal data class RpeOption(
  * [unit] reaches the scale because the low rungs name a WEIGHT the lifter
  * could have added, and that figure is authored per unit rather than
  * converted -- "+10-15 lb" and "+5 kg", never "+4.5 kg".
+ *
+ * [ask] is which noun the HEADROOM rungs use (#244), and it is NOT defaulted:
+ * the four call sites answer it from two different places -- the set-end grid
+ * resolves the slot in front of the lifter through `EffortScale.askFor`, the
+ * rest screen's two read the word FROZEN with the finished set -- and a
+ * default would let a new call site ask a pull-up about load by saying
+ * nothing.
  */
-internal fun rpeOptions(timed: Boolean, explosive: Boolean, unit: WeightUnit): List<RpeOption> =
-    EffortScale.tiles(timed = timed, explosive = explosive, unit = unit).map { tile ->
+internal fun rpeOptions(timed: Boolean, explosive: Boolean, unit: WeightUnit, ask: EffortAsk): List<RpeOption> =
+    EffortScale.tiles(timed = timed, explosive = explosive, unit = unit, ask = ask).map { tile ->
         RpeOption(
             rpe = tile.rpe,
             failed = tile.claim == EffortClaim.FAILED,

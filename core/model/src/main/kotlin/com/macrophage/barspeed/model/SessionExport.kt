@@ -1021,6 +1021,25 @@ data class SessionExport(
          * need a second word if it ever is.
          */
         val VALID_REFUSED_DETECTION_REASONS = setOf("unpairedRangeOutlier")
+
+        /**
+         * Which scale a set's [SetExport.rpe] was given on, the values
+         * [SetExport.rpeScale] is drawn from. Schema 1.19, issue #244.
+         *
+         * A literal set rather than a projection of [EffortAsk], the same
+         * arrangement [VALID_NO_REPS_REASONS] uses: this is the WIRE
+         * vocabulary and the enum is a Kotlin type, so writing one from the
+         * other would let a Kotlin rename redefine what a stored word means
+         * with nothing to red. `HeadroomScaleContractTest` asserts the two
+         * agree, in both directions, from the side that can see both.
+         *
+         * Each word names the QUESTION the lifter was asked at the moment the
+         * set ended, never a re-reading of the plan: plans are editable and
+         * deletable, and an exercise's `progression` can move under an old
+         * set. The word is frozen into the row when the set is written, for
+         * the reason [SetExport.bodyWeightKg] is.
+         */
+        val VALID_RPE_SCALES = setOf("load", "reps", "time", "feel")
     }
 }
 

@@ -24,13 +24,18 @@ import kotlin.test.assertTrue
  * justification is asking for numbers the lifter can supply.
  */
 class EffortScaleTest {
+    // WEIGHT on every helper, which is what these tests were written against:
+    // it is the default an omitted `progression` resolves to, so passing it
+    // explicitly keeps every assertion below asking exactly what it asked
+    // before the parameter existed (#244).
     private fun repTiles(unit: WeightUnit = WeightUnit.LB) =
-        EffortScale.tiles(timed = false, explosive = false, unit = unit)
+        EffortScale.tiles(timed = false, explosive = false, unit = unit, ask = EffortAsk.LOAD)
 
     private fun timedTiles(unit: WeightUnit = WeightUnit.LB) =
-        EffortScale.tiles(timed = true, explosive = false, unit = unit)
+        EffortScale.tiles(timed = true, explosive = false, unit = unit, ask = EffortAsk.TIME)
 
-    private fun explosiveTiles(unit: WeightUnit = WeightUnit.LB) = EffortScale.tiles(false, explosive = true, unit)
+    private fun explosiveTiles(unit: WeightUnit = WeightUnit.LB) =
+        EffortScale.tiles(false, explosive = true, unit, EffortAsk.LOAD)
 
     private fun allLadders() = listOf(WeightUnit.KG, WeightUnit.LB).flatMap { unit ->
         listOf(repTiles(unit), timedTiles(unit), explosiveTiles(unit))

@@ -34,6 +34,8 @@ import com.macrophage.barspeed.model.ArmedLinks
 import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.EffortAsk
+import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.HrSample
@@ -423,6 +425,20 @@ data class SetFeedback(
      * the body-weight term this set was actually recorded with.
      */
     val loadOverrideAddedKg: Double? = null,
+    /**
+     * Which scale this set was RATED on, frozen with everything else (#244).
+     *
+     * The rest screen re-opens the same grid to correct a rating, and it must
+     * ask in the dimension the set was rated in rather than in whatever the
+     * plan says now. Frozen for [bodyWeightKg]'s reason and a sharper one: a
+     * plan is editable and deletable, so an exercise's `progression` can move
+     * -- or the whole plan can be gone -- while the set that was rated under
+     * it is still on the rest screen. This is the same value
+     * `completedSetOf` writes into the row's `rpeScale`, resolved once by
+     * `EffortScale.askFor`, so the popup and the archive cannot disagree about
+     * which question was asked.
+     */
+    val rpeAsk: EffortAsk,
 ) {
     // Against [recordedReps] rather than the analysis, so this and the box's
     // struck pair read the same left-hand figure. Behaviour-identical at this
@@ -1988,6 +2004,10 @@ private fun restingState(
             side = p.side,
             explosive = p.exercise.kind == ExerciseKind.EXPLOSIVE,
             repsOverride = p.manualReps,
+            // Resolved from the FROZEN pair, not from live state, and by the
+            // same call `completedSetOf` makes -- one decision, two readers
+            // (#244).
+            rpeAsk = EffortScale.askFor(p.isTimed, p.slot?.progression),
         ),
         lastSetRpe = p.rating?.rpe,
         lastSetFailed = failed,

@@ -240,7 +240,8 @@ class EffortContractTest {
         // And the anchors it names are the anchors the app can actually write.
         assertEquals(
             listOf(1, 4, 6, 7, 8, 9, 10),
-            EffortScale.tiles(timed = false, explosive = false, unit = WeightUnit.LB).mapNotNull { it.rpe },
+            EffortScale.tiles(false, explosive = false, unit = WeightUnit.LB, ask = EffortAsk.LOAD)
+                .mapNotNull { it.rpe },
             "the app writes a set of anchors the published description does not describe",
         )
     }

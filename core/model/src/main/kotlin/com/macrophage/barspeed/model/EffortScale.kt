@@ -77,15 +77,33 @@ enum class EffortClaim {
 }
 
 /**
- * Which noun the headroom rungs ask in.
+ * Which noun the headroom rungs ask in, and the word the export publishes for
+ * it.
  *
  * [LOAD] on anything with a load ladder; [TIME] on a hold or a carry, where
  * load headroom is meaningless on a plank and answerable but beside the point
  * on a farmer's walk. Same tiers, same `rpe` anchors, different noun -- and
  * the externally-checkable property survives either way, which is the whole
  * reason the low end asks for a figure rather than a feeling.
+ *
+ * [REPS] and [FEEL] arrive with #244, chosen by the exercise's declared
+ * [ProgressionKind] rather than by the set's kind. [REPS] is for work whose
+ * only ladder is volume -- a pull-up the lifter cannot add plates to -- and
+ * [FEEL] is for an exercise declared `"none"`, which holds its load and its
+ * reps across its sets, so a rung there promises no quantity at all.
+ *
+ * [word] is what a set's `rpeScale` publishes. It is the enum name lowercased
+ * today and is written out per constant anyway, because the wire vocabulary is
+ * a published contract and renaming a Kotlin constant must not silently
+ * redefine what a stored word means. [SessionExport.VALID_RPE_SCALES] is the
+ * schema's twin of this list, pinned against it in both directions.
  */
-enum class EffortAsk { LOAD, TIME }
+enum class EffortAsk(val word: String) {
+    LOAD("load"),
+    REPS("reps"),
+    TIME("time"),
+    FEEL("feel"),
+}
 
 /**
  * How much more the set would have taken, in equipment increments.
@@ -235,19 +253,80 @@ object EffortScale {
         )
 
     /**
+     * The same three tiers asked in REPS, for work whose only ladder is
+     * volume (#244).
+     *
+     * A DECLARED SEAM AT THIS COMMIT: empty, so [headroomCaption] throws for
+     * [EffortAsk.REPS] and nothing reaches it, because [askFor] cannot return
+     * that value yet. The rows land with the fix.
+     */
+    private val REPS_CAPTIONS: Map<HeadroomTier, String> = emptyMap()
+
+    /**
+     * The same three tiers asked as a FEELING, for an exercise declared
+     * `"none"` (#244).
+     *
+     * A DECLARED SEAM AT THIS COMMIT, for [REPS_CAPTIONS]' reason.
+     */
+    private val FEEL_CAPTIONS: Map<HeadroomTier, String> = emptyMap()
+
+    /**
+     * Which noun this set's headroom rungs ask in.
+     *
+     * A DECLARED SEAM AT THIS COMMIT. It answers what the two-branch
+     * expression inside [tiles] answered before it existed -- the set's KIND
+     * and nothing else -- and ignores [progression] entirely. #244's fix is
+     * the body of this one function; every caller is already wired to it, so
+     * the change reaches the screen, the write and the export at once rather
+     * than three times.
+     *
+     * A NULL [progression] is an exercise whose plan declared nothing, and an
+     * ad-hoc set, which has no plan at all. Both read as
+     * [ProgressionKind.WEIGHT] -- that is what an omitted key MEANS, stated
+     * once on [ProgressionKind.ofPlan] -- so nothing recorded against a plan
+     * written before schema 1.11 is asked a different question than it was.
+     * Taking the null here rather than resolving it at the call site is what
+     * makes the ad-hoc case pinnable: `:app` has no reachable test seam, so a
+     * `?: WEIGHT` written there is a rule nothing on the CI path can fail.
+     */
+    fun askFor(timed: Boolean, progression: ProgressionKind?): EffortAsk =
+        when (progression ?: ProgressionKind.WEIGHT) {
+            // A DECLARED SEAM: all four arms answer from the set's KIND,
+            // which is what the two-branch expression inside `tiles` answered
+            // before this function existed. #244's fix replaces three of them.
+            ProgressionKind.WEIGHT,
+            ProgressionKind.REPS,
+            ProgressionKind.TIME,
+            ProgressionKind.NONE,
+            -> if (timed) EffortAsk.TIME else EffortAsk.LOAD
+        }
+
+    /**
      * The caption for one headroom rung, read from the table.
      *
-     * [unit] is ignored for [EffortAsk.TIME]: seconds are the same in both
-     * units, and taking the argument anyway is better than a second entry
-     * point that could disagree about which tiers exist.
+     * [unit] is ignored for every ask but [EffortAsk.LOAD]: seconds, reps and
+     * feelings are the same in both units, and taking the argument anyway is
+     * better than a second entry point that could disagree about which tiers
+     * exist.
      */
     fun headroomCaption(tier: HeadroomTier, ask: EffortAsk, unit: WeightUnit): String = when (ask) {
         EffortAsk.TIME -> checkNotNull(TIME_CAPTIONS[tier]) { "no time caption for $tier" }
+        EffortAsk.REPS -> checkNotNull(REPS_CAPTIONS[tier]) { "no reps caption for $tier" }
+        EffortAsk.FEEL -> checkNotNull(FEEL_CAPTIONS[tier]) { "no feel caption for $tier" }
         EffortAsk.LOAD -> checkNotNull(LOAD_CAPTIONS[tier to unit]) { "no load caption for $tier in $unit" }
     }
 
     /**
      * The tiles for one set, easiest first, with the failure tile last.
+     *
+     * [ask] is [askFor]'s answer and decides the HEADROOM wording alone: the
+     * counted end and the failure tile below are the set's KIND's business and
+     * do not move with it. It is taken rather than derived here because the
+     * same answer is FROZEN onto the row and onto the rest screen's feedback
+     * when the set is written (#244) -- one resolution, three readers, so the
+     * tile the lifter tapped, the tile the correction popup lights and the
+     * word the archive publishes cannot disagree. Pass [askFor]'s answer and
+     * nothing else: a hand-built pair can say TIME rungs on a rep ladder.
      *
      * [timed] and [explosive] are the two branches `rpeOptions` already made
      * before this object existed, kept rather than replaced: "reps left"
@@ -274,8 +353,7 @@ object EffortScale {
      * qualified rather than being kept beside three headroom captions that
      * have no counterpart for it.
      */
-    fun tiles(timed: Boolean, explosive: Boolean, unit: WeightUnit): List<EffortTile> {
-        val ask = if (timed) EffortAsk.TIME else EffortAsk.LOAD
+    fun tiles(timed: Boolean, explosive: Boolean, unit: WeightUnit, ask: EffortAsk): List<EffortTile> {
         val headroom =
             listOf(HeadroomTier.MUCH_MORE, HeadroomTier.TWO_INCREMENTS, HeadroomTier.ONE_INCREMENT)
                 .map { EffortTile(it.rpe, EffortClaim.HEADROOM, headroomCaption(it, ask, unit)) }

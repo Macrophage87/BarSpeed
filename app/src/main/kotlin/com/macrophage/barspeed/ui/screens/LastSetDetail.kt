@@ -136,10 +136,15 @@ internal fun LastSetDetail(
  * The effort WORDING comes from [rpeOptions], which is `:app`'s own table, so
  * the tile description is resolved here and handed over; everything the policy
  * decides from it is the policy's.
+ *
+ * The scale is the one FROZEN with the set (#244), never the plan re-read: the
+ * row on this card must name the tile the lifter actually tapped, and an
+ * exercise's `progression` can be edited -- or its whole plan deleted -- while
+ * this card is still on screen.
  */
 @Composable
 private fun LastSetCard(state: RecordState, feedback: SetFeedback) {
-    val options = rpeOptions(feedback.actualDurationS != null, feedback.explosive, state.weightUnit)
+    val options = rpeOptions(feedback.actualDurationS != null, feedback.explosive, state.weightUnit, feedback.rpeAsk)
     val rated = options.firstOrNull { !it.failed && it.rpe == state.lastSetRpe }?.description
     val values =
         LastSetRecordPolicy.values(
@@ -473,6 +478,10 @@ private fun DraftWarmupRow(state: RecordState, warmup: Boolean, onDraft: (Boolea
  * here changes it -- and correcting the rep count in the same popup may move it
  * on confirm, which is exactly why the sentence below the grid says a rating
  * cannot clear a shortfall.
+ *
+ * The grid is worded on the scale FROZEN with the set (#244). A correction is
+ * a second answer to the SAME question, so re-asking it in another dimension
+ * would silently reinterpret the rating the lifter is looking at.
  */
 @Composable
 private fun DraftEffortSection(
@@ -482,7 +491,7 @@ private fun DraftEffortSection(
     tappedFailed: Boolean,
     onDraft: (Int?, Boolean) -> Unit,
 ) {
-    val options = rpeOptions(feedback.actualDurationS != null, feedback.explosive, state.weightUnit)
+    val options = rpeOptions(feedback.actualDurationS != null, feedback.explosive, state.weightUnit, feedback.rpeAsk)
     val selection =
         EffortCorrectionPolicy.selection(
             rpe = rpe,
