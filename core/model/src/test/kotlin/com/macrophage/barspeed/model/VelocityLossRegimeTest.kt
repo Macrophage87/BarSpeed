@@ -106,6 +106,40 @@ class VelocityLossRegimeTest {
         assertEquals(VelocityLossRegime.MAX_INTENT, of(null, false, ExerciseKind.DYNAMIC, horizontal = true))
     }
 
+    /**
+     * THE CASE THE PLANE-BLIND RULE GETS BACKWARDS -- round 1 finding 2.
+     *
+     * On a chest-supported row or a chest-press machine there is no up or
+     * down for a positional reading to attach to, so digit 3 is the concentric
+     * by PHASE whatever `concentric` the plan declared beside `plane`. The two
+     * keys are independent in the plan schema and `SetGeometryPolicy.resolve`
+     * stores whatever each one said, so `plane: horizontal` with
+     * `concentric: down` is representable and nothing rejects it.
+     *
+     * `30X0` on such a set is an explosive DRIVE. The voice guide says so --
+     * `TempoSchedule.of` sets `digit1IsConcentric = if (horizontal) false else
+     * !concentricUp` -- and the tempo scorer leaves that stroke unscored for
+     * the same reason. The regime must agree with them, and the pair below is
+     * what makes the disagreement visible: the SAME tempo on the SAME plane
+     * with the drive declared each way.
+     */
+    @Test
+    fun `an X in digit 3 is the concentric on any horizontal set, whichever way the drive is declared`() {
+        assertEquals(VelocityLossRegime.MAX_INTENT, of("30X0", true, ExerciseKind.DYNAMIC, horizontal = true))
+        assertEquals(VelocityLossRegime.MAX_INTENT, of("30X0", false, ExerciseKind.DYNAMIC, horizontal = true))
+    }
+
+    /**
+     * And because the plane answers it outright, the drive direction is not
+     * needed at all on horizontal work -- unlike vertical work, where a
+     * missing direction leaves an X in digit 3 undecidable.
+     */
+    @Test
+    fun `a horizontal X concentric needs no drive direction`() {
+        assertEquals(VelocityLossRegime.MAX_INTENT, of("30X0", null, ExerciseKind.DYNAMIC, horizontal = true))
+        assertNull(of("30X0", null, ExerciseKind.DYNAMIC, horizontal = false), "vertical still needs one")
+    }
+
     @Test
     fun `a horizontal hold gets no word, the same as a vertical one`() {
         assertNull(of("2011", true, ExerciseKind.HOLD, horizontal = true))
