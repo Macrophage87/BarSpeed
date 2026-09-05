@@ -15,13 +15,41 @@ import kotlin.test.assertTrue
 
 /**
  * The v16 -> v17 migration: `bodyWeightKg` on set_records, the term the load
- * arithmetic added and the archive never published (#220).
+ * arithmetic added and the archive never published (#220), and `rpeScale`, the
+ * word saying which question the set was rated on (#244).
  *
- * DIFFERENTIALS. Every test here fails at the commit that introduces it. There
- * is no committed `17.json`, so the baseline lookup errors out with the message
- * it was written to carry; [DATABASE_VERSION] is 16; and
- * [AppDatabase.MIGRATION_16_17] is declared with an empty body and is not
- * registered, so the recording database sees no statement at all.
+ * TWO COLUMNS ON ONE HOP, and that is not two changes merged: 17 has NOT
+ * SHIPPED. v0.1.50 carries `DATABASE_VERSION = 16`, read by
+ * `git show v0.1.50:core/data/.../AppDatabase.kt` rather than assumed, so no
+ * installed build has ever run 16 -> 17 and extending it costs nobody a second
+ * migration. Minting 18 for a nullable append on the same table would put a
+ * hop in the chain that no device will ever be at the start of.
+ *
+ * DIFFERENTIALS. Every test here fails at the commit that introduces it. For
+ * the body-weight half: there was no committed `17.json`, so the baseline
+ * lookup errored out with the message it was written to carry;
+ * [DATABASE_VERSION] was 16; and [AppDatabase.MIGRATION_16_17] was declared
+ * with an empty body and was not registered. For the scale half, at the commit
+ * before the fix: `17.json` describes one added column, the migration executes
+ * one statement, and `SetRecordEntity` has no `rpeScale` field.
+ *
+ * ## The scale column's shape, and the absence it must not collapse
+ *
+ * TEXT, NULLABLE, NO DEFAULT. It holds the word itself -- `load`, `reps`,
+ * `time` or `feel` -- rather than an ordinal, so reordering the Kotlin enum
+ * cannot reinterpret a stored row. NULL means one thing only: the set was
+ * recorded before this column existed. It is never written for "the app could
+ * not tell", because the app always can -- an ad-hoc set with no plan resolves
+ * through the same decision every planned set does -- so no present row is
+ * ambiguous, which is the property the body-weight column beside it could not
+ * have.
+ *
+ * NO BACKFILL, and the refusal is stronger here than #220's. A past set's
+ * progression is not recoverable at all: `set_records` has no such column,
+ * `sessions` keeps only the plan's display name, and plans are editable and
+ * deletable. Writing `load` across the archive would state that every past set
+ * was rated on a load ladder, which is false for every timed set ever
+ * recorded.
  *
  * ## Why a column and not a derivation
  *
@@ -141,7 +169,7 @@ class Migration16To17Test {
      * carry.
      */
     @Test
-    fun `the schema baselines differ by exactly the body-weight column`() {
+    fun `the schema baselines differ by exactly the body weight and the scale word`() {
         for (table in listOf("raw_streams", "sessions", "plans", "custom_exercises")) {
             assertEquals(
                 emptySet(),
@@ -150,11 +178,33 @@ class Migration16To17Test {
             )
         }
         val gained = columnsOf(17, "set_records") - columnsOf(16, "set_records").keys
-        assertEquals(setOf("bodyWeightKg"), gained.keys, "set_records gained something other than the body weight")
+        assertEquals(
+            setOf("bodyWeightKg", "rpeScale"),
+            gained.keys,
+            "set_records gained something other than the body weight and the scale word",
+        )
         val (affinity, notNull, default) = gained.getValue("bodyWeightKg")
         assertEquals("REAL", affinity, "bodyWeightKg is not REAL, so it cannot hold a kilogram figure")
         assertTrue(!notNull, "bodyWeightKg is NOT NULL, so a row the app could not observe cannot be stored")
         assertNull(default, "bodyWeightKg carries a default, which is a weighing nobody did")
+    }
+
+    /**
+     * The scale word's shape, asserted apart from the body weight's because the
+     * two columns are not the same kind of fact.
+     *
+     * TEXT so the row holds the published word itself rather than an ordinal
+     * into a Kotlin enum. NULLABLE with NO DEFAULT because a defaulted `load`
+     * would be a claim about every set already in the archive -- including
+     * every plank, which was asked in seconds.
+     */
+    @Test
+    fun `the scale word is nullable text with no default`() {
+        val gained = columnsOf(17, "set_records") - columnsOf(16, "set_records").keys
+        val (affinity, notNull, default) = gained.getValue("rpeScale")
+        assertEquals("TEXT", affinity, "rpeScale is not TEXT, so it cannot hold the published word itself")
+        assertTrue(!notNull, "rpeScale is NOT NULL, so a row recorded before the column cannot be stored")
+        assertNull(default, "rpeScale carries a default, which asserts a question nobody was asked")
     }
 
     /**
@@ -185,15 +235,23 @@ class Migration16To17Test {
     }
 
     /**
-     * The migration executes exactly the one append the baselines call for.
+     * The migration executes exactly the two appends the baselines call for.
      *
      * Read off the real migration body through a recording database, so this is
      * the SQL that will run rather than a second copy of it kept beside the
-     * first.
+     * first. IT SAID ONE STATEMENT and named only the body weight; #244 extends
+     * the same unshipped hop, so the expectation is corrected here rather than
+     * a second hop being minted.
      */
     @Test
-    fun `the migration runs one add-column statement and nothing else`() {
-        assertEquals(listOf("ALTER TABLE set_records ADD COLUMN bodyWeightKg REAL"), executedSql())
+    fun `the migration runs two add-column statements and nothing else`() {
+        assertEquals(
+            listOf(
+                "ALTER TABLE set_records ADD COLUMN bodyWeightKg REAL",
+                "ALTER TABLE set_records ADD COLUMN rpeScale TEXT",
+            ),
+            executedSql(),
+        )
     }
 
     /**
@@ -232,7 +290,7 @@ class Migration16To17Test {
         assertEquals(
             emptyList(),
             executedSql().filter { it.uppercase().startsWith("UPDATE ") || it.uppercase().startsWith("INSERT ") },
-            "the migration backfills a weighing nobody did",
+            "the migration backfills a weighing nobody did, or a question nobody was asked",
         )
     }
 }
