@@ -219,8 +219,11 @@ class CadencePlanTest {
         //
         // What stays true of the three that remain: the rep NUMBER is on
         // screen, driven by onRepCounted, so it is the metronome's own count
-        // and not the sensor's, and the "Last rep" warning has no on-screen
-        // equivalent at all and is simply lost.
+        // and not the sensor's, and since #252 the "Last rep" warning DOES
+        // have an on-screen equivalent -- GuidedRepCaption.forRing draws
+        // "last rep of N" on the last rep of any set that asked for a count,
+        // whether or not the plan speaks -- so on these three pairs the
+        // screen is the only channel that warns at all.
         assertEquals(
             listOf("bench 1010", "bench 1110", "leg press 1010"),
             named(carries = false),

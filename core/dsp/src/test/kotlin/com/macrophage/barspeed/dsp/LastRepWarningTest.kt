@@ -79,9 +79,10 @@ import kotlin.test.assertTrue
  * where case 1 takes it. An earlier version of this paragraph named `1110`
  * flatly, which is false on a concentric-first lift whose concentric is up and
  * on an eccentric-first lift whose concentric is down, and it is deleted rather
- * than softened. The two rows below -- `1010` on a leg press, `1110` on a bench
- * press, both unswapped -- are the whole of the "some schedule has no beat that
- * fits any word" case.
+ * than softened. The two rows below are the whole of the "some schedule has no
+ * beat that fits any word" case: `1010` on a leg press, which `TempoSchedule.of`
+ * SWAPS -- harmlessly, since its two strokes are equal and both its pauses are
+ * zero -- and `1110` on a bench press, which it leaves unswapped.
  *
  * Nothing here touches `RecordViewModel`'s unguided counter, which speaks
  * through `VoiceMilestonePolicy.repMilestone` at the instant a rep is counted

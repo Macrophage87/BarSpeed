@@ -176,9 +176,16 @@ class CadenceVoiceTest {
         //
         // It reads announcementFor for the expected side, which is the
         // decision, against the script's rows, which are the delivery. A plan
-        // that decides to say nothing is covered too: 1010 on a leg press and
-        // 1110 on a bench press are both unswapped schedules of two one-second
-        // strokes, so they have no home for a call and must record none.
+        // that decides to say nothing is covered too, in the two shapes the
+        // corpus carries. 1010 has no pause to give at either end, so it is a
+        // schedule of two one-second strokes on every lift -- this leg press
+        // included, even though TempoSchedule.of swaps it, because swapping
+        // two equal strokes and two zero pauses changes nothing. 1110 keeps
+        // its call-less shape only where the digits are left unswapped, as on
+        // this bench press: digit 2's one-second pause then sits INSIDE the
+        // rep and the rep closes on nothing, where the swap would carry that
+        // pause to the END of the rep and hand it the call. Neither of these
+        // two rows has a home, so both must record none.
         corpus.forEach { (tempo, direction, reps) ->
             val p = plan(tempo, direction)
             val decided = (2..reps).mapNotNull { p.announcementFor(it, reps) }
