@@ -84,11 +84,18 @@ object TempoAdjustPolicy {
      * grading the lifter against the 0. A control that BUILDS a tempo out of
      * digits must not be able to reach that state. Since #251 the PLAN import
      * gate refuses one too, by path, under plan schema 1.12 -- see
-     * [PlanSetDef.validate]. Two doors are still open and are named rather
-     * than claimed shut: a set already recorded with a zero stroke, and the
-     * ad-hoc tempo TEXT FIELD, which takes free text through [Tempo.parseOrNull]
-     * and is not this issue's ask. [wheelValues] answers null for either
-     * rather than quietly raising it, so the wheel is not drawn at all.
+     * [PlanSetDef.validate]. Three doors are still open and are named rather
+     * than claimed shut: a set already recorded with a zero stroke; the ad-hoc
+     * tempo TEXT FIELD, which takes free text through [Tempo.parseOrNull]; and
+     * a plan-authored FRACTIONAL stroke below one second. `0.5-0-1-0` is
+     * admitted by the tightened schema pattern AND by [PlanSetDef.validate],
+     * whose test is [Tempo.hasZeroStroke] -- `downS == 0.0 || upS == 0.0`, an
+     * equality and not a floor -- while `CadencePlan.strokeSeconds` truncates
+     * it to a one-second beat and `SetAnalyzer.complianceFor` goes on grading
+     * the 0.5. Same mismatch a 0 produced. None of the three is this issue's
+     * ask, and the third one closes only by moving the published pattern and
+     * the gate together. [wheelValues] answers null for all three rather than
+     * quietly raising them, so no wheel is drawn on any of them.
      *
      * Pauses have no such floor. A pause of 0 is a real pause -- the one where
      * the lifter does not stop -- and the metronome plays it by emitting no

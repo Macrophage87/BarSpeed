@@ -484,6 +484,26 @@ class CadencePlanTest {
     }
 
     /**
+     * The half-second stroke a plan can still author, and what the metronome
+     * does with it.
+     *
+     * The zero-stroke case above is refused at the import gate since #251, but
+     * that gate's test is an equality against 0.0 rather than a floor, so
+     * `0.5-0-1-0` is still accepted by it and by the published pattern.
+     * `strokeSeconds` truncates before it coerces -- `0.5.toInt()` is 0 -- so
+     * the half second is played as a full one while `complianceFor` goes on
+     * grading against the 0.5. CHARACTERIZATION: nothing moved here.
+     * `TempoStrokeRoleContractTest` in `:core:model` pins the accepting half.
+     */
+    @Test
+    fun `a fractional stroke below one second is played as one second`() {
+        val s = schedule("0.5-0-1-0", benchPress)
+        assertEquals(1.5, s.prescribedCycleS, "the PRESCRIPTION counts the half second")
+        assertEquals(listOf("DOWN" to 1, "UP" to 1), shape(CadencePlan.of(s)))
+        assertEquals(2, CadencePlan.of(s).deliveredCycleS, "half a second over, from the truncation alone")
+    }
+
+    /**
      * Both stroke digits at zero, which is the degenerate end of the coercion
      * the two pins above cover one digit at a time.
      *

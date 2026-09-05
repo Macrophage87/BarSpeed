@@ -179,6 +179,35 @@ class TempoStrokeRoleContractTest {
         }
     }
 
+    /**
+     * CHARACTERIZATION, not a differential. The THIRD door
+     * [TempoAdjustPolicy.MIN_STROKE_S]'s KDoc names rather than claims shut.
+     *
+     * The gate's test is [Tempo.hasZeroStroke], an equality against 0.0 and
+     * not a floor, so a plan may still author a half-second stroke and be
+     * accepted -- and the published pattern admits it too, which
+     * `the published plan schema refuses a stroke of zero` pins from the
+     * other side by listing `0.5-0-1-0` among the strings it must still take.
+     * `CadencePlan.strokeSeconds` then truncates that 0.5 to a one-second
+     * beat while `SetAnalyzer.complianceFor` grades the 0.5, which is exactly
+     * the mismatch this branch closed for a 0 and did not close here.
+     * `CadencePlanTest` pins the playing half, in the module that plays it.
+     *
+     * Pinned green rather than fixed: closing it moves the published pattern
+     * and the gate together and is its own piece of work. What it buys is
+     * that the day the floor becomes a floor, this assertion inverts instead
+     * of a sentence in a KDoc going quietly stale.
+     */
+    @Test
+    fun `today the plan gate accepts a fractional stroke below one second`() {
+        val path = "sessions[0].exercises[0].sets[0]"
+        listOf("0.5-0-1-0", "1-0-0.5-0").forEach { text ->
+            assertFalse(Tempo.parse(text).hasZeroStroke, "'$text' is not a zero stroke; the gate's test misses it")
+            assertEquals(emptyList(), PlanSetDef(reps = 5, tempo = text).validate(path), "'$text' at the gate")
+            assertNull(TempoAdjustPolicy.wheelValues(text), "'$text' must draw no wheel")
+        }
+    }
+
     /** A pause of 0 is a real pause -- the one where the lifter does not stop -- and stays valid. */
     @Test
     fun `a zero pause is still a tempo the plan gate accepts`() {
