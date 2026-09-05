@@ -16,7 +16,8 @@ import kotlin.test.assertTrue
  * [LastSetRecordPolicy.status] is where this commit's DIFFERENTIAL is. The seam
  * says the effort and nothing else, so the ten cases from "a failed set says
  * why it ended" down all fail here, and the commit after this one is what makes
- * them pass. 60ac18d5's two GAP characterizations are DELETED rather than
+ * them pass. The two GAP characterizations added by "Give the last-set seam
+ * the facts it has to speak, still unspoken" are DELETED rather than
  * reworded: they stated the silence as today's answer, and the differential is
  * what ends it.
  *

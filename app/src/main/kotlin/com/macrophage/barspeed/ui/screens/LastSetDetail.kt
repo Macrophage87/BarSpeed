@@ -278,9 +278,9 @@ private fun CorrectionDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                // Both halves of a retraction, which is what bc0661c8's CLEAR
-                // foot did in one place: `limitLastSet(null)` AND `onSkip()`.
-                // Read BEFORE applyDraft issues the write.
+                // Both halves of a retraction, which is what [LimiterPage]'s
+                // CLEAR foot does in one place: `limitLastSet(null)` AND
+                // `onSkip()`. Read BEFORE applyDraft issues the write.
                 val retracted = SetLimiterPolicy.retractsStoredReason(state.lastSetLimiter, limiter)
                 applyDraft(
                     state = state,
@@ -551,8 +551,8 @@ private fun DraftEffortSection(
  * single limitLastSet call is the write, which fires because the draft
  * differs from the stored answer.
  *
- * THE WRITE IS ONLY HALF OF WHAT bc0661c8's FOOT DID. That foot ran
- * `limitLastSet(null)` AND `onSkip()`, and `onSkip` set `RestingStage`'s
+ * THE WRITE IS ONLY HALF OF WHAT [LimiterPage]'S CLEAR FOOT DOES. That foot
+ * runs `limitLastSet(null)` AND `onSkip()`, and `onSkip` sets `RestingStage`'s
  * `dismissed`. [SetLimiterPolicy.prompts] is true again for a failed set once
  * the stored answer is null and `dismissed` is false, so the null written
  * alone re-opens [LimiterPage] at the top of the rest screen. The confirm in

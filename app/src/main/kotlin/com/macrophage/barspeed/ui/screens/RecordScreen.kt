@@ -706,10 +706,13 @@ private fun previewSummary(preview: SessionPreview): String {
  * OBSERVED RENDERING, and the canonical record of it for both surfaces --
  * `PlanDetailScreen.ExerciseCard` points here rather than repeating it. No
  * test on the CI path renders a composable, so this was read off a screen:
- * emulator `barspeed-api35`, headless, debug APK built from 9b089c88, a
- * five-exercise plan declaring weight / reps / time / none and one omitting
- * the key. Every header named one dimension on both screens, and the omitted
- * key read "steps up by weight". At `font_scale 2.0` each phrase still
+ * emulator `barspeed-api35`, headless, debug APK built from the commit whose
+ * subject is "Say which dimension each exercise steps up, before the session
+ * starts" -- named by subject, not by SHA, because a rebase moves the SHA and
+ * has already moved this one -- with a five-exercise plan declaring
+ * weight / reps / time / none and one omitting the key. Every header named
+ * one dimension on both screens, and the omitted key read
+ * "steps up by weight". At `font_scale 2.0` each phrase still
  * renders in full on one line, neither wrapped nor clipped -- read on this
  * screen's preview, with all four phrases on screen together. The TopAppBar
  * title above them does clip at that scale; that is pre-existing and
@@ -2998,10 +3001,10 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     NextSetBlock(state, viewModel)
     SessionCloseControls(state, viewModel)
     Spacer(Modifier.height(16.dp))
-    // `onReasonRetracted` is the second half of what bc0661c8's CLEAR foot did
-    // -- it ran `limitLastSet(null)` AND `onSkip()`. Without it a confirm that
-    // clears the reason makes SetLimiterPolicy.prompts true again and re-opens
-    // the page above.
+    // `onReasonRetracted` is the second half of what [LimiterPage]'s CLEAR
+    // foot does -- it runs `limitLastSet(null)` AND `onSkip()`. Without it a
+    // confirm that clears the reason makes SetLimiterPolicy.prompts true
+    // again and re-opens the page above.
     LastSetDetail(
         state = state,
         viewModel = viewModel,

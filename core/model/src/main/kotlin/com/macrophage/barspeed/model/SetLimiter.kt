@@ -568,8 +568,8 @@ object SetLimiterPolicy {
      *
      * True only where an answer stood and the draft carries none. A retraction
      * is two writes and not one: the stored answer goes back to null, and the
-     * rest screen has to be told the page was already offered. At bc0661c8 the
-     * CLEAR foot ran `limitLastSet(null)` AND `onSkip()`, and [prompts] is true
+     * rest screen has to be told the page was already offered. `LimiterPage`'s
+     * CLEAR foot runs `limitLastSet(null)` AND `onSkip()`, and [prompts] is true
      * again for a failed set once [limiter] is null and `dismissed` is false --
      * so the null written alone re-opens the page the retraction just cleared.
      *
