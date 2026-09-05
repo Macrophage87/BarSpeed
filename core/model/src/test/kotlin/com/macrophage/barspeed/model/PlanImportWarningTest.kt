@@ -426,11 +426,18 @@ class PlanImportWarningTest {
 
         assertEquals(emptyList(), result.errors, "a declared pair is not a reason to refuse the plan")
         // dumbbell_bench_press is not built in, so this also draws the
-        // undeclared-start warning; pairVsLoad is first in warnings()' list.
+        // undeclared-start warning, and since #253 a count with no
+        // "implement" draws a third saying the card will show no pair line.
+        // pairVsLoad is still first in warnings()' list.
         assertEquals(
-            2,
+            3,
             result.warnings.size,
-            "expected the pair note and the undeclared-start note: ${result.warnings}",
+            "expected the pair note, the undeclared-implement note and the undeclared-start note: " +
+                "${result.warnings}",
+        )
+        assertTrue(
+            result.warnings.any { "but no \"implement\"" in it },
+            "a pair with no implement draws no line on the card and nothing else says so",
         )
         val warning = result.warnings.first()
         assertTrue(warning.contains("80 lb"), warning)
@@ -461,11 +468,20 @@ class PlanImportWarningTest {
         assertEquals(emptyList(), result.errors)
         assertEquals(2, assertNotNull(result.plan).sessions[0].exercises[0].implementCount)
         // rear_foot_elevated_split_squat is not built in, so this also draws
-        // the undeclared-start warning alongside the pair note.
+        // the undeclared-start warning alongside the pair note, and since #253
+        // a third for the count declared with no "implement".
         assertEquals(
-            2,
+            3,
             result.warnings.size,
-            "expected the pair note and the undeclared-start note: ${result.warnings}",
+            "expected the pair note, the undeclared-implement note and the undeclared-start note: " +
+                "${result.warnings}",
+        )
+        // The count is what the author wrote, and it is NOT read as two
+        // dumbbells: only the word does that. This exercise gets no loading
+        // line on the card at all until the plan says which implement it is.
+        assertEquals(
+            Implement.OTHER,
+            assertNotNull(result.plan).sessions[0].exercises[0].resolvedImplement,
         )
     }
 }
