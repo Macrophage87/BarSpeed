@@ -80,6 +80,27 @@ class RepMarkTrackTest {
         "field-latpulldown-1120-12rep-s38-set14" to 12,
     )
 
+    private fun hasSidecar(f: String, suffix: String): Boolean = javaClass.getResource("/$f$suffix") != null
+
+    /**
+     * The provenance rule this file's KDoc states, read off the resource
+     * directory instead of asserted in prose.
+     *
+     * "one per capture that already has both an `imu-a` (or `imu-b`) stream
+     * and a `-cues.csv` on this classpath" is a claim about which files are
+     * present, and nothing has ever listed the directory to check it. This
+     * lists it.
+     */
+    @Test
+    fun `every capture with a cue track carries a rep file`() {
+        assertEquals(
+            emptyList(),
+            FieldCorpus.onClasspath().filter {
+                hasSidecar(it, "-cues.csv") && !hasSidecar(it, "-reps.csv")
+            },
+        )
+    }
+
     @Test
     fun `every capture reports the mark count its session recorded`() {
         assertEquals(corpus.toMap(), corpus.associate { (f, _) -> f to RepMarks.read(f).size })
