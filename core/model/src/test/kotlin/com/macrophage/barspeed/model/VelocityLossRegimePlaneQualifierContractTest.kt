@@ -62,6 +62,8 @@ class VelocityLossRegimePlaneQualifierContractTest {
     private fun velocityLossBullet() =
         prompt.lineSequence().first { it.trimStart().startsWith("- \"velocityLoss_pct\"") }
 
+    private fun prescribingLine() = prompt.lineSequence().first { "PRESCRIBING A TEMPO CHOOSES WHICH FIGURE" in it }
+
     @Test
     fun `the published regime key qualifies its concentric-down sentence to vertical work`() {
         val text = regimeDescription()
@@ -151,6 +153,29 @@ class VelocityLossRegimePlaneQualifierContractTest {
         assertTrue(
             "a HORIZONTAL one can be \"maxIntent\"" in line,
             "PLAN_PROMPT does not tell a coach a horizontal tempo set can still be maxIntent: $line",
+        )
+    }
+
+    /**
+     * The WRITING half of the prompt, which the reading key already gets
+     * right. The `- "velocityLoss_pct"` bullet names an explosive lift among
+     * the `maxIntent` cases; the paragraph telling a coach how to PRESCRIBE a
+     * tempo does not, and tells them instead that a numbered concentric digit
+     * makes a set `controlled`, full stop. That is false on an explosive
+     * lift: [VelocityLossRegime.of] answers `maxIntent` there whatever tempo
+     * is written on it, so a coach following the writing guidance is told the
+     * set will be read one way and the export says the other.
+     */
+    @Test
+    fun `the plan prompt writing guidance exempts an explosive lift from the controlled rule`() {
+        val line = prescribingLine()
+        assertTrue(
+            "explosive" in line,
+            "PLAN_PROMPT's tempo-writing guidance never names the explosive kind: $line",
+        )
+        assertFalse(
+            "A set with a numbered concentric digit is \"controlled\":" in line,
+            "PLAN_PROMPT still calls every numbered concentric digit controlled, with no exception: $line",
         )
     }
 }
