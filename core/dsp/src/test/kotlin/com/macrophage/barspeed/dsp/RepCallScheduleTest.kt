@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
  *
  * The tracks these strings are derived from are not constructed. They are the
  * cue tracks of seven guided sets, read from `_cues.csv` in two capture
- * archives that are not committed to this repository:
+ * archives, six of them from archives not committed to this repository:
  *
  * | row | capture | app | set |
  * |---|---|---|---|
@@ -23,6 +23,17 @@ import kotlin.test.assertEquals
  * | `fly2011x12` | field-38 | 0.1.50 | 6, chest-supported rear delt fly, 12 planned |
  * | `curl2010x12` | field-38 | 0.1.50 | 10, seated biceps curl, 12 planned |
  * | `pushdown1120x12` | field-38 | 0.1.50 | 12, triceps pushdown, 12 planned |
+ *
+ * One of the seven is committed now: field-38 set 4 is
+ * `field-ohp-3010-8rep-s38-set04-cues.csv`, added on this branch for issue
+ * #72. Its rows reproduce `ohp3010x8` second for second under the PRE-#243
+ * schedule -- every `Rep n` one lower (`Rep 1` at 0:05 where the string below
+ * has `Rep 2`, through `Rep 6` at 0:25), no `Last rep` at 0:29, and a tempo
+ * count `1` at 0:30 that the restored `Last rep` displaces. `Done` is at 0:32
+ * on both. The committed track also carries the two prep rows these strings
+ * begin after, `Ready` at -0:02 and `Brace` at -0:01. Read against the
+ * `work_started_ms` of 1788516049461 in that set's own `_prep.csv`, which is
+ * not committed.
  *
  * Each row of a track was taken as `(timestamp_ms - workStartedAt_ms) / 1000`
  * and rounded to the nearest second; the worst deviation from a whole second
