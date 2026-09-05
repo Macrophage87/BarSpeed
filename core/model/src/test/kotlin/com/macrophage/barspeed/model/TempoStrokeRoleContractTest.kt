@@ -112,6 +112,16 @@ class TempoStrokeRoleContractTest {
         assertEquals("1", TempoAdjustPolicy.steppedValue("30X0", returnStroke, 1))
         assertTrue(TempoAdjustPolicy.canStep("30X0", returnStroke, 1), "there is a way out of it")
         assertEquals("3010", TempoAdjustPolicy.withDigit("30X0", returnStroke, "1"))
+        // A tap of more than one place, which the screen cannot produce -- its
+        // STEPPER_STEP is 1 -- and which the public function must still answer
+        // for. X is BELOW one second, so it sits one place below the head of a
+        // range that starts at 1, and a two-place tap up from it lands on 2.
+        // This is the pin the mutation table asked for: without it, an
+        // explicit "any tap off the alphabet lands on the first value" branch
+        // is unkillable, which makes it decoration in a function whose whole
+        // job is deciding which value a tap produces.
+        assertEquals("2", TempoAdjustPolicy.steppedValue("30X0", returnStroke, 2))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("30X0", returnStroke, -2))
     }
 
     /**
