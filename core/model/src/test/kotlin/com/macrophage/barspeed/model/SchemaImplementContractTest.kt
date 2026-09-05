@@ -136,8 +136,13 @@ class SchemaImplementContractTest {
             "`bar_lb`" in description,
             "the plan version log never names the bar override that came with it",
         )
+        // The needle is the 1.12 entry's OWN words, not "no longer": that
+        // phrase already occurred twice in this description at
+        // 5328be84cf1dc85921b7e9ef3493c4662e562a24, before a line of #253 text
+        // existed, so a pin keyed off it passed with the STOPS paragraph
+        // deleted -- a check that cannot fail reads as coverage.
         assertTrue(
-            "no longer" in description,
+            "loses the loading line" in description,
             "the version log never says what STOPS happening -- a plan written before 1.12 loses " +
                 "the card's loading line, and the log is where a reader finds that out: $description",
         )
