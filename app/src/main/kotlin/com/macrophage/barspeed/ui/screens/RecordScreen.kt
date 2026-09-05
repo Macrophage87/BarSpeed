@@ -2274,6 +2274,18 @@ private fun GuidedSetStage(state: RecordState, viewModel: RecordViewModel, slot:
  *
  * It decides nothing. Every word comes from [StartCuePolicy], in `:core:model`,
  * where a test runs on every push; nothing in this file is reachable by one.
+ *
+ * `[Field]` -- NO DEVICE HAS DRAWN THIS. The lane that added it could not run
+ * the emulator: free physical memory was polled every 60 s for 30 minutes and
+ * never rose above 1.52 GB against the bench-test recipe's ~3 GB floor, so the
+ * AVD was never booted and no screenshot exists. What is unverified is
+ * everything only a renderer can answer, and the longest phrase is the one to
+ * check: `"Start at the BOTTOM, first movement UP"` is 38 characters at
+ * `headlineSmall`, and whether it wraps to two lines, wraps mid-word, or clips
+ * on a narrow phone at a large font scale has not been observed. Next time the
+ * emulator is free: import a plan declaring one `"start": "top"` and one
+ * `"start": "bottom"` exercise, START each, and screenshot the countdown at
+ * `wm size 360x800` and at `font_scale 2.0` as well as at the defaults.
  */
 @Composable
 private fun StartCueBlock(cue: StartCue) {

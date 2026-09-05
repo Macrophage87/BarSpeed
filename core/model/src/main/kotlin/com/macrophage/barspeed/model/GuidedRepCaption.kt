@@ -20,6 +20,13 @@ package com.macrophage.barspeed.model
  * The rule is pure and lives here so `CadencePlan.announcementFor` and this can
  * be pinned to name the same rep. That pin is in `:core:dsp`
  * (`RingVoiceAgreementTest`), the only side that can see both.
+ *
+ * `[Field]` -- the two channels are pinned equal as STRINGS, and nothing here
+ * has been seen and heard together. No device has drawn this caption: the lane
+ * that wrote it polled free memory every 60 s for 30 minutes and never saw
+ * above 1.52 GB against the bench recipe's ~3 GB floor, so the emulator was
+ * never booted. Whether the ring and the voice now read as one count is the
+ * lifter's to say, mid-set, on any tempo with a beat able to carry a call.
  */
 object GuidedRepCaption {
     /**
