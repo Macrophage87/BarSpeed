@@ -719,6 +719,19 @@ class CuedRepCoverageTest {
         assertEquals(132, driveUpCued, "cued reps on drive-up lifts")
         assertEquals(1, driveDownDoubled, "cued reps counted twice on drive-down lifts")
         assertEquals(0, driveUpDoubled, "and none at all on drive-up lifts")
+        // RED, this commit: the comment above says issue 102's seven doubled
+        // windows "are gone" and that this test is kept as a regression guard.
+        // If that still holds, no capture in this corpus holds a window with
+        // two counted reps in it. Named per capture rather than totalled, so
+        // the answer says WHICH one rather than how many.
+        val doubledByFixture = cueTracked.associate { (fixture, d, _) ->
+            fixture to hits(fixture, d, c, tol).count { it > 1 }
+        }.filterValues { it > 0 }
+        assertEquals(
+            emptyMap<String, Int>(),
+            doubledByFixture,
+            "captures holding a window with two counted reps in it",
+        )
     }
 
     @Test

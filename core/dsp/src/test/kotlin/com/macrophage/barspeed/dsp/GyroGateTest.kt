@@ -271,6 +271,22 @@ class GyroGateTest {
     }
 
     @Test
+    fun `session 38 set 4's roll excursion is a rotation comparable to issue 72's table`() {
+        // RED, this commit. The comment beside `field-ohp-3010-8rep-s38-set04`
+        // in the list above reads "360 deg of roll excursion, and its
+        // distribution straddles", putting the two side by side as though the
+        // first explained the second, and issue #72's table quotes 31-52 deg
+        // of roll for the same exercise. If the 360 is a rotation of the same
+        // kind, the capture's own roll column spans no more than that table's
+        // worst row. Measured from the committed column rather than taken from
+        // `meta.json`, because `meta.json` reports the summary and the column
+        // reports what it was computed from.
+        val roll = load("field-ohp-3010-8rep-s38-set04").map { it.rollDeg }
+        val span = roll.max() - roll.min()
+        assertTrue(span <= 52.0, "roll span of session 38 set 4, against issue 72's 31-52 deg: $span")
+    }
+
+    @Test
     fun `both probes are duty-cycle statistics, so appended idle time flips the gate`() {
         // Neither probe is a property of the MOUNT alone. Both are statistics
         // over the whole recorded window, so idle time inside the recording
