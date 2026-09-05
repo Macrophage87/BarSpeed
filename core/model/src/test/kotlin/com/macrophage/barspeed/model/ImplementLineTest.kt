@@ -86,6 +86,16 @@ class ImplementLineTest {
     }
 
     @Test
+    fun `a bar declared in the other unit is named at two decimal places`() {
+        // A 15 kg bar read on a pounds screen. Unrounded this line ends
+        // "33.0693339327 lb bar".
+        assertEquals(
+            "45 + 25 + 10 + 5 per side, 33.07 lb bar",
+            line(Implement.BARBELL, lb(203.0), barKg = 15.0),
+        )
+    }
+
+    @Test
     fun `a bar with nothing on it says so`() {
         assertEquals("Empty bar", line(Implement.BARBELL, lb(45.0)))
         assertEquals("Empty 35 lb bar", line(Implement.BARBELL, lb(35.0), barKg = lb(35.0)))

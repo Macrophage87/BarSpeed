@@ -8,9 +8,16 @@ import kotlin.test.assertTrue
  * The bar a plan can declare for itself (`bar_lb` / `bar_kg`, #253), and the
  * default that stands when it does not.
  *
- * The rounding case is the one worth having: a 35 lb bar is stored as
- * 15.8757... kg, and without rounding the display unit it comes back as
- * 34.99999999999999 lb and prints that way beside a rack.
+ * THE ROUNDING CASE IS THE ONE WORTH HAVING, and the first version of it was
+ * a test that could not fail. It asserted a pound bar surviving the trip
+ * through kilograms and back, on the assumption that the last digit drifts:
+ * removing the rounding from PlateMath killed NOTHING, because 35, 33 and 55
+ * all round-trip exactly in IEEE doubles. (Some do not -- 49.25 lb comes back
+ * 49.25000000000001 -- but no case here used one.) The real case is a bar
+ * declared in ONE unit and displayed in the OTHER, where there is no round
+ * trip to survive: a 15 kg bar is 33.0693339327 lb, and unrounded that is
+ * what prints beside the plates. Both are pinned below and the second is what
+ * kills the mutation.
  */
 class PlateMathBarOverrideTest {
     private fun lb(pounds: Double) = pounds / WeightUnit.LB_PER_KG
@@ -38,6 +45,15 @@ class PlateMathBarOverrideTest {
             assertEquals(pounds, PlateMath.perSide(lb(200.0), WeightUnit.LB, lb(pounds)).barWeight)
         }
         assertEquals(15.0, PlateMath.perSide(80.0, WeightUnit.KG, 15.0).barWeight)
+    }
+
+    @Test
+    fun `a bar declared in one unit and read in the other is rounded for the screen`() {
+        // 15 kg is 33.0693339327 lb. Two decimal places, because a bar is a
+        // real object whose weight is worth reading, and eleven of them are
+        // not.
+        assertEquals(33.07, PlateMath.perSide(lb(200.0), WeightUnit.LB, 15.0).barWeight)
+        assertEquals(15.88, PlateMath.perSide(100.0, WeightUnit.KG, lb(35.0)).barWeight)
     }
 
     @Test
