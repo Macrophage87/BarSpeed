@@ -1108,6 +1108,16 @@ data class SessionExport(
          * the reason [SetExport.bodyWeightKg] is.
          */
         val VALID_RPE_SCALES = setOf("load", "reps", "time", "feel")
+
+        /**
+         * The words a set's `velocityLossRegime` may take, #250.
+         *
+         * DERIVED from the enum rather than written out, so the published
+         * schema, the exporter and this set cannot state three different
+         * vocabularies. [VelocityLossRegime] is where the rule lives and its
+         * KDoc is the one account of it.
+         */
+        val VALID_VELOCITY_LOSS_REGIMES = VelocityLossRegime.entries.map { it.wireName }.toSet()
     }
 }
 
