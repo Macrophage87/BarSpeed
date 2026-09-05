@@ -342,15 +342,20 @@ object TempoAdjustPolicy {
     fun steppedValue(tempoText: String?, digit: TempoDigit, delta: Int): String? {
         val current = valueAt(tempoText, digit.position) ?: return null
         val choices = digit.choices
-        val index = choices.indexOf(current)
-        // -1 is reachable, and was not before #251 split the two alphabets.
-        // wheelValues checks a value against what the NOTATION can spell and a
-        // wheel now offers less than that, so a plan declaring 30X0 on a
-        // pulldown draws an X on a digit whose wheel has none. Either button
-        // moves it to the nearest value that wheel does offer, rather than
-        // doing nothing: the state is escapable and not re-enterable.
-        if (index < 0) return choices.firstOrNull()
-        return choices[(index + delta).coerceIn(choices.indices)]
+        // indexOf CAN answer -1, and could not before #251 split the two
+        // alphabets: wheelValues checks a value against what the NOTATION can
+        // spell and a wheel now offers less than that, so a plan declaring
+        // 30X0 on a pulldown draws an X on a digit whose wheel has none. The
+        // coercion is what handles it and no branch stands in front of it: -1
+        // is where X belongs on a range that starts at 1, because X is the
+        // value BELOW one second, so `-` gives 1, `+` gives 1, and a
+        // hypothetical two-place tap gives 2. The state is escapable and not
+        // re-enterable, which is what the lifter needs from it. An explicit
+        // "off the alphabet lands on the first value" branch stood here for
+        // one commit and was deleted: it answered every tap the screen can
+        // produce identically, so no test could kill it, and a guard nothing
+        // can kill reads as coverage while guarding nothing.
+        return choices[(choices.indexOf(current) + delta).coerceIn(choices.indices)]
     }
 
     /**
