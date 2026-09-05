@@ -1027,9 +1027,9 @@ data class SessionExport(
          * and the rating as the autoregulation figures, and read
          * `velocityLoss_pct` as compliance rather than fatigue.
          *
-         * DERIVED, NOT STORED. All three inputs are already frozen on the
-         * set's row -- its prescription, and the drive direction and kind of
-         * its geometry -- so the word is computed at export time and
+         * DERIVED, NOT STORED. All four inputs are already frozen on the
+         * set's row -- its prescription, and the plane, drive direction and
+         * kind of its geometry -- so the word is computed at export time and
          * `DATABASE_VERSION` does not move. A set re-exported by this build
          * gains the word however long ago it was recorded, provided its
          * geometry was stored.
