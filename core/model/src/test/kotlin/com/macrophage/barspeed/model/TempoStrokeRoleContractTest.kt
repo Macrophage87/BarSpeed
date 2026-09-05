@@ -62,8 +62,9 @@ class TempoStrokeRoleContractTest {
     fun `today a pulldown's return stroke can be stepped to X`() {
         val digits = pulldown()
         assertEquals("eccentric", digits.first { it.position == TempoAdjustPolicy.UP_STROKE }.caption)
-        assertEquals("X", TempoAdjustPolicy.steppedValue("3090", TempoAdjustPolicy.UP_STROKE, 1))
-        assertTrue(TempoAdjustPolicy.canStep("3090", TempoAdjustPolicy.UP_STROKE, 1))
+        val returnStroke = digits.first { it.position == TempoAdjustPolicy.UP_STROKE }
+        assertEquals("X", TempoAdjustPolicy.steppedValue("3090", returnStroke, 1))
+        assertTrue(TempoAdjustPolicy.canStep("3090", returnStroke, 1))
     }
 
     /**
@@ -72,9 +73,10 @@ class TempoStrokeRoleContractTest {
      */
     @Test
     fun `today X sits above nine rather than below one`() {
-        assertEquals("X", TempoAdjustPolicy.steppedValue("3090", TempoAdjustPolicy.UP_STROKE, 1))
-        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.UP_STROKE, -1))
-        assertFalse(TempoAdjustPolicy.canStep("3010", TempoAdjustPolicy.UP_STROKE, -1))
+        val drive = benchPress().first { it.position == TempoAdjustPolicy.UP_STROKE }
+        assertEquals("X", TempoAdjustPolicy.steppedValue("3090", drive, 1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", drive, -1))
+        assertFalse(TempoAdjustPolicy.canStep("3010", drive, -1))
     }
 
     /**

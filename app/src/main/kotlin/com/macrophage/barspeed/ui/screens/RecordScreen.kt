@@ -1315,9 +1315,9 @@ private fun TempoDigitStepper(digit: TempoDigit, tempo: String, selected: String
         }
         OutlinedButton(
             onClick = {
-                TempoAdjustPolicy.steppedValue(tempo, digit.position, -STEPPER_STEP)?.let(onPick)
+                TempoAdjustPolicy.steppedValue(tempo, digit, -STEPPER_STEP)?.let(onPick)
             },
-            enabled = TempoAdjustPolicy.canStep(tempo, digit.position, -STEPPER_STEP),
+            enabled = TempoAdjustPolicy.canStep(tempo, digit, -STEPPER_STEP),
         ) {
             Text("-")
         }
@@ -1331,9 +1331,9 @@ private fun TempoDigitStepper(digit: TempoDigit, tempo: String, selected: String
         )
         OutlinedButton(
             onClick = {
-                TempoAdjustPolicy.steppedValue(tempo, digit.position, STEPPER_STEP)?.let(onPick)
+                TempoAdjustPolicy.steppedValue(tempo, digit, STEPPER_STEP)?.let(onPick)
             },
-            enabled = TempoAdjustPolicy.canStep(tempo, digit.position, STEPPER_STEP),
+            enabled = TempoAdjustPolicy.canStep(tempo, digit, STEPPER_STEP),
         ) {
             Text("+")
         }

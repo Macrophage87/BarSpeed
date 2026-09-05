@@ -31,12 +31,31 @@ class TempoAdjustPolicyTest {
     private fun labelled(digits: List<TempoDigit>) = digits.map { "${it.label}/${it.caption}" }
 
     /**
+     * The digit at [position] on a BENCH PRESS, for the sweeps and the pins
+     * that are about stepping rather than about the lift.
+     *
+     * `TempoAdjustPolicy.steppedValue`, `canStep` and `withDigit` take a
+     * [TempoDigit] and not a bare position, because which values a digit may be
+     * stepped through depends on which stroke is the drive (#251). Everything
+     * in this class that is not itself about the drive direction asks about the
+     * shape the app sees most: vertical, drive up. The pins that ARE about the
+     * direction live in `TempoStrokeRoleContractTest`.
+     *
+     * A position outside the notation has no digit, and one is fabricated for
+     * it so that the out-of-range pins can still be made.
+     */
+    private fun wheel(position: Int): TempoDigit = benchPress().firstOrNull { it.position == position }
+        ?: TempoDigit(position, "", "", TempoAdjustPolicy.spellable(position))
+
+    /**
      * The tempo one tap of a stepper leaves behind: the screen's own two calls,
      * in the order the screen makes them, so the pins cover the round trip
      * rather than the digit alone.
      */
     private fun tapped(tempo: String, position: Int, delta: Int): String? =
-        TempoAdjustPolicy.steppedValue(tempo, position, delta)?.let { TempoAdjustPolicy.withDigit(tempo, position, it) }
+        TempoAdjustPolicy.steppedValue(tempo, wheel(position), delta)?.let {
+            TempoAdjustPolicy.withDigit(tempo, wheel(position), it)
+        }
 
     @Test
     fun `a drive-up vertical lift calls digit 1 the down stroke and its eccentric`() {
@@ -94,14 +113,14 @@ class TempoAdjustPolicyTest {
     }
 
     @Test
-    fun `a stroke may not be zero and the up stroke alone may be explosive`() {
-        assertEquals((1..9).map { it.toString() }, TempoAdjustPolicy.choices(TempoAdjustPolicy.DOWN_STROKE))
-        assertEquals((0..9).map { it.toString() }, TempoAdjustPolicy.choices(TempoAdjustPolicy.BOTTOM_PAUSE))
+    fun `a tempo string may not spell a zero stroke and only the up stroke may spell X`() {
+        assertEquals((1..9).map { it.toString() }, TempoAdjustPolicy.spellable(TempoAdjustPolicy.DOWN_STROKE))
+        assertEquals((0..9).map { it.toString() }, TempoAdjustPolicy.spellable(TempoAdjustPolicy.BOTTOM_PAUSE))
         assertEquals(
             (1..9).map { it.toString() } + "X",
-            TempoAdjustPolicy.choices(TempoAdjustPolicy.UP_STROKE),
+            TempoAdjustPolicy.spellable(TempoAdjustPolicy.UP_STROKE),
         )
-        assertEquals((0..9).map { it.toString() }, TempoAdjustPolicy.choices(TempoAdjustPolicy.TOP_PAUSE))
+        assertEquals((0..9).map { it.toString() }, TempoAdjustPolicy.spellable(TempoAdjustPolicy.TOP_PAUSE))
     }
 
     /**
@@ -114,8 +133,8 @@ class TempoAdjustPolicyTest {
     @Test
     fun `every value of every wheel spells a tempo the app can parse`() {
         (1..TempoAdjustPolicy.DIGITS).forEach { position ->
-            TempoAdjustPolicy.choices(position).forEach { value ->
-                val text = TempoAdjustPolicy.withDigit("3010", position, value)
+            wheel(position).choices.forEach { value ->
+                val text = TempoAdjustPolicy.withDigit("3010", wheel(position), value)
                 assertNotNull(text, "digit $position = $value spells nothing")
                 assertNotNull(Tempo.parseOrNull(text), "digit $position = $value spells '$text', which will not parse")
                 assertEquals(text, TempoAdjustPolicy.wheelValues(text)?.joinToString(""), "and it draws back the same")
@@ -161,22 +180,25 @@ class TempoAdjustPolicyTest {
 
     @Test
     fun `changing one digit changes that digit and nothing else`() {
-        assertEquals("5010", TempoAdjustPolicy.withDigit("3010", TempoAdjustPolicy.DOWN_STROKE, "5"))
-        assertEquals("3210", TempoAdjustPolicy.withDigit("3010", TempoAdjustPolicy.BOTTOM_PAUSE, "2"))
-        assertEquals("30X0", TempoAdjustPolicy.withDigit("3010", TempoAdjustPolicy.UP_STROKE, "X"))
-        assertEquals("3013", TempoAdjustPolicy.withDigit("3010", TempoAdjustPolicy.TOP_PAUSE, "3"))
-        assertEquals("3010", TempoAdjustPolicy.withDigit("30X0", TempoAdjustPolicy.UP_STROKE, "1"))
+        assertEquals("5010", TempoAdjustPolicy.withDigit("3010", wheel(TempoAdjustPolicy.DOWN_STROKE), "5"))
+        assertEquals("3210", TempoAdjustPolicy.withDigit("3010", wheel(TempoAdjustPolicy.BOTTOM_PAUSE), "2"))
+        assertEquals("30X0", TempoAdjustPolicy.withDigit("3010", wheel(TempoAdjustPolicy.UP_STROKE), "X"))
+        assertEquals("3013", TempoAdjustPolicy.withDigit("3010", wheel(TempoAdjustPolicy.TOP_PAUSE), "3"))
+        assertEquals("3010", TempoAdjustPolicy.withDigit("30X0", wheel(TempoAdjustPolicy.UP_STROKE), "1"))
     }
 
     @Test
     fun `a change that would not spell a tempo changes nothing`() {
-        assertNull(TempoAdjustPolicy.withDigit("3010", TempoAdjustPolicy.DOWN_STROKE, "0"), "the stroke floor")
-        assertNull(TempoAdjustPolicy.withDigit("3010", TempoAdjustPolicy.BOTTOM_PAUSE, "X"), "X off the up stroke")
-        assertNull(TempoAdjustPolicy.withDigit("3010", 0, "1"), "there is no digit 0")
-        assertNull(TempoAdjustPolicy.withDigit("3010", 5, "1"), "and no digit 5")
-        assertNull(TempoAdjustPolicy.withDigit(null, TempoAdjustPolicy.DOWN_STROKE, "3"), "nothing to change")
+        assertNull(TempoAdjustPolicy.withDigit("3010", wheel(TempoAdjustPolicy.DOWN_STROKE), "0"), "the stroke floor")
         assertNull(
-            TempoAdjustPolicy.withDigit("3-0-1.5-0", TempoAdjustPolicy.BOTTOM_PAUSE, "1"),
+            TempoAdjustPolicy.withDigit("3010", wheel(TempoAdjustPolicy.BOTTOM_PAUSE), "X"),
+            "X off the up stroke",
+        )
+        assertNull(TempoAdjustPolicy.withDigit("3010", wheel(0), "1"), "there is no digit 0")
+        assertNull(TempoAdjustPolicy.withDigit("3010", wheel(5), "1"), "and no digit 5")
+        assertNull(TempoAdjustPolicy.withDigit(null, wheel(TempoAdjustPolicy.DOWN_STROKE), "3"), "nothing to change")
+        assertNull(
+            TempoAdjustPolicy.withDigit("3-0-1.5-0", wheel(TempoAdjustPolicy.BOTTOM_PAUSE), "1"),
             "a tempo the control could not have drawn cannot be written back through it",
         )
     }
@@ -194,15 +216,18 @@ class TempoAdjustPolicyTest {
     fun `a tempo with no control on it cannot be stepped, and neither can a digit that is not there`() {
         listOf(null, "", "3-0-1.5-0", "10-0-1-0", "0010", "3000").forEach { tempo ->
             (1..TempoAdjustPolicy.DIGITS).forEach { position ->
-                assertNull(TempoAdjustPolicy.steppedValue(tempo, position, 1), "'$tempo' digit $position up")
-                assertNull(TempoAdjustPolicy.steppedValue(tempo, position, -1), "'$tempo' digit $position down")
-                assertFalse(TempoAdjustPolicy.canStep(tempo, position, 1), "'$tempo' digit $position offers up")
-                assertFalse(TempoAdjustPolicy.canStep(tempo, position, -1), "'$tempo' digit $position offers down")
+                assertNull(TempoAdjustPolicy.steppedValue(tempo, wheel(position), 1), "'$tempo' digit $position up")
+                assertNull(TempoAdjustPolicy.steppedValue(tempo, wheel(position), -1), "'$tempo' digit $position down")
+                assertFalse(TempoAdjustPolicy.canStep(tempo, wheel(position), 1), "'$tempo' digit $position offers up")
+                assertFalse(
+                    TempoAdjustPolicy.canStep(tempo, wheel(position), -1),
+                    "'$tempo' digit $position offers down",
+                )
             }
         }
         listOf(0, 5).forEach { position ->
-            assertNull(TempoAdjustPolicy.steppedValue("3010", position, 1), "there is no digit $position")
-            assertFalse(TempoAdjustPolicy.canStep("3010", position, 1), "and no button on it either")
+            assertNull(TempoAdjustPolicy.steppedValue("3010", wheel(position), 1), "there is no digit $position")
+            assertFalse(TempoAdjustPolicy.canStep("3010", wheel(position), 1), "and no button on it either")
         }
     }
 
@@ -224,18 +249,18 @@ class TempoAdjustPolicyTest {
     @Test
     fun `every tap of every digit lands on a value that digit is allowed to take`() {
         (1..TempoAdjustPolicy.DIGITS).forEach { source ->
-            TempoAdjustPolicy.choices(source).forEach { value ->
-                val tempo = TempoAdjustPolicy.withDigit("3010", source, value)
+            wheel(source).choices.forEach { value ->
+                val tempo = TempoAdjustPolicy.withDigit("3010", wheel(source), value)
                 assertNotNull(tempo, "digit $source = $value spells nothing")
                 (1..TempoAdjustPolicy.DIGITS).forEach { position ->
                     (-12..12).forEach { delta ->
-                        val stepped = TempoAdjustPolicy.steppedValue(tempo, position, delta)
+                        val stepped = TempoAdjustPolicy.steppedValue(tempo, wheel(position), delta)
                         assertNotNull(stepped, "'$tempo' digit $position by $delta")
                         assertTrue(
-                            stepped in TempoAdjustPolicy.choices(position),
+                            stepped in wheel(position).choices,
                             "'$tempo' digit $position by $delta gives '$stepped', which that digit may not take",
                         )
-                        val after = TempoAdjustPolicy.withDigit(tempo, position, stepped)
+                        val after = TempoAdjustPolicy.withDigit(tempo, wheel(position), stepped)
                         assertNotNull(after, "'$tempo' digit $position by $delta spells nothing")
                         assertNotNull(Tempo.parseOrNull(after), "'$after' will not parse")
                         val moved = TempoAdjustPolicy.wheelValues(after)!!
@@ -260,11 +285,11 @@ class TempoAdjustPolicyTest {
      */
     @Test
     fun `one tap moves the digit it is on by one place`() {
-        assertEquals("4", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.DOWN_STROKE, 1))
-        assertEquals("2", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.DOWN_STROKE, -1))
-        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.BOTTOM_PAUSE, 1))
-        assertEquals("2", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.UP_STROKE, 1))
-        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.TOP_PAUSE, 1))
+        assertEquals("4", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.DOWN_STROKE), 1))
+        assertEquals("2", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.DOWN_STROKE), -1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.BOTTOM_PAUSE), 1))
+        assertEquals("2", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.UP_STROKE), 1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.TOP_PAUSE), 1))
         assertEquals("3010", tapped("2010", TempoAdjustPolicy.DOWN_STROKE, 1))
         assertEquals("3010", tapped("3011", TempoAdjustPolicy.TOP_PAUSE, -1))
     }
@@ -280,13 +305,13 @@ class TempoAdjustPolicyTest {
      */
     @Test
     fun `a stroke steps down to one second and stops there`() {
-        assertEquals("2", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.DOWN_STROKE, -1))
-        assertEquals("1", TempoAdjustPolicy.steppedValue("2010", TempoAdjustPolicy.DOWN_STROKE, -1))
-        assertEquals("1", TempoAdjustPolicy.steppedValue("1010", TempoAdjustPolicy.DOWN_STROKE, -1))
-        assertEquals("1", TempoAdjustPolicy.steppedValue("1010", TempoAdjustPolicy.DOWN_STROKE, -5))
-        assertFalse(TempoAdjustPolicy.canStep("1010", TempoAdjustPolicy.DOWN_STROKE, -1), "no tap left to offer")
-        assertEquals("1", TempoAdjustPolicy.steppedValue("3020", TempoAdjustPolicy.UP_STROKE, -1))
-        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.UP_STROKE, -1))
+        assertEquals("2", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.DOWN_STROKE), -1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("2010", wheel(TempoAdjustPolicy.DOWN_STROKE), -1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("1010", wheel(TempoAdjustPolicy.DOWN_STROKE), -1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("1010", wheel(TempoAdjustPolicy.DOWN_STROKE), -5))
+        assertFalse(TempoAdjustPolicy.canStep("1010", wheel(TempoAdjustPolicy.DOWN_STROKE), -1), "no tap left to offer")
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3020", wheel(TempoAdjustPolicy.UP_STROKE), -1))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.UP_STROKE), -1))
     }
 
     /**
@@ -299,21 +324,21 @@ class TempoAdjustPolicyTest {
      */
     @Test
     fun `the up stroke steps into X at the top and back out into nine`() {
-        assertEquals("X", TempoAdjustPolicy.steppedValue("3090", TempoAdjustPolicy.UP_STROKE, 1))
-        assertEquals("X", TempoAdjustPolicy.steppedValue("30X0", TempoAdjustPolicy.UP_STROKE, 1))
-        assertFalse(TempoAdjustPolicy.canStep("30X0", TempoAdjustPolicy.UP_STROKE, 1), "nothing faster than X")
-        assertEquals("9", TempoAdjustPolicy.steppedValue("30X0", TempoAdjustPolicy.UP_STROKE, -1))
+        assertEquals("X", TempoAdjustPolicy.steppedValue("3090", wheel(TempoAdjustPolicy.UP_STROKE), 1))
+        assertEquals("X", TempoAdjustPolicy.steppedValue("30X0", wheel(TempoAdjustPolicy.UP_STROKE), 1))
+        assertFalse(TempoAdjustPolicy.canStep("30X0", wheel(TempoAdjustPolicy.UP_STROKE), 1), "nothing faster than X")
+        assertEquals("9", TempoAdjustPolicy.steppedValue("30X0", wheel(TempoAdjustPolicy.UP_STROKE), -1))
         assertEquals("30X0", tapped("3090", TempoAdjustPolicy.UP_STROKE, 1))
     }
 
     /** A pause steps down to zero -- the pause where the lifter does not stop -- and stops. */
     @Test
     fun `a pause steps down to zero and stops`() {
-        assertEquals("0", TempoAdjustPolicy.steppedValue("3011", TempoAdjustPolicy.TOP_PAUSE, -1))
-        assertTrue(TempoAdjustPolicy.canStep("3011", TempoAdjustPolicy.TOP_PAUSE, -1))
-        assertEquals("0", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.TOP_PAUSE, -1))
-        assertFalse(TempoAdjustPolicy.canStep("3010", TempoAdjustPolicy.TOP_PAUSE, -1), "zero is the floor")
-        assertEquals("0", TempoAdjustPolicy.steppedValue("3110", TempoAdjustPolicy.BOTTOM_PAUSE, -3))
+        assertEquals("0", TempoAdjustPolicy.steppedValue("3011", wheel(TempoAdjustPolicy.TOP_PAUSE), -1))
+        assertTrue(TempoAdjustPolicy.canStep("3011", wheel(TempoAdjustPolicy.TOP_PAUSE), -1))
+        assertEquals("0", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.TOP_PAUSE), -1))
+        assertFalse(TempoAdjustPolicy.canStep("3010", wheel(TempoAdjustPolicy.TOP_PAUSE), -1), "zero is the floor")
+        assertEquals("0", TempoAdjustPolicy.steppedValue("3110", wheel(TempoAdjustPolicy.BOTTOM_PAUSE), -3))
     }
 
     /**
@@ -326,12 +351,12 @@ class TempoAdjustPolicyTest {
      */
     @Test
     fun `a step past the end of the range clamps rather than wrapping`() {
-        assertEquals("9", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.DOWN_STROKE, 99))
-        assertEquals("9", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.BOTTOM_PAUSE, 99))
-        assertEquals("X", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.UP_STROKE, 99))
-        assertEquals("1", TempoAdjustPolicy.steppedValue("3050", TempoAdjustPolicy.UP_STROKE, -99))
-        assertEquals("0", TempoAdjustPolicy.steppedValue("3919", TempoAdjustPolicy.TOP_PAUSE, -99))
-        assertEquals("1", TempoAdjustPolicy.steppedValue("3919", TempoAdjustPolicy.DOWN_STROKE, -99))
+        assertEquals("9", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.DOWN_STROKE), 99))
+        assertEquals("9", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.BOTTOM_PAUSE), 99))
+        assertEquals("X", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.UP_STROKE), 99))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3050", wheel(TempoAdjustPolicy.UP_STROKE), -99))
+        assertEquals("0", TempoAdjustPolicy.steppedValue("3919", wheel(TempoAdjustPolicy.TOP_PAUSE), -99))
+        assertEquals("1", TempoAdjustPolicy.steppedValue("3919", wheel(TempoAdjustPolicy.DOWN_STROKE), -99))
     }
 
     /**
@@ -343,11 +368,11 @@ class TempoAdjustPolicyTest {
      */
     @Test
     fun `a tap that would move nothing is not offered`() {
-        assertTrue(TempoAdjustPolicy.canStep("3010", TempoAdjustPolicy.DOWN_STROKE, 1), "3 has an up")
-        assertTrue(TempoAdjustPolicy.canStep("3010", TempoAdjustPolicy.DOWN_STROKE, -1), "and a down")
-        assertFalse(TempoAdjustPolicy.canStep("9010", TempoAdjustPolicy.DOWN_STROKE, 1), "9 is the ceiling")
-        assertFalse(TempoAdjustPolicy.canStep("3010", TempoAdjustPolicy.DOWN_STROKE, 0), "a tap of nothing")
-        assertEquals("3", TempoAdjustPolicy.steppedValue("3010", TempoAdjustPolicy.DOWN_STROKE, 0))
+        assertTrue(TempoAdjustPolicy.canStep("3010", wheel(TempoAdjustPolicy.DOWN_STROKE), 1), "3 has an up")
+        assertTrue(TempoAdjustPolicy.canStep("3010", wheel(TempoAdjustPolicy.DOWN_STROKE), -1), "and a down")
+        assertFalse(TempoAdjustPolicy.canStep("9010", wheel(TempoAdjustPolicy.DOWN_STROKE), 1), "9 is the ceiling")
+        assertFalse(TempoAdjustPolicy.canStep("3010", wheel(TempoAdjustPolicy.DOWN_STROKE), 0), "a tap of nothing")
+        assertEquals("3", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.DOWN_STROKE), 0))
     }
 
     @Test

@@ -2133,8 +2133,18 @@ private fun restingState(
  * show, and the control is not drawn for those at all.
  */
 private fun tempoAdjustedState(s: RecordState, position: Int, value: String): RecordState {
+    // The upcoming slot is what says which stroke is the DRIVE, and the digit
+    // carries that answer with it: TempoAdjustPolicy.withDigit takes a
+    // TempoDigit rather than a position so a caller cannot ask about a digit
+    // without saying which lift it belongs to. #251. The same guard the
+    // control draws itself behind -- TempoAdjuster returns early with no slot
+    // -- so no tap the screen can produce reaches the null branch.
+    val exercise = s.upcomingSlot?.exercise ?: return s
+    val digit =
+        TempoAdjustPolicy.digits(exercise.concentricUp, exercise.horizontal)
+            .firstOrNull { it.position == position } ?: return s
     val editing = s.statedTempo ?: s.upcomingSlot?.tempo
-    val turned = TempoAdjustPolicy.withDigit(editing, position, value) ?: return s
+    val turned = TempoAdjustPolicy.withDigit(editing, digit, value) ?: return s
     return s.copy(statedTempo = turned)
 }
 

@@ -25,7 +25,14 @@ data class TempoDigit(
     val label: String,
     /** What this digit is for THIS lift: which phase, or which phase it follows. */
     val caption: String,
-    /** The values this digit may take, in the order a wheel offers them. */
+    /**
+     * The values this digit may be STEPPED to on THIS lift, in wheel order.
+     *
+     * The wheel's OFFER, which is narrower than what the notation can spell:
+     * [TempoAdjustPolicy.spellable] is that one. The two are separate because
+     * whether a digit may be moved to a value depends on the digit's ROLE on
+     * the lift, and whether a string is a tempo does not.
+     */
     val choices: List<String>,
 )
 
@@ -48,9 +55,9 @@ data class TempoDigit(
  * boundary: a rep set that acquires a tempo gains a prep, a voice pacing it,
  * the guide taking the rep count off the lifter, and a compliance verdict; one
  * that loses its tempo loses all four. Every value this object can produce
- * comes from [choices], which has no empty entry, and [wheelValues] answers
- * null -- no control at all -- for a set that declares no tempo. Adding one is
- * a feature, and not this one.
+ * comes from a digit's [TempoDigit.choices], which has no empty entry, and
+ * [wheelValues] answers null -- no control at all -- for a set that declares
+ * no tempo. Adding one is a feature, and not this one.
  */
 object TempoAdjustPolicy {
     /** Digit 1: the down stroke. */
@@ -95,20 +102,48 @@ object TempoAdjustPolicy {
 
     private val STROKE_CHOICES: List<String> = (MIN_STROKE_S..MAX_DIGIT_S).map { it.toString() }
 
-    private val UP_STROKE_CHOICES: List<String> = STROKE_CHOICES + EXPLOSIVE
+    private val UP_STROKE_SPELLABLE: List<String> = STROKE_CHOICES + EXPLOSIVE
 
     /**
-     * The values digit [position] may take, in wheel order.
+     * The values digit [position] may SPELL, in wheel order.
      *
-     * Read off what [Tempo.parse] already refuses rather than restated: "X" is
-     * taken on the up stroke and nowhere else, and a component of ten or more
-     * needs the dash form, which four single-character wheels do not spell.
+     * The NOTATION's alphabet, and only that. Read off what [Tempo.parse]
+     * already refuses rather than restated: "X" is taken on the up stroke and
+     * nowhere else, and a component of ten or more needs the dash form, which
+     * four single-character wheels do not spell.
+     *
+     * [TempoDigit.choices] is the other half, and the two are deliberately not
+     * one list. This one answers "is this string a tempo four wheels can
+     * SHOW", which is what [wheelValues] and [compose] ask. That one answers
+     * "may this digit be STEPPED to this value on THIS lift", which is
+     * narrower, because it depends on which stroke is the drive. One list
+     * answering both questions is one flag with two jobs.
      */
-    fun choices(position: Int): List<String> = when (position) {
-        UP_STROKE -> UP_STROKE_CHOICES
+    fun spellable(position: Int): List<String> = when (position) {
+        UP_STROKE -> UP_STROKE_SPELLABLE
         DOWN_STROKE -> STROKE_CHOICES
         else -> PAUSE_CHOICES
     }
+
+    /**
+     * Which digit of the notation is the CONCENTRIC stroke, for a lift with
+     * this drive direction and plane: [DOWN_STROKE] or [UP_STROKE].
+     *
+     * The two-step rule, stated once here and read by [digits] rather than
+     * spelled a second time. Horizontal work is read by PHASE -- digit 3 is
+     * the drive, whatever the plan declared beside `plane`, because a seated
+     * row has no up or down for a positional reading to attach to. Vertical
+     * work is POSITIONAL: digit 3 while the drive moves up, digit 1 when it
+     * moves down, which is what makes a leg curl's `1030` a one-second pull
+     * down.
+     *
+     * `TempoSchedule.of` and [VelocityLossRegime] say the same thing as
+     * `digit1IsConcentric = if (horizontal) false else !concentricUp`, and
+     * `VelocityLossRegimeTempoScheduleContractTest` in `:core:dsp` pins two of
+     * the three equal.
+     */
+    fun concentricDigit(concentricUp: Boolean, horizontal: Boolean): Int =
+        if (!horizontal && !concentricUp) DOWN_STROKE else UP_STROKE
 
     /**
      * What each digit is, for a lift with this drive direction and plane.
@@ -130,26 +165,27 @@ object TempoAdjustPolicy {
      * lengthening the wrong half of the rep.
      */
     fun digits(concentricUp: Boolean, horizontal: Boolean): List<TempoDigit> {
-        val digit1IsConcentric = if (horizontal) false else !concentricUp
+        val concentric = concentricDigit(concentricUp, horizontal)
+        val digit1IsConcentric = concentric == DOWN_STROKE
         val downStroke =
             TempoDigit(
                 position = DOWN_STROKE,
                 label = strokeLabel(horizontal, isConcentric = digit1IsConcentric, movesUp = false),
                 caption = phase(digit1IsConcentric),
-                choices = choices(DOWN_STROKE),
+                choices = spellable(DOWN_STROKE),
             )
         val upStroke =
             TempoDigit(
                 position = UP_STROKE,
                 label = strokeLabel(horizontal, isConcentric = !digit1IsConcentric, movesUp = true),
                 caption = phase(!digit1IsConcentric),
-                choices = choices(UP_STROKE),
+                choices = spellable(UP_STROKE),
             )
         return listOf(
             downStroke,
-            TempoDigit(BOTTOM_PAUSE, PAUSE, after(downStroke.caption), choices(BOTTOM_PAUSE)),
+            TempoDigit(BOTTOM_PAUSE, PAUSE, after(downStroke.caption), spellable(BOTTOM_PAUSE)),
             upStroke,
-            TempoDigit(TOP_PAUSE, PAUSE, after(upStroke.caption), choices(TOP_PAUSE)),
+            TempoDigit(TOP_PAUSE, PAUSE, after(upStroke.caption), spellable(TOP_PAUSE)),
         )
     }
 
@@ -174,78 +210,97 @@ object TempoAdjustPolicy {
                 wholeSecond(tempo.topPauseS) ?: return null,
             )
         // The floor and the ceiling are both this membership test and are not
-        // restated above: a component of ten or more spells "10", which is in
-        // no wheel, and a zero stroke spells "0", which is in neither stroke
-        // wheel. A second guard would be a check no test could kill.
-        return spelled.takeIf { values -> values.indices.all { values[it] in choices(it + 1) } }
+        // restated above: a component of ten or more spells "10", which the
+        // notation's alphabet does not carry, and a zero stroke spells "0",
+        // which is in neither stroke's. A second guard would be a check no
+        // test could kill.
+        return spelled.takeIf { values -> values.indices.all { values[it] in spellable(it + 1) } }
     }
 
-    /** The tempo these wheel values spell, or null when they spell none. */
+    /**
+     * The tempo these wheel values spell, or null when they spell none.
+     *
+     * [spellable] and not the wheel's own offer, deliberately: this asks
+     * whether four characters ARE a tempo, and a digit the lifter never
+     * touched keeps whatever its plan declared. Whether a digit may be MOVED
+     * to a value is [withDigit]'s question and is asked of that digit's
+     * [TempoDigit.choices].
+     */
     fun compose(values: List<String>): String? {
         if (values.size != DIGITS) return null
-        if (values.indices.any { values[it] !in choices(it + 1) }) return null
+        if (values.indices.any { values[it] !in spellable(it + 1) }) return null
         return values.joinToString("")
     }
 
     /**
-     * [tempoText] with digit [position] set to [value], or null when the result
-     * would not be a tempo.
+     * [tempoText] with [digit] set to [value], or null when the result would
+     * not be a tempo, or when that digit does not OFFER that value.
      *
      * The only route by which a wheel changes anything. It runs the whole
      * string back through [wheelValues] first, so a tempo the control could not
      * have DRAWN cannot be written back through it either.
+     *
+     * A [TempoDigit] and not a bare position, because the alphabet a digit may
+     * be moved through depends on the LIFT and a position cannot say which
+     * lift it belongs to. Taking the digit makes that impossible to omit: a
+     * caller that has not asked [digits] which lift it is adjusting has
+     * nothing to pass.
      */
-    fun withDigit(tempoText: String?, position: Int, value: String): String? {
-        if (position < DOWN_STROKE || position > TOP_PAUSE) return null
+    fun withDigit(tempoText: String?, digit: TempoDigit, value: String): String? {
+        if (digit.position < DOWN_STROKE || digit.position > TOP_PAUSE) return null
+        if (value !in digit.choices) return null
         val values = wheelValues(tempoText)?.toMutableList() ?: return null
-        values[position - 1] = value
+        values[digit.position - 1] = value
         return compose(values)
     }
 
     /**
-     * The value digit [position] takes after [delta] taps of a stepper, or null
-     * when [tempoText] has no such control to tap.
+     * The value [digit] takes after [delta] taps of a stepper, or null when
+     * [tempoText] has no such control to tap.
      *
-     * The index moves along [choices] and is COERCED into that list's indices,
+     * The index moves along [TempoDigit.choices] and is COERCED into that
+     * list's indices,
      * never wrapped. Wrapping would turn a 9 into a 1 on one mis-tap, which on
      * the down stroke is an eight-second difference in what the voice paces and
      * what the compliance scorer grades; clamping makes the end of the range
      * feel like the end of the range. A tap that cannot move is what [canStep]
      * reports, so the button can be drawn disabled rather than lying.
      *
-     * The alphabet is [choices]', so nothing new is reachable through stepping:
+     * The alphabet is the digit's own, so nothing new is reachable through
+     * stepping:
      * "X" is the last entry of the up stroke's list, which makes `+` from 9 give
      * X and `-` from X give 9 without a second statement of where X is legal.
      *
      * Null exactly where [wheelValues] is null -- a set that declares no tempo,
      * a fractional or two-character component, a stroke below [MIN_STROKE_S] --
-     * plus a [position] outside the notation. The caller draws no control at all
-     * for any of them.
+     * plus a digit position outside the notation. The caller draws no control
+     * at all for any of them.
      *
      * A digit value rather than the whole tempo, because the state entry point
      * this feeds takes a digit and routes it through [withDigit]: the guarantee
      * that a tempo the control could not have DRAWN cannot be written back is
      * inherited rather than restated here.
      */
-    fun steppedValue(tempoText: String?, position: Int, delta: Int): String? {
-        val current = valueAt(tempoText, position) ?: return null
-        val choices = choices(position)
+    fun steppedValue(tempoText: String?, digit: TempoDigit, delta: Int): String? {
+        val current = valueAt(tempoText, digit.position) ?: return null
+        val choices = digit.choices
         // indexOf cannot answer -1: wheelValues has already checked every value
         // against the same list, and valueAt is null wherever it did not.
         return choices[(choices.indexOf(current) + delta).coerceIn(choices.indices)]
     }
 
     /**
-     * Whether one tap of [delta] on digit [position] would actually move it.
+     * Whether one tap of [delta] on [digit] would actually move it.
      *
      * The enabled state of a stepper button, decided here rather than in the
-     * screen: false at both ends of a digit's [choices] and false wherever
+     * screen: false at both ends of a digit's [TempoDigit.choices] and false
+     * wherever
      * [steppedValue] is null. A button that is drawn enabled and does nothing is
      * the state #154 was raised about, one control over.
      */
-    fun canStep(tempoText: String?, position: Int, delta: Int): Boolean {
-        val current = valueAt(tempoText, position) ?: return false
-        return steppedValue(tempoText, position, delta) != current
+    fun canStep(tempoText: String?, digit: TempoDigit, delta: Int): Boolean {
+        val current = valueAt(tempoText, digit.position) ?: return false
+        return steppedValue(tempoText, digit, delta) != current
     }
 
     /**
