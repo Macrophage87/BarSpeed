@@ -74,3 +74,7 @@ gh workflow run Release -f tag=vX.Y.Z --repo Macrophage87/BarSpeed
 A comment naming the tag on the issues that shipped in it — new with this skill; landed-SHA
 comments are `/land`'s step and are already posted. The release summary to the owner with the
 artifact digest, and the bench-test reminder if `DATABASE_VERSION` moved.
+
+Then `/field-checks <version>`: if anything in the release carries a `[Field]` item, the owner
+gets the phone-sized checklist PDF with the install notice (owner's ask, 2026-09-05). If nothing
+does, the summary says so in one line rather than leaving the file out silently.

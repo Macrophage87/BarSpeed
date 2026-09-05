@@ -1,0 +1,384 @@
+{
+ "heading": "Next session, from 2026-09-05 (v0.1.51)",
+ "items": [
+  {
+   "tag": "Field-38 question",
+   "ref": "ask 1",
+   "title": "Which unit is role a?",
+   "intro": "Everything in the field-38 mount table is otherwise an inference, permanently.",
+   "checks": [
+    "At the top of the session, say once which physical unit is <b>role a</b> (\"a = left-hand dumbbell\", \"a = the one on the stack\")."
+   ],
+   "tier": "Answer"
+  },
+  {
+   "tag": "Field-38 question",
+   "ref": "ask 2 / #87 #133",
+   "title": "How is each unit strapped to a dumbbell?",
+   "intro": "On the three incline press sets, unit a sat past 80 degrees of pitch for 54%, 89% and 66% of the work window; unit b never did. A photo settles whether that is a mounting convention or a frame problem.",
+   "checks": [
+    "One photo of each implement before the first set.",
+    "Say which face of the unit touches the handle and which axis runs along it."
+   ],
+   "tier": "Answer"
+  },
+  {
+   "tag": "Field-38 question",
+   "ref": "ask 3 / #249",
+   "title": "Dead hangs: the -5 s correction",
+   "intro": "If you did not tap it, the two gaps in the recorded durations are a defect rather than a correction, and #249 moves from P3 to P1.",
+   "checks": [
+    "On the two field-38 dead hangs, did you tap the <b>-5 s</b> hold correction?",
+    "How many times on each?"
+   ],
+   "tier": "Answer"
+  },
+  {
+   "tag": "Field-38 question",
+   "ref": "ask 4",
+   "title": "Set 18: was the limiter prompt shown?",
+   "intro": "Set 18 (a failed lat pulldown) exported <b>failed</b> and <b>failedByLifter</b> with no limiter word, while sets 16 and 17 both carry <b>muscle</b>.",
+   "checks": [
+    "Were you offered the limiter prompt on set 18 and skipped it, or was it never shown?"
+   ],
+   "tier": "Answer"
+  },
+  {
+   "tag": "Field-38 question",
+   "ref": "ask 5 / #220",
+   "title": "Body weight and assist on the hangs",
+   "intro": "Without both, nobody can say how much of the recorded 29.4 kg was you. From v0.1.51 the export publishes the split; this is for the field-38 archive only.",
+   "checks": [
+    "Was a body weight entered in Settings before field-38?",
+    "What was the assist stack set to on each dead hang?"
+   ],
+   "tier": "Answer"
+  },
+  {
+   "tag": "Field-38 question",
+   "ref": "ask 6 / #248",
+   "title": "The tempo count on 2 s strokes",
+   "intro": "The archive says no count was spoken on these sets. Your ear is the check.",
+   "checks": [
+    "On the 2011, 2010 and 1120 sets, after the first rep: did you hear a count between \"Down\" or \"Up\" and the next \"Rep N\"?"
+   ],
+   "tier": "Answer"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#235",
+   "title": "Every exercise header names its dimension",
+   "intro": "Nothing here was seen on a real phone.",
+   "checks": [
+    "Before START: every exercise header in the session preview names one dimension.",
+    "Same plan on the plan detail screen: same headers.",
+    "An exercise declared <b>\"progression\": \"none\"</b> reads \"holds load\".",
+    "An exercise that omits the key reads \"steps up by weight\".",
+    "Plan detail still reads at a large font size."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#236",
+   "title": "The headroom grid sits above Up next",
+   "intro": "Rate a set in the headroom range (rung 6, 4 or 1) with sets left.",
+   "checks": [
+    "The grid is the first thing under the rest header controls.",
+    "The Up next card is directly below it, both visible without scrolling.",
+    "On the last set of an exercise, tap ADD SET while the grid is not drawn: does the grid appearing above ADD SET move the button enough to mistap REMOVE SET beneath it?"
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#237",
+   "title": "The Last set box and its Correct popup",
+   "intro": "Nothing on these surfaces has been rendered.",
+   "checks": [
+    "After a set, the last-set box states what was recorded in one line.",
+    "Tap <b>Correct</b>, change the reps, confirm: the box shows the correction.",
+    "On a set answered \"Other\": open Correct, open the free-text field, type something different, tap BACK, then SAVE CORRECTIONS. Reopen Correct: the stored words are the ones from before you typed.",
+    "Same sequence ending in SAVE inside the field: the typed words are stored.",
+    "Record a failed set, answer the reason page, then Correct / CLEAR / SAVE: the reason page does not reopen.",
+    "CANCEL leaves the stored reason exactly as it was."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#238",
+   "title": "The three buttons under Up next",
+   "intro": "This row has never been drawn on any device. Two screenshots are owed.",
+   "checks": [
+    "Between sets, <b>Change next set</b>, <b>Switch exercise</b> and <b>Add a set</b> sit on one row, no cut-off label. Remove set stays a text link.",
+    "At a large font size the row wraps rather than pushing a button off screen.",
+    "SWITCH EXERCISE opens the old chooser, now titled \"Equipment busy? Do another exercise next\".",
+    "ADD SET: the caption under the row names the exercise the set was added to.",
+    "On the last exercise of the session only CHANGE NEXT SET and ADD SET draw, on the rest screen and on READY.",
+    "Screenshot of the row.",
+    "Screenshot of the chooser."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#241",
+   "title": "The countdown says which way the first rep goes",
+   "intro": "The lat pulldown is the interesting case: its drive goes down, so position and drive direction disagree on screen. Horizontal lifts say only \"First movement DRIVE\" or \"RETURN\". Not drawn on any device yet.",
+   "checks": [
+    "Lat pulldown at START: the countdown says \"Start at the TOP, first movement DOWN\" and the first word the voice speaks matches.",
+    "Overhead press at START: \"Start at the BOTTOM, first movement UP\", voice matches.",
+    "The 38-character line is readable at your font size.",
+    "On a short prep (1 or 2 s) there is time to read it."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#243 #252",
+   "title": "The ring number is the number being spoken",
+   "intro": "The cue track in the export will show whether the fix matches what you heard. The ring captions grew inside a fixed ring and may wrap or clip.",
+   "checks": [
+    "On a guided set the voice says the number of the rep you are doing, during that rep.",
+    "\"Last rep\" is spoken on the final rep of every set, then \"Done\".",
+    "The number on the ring is the number being spoken, not one behind.",
+    "During the prep the ring reads \"N reps to come\" and fits.",
+    "On the last rep the ring reads \"last rep of N\" and fits (screenshot if you can)."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#244",
+   "title": "Headroom tiles worded by progression",
+   "intro": "Rate a <b>reps</b> exercise (a pull-up) and a <b>\"none\"</b> exercise in the same session.",
+   "checks": [
+    "Reps tiles read \"About 3-4 reps left\" / \"Five or more reps left\" / \"Many more reps left\".",
+    "None tiles read \"Comfortable - some left\" / \"Easy - plenty left\" / \"Very easy\".",
+    "No tile on either names a pound or a kilogram.",
+    "With exactly three reps left on the reps exercise, which tile do you reach for: rpe 7 \"3 reps left\" or rpe 6 \"About 3-4 reps left\"? Say which."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#244",
+   "title": "The suggested step follows the rung",
+   "intro": "Rate a <b>weight</b> exercise at rung 6, then 4, then 1, on three different sets. Time exercises suggest +5 s at rung 6 beside a caption saying \"about 15 s longer\"; that gap is deliberate, say if it reads wrong.",
+   "checks": [
+    "The grid still offers all six pound steps at every rung.",
+    "Rung 6 pre-fills <b>+5 lb</b> (+2.5 kg).",
+    "Rung 4 pre-fills <b>+20 lb</b> (+10 kg).",
+    "Rung 1 pre-fills <b>+30 lb</b> (+15 kg)."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#244 #245",
+   "title": "The export carries the new keys",
+   "intro": "Neither key has ever been written from a real sensor. I check the zip offline.",
+   "checks": [
+    "One normal prepped set on the sensor.",
+    "Export the session and send the zip as usual.",
+    "I verify: every rated set carries <b>rpeScale</b>; unrated sets carry none; the prepped set carries <b>detectionsBeforeWorkStart</b>."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#244 #220",
+   "title": "Install over v0.1.50 and open the history",
+   "intro": "If a card ever says the database was moved aside into files/rescued/, mail me that file the moment it appears: that is the rollback path and the app will be empty.",
+   "checks": [
+    "After installing v0.1.51 over v0.1.50, the app opens.",
+    "History: past sets still read.",
+    "No old row shows a scale word.",
+    "Export once afterwards: I check the old sets re-export with the body-weight source reading \"default\"."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#239 #61",
+   "title": "A dead hang with no body weight refuses",
+   "intro": "The refusal dialog and the save-and-start path have not been seen on a device since the write order changed.",
+   "checks": [
+    "Start a <b>rope dead hang</b> with no body weight in Settings: the app refuses and prompts for it.",
+    "Enter body weight, start: the recorded load is your body weight (minus assist if any)."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#191",
+   "title": "The limiter offer on a hard completed set",
+   "intro": "",
+   "checks": [
+    "Finish a set and rate it <b>8</b> or higher: the limiter tiles appear once, asking what made the set non-trivial.",
+    "On a set rated in the headroom rungs the tiles do not appear."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#64 #136",
+   "title": "The copied plan prompt says 1.12",
+   "intro": "Ten seconds, no gym needed.",
+   "checks": [
+    "Copy the plan prompt out of the app and paste it somewhere.",
+    "The prose sentence says schema <b>1.12</b>.",
+    "The JSON skeleton says <b>1.12</b>."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#178 #172",
+   "title": "Rest timing against a stopwatch",
+   "intro": "",
+   "checks": [
+    "On one rest, start a stopwatch at your last rep: the app counts rest from the set-over instant, not from when the rest screen appeared.",
+    "When a rest fully elapses nothing is spoken at zero. Do you notice the silence, or miss \"Rest over\"?"
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#143",
+   "title": "A load correction carries through a block",
+   "intro": "Only if a plan has a progressive block, for example 45 / 55 / 65 on one exercise. Never run on a device; optional.",
+   "checks": [
+    "Open set 1 at 50 instead of 45 and record it.",
+    "Set 2: the load box holds <b>60</b> and the caption says the offset carried.",
+    "Set 3: the load box holds <b>70</b>."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#125",
+   "title": "Sensor handling after the set",
+   "intro": "Field-38 set 10 published a fifth rep manufactured by two samples above 4 g on a set whose gyro never moved. The note tells me whether the refusal rule is catching handling or corruption.",
+   "checks": [
+    "On assisted pull-ups, tape or clip the sensor rigid to the bar.",
+    "After each set, note whether you touched or moved the bar before END SET."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#185",
+   "title": "Both units on one stack, once",
+   "intro": "Field-38 sets 12-13 already gave one co-mounted pair; one more on a different machine lets the co-mount maths start.",
+   "checks": [
+    "On one stack-mounted set, put both units on the stack."
+   ],
+   "tier": "Tier 2"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#96",
+   "title": "Assist machine: does the carriage move with you?",
+   "intro": "Sensor clipped where field-37 had it. Two extra sets.",
+   "checks": [
+    "One set of 5 assisted pull-ups declaring <b>sensorOnStack true, sensorInverted true</b>: note the rep count the app shows.",
+    "One more with <b>sensorInverted false</b>: note the rep count."
+   ],
+   "tier": "Tier 2"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#110",
+   "title": "A drive-down lift with the sensor on the handle",
+   "intro": "On a stack mount the two flips cancel; off the stack they do not, and no capture exists to say what the analyzer does then. Shares a session with #117.",
+   "checks": [
+    "One lat pulldown or triceps pushdown with the sensor on the <b>handle</b>, guided mode as usual.",
+    "Declare <b>concentricUp false, sensorInverted false, sensorOnStack false</b>.",
+    "Note the rep count the app shows."
+   ],
+   "tier": "Tier 2"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#117",
+   "title": "A horizontal lift, handle-mounted, with a settle",
+   "intro": "The horizontal axis sign is decided by the first movement in the set. A 3 cm settle can invert the whole set while every published number stays plausible. Shares a session with #110.",
+   "checks": [
+    "One seated row, chest press or face pull with the sensor on the <b>handle</b>, clean.",
+    "One more where you deliberately settle the handle a few centimetres the wrong way before the first rep."
+   ],
+   "tier": "Tier 2"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#107",
+   "title": "Is the corrected cadence followable?",
+   "intro": "On 3010 the rep number is merged into the first stroke call (\"Down, rep three ... two ... Up\"). On 2010 there is no spoken rep number at all, only the stroke words, with the number on screen.",
+   "checks": [
+    "One <b>3010</b> press, guided: can you follow it?",
+    "One <b>2010</b> leg press, guided: can you follow it?",
+    "Which one loses you, if either?"
+   ],
+   "tier": "Tier 2"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#47",
+   "title": "Seated OHP: does the analyzer see a 3 s lowering?",
+   "intro": "P1: this decides whether every other tempo figure can be trusted. Fail looks like a short plausible value well under 3 s.",
+   "checks": [
+    "Seated overhead press, sensor on the bar, prescribed <b>3010</b>, eight reps.",
+    "Stopwatch on the 3 s lowering; say what it read.",
+    "I check the export: each rep's eccentric time is absent or within 0.5 s of the stopwatch."
+   ],
+   "tier": "Tier 2"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#78",
+   "title": "Keyboard and plate line on READY",
+   "intro": "App open, no bar needed.",
+   "checks": [
+    "On READY, tap the load field: START SET stays visible and tappable with the keyboard open.",
+    "On a barbell slot declaring 100 kg, type <b>90</b> into the load field: the plate line changes to the plates for 90 kg."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#105",
+   "title": "The SETUP card and its latch",
+   "intro": "",
+   "checks": [
+    "While pairing, <b>UNRESPONSIVE</b> reads clearly different from <b>PAIR OR POWER</b> on the SETUP card at your text size.",
+    "The advice on the card survives a reconnect cycle.",
+    "The advice on the card survives a screen rotation."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#63",
+   "title": "A carry prescribed in reps",
+   "intro": "Since carries stopped being timed by default, gait feeds the rep detector and the voice announces reps on a walk. Only if a carry is in the plan anyway.",
+   "checks": [
+    "Prescribe <b>farmers_walk</b> as reps 3 with the sensor mounted: what did the voice do, what did the app count?",
+    "Prescribe <b>sled_push</b> as reps 4: same two notes."
+   ],
+   "tier": "Tier 2"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#54 #55",
+   "title": "Other Android versions",
+   "intro": "Nothing to do on your phone; listed so the set is complete.",
+   "checks": [
+    "API 34+ device: START SET with Nearby denied does not crash and the set still records (no sensor stream then).",
+    "API 26-30 device: the app installs and scans at all."
+   ],
+   "tier": "Deferred"
+  }
+ ]
+}
