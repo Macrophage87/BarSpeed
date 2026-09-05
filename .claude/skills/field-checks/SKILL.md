@@ -60,11 +60,20 @@ Rules that came from the first build:
 - State the **pass** as what the screen or voice does, not what the code does.
 - Where the check is really *my* offline verification (a key in the export), the owner's check
   is "export and send the zip"; say the rest is mine.
-- Tier every page: `Tier 1` (inside a normal set, no gym cost), `Tier 2` (an extra set or an
-  unusual mount — the owner takes these only when convenient), `Deferred` (needs hardware the
-  owner does not have). Order: the release's Tier 1, then Tier 2, then Deferred. An item tiered
-  `Answer` is a question: the builder leaves it out of the PDF and prints it, so it can be
-  pasted into the chat message instead.
+- Tier every item. Owner, 2026-09-05: "Since there's 3 items, the first is questions, just
+  display them in chat. Have the field tested ones like I asked. The ones that just require me
+  to use the app without actually lifting can be on a one page checklist." So:
+  - `Answer` — a question. The builder leaves it out of the PDF and prints it, so it can be
+    pasted into the chat message.
+  - `App` — needs only the app open, no set under load: the plan prompt's text, the headers
+    before START, the install-over history check, the keyboard on READY, the SETUP card while
+    pairing. The builder puts every `App` check together on ONE page at the front, a checkbox
+    each, in a compact font; if they overflow, the page continues rather than splitting into
+    one item per page.
+  - `Tier 1` — inside a normal set, no gym cost. `Tier 2` — an extra set or an unusual mount;
+    the owner takes these only when convenient. `Deferred` — needs hardware the owner does not
+    have. One page each, a checkbox per check.
+  Order after the index: the App page, then Tier 1, then Tier 2, then Deferred.
 - Put the quantities the owner needs *in* the check ("+5 lb at rung 6"), never "see the issue".
 
 Items are a JSON list next to the build script — one object per page:

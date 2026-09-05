@@ -19,6 +19,8 @@ W, H = 100 * mm, 178 * mm
 M = 7 * mm
 BOX = 5.5 * mm
 GAP = 2.5 * mm
+ABOX = 4.2 * mm   # the App page's smaller box, so the checklist fits one page
+AGAP = 1.0 * mm
 
 TAGCOL = {
     'Open issue': colors.HexColor('#38761d'),
@@ -68,12 +70,43 @@ def layout(intro, checks, sz):
     return rows, total
 
 
+def app_font_size(app_items):
+    """The largest size from 10 pt down to 7.5 pt at which the App checklist fits one page."""
+    sz = 10.0
+    while sz > 7.5 and app_pages_needed(app_items, sz) > 1:
+        sz -= 0.25
+    return sz
+
+
+def app_pages_needed(app_items, sz=None):
+    """Dry run of the App page layout: how many pages the app-only checklist takes."""
+    if not app_items:
+        return 0
+    if sz is None:
+        sz = app_font_size(app_items)
+    pages, y = 1, H - 15 * mm - 18 - 2 * mm
+    for it in app_items:
+        head = Paragraph('<b>%s</b> (%s)' % (it['title'], it['ref']), body(sz))
+        _, hh = head.wrap(W - 2 * M, H)
+        need = hh + 1.5 * mm
+        for ch in it['checks']:
+            _, h = Paragraph(ch, body(sz - 0.5)).wrap(W - 2 * M - ABOX - GAP, H)
+            need += max(h, ABOX) + AGAP
+        if y - need < 7 * mm:
+            pages += 1
+            y = H - 15 * mm
+        y -= need + 1.5 * mm
+    return pages
+
+
 def build(items, out, heading):
     c = canvas.Canvas(out, pagesize=(W, H))
     c.setTitle(heading)
     c.setAuthor('BarSpeed')
     form = c.acroForm
-    n_pages = len(items) + 1
+    app_items = [it for it in items if it.get('tier') == 'App']
+    items = [it for it in items if it.get('tier') != 'App']
+    n_pages = 1 + app_pages_needed(app_items) + len(items)
 
     def footer(page):
         c.setFillColor(colors.HexColor('#888888'))
@@ -100,16 +133,21 @@ def build(items, out, heading):
     _, h = p.wrap(W - 2 * M, 30 * mm)
     p.drawOn(c, M, y - h)
     y -= h + 2 * mm
-    intro = ('One item per page, a checkbox per check. Brown pages are questions you can answer by '
-             'message. Blue pages are release checks that fold into a normal session. Green pages are '
-             'open issues; Tier 2 ones need an extra set or an unusual mount, so take them only when '
-             'convenient.')
+    intro = ('A checkbox per check. The purple page holds everything that needs only the app open, '
+             'no lifting. After it, one item per page: blue pages are release checks that fold into a '
+             'normal session, green pages are open issues; Tier 2 ones need an extra set or an unusual '
+             'mount, so take them only when convenient. Questions come to you in chat, not here.')
     p = Paragraph(intro, STYLES['idx'])
     _, h = p.wrap(W - 2 * M, 60 * mm)
     p.drawOn(c, M, y - h)
     y -= h + 3 * mm
-    lines = ['%d. %s <font color="#777777">(%s, %s)</font>' % (i, it['title'], it['ref'], it['tier'])
-             for i, it in enumerate(items, start=2)]
+    lines = []
+    first = 2
+    if app_items:
+        lines.append('%d. App-only checklist, no lifting <font color="#777777">(%d items)</font>' % (first, len(app_items)))
+        first += app_pages_needed(app_items)
+    lines += ['%d. %s <font color="#777777">(%s, %s)</font>' % (i, it['title'], it['ref'], it['tier'])
+              for i, it in enumerate(items, start=first)]
     sz = 9.5
     while True:
         p = Paragraph('<br/>'.join(lines), ParagraphStyle('i2', fontName='Helvetica', fontSize=sz, leading=sz * 1.28))
@@ -124,7 +162,52 @@ def build(items, out, heading):
     c.showPage()
 
     nbox = 0
-    for i, it in enumerate(items, start=2):
+    page = 1
+
+    # The App page: every check that needs only the app open, together, a checkbox each
+    # (owner, 2026-09-05: "the ones that just require me to use the app without actually
+    # lifting can be on a one page checklist"). Continues onto a further page on overflow.
+    if app_items:
+        page += 1
+        band(colors.HexColor('#5b3d8a'), 'App only - no lifting', 'one-page checklist')
+        y = H - 15 * mm
+        t = Paragraph('Phone in hand, no bar', STYLES['title'])
+        _, h = t.wrap(W - 2 * M, 40 * mm)
+        t.drawOn(c, M, y - h)
+        y -= h + 2 * mm
+        sz = app_font_size(app_items)
+        print('app page font %.2f, pages %d' % (sz, app_pages_needed(app_items, sz)))
+        for it in app_items:
+            head = Paragraph('<b>%s</b> <font color="#777777">(%s)</font>' % (it['title'], it['ref']), body(sz))
+            _, hh = head.wrap(W - 2 * M, H)
+            rows = []
+            for ch in it['checks']:
+                p = Paragraph(ch, body(sz - 0.5))
+                _, h = p.wrap(W - 2 * M - ABOX - GAP, H)
+                rows.append((p, max(h, ABOX)))
+            need = hh + 1.5 * mm + sum(h + AGAP for _, h in rows)
+            if y - need < 7 * mm:
+                footer(page)
+                c.showPage()
+                page += 1
+                band(colors.HexColor('#5b3d8a'), 'App only - no lifting', 'continued')
+                y = H - 15 * mm
+            head.drawOn(c, M, y - hh)
+            y -= hh + 1.5 * mm
+            for p, h in rows:
+                nbox += 1
+                form.checkbox(name='app_c%03d' % nbox, tooltip=it['title'], x=M, y=y - ABOX, size=ABOX,
+                              buttonStyle='check', borderWidth=1, borderColor=colors.HexColor('#555555'),
+                              fillColor=colors.white, textColor=colors.black, forceBorder=True)
+                p.drawOn(c, M + ABOX + GAP, y - h)
+                y -= h + AGAP
+            y -= 1.5 * mm
+        footer(page)
+        c.showPage()
+
+    for it in items:
+        page += 1
+        i = page
         band(tag_colour(it['tag']), it['tag'], '%s - %s' % (it['ref'], it['tier']))
         y = H - 15 * mm
         t = Paragraph(it['title'], STYLES['title'])

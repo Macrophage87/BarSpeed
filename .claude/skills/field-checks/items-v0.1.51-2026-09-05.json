@@ -2,48 +2,6 @@
  "heading": "Next session, from 2026-09-05 (v0.1.51)",
  "items": [
   {
-   "tag": "Field-38 question",
-   "ref": "ask 1",
-   "title": "Which unit is role a?",
-   "intro": "Everything in the field-38 mount table is otherwise an inference, permanently.",
-   "checks": [
-    "At the top of the session, say once which physical unit is <b>role a</b> (\"a = left-hand dumbbell\", \"a = the one on the stack\")."
-   ],
-   "tier": "Answer"
-  },
-  {
-   "tag": "Field-38 question",
-   "ref": "ask 2 / #87 #133",
-   "title": "How is each unit strapped to a dumbbell?",
-   "intro": "Answered 2026-09-05: one unit strapped to its dumbbell, the other on a magnet (the usual mount), and the magnet fell off. Unit a sat past 80 degrees of pitch on the three incline press sets; unit b never did.",
-   "checks": [
-    "Which unit was the magnet one, a or b?",
-    "Did the magnet come off mid-set or between sets, and on which set?",
-    "A photo of the strapped mount: which face touches the handle, which axis runs along it."
-   ],
-   "tier": "Answer"
-  },
-  {
-   "tag": "Field-38 question",
-   "ref": "ask 4",
-   "title": "Set 18: was the limiter prompt shown?",
-   "intro": "Set 18 (the second rope dead hang) exported <b>failed</b> and <b>failedByLifter</b> with no limiter word, while set 16 (lat pulldown) and set 17 (the first dead hang) both carry <b>muscle</b>. Owner 2026-09-05: the prompt was shown, \"I believe that I put muscle as the limiter, not sure though.\"",
-   "checks": [
-    "On the next hands-full hold that fails, note whether you answered the limiter and what you chose; I compare with the export."
-   ],
-   "tier": "Answer"
-  },
-  {
-   "tag": "Field-38 question",
-   "ref": "ask 6 / #248",
-   "title": "The tempo count on 2 s strokes",
-   "intro": "The archive says no count was spoken on these sets. Your ear is the check.",
-   "checks": [
-    "On the 2011, 2010 and 1120 sets, after the first rep: did you hear a count between \"Down\" or \"Up\" and the next \"Rep N\"?"
-   ],
-   "tier": "Answer"
-  },
-  {
    "tag": "v0.1.51",
    "ref": "#235",
    "title": "Every exercise header names its dimension",
@@ -55,7 +13,55 @@
     "An exercise that omits the key reads \"steps up by weight\".",
     "Plan detail still reads at a large font size."
    ],
-   "tier": "Tier 1"
+   "tier": "App"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#244 #220",
+   "title": "Install over v0.1.50 and open the history",
+   "intro": "If a card ever says the database was moved aside into files/rescued/, mail me that file the moment it appears: that is the rollback path and the app will be empty.",
+   "checks": [
+    "After installing v0.1.51 over v0.1.50, the app opens.",
+    "History: past sets still read.",
+    "No old row shows a scale word.",
+    "Export once afterwards: I check the old sets re-export with the body-weight source reading \"default\"."
+   ],
+   "tier": "App"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#64 #136",
+   "title": "The copied plan prompt says 1.12",
+   "intro": "Ten seconds, no gym needed.",
+   "checks": [
+    "Copy the plan prompt out of the app and paste it somewhere.",
+    "The prose sentence says schema <b>1.12</b>.",
+    "The JSON skeleton says <b>1.12</b>."
+   ],
+   "tier": "App"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#78",
+   "title": "Keyboard and plate line on READY",
+   "intro": "App open, no bar needed.",
+   "checks": [
+    "On READY, tap the load field: START SET stays visible and tappable with the keyboard open.",
+    "On a barbell slot declaring 100 kg, type <b>90</b> into the load field: the plate line changes to the plates for 90 kg."
+   ],
+   "tier": "App"
+  },
+  {
+   "tag": "Open issue",
+   "ref": "#105",
+   "title": "The SETUP card and its latch",
+   "intro": "",
+   "checks": [
+    "While pairing, <b>UNRESPONSIVE</b> reads clearly different from <b>PAIR OR POWER</b> on the SETUP card at your text size.",
+    "The advice on the card survives a reconnect cycle.",
+    "The advice on the card survives a screen rotation."
+   ],
+   "tier": "App"
   },
   {
    "tag": "v0.1.51",
@@ -167,19 +173,6 @@
   },
   {
    "tag": "v0.1.51",
-   "ref": "#244 #220",
-   "title": "Install over v0.1.50 and open the history",
-   "intro": "If a card ever says the database was moved aside into files/rescued/, mail me that file the moment it appears: that is the rollback path and the app will be empty.",
-   "checks": [
-    "After installing v0.1.51 over v0.1.50, the app opens.",
-    "History: past sets still read.",
-    "No old row shows a scale word.",
-    "Export once afterwards: I check the old sets re-export with the body-weight source reading \"default\"."
-   ],
-   "tier": "Tier 1"
-  },
-  {
-   "tag": "v0.1.51",
    "ref": "#239 #61",
    "title": "A dead hang with no body weight refuses",
    "intro": "The refusal dialog and the save-and-start path have not been seen on a device since the write order changed.",
@@ -197,18 +190,6 @@
    "checks": [
     "Finish a set and rate it <b>8</b> or higher: the limiter tiles appear once, asking what made the set non-trivial.",
     "On a set rated in the headroom rungs the tiles do not appear."
-   ],
-   "tier": "Tier 1"
-  },
-  {
-   "tag": "v0.1.51",
-   "ref": "#64 #136",
-   "title": "The copied plan prompt says 1.12",
-   "intro": "Ten seconds, no gym needed.",
-   "checks": [
-    "Copy the plan prompt out of the app and paste it somewhere.",
-    "The prose sentence says schema <b>1.12</b>.",
-    "The JSON skeleton says <b>1.12</b>."
    ],
    "tier": "Tier 1"
   },
@@ -270,12 +251,11 @@
   {
    "tag": "Open issue",
    "ref": "#110",
-   "title": "A drive-down lift with the sensor on the handle",
-   "intro": "On a stack mount the two flips cancel; off the stack they do not, and no capture exists to say what the analyzer does then. Shares a session with #117.",
+   "title": "Handle-mounted pulldown, unit strapped rigid",
+   "intro": "Field-38 already answered the original question (sets 14-16 had a unit on the handle). What is left to de-confound: the handle unit over-counts by 17-42% and it may be the unit swinging on the bar rather than the declaration.",
    "checks": [
-    "One lat pulldown or triceps pushdown with the sensor on the <b>handle</b>, guided mode as usual.",
-    "Declare <b>concentricUp false, sensorInverted false, sensorOnStack false</b>.",
-    "Note the rep count the app shows."
+    "One lat pulldown set with the handle unit strapped so it cannot swing (not the magnet), declared concentricUp false, sensorInverted false, sensorOnStack false.",
+    "Note the rep count the app shows against your own count."
    ],
    "tier": "Tier 2"
   },
@@ -316,29 +296,6 @@
   },
   {
    "tag": "Open issue",
-   "ref": "#78",
-   "title": "Keyboard and plate line on READY",
-   "intro": "App open, no bar needed.",
-   "checks": [
-    "On READY, tap the load field: START SET stays visible and tappable with the keyboard open.",
-    "On a barbell slot declaring 100 kg, type <b>90</b> into the load field: the plate line changes to the plates for 90 kg."
-   ],
-   "tier": "Tier 1"
-  },
-  {
-   "tag": "Open issue",
-   "ref": "#105",
-   "title": "The SETUP card and its latch",
-   "intro": "",
-   "checks": [
-    "While pairing, <b>UNRESPONSIVE</b> reads clearly different from <b>PAIR OR POWER</b> on the SETUP card at your text size.",
-    "The advice on the card survives a reconnect cycle.",
-    "The advice on the card survives a screen rotation."
-   ],
-   "tier": "Tier 1"
-  },
-  {
-   "tag": "Open issue",
    "ref": "#63",
    "title": "A carry prescribed in reps",
    "intro": "Since carries stopped being timed by default, gait feeds the rep detector and the voice announces reps on a walk. Only if a carry is in the plan anyway.",
@@ -358,6 +315,16 @@
     "API 26-30 device: the app installs and scans at all."
    ],
    "tier": "Deferred"
+  },
+  {
+   "tag": "Field-38 question",
+   "ref": "ask 4",
+   "title": "Set 18: was the limiter prompt shown?",
+   "intro": "Set 18 (the second rope dead hang) exported <b>failed</b> and <b>failedByLifter</b> with no limiter word, while set 16 (lat pulldown) and set 17 (the first dead hang) both carry <b>muscle</b>. Owner 2026-09-05: the prompt was shown, \"I believe that I put muscle as the limiter, not sure though.\"",
+   "checks": [
+    "On the next hands-full hold that fails, note whether you answered the limiter and what you chose; I compare with the export."
+   ],
+   "tier": "Answer"
   }
  ]
 }
