@@ -338,4 +338,27 @@ class SchemaProgressionContractTest {
             "the prompt never says the wrong question is frozen onto the row",
         )
     }
+
+    /**
+     * #244's round 3. The mismatch warning's cost is now stated in TWO
+     * places -- `PLAN_PROMPT`, which is what the COPY PLAN PROMPT button puts
+     * on a coach's clipboard, and the published
+     * `docs/schemas/plan.schema.json` the prompt points at. Round 1 already
+     * edited one copy of a sentence and left the other standing, which is the
+     * duplicate-documentation drift this repo keeps shipping, so the two are
+     * pinned TOGETHER rather than each on its own. Deleting the clause from
+     * either copy reds this.
+     */
+    @Test
+    fun `the prompt and the published schema both say the rating is worded in that dimension anyway`() {
+        val clause = "worded in that dimension anyway"
+        val sentence = prompt.lineSequence().first { "\"progression\"" in it }
+        assertTrue(clause in sentence, "PLAN_PROMPT's progression sentence dropped the clause: $sentence")
+        val description = exerciseProps()["progression"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            clause in description,
+            "the published plan schema's progression description dropped the clause: $description",
+        )
+    }
 }

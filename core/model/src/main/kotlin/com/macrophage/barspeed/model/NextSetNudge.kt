@@ -301,6 +301,11 @@ object NextSetNudgePolicy {
      * suggestion says how much to actually add next set, and on the rung
      * below the add point those are deliberately different numbers.
      *
+     * The TIME row diverges furthest, and in the same unit: rung 6 suggests
+     * +5 s beside a caption reading 'Could have gone about 15 s longer', rung
+     * 4 +10 s beside 'about 30 s longer' -- TIME_STEPS_S is #214's unchanged
+     * 5/10/15 row and the captions are the owner's 15/30 anchors from #244.
+     *
      * TWO RUNGS SHARE A SUGGESTION ON THE REP ROW, because it is two long and
      * there are three rungs. Written down rather than left as an accident:
      * rung 4 and rung 1 both suggest +2, and what separates them on screen is
