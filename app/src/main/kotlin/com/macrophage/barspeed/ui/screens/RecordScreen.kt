@@ -79,6 +79,7 @@ import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
 import com.macrophage.barspeed.model.ExitPrompt
+import com.macrophage.barspeed.model.GuidedRepCaption
 import com.macrophage.barspeed.model.ImplementLoad
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.Phase
@@ -2224,11 +2225,23 @@ private fun GuidedSetStage(state: RecordState, viewModel: RecordViewModel, slot:
                     if (state.guidedLabel == "DONE") "✓" else "${state.guidedCountdown}",
                     style = MaterialTheme.typography.displayLarge,
                 )
-                Text(
-                    "rep ${state.manualReps}" + (plannedReps?.let { " of $it" } ?: ""),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = BarColors.Sub,
-                )
+                // What the ring calls the rep is GuidedRepCaption's decision,
+                // in :core:model where a test runs on every push. The screen
+                // holds the three facts it takes and none of the rule: which
+                // reps are finished, how many were asked for, and which phase
+                // of the set is on screen.
+                GuidedRepCaption.forRing(
+                    finishedReps = state.manualReps,
+                    plannedReps = plannedReps,
+                    leadIn = state.leadInRunning,
+                    finished = state.guidedFinished,
+                )?.let { caption ->
+                    Text(
+                        caption,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BarColors.Sub,
+                    )
+                }
             }
         }
         Spacer(Modifier.height(14.dp))
