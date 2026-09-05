@@ -41,9 +41,9 @@ import kotlin.test.assertTrue
  *
  * ## Why it is DERIVED rather than stored
  *
- * All three inputs -- the set's prescription and the drive direction and kind
- * of its frozen geometry -- are already on the row, so the word is computed at
- * export time and `DATABASE_VERSION` does not move. That is the opposite of
+ * All four inputs -- the set's prescription and the plane, drive direction and
+ * kind of its frozen geometry -- are already on the row, so the word is
+ * computed at export time and `DATABASE_VERSION` does not move. That is the opposite of
  * `rpeScale`, which records which question a lifter was SHOWN and therefore
  * cannot be re-derived from anything.
  *
