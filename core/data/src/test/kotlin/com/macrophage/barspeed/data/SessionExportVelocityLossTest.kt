@@ -2,8 +2,13 @@ package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.RepAnalysis
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.GeometrySource
+import com.macrophage.barspeed.model.GeometrySources
+import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.SetExport
+import com.macrophage.barspeed.model.StartPhase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -126,7 +131,7 @@ class SessionExportVelocityLossTest {
         verdicts = emptyList(),
     )
 
-    private fun exporter(analysis: SetAnalysis): SessionExporter {
+    private fun exporter(analysis: SetAnalysis, tempo: String? = null, geometryJson: String? = null): SessionExporter {
         val row =
             SetRecordEntity(
                 id = 5L,
@@ -138,9 +143,11 @@ class SessionExportVelocityLossTest {
                 actualReps = 12,
                 repsManual = true,
                 plannedReps = 12,
+                tempo = tempo,
                 startedAtMs = 1_000L,
                 endedAtMs = 61_000L,
                 analysisJson = json.encodeToString(SetAnalysis.serializer(), analysis),
+                geometryJson = geometryJson,
             )
         val dao =
             FakeSessionDao(
@@ -236,4 +243,78 @@ class SessionExportVelocityLossTest {
         val text = exporter(none).exportJson(1L, includeRepDetail = false)!!
         assertTrue("velocityLossBasis" !in text, "expected the key to be absent entirely, got:\n$text")
     }
+
+    /**
+     * Which QUESTION the set's velocity loss answers, published beside it
+     * (#250).
+     *
+     * DIFFERENTIAL, red at the commit that introduces it: `SetExport` has no
+     * such field and this exporter writes nothing.
+     *
+     * The leg curl is the case that matters. Its drive moves DOWN, so the
+     * concentric is digit 1: `1030` prescribes a one-second pull and a
+     * three-second return, and the set is `controlled`. A rule read off
+     * digit 3 would reach the same word here by accident, which is why
+     * `VelocityLossRegimeTest` asserts both drive directions and this asserts
+     * the wiring.
+     *
+     * Asserted on the WIRE rather than on the decoded object, so that the
+     * absence case is a missing key and not a null literal -- and so that this
+     * test compiles at the commit that reds it, which an assertion on a field
+     * that does not exist yet would not.
+     *
+     * `velocityLoss_pct` stays published on a controlled set. The word says
+     * how to read it; it does not withhold it.
+     */
+    @Test
+    fun `a set publishes the regime its prescription and its stored geometry put it in`() = runTest {
+        val analysis = analysisOf(0.60, 0.55, 0.50, storedVelocityLossPct = 16.7)
+        val stored = json.encodeToString(ResolvedGeometry.serializer(), legCurlDown)
+
+        val controlled =
+            exporter(analysis, tempo = "1030", geometryJson = stored).exportJson(1L, includeRepDetail = false)!!
+        assertTrue(
+            "\"velocityLossRegime\": \"controlled\"" in controlled,
+            "a prescribed drive speed is a compliance figure, not fatigue:\n$controlled",
+        )
+        assertTrue(
+            "\"velocityLoss_pct\"" in controlled,
+            "velocity loss stopped being published on a controlled set:\n$controlled",
+        )
+
+        val straight =
+            exporter(analysis, tempo = null, geometryJson = stored).exportJson(1L, includeRepDetail = false)!!
+        assertTrue(
+            "\"velocityLossRegime\": \"maxIntent\"" in straight,
+            "straight reps are the regime velocity loss was built for:\n$straight",
+        )
+
+        val bare =
+            exporter(analysis, tempo = "1030", geometryJson = null).exportJson(1L, includeRepDetail = false)!!
+        assertTrue(
+            "velocityLossRegime" !in bare,
+            "a set with no stored geometry was given a regime anyway:\n$bare",
+        )
+    }
+
+    /** The leg curl's own geometry: the drive pulls DOWN, so digit 1 is the concentric. */
+    private val legCurlDown =
+        ResolvedGeometry(
+            startsWith = StartPhase.CONCENTRIC,
+            concentricUp = false,
+            horizontal = false,
+            sensorOnStack = true,
+            sensorInverted = true,
+            travelRatio = 2.0,
+            kind = ExerciseKind.DYNAMIC,
+            bodyweight = false,
+            sources =
+            GeometrySources(
+                startsWith = GeometrySource.DECLARED,
+                concentric = GeometrySource.DECLARED,
+                plane = GeometrySource.SEEDED,
+                kind = GeometrySource.SEEDED,
+                travelRatio = GeometrySource.DECLARED,
+            ),
+        )
 }
