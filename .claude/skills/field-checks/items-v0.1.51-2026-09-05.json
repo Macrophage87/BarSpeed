@@ -15,21 +15,11 @@
    "tag": "Field-38 question",
    "ref": "ask 2 / #87 #133",
    "title": "How is each unit strapped to a dumbbell?",
-   "intro": "On the three incline press sets, unit a sat past 80 degrees of pitch for 54%, 89% and 66% of the work window; unit b never did. A photo settles whether that is a mounting convention or a frame problem.",
+   "intro": "Answered 2026-09-05: one unit strapped to its dumbbell, the other on a magnet (the usual mount), and the magnet fell off. Unit a sat past 80 degrees of pitch on the three incline press sets; unit b never did.",
    "checks": [
-    "One photo of each implement before the first set.",
-    "Say which face of the unit touches the handle and which axis runs along it."
-   ],
-   "tier": "Answer"
-  },
-  {
-   "tag": "Field-38 question",
-   "ref": "ask 3 / #249",
-   "title": "Dead hangs: the -5 s correction",
-   "intro": "If you did not tap it, the two gaps in the recorded durations are a defect rather than a correction, and #249 moves from P3 to P1.",
-   "checks": [
-    "On the two field-38 dead hangs, did you tap the <b>-5 s</b> hold correction?",
-    "How many times on each?"
+    "Which unit was the magnet one, a or b?",
+    "Did the magnet come off mid-set or between sets, and on which set?",
+    "A photo of the strapped mount: which face touches the handle, which axis runs along it."
    ],
    "tier": "Answer"
   },
@@ -37,20 +27,9 @@
    "tag": "Field-38 question",
    "ref": "ask 4",
    "title": "Set 18: was the limiter prompt shown?",
-   "intro": "Set 18 (a failed lat pulldown) exported <b>failed</b> and <b>failedByLifter</b> with no limiter word, while sets 16 and 17 both carry <b>muscle</b>.",
+   "intro": "Set 18 (the second rope dead hang) exported <b>failed</b> and <b>failedByLifter</b> with no limiter word, while set 16 (lat pulldown) and set 17 (the first dead hang) both carry <b>muscle</b>. Owner 2026-09-05: the prompt was shown, \"I believe that I put muscle as the limiter, not sure though.\"",
    "checks": [
-    "Were you offered the limiter prompt on set 18 and skipped it, or was it never shown?"
-   ],
-   "tier": "Answer"
-  },
-  {
-   "tag": "Field-38 question",
-   "ref": "ask 5 / #220",
-   "title": "Body weight and assist on the hangs",
-   "intro": "Without both, nobody can say how much of the recorded 29.4 kg was you. From v0.1.51 the export publishes the split; this is for the field-38 archive only.",
-   "checks": [
-    "Was a body weight entered in Settings before field-38?",
-    "What was the assist stack set to on each dead hang?"
+    "On the next hands-full hold that fails, note whether you answered the limiter and what you chose; I compare with the export."
    ],
    "tier": "Answer"
   },

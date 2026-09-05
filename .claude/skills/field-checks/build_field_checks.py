@@ -165,4 +165,13 @@ if __name__ == '__main__':
         data = json.load(f)
     items = data['items'] if isinstance(data, dict) else data
     heading = data.get('heading', 'Next session') if isinstance(data, dict) else 'Next session'
-    build(items, sys.argv[2], heading)
+    # Questions are asked in chat, never printed one per page (owner, 2026-09-05).
+    questions = [it for it in items if it.get('tier') == 'Answer']
+    checks = [it for it in items if it.get('tier') != 'Answer']
+    if questions:
+        print('QUESTIONS (ask these in the chat message, not in the PDF):')
+        for q in questions:
+            for ch in q['checks']:
+                print('- [%s] %s' % (q['ref'], ch))
+        print()
+    build(checks, sys.argv[2], heading)

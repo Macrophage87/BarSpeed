@@ -35,9 +35,14 @@ The items live in three places and none of them is complete alone:
    Also grep open titles for `[Field]` — some carry the tag in the title without the label
    (#63, #54, #55 did).
 3. **The latest field report's "[Field] asks for the next session"** section
-   (`BarSpeed-field-captures/field-<NN>/analysis/field-<NN>-report.md`). These are questions
-   the owner answers by message, not gym checks; they get their own colour so the owner can
-   clear them from the sofa.
+   (`BarSpeed-field-captures/field-<NN>/analysis/field-<NN>-report.md`). Most of these are
+   questions the owner answers by message, not gym checks. **Questions do not go in the
+   PDF** — owner, 2026-09-05, after the first build put six of them on their own pages: "keep
+   the 'asking questions' separate from the testing questions. You can just ask me here or
+   provide a single sheet to do so." Ask them in the chat message that delivers the report or
+   the PDF, numbered, one line each; if there are more than a handful, one separate
+   "Questions" sheet. A report ask that is really a gym check ("both units on one stack once")
+   goes in the PDF as a check.
 
 Drop an item only when its issue is closed AND the field-38-style ingest has discharged it in a
 report. An item nobody can act on (needs another phone, another API level) stays in, marked
@@ -55,10 +60,11 @@ Rules that came from the first build:
 - State the **pass** as what the screen or voice does, not what the code does.
 - Where the check is really *my* offline verification (a key in the export), the owner's check
   is "export and send the zip"; say the rest is mine.
-- Tier every page: `Answer` (reply by message), `Tier 1` (inside a normal set, no gym cost),
-  `Tier 2` (an extra set or an unusual mount — the owner takes these only when convenient),
-  `Deferred` (needs hardware the owner does not have). Order: Answer, then the release's Tier 1,
-  then Tier 2, then Deferred.
+- Tier every page: `Tier 1` (inside a normal set, no gym cost), `Tier 2` (an extra set or an
+  unusual mount — the owner takes these only when convenient), `Deferred` (needs hardware the
+  owner does not have). Order: the release's Tier 1, then Tier 2, then Deferred. An item tiered
+  `Answer` is a question: the builder leaves it out of the PDF and prints it, so it can be
+  pasted into the chat message instead.
 - Put the quantities the owner needs *in* the check ("+5 lb at rung 6"), never "see the issue".
 
 Items are a JSON list next to the build script — one object per page:
