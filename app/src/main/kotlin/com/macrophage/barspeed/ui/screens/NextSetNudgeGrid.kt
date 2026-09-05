@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -167,6 +168,11 @@ internal fun NextSetNudgeSection(state: RecordState, viewModel: RecordViewModel)
             unit = state.weightUnit,
         )
     if (options.isEmpty()) return
+    // Which of them the rung puts first, or null where the rule declines to
+    // pick (#244). The OFFER is unchanged -- every rung offers the full #214
+    // row, the owner's "Give the option to add more at each of the headroom
+    // intervals" -- and this only decides which tile is drawn filled.
+    val suggested = NextSetNudgePolicy.suggestedStep(HeadroomTier.ofRpe(state.lastSetRpe), options)
 
     if (changing) {
         ChangeSetDialog(state, viewModel, next, next = true) { changing = false }
@@ -182,14 +188,30 @@ internal fun NextSetNudgeSection(state: RecordState, viewModel: RecordViewModel)
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         ) {
             row.forEach { nudge ->
-                OutlinedButton(
-                    onClick = {
-                        applyNudge(state, viewModel, nudge)
-                        done = true
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(nudge.label, style = MaterialTheme.typography.labelLarge)
+                // Filled for the suggested step, outlined for the rest. A
+                // suggestion and not a restriction: every tile does exactly
+                // what it did before and the lifter can take any of them, so
+                // the difference is a colour and nothing else.
+                if (nudge == suggested) {
+                    Button(
+                        onClick = {
+                            applyNudge(state, viewModel, nudge)
+                            done = true
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(nudge.label, style = MaterialTheme.typography.labelLarge)
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = {
+                            applyNudge(state, viewModel, nudge)
+                            done = true
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(nudge.label, style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
             repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }

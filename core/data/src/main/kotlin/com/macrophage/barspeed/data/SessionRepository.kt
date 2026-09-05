@@ -33,6 +33,15 @@ data class CompletedSet(
      * cases null covers; this is the object that fills it.
      */
     val bodyWeightKg: Double? = null,
+    /**
+     * Which question this set's [rpe] answers, as the published word (#244).
+     *
+     * [SetRecordEntity.rpeScale] states what the word is, why it is the
+     * RESOLVED scale rather than the plan's declaration, and what null means;
+     * this is the object that fills it. Null on a set recorded by a caller
+     * that does not supply one, which no shipped call site is.
+     */
+    val rpeScale: String? = null,
     val plannedReps: Int?,
     /** Lifter-counted reps for sensorless sets; overrides the analysis count. */
     val manualReps: Int? = null,
@@ -390,6 +399,10 @@ class SessionRepository(
                 // moves, so a reading taken at write time would already be a
                 // different fact from the one totalKg added (#220).
                 bodyWeightKg = set.bodyWeightKg,
+                // The word the caller froze when the set ended, never a
+                // reading of the plan taken here: the plan can have been
+                // edited between the tap and this write (#244).
+                rpeScale = set.rpeScale,
                 actualReps = set.manualReps ?: set.analysis.reps.size,
                 repsManual = set.manualReps != null,
                 plannedReps = set.plannedReps,

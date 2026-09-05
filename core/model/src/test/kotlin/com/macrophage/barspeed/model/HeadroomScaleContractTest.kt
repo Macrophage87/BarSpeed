@@ -2,19 +2,26 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
- * The seams #244 is built on, pinned at the commit that declares them.
+ * The seams #244 was built on, corrected at the commit that fills them.
  *
- * GREEN HERE ON PURPOSE. [EffortScale.askFor] and
- * [NextSetNudgePolicy.suggestedStep] both exist at this commit answering what
- * the app already answered -- the set's KIND for the first, nothing at all for
- * the second -- so what these assertions record is the BEFORE. The
- * differentials that red against them live in `HeadroomScaleDifferentialTest`
- * and arrive next.
+ * TWO OF THESE RECORDED THE BEFORE and are now inverted, in place and named:
+ * [EffortScale.askFor] read the exercise's declaration and discarded it, and
+ * [NextSetNudgePolicy.suggestedStep] answered null for every rung. Both are
+ * false now. They are not deleted, because what each pins is still the thing
+ * worth pinning -- that the decision reads the declaration at all, and that
+ * the rung picks something -- and because a reader of this file should be able
+ * to see what the behaviour was on the other side of the change.
  *
- * The wire-vocabulary pin below is not a seam and is expected to hold
+ * The full per-cell table lives in `HeadroomScaleDifferentialTest`, which is
+ * where it was shown red; these are the two shapes of the answer rather than
+ * its contents.
+ *
+ * The wire-vocabulary pin below was never a seam and is expected to hold
  * permanently: [SessionExport.VALID_RPE_SCALES] and [EffortAsk] are two
  * statements of one closed list, one of them published, and this is the only
  * thing that can see both.
@@ -57,18 +64,29 @@ class HeadroomScaleContractTest {
     // ---- the seams, answering what the app answers today ----
 
     /**
-     * The ask is chosen by the set's KIND alone at this commit, whatever the
-     * exercise declares. That is the defect; this records it as the seam's
-     * current body so the next commit's differentials have something exact to
-     * fail against.
+     * The ask READS the exercise's declaration.
+     *
+     * IT SAID `askFor ignores the progression and answers from the set kind`
+     * and asserted LOAD for every declaration on a dynamic set and TIME for
+     * every declaration on a timed one. That was the seam, and it was the
+     * defect: it is why a pull-up block declared `"reps"` was asked how much
+     * more WEIGHT it had in it. Inverted here rather than deleted -- the
+     * property worth pinning is that three of the four declarations move the
+     * answer at all, which is the whole of #244.
+     *
+     * Only WEIGHT still defers to the kind, and that is the design: it is what
+     * an omitted key resolves to, so deferring is what keeps every plan
+     * written before schema 1.11 asking exactly what it always asked.
      */
     @Test
-    fun `askFor ignores the progression and answers from the set kind`() {
-        val declarations: List<ProgressionKind?> = ProgressionKind.entries + listOf(null)
-        declarations.forEach {
-            assertEquals(EffortAsk.LOAD, EffortScale.askFor(timed = false, progression = it), "dynamic, $it")
-            assertEquals(EffortAsk.TIME, EffortScale.askFor(timed = true, progression = it), "timed, $it")
+    fun `askFor reads the progression, and only weight still defers to the set kind`() {
+        listOf(false, true).forEach { timed ->
+            assertEquals(EffortAsk.REPS, EffortScale.askFor(timed, ProgressionKind.REPS), "reps, timed=$timed")
+            assertEquals(EffortAsk.TIME, EffortScale.askFor(timed, ProgressionKind.TIME), "time, timed=$timed")
+            assertEquals(EffortAsk.FEEL, EffortScale.askFor(timed, ProgressionKind.NONE), "none, timed=$timed")
         }
+        assertEquals(EffortAsk.LOAD, EffortScale.askFor(timed = false, progression = ProgressionKind.WEIGHT))
+        assertEquals(EffortAsk.TIME, EffortScale.askFor(timed = true, progression = ProgressionKind.WEIGHT))
     }
 
     /**
@@ -91,9 +109,17 @@ class HeadroomScaleContractTest {
         }
     }
 
-    /** Nothing is suggested at this commit; the grid draws six equal tiles. */
+    /**
+     * Every rung suggests exactly one of the offered tiles.
+     *
+     * IT SAID `suggestedStep suggests nothing yet` and asserted null for every
+     * rung, which was the seam. Inverted here: WHICH tile each rung picks is
+     * pinned per progression in `HeadroomScaleDifferentialTest`, and what this
+     * keeps is the shape -- three rungs, three answers, all of them drawn from
+     * the row that was offered, never a fourth step the grid does not show.
+     */
     @Test
-    fun `suggestedStep suggests nothing yet`() {
+    fun `every rung suggests one of the tiles the grid actually offers`() {
         val offered =
             NextSetNudgePolicy.options(
                 tier = HeadroomTier.ONE_INCREMENT,
@@ -104,7 +130,10 @@ class HeadroomScaleContractTest {
                 unit = WeightUnit.LB,
             )
         HeadroomTier.entries.forEach {
-            assertNull(NextSetNudgePolicy.suggestedStep(it, offered), "$it already suggests a step")
+            val pick = NextSetNudgePolicy.suggestedStep(it, offered)
+            assertNotNull(pick, "$it suggests nothing")
+            assertTrue(pick in offered, "$it suggests a tile the grid does not offer: $pick")
         }
+        assertNull(NextSetNudgePolicy.suggestedStep(null, offered), "an unrated set is offered a step")
     }
 }

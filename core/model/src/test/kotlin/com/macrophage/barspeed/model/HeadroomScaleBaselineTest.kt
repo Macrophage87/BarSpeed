@@ -55,17 +55,23 @@ class HeadroomScaleBaselineTest {
     }
 
     /**
-     * The timed captions, verbatim. These are the strings #244's owner
-     * comment of 2026-09-04 replaces with 15 s and 30 s anchors, so they are
-     * transcribed here at the commit before the change.
+     * The timed captions, verbatim.
+     *
+     * IT SAID "Could have gone 15-30 s longer" and "about a minute longer" at
+     * the characterization commit, and both are now FALSE: the owner's comment
+     * of 2026-09-04 -- *"For holds let's do 15 sec and 30 sec."* -- replaces
+     * them, and forcing that diff is what this pin was written for. Corrected
+     * forward rather than deleted, because a stored timed 4 means one thing
+     * before this branch and another after it, and a transcription of both is
+     * how a reader of the archive can tell.
      */
     @Test
-    fun `a hold's three headroom rungs say fifteen-to-thirty, about a minute, and much longer`() {
+    fun `a hold's three headroom rungs say about fifteen, about thirty, and much longer`() {
         assertEquals(
             listOf(
                 "Could have gone much longer",
-                "Could have gone about a minute longer",
-                "Could have gone 15-30 s longer",
+                "Could have gone about 30 s longer",
+                "Could have gone about 15 s longer",
             ),
             EffortScale.tiles(true, explosive = false, unit = WeightUnit.LB, ask = EffortAsk.TIME)
                 .filter { it.claim == EffortClaim.HEADROOM }
@@ -74,15 +80,17 @@ class HeadroomScaleBaselineTest {
     }
 
     /**
-     * A dynamic set is asked about LOAD, and nothing about the exercise can
-     * change that -- `tiles` takes no progression at all.
+     * A dynamic set on a WEIGHT-progression exercise is asked about load.
      *
-     * This is the defect itself, written as a passing test. It reds in the
-     * commit that fixes #244 for a `reps` or `none` exercise and is corrected
-     * there to assert the same thing of a `weight` exercise only.
+     * IT SAID "every dynamic set is asked about load, whatever the exercise
+     * progresses on" at the characterization commit, which was the defect
+     * itself written as a passing test. It is false now for `reps` and `none`,
+     * and the assertion is narrowed to the case that survives rather than
+     * deleted -- what a weight exercise asks has NOT changed, and that is
+     * worth going on pinning.
      */
     @Test
-    fun `every dynamic set is asked about load, whatever the exercise progresses on`() {
+    fun `a dynamic weight-progression set is asked about load`() {
         val headroom =
             EffortScale.tiles(false, explosive = false, unit = WeightUnit.LB, ask = EffortAsk.LOAD)
                 .filter { it.claim == EffortClaim.HEADROOM }
@@ -128,19 +136,28 @@ class HeadroomScaleBaselineTest {
     }
 
     /**
-     * The export carries no word for which scale a rating was given on, so a
-     * coach reading a 6 cannot tell a load claim from a rep claim.
+     * The export now carries the word, and no longer says it cannot.
      *
-     * Both halves: the published schema has no key, and its own description
-     * says the fact is unrecoverable. The second sentence is the one that goes
-     * false when the key lands.
+     * IT SAID `the published set carries no scale word and says the scale is
+     * unrecoverable` at the characterization commit and asserted exactly the
+     * two things this branch reverses. Both halves are inverted here rather
+     * than deleted: what the pin is FOR is that the two statements move
+     * together, and a key that lands beside a description still saying it does
+     * not exist is the drift class this repository keeps shipping.
+     *
+     * The narrower claim survives untouched and is asserted with them: which
+     * UNIT'S caption was on screen is still not recorded, and never was.
      */
     @Test
-    fun `the published set carries no scale word and says the scale is unrecoverable`() {
-        assertFalse("rpeScale" in setProperties().keys, "the export already publishes a scale word")
-        assertTrue(
+    fun `the published set carries the scale word and no longer calls it unrecoverable`() {
+        assertTrue("rpeScale" in setProperties().keys, "the export does not publish the scale word")
+        assertFalse(
             "nor whether the set drew the load or the time rungs" in rpeDescription(),
-            "the published rpe no longer says the drawn rungs are unrecoverable: ${rpeDescription()}",
+            "the published rpe still says the drawn rungs are unrecoverable: ${rpeDescription()}",
+        )
+        assertTrue(
+            "DOES NOT RECORD which unit's caption was on screen" in rpeDescription(),
+            "the published rpe stopped saying the display unit is unrecoverable, which it still is",
         )
     }
 }

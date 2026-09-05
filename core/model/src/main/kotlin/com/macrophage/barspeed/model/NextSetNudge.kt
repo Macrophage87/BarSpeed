@@ -257,8 +257,8 @@ object NextSetNudgePolicy {
      * Which of [options]' tiles the rung suggests first, or null when the grid
      * is not drawn at all (#244).
      *
-     * A DECLARED SEAM AT THIS COMMIT, returning null: nothing is suggested,
-     * which is exactly what the grid does today.
+     * Rung 6 the smallest step of the row, rung 4 its middle, rung 1 its
+     * largest -- the owner's third comment on #244.
      *
      * IT PICKS FROM [offered] AND NEVER NARROWS IT. The owner's first two
      * comments on #244 asked for a narrowed offer per rung and his third
@@ -280,10 +280,27 @@ object NextSetNudgePolicy {
      * six long for weight, three for time and two for reps, so "the middle
      * one" is arithmetic over the length rather than a number.
      *
-     * A DECLARED SEAM AT THIS COMMIT: empty, so [suggestedStep] answers null
-     * for every rung and the grid draws what it draws today.
+     * THE MIDDLE OF AN EVEN ROW IS THE UPPER OF THE TWO CENTRE ENTRIES,
+     * `size / 2`, and that is a choice with a reason. It makes rung 6 to rung
+     * 4 a real move on every row -- +1 to +2 reps, +5 to +10 s, +5 to +20 lb
+     * -- which is the direction the owner named when he said the add point is
+     * rung 4 and not rung 6. On the pound row it also lands the suggestion on
+     * 20 lb, exactly the figure rung 4's own caption says was left. `size / 2 -
+     * 1` would have put rung 4 on the same +1 rep as rung 6 and made the rung
+     * decide nothing at all on a rep exercise.
+     *
+     * TWO RUNGS SHARE A SUGGESTION ON THE REP ROW, because it is two long and
+     * there are three rungs. Written down rather than left as an accident:
+     * rung 4 and rung 1 both suggest +2, and what separates them on screen is
+     * CUSTOM beside the tile, the owner's *"rung 1 the largest with custom
+     * beside it"*, rather than a third step nobody offered.
      */
-    private val SUGGESTED_INDEX: Map<HeadroomTier, (Int) -> Int> = emptyMap()
+    private val SUGGESTED_INDEX: Map<HeadroomTier, (Int) -> Int> =
+        mapOf(
+            HeadroomTier.ONE_INCREMENT to { _ -> 0 },
+            HeadroomTier.TWO_INCREMENTS to { size -> size / 2 },
+            HeadroomTier.MUCH_MORE to { size -> size - 1 },
+        )
 
     /**
      * The authored row for a unit, PICKED and never computed.

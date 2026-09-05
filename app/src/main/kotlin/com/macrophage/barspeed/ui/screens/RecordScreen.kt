@@ -3255,8 +3255,11 @@ private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel)
  * way the session closes (#159).
  *
  * DELIBERATELY NOT THE EFFORT GRID'S VOCABULARY. That grid says "3 reps left"
- * or "Could have added 10-15 lb" about ONE set on 1-10; this is the whole
- * workout on 1-10 and there are no reps left in a session. The two scales now
+ * about ONE set on 1-10, and below the counted end it says whatever that
+ * exercise progresses in -- "Could have added 10-15 lb", "About 3-4 reps
+ * left", "Could have gone about 15 s longer" or a bare "Easy" (#244). This is
+ * the whole workout on 1-10 and there are no reps left in a session, nor a
+ * progression for one to be asked in. The two scales now
  * span the same range, so nothing but the wording keeps them apart. Bare
  * numbers with the two ends labelled, so nothing here can be read as the other
  * scale.
@@ -3369,8 +3372,10 @@ internal data class RpeOption(
  * no colour, because a colour is not a fact about effort.
  *
  * [unit] reaches the scale because the low rungs name a WEIGHT the lifter
- * could have added, and that figure is authored per unit rather than
- * converted -- "+10-15 lb" and "+5 kg", never "+4.5 kg".
+ * could have added WHEN [ask] is a load question, and that figure is authored
+ * per unit rather than converted -- "+10-15 lb" and "+5 kg", never "+4.5 kg".
+ * It is passed on every ask and ignored by three of the four: seconds, reps
+ * and feelings are the same in both gyms.
  *
  * [ask] is which noun the HEADROOM rungs use (#244), and it is NOT defaulted:
  * the four call sites answer it from two different places -- the set-end grid

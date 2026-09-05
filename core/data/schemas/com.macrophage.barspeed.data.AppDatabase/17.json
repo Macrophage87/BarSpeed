@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 17,
-    "identityHash": "26b289eed573e287487736257609c78a",
+    "identityHash": "05d31aa124fbf495172cfe856f621eea",
     "entities": [
       {
         "tableName": "plans",
@@ -122,7 +122,7 @@
       },
       {
         "tableName": "set_records",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER NOT NULL, `orderIdx` INTEGER NOT NULL, `exerciseId` TEXT NOT NULL, `exerciseName` TEXT NOT NULL, `loadKg` REAL NOT NULL, `plannedLoadKg` REAL, `bodyWeightKg` REAL, `actualReps` INTEGER NOT NULL, `repsManual` INTEGER NOT NULL, `plannedReps` INTEGER, `actualDurationS` INTEGER, `plannedDurationS` INTEGER, `side` TEXT, `plannedSide` TEXT, `rpe` INTEGER, `failed` INTEGER NOT NULL, `failedByLifter` INTEGER, `warmup` INTEGER NOT NULL, `warmupMark` INTEGER, `added` INTEGER NOT NULL, `voided` INTEGER NOT NULL, `voidReason` TEXT, `limiter` TEXT, `limiterNote` TEXT, `tempo` TEXT, `targetMeanConVelMps` REAL, `velocityLossStopPct` REAL, `plannedRestS` INTEGER, `plannedPrepS` INTEGER, `prepS` INTEGER, `workBegan` INTEGER, `startedAtMs` INTEGER NOT NULL, `endedAtMs` INTEGER NOT NULL, `analysisJson` TEXT NOT NULL, `geometryJson` TEXT, `sensorsJson` TEXT, `hrEndOfSetBpm` INTEGER, `hrAvgBpm` INTEGER, `hrMaxBpm` INTEGER, FOREIGN KEY(`sessionId`) REFERENCES `sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER NOT NULL, `orderIdx` INTEGER NOT NULL, `exerciseId` TEXT NOT NULL, `exerciseName` TEXT NOT NULL, `loadKg` REAL NOT NULL, `plannedLoadKg` REAL, `bodyWeightKg` REAL, `rpeScale` TEXT, `actualReps` INTEGER NOT NULL, `repsManual` INTEGER NOT NULL, `plannedReps` INTEGER, `actualDurationS` INTEGER, `plannedDurationS` INTEGER, `side` TEXT, `plannedSide` TEXT, `rpe` INTEGER, `failed` INTEGER NOT NULL, `failedByLifter` INTEGER, `warmup` INTEGER NOT NULL, `warmupMark` INTEGER, `added` INTEGER NOT NULL, `voided` INTEGER NOT NULL, `voidReason` TEXT, `limiter` TEXT, `limiterNote` TEXT, `tempo` TEXT, `targetMeanConVelMps` REAL, `velocityLossStopPct` REAL, `plannedRestS` INTEGER, `plannedPrepS` INTEGER, `prepS` INTEGER, `workBegan` INTEGER, `startedAtMs` INTEGER NOT NULL, `endedAtMs` INTEGER NOT NULL, `analysisJson` TEXT NOT NULL, `geometryJson` TEXT, `sensorsJson` TEXT, `hrEndOfSetBpm` INTEGER, `hrAvgBpm` INTEGER, `hrMaxBpm` INTEGER, FOREIGN KEY(`sessionId`) REFERENCES `sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -169,6 +169,11 @@
             "fieldPath": "bodyWeightKg",
             "columnName": "bodyWeightKg",
             "affinity": "REAL"
+          },
+          {
+            "fieldPath": "rpeScale",
+            "columnName": "rpeScale",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "actualReps",
@@ -474,7 +479,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '26b289eed573e287487736257609c78a')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '05d31aa124fbf495172cfe856f621eea')"
     ]
   }
 }

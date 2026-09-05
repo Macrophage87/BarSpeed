@@ -9,6 +9,7 @@ import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.hrm.HrTrust
 import com.macrophage.barspeed.model.AbandonedSetPolicy
 import com.macrophage.barspeed.model.ArmedSilencePolicy
+import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseExport
 import com.macrophage.barspeed.model.FailureProvenancePolicy
 import com.macrophage.barspeed.model.GeometryExport
@@ -265,6 +266,11 @@ class SessionExporter(
             side = record.side,
             plannedSide = record.plannedSide,
             rpe = record.rpe,
+            // Which question that number answers (#244). Withheld from a set
+            // carrying no rating: `EffortScale.publishedScale` owns the rule,
+            // asked here and at the manifest writer below so the two cannot
+            // come to differ.
+            rpeScale = EffortScale.publishedScale(record.rpe, record.rpeScale),
             failed = record.failed,
             // Whose verdict the failure is (#216). Never beside a set that did
             // not fail: a `false` there would read as a derived failure that
@@ -855,6 +861,10 @@ class RawExporter(
         // depends on which file the coach opened.
         str("plannedSide", record.plannedSide)
         num("rpe", record.rpe)
+        // Beside the number it qualifies, in the manifest as well as in
+        // session.json (#244). `str` drops a null, and the null here is the
+        // same decision the session document makes.
+        str("rpeScale", EffortScale.publishedScale(record.rpe, record.rpeScale))
         flag("failed", record.failed)
         // [bool] and not [flag], gated on there being a failure at all: a
         // published false here is a real statement -- the app derived it and

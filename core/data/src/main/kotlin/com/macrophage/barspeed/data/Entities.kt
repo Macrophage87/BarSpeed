@@ -59,8 +59,11 @@ data class SessionEntity(
      * the scale.
      *
      * NOT [SetRecordEntity.rpe]. That column is how much ONE set had left in
-     * it, on 1 to 10 anchored as reps in reserve at the top and as load or
-     * time headroom below; this is the whole workout on 1 to 10. Two columns
+     * it, on 1 to 10 anchored as reps in reserve at the top and, below that,
+     * as headroom in whichever noun the exercise progresses in --
+     * [SetRecordEntity.rpeScale] beside it says which; this is the whole
+     * workout on 1 to 10, and it has no such column because a session
+     * progresses in nothing. Two columns
      * of the same type in the same database, both called RPE, so the difference
      * is written at both of them.
      *
@@ -120,6 +123,33 @@ data class SetRecordEntity(
      * separable and nothing here pretends otherwise.
      */
     val bodyWeightKg: Double? = null,
+    /**
+     * WHICH QUESTION this set's [rpe] answers, as the published word
+     * (v17, #244).
+     *
+     * One of `load`, `reps`, `time` or `feel` -- `SessionExport.VALID_RPE_SCALES`
+     * is the list, and `EffortAsk` is the enum that produces it. The WORD and
+     * not an ordinal, so reordering that enum cannot reinterpret a stored row.
+     *
+     * FROZEN AT WRITE TIME from the finished slot's `progression`, resolved
+     * through `EffortScale.askFor`, and never re-derived. Two reasons, and the
+     * second is the sharper one. A plan is editable and deletable, so the
+     * exercise's declaration can move -- or vanish -- under a set already
+     * recorded. And the resolved WORD is stored rather than the raw
+     * declaration because this is a capture-time fact about which question the
+     * lifter was SHOWN: a later change to how a declaration maps onto a
+     * question must not restate what a past lifter saw. [bodyWeightKg]'s
+     * reason, one step further.
+     *
+     * NULL means one thing only: the set was recorded before this column
+     * existed. It is never written for "the app could not tell", because the
+     * app always can -- an ad-hoc set with no plan resolves through the same
+     * decision every planned set does, and lands on `load` or `time` by its
+     * own kind. So unlike [bodyWeightKg] beside it, a null here collapses no
+     * two states. Nothing backfills it and nothing can: no column, here or on
+     * `sessions`, records what a past set's exercise progressed on.
+     */
+    val rpeScale: String? = null,
     val actualReps: Int,
     /** True when actualReps was entered or corrected by the lifter, not the sensor. */
     val repsManual: Boolean = false,

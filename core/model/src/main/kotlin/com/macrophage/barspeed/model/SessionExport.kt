@@ -44,8 +44,10 @@ data class SessionExport(
      * [SessionRpe.MAX], stated once when they finished it (#159).
      *
      * NOT THE PER-SET SCALE. [SetExport.rpe] is one set's answer to "how much
-     * was left", anchored as reps in reserve at 7 to 10 and as load or time
-     * headroom below that; this is the whole workout on 1 to 10, and the two
+     * was left", anchored as reps in reserve at 7 to 10 and, below that, as
+     * headroom in whichever noun the exercise progresses in -- load, reps,
+     * seconds or a bare feeling, named by [SetExport.rpeScale] from 1.19;
+     * this is the whole workout on 1 to 10, and the two
      * must never be averaged or compared as one quantity. Both now span the
      * same published range, so only these descriptions tell them apart.
      * [SessionRpe] states the difference once and the published schema states
@@ -213,7 +215,10 @@ data class SessionExport(
          * DIFFERENTLY ALONG ITS LENGTH. 7 to 10 stay reps in reserve -- three,
          * two, one, none -- and 6, 4 and 1 are load headroom, "could have
          * added one increment / two increments / much more", asked in seconds
-         * instead on a hold. No key changes type or stops being written, and
+         * instead on a hold. (THAT IS WHAT 1.14 DID. From 1.19 the noun is the
+         * exercise's own declared progression and a set says which in
+         * `rpeScale`; the eleventh 1.19 entry below is the one to read for a
+         * document declaring that version or later.) No key changes type or stops being written, and
          * no stored value is rewritten; what changes is what a NEWLY written
          * value means at the low end and which values the app can write at
          * all. 6 is the value to read carefully: it was the FLOOR of the old
@@ -920,6 +925,69 @@ data class SessionExport(
          * the count the lifter performed. On the capture this was written from,
          * one set keeps ten detections against eight reps counted by hand.
          * Over-segmentation is a separate defect and is not touched here.
+         *
+         * 1.19 carries an ELEVENTH change, under the same number and for the
+         * reason the entries above state -- a number takes further entries
+         * until it ships, and 1.19 is unreleased; v0.1.50 shipped 1.18, read
+         * by `git show v0.1.50:core/model/.../SessionExport.kt` rather than
+         * assumed (#244). A rated set may carry [SetExport.rpeScale], one of
+         * `load`, `reps`, `time` or `feel`, saying WHICH QUESTION its
+         * [SetExport.rpe] answers.
+         *
+         * The headroom rungs -- 1, 4 and 6 -- used to be worded by the set's
+         * KIND alone: load on anything dynamic, seconds on a hold. From this
+         * version they are worded by the EXERCISE's declared `progression`
+         * (plan 1.11), so a pull-up block declared `"reps"` is asked how many
+         * more reps were left rather than how much more weight, and an
+         * exercise declared `"none"` is asked for a feeling with no quantity
+         * attached. A `6` therefore carries three different claims depending
+         * on the exercise, and no other key in this document separates them:
+         * the plan is not in the export, `progression` is not published per
+         * set, and a plan can be edited or deleted after the session it drove.
+         * This key is how a reader tells them apart.
+         *
+         * THE WORDS AND WHAT EACH MEANS AT EACH RUNG. `load`: 6 could have
+         * added one equipment increment, 4 two, 1 much more. `reps`: 6 about
+         * three or four reps left, 4 five or more, 1 many more -- these start
+         * ABOVE the counted end, which already covers one, two and three left
+         * at 9, 8 and 7. `time`: 6 about 15 s longer, 4 about 30 s longer, 1
+         * much longer. `feel`: 6 comfortable, 4 easy, 1 very easy, with no
+         * quantity at any rung. The counted end, 7 through 10, is UNCHANGED on
+         * every scale.
+         *
+         * THE TIMED WORDING ALSO MOVED, and it is a change to what a stored
+         * value means rather than a new key: 6 was "could have gone 15-30 s
+         * longer" and 4 "about a minute longer" from 1.14 through 1.18, and
+         * they are now about 15 s and about 30 s. A timed 4 recorded before
+         * this version claimed roughly twice what a timed 4 recorded after it
+         * claims. Nothing rewrites stored values and nothing can, so a reader
+         * comparing timed headroom across the boundary is comparing two
+         * different questions; `schemaVersion` is what says which side a
+         * document is on.
+         *
+         * FROZEN AT WRITE TIME, not derived at export. The word is resolved
+         * when the set is recorded and stored on the row, for the reason
+         * [SetExport.bodyWeightKg] is stored and one step further: the RESOLVED
+         * scale is kept rather than the raw declaration, because this is a
+         * capture-time fact about which question the lifter was SHOWN, and a
+         * later change to how a declaration maps onto a question must not
+         * restate what a past lifter saw.
+         *
+         * ABSENT ON A SET RECORDED BEFORE THIS VERSION, and the reading rule
+         * for those is today's behaviour rather than a guess: `load` on a
+         * dynamic set, `time` on a timed one, which is exactly what the app
+         * asked before the key existed. It says nothing about what those
+         * exercises PROGRESSED on -- nothing recorded that -- and it is not
+         * backfilled, because a past set's progression is not recoverable from
+         * any column, here or on `sessions`. ALSO ABSENT on a set carrying no
+         * `rpe` at all: the word qualifies the number and is published beside
+         * it or not at all, which is `failedByLifter`'s rule.
+         *
+         * Additive to a reader that ignores it -- no key changes type, none
+         * stops being written -- but NOT to a validator: the key is a CLOSED
+         * enum, so a reader validating against 1.18 rejects a document
+         * carrying it. `DATABASE_VERSION` DOES move, 16 -> 17, which is the
+         * unshipped hop #220's body-weight column also rides.
          */
         const val SCHEMA_VERSION = "1.19"
 
@@ -1167,22 +1235,34 @@ data class SetExport(
      *  - 10 nothing left, 9 one rep left, 8 two reps left, 7 three reps left
      *    -- reps in reserve, on a hold or an explosive lift the same rungs in
      *    that movement's own words.
-     *  - 6, 4 and 1 are HEADROOM, and the caption names a figure rather than
-     *    a notch, because there is no declared equipment increment anywhere
-     *    in this codebase and the app cannot know which is in front of the
-     *    lifter. On a rep set: 6 "could have added 10-15 lb" or "5 kg", 4
-     *    "20-30 lb" or "10 kg", 1 "much more". On a hold or a carry the same
-     *    three rungs ask in seconds: 6 "15-30 s longer", 4 "about a minute
-     *    longer", 1 "much longer". The pound band spans a bar's 10 lb and a
-     *    stack's 15 lb, which is why one tile serves both.
+     *  - 6, 4 and 1 are HEADROOM, and from 1.19 the noun they ask in is the
+     *    EXERCISE's own, named by [rpeScale]. On a `load` scale the caption
+     *    names a figure rather than a notch, because there is no declared
+     *    equipment increment anywhere in this codebase and the app cannot know
+     *    which is in front of the lifter: 6 "could have added 10-15 lb" or
+     *    "5 kg", 4 "20-30 lb" or "10 kg", 1 "much more", the pound band
+     *    spanning a bar's 10 lb and a stack's 15 lb. On `reps`: 6 "about 3-4
+     *    reps left", 4 "five or more", 1 "many more" -- above the counted end,
+     *    which already covers three and below. On `time`: 6 "about 15 s
+     *    longer", 4 "about 30 s longer", 1 "much longer". On `feel`: 6
+     *    "comfortable", 4 "easy", 1 "very easy", naming no quantity at all.
      *
-     * WHICH CAPTION THE LIFTER SAW IS NOT RECORDED. The unit and the load or
-     * time branch are display decisions taken at set end and nothing here
-     * carries them; a reader wanting the unit reads the session's own, and a
-     * reader wanting to know whether the time rungs were drawn reads
-     * [durationS]. [EffortScale] owns the captions; the figures in SECONDS
-     * are authored rather than measured, while the pound and kilogram bands
-     * come from the equipment the lifter actually meets.
+     * WHICH SCALE THE LIFTER WAS ASKED ON IS RECORDED, in [rpeScale], and a 6
+     * cannot be read without it: the same integer is a plate claim on one
+     * exercise and a rep claim on another. Absent on a set recorded before
+     * 1.19, where the rule is `load` on a dynamic set and `time` on a timed
+     * one -- what the app asked then. WHICH UNIT'S caption was on screen is
+     * still not recorded: that is a display decision taken at set end, and a
+     * reader wanting it reads the session's own unit. [EffortScale] owns the
+     * captions; the figures in SECONDS and in REPS are authored rather than
+     * measured, while the pound and kilogram bands come from the equipment
+     * the lifter actually meets.
+     *
+     * A TIMED 4 CHANGED MEANING AT 1.19. It was "about a minute longer" from
+     * 1.14 and is "about 30 s longer" now, and a timed 6 was "15-30 s longer"
+     * and is "about 15 s". Nothing rewrites stored values, so a reader
+     * comparing timed headroom across that boundary is comparing two different
+     * questions.
      *
      * 2, 3 and 5 are valid values with no tile: the gaps exist so the anchors
      * SORT, and a reader meeting one from an older session is looking at a
@@ -1198,6 +1278,26 @@ data class SetExport(
      * quantity.
      */
     val rpe: Int? = null,
+    /**
+     * Which question [rpe] answers, from [SessionExport.VALID_RPE_SCALES]
+     * (1.19, #244).
+     *
+     * `load` a weight the lifter could have added, `reps` a count of reps left,
+     * `time` seconds a hold could have run on, `feel` a bare feeling with no
+     * quantity. It names the HEADROOM rungs only: the counted end, 7 through
+     * 10, is reps in reserve on every scale.
+     *
+     * ABSENT on a set recorded before 1.19 -- read `load` on a dynamic set and
+     * `time` on a timed one, which is what the app asked then -- and absent on
+     * any set carrying no [rpe], because a word with no number beside it names
+     * a grid that was drawn rather than a rating that was given.
+     *
+     * It is a fact about the QUESTION and not about the exercise. It does not
+     * say what the exercise progresses on: those agree today, and freezing the
+     * resolved word rather than the declaration is what keeps a past rating
+     * readable if the mapping between them ever changes.
+     */
+    val rpeScale: String? = null,
     /**
      * True when the set is marked failed: the lifter tapped it as failed, the
      * set fell short of its planned reps or duration and the app derived a

@@ -524,13 +524,30 @@ abstract class AppDatabase : RoomDatabase() {
          * This hop was written as 15 -> 16 and REBASED onto #60's landed
          * 15 -> 16, which took that number first; it is 16 -> 17 here.
          *
-         * [Migration16To17Test] pins the statement, the baseline difference
+         * `rpeScale` RIDES ON THE SAME HOP (#244): the word saying which
+         * question a set's `rpe` answers -- `load`, `reps`, `time` or `feel`.
+         * A second column on this hop rather than an 18, because 17 has NOT
+         * SHIPPED. v0.1.50 carries `DATABASE_VERSION = 16`, read by
+         * `git show v0.1.50:core/data/.../AppDatabase.kt` rather than assumed,
+         * so no installed build has ever run 16 -> 17 and extending it costs
+         * nobody a second migration. Minting 18 would put a hop in the chain
+         * that no device will ever be at the start of.
+         *
+         * TEXT, nullable, no default, and the same refusal: the word itself is
+         * stored so reordering the Kotlin enum cannot reinterpret a row, and a
+         * defaulted `load` would assert of every set already in the archive
+         * that it was rated on a load ladder -- false for every timed set ever
+         * recorded. A past set's progression is not recoverable from anything
+         * stored, so there is nothing to backfill FROM even if it were wanted.
+         *
+         * [Migration16To17Test] pins both statements, the baseline difference
          * and the refusal.
          */
         internal val MIGRATION_16_17 =
             object : Migration(16, 17) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE set_records ADD COLUMN bodyWeightKg REAL")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN rpeScale TEXT")
                 }
             }
 

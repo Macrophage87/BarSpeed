@@ -181,12 +181,19 @@ object EffortScale {
     val UNANCHORED_RPE = setOf(2, 3, 5)
 
     /**
-     * Every figure in every caption is a whole multiple of this.
+     * Every figure in every LOAD caption is a whole multiple of this.
      *
      * 5 is the smallest jump either gym offers -- 5 lb per side on a bar, a
      * 5 kg step on a plate-loaded machine -- and no conversion of a figure
      * from the other unit lands on one. That is what makes the authoring rule
      * testable rather than merely stated.
+     *
+     * IT SAID "every figure in every caption" and that is FALSE from #244: the
+     * REPS row names 3 and 4, which are rep counts and not weights, and the
+     * rule was never about them. It is a rule about what a lifter can put on a
+     * bar, so it applies to [LOAD_CAPTIONS] and to `NextSetNudgePolicy`'s
+     * pound row, and to nothing else. `EffortScaleTest`'s check runs over the
+     * load and time ladders only, which is what it always ran over.
      */
     const val GYM_INCREMENT_MULTIPLE = 5
 
@@ -230,12 +237,14 @@ object EffortScale {
      * than "held" because the same tile is drawn for a farmer's walk.
      *
      * The figures are NOT measured. Nothing in this repository holds a capture
-     * of a lifter reporting how much longer a hold could have run. 15-30 s is
-     * the owner's own recommendation on #187 -- "could have held ~15-30 s
-     * longer" -- and the minute beside it is authored to the same one-step /
-     * two-step shape the load table uses. Revising them after a session is a
-     * change to this map and nothing else, which is why the table is here
-     * rather than inline at the tile.
+     * of a lifter reporting how much longer a hold could have run. They are the
+     * owner's own anchors on #244 -- *"For holds let's do 15 sec and 30 sec."*
+     * -- and they REPLACE the "15-30 s longer" and "about a minute longer" this
+     * table carried from #187. That earlier pair was the owner's recommendation
+     * too and was not wrong; it was coarser, and the 15 / 30 pair puts the
+     * add-a-step point on rung 4 where the reps row now puts it. Revising them
+     * after a session is a change to this map and nothing else, which is why
+     * the table is here rather than inline at the tile.
      *
      * **The load table's justification does not transfer, and that is an open
      * question rather than a settled one.** The load bands are fixed BECAUSE
@@ -247,28 +256,71 @@ object EffortScale {
      */
     private val TIME_CAPTIONS: Map<HeadroomTier, String> =
         mapOf(
-            HeadroomTier.ONE_INCREMENT to "Could have gone 15-30 s longer",
-            HeadroomTier.TWO_INCREMENTS to "Could have gone about a minute longer",
+            HeadroomTier.ONE_INCREMENT to "Could have gone about 15 s longer",
+            HeadroomTier.TWO_INCREMENTS to "Could have gone about 30 s longer",
             HeadroomTier.MUCH_MORE to "Could have gone much longer",
         )
 
     /**
      * The same three tiers asked in REPS, for work whose only ladder is
-     * volume (#244).
+     * volume -- a pull-up the lifter cannot add plates to (#244).
      *
-     * A DECLARED SEAM AT THIS COMMIT: empty, so [headroomCaption] throws for
-     * [EffortAsk.REPS] and nothing reaches it, because [askFor] cannot return
-     * that value yet. The rows land with the fix.
+     * THE ROWS START ABOVE THE COUNTED END, and that is the owner's own
+     * correction to #244's body: *"1-2 reps of headroom is typically the
+     * target. We'd want more than that. RPE 6 is 3 reps. One notch down is
+     * probably when you'd add a rep or two though."* The body's table put
+     * "1-2 more reps" on rung 6; the counted end already covers one, two and
+     * three left at 9, 8 and 7, and one or two in reserve is the TARGET rather
+     * than headroom. So the add-a-rep point is rung 4, one notch below 6.
+     *
+     * **THIS CLOSES THE GAP [EffortScale]'S KDOC SAYS NOT TO CLOSE, and the
+     * exception is argued rather than overlooked.** That rule -- *"the gap
+     * between ONE_INCREMENT and three reps left is a decision. Do not close
+     * it."* -- exists because a headroom question sitting where the rep count
+     * is most reliable asks for a guess when a better instrument is right
+     * there. On a reps-progression exercise the headroom question IS a rep
+     * count, so it is the better instrument rather than the guess, and the
+     * justification does not transfer. What DOES survive is a real ambiguity:
+     * rpe 7 says "3 reps left" and rpe 6 says "About 3-4 reps left", so a
+     * lifter with exactly three left meets two tiles. Which one they tap has
+     * never been observed and is a field item, not a solved problem.
+     *
+     * Unit-free, for [TIME_CAPTIONS]' reason: a rep is a rep in both gyms.
      */
-    private val REPS_CAPTIONS: Map<HeadroomTier, String> = emptyMap()
+    private val REPS_CAPTIONS: Map<HeadroomTier, String> =
+        mapOf(
+            HeadroomTier.ONE_INCREMENT to "About 3-4 reps left",
+            HeadroomTier.TWO_INCREMENTS to "Five or more reps left",
+            HeadroomTier.MUCH_MORE to "Many more reps left",
+        )
 
     /**
      * The same three tiers asked as a FEELING, for an exercise declared
      * `"none"` (#244).
      *
-     * A DECLARED SEAM AT THIS COMMIT, for [REPS_CAPTIONS]' reason.
+     * NO QUANTITY ANYWHERE, which is the whole of this row. A `"none"`
+     * exercise holds its load and its reps across its sets and
+     * [NextSetNudgePolicy.options] offers it nothing however it was rated, so
+     * a rung promising an increment promises something the app then refuses.
+     * The rungs still SORT -- 1 easier than 4 easier than 6 -- because the
+     * stored `rpe` and its ordering are unchanged on every progression.
+     *
+     * THE OWNER'S THREE PHRASES, WITH TWO OF THEM SWAPPED, and the swap is a
+     * correction to #244's body rather than a preference. That table puts
+     * "easy, had plenty left" on rung 6 and "comfortable, some left" on rung
+     * 4, which inverts the ordering the same paragraph demands: plenty left is
+     * EASIER than some left, so as written the harder rung claimed more in
+     * reserve. The words are his; the order is the issue's own prose.
+     *
+     * Unit-free, and digit-free: `HeadroomScaleDifferentialTest` reds if any
+     * of these three ever names a number.
      */
-    private val FEEL_CAPTIONS: Map<HeadroomTier, String> = emptyMap()
+    private val FEEL_CAPTIONS: Map<HeadroomTier, String> =
+        mapOf(
+            HeadroomTier.ONE_INCREMENT to "Comfortable — some left",
+            HeadroomTier.TWO_INCREMENTS to "Easy — plenty left",
+            HeadroomTier.MUCH_MORE to "Very easy",
+        )
 
     /**
      * Which noun this set's headroom rungs ask in.
@@ -291,15 +343,42 @@ object EffortScale {
      */
     fun askFor(timed: Boolean, progression: ProgressionKind?): EffortAsk =
         when (progression ?: ProgressionKind.WEIGHT) {
-            // A DECLARED SEAM: all four arms answer from the set's KIND,
-            // which is what the two-branch expression inside `tiles` answered
-            // before this function existed. #244's fix replaces three of them.
-            ProgressionKind.WEIGHT,
-            ProgressionKind.REPS,
-            ProgressionKind.TIME,
-            ProgressionKind.NONE,
-            -> if (timed) EffortAsk.TIME else EffortAsk.LOAD
+            // WEIGHT DEFERS TO THE SET'S KIND and the other three do not.
+            // That asymmetry is the design, not an oversight: WEIGHT is what
+            // an OMITTED key resolves to, so every plan written before schema
+            // 1.11 declares it by saying nothing -- and a hold from such a
+            // plan has always been asked in seconds. Letting the declaration
+            // win here would move every legacy plank onto load headroom,
+            // which is this issue's own defect in the other direction.
+            //
+            // The cost, stated rather than hidden: a hold whose plan
+            // DELIBERATELY says "weight" -- a weighted plank -- is asked in
+            // seconds while #214's grid offers it pounds. Those are two
+            // different questions ("how much was left" and "what should
+            // change next set") and the app has never been able to tell that
+            // declaration from an omitted one, because `ProgressionKind.ofPlan`
+            // collapses them before this is reached. Raised, not folded in.
+            ProgressionKind.WEIGHT -> if (timed) EffortAsk.TIME else EffortAsk.LOAD
+            ProgressionKind.REPS -> EffortAsk.REPS
+            ProgressionKind.TIME -> EffortAsk.TIME
+            ProgressionKind.NONE -> EffortAsk.FEEL
         }
+
+    /**
+     * The scale word an export publishes for one set, or null to omit the key.
+     *
+     * WITHHELD FROM A SET CARRYING NO RATING, which is `failedByLifter`'s rule
+     * and the same argument: the column is written on every set the app
+     * records, because the app always knows which grid it drew, but a word
+     * with no number beside it says only which tiles were on screen -- not a
+     * fact about the set -- and it reads as a rating that was never given.
+     *
+     * Here rather than at the two export writers because there ARE two, the
+     * session document and the archive's manifest, and a rule inlined at both
+     * is a rule that can come to differ. `RpeScalePublishedTest` asserts both
+     * writers against it.
+     */
+    fun publishedScale(rpe: Int?, scale: String?): String? = if (rpe == null) null else scale
 
     /**
      * The caption for one headroom rung, read from the table.

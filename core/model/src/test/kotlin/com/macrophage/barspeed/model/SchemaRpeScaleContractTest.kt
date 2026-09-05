@@ -214,7 +214,11 @@ class SchemaRpeScaleContractTest {
 
     @Test
     fun `the plan prompt says what an absent scale word means, on both kinds of set`() {
-        val line = prompt.lineSequence().first { "\"rpeScale\"" in it }
+        // The reading-key BULLET, not merely the first line mentioning the
+        // key: the `progression` paragraph names it too, several lines
+        // earlier, and `first { }` picked that one -- so this test read a
+        // sentence that was never meant to carry the absence rule.
+        val line = prompt.lineSequence().first { it.trimStart().startsWith("- \"rpeScale\"") }
         assertTrue("ABSENT" in line || "absent" in line, "the prompt does not say what absence means: $line")
         assertTrue("load" in line && "time" in line, "the prompt does not give the absence rule per kind: $line")
     }
@@ -244,12 +248,26 @@ class SchemaRpeScaleContractTest {
      * The prompt's old line said a headroom rung is LOAD on every dynamic set.
      * It is not, from this version, and a coach following it reads a pull-up's
      * 6 as a plate claim.
+     *
+     * IT ASSERTED THAT THE PHRASE "These are LOAD, not reps" WAS GONE, and
+     * that was too strong: the phrase is TRUE and worth keeping on the weight
+     * row, where the rungs really are a load claim and the reason -- a rep
+     * count below three left is a guess -- is exactly what a coach needs. What
+     * had to go is the phrase standing UNQUALIFIED over every dynamic set. So
+     * this asserts the qualification instead of the absence.
      */
     @Test
     fun `the plan prompt no longer says the headroom end is load on every dynamic set`() {
+        val claims = prompt.lineSequence().filter { "These are LOAD, not reps" in it }.toList()
+        claims.forEach {
+            assertTrue(
+                "progresses by WEIGHT" in it,
+                "the prompt calls a headroom rung a load claim without saying on which exercises: $it",
+            )
+        }
         assertFalse(
-            "These are LOAD, not reps" in prompt,
-            "the prompt still tells a coach every dynamic headroom rung is a load claim",
+            "Dynamic sets, headroom end" in prompt,
+            "the prompt still keys the headroom end off the set's kind rather than the exercise's progression",
         )
     }
 }

@@ -798,6 +798,20 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
         loadKg = p.loadKg,
         plannedLoadKg = p.plannedLoadKg,
         bodyWeightKg = p.bodyWeightKg,
+        // WHICH QUESTION the lifter was shown, resolved once from the FROZEN
+        // pair by the same call that worded the tiles they tapped (#244). Not
+        // the raw declaration: the stored word is a capture-time fact about
+        // what was asked, and a later change to how a declaration maps onto a
+        // question must not restate what a past lifter saw.
+        //
+        // `p.slot` is null on an ad-hoc set, which no plan declared anything
+        // for; `askFor` resolves that as WEIGHT and the set's own kind then
+        // decides, so an ad-hoc rep set stores `load` and an ad-hoc hold
+        // stores `time`. #244's brief said an ad-hoc set is written as `load`
+        // outright; that is right for a dynamic one and WRONG for a hold,
+        // which is asked in seconds on screen, and writing `load` there would
+        // record a question nobody was shown.
+        rpeScale = EffortScale.askFor(p.isTimed, p.slot?.progression).word,
         plannedReps = p.plannedReps,
         manualReps = p.manualReps,
         actualDurationS = p.actualDurationS,
