@@ -122,14 +122,14 @@ object StartCuePolicy {
      *
      * Horizontal work gets the movement and NOT a position, deliberately.
      * Issue #241 asked for `"Start EXTENDED, first movement RETURN"` and
-     * `"Start CONTRACTED, first movement DRIVE"`, and neither is written here:
-     * the pairing is inverted -- a rep that opens on the RETURN opens from the
-     * contracted end, because the drive is what got the lifter there -- and
-     * even corrected it would be wrong on half the machines it applies to. The
-     * drive of a seated row ends contracted and the drive of a chest press ends
-     * extended, and nothing in [ExerciseDef] distinguishes a horizontal pull
-     * from a horizontal press. The word is what the app knows; the position is
-     * not.
+     * `"Start CONTRACTED, first movement DRIVE"`, and neither is written here.
+     * That pairing holds on a horizontal PRESS and is inverted on a horizontal
+     * PULL, and nothing in [ExerciseDef] distinguishes the two. A chest press
+     * opening on the RETURN opens EXTENDED, which is what #241 says, because
+     * the drive that preceded it ended extended; a seated row opening on the
+     * RETURN opens CONTRACTED, the opposite, because its drive ended
+     * contracted. One pair of words cannot be right for both. The word is what
+     * the app knows; the position is not.
      */
     private fun phrase(word: String, horizontal: Boolean): String = when {
         horizontal -> "First movement $word"

@@ -176,8 +176,9 @@ class CadenceVoiceTest {
         //
         // It reads announcementFor for the expected side, which is the
         // decision, against the script's rows, which are the delivery. A plan
-        // that decides to say nothing is covered too: 1010 and 1110 have no
-        // home for a call, and must therefore record none.
+        // that decides to say nothing is covered too: 1010 on a leg press and
+        // 1110 on a bench press are both unswapped schedules of two one-second
+        // strokes, so they have no home for a call and must record none.
         corpus.forEach { (tempo, direction, reps) ->
             val p = plan(tempo, direction)
             val decided = (2..reps).mapNotNull { p.announcementFor(it, reps) }

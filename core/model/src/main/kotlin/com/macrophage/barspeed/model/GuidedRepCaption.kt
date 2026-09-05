@@ -27,6 +27,17 @@ package com.macrophage.barspeed.model
  * above 1.52 GB against the bench recipe's ~3 GB floor, so the emulator was
  * never booted. Whether the ring and the voice now read as one count is the
  * lifter's to say, mid-set, on any tempo with a beat able to carry a call.
+ *
+ * The strings also GREW, inside a ring whose diameter is fixed. `ProgressRing`
+ * is a 230 dp box and `RecordScreen` takes that default; the caption is drawn
+ * `bodySmall` inside it with no `maxLines` and no `overflow`. The expression
+ * lifted from the composable had one shape, `rep 12 of 12`, 12 characters. The
+ * longest now is `12 reps to come` at 15, with `last rep of 12` at 14 and
+ * `12 of 12 done` at 13. Whether they fit, wrap, wrap mid-word or clip at
+ * `wm size 360x800` or `font_scale 2.0` has not been observed once, so
+ * screenshot the ring during the PREP and on the LAST rep and not only
+ * mid-set: those two carry the longest lines, and neither is the line a
+ * mid-set glance shows.
  */
 object GuidedRepCaption {
     /**

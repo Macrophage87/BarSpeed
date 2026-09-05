@@ -70,11 +70,18 @@ import kotlin.test.assertTrue
  *
  * ## What still cannot be said, and it is not a preference
  *
- * A tempo whose both strokes are one second with no closing pause -- `1010`,
- * `1110` -- has a word in every second of its cycle and no beat with a count to
- * give up. It announces NOTHING on any rep, and the final rep is no exception.
- * Those two rows are the whole of the "some tempo has no beat that fits any
- * word" case, and they are in the corpus below for it.
+ * A SCHEDULE of two one-second strokes with no closing pause has a word in
+ * every second of its cycle and no beat with a count to give up. It announces
+ * NOTHING on any rep, and the final rep is no exception. `1010` resolves to one
+ * on every lift; `1110` does so only when `TempoSchedule.of` leaves the digits
+ * in prescription order, because the swap it performs on a lift that does not
+ * open with digit 1's stroke carries digit 2's pause to the end of the rep,
+ * where case 1 takes it. An earlier version of this paragraph named `1110`
+ * flatly, which is false on a concentric-first lift whose concentric is up and
+ * on an eccentric-first lift whose concentric is down, and it is deleted rather
+ * than softened. The two rows below -- `1010` on a leg press, `1110` on a bench
+ * press, both unswapped -- are the whole of the "some schedule has no beat that
+ * fits any word" case.
  *
  * Nothing here touches `RecordViewModel`'s unguided counter, which speaks
  * through `VoiceMilestonePolicy.repMilestone` at the instant a rep is counted

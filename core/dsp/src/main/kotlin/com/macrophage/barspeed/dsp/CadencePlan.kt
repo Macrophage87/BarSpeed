@@ -60,9 +60,9 @@ data class CadenceBeat(
  *    spoken count at all, which is issue 147 and a complaint from the gym.
  * 4. **Not spoken.** The rep number stays on screen, driven by `onRepCounted`,
  *    and that on-screen number is the metronome's own count rather than the
- *    sensor's -- and it counts FINISHED reps, so it reads one lower than the
- *    voice on every plan that speaks. See "The SCREEN still counts finished
- *    reps" below; it is stated once, there.
+ *    sensor's. It named FINISHED reps until #252 and names the rep in hand
+ *    now, so it agrees with the voice on every plan that speaks. See "The
+ *    SCREEN named finished reps until #252" below; it is stated once, there.
  *
  * The behaviour before issue 106 was a fifth option: insert a one-second beat
  * the prescription did not ask for.
@@ -117,9 +117,9 @@ data class CadenceBeat(
  * the set, and the warning in it is a statement about the rep in hand rather
  * than one still to come. The withholding is deleted rather than narrowed: it
  * answered a question this schedule no longer asks. The final rep is named on
- * every plan with a beat able to carry a call, and nowhere else -- `1010` and
- * `1110` have a word in every second of their cycle and still say nothing, on
- * the last rep as on every other.
+ * every plan with a beat able to carry a call, and nowhere else -- a schedule
+ * of two one-second strokes with no closing pause has a word in every second
+ * of its cycle and still says nothing, on the last rep as on every other.
  *
  * The audio of the final rep is 0.1.43's again on the plans that had it
  * withheld. That is MEASURED on two of the thirteen and DERIVED on the rest:
@@ -143,30 +143,30 @@ data class CadenceBeat(
  * "carries the call instead", which is false by one second and is deleted
  * rather than softened -- the call is not where the count was.
  *
- * ## The SCREEN still counts finished reps, and #243 did not move it
+ * ## The SCREEN named finished reps until #252, and now names the rep in hand
  *
- * `RecordScreen.GuidedSetStage` draws `"rep N of M"` from `RecordState
- * .manualReps`, which `GuidedCadenceRunner` sets from `onRepCounted(rep)` --
- * fired at [repCompleteAfterBeat], with the rep just FINISHED. Nothing in
- * `:core:dsp` decides that and this change did not touch it.
+ * `RecordScreen.GuidedSetStage` draws the line under the ring from
+ * `GuidedRepCaption.forRing` in `:core:model`, handing it `RecordState
+ * .manualReps` -- which `GuidedCadenceRunner` sets from `onRepCounted(rep)`,
+ * fired at [repCompleteAfterBeat] with the rep just FINISHED. `forRing` names
+ * `finishedReps + 1`, so the lifter in their seventh rep of twelve reads
+ * `rep 7 of 12` and hears `"Rep 7"`.
  *
- * The consequence is a mismatch that runs for the whole set. The lifter in
- * their seventh rep of twelve now hears `"Rep 7"` and reads `rep 6 of 12` on
- * the ring. Before #243 the two agreed, because the voice counted finished
- * reps too; the voice moved and the screen did not, so a change that removed
- * one off-by-one created a second one between two things the lifter can see
- * and hear at once.
+ * Between #243 and #252 the two disagreed for the whole of every set: #243
+ * moved the voice onto the rep in hand and the screen still counted finished
+ * reps, so a change that removed one off-by-one created a second one between
+ * two things the lifter can see and hear at once. #252 moved the screen with
+ * it, and the prep is a distinct state rather than rep zero -- while the
+ * countdown runs the ring names how many reps are COMING, so nothing claims a
+ * rep is in hand before one is.
  *
- * That is stated here rather than fixed here on purpose: the screen is `:app`,
- * where no test on the CI path reaches it, and the right answer is not obvious.
- * Making the ring read the rep now due would put `rep 1 of 12` on screen before
- * a single rep is done. **Whether the mismatch reads as the app losing count is
- * a `[Field]` question and this file does not answer it in advance.** On the
- * next guided set, on any tempo: read the ring while the voice speaks a number,
- * and say whether the two disagreeing by one is confusing, invisible, or worse
- * than the miscount #243 was filed for. The set's `_cues.csv` records what was
- * SAID and its instant, so the spoken half is recoverable from the capture; the
- * screen leaves no trace and only the lifter can report it.
+ * Nothing in `:core:dsp` decides the caption, and the two decisions are pinned
+ * equal here rather than trusted: `RingVoiceAgreementTest` reads
+ * [announcementFor] against `forRing` rep by rep -- `"Rep 7"` against
+ * `rep 7 of 12`, [LAST_REP] against `last rep of 12` -- and it is on this side
+ * because `:core:model` cannot see this file. `[Field]`: no device has drawn
+ * the caption, and what that leaves unverified is recorded once, in
+ * `GuidedRepCaption`'s KDoc, rather than repeated here.
  *
  * Rep 1 is announced on no plan, and that is the schedule rather than an
  * omission. A call rides a beat of the rep it names on cases 2 and 3 and the
@@ -188,9 +188,19 @@ data class CadenceBeat(
  *
  * ## What stays uncarryable, and what was rejected
  *
- * A tempo whose BOTH strokes are one second with no closing pause -- `1010`,
- * `1110` -- has a word in every second of its cycle and keeps case 4. Four
- * ways of forcing a call into it were considered and rejected:
+ * A SCHEDULE of two one-second strokes with no closing pause has a word in
+ * every second of its cycle and keeps case 4. `1010` resolves to one on every
+ * lift. `1110` resolves to one only when the digits are left in prescription
+ * order: `TempoSchedule.of` swaps the two strokes whenever digit 1 is not the
+ * stroke the lift opens with, and the swap carries digit 2's pause to the END
+ * of the rep, where it is a one-second closing pause and case 1 takes it.
+ * Across the four geometries [com.macrophage.barspeed.model.ExerciseDef] can
+ * express, `1110` announces on a concentric-first lift whose concentric is up
+ * and on an eccentric-first lift whose concentric is down. An earlier version
+ * of this paragraph named `1110` flatly as uncarryable, which is false on two
+ * of those four and is deleted rather than softened. Four ways of forcing a
+ * call into a schedule that genuinely has no room were considered and
+ * rejected:
  *
  * - **Speak a bare digit** rather than `"Rep 3"`, on the theory that a shorter
  *   utterance survives a shorter window. Bare digits are already the most
