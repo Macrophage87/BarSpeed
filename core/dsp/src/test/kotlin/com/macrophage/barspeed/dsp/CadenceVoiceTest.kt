@@ -149,6 +149,61 @@ class CadenceVoiceTest {
         )
     }
 
+    /**
+     * An X stroke is called as a one-second beat, word then no count (#250).
+     *
+     * CHARACTERIZATION, not a change. #250's second comment asks for this
+     * behaviour and states that the guide does not have it -- reading
+     * `TempoSchedule.prescribedCycleS`'s KDoc, which is about the
+     * PRESCRIPTION, as a statement about the metronome. The claim is wrong and
+     * this pin is what says so: `30X0` and `3010` produce the SAME script,
+     * second for second, because `CadencePlan.strokeSeconds` has always
+     * substituted a second for a null stroke. No red preceded these
+     * assertions; nothing moved for them to red against.
+     *
+     * The X stroke's word is spoken and no count follows it, which is not a
+     * rule about X at all -- a one-second stroke of any digit is below
+     * [GuidedCadence.COUNT_ALOUD_FROM_S] and the last second of a stroke is
+     * the next beat's word. `3010`'s own `Up` behaves identically, which is
+     * exactly why the two scripts coincide.
+     *
+     * What this does NOT pin, because it is untouched: `Tempo.upS` stays null,
+     * so `isExplosiveUpStroke` and the compliance scorer still see an X phase
+     * as unprescribed and leave it unscored.
+     */
+    @Test
+    fun `an X stroke is called as a one-second beat, word then no count`() {
+        val script = CadenceVoice.script(plan("30X0"), plannedReps = 2)
+        assertEquals(
+            listOf(
+                0 to "Down",
+                1 to "1",
+                2 to "2",
+                3 to "Up",
+                4 to "Down, Last rep",
+                6 to "2",
+                7 to "Up",
+                8 to "Done",
+            ),
+            script.map { it.atSecond to it.utterance },
+        )
+        assertEquals(
+            CadenceVoice.script(plan("3010"), plannedReps = 2).map { it.atSecond to it.utterance },
+            script.map { it.atSecond to it.utterance },
+            "the owner's rule: 30X0 is four seconds of beats like 3010",
+        )
+        assertEquals(4, plan("30X0").deliveredCycleS, "one rep of 30X0 is four seconds of cadence")
+        assertNull(
+            CadenceVoice.countCall(plan("30X0").beats[1], null, 1),
+            "the X stroke's own second is its word, never a count",
+        )
+        assertEquals(
+            null,
+            Tempo.parse("30X0").upS,
+            "and the prescription still records X, so the scorer leaves that phase alone",
+        )
+    }
+
     @Test
     fun `every word the guide speaks is a word the cue track carries`() {
         // Issue 176, as the general rule. An utterance is one or two words --

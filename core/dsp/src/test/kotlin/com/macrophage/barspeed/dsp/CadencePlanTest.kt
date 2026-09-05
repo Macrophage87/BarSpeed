@@ -463,11 +463,24 @@ class CadencePlanTest {
         assertEquals(4, CadencePlan.of(s).deliveredCycleS, "one second over, from the coercion alone")
     }
 
+    /**
+     * CHARACTERIZATION, extended for #250. The shape line was already here;
+     * the two cycle figures were not, and their absence is what let #250's
+     * second comment read `prescribedCycleS`'s KDoc as a statement about the
+     * metronome and conclude that "the metronome allots an X stroke no time at
+     * all". It never did. `strokeSeconds` substitutes 1.0 for a null and
+     * floors every stroke at a second, so the owner's rule -- an X stroke is
+     * still a one-second beat -- is the shipped behaviour and this commit pins
+     * it rather than changing it. No red was shown for these two lines because
+     * nothing moved: they are pins on behaviour that already held.
+     */
     @Test
     fun `an explosive stroke is played as one second`() {
         val s = schedule("30X0", benchPress)
         assertEquals(null, s.second.seconds, "X has no prescribed seconds")
         assertEquals(listOf("DOWN" to 3, "UP" to 1), shape(CadencePlan.of(s)))
+        assertEquals(3.0, s.prescribedCycleS, "the PRESCRIPTION counts no seconds for X")
+        assertEquals(4, CadencePlan.of(s).deliveredCycleS, "the CADENCE plays the X stroke for a second")
     }
 
     /**

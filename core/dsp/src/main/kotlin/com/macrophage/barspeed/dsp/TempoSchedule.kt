@@ -34,8 +34,24 @@ data class TempoSchedule(
     val concentricS: Double? get() = if (first.isConcentric) first.seconds else second.seconds
 
     /**
-     * Seconds one rep is prescribed to take: both strokes and both pauses. An
+     * Seconds one rep is PRESCRIBED to take: both strokes and both pauses. An
      * explosive stroke has no prescribed seconds and contributes none.
+     *
+     * NOT what the metronome plays, and reading it as that is the mistake
+     * #250's second comment made against this very paragraph. The voice guide
+     * gives an X stroke a ONE-SECOND beat and always has:
+     * `CadencePlan.strokeSeconds` substitutes 1.0 for a null and floors every
+     * stroke at a second, so `30X0` is delivered as a four-second cycle
+     * against a prescription of three. The same floor lifts a written `0`
+     * digit, which is why `3000` also delivers four. `CadencePlanTest` pins
+     * both, and `CadenceVoiceTest` pins that the X stroke's word is called
+     * with no count behind it -- a one-second stroke is below
+     * [GuidedCadence.COUNT_ALOUD_FROM_S].
+     *
+     * The gap between the two figures is the whole content of issue 106 and is
+     * deliberate: this one is what the plan asked for, and the analysis side
+     * grades against it. `SetAnalyzer.complianceFor` leaves a null-seconds
+     * phase UNSCORED, which is what keeps an X stroke out of the tempo score.
      */
     val prescribedCycleS: Double
         get() = (first.seconds ?: 0.0) + pauseAfterFirstS + (second.seconds ?: 0.0) + pauseAfterSecondS
