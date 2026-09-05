@@ -2045,7 +2045,7 @@ private fun restingState(
             // the lifter reads between sets and the word the coach reads in
             // the export are one decision applied to one object (#250).
             velocityLossRegime =
-            VelocityLossRegime.of(p.tempoText, p.geometry.concentricUp, p.geometry.kind),
+            VelocityLossRegime.of(p.tempoText, p.geometry.concentricUp, p.geometry.horizontal, p.geometry.kind),
             repsOverride = p.manualReps,
             // Resolved from the FROZEN pair, not from live state, and by the
             // same call `completedSetOf` makes -- one decision, two readers

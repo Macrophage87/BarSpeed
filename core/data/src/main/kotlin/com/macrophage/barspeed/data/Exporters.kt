@@ -339,6 +339,7 @@ class SessionExporter(
             VelocityLossRegime.of(
                 tempoPrescribed = record.tempo,
                 concentricUp = geometry?.concentricUp,
+                horizontal = geometry?.horizontal,
                 kind = geometry?.kind,
             )?.wireName,
             // How many detections the analyzer refused as not reps of this

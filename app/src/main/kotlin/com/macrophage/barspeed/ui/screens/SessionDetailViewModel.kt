@@ -74,7 +74,7 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
      */
     fun velocityLossRegime(record: SetRecordEntity): VelocityLossRegime? {
         val geometry = repository.decodeGeometry(record)
-        return VelocityLossRegime.of(record.tempo, geometry?.concentricUp, geometry?.kind)
+        return VelocityLossRegime.of(record.tempo, geometry?.concentricUp, geometry?.horizontal, geometry?.kind)
     }
 
     /**

@@ -170,6 +170,7 @@ class SchemaVelocityLossRegimeContractTest {
                 VelocityLossRegime.of(
                     tempoPrescribed = set["tempoPrescribed"]?.jsonPrimitive?.content,
                     concentricUp = geometry?.get("concentric")?.jsonPrimitive?.content?.let { it == "up" },
+                    horizontal = geometry?.get("plane")?.jsonPrimitive?.content?.let { it == "horizontal" },
                     kind =
                     geometry?.get("kind")?.jsonPrimitive?.content
                         ?.let { word -> ExerciseKind.entries.first { it.name.lowercase() == word } },

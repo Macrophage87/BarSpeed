@@ -20,8 +20,13 @@ import kotlin.test.assertTrue
  * is asserted against both drive directions.
  */
 class VelocityLossRegimeTest {
-    private fun of(tempo: String?, concentricUp: Boolean?, kind: ExerciseKind?) =
-        VelocityLossRegime.of(tempo, concentricUp, kind)
+    /**
+     * [horizontal] defaults to false so that every row written before the
+     * plane became an input still reads as the vertical lift it was always
+     * about. A row that is about the plane says so.
+     */
+    private fun of(tempo: String?, concentricUp: Boolean?, kind: ExerciseKind?, horizontal: Boolean? = false) =
+        VelocityLossRegime.of(tempo, concentricUp, horizontal, kind)
 
     // ---- 1. the three max-intent cases the owner named ----
 
@@ -74,6 +79,37 @@ class VelocityLossRegimeTest {
     fun `an X in digit 3 is the eccentric on a drive that moves down, so the set is controlled`() {
         assertEquals(VelocityLossRegime.CONTROLLED, of("30X0", false, ExerciseKind.DYNAMIC))
         assertEquals(VelocityLossRegime.CONTROLLED, of("1030", false, ExerciseKind.DYNAMIC))
+    }
+
+    // ---- 2b. the plane, which decides the digit before the direction does ----
+
+    /**
+     * Horizontal work read by PHASE, the half of the rule these pins never
+     * asked about until round 1 finding 2 named it.
+     *
+     * `TempoSchedule.of` sets `digit1IsConcentric = if (horizontal) false else
+     * !concentricUp`, so on a seated row or a chest press digit 3 is the
+     * concentric whatever `concentricUp` holds -- there is no up or down for a
+     * positional reading to attach to. These three rows are the ones today's
+     * plane-blind rule already answers correctly; the row it gets wrong is the
+     * one the next commit reds.
+     */
+    @Test
+    fun `a horizontal set with a numbered digit 3 is controlled`() {
+        assertEquals(VelocityLossRegime.CONTROLLED, of("2011", true, ExerciseKind.DYNAMIC, horizontal = true))
+        assertEquals(VelocityLossRegime.CONTROLLED, of("2011", false, ExerciseKind.DYNAMIC, horizontal = true))
+    }
+
+    @Test
+    fun `a horizontal set with no tempo is max intent, plane or no plane`() {
+        assertEquals(VelocityLossRegime.MAX_INTENT, of(null, true, ExerciseKind.DYNAMIC, horizontal = true))
+        assertEquals(VelocityLossRegime.MAX_INTENT, of(null, false, ExerciseKind.DYNAMIC, horizontal = true))
+    }
+
+    @Test
+    fun `a horizontal hold gets no word, the same as a vertical one`() {
+        assertNull(of("2011", true, ExerciseKind.HOLD, horizontal = true))
+        assertNull(of(null, false, ExerciseKind.CARRY, horizontal = true))
     }
 
     /**

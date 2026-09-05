@@ -95,14 +95,40 @@ enum class VelocityLossRegime(
          * The regime of a set, or null where it is not decidable.
          *
          * [tempoPrescribed] is the set's own prescription in the notation the
-         * plan wrote; [concentricUp] and [kind] come from the geometry FROZEN
-         * on the set's row when it was recorded, never from the exercise
-         * definition as it stands today. The three inputs are all stored, so
-         * this is derived at export time and needs no column of its own --
-         * unlike `rpeScale`, which records a question a lifter was shown and
-         * has to be frozen.
+         * plan wrote; [concentricUp], [horizontal] and [kind] come from the
+         * geometry FROZEN on the set's row when it was recorded, never from
+         * the exercise definition as it stands today. The four inputs are all
+         * stored, so this is derived at export time and needs no column of its
+         * own -- unlike `rpeScale`, which records a question a lifter was shown
+         * and has to be frozen.
+         *
+         * [horizontal] IS ACCEPTED HERE AND NOT YET READ. Round 1 finding 2 on
+         * this branch: the digit rule below is written as though the drive
+         * direction alone decided which digit the concentric is, and
+         * `TempoSchedule.of` reads the PLANE first -- digit 3 is the concentric
+         * whenever the movement is horizontal, whatever `concentricUp` says.
+         * This commit only widens the input, so the differential can be written
+         * against a signature that will not move under it; the commit after
+         * this one reds the case and the one after that reads the plane.
+         *
+         * Nullable rather than the plain `Boolean` the finding asked for, and
+         * that is deliberate: `ResolvedGeometry` is stored present-or-absent as
+         * a unit, so two of the three call sites hold `geometry?.horizontal`,
+         * and defaulting a missing plane to `false` would state a plane no row
+         * recorded. [kind] being null already ends the decision before the
+         * plane is asked for.
          */
-        fun of(tempoPrescribed: String?, concentricUp: Boolean?, kind: ExerciseKind?): VelocityLossRegime? = when {
+        // Transitional and deleted by the commit that reads the plane. detekt
+        // 1.23.8's UnusedParameter is active through buildUponDefaultConfig and
+        // fires on a public companion function, so "widen now, read next
+        // commit" cannot be expressed without saying so here.
+        @Suppress("UnusedParameter")
+        fun of(
+            tempoPrescribed: String?,
+            concentricUp: Boolean?,
+            horizontal: Boolean?,
+            kind: ExerciseKind?,
+        ): VelocityLossRegime? = when {
             // No stored geometry: the set cannot be placed, and inventing a
             // direction reads exactly like a measured one.
             kind == null -> null
