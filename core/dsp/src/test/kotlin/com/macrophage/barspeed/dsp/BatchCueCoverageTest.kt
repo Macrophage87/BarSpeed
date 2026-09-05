@@ -2,7 +2,6 @@ package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
-import java.io.File
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -934,13 +933,7 @@ class BatchCueCoverageTest {
         // The coverage guard. Without it the next capture dropped into the
         // resource directory is silently outside every figure above, which is
         // exactly how a corpus total goes stale while staying green.
-        val onDisk = File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile.list()!!
-            .filter {
-                it.startsWith("field-") && it.endsWith(".csv") &&
-                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
-            }
-            .map { it.removeSuffix(".csv") }
-            .sorted()
+        val onDisk = FieldCorpus.onClasspath()
         assertEquals(
             onDisk,
             (scored.map { it.fixture } + notScored + notRepCorpus).sorted(),

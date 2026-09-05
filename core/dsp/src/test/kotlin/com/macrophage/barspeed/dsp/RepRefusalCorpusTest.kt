@@ -2,7 +2,6 @@ package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
-import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -114,13 +113,7 @@ class RepRefusalCorpusTest {
      */
     @Test
     fun `the corpus list is every committed capture`() {
-        val onDisk = File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile.list()!!
-            .filter {
-                it.startsWith("field-") && it.endsWith(".csv") &&
-                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
-            }
-            .map { it.removeSuffix(".csv") }
-            .sorted()
+        val onDisk = FieldCorpus.onClasspath()
         assertEquals(onDisk, corpus.map { it.first }.sorted())
         assertEquals(42, corpus.size, "captures this file walks")
     }

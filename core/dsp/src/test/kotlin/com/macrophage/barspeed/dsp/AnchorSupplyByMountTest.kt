@@ -2,7 +2,6 @@ package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
-import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -187,13 +186,7 @@ class AnchorSupplyByMountTest {
 
     /** Every capture on the classpath, as [GyroGateTest] enumerates them. */
     private val corpus: List<String> by lazy {
-        File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile.list()!!
-            .filter {
-                it.startsWith("field-") && it.endsWith(".csv") &&
-                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
-            }
-            .map { it.removeSuffix(".csv") }
-            .sorted()
+        FieldCorpus.onClasspath()
     }
 
     private fun batchAnalysis(fixture: String, startsWith: StartPhase, loadKg: Double): SetAnalysis =
