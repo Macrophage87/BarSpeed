@@ -26,8 +26,12 @@ package com.macrophage.barspeed.model
  *
  * [implementCount] and [restS] are carried and not yet drawn:
  * [SessionPreviewPolicy.setLine] reads neither, unlike the running set's
- * `SlotCard`, whose secondary line adds a "Pick up: …" implement split and a
- * "rest mm:ss" clause the preview's set line does not repeat.
+ * `SlotCard`, whose secondary line adds a "rest mm:ss" clause the preview's
+ * set line does not repeat.
+ *
+ * The implement is NOT on that secondary line, and [implementCount] does not
+ * decide it. What the card draws is [ImplementLine]'s, keyed off the plan's
+ * `implement`, on a line of its own ABOVE the secondary one (#253).
  */
 data class PreviewSet(
     val exerciseName: String,
