@@ -105,6 +105,26 @@ class SchemaProgressionContractTest {
         assertTrue("none" in described, "the description never names the hold value")
     }
 
+    /**
+     * #244's round 1, finding 1. `PLAN_PROMPT` points the coach at this
+     * document as the authoritative machine-readable schema, and from #244
+     * the prompt says the key also decides which question the post-set rating
+     * asks. The pointer's target has to say the same thing, and the sentence
+     * that said the opposite -- "This decides only what is OFFERED" -- is
+     * DELETED rather than softened.
+     */
+    @Test
+    fun `the published progression description says it also words the post-set rating`() {
+        val described = exerciseProps()["progression"]!!.jsonObject["description"]!!.jsonPrimitive.content
+        assertTrue(
+            "This decides only what is OFFERED" !in described,
+            "the description still says the key decides only what is offered",
+        )
+        assertTrue("WHICH QUESTION" in described, "the description never says it picks the rating's question")
+        assertTrue("rpeScale" in described, "the description never names the exported word")
+        assertTrue("1.19" in described, "the description never says which export schema records it")
+    }
+
     @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun `the exercise decoder recognises the progression key`() {
@@ -175,6 +195,36 @@ class SchemaProgressionContractTest {
         val matching = warnings.filter { "progression" in it }
         assertEquals(1, matching.size, "expected one progression warning, got $warnings")
         assertTrue("bench_press" in matching.first(), matching.first())
+    }
+
+    /**
+     * #244's round 1, finding 2. The two mismatch warnings are no longer
+     * reports of an inert declaration: `askFor` lets REPS and TIME win
+     * outright over the set's kind, so a warned-but-accepted plan changes
+     * which question the post-set rating asks and freezes that word onto the
+     * row. The gate only WARNS, so such a plan imports -- the message has to
+     * say what it now costs, not just that the grid is empty.
+     */
+    @Test
+    fun `reps on a timed exercise says the rating is worded in reps anyway`() {
+        val warning = PlanImport.parse(plan("reps", timed = true)).warnings
+            .first { "progression" in it }
+        assertTrue(
+            "the rating after each set is worded in that dimension anyway" in warning,
+            "the warning still reads as an inert declaration: $warning",
+        )
+        assertTrue("rpeScale" in warning, "the warning never names the word frozen onto the row: $warning")
+    }
+
+    @Test
+    fun `time on a rep-prescribed exercise says the rating is worded in time anyway`() {
+        val warning = PlanImport.parse(plan("time", timed = false)).warnings
+            .first { "progression" in it }
+        assertTrue(
+            "the rating after each set is worded in that dimension anyway" in warning,
+            "the warning still reads as an inert declaration: $warning",
+        )
+        assertTrue("rpeScale" in warning, "the warning never names the word frozen onto the row: $warning")
     }
 
     @Test
