@@ -2,7 +2,6 @@ package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
-import java.io.File
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -496,14 +495,7 @@ class CuedRepCoverageTest {
         // detect the thing that actually happened: six captures were added and
         // named in neither list, and every assertion stayed green while the
         // file's headline claim went false.
-        val dir = File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile
-        val onDisk = dir.list()!!
-            .filter {
-                it.startsWith("field-") && it.endsWith(".csv") &&
-                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
-            }
-            .map { it.removeSuffix(".csv") }
-            .sorted()
+        val onDisk = FieldCorpus.onClasspath()
         assertTrue(onDisk.size >= 28, "captures found on the classpath: ${onDisk.size}")
         assertEquals(
             onDisk,

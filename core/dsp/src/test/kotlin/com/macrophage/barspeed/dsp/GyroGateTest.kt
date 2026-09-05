@@ -1,7 +1,6 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
-import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -356,14 +355,7 @@ class GyroGateTest {
         // Same guard [CuedRepCoverageTest] carries, for the same reason: a
         // capture added and named nowhere would leave every assertion above
         // green while the claims they make went narrower than they read.
-        val dir = File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile
-        val onDisk = dir.list()!!
-            .filter {
-                it.startsWith("field-") && it.endsWith(".csv") &&
-                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
-            }
-            .map { it.removeSuffix(".csv") }
-            .sorted()
+        val onDisk = FieldCorpus.onClasspath()
         assertEquals(onDisk, corpus.sorted(), "every capture on the classpath is in this file's corpus")
     }
 }

@@ -5,7 +5,6 @@ import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.serialization.json.Json
-import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -45,13 +44,7 @@ class BlankAnalysisReasonTest {
         VelocityEstimator.estimate(load(fixture), DspConfig(), MovementPlane.VERTICAL)
 
     private val corpus: List<String> by lazy {
-        File(javaClass.getResource("/field-still-0rep.csv")!!.toURI()).parentFile.list()!!
-            .filter {
-                it.startsWith("field-") && it.endsWith(".csv") &&
-                    !it.endsWith("-cues.csv") && !it.endsWith("-prep.csv")
-            }
-            .map { it.removeSuffix(".csv") }
-            .sorted()
+        FieldCorpus.onClasspath()
     }
 
     /** A census with every count zero, to be copied with only the field under test set. */
