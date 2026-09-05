@@ -39,6 +39,7 @@ import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.HrSample
+import com.macrophage.barspeed.model.Implement
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.LiveFeed
@@ -188,6 +189,29 @@ data class PlannedSlot(
      * across all of them, and nothing divides either. See [ImplementLoad].
      */
     val implementCount: Int? = null,
+    /**
+     * What KIND of object this exercise's load sits on, as the plan declared
+     * it -- barbell, dumbbell or other (#253).
+     *
+     * Not nullable and not inferred: an omitted declaration IS
+     * [Implement.OTHER], resolved once at flatten time by
+     * [Implement.ofPlan]. DISPLAY ONLY, like [implementCount] beside it -- it
+     * decides the "Up next" card's second line and reaches nothing that is
+     * stored, exported or summed.
+     */
+    val implement: Implement = Implement.OTHER,
+    /**
+     * The bar this exercise is loaded on, in kilograms, where the plan
+     * declared one (`bar_lb` / `bar_kg`); null takes the unit's standard bar,
+     * 45 lb or 20 kg.
+     *
+     * Kilograms because that is the canonical unit for every load in this app,
+     * so a pound-authored bar and a kilogram-authored one are the same number
+     * by the time anything reads them. DISPLAY ONLY: it is subtracted from
+     * nothing that is recorded, and the load the set writes is the plan's
+     * total, bar included, exactly as it was before this key existed.
+     */
+    val barKg: Double? = null,
     /**
      * The part of the plan's coaching cue shown with the set without the lifter
      * touching the phone: the exercise's `description` (or its older `notes`

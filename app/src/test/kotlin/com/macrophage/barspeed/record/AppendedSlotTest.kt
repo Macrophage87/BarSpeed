@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.model.ExerciseDef
+import com.macrophage.barspeed.model.Implement
 import com.macrophage.barspeed.model.ProgressionKind
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.Stage
@@ -103,6 +104,11 @@ private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     "geometry" to Append.INHERITED,
     "side" to Append.INHERITED,
     "implementCount" to Append.INHERITED,
+    // What the load sits on, and the bar it sits on where the plan named one
+    // (#253). One more set of the anchor's exercise is done with the anchor's
+    // implement -- there is no other answer -- so both follow it.
+    "implement" to Append.INHERITED,
+    "barKg" to Append.INHERITED,
     "exerciseNotes" to Append.INHERITED,
     "exerciseNotesBehindTap" to Append.INHERITED,
     "targetMeanConVelMps" to Append.INHERITED,
@@ -166,6 +172,11 @@ private fun slot(
     // field being cleared where the anchor had something to clear.
     plannedSide = side,
     implementCount = 2,
+    // Neither is the field's default: an inheritance pin comparing two copies
+    // of a default value cannot fail, the reason `progression` below is not
+    // WEIGHT here either.
+    implement = Implement.DUMBBELL,
+    barKg = 25.0,
     exerciseNotes = "Brace before the first rep",
     exerciseNotesBehindTap = "Elbows under the bar",
     targetMeanConVelMps = 0.45,
@@ -226,6 +237,8 @@ private fun timedSlot(setIndexInExercise: Int, setsInExercise: Int) = PlannedSlo
     plannedTempo = null,
     side = "right",
     implementCount = 1,
+    implement = Implement.BARBELL,
+    barKg = 15.0,
     exerciseNotes = "Ribs down",
     exerciseNotesBehindTap = null,
     targetMeanConVelMps = null,

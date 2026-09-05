@@ -86,7 +86,6 @@ import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PlanValueCaption
-import com.macrophage.barspeed.model.PlateMath
 import com.macrophage.barspeed.model.PreviewBlock
 import com.macrophage.barspeed.model.RecordExitPolicy
 import com.macrophage.barspeed.model.RemoveSetControl
@@ -129,6 +128,7 @@ import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
 import com.macrophage.barspeed.record.SetRating
+import com.macrophage.barspeed.record.cardInstruction
 import com.macrophage.barspeed.record.previewSet
 import com.macrophage.barspeed.record.soleSilenceOver
 import com.macrophage.barspeed.ui.BarColors
@@ -3970,42 +3970,11 @@ private fun SlotCard(
                 Spacer(Modifier.height(4.dp))
                 ExpandableNote(slot.exerciseNotes, slot.exerciseNotesBehindTap, BarColors.Amber)
             }
-            // The plate line is an INSTRUCTION, not a description: the title
-            // above keeps stating what the plan asked for, but telling the
-            // lifter to load 100 while they have said 90 would be telling them
-            // to do the wrong thing. This also opens a case that could not
-            // arise before -- a barbell slot the plan gave no load for now
-            // draws a line once the lifter states one -- which is wanted:
-            // there was nothing to compute from before, and there is now.
-            //
-            // "Pick up" REPLACES the plate line rather than sitting beside it,
-            // and a DECLARED count beats an INFERRED bar, which is the
-            // precedence used everywhere else here. You cannot load plates per
-            // side onto two dumbbells, and usesBarbell is a guess from the
-            // exercise id while the count is not guessed at all.
-            //
-            // Both lines read the same load, which is the ADDED load: the
-            // slot's own number, or what the lifter has stated in its place.
-            // Never a body-weight-inclusive total -- see ImplementLoad.
-            //
-            // No plate line on body-weight work, whatever usesBarbell says.
-            // That flag is inferred from the exercise id where the plan does
-            // not declare it, and "pull_up" carries none of the non-barbell
-            // hints, so a weighted pull-up currently draws "Plates/side: 5
-            // (20 kg bar)" -- an instruction to load a bar that is not in the
-            // movement. The "Pick up" line survives, because a plate held on a
-            // dip belt or a pair of dumbbells on a weighted dip is a real
-            // thing to pick up. #160.
-            val instructionKg = (plateLoadKgOverride ?: slot.loadKg)?.takeIf { it > 0 }
-            val instruction =
-                if (ImplementLoad.count(slot.implementCount) > 1) {
-                    ImplementLoad.decomposition(instructionKg, slot.implementCount, unit)
-                        ?.let { "Pick up: $it" }
-                } else if (slot.exercise.usesBarbell && !slot.exercise.bodyweight) {
-                    instructionKg?.let { plateLine(it, unit) }
-                } else {
-                    null
-                }
+            // What to pick up, or how to load the bar. The decision moved
+            // to `PlannedSlot.cardInstruction` so that a test can run it --
+            // nothing in this repository can reach a composable -- and the
+            // rules it used to state here moved with it, unchanged.
+            val instruction = slot.cardInstruction(unit, plateLoadKgOverride)
             instruction?.let {
                 Spacer(Modifier.height(4.dp))
                 Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Blue)
@@ -4029,23 +3998,6 @@ private fun FinishedStage(state: RecordState, navController: NavController) {
         onClick = { navController.navigate("home") { popUpTo("home") { inclusive = true } } },
         modifier = Modifier.fillMaxWidth(),
     ) { Text("Done") }
-}
-
-/** "Plates/side: 45 + 25 + 2.5 (45 lb bar)" for barbell lifts. */
-private fun plateLine(loadKg: Double, unit: WeightUnit): String? {
-    val breakdown = PlateMath.perSide(loadKg, unit)
-    val barText = "${trim(breakdown.barWeight)} ${unit.suffix} bar"
-    return when {
-        breakdown.belowBar -> "Below bar weight ($barText)"
-        breakdown.platesPerSide.isEmpty() && breakdown.leftoverPerSide == 0.0 -> "Empty bar ($barText)"
-        else -> {
-            val plates = breakdown.platesPerSide.joinToString(" + ") { trim(it) }
-            val leftover =
-                breakdown.leftoverPerSide.takeIf { it > 0 }
-                    ?.let { " (+${trim(it)} short)" } ?: ""
-            "Plates/side: $plates$leftover ($barText)"
-        }
-    }
 }
 
 private fun formatMmSs(totalS: Int): String = String.format(Locale.US, "%d:%02d", totalS / 60, totalS % 60)

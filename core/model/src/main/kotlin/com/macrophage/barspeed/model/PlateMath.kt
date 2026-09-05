@@ -22,9 +22,25 @@ object PlateMath {
 
     private const val EPSILON = 0.05
 
-    /** Break a total load (kg canonical) into per-side plates in the display unit. */
-    fun perSide(totalKg: Double, unit: WeightUnit): PlateBreakdown {
-        val bar = if (unit == WeightUnit.KG) KG_BAR else LB_BAR
+    /** The bar this unit assumes when the plan declares none: 45 lb or 20 kg. */
+    fun defaultBar(unit: WeightUnit): Double = if (unit == WeightUnit.KG) KG_BAR else LB_BAR
+
+    /**
+     * Break a total load (kg canonical) into per-side plates in the display
+     * unit.
+     *
+     * [barKgOverride] is the plan's own bar for this exercise -- a 35 lb bar,
+     * a trap bar, a fixed bar -- in kilograms, the canonical unit everything
+     * else is stored in; null takes [defaultBar]. It is rounded to a hundredth
+     * of the display unit for the same reason a plate is: a 35 lb bar written
+     * by the plan arrives here as 15.876 kg and comes back as 34.99999999996
+     * lb, which is not a thing to print beside a rack.
+     */
+    fun perSide(totalKg: Double, unit: WeightUnit, barKgOverride: Double? = null): PlateBreakdown {
+        val bar =
+            barKgOverride
+                ?.let { Math.round(unit.fromKg(it) * 100.0) / 100.0 }
+                ?: defaultBar(unit)
         val plates = if (unit == WeightUnit.KG) KG_PLATES else LB_PLATES
         val total = unit.fromKg(totalKg)
         if (total < bar - EPSILON) {
