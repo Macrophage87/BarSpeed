@@ -311,24 +311,36 @@ class TempoAdjustPolicyTest {
         assertEquals("1", TempoAdjustPolicy.steppedValue("1010", wheel(TempoAdjustPolicy.DOWN_STROKE), -5))
         assertFalse(TempoAdjustPolicy.canStep("1010", wheel(TempoAdjustPolicy.DOWN_STROKE), -1), "no tap left to offer")
         assertEquals("1", TempoAdjustPolicy.steppedValue("3020", wheel(TempoAdjustPolicy.UP_STROKE), -1))
-        assertEquals("1", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.UP_STROKE), -1))
+        assertEquals(
+            "X",
+            TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.UP_STROKE), -1),
+            "one second is the floor of a stroke's SECONDS; on the drive there is one more tap below it, #251",
+        )
     }
 
     /**
-     * The up stroke steps into X and stops, and steps back out into 9.
+     * The drive steps DOWN into X and stops, and steps back out into 1.
      *
-     * "X" is the last entry of the up stroke's choices and nothing else needed
-     * saying: no new alphabet, no second statement of where X is legal. It is
-     * the top of that digit's range because there is nothing faster than as
-     * fast as possible.
+     * INVERTED by #251, and the sentence that used to be here -- "X is the last
+     * entry of the up stroke's choices ... the top of that digit's range" -- is
+     * deleted rather than reworded, because it was the defect. X is the FASTEST
+     * stroke there is, so putting it past 9 put it at the SLOW end of the
+     * range: one mis-tap past a nine-second stroke produced an explosive one,
+     * and the lifter who wanted an explosive drive had to walk up through eight
+     * values to reach it. Below 1 is where it belongs, and where the owner's
+     * ask put it.
+     *
+     * `TempoStrokeRoleContractTest` carries the other half -- that this is the
+     * DRIVE's range and not digit 3's.
      */
     @Test
-    fun `the up stroke steps into X at the top and back out into nine`() {
-        assertEquals("X", TempoAdjustPolicy.steppedValue("3090", wheel(TempoAdjustPolicy.UP_STROKE), 1))
-        assertEquals("X", TempoAdjustPolicy.steppedValue("30X0", wheel(TempoAdjustPolicy.UP_STROKE), 1))
-        assertFalse(TempoAdjustPolicy.canStep("30X0", wheel(TempoAdjustPolicy.UP_STROKE), 1), "nothing faster than X")
-        assertEquals("9", TempoAdjustPolicy.steppedValue("30X0", wheel(TempoAdjustPolicy.UP_STROKE), -1))
-        assertEquals("30X0", tapped("3090", TempoAdjustPolicy.UP_STROKE, 1))
+    fun `the drive steps below one into X and back out into one`() {
+        assertEquals("X", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.UP_STROKE), -1))
+        assertEquals("X", TempoAdjustPolicy.steppedValue("30X0", wheel(TempoAdjustPolicy.UP_STROKE), -1))
+        assertFalse(TempoAdjustPolicy.canStep("30X0", wheel(TempoAdjustPolicy.UP_STROKE), -1), "nothing faster than X")
+        assertEquals("1", TempoAdjustPolicy.steppedValue("30X0", wheel(TempoAdjustPolicy.UP_STROKE), 1))
+        assertEquals("9", TempoAdjustPolicy.steppedValue("3090", wheel(TempoAdjustPolicy.UP_STROKE), 1))
+        assertEquals("30X0", tapped("3010", TempoAdjustPolicy.UP_STROKE, -1))
     }
 
     /** A pause steps down to zero -- the pause where the lifter does not stop -- and stops. */
@@ -353,8 +365,8 @@ class TempoAdjustPolicyTest {
     fun `a step past the end of the range clamps rather than wrapping`() {
         assertEquals("9", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.DOWN_STROKE), 99))
         assertEquals("9", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.BOTTOM_PAUSE), 99))
-        assertEquals("X", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.UP_STROKE), 99))
-        assertEquals("1", TempoAdjustPolicy.steppedValue("3050", wheel(TempoAdjustPolicy.UP_STROKE), -99))
+        assertEquals("9", TempoAdjustPolicy.steppedValue("3010", wheel(TempoAdjustPolicy.UP_STROKE), 99))
+        assertEquals("X", TempoAdjustPolicy.steppedValue("3050", wheel(TempoAdjustPolicy.UP_STROKE), -99))
         assertEquals("0", TempoAdjustPolicy.steppedValue("3919", wheel(TempoAdjustPolicy.TOP_PAUSE), -99))
         assertEquals("1", TempoAdjustPolicy.steppedValue("3919", wheel(TempoAdjustPolicy.DOWN_STROKE), -99))
     }

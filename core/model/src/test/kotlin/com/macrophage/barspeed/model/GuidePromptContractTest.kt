@@ -427,6 +427,23 @@ class GuidePromptContractTest {
         )
     }
 
+    /**
+     * A stroke digit may not be 0, and the prompt is where a plan author is
+     * told so BEFORE the gate refuses their document (#251).
+     *
+     * The gate now rejects `0010` and `3000` by path. A refusal the prompt did
+     * not warn about is a plan bounced for a rule its author had no way to
+     * read: the published schema states it, and nothing sends the published
+     * schema anywhere. This is the copy that reaches the model.
+     */
+    @Test
+    fun `the plan prompt says a stroke digit may not be zero`() {
+        assertTrue(
+            "only the two pauses" in prompt,
+            "the plan prompt never says that only the pause digits may be 0",
+        )
+    }
+
     private companion object {
         /**
          * The source spelling of the interpolation both version sites use. The
