@@ -26,6 +26,15 @@ import kotlin.test.assertTrue
  * unqualified one, so restoring the old sentence fails the assertion that the
  * old sentence is gone.
  *
+ * WHAT THIS PIN DOES NOT COVER, stated because a green pin reads as
+ * coverage. It asserts the PLAN_PROMPT source string; it says nothing
+ * about how that string DRAWS. PLAN_PROMPT is rendered on the Guide screen
+ * as well as copied by the COPY PLAN PROMPT button, and nothing in this
+ * repository can run a Compose screen. The corrected passage was read off a
+ * device once, on the headless AVD barspeed-api35, and that was a bench run
+ * rather than a check CI repeats -- see the commit that added this
+ * paragraph. What a coach's model then DOES with the copy stays [Field].
+ *
  * The Kotlin twin is pinned by [VelocityLossRegimeTest] and
  * `VelocityLossRegimeTempoScheduleContractTest` for its BEHAVIOUR; what cannot
  * be reached from a test is a KDoc, so `SessionExport`'s and
