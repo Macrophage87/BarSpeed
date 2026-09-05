@@ -29,9 +29,11 @@ import kotlin.test.assertEquals
  *
  * [RepMarkTrackTest] measures that every mark on this corpus is a row of the
  * same capture's cue track, so scoring against them is scoring against the
- * metronome. It says whether a call landed on the rep the GUIDE called, which
- * is the rep the lifter performed on 102 of these 103 marks -- session 37 set
- * 2 is the exception, 6 reps recorded against 7 marks.
+ * metronome. It says whether a call landed on the rep the GUIDE called. 102
+ * of these 103 marks have a performed rep behind them BY COUNT -- session 37
+ * set 2 recorded 6 against 7 marks -- but a count is not a correspondence,
+ * and which performed rep sits on a given mark is not readable from a
+ * metronome track.
  *
  * What it cannot settle is issue #145's actual subject. Every capture here is
  * a tempo set with a 1 to 4 second prescribed eccentric; a straight-rep set is
@@ -48,17 +50,44 @@ import kotlin.test.assertEquals
  * the detector undercounts a twelve-rep pulldown` and `the back squat names a
  * seventh rep on a six-rep set` write out what that sounds like.
  *
+ * Those are AFTER numbers, and the total hides what the change did. The
+ * closed-run rule that produced them -- the commit `Speak only the reps whose
+ * drive the detector has finished watching` -- left the total of 11 exactly
+ * where it found it while moving the per-capture counts under it: four
+ * captures' right counts FELL and two ROSE. That is the cancellation the
+ * table below exists to stop being read as no change. All six are named, with
+ * both 40-char SHAs and the command that measured them, in the body of the
+ * commit that added the [Row.batchSpans] column.
+ *
  * So this does NOT clear #145's bar, which its own comment states as zero
  * wrong numbers, and nothing in `:app` is un-gated on the strength of it. The
  * bottleneck is measured and it is not the pairing rule this branch unified:
  * the batch path over the same captures resolves 5 to 15 spans per set where
- * this resolves 0 to 8, on the same rule and a different velocity. That is
+ * this resolves 0 to 8, on the same rule and a different velocity. Both
+ * ranges are now read off the table below and asserted by `the batch path
+ * resolves five to fifteen spans per set where the caller speaks zero to
+ * eight`; the commit named above put the same range in its body with nothing
+ * computing it, which was a claim stronger than its evidence. That gap is
  * issue #94's live-tracker estimate, which #145 already names as its
  * prerequisite.
  */
 class LiveRepCallCorpusTest {
-    /** marks on the track, calls made, calls in the right window, samples contradicted. */
-    private data class Row(val marks: Int, val calls: Int, val right: Int, val contradicted: Int)
+    /**
+     * marks on the track, calls made, calls in the right window, samples
+     * contradicted, and the spans the BATCH path resolves over the same
+     * capture.
+     *
+     * [batchSpans] is a column rather than a sentence because the gap between
+     * it and [calls] is this branch's headline conclusion, and a headline
+     * conclusion nothing computes is the defect class this file keeps finding.
+     */
+    private data class Row(
+        val marks: Int,
+        val calls: Int,
+        val right: Int,
+        val contradicted: Int,
+        val batchSpans: Int,
+    )
 
     private fun load(n: String): List<ImuSample> = ImuCsv.decode(
         javaClass.getResourceAsStream("/$n.csv")!!.readBytes().decodeToString(),
@@ -103,6 +132,31 @@ class LiveRepCallCorpusTest {
         }
     }
 
+    /**
+     * What the batch path's segmenter resolves over the WHOLE capture.
+     *
+     * `SetAnalyzer.analyze` builds its series as `VelocityEstimator.estimate(
+     * samples, config, measuredPlane)`, then `orient`, then
+     * `mappedToLifter(sensorToLifter)`. `orient` is private and returns its
+     * argument unchanged unless `measuredPlane == HORIZONTAL`; every capture
+     * here measures VERTICAL, so reproducing the pipeline without it is exact
+     * and not an approximation. `every capture here is measured vertically, so
+     * the batch series needs no orientation` is what keeps that true the day a
+     * capture is added.
+     *
+     * Counted off `RepSegmenter.segment`, not off `analysis.reps`: `analyze`
+     * bounds the span list at BOTH ends before publishing reps -- the set-end
+     * cue at the tail and the work-start instant at the head -- and the number
+     * worth comparing against [Row.calls] is what the segmenter resolved on
+     * the same pairing rule the caller runs, before any bound is applied.
+     */
+    private fun batchSpans(fixture: String, direction: LiftDirection): Int {
+        val config = DspConfig()
+        val series = VelocityEstimator.estimate(load(fixture), config, direction.measuredPlane)
+            .mappedToLifter(direction.sensorToLifter)
+        return RepSegmenter.segment(series, direction, config).size
+    }
+
     private fun rows(): Map<String, Row> = LiveRepCallCorpus.ALL.associate { (fixture, direction) ->
         val scored = score(fixture, direction)
         fixture to Row(
@@ -110,6 +164,7 @@ class LiveRepCallCorpusTest {
             scored.calls.size,
             rightCount(fixture, scored.calls),
             scored.contradicted,
+            batchSpans(fixture, direction),
         )
     }
 
@@ -140,19 +195,19 @@ class LiveRepCallCorpusTest {
     fun `what the thirteen captures make the caller say`() {
         assertEquals(
             mapOf(
-                "field-backsquat-4011-6rep-s36-set01" to Row(6, 7, 1, 0),
-                "field-rdl-3010-10rep-s36-set05" to Row(10, 0, 0, 0),
-                "field-legpress-single-2011-8rep-s36-set07" to Row(8, 8, 1, 0),
-                "field-ohp-3010-6rep-s37-set02" to Row(7, 0, 0, 0),
-                "field-ohp-prepinflated-s37-set03" to Row(7, 3, 3, 0),
-                "field-ohp-prepinflated-s37-set04" to Row(5, 1, 1, 0),
-                "field-bench-3010-6rep-s37-set05" to Row(6, 1, 0, 0),
-                "field-bench-3010-6rep-s37-set06" to Row(6, 0, 0, 0),
-                "field-pullup-3010-8rep-s37-set09" to Row(8, 2, 1, 0),
-                "field-inclinepress-3010-12rep-s38-set02" to Row(12, 4, 3, 0),
-                "field-ohp-3010-8rep-s38-set04" to Row(8, 0, 0, 0),
-                "field-ohp-3010-8rep-s38-set05" to Row(8, 2, 0, 0),
-                "field-latpulldown-1120-12rep-s38-set14" to Row(12, 7, 1, 0),
+                "field-backsquat-4011-6rep-s36-set01" to Row(6, 7, 1, 0, 9),
+                "field-rdl-3010-10rep-s36-set05" to Row(10, 0, 0, 0, 11),
+                "field-legpress-single-2011-8rep-s36-set07" to Row(8, 8, 1, 0, 10),
+                "field-ohp-3010-6rep-s37-set02" to Row(7, 0, 0, 0, 9),
+                "field-ohp-prepinflated-s37-set03" to Row(7, 3, 3, 0, 11),
+                "field-ohp-prepinflated-s37-set04" to Row(5, 1, 1, 0, 7),
+                "field-bench-3010-6rep-s37-set05" to Row(6, 1, 0, 0, 5),
+                "field-bench-3010-6rep-s37-set06" to Row(6, 0, 0, 0, 6),
+                "field-pullup-3010-8rep-s37-set09" to Row(8, 2, 1, 0, 6),
+                "field-inclinepress-3010-12rep-s38-set02" to Row(12, 4, 3, 0, 13),
+                "field-ohp-3010-8rep-s38-set04" to Row(8, 0, 0, 0, 9),
+                "field-ohp-3010-8rep-s38-set05" to Row(8, 2, 0, 0, 15),
+                "field-latpulldown-1120-12rep-s38-set14" to Row(12, 7, 1, 0, 14),
             ),
             rows(),
         )
@@ -175,6 +230,43 @@ class LiveRepCallCorpusTest {
         assertEquals(4, r.count { it.calls == 0 })
         assertEquals(2, r.count { it.calls > 0 && it.right == it.calls })
         assertEquals(7, r.count { it.calls > 0 && it.right < it.calls })
+    }
+
+    /**
+     * The batch path resolves more spans than the caller speaks, and by how
+     * much at each end.
+     *
+     * The class KDoc's "5 to 15 spans per set where this resolves 0 to 8" was
+     * prose over a table that did not hold the first number. It holds it now
+     * and this is where the range is checked, so the sentence and the tree
+     * cannot drift apart. Bounds rather than a per-capture list because the
+     * per-capture list IS the table above; what this adds is that neither end
+     * of either range can move without a failure.
+     */
+    @Test
+    fun `the batch path resolves five to fifteen spans per set where the caller speaks zero to eight`() {
+        val r = rows().values
+        assertEquals(5, r.minOf { it.batchSpans })
+        assertEquals(15, r.maxOf { it.batchSpans })
+        assertEquals(0, r.minOf { it.calls })
+        assertEquals(8, r.maxOf { it.calls })
+    }
+
+    /**
+     * Every capture here is measured vertically.
+     *
+     * [batchSpans] reproduces `SetAnalyzer.analyze`'s series without its
+     * private `orient` stage, which is exact only while no capture measures
+     * HORIZONTAL. The day one does, this reds and says so, rather than
+     * [batchSpans] quietly reporting a number the batch path would not have
+     * produced.
+     */
+    @Test
+    fun `every capture here is measured vertically, so the batch series needs no orientation`() {
+        assertEquals(
+            LiveRepCallCorpus.ALL.associate { (f, _) -> f to MovementPlane.VERTICAL },
+            LiveRepCallCorpus.ALL.associate { (f, d) -> f to d.measuredPlane },
+        )
     }
 
     /**
