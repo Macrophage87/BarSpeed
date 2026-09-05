@@ -102,6 +102,7 @@ import com.macrophage.barspeed.model.SetCardValue
 import com.macrophage.barspeed.model.SetCardValues
 import com.macrophage.barspeed.model.SetEndControl
 import com.macrophage.barspeed.model.SetEndControlPolicy
+import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLimiterGroup
 import com.macrophage.barspeed.model.SetLimiterPagePlacement
@@ -113,6 +114,8 @@ import com.macrophage.barspeed.model.SetRepsPolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.SideChoicePolicy
 import com.macrophage.barspeed.model.Stage
+import com.macrophage.barspeed.model.StartCue
+import com.macrophage.barspeed.model.StartCuePolicy
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TempoDigit
@@ -2229,14 +2232,68 @@ private fun GuidedSetStage(state: RecordState, viewModel: RecordViewModel, slot:
             }
         }
         Spacer(Modifier.height(14.dp))
-        Text(
-            "Follow the voice — the app counts the reps.",
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Sub,
-        )
+        // The prep is the only moment this can be read: once the cadence
+        // starts the lifter is moving, and the line the voice is about to say
+        // is no use after it has said it.
+        if (state.leadInRunning) {
+            StartCueBlock(startCueFor(state, slot))
+        } else {
+            Text(
+                "Follow the voice — the app counts the reps.",
+                style = MaterialTheme.typography.bodySmall,
+                color = BarColors.Sub,
+            )
+        }
         Spacer(Modifier.height(24.dp))
         EndSetControl(state, viewModel)
     }
+}
+
+/**
+ * Where the coming rep starts, drawn under the ring while the prep counts down
+ * (#241).
+ *
+ * Headline type rather than the body style the line it replaces uses, because
+ * the lifter reading it is standing at the bar with the phone on the floor or a
+ * bench. [StartCue.marker] is drawn only when it is present and in the warning
+ * colour: it says the app GUESSED the start from words in the exercise id, so
+ * the plan is worth checking before the first rep goes the wrong way.
+ *
+ * It decides nothing. Every word comes from [StartCuePolicy], in `:core:model`,
+ * where a test runs on every push; nothing in this file is reachable by one.
+ */
+@Composable
+private fun StartCueBlock(cue: StartCue) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            cue.phrase,
+            style = MaterialTheme.typography.headlineSmall,
+            color = BarColors.Volt,
+            textAlign = TextAlign.Center,
+        )
+        cue.marker?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = BarColors.Amber)
+        }
+    }
+}
+
+/**
+ * The start cue for the set now being prepped.
+ *
+ * The geometry comes off the slot the plan resolved, so what is shown is what
+ * `SetAnalyzer` will be handed and what the export will publish -- never a
+ * second resolution of the same question. An ad-hoc set has no slot and no
+ * plan, so its provenance is asked of [SetGeometryPolicy.describe] with no
+ * declaration, which is the same call `RecordViewModel` makes when it freezes
+ * an ad-hoc set's geometry into the pending write.
+ */
+private fun startCueFor(state: RecordState, slot: PlannedSlot?): StartCue {
+    val exercise = state.currentExercise
+    val source =
+        slot?.geometry?.sources?.startsWith
+            ?: SetGeometryPolicy.describe(exercise, declared = null).sources.startsWith
+    return StartCuePolicy.of(exercise.startsWith, exercise.concentricUp, exercise.horizontal, source)
 }
 
 /** Sensorless set: the lifter taps to count reps; the ring tracks planned progress. */

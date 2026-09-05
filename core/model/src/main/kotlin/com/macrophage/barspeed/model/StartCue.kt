@@ -86,11 +86,6 @@ object StartCuePolicy {
     /**
      * The cue for a lift with this geometry.
      *
-     * Not implemented at this commit. The symbol exists so the differentials
-     * that pin the exact words can compile and red one assertion at a time;
-     * there was no earlier behaviour to lift, because the prep countdown said
-     * nothing about the start at all. Nothing calls this yet.
-     *
      * Takes the four values it reads rather than an [ExerciseDef] and a
      * [ResolvedGeometry]: `horizontal` and `startsWith` come off the definition
      * the set will run against, while [source] comes off the slot's stored
@@ -101,6 +96,50 @@ object StartCuePolicy {
      *   plane the sensor happens to travel in. A stack-mounted sensor on a
      *   seated row moves vertically and the lifter still does not.
      */
-    fun of(startsWith: StartPhase, concentricUp: Boolean, horizontal: Boolean, source: GeometrySource): StartCue =
-        TODO("#241 start cue for $startsWith/up=$concentricUp/horizontal=$horizontal/$source")
+    fun of(startsWith: StartPhase, concentricUp: Boolean, horizontal: Boolean, source: GeometrySource): StartCue {
+        val word = firstMovementWord(startsWith, concentricUp, horizontal)
+        return StartCue(phrase = phrase(word, horizontal), word = word, marker = marker(source))
+    }
+
+    /**
+     * The word the first stroke of every rep is called by.
+     *
+     * The same three inputs `TempoSchedule.of` resolves its first stroke's
+     * label from, in the same order of questions: horizontal work is called by
+     * PHASE because there is no up or down on a seated row, and vertical work
+     * by DIRECTION. Stated twice in two modules, so it is pinned equal in
+     * `:core:dsp` rather than trusted.
+     */
+    fun firstMovementWord(startsWith: StartPhase, concentricUp: Boolean, horizontal: Boolean): String = when {
+        horizontal -> if (startsWith == StartPhase.CONCENTRIC) DRIVE else RETURN
+        ExerciseDef.startsAtTop(startsWith, concentricUp) -> DOWN
+        else -> UP
+    }
+
+    /**
+     * Where the lifter stands before the first movement, said in the plane's
+     * own words.
+     *
+     * Horizontal work gets the movement and NOT a position, deliberately.
+     * Issue #241 asked for `"Start EXTENDED, first movement RETURN"` and
+     * `"Start CONTRACTED, first movement DRIVE"`, and neither is written here:
+     * the pairing is inverted -- a rep that opens on the RETURN opens from the
+     * contracted end, because the drive is what got the lifter there -- and
+     * even corrected it would be wrong on half the machines it applies to. The
+     * drive of a seated row ends contracted and the drive of a chest press ends
+     * extended, and nothing in [ExerciseDef] distinguishes a horizontal pull
+     * from a horizontal press. The word is what the app knows; the position is
+     * not.
+     */
+    private fun phrase(word: String, horizontal: Boolean): String = when {
+        horizontal -> "First movement $word"
+        word == DOWN -> "Start at the TOP, first movement $DOWN"
+        else -> "Start at the BOTTOM, first movement $UP"
+    }
+
+    private fun marker(source: GeometrySource): String? = when (source) {
+        GeometrySource.DECLARED, GeometrySource.SEEDED -> null
+        GeometrySource.INFERRED -> GUESSED_MARKER
+        GeometrySource.DEFAULT -> UNDECLARED_MARKER
+    }
 }
