@@ -293,4 +293,49 @@ class SchemaProgressionContractTest {
             "the progression sentence does not connect to the step-up rule: $sentence",
         )
     }
+
+    /**
+     * #244's round 2, finding 1. Round 1 deleted the word "only" from the
+     * schema's copy of this sentence and left the CANONICAL copy standing.
+     * `PLAN_PROMPT` is what the COPY PLAN PROMPT button puts on the
+     * clipboard, so it is the copy a coach actually reads, and it contradicts
+     * itself one clause later: "It decides only what is OFFERED" is followed
+     * immediately by "It also decides WHICH QUESTION I am asked after the
+     * set".
+     */
+    @Test
+    fun `the plan prompt no longer says the progression decides only what is offered`() {
+        val sentence = prompt.lineSequence().first { "\"progression\"" in it }
+        assertTrue(
+            "It decides only what is OFFERED" !in sentence,
+            "the prompt still says the key decides ONLY what is offered, one clause before saying " +
+                "it also decides which question the rating asks",
+        )
+        assertTrue(
+            "It decides what is OFFERED" in sentence,
+            "the prompt no longer tells the coach the key decides what is offered at all",
+        )
+    }
+
+    /**
+     * #244's round 2, finding 2. The prompt summarised the import gate as
+     * saying the grid has nothing to offer -- the inert-declaration framing
+     * round 1 declared false and corrected in `Plan.progressionVsSets`'s KDoc
+     * and in both messages it returns. The prompt's summary of that gate has
+     * to carry the same cost the gate now names, because a coach reading only
+     * the prompt would otherwise treat a mismatched declaration as harmless.
+     */
+    @Test
+    fun `the plan prompt says a mismatched progression still words the rating`() {
+        val sentence = prompt.lineSequence().first { "\"progression\"" in it }
+        assertTrue(
+            "the grid has nothing to offer, and that the rating after each set is worded in " +
+                "that dimension anyway" in sentence,
+            "the prompt still describes the gate as reporting an inert declaration",
+        )
+        assertTrue(
+            "rpeScale records it" in sentence,
+            "the prompt never says the wrong question is frozen onto the row",
+        )
+    }
 }
