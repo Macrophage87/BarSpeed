@@ -34,30 +34,54 @@ import kotlinx.serialization.Serializable
  * no part -- an earlier draft of #250 had it in the rule and the owner dropped
  * it.
  *
- * ## Reading the concentric digit
+ * ## Reading the concentric digit: the PLANE first, the direction second
  *
- * Tempo digits are POSITIONAL, so the concentric is digit 3 when the drive
- * moves up and digit 1 when it moves down -- a leg curl, a lat pulldown, a
- * pushdown. Reading digit 3 blindly gets every concentric-down lift backwards,
- * which is `PhaseTempoTarget`'s and `TempoSchedule`'s own lesson (#127).
+ * Horizontal work is read by PHASE -- digit 1 the eccentric, digit 3 the
+ * concentric -- because a seated row or a chest press has no up and no down
+ * for a positional reading to attach to. Only VERTICAL work is POSITIONAL, and
+ * there the concentric is digit 3 when the drive moves up and digit 1 when it
+ * moves down: a leg curl, a lat pulldown, a pushdown. `TempoSchedule.of` says
+ * the same two-step rule as `digit1IsConcentric = if (horizontal) false else
+ * !concentricUp`, and `TempoAdjustPolicy.digits` says it a third time.
+ * `VelocityLossRegimeTempoScheduleContractTest` in `:core:dsp` pins this file
+ * equal to `TempoSchedule`, because `:core:dsp` is the only module that can
+ * import both.
+ *
+ * CORRECTION, carried forward rather than reworded away. This section stated
+ * the positional half as the whole rule -- "Tempo digits are POSITIONAL, so
+ * the concentric is digit 3 when the drive moves up and digit 1 when it moves
+ * down" -- and [of] was written to match, taking no plane at all. That is
+ * round 1 finding 2 on this branch. A set declared `plane: horizontal` with
+ * `concentric: down` and prescribed `30X0` came out [CONTROLLED] while the
+ * voice guide called digit 3 the DRIVE and gave it no count, so the history
+ * card withheld the velocity pill on a set whose drive speed nothing had
+ * fixed. Reading digit 3 blindly gets every VERTICAL concentric-down lift
+ * backwards, which is `PhaseTempoTarget`'s and `TempoSchedule`'s own lesson
+ * (#127); reading the direction blindly got every horizontal one backwards,
+ * which was this file's.
  *
  * WHAT TODAY'S CONTRACT ALLOWS, stated because the rule above is wider than it.
  * The plan schema's tempo pattern accepts `X` only in digit 3
- * (`[0-9]{2}[Xx][0-9]`) and [Tempo.parse] refuses a non-numeric digit 1, so a
- * concentric-DOWN lift cannot declare an explosive concentric at all: its
- * digit 1 is always a number and it is therefore always [CONTROLLED] whenever
- * it carries a tempo. That is a limit of the contract, not of this decision --
- * the branch that would return [MAX_INTENT] for it is written and unreachable.
- * Widening the pattern is its own piece of work, filed as #258, because it
- * changes [Tempo]'s shape, the plan schema under its unreleased number, the
- * voice guide and the tempo scorer together.
+ * (`[0-9]{2}[Xx][0-9]`) and [Tempo.parse] refuses a non-numeric digit 1. So a
+ * VERTICAL concentric-DOWN lift cannot declare an explosive concentric at all:
+ * its digit 1 is always a number and it is therefore always [CONTROLLED]
+ * whenever it carries a tempo, and the branch that would return [MAX_INTENT]
+ * for it is written and unreachable. HORIZONTAL work is not in that position.
+ * Its concentric IS digit 3, whatever `concentric` the plan declared beside
+ * `plane`, so `30X0` on a chest press or a chest-supported row is [MAX_INTENT]
+ * under today's contract -- reachable, and the case the correction above
+ * names. Widening the pattern for vertical concentric-down work is its own
+ * piece of work, filed as #258, because it changes [Tempo]'s shape, the plan
+ * schema under its unreleased number, the voice guide and the tempo scorer
+ * together.
  *
  * ## Absence is a state
  *
  * [of] returns null where the regime is not decidable rather than picking a
  * word. Three inputs do that: a set whose geometry was never stored (every set
- * recorded before that column existed), a tempo string this build cannot parse,
- * and a hold or a carry, which has no concentric velocity for the question to
+ * recorded before that column existed, and with it the plane and the drive
+ * direction), a tempo string this build cannot parse, and a hold or a carry,
+ * which has no concentric velocity for the question to
  * be about. A reader that finds no word reads the set the way every reader read
  * every set before this key existed, which is [MAX_INTENT]'s reading -- so
  * absence loses nothing and claims nothing.
@@ -102,27 +126,14 @@ enum class VelocityLossRegime(
          * own -- unlike `rpeScale`, which records a question a lifter was shown
          * and has to be frozen.
          *
-         * [horizontal] IS ACCEPTED HERE AND NOT YET READ. Round 1 finding 2 on
-         * this branch: the digit rule below is written as though the drive
-         * direction alone decided which digit the concentric is, and
-         * `TempoSchedule.of` reads the PLANE first -- digit 3 is the concentric
-         * whenever the movement is horizontal, whatever `concentricUp` says.
-         * This commit only widens the input, so the differential can be written
-         * against a signature that will not move under it; the commit after
-         * this one reds the case and the one after that reads the plane.
-         *
-         * Nullable rather than the plain `Boolean` the finding asked for, and
-         * that is deliberate: `ResolvedGeometry` is stored present-or-absent as
-         * a unit, so two of the three call sites hold `geometry?.horizontal`,
-         * and defaulting a missing plane to `false` would state a plane no row
-         * recorded. [kind] being null already ends the decision before the
-         * plane is asked for.
+         * [horizontal] is nullable rather than the plain `Boolean` round 1
+         * finding 2 asked for, and that is deliberate: `ResolvedGeometry` is
+         * stored present-or-absent as a unit, so two of the three call sites
+         * hold `geometry?.horizontal`, and defaulting a missing plane to
+         * `false` would state a plane no row recorded. [kind] being null
+         * already ends the decision before the plane is asked for, so the
+         * nullability costs no reachable branch.
          */
-        // Transitional and deleted by the commit that reads the plane. detekt
-        // 1.23.8's UnusedParameter is active through buildUponDefaultConfig and
-        // fires on a public companion function, so "widen now, read next
-        // commit" cannot be expressed without saying so here.
-        @Suppress("UnusedParameter")
         fun of(
             tempoPrescribed: String?,
             concentricUp: Boolean?,
@@ -137,21 +148,32 @@ enum class VelocityLossRegime(
             kind == ExerciseKind.HOLD || kind == ExerciseKind.CARRY -> null
             kind == ExerciseKind.EXPLOSIVE -> MAX_INTENT
             tempoPrescribed == null -> MAX_INTENT
-            else -> ofTempo(Tempo.parseOrNull(tempoPrescribed), concentricUp)
+            else -> ofTempo(Tempo.parseOrNull(tempoPrescribed), concentricUp, horizontal)
         }
 
-        private fun ofTempo(tempo: Tempo?, concentricUp: Boolean?): VelocityLossRegime? = when {
+        private fun ofTempo(tempo: Tempo?, concentricUp: Boolean?, horizontal: Boolean?): VelocityLossRegime? = when {
             // A prescription this build cannot read is not the same fact as no
             // prescription: something was asked for and the digits are not
             // available to say what.
             tempo == null -> null
             // Digit 3 is a number. Whichever digit the drive is, it is a
-            // number -- digit 1 has no explosive form -- so the direction
-            // cannot change the answer and is not consulted.
+            // number -- digit 1 has no explosive form -- so neither the plane
+            // nor the direction can change the answer and neither is consulted.
             !tempo.isExplosiveUpStroke -> CONTROLLED
-            // Digit 3 is X, so the answer turns on which stroke the drive is.
-            concentricUp == true -> MAX_INTENT
-            concentricUp == false -> CONTROLLED
+            // Digit 3 is X, so the answer turns on whether digit 3 is the
+            // concentric. The PLANE decides that outright on horizontal work,
+            // where digit 3 is the concentric by phase and the declared drive
+            // direction has nothing to attach to.
+            horizontal == true -> MAX_INTENT
+            // Vertical work is positional, so here the direction decides.
+            horizontal == false && concentricUp == true -> MAX_INTENT
+            horizontal == false && concentricUp == false -> CONTROLLED
+            // No plane, or vertical with no direction: an X in digit 3 could be
+            // either stroke and nothing on the row says which. Unreachable from
+            // the three call sites -- ResolvedGeometry is stored as a unit, so
+            // a null plane means a null kind, which returned above -- and null
+            // rather than a guess for the same reason every other absence here
+            // is.
             else -> null
         }
     }

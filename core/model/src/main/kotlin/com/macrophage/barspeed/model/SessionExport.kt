@@ -1013,9 +1013,13 @@ data class SessionExport(
          * THE RULE, from the owner. `maxIntent` when the set has NO tempo, or
          * its kind is `explosive`, or the prescribed tempo's CONCENTRIC digit
          * is `X`; `controlled` otherwise. The concentric digit is read through
-         * the drive direction -- digit 3 while the drive moves up, digit 1
-         * when it moves down, on a leg curl, a lat pulldown or a pushdown --
-         * never as digit 3 blindly. The velocity TARGET plays no part.
+         * the geometry, PLANE FIRST: on horizontal work digit 3 is the
+         * concentric by phase, whatever `geometry.concentric` says, because a
+         * seated row has no up or down; only on VERTICAL work does the drive
+         * direction decide, digit 3 while it moves up and digit 1 when it
+         * moves down, on a leg curl, a lat pulldown or a pushdown. Never
+         * digit 3 blindly, and never the direction blindly. The velocity
+         * TARGET plays no part.
          *
          * `velocityLoss_pct` IS STILL PUBLISHED IN BOTH REGIMES and no key
          * stops being written. What changes for a reader is what to do with it:
@@ -1037,11 +1041,16 @@ data class SessionExport(
          * -- read velocity loss as this document has always said to, which is
          * `maxIntent`'s reading.
          *
-         * A CONCENTRIC-DOWN LIFT CANNOT BE `maxIntent` WHILE CARRYING A TEMPO,
-         * and the limit is in the plan contract rather than here: the plan
-         * schema accepts `X` only in digit 3, so digit 1 is always a number
-         * and the drive of a leg curl always has a prescribed speed. Widening
-         * that pattern is #258.
+         * A VERTICAL CONCENTRIC-DOWN LIFT CANNOT BE `maxIntent` WHILE CARRYING
+         * A TEMPO, and the limit is in the plan contract rather than here: the
+         * plan schema accepts `X` only in digit 3, so digit 1 is always a
+         * number and the drive of a leg curl always has a prescribed speed.
+         * Widening that pattern is #258. This paragraph said "a concentric-down
+         * lift", without the plane, and that was wrong for horizontal work,
+         * whose concentric IS digit 3 -- round 1 finding 2 on the branch that
+         * added this key. A chest press or a chest-supported row prescribed
+         * `30X0` is `maxIntent` under today's contract however its
+         * `geometry.concentric` was declared.
          *
          * Additive to a reader that ignores it -- no key changes type, none
          * stops being written -- but NOT to a validator, because the key is a
