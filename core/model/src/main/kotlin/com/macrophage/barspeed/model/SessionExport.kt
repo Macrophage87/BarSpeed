@@ -1003,10 +1003,12 @@ data class SessionExport(
          * asks for a one-second stroke on every rep -- so the same figure
          * measures how well the lifter held the count. Field-38 is a whole
          * session of those: sixteen dynamic sets, every one tempo-prescribed,
-         * whose figures disagree between two units on ONE BAR by 2.7 against
-         * 74.1 on set 1 and 41.9 against 36.3 on set 12. Sensors on one bar
-         * cannot disagree that far about fatigue; they can easily disagree
-         * that far about a figure that is not measuring it.
+         * and the first archive recorded with two accelerometers on every set.
+         * Its sets 12 and 13 put two units on ONE rail-guided stack -- one
+         * travel, rep counts agreeing exactly -- and the published figure
+         * still moves 5.6 and 7.3 points with the choice of unit (41.9
+         * against 36.3, and 27.0 against 19.7). One travel and one lifter
+         * leaves no fatigue in that difference.
          *
          * THE RULE, from the owner. `maxIntent` when the set has NO tempo, or
          * its kind is `explosive`, or the prescribed tempo's CONCENTRIC digit

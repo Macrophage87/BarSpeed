@@ -34,9 +34,10 @@ import kotlin.test.assertTrue
  * On a tempo-prescribed controlled movement the concentric speed IS the
  * prescription, so the same figure measures how well the lifter held the count
  * -- and nothing in the document says which of the two a reader is looking at.
- * Field-38's sixteen tempo-prescribed sets published figures that disagree
- * between two units on one bar by up to 71 points; a coach reading them as
- * fatigue reads noise as autoregulation.
+ * On the two sets of field-38 that bolted both accelerometers to ONE
+ * rail-guided stack, one travel with rep counts agreeing exactly, the published
+ * figure still moved 5.6 and 7.3 points with the choice of unit; a coach reading
+ * those as fatigue reads the mount as autoregulation.
  *
  * ## Why it is DERIVED rather than stored
  *

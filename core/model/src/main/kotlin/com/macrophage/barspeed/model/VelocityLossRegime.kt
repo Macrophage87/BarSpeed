@@ -13,13 +13,18 @@ import kotlinx.serialization.Serializable
  * On a tempo-prescribed controlled movement the concentric speed IS the
  * prescription. A `2011` fly asks for a one-second stroke on every rep, so the
  * velocity is an instruction the lifter follows rather than a capacity they
- * spend, and best-to-last measures how well they held the count. Field-38 is a
- * whole session of such sets: sixteen dynamic sets, every one tempo-prescribed,
- * whose velocity-loss figures behave like noise -- 2.7 against 74.1 from the
- * two units on set 1, and 41.9 against 36.3 from two units bolted to one stack
- * on set 12. Two sensors on one bar cannot disagree by 71 points about how
- * tired the lifter got; they can easily disagree that much about a figure that
- * is not measuring fatigue in the first place.
+ * spend, and best-to-last measures how well they held the count.
+ *
+ * Field-38 is a whole session of such sets -- sixteen dynamic sets, every one
+ * tempo-prescribed -- and the first archive recorded with two accelerometers on
+ * every set, so it can ask what a SECOND unit would have published. Sets 12 and
+ * 13 are the rows that carry the argument: two units bolted to ONE rail-guided
+ * stack, one travel, agreeing exactly on rep count, and still 5.6 and 7.3 points
+ * apart on velocity loss (41.9 against 36.3, and 27.0 against 19.7). One travel
+ * and one lifter leaves no fatigue in that difference. Across the session the
+ * choice of unit moves the published figure much further still -- 2.7 against
+ * 74.1 on set 1 -- though that set is a dumbbell incline press, so its two units
+ * are on two implements and two travels and are not a controlled comparison.
  *
  * ## The rule, from the owner
  *

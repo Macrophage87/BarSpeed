@@ -77,16 +77,35 @@ class VelocityLossRegimeTest {
     }
 
     /**
-     * Field-38's own prescriptions, which are what #250 was filed about.
+     * Field-38's own prescriptions, each with the drive direction the set was
+     * actually recorded with -- read out of
+     * `field-38/extracted/session.json`, not from the issue's prose.
      *
-     * Every one of them lands in the controlled regime, which is the whole
-     * claim: sixteen dynamic sets whose published headline was a fatigue
-     * figure computed over strokes the plan had fixed the speed of.
+     * Every one of the session's sixteen dynamic sets lands in the controlled
+     * regime, which is the whole claim: sixteen sets whose published headline
+     * was a fatigue figure computed over strokes the plan had fixed the speed
+     * of. The two `1120` rows are the pushdown and the lat pulldown, whose
+     * drive moves DOWN, so their concentric digit is the leading `1` and not
+     * the `2`; asserting them with `concentricUp = true` would pass for the
+     * wrong reason.
+     *
+     * CORRECTION, carried forward rather than reworded away: this list was
+     * written as `2011, 2010, 1120, 3010, 2012` and field-38 prescribes no
+     * `2012` at all. The four below are the four the capture contains.
      */
     @Test
     fun `every tempo field-38 prescribed is controlled`() {
-        listOf("2011", "2010", "1120", "3010", "2012").forEach {
-            assertEquals(VelocityLossRegime.CONTROLLED, of(it, true, ExerciseKind.DYNAMIC), it)
+        // 3010: dumbbell incline press, seated overhead press.
+        // 2011: chest-supported rear delt fly, seated lateral raise.
+        // 2010: seated biceps curl.
+        // 1120: triceps pushdown, lat pulldown -- the drive pulls DOWN.
+        val prescribed = listOf("3010" to true, "2011" to true, "2010" to true, "1120" to false)
+        prescribed.forEach { (tempo, concentricUp) ->
+            assertEquals(
+                VelocityLossRegime.CONTROLLED,
+                of(tempo, concentricUp, ExerciseKind.DYNAMIC),
+                "$tempo, drive ${if (concentricUp) "up" else "down"}",
+            )
         }
     }
 
