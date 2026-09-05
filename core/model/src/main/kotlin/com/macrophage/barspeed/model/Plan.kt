@@ -89,6 +89,7 @@ data class PlanFile(
                 exercise.implementCount?.let {
                     if (it < 1) errors += "sessions[$si].exercises[$ei].implementCount must be at least 1"
                 }
+                errors += implementErrors(si, ei, exercise)
                 if (exercise.plane != null && exercise.plane !in VALID_PLANES) {
                     errors += "sessions[$si].exercises[$ei].plane must be \"vertical\" or \"horizontal\""
                 }
@@ -173,6 +174,7 @@ data class PlanFile(
      * a choice the app made on the author's behalf.
      */
     fun warnings(): List<String> = eachExercise(::pairVsLoad) +
+        eachExercise(::implementUndeclared) +
         eachExercise(::startUndeclared) +
         eachExercise(::startVsSeed) +
         eachExercise(::kindVsSeed) +
@@ -219,6 +221,86 @@ data class PlanFile(
             "\"implementCount\": $n, so this plan's $whole means $n × ${plainNumber(total / n)} $unit " +
             "in hand, not $whole in each. load_kg/load_lb is always the TOTAL across everything " +
             "held — if $whole was what was on one of them, write the total of all $n here instead."
+    }
+
+    /**
+     * Everything refused about `implement`, `bar_lb` and `bar_kg` (#253).
+     *
+     * REFUSED rather than resolved, all of it, for the reason the bodyweight
+     * pair is refused: what these keys produce is an INSTRUCTION the lifter
+     * follows with a bar in their hands, so a contradiction settled quietly
+     * becomes a wrong loading rather than a wrong number in a file. "2 x 97.5
+     * lb dumbbells" for a barbell set is worse than a plan that does not
+     * import, because the plan that does not import gets fixed.
+     *
+     * The unrecognised word is refused for `progression`'s reason as well:
+     * reading it as the default would leave an author believing they had
+     * declared a barbell on every exercise carrying their typo, and the only
+     * symptom is a card with one line fewer.
+     */
+    private fun implementErrors(si: Int, ei: Int, exercise: PlanExerciseDef): List<String> {
+        val path = "sessions[$si].exercises[$ei]"
+        val errors = mutableListOf<String>()
+        exercise.implement?.let {
+            if (it !in VALID_IMPLEMENTS) {
+                errors += "$path.implement must be one of ${VALID_IMPLEMENTS.joinToString()}"
+            }
+        }
+        if (exercise.barKg != null && exercise.barLb != null) {
+            errors += "$path must not have both bar_kg and bar_lb"
+        }
+        listOf("bar_kg" to exercise.barKg, "bar_lb" to exercise.barLb).forEach { (key, value) ->
+            if (value == null) return@forEach
+            if (value <= 0) errors += "$path.$key must be positive"
+            // An OMITTED implement lands here too, and deliberately: the
+            // commonest way to get this wrong is to write the bar and forget
+            // the key, and an omitted implement is "other", which has no bar.
+            if (exercise.resolvedImplement != Implement.BARBELL) {
+                errors += "$path.$key is declared on an exercise whose \"implement\" is " +
+                    "not \"barbell\" - only a barbell has a bar to load"
+            }
+        }
+        val count = exercise.implementCount
+        if (count != null) {
+            // The word and the number are two statements about the same fact,
+            // and the app cannot pick between them: reading the word would
+            // print a split the plan did not ask for, reading the number would
+            // drop the pair the word promised.
+            if (exercise.resolvedImplement == Implement.DUMBBELL && count < ImplementLine.DUMBBELL_PAIR) {
+                errors += "$path: \"implement\": \"dumbbell\" and \"implementCount\": $count " +
+                    "disagree - a dumbbell is a PAIR; omit the count, or write \"implement\": " +
+                    "\"other\" for a single dumbbell"
+            }
+            if (exercise.resolvedImplement == Implement.BARBELL && count > 1) {
+                errors += "$path: \"implement\": \"barbell\" and \"implementCount\": $count " +
+                    "disagree - a barbell is ONE object; load_kg/load_lb is the total on the bar"
+            }
+        }
+        return errors
+    }
+
+    /**
+     * A plan that declares how many objects it is held with and not WHAT they
+     * are, which since #253 draws no loading line at all.
+     *
+     * Second in the list, beside the other implementCount warning, because it
+     * is about the same key. It is the only place the loss is visible: the
+     * document is unchanged, and the card just has one line fewer than it did
+     * in the build before this one. Every plan written against schema 1.11 or
+     * earlier that used a pair is in this population, which is why the warning
+     * says which word to add rather than only what went wrong.
+     *
+     * Silent when the plan declares an implement, "other" included -- that is
+     * an author who has decided -- and silent on a count of 1, which drew no
+     * line before this change either.
+     */
+    private fun implementUndeclared(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        if (exercise.implement != null) return null
+        val n = exercise.implementCount ?: return null
+        if (n < ImplementLine.DUMBBELL_PAIR) return null
+        return "sessions[$si].exercises[$ei]: ${exercise.exercise} declares \"implementCount\": $n " +
+            "but no \"implement\", so nothing is drawn under the set on the Up next card - declare " +
+            "\"implement\": \"dumbbell\" for the pair line, or \"other\" to accept none."
     }
 
     private fun eachExercise(warn: (Int, Int, PlanExerciseDef) -> String?): List<String> = sessions
@@ -538,6 +620,19 @@ data class PlanFile(
          * [PlanExerciseDef.progression] for why the contract needs both.
          */
         val VALID_PROGRESSIONS = setOf("weight", "reps", "time", "none")
+
+        /**
+         * The declarable implements, lowercased [Implement] names.
+         *
+         * DERIVED from the enum rather than typed out beside it, unlike
+         * [VALID_KINDS]: there is no second vocabulary here for a literal to
+         * disagree with, and a literal that can drift from its own enum is a
+         * failure mode this set does not need to have. What IS pinned, in
+         * `SchemaImplementContractTest`, is this vocabulary against the
+         * PUBLISHED schema's enum, in both directions -- that is the pair that
+         * can really disagree.
+         */
+        val VALID_IMPLEMENTS: Set<String> = Implement.entries.map { it.name.lowercase() }.toSet()
 
         /**
          * How many characters of [PlanExerciseDef.description] the rest screen

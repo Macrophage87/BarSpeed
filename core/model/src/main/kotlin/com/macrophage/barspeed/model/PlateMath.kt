@@ -31,10 +31,17 @@ object PlateMath {
      *
      * [barKgOverride] is the plan's own bar for this exercise -- a 35 lb bar,
      * a trap bar, a fixed bar -- in kilograms, the canonical unit everything
-     * else is stored in; null takes [defaultBar]. It is rounded to a hundredth
-     * of the display unit for the same reason a plate is: a 35 lb bar written
-     * by the plan arrives here as 15.876 kg and comes back as 34.99999999996
-     * lb, which is not a thing to print beside a rack.
+     * else is stored in; null takes [defaultBar].
+     *
+     * ROUNDED to a hundredth of the display unit, because the bar is printed.
+     * The case that needs it is a bar declared in one unit and READ in the
+     * other, where there is no round trip to survive: `"bar_kg": 15` on a
+     * pounds screen is 33.0693339327 lb, and that is the whole string beside
+     * the plates without this. A bar declared in the unit it is read in
+     * usually survives the trip through kilograms untouched -- but not always,
+     * and the exceptions are ordinary weights: 49.25 lb returns
+     * 49.25000000000001. An earlier version of this KDoc said a 35 lb bar
+     * returns 34.99999999996; that was not measured and is not true.
      */
     fun perSide(totalKg: Double, unit: WeightUnit, barKgOverride: Double? = null): PlateBreakdown {
         val bar =

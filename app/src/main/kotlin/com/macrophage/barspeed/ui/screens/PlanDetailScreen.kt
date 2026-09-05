@@ -336,7 +336,10 @@ private fun ExerciseCard(exercise: PlanExerciseDef, unit: WeightUnit) {
             // rather than afterwards in an export. The per-set loads below
             // stay the TOTAL, which is what they have always been and what is
             // recorded.
-            exercise.implementCount?.takeIf { it > 1 }?.let { n ->
+            // The RESOLVED count since #253, so a declared dumbbell states its
+            // pair here as well as on the card. Reading the raw key would make
+            // this screen and the record queue disagree about the same plan.
+            exercise.resolvedImplementCount?.takeIf { it > 1 }?.let { n ->
                 Spacer(Modifier.height(2.dp))
                 Text(
                     "Held $n at a time — each load below is the TOTAL across all $n.",

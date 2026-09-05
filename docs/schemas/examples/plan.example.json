@@ -11,6 +11,7 @@
           "exercise": "back_squat",
           "description": "Brace before you unrack, then break at the hips and knees together. Stop the eccentric where your ribs stay down.",
           "additional_notes": "Set the safeties one hole below your bottom position before the first work set. If the last rep of a set turns into a grind, stop the set there and log it: this block is about bar speed at five reps, not about making the sixth.",
+          "implement": "barbell",
           "sets": [
             {
               "reps": 5,
@@ -40,6 +41,7 @@
         {
           "exercise": "romanian_deadlift",
           "prep_s": 20,
+          "implement": "barbell",
           "sets": [
             {
               "reps": 8,
@@ -128,6 +130,7 @@
       "exercises": [
         {
           "exercise": "bench_press",
+          "implement": "barbell",
           "sets": [
             {
               "reps": 5,
@@ -147,9 +150,9 @@
         },
         {
           "exercise": "dumbbell_bench_press",
-          "implementCount": 2,
           "start": "top",
           "notes": "A pair. load_lb is the TOTAL across both - 80 is two 40s, not 80 in each hand.",
+          "implement": "dumbbell",
           "sets": [
             {
               "reps": 10,
@@ -170,6 +173,7 @@
           "implementCount": 1,
           "start": "bottom",
           "notes": "One object held, one side at a time. Which side is a different fact from how many are held, so both are declared and neither is taken from the other.",
+          "implement": "other",
           "sets": [
             {
               "reps": 10,

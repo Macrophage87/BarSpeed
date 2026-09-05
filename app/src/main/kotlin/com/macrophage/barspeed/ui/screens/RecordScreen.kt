@@ -3941,6 +3941,24 @@ private fun SlotCard(
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
+            // How to load the movement, directly under it, in the card's own
+            // text -- not the tiny blue caption it used to be at the bottom of
+            // the card (#253). It is the second thing to read and the second
+            // line on the card, and it is READ AT A RACK, where a caption
+            // under everything else is the wrong size in the wrong place.
+            //
+            // WHAT DECIDES IT IS THE PLAN, not the exercise id. Nothing is
+            // drawn where the plan declared no implement, which is every plan
+            // written before schema 1.12 -- the import gate warns about the
+            // pair case and the version log carries the rest.
+            //
+            // The decision is `ImplementLine`'s, in :core:model, and the
+            // handover is `PlannedSlot.cardInstruction`. Both are tested; this
+            // -- the size, the colour, the position -- is not, because nothing
+            // in this repository draws Compose.
+            slot.cardInstruction(unit, plateLoadKgOverride)?.let {
+                Text(it, style = MaterialTheme.typography.titleMedium)
+            }
             // Prep joins the rest clock here, and only when it deviates.
             // It is the one change with no figure of its own on the card --
             // the card states what the set IS, and the seconds before it
@@ -3969,15 +3987,6 @@ private fun SlotCard(
             if (slot.exerciseNotes != null || slot.exerciseNotesBehindTap != null) {
                 Spacer(Modifier.height(4.dp))
                 ExpandableNote(slot.exerciseNotes, slot.exerciseNotesBehindTap, BarColors.Amber)
-            }
-            // What to pick up, or how to load the bar. The decision moved
-            // to `PlannedSlot.cardInstruction` so that a test can run it --
-            // nothing in this repository can reach a composable -- and the
-            // rules it used to state here moved with it, unchanged.
-            val instruction = slot.cardInstruction(unit, plateLoadKgOverride)
-            instruction?.let {
-                Spacer(Modifier.height(4.dp))
-                Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Blue)
             }
         }
     }

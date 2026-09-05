@@ -92,7 +92,18 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                     // exercise in one session carry independent counts and
                     // nothing can leak between them. Display only: loadKg
                     // above is untouched by it.
-                    implementCount = exerciseDef.implementCount,
+                    //
+                    // RESOLVED, not raw, since #253: a declared dumbbell means
+                    // a pair whether or not the plan spelled the count out.
+                    // Still nullable, and absent is still not 1.
+                    implementCount = exerciseDef.resolvedImplementCount,
+                    // What the load sits on and, on a barbell, which bar --
+                    // the two declarations the "Up next" card's second line is
+                    // drawn from (#253). Exercise level only: what a movement
+                    // is performed with is a property of the movement, not of
+                    // one of its sets.
+                    implement = exerciseDef.resolvedImplement,
+                    barKg = exerciseDef.resolvedBarKg,
                     exerciseNotes = note.visible,
                     exerciseNotesBehindTap = note.behindTap,
                     targetMeanConVelMps = set.targetMeanConcentricVelocityMps,
