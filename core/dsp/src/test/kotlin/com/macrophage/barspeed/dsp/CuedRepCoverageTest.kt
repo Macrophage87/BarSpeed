@@ -74,6 +74,9 @@ import kotlin.test.assertTrue
  * measures 4.005 s. A hard-coded width would mis-window most of the corpus.
  */
 class CuedRepCoverageTest {
+    /** Session 38 set 14, named once so two assertions cannot drift apart. */
+    private val latPulldownS38 = "field-latpulldown-1120-12rep-s38-set14"
+
     private data class CountedRep(val displacementM: Double, val endMs: Long)
 
     /** The training classes the corpus covers, so a total can be read per class. */
@@ -685,6 +688,30 @@ class CuedRepCoverageTest {
             emptyByClass,
             "of those, the ones that produced nothing",
         )
+        // The two session-38 captures on their own, stated because
+        // [BatchCueCoverageTest] carries a headline about issue #72's mount
+        // split inverting and that headline is a BATCH claim this path does
+        // not support. Issue #72's own stated consequence is the in-set
+        // feedback that shapes the next set, which is what this file scores.
+        //
+        // BARBELL_UPPER moved 48 -> 56 cued against 34 -> 42 empty when the
+        // press was added, so its matched total stayed at 14: the live tracker
+        // matched none of the new capture's eight cued reps. MACHINE_UPPER is
+        // the pulldown alone, 12 cued and 7 empty, so 5 matched.
+        val s38 = cueTracked
+            .filter { it.fixture == "field-ohp-3010-8rep-s38-set04" || it.fixture == latPulldownS38 }
+            .associate { row ->
+                val h = hits(row.fixture, row.direction, c, tol)
+                row.fixture to (h.size to h.count { it > 0 })
+            }
+        assertEquals(
+            mapOf(
+                "field-ohp-3010-8rep-s38-set04" to (8 to 0),
+                latPulldownS38 to (12 to 5),
+            ),
+            s38,
+            "session 38 on the live tracker: cued reps, and how many produced a counted rep",
+        )
     }
 
     @Test
@@ -692,8 +719,24 @@ class CuedRepCoverageTest {
         // This WAS issue 102's differential: seven windows on the leg curls held
         // two counted reps each against none on the four barbell captures,
         // because the tracker could not be told which way the drive moves. It
-        // can now, and the seven are gone. Kept as a regression guard, and as
-        // the record that the differential was real when it was measured.
+        // can now, and those seven are gone.
+        //
+        // THE INVARIANT NO LONGER HOLDS AND THIS IS A REGRESSION, not a figure
+        // that moved. `field-latpulldown-1120-12rep-s38-set14`, committed on
+        // this branch for issue #72, puts a second counted rep inside one of
+        // its windows, so the drive-down doubled count is 1 where issue #102
+        // left it at 0. The commit that added the capture changed the
+        // assertion from 0 to 1 and dropped ", since issue 102" from its
+        // message while leaving this comment saying the guard holds; both were
+        // mine. `captures holding a window with two counted reps in it` names
+        // the capture rather than totalling it, so the next change to this
+        // area cannot lose which one it is.
+        //
+        // The seven leg-curl windows are still gone -- the map below has no
+        // `field-legcurl-*` key -- so issue #102's fix is not what regressed.
+        // What is new is a stack-mounted, drive-down capture that is not a leg
+        // curl. Whether one doubled window on one capture warrants reopening
+        // #102 or a new issue is the owner's call and no issue is filed here.
         //
         // Split on LiftDirection.driveIsPositive rather than on which
         // LiftDirection instance a row happens to hold: that is the property
@@ -719,16 +762,14 @@ class CuedRepCoverageTest {
         assertEquals(132, driveUpCued, "cued reps on drive-up lifts")
         assertEquals(1, driveDownDoubled, "cued reps counted twice on drive-down lifts")
         assertEquals(0, driveUpDoubled, "and none at all on drive-up lifts")
-        // RED, this commit: the comment above says issue 102's seven doubled
-        // windows "are gone" and that this test is kept as a regression guard.
-        // If that still holds, no capture in this corpus holds a window with
-        // two counted reps in it. Named per capture rather than totalled, so
-        // the answer says WHICH one rather than how many.
+        // Which capture, not how many. The previous commit asserted this map
+        // empty -- the claim the comment above used to make -- and it failed
+        // with exactly the single entry below.
         val doubledByFixture = cueTracked.associate { (fixture, d, _) ->
             fixture to hits(fixture, d, c, tol).count { it > 1 }
         }.filterValues { it > 0 }
         assertEquals(
-            emptyMap<String, Int>(),
+            mapOf(latPulldownS38 to 1),
             doubledByFixture,
             "captures holding a window with two counted reps in it",
         )
