@@ -800,11 +800,15 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
         loadKg = p.loadKg,
         plannedLoadKg = p.plannedLoadKg,
         bodyWeightKg = p.bodyWeightKg,
-        // WHICH QUESTION the lifter was shown, resolved once from the FROZEN
-        // pair by the same call that worded the tiles they tapped (#244). Not
-        // the raw declaration: the stored word is a capture-time fact about
-        // what was asked, and a later change to how a declaration maps onto a
-        // question must not restate what a past lifter saw.
+        // WHICH QUESTION the lifter was shown, resolved from the FROZEN pair;
+        // the tiles were worded by a DIFFERENT askFor call in RecordScreen,
+        // off state.currentIsTimed/state.currentSlot -- they agree only
+        // because endSet builds this pair from that same state in the same
+        // action (#244).
+        //
+        // Not the raw declaration: the stored word is a capture-time fact
+        // about what was asked, and a later change to how a declaration maps
+        // onto a question must not restate what a past lifter saw.
         //
         // `p.slot` is null on an ad-hoc set, which no plan declared anything
         // for; `askFor` resolves that as WEIGHT and the set's own kind then
