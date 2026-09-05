@@ -951,7 +951,19 @@ data class PlanSetDef(
             errors += "$path.side must be \"left\" or \"right\""
         }
         tempo?.let {
-            if (Tempo.parseOrNull(it) == null) errors += "$path.tempo '$it' is not valid tempo notation"
+            val parsed = Tempo.parseOrNull(it)
+            // Two errors, never both: an unparseable string has no strokes to
+            // check. The zero-stroke refusal is plan schema 1.12's (#251) and
+            // is stated at $defs.set.properties.tempo in the published
+            // document; a plan is written by someone who is not holding the
+            // phone, so the path is named the way every other error here names
+            // one.
+            when {
+                parsed == null -> errors += "$path.tempo '$it' is not valid tempo notation"
+                parsed.hasZeroStroke ->
+                    errors += "$path.tempo '$it' prescribes a stroke of 0; a stroke takes time, so only " +
+                        "the two pauses (digits 2 and 4) may be 0"
+            }
         }
         velocityLossStopPct?.let {
             if (it <= 0 || it > 100) errors += "$path.velocityLossStop_pct must be in (0, 100]"

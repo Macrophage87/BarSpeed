@@ -82,9 +82,13 @@ object TempoAdjustPolicy {
      * second because the runner can only sleep in whole seconds, so a stroke
      * prescribed as 0 is PLAYED as 1 while the compliance scorer goes on
      * grading the lifter against the 0. A control that BUILDS a tempo out of
-     * digits must not be able to reach that state. A plan that declares one
-     * still can, and [wheelValues] answers null for it rather than quietly
-     * raising it.
+     * digits must not be able to reach that state. Since #251 the PLAN import
+     * gate refuses one too, by path, under plan schema 1.12 -- see
+     * [PlanSetDef.validate]. Two doors are still open and are named rather
+     * than claimed shut: a set already recorded with a zero stroke, and the
+     * ad-hoc tempo TEXT FIELD, which takes free text through [Tempo.parseOrNull]
+     * and is not this issue's ask. [wheelValues] answers null for either
+     * rather than quietly raising it, so the wheel is not drawn at all.
      *
      * Pauses have no such floor. A pause of 0 is a real pause -- the one where
      * the lifter does not stop -- and the metronome plays it by emitting no
@@ -95,7 +99,13 @@ object TempoAdjustPolicy {
     /** The largest value a single digit can spell; see [Tempo.parse]'s compact form. */
     const val MAX_DIGIT_S = 9
 
-    /** The up stroke's "as fast as possible" marker. [Tempo.parse] takes it on digit 3 alone. */
+    /**
+     * The drive's "as fast as possible" marker.
+     *
+     * [Tempo.parse] takes it on digit 3 alone, which is why the wheel offers it
+     * on digit 3 alone even though the RULE is about the concentric stroke --
+     * see [wheelChoices] and #258.
+     */
     const val EXPLOSIVE = "X"
 
     private val PAUSE_CHOICES: List<String> = (0..MAX_DIGIT_S).map { it.toString() }
@@ -103,6 +113,16 @@ object TempoAdjustPolicy {
     private val STROKE_CHOICES: List<String> = (MIN_STROKE_S..MAX_DIGIT_S).map { it.toString() }
 
     private val UP_STROKE_SPELLABLE: List<String> = STROKE_CHOICES + EXPLOSIVE
+
+    /**
+     * The drive's wheel: X FIRST, then 1..9.
+     *
+     * The order is the whole of it. X is faster than a one-second stroke, so a
+     * range that runs 1..9 and then X puts the fastest value at the slow end,
+     * one tap past nine -- where a mis-tap reaches it and a lifter who wants it
+     * has to walk through eight values they do not want.
+     */
+    private val CONCENTRIC_STROKE_CHOICES: List<String> = listOf(EXPLOSIVE) + STROKE_CHOICES
 
     /**
      * The values digit [position] may SPELL, in wheel order.
@@ -172,21 +192,57 @@ object TempoAdjustPolicy {
                 position = DOWN_STROKE,
                 label = strokeLabel(horizontal, isConcentric = digit1IsConcentric, movesUp = false),
                 caption = phase(digit1IsConcentric),
-                choices = spellable(DOWN_STROKE),
+                choices = wheelChoices(DOWN_STROKE, concentric),
             )
         val upStroke =
             TempoDigit(
                 position = UP_STROKE,
                 label = strokeLabel(horizontal, isConcentric = !digit1IsConcentric, movesUp = true),
                 caption = phase(!digit1IsConcentric),
-                choices = spellable(UP_STROKE),
+                choices = wheelChoices(UP_STROKE, concentric),
             )
         return listOf(
             downStroke,
-            TempoDigit(BOTTOM_PAUSE, PAUSE, after(downStroke.caption), spellable(BOTTOM_PAUSE)),
+            TempoDigit(BOTTOM_PAUSE, PAUSE, after(downStroke.caption), wheelChoices(BOTTOM_PAUSE, concentric)),
             upStroke,
-            TempoDigit(TOP_PAUSE, PAUSE, after(upStroke.caption), spellable(TOP_PAUSE)),
+            TempoDigit(TOP_PAUSE, PAUSE, after(upStroke.caption), wheelChoices(TOP_PAUSE, concentric)),
         )
+    }
+
+    /**
+     * The values a wheel on digit [position] OFFERS, on a lift whose concentric
+     * stroke is digit [concentricDigit]. Issue #251.
+     *
+     * Three roles, not four positions:
+     *
+     * - The CONCENTRIC stroke is the drive, and "X" -- as fast as possible --
+     *   is a drive instruction. It sits BELOW one second, because it is the
+     *   fastest stroke there is and one second is merely the fastest NUMBER.
+     * - The ECCENTRIC stroke is 1..9. An explosive eccentric is not a
+     *   prescription a lifter can follow, and offering one on the digit the
+     *   voice guide calls the RETURN is what this issue was raised for: the
+     *   alphabet used to be read off the position alone, so every vertical
+     *   concentric-down lift -- a lat pulldown, a triceps pushdown, a leg curl
+     *   -- got X on the wrong stroke.
+     * - The two pauses are 0..9. A pause of 0 is the pause where the lifter
+     *   does not stop.
+     *
+     * The X is offered only where [spellable] says one can be WRITTEN, which
+     * today is digit 3 alone. On a vertical concentric-down lift the drive is
+     * digit 1, so that lift is offered no X on either stroke -- not because
+     * this rule withholds it but because [Tempo] cannot hold one there.
+     * Widening the notation is #258, and it turns this on by moving that one
+     * statement rather than this one.
+     *
+     * Private, and reached only through [TempoDigit.choices]: a caller holding
+     * a digit holds the lift it was built for, so there is no way to pair one
+     * lift's role with another lift's alphabet.
+     */
+    private fun wheelChoices(position: Int, concentricDigit: Int): List<String> = when {
+        position != DOWN_STROKE && position != UP_STROKE -> PAUSE_CHOICES
+        position != concentricDigit -> STROKE_CHOICES
+        EXPLOSIVE in spellable(position) -> CONCENTRIC_STROKE_CHOICES
+        else -> STROKE_CHOICES
     }
 
     /**
@@ -267,9 +323,11 @@ object TempoAdjustPolicy {
      * reports, so the button can be drawn disabled rather than lying.
      *
      * The alphabet is the digit's own, so nothing new is reachable through
-     * stepping:
-     * "X" is the last entry of the up stroke's list, which makes `+` from 9 give
-     * X and `-` from X give 9 without a second statement of where X is legal.
+     * stepping. "X" is the FIRST entry of the drive's list, which makes `-`
+     * from 1 give X and `+` from X give 1 without a second statement of where
+     * X is legal. (This paragraph used to say X was the LAST entry and the top
+     * of the range. That was the defect #251 was raised for, not a description
+     * of it, and the sentence is deleted rather than reworded.)
      *
      * Null exactly where [wheelValues] is null -- a set that declares no tempo,
      * a fractional or two-character component, a stroke below [MIN_STROKE_S] --
@@ -284,9 +342,15 @@ object TempoAdjustPolicy {
     fun steppedValue(tempoText: String?, digit: TempoDigit, delta: Int): String? {
         val current = valueAt(tempoText, digit.position) ?: return null
         val choices = digit.choices
-        // indexOf cannot answer -1: wheelValues has already checked every value
-        // against the same list, and valueAt is null wherever it did not.
-        return choices[(choices.indexOf(current) + delta).coerceIn(choices.indices)]
+        val index = choices.indexOf(current)
+        // -1 is reachable, and was not before #251 split the two alphabets.
+        // wheelValues checks a value against what the NOTATION can spell and a
+        // wheel now offers less than that, so a plan declaring 30X0 on a
+        // pulldown draws an X on a digit whose wheel has none. Either button
+        // moves it to the nearest value that wheel does offer, rather than
+        // doing nothing: the state is escapable and not re-enterable.
+        if (index < 0) return choices.firstOrNull()
+        return choices[(index + delta).coerceIn(choices.indices)]
     }
 
     /**

@@ -30,6 +30,28 @@ data class Tempo(
 ) {
     val isExplosiveUpStroke: Boolean get() = upS == null
 
+    /**
+     * Either stroke is prescribed as no time at all.
+     *
+     * A stroke takes time. The two PAUSES may be 0 -- that is the pause where
+     * the lifter does not stop, and the metronome plays it by emitting no beat
+     * -- but a 0 stroke is not a tempo anyone can perform, and the app does not
+     * even try: `CadencePlan.of` floors every stroke at one second because the
+     * runner can only sleep in whole ones, while `SetAnalyzer.complianceFor`
+     * goes on grading the lifter against the 0. So the voice plays a
+     * one-second stroke and the score marks it late, on every rep, for a
+     * prescription the lifter followed exactly.
+     *
+     * Read by [PlanSetDef.validate], which refuses such a plan by path under
+     * plan schema 1.12 (#251). NOT read by [parse], deliberately: a set already
+     * recorded with a zero stroke must still re-parse, or its export and its
+     * history card lose their tempo entirely.
+     *
+     * An explosive stroke is not a zero one. `null` is "as fast as possible",
+     * which is a real instruction; 0 is "in no time", which is not.
+     */
+    val hasZeroStroke: Boolean get() = downS == 0.0 || upS == 0.0
+
     fun notation(): String {
         val up = upS?.let { formatDigit(it) } ?: "X"
         return "${formatDigit(downS)}${formatDigit(bottomPauseS)}$up${formatDigit(topPauseS)}"

@@ -1285,9 +1285,12 @@ private fun TempoAdjuster(state: RecordState, viewModel: RecordViewModel) {
  * screen are one idiom and not two.
  *
  * Both buttons ask [TempoAdjustPolicy] what a tap would produce and whether it
- * would move anything; nothing here knows that "X" is the top of the up stroke
- * or that a stroke floors at one second. A disabled button rather than a tap
- * that does nothing is the whole point of asking twice.
+ * would move anything; nothing here knows which stroke is the drive, that the
+ * drive alone is offered "X", that "X" sits below one second, or that a stroke
+ * floors there. The digit it is handed carries all four answers -- #251 moved
+ * them onto it precisely so this composable could not hold a fifth opinion. A
+ * disabled button rather than a tap that does nothing is the whole point of
+ * asking twice.
  *
  * [onPick] hands back the digit's new VALUE, not a tempo, because
  * `adjustTempoDigit` routes it through `TempoAdjustPolicy.withDigit` -- which
