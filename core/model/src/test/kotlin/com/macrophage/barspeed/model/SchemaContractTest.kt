@@ -202,7 +202,8 @@ class SchemaContractTest {
             setOf(
                 "exercise", "notes", "description", "additional_notes", "start", "concentric",
                 "sensorInverted", "sensorOnStack", "travelRatio", "plane", "bodyweight",
-                "implementCount", "optional", "progression", "kind", "prep_s", "sensors", "sets",
+                "implementCount", "implement", "bar_lb", "bar_kg", "optional", "progression",
+                "kind", "prep_s", "sensors", "sets",
             )
         assertEquals(declared, exerciseKeys, "PlanExerciseDef and the schema disagree on exercise keys")
     }

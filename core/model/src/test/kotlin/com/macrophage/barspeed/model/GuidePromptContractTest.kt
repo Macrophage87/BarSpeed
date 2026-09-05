@@ -58,8 +58,31 @@ class GuidePromptContractTest {
         listOf(
             "exercise", "notes", "description", "additional_notes", "start", "concentric",
             "sensorInverted", "sensorOnStack", "travelRatio", "plane", "bodyweight",
-            "implementCount", "optional", "prep_s", "sensors", "sets",
+            "implementCount", "implement", "bar_lb", "bar_kg", "optional", "prep_s", "sensors",
+            "sets",
         ).forEach(::assertDocuments)
+    }
+
+    /**
+     * The prompt states the two halves of `implement` a model cannot infer
+     * from the word: that a SINGLE dumbbell is "other", and that omitting the
+     * key means the app says nothing about how to load the movement rather
+     * than guessing from the exercise id (#253).
+     *
+     * Both are rules about what NOT to write, which is the kind of rule a
+     * generating model gets wrong by default -- "dumbbell_row" reads as a
+     * dumbbell exercise, and it is one dumbbell.
+     */
+    @Test
+    fun `the plan prompt states the single-dumbbell rule and what omitting implement means`() {
+        assertTrue(
+            "single dumbbell" in prompt || "one dumbbell" in prompt,
+            "the plan prompt never tells the model that a single dumbbell is \"other\"",
+        )
+        assertTrue(
+            "\"implement\": \"other\"" in prompt,
+            "the plan prompt never shows the \"other\" value being written",
+        )
     }
 
     @Test

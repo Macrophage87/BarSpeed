@@ -33,6 +33,43 @@ class ShippedPlanExampleTest {
         return Json { ignoreUnknownKeys = true }.decodeFromString(PlanFile.serializer(), text)
     }
 
+    /**
+     * The shipped example declares an `implement` on every exercise whose card
+     * has something to say, and says "other" out loud on the single-dumbbell
+     * row (#253).
+     *
+     * The example is the only plan a generating model is shown in full, and
+     * the single-dumbbell case is the one it will get wrong by default: the id
+     * says dumbbell and the answer is "other", because the word means a PAIR.
+     * A key demonstrated nowhere in the example is a key most generated plans
+     * will omit -- and omitting this one costs the lifter the loading line
+     * entirely.
+     */
+    @Test
+    fun `the shipped example declares an implement on the lifts that have a loading`() {
+        val plan = shippedExample()
+        val byId = plan.sessions.flatMap { it.exercises }.associateBy { it.exercise }
+        assertEquals(Implement.BARBELL, byId.getValue("back_squat").resolvedImplement)
+        assertEquals(Implement.BARBELL, byId.getValue("bench_press").resolvedImplement)
+        assertEquals(Implement.DUMBBELL, byId.getValue("dumbbell_bench_press").resolvedImplement)
+        // One dumbbell is "other", and the example says so rather than leaving
+        // the key off, which would be indistinguishable from not having
+        // thought about it.
+        assertEquals("other", byId.getValue("single_arm_dumbbell_row").implement)
+    }
+
+    /**
+     * A declared dumbbell carries the pair without the example spelling out
+     * `implementCount`, which is the whole of what the word buys an author.
+     */
+    @Test
+    fun `the example's dumbbell press needs no count to be a pair`() {
+        val press = shippedExample().sessions.flatMap { it.exercises }
+            .first { it.exercise == "dumbbell_bench_press" }
+        assertNull(press.implementCount, "the example still spells out a count the word already means")
+        assertEquals(2, press.resolvedImplementCount)
+    }
+
     @Test
     fun `shipped example runs a loaded carry straight into a loadless hold`() {
         val plan = shippedExample()

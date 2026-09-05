@@ -17,10 +17,9 @@ import kotlin.test.assertNull
  * expectation IS the differential. They are corrected here, at the commit that
  * makes the old expectation false, rather than left to red a later one.
  *
- * What has NOT changed yet, and is pinned so the next commit's reds are
- * measured against it: nothing validates any of the three. An unrecognised
- * implement, a bar weight on a dumbbell and a dumbbell declared with a count
- * of one are all still accepted in silence.
+ * What the gate REFUSES about the three is pinned in [PlanImplementGateTest],
+ * which replaced the case this file carried for one commit -- that nothing
+ * validated them at all.
  */
 class PlanImplementKeyCharacterizationTest {
     private fun planWith(exerciseKeys: String): String = """
@@ -57,19 +56,6 @@ class PlanImplementKeyCharacterizationTest {
         assertFalse(
             unknownKeyWarning(PlanImport.parse(planWith("\"bar_kg\": 15,")), "bar_kg"),
             "bar_kg is still reported as unknown",
-        )
-    }
-
-    @Test
-    fun `nothing validates the three declarations yet`() {
-        assertEquals(emptyList(), PlanImport.parse(planWith("\"implement\": \"barbel\",")).errors)
-        assertEquals(
-            emptyList(),
-            PlanImport.parse(planWith("\"implement\": \"dumbbell\", \"bar_lb\": 35,")).errors,
-        )
-        assertEquals(
-            emptyList(),
-            PlanImport.parse(planWith("\"implement\": \"dumbbell\", \"implementCount\": 1,")).errors,
         )
     }
 
