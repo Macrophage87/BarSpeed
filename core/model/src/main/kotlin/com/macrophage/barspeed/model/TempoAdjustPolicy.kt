@@ -361,7 +361,10 @@ object TempoAdjustPolicy {
         // "off the alphabet lands on the first value" branch stood here for
         // one commit and was deleted: it answered every tap the screen can
         // produce identically, so no test could kill it, and a guard nothing
-        // can kill reads as coverage while guarding nothing.
+        // can kill reads as coverage while guarding nothing. It is also
+        // CARRIED -- withDigit rebuilds through wheelValues, whose test is
+        // spellable(), so 30X0 on a pulldown becomes 20X0 when digit 1 is
+        // stepped; only a tap on the X's own digit clears it.
         return choices[(choices.indexOf(current) + delta).coerceIn(choices.indices)]
     }
 

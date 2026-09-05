@@ -64,7 +64,7 @@ class TempoStrokeRoleContractTest {
      * the strokes were being argued about.
      */
     @Test
-    fun `X is offered on the concentric stroke and on no other digit`() {
+    fun `X is offered on the concentric stroke where the notation can spell one, and on no other digit`() {
         listOf(benchPress(), seatedRow()).forEach { digits ->
             assertEquals(listOf("X") + oneToNine, at(digits, TempoAdjustPolicy.UP_STROKE).choices)
             assertEquals(oneToNine, at(digits, TempoAdjustPolicy.DOWN_STROKE).choices)
