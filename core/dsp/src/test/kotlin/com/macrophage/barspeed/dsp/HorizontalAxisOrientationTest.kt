@@ -33,11 +33,22 @@ import kotlin.test.assertTrue
  * ## Why this is synthetic
  *
  * No committed capture can exercise it. Reaching `orient` needs
- * `plane == HORIZONTAL` AND `!sensorOnStack`, and the three horizontal captures
- * in the corpus are all stack-mounted -- the sensor rides the stack and moves
- * vertically whatever the lifter does. Forced through the horizontal path they
- * produce NO movement runs at all, because vertical acceleration exceeds the
- * best horizontal axis by 20x to 44x. That ratio is pinned below.
+ * `plane == HORIZONTAL` AND `!sensorOnStack`, and nothing committed declares
+ * the first. The three captures of horizontal exercises --
+ * `field-cablerow-static-8rep`, `field-facepull-static-12rep` and
+ * `field-pallof-static-12rep` -- are scored everywhere on this classpath as
+ * `LiftDirection(startsWith = CONCENTRIC)`, whose `plane` defaults to VERTICAL
+ * and whose `sensorOnStack` defaults to FALSE.
+ *
+ * The sentence that stood here said those three "are all stack-mounted". It is
+ * deleted rather than reworded: no committed byte declares that either, as
+ * `BatchCueCoverageTest` sets out at length -- issue #72's own table calls the
+ * three cable sets stack-mounted and the classpath does not. The mount is not
+ * what disarms this defect on the committed corpus; the undeclared plane is.
+ *
+ * Forced through the horizontal path they produce NO movement runs at all,
+ * because vertical acceleration exceeds the best horizontal axis by 20x to
+ * 44x. That ratio is pinned below.
  *
  * So these samples are fabricated, and nothing here should be read as evidence
  * about a real set. No fix is fitted to them for exactly that reason: a

@@ -52,6 +52,26 @@ sealed interface RepCall {
  * a set still in progress can do. So this runs the batch rule over a causal
  * estimate, and the two disagree wherever the estimates do.
  *
+ * The PLANE is not shared either, and that is a sharper difference than the
+ * velocity. `StreamingSetTracker.feed` always integrates
+ * `FrameTransform.verticalLinearAccelMps2` whatever `LiftDirection.plane`
+ * says, while `SetAnalyzer.analyze` passes `direction.measuredPlane` to
+ * `VelocityEstimator.estimate`, which takes a horizontal branch -- a
+ * principal-axis projection of the horizontal acceleration -- for a
+ * handle-mounted horizontal lift. On such a lift the two measure DIFFERENT
+ * AXES, not two estimates of one axis, so "the same rule over a causal
+ * estimate" understates the divergence there.
+ *
+ * No committed capture reaches it. The three captures of horizontal exercises
+ * on this module's classpath -- `field-cablerow-static-8rep`,
+ * `field-facepull-static-12rep` and `field-pallof-static-12rep` -- are scored
+ * everywhere as `LiftDirection(startsWith = CONCENTRIC)`, whose `plane`
+ * defaults to VERTICAL, and all thirteen mark-carrying captures measure
+ * VERTICAL too, which `LiveRepCallCorpusTest`'s `every capture here is
+ * measured vertically, so the batch series needs no orientation` asserts.
+ * What the divergence does to a real handle-mounted set is unmeasured and is
+ * not claimed here.
+ *
  * ## Why the announcement lands at the inter-rep rest
  *
  * Nothing here has a rest detector, and it does not need one. A [RepSpan]
@@ -154,6 +174,19 @@ class LiveRepCaller(
     fun feed(live: LiveSetState, timestampMs: Long): RepCall {
         append(live)
         if (size < MIN_SAMPLES) return RepCall.Hold
+        // MIXED FRAMES, deliberately, and stated because nothing in the type
+        // says it. The acceleration in this series is in the SENSOR frame and
+        // the velocity is in the LIFTER frame: StreamingSetTracker scales only
+        // the velocity, by sensorToLifter -- `(rawV - anchorOffset) *
+        // velocityScale` -- and publishes `filtered - accelBias` unscaled,
+        // while the batch path's `VelocitySeries.mappedToLifter` scales BOTH.
+        // On the corpus's pulldown, whose sensorToLifter is -1, that leaves
+        // the two fields signed against OPPOSITE axes. Every VelocitySeries
+        // SetAnalyzer builds holds the invariant this one breaks.
+        //
+        // It is safe only because RepSegmenter reads velocityMps and timeS and
+        // nothing else. Any future consumer of accelMps2 from here must map it
+        // through sensorToLifter first.
         val series = VelocitySeries(
             timeS = timeS.copyOf(size),
             accelMps2 = accelMps2.copyOf(size),
