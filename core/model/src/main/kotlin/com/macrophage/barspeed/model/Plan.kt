@@ -717,6 +717,44 @@ data class PlanExerciseDef(
      * with two objects; a suitcase carry is unilateral with one.
      */
     val implementCount: Int? = null,
+    /**
+     * What KIND of object this exercise's load sits on: `"barbell"`,
+     * `"dumbbell"` or `"other"` (schema 1.12, issue #253).
+     *
+     * Read through [resolvedImplement], never raw. OMITTED MEANS `"other"`,
+     * and "other" means the card says nothing about how to load the movement.
+     * Nothing is inferred from the exercise id, which is the whole point of
+     * the key: the app used to decide barbell-ness from the id, so a barbell
+     * lift with a name the matcher did not know got no loading at all and a
+     * cable exercise whose id looked dynamic could be told to load plates onto
+     * a bar that is not in the movement. A guess is the wrong shape for an
+     * instruction someone follows with a bar in their hands.
+     *
+     * A SINGLE dumbbell is `"other"`, not `"dumbbell"`. The word here means a
+     * PAIR -- it is what makes the card say "2 x 45 lb dumbbells" without the
+     * plan spelling out [implementCount] -- and there is nothing to say about
+     * one dumbbell that the load figure does not already say.
+     *
+     * DISPLAY ONLY. It reaches one line on one card and nothing that is
+     * stored, exported or summed.
+     */
+    val implement: String? = null,
+    /**
+     * The bar this exercise is loaded on, in POUNDS, where it is not the
+     * standard 45 lb / 20 kg one: a 35 lb bar, a trap bar, a fixed bar
+     * (schema 1.12, issue #253).
+     *
+     * At most one of `bar_lb` / `bar_kg`, and only on `"implement":
+     * "barbell"`; [PlanFile.validate] refuses both mistakes with the path
+     * named. Read through [resolvedBarKg].
+     *
+     * It does NOT change what `load_kg` / `load_lb` mean, which are the total
+     * on the bar, bar included, exactly as before this key existed. It decides
+     * only how that total is split into plates.
+     */
+    @SerialName("bar_lb") val barLb: Double? = null,
+    /** The same bar in kilograms; converted by [resolvedBarKg]. */
+    @SerialName("bar_kg") val barKg: Double? = null,
     /** Accessory work that may be dropped when a session runs long. */
     val optional: Boolean = false,
     /**
@@ -839,6 +877,54 @@ data class PlanExerciseDef(
     val startsAtTop: Boolean
         get() = startsAtTopOverride
             ?: ((ExerciseDef.inferStartPhase(exercise) == StartPhase.ECCENTRIC) == concentricUp)
+
+    /**
+     * What this exercise's load sits on, with an omitted or unrecognised
+     * declaration resolving to [Implement.OTHER] -- which draws no loading
+     * line at all.
+     *
+     * [PlanFile.validate] refuses the unrecognised word with the path named,
+     * so it should never get this far; if it does, saying nothing is the right
+     * failure. The failure mode of silence is a lifter doing their own plate
+     * arithmetic, and the failure mode of a guess is a lifter loading the
+     * wrong bar.
+     */
+    val resolvedImplement: Implement
+        get() = Implement.ofPlan(implement)
+
+    /**
+     * How many identical objects this exercise is held with, with the pair a
+     * declared dumbbell already means supplied.
+     *
+     * STILL NULLABLE, and null still means "no split to show" rather than one
+     * object -- [implementCount]'s own KDoc turns on that distinction and this
+     * must not collapse it. What changes is only that a `"dumbbell"` with no
+     * count reads as 2 instead of as nothing, because the word IS the
+     * declaration; every other implement reads exactly what the plan wrote.
+     *
+     * The 2 lives in [ImplementLine.resolvedCount] and is delegated to here,
+     * so the card and the plan model cannot come to disagree about what a
+     * dumbbell means.
+     */
+    val resolvedImplementCount: Int?
+        get() = if (resolvedImplement == Implement.DUMBBELL) {
+            ImplementLine.resolvedCount(resolvedImplement, implementCount)
+        } else {
+            implementCount
+        }
+
+    /**
+     * The declared bar in kilograms, or null for the display unit's standard
+     * bar.
+     *
+     * Converted the way [PlanSetDef.resolvedLoadKg] converts a load, so a
+     * pound-authored bar and a kilogram-authored one are the same number by
+     * the time anything reads them. `bar_kg` wins if a document somehow
+     * carries both; [PlanFile.validate] refuses that document, so the
+     * precedence decides nothing a user can reach.
+     */
+    val resolvedBarKg: Double?
+        get() = barKg ?: barLb?.let { it / WeightUnit.LB_PER_KG }
 
     /** Declared kind, when the plan pins one and names a kind that exists. */
     val kindOverride: ExerciseKind?

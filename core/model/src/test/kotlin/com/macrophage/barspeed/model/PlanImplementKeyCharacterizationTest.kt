@@ -2,23 +2,25 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 /**
- * What the import gate does TODAY with the three keys #253 adds -- `implement`,
+ * What the import gate does with the three keys #253 adds -- `implement`,
  * `bar_lb` and `bar_kg`.
  *
- * All three are unknown keys: the plan decodes, the declaration is dropped on
- * the floor, and the only trace is one aggregated unknown-key warning per key.
- * That is the pre-state every differential in this change is measured against,
- * and it is worth having in the tree rather than in a commit body because the
- * warning is generated from the serializer descriptor -- declaring the field is
- * what makes the warning stop, and nothing else says so.
+ * All three were UNKNOWN keys one commit ago: the plan decoded, the
+ * declaration was dropped on the floor, and one aggregated unknown-key warning
+ * per key was the only trace. Declaring the fields is what stops that warning
+ * -- it is generated from the serializer descriptor -- so the three cases
+ * below now assert the silence rather than the warning, and the change of
+ * expectation IS the differential. They are corrected here, at the commit that
+ * makes the old expectation false, rather than left to red a later one.
  *
- * Also pinned: a plan declaring a dumbbell today implies NOTHING about
- * `implementCount`. That is what #253 changes at the resolved reading, and the
- * raw field must keep reading exactly what the author wrote either way.
+ * What has NOT changed yet, and is pinned so the next commit's reds are
+ * measured against it: nothing validates any of the three. An unrecognised
+ * implement, a bar weight on a dumbbell and a dumbbell declared with a count
+ * of one are all still accepted in silence.
  */
 class PlanImplementKeyCharacterizationTest {
     private fun planWith(exerciseKeys: String): String = """
@@ -40,28 +42,39 @@ class PlanImplementKeyCharacterizationTest {
         result.warnings.any { "unknown key \"$key\"" in it }
 
     @Test
-    fun `implement is an unknown key the gate reports and drops`() {
+    fun `implement is a known key the gate no longer reports`() {
         val result = PlanImport.parse(planWith("\"implement\": \"barbell\","))
-        assertEquals(emptyList(), result.errors, "declaring implement is not an error today")
-        assertTrue(unknownKeyWarning(result, "implement"), "warnings were ${result.warnings}")
+        assertEquals(emptyList(), result.errors)
+        assertFalse(unknownKeyWarning(result, "implement"), "warnings were ${result.warnings}")
+        assertEquals(Implement.BARBELL, result.plan!!.sessions[0].exercises[0].resolvedImplement)
     }
 
     @Test
-    fun `bar_lb and bar_kg are unknown keys the gate reports and drops`() {
-        val result = PlanImport.parse(planWith("\"bar_lb\": 35, \"bar_kg\": 15,"))
-        assertEquals(emptyList(), result.errors, "declaring a bar weight is not an error today")
-        assertTrue(unknownKeyWarning(result, "bar_lb"), "warnings were ${result.warnings}")
-        assertTrue(unknownKeyWarning(result, "bar_kg"), "warnings were ${result.warnings}")
+    fun `bar_lb and bar_kg are known keys the gate no longer reports`() {
+        val result = PlanImport.parse(planWith("\"implement\": \"barbell\", \"bar_lb\": 35,"))
+        assertEquals(emptyList(), result.errors)
+        assertFalse(unknownKeyWarning(result, "bar_lb"), "warnings were ${result.warnings}")
+        assertFalse(
+            unknownKeyWarning(PlanImport.parse(planWith("\"bar_kg\": 15,")), "bar_kg"),
+            "bar_kg is still reported as unknown",
+        )
     }
 
     @Test
-    fun `a bar weight on a non-barbell implement is accepted today`() {
-        val result = PlanImport.parse(planWith("\"implement\": \"dumbbell\", \"bar_lb\": 35,"))
-        assertEquals(emptyList(), result.errors, "nothing checks the pair today")
+    fun `nothing validates the three declarations yet`() {
+        assertEquals(emptyList(), PlanImport.parse(planWith("\"implement\": \"barbel\",")).errors)
+        assertEquals(
+            emptyList(),
+            PlanImport.parse(planWith("\"implement\": \"dumbbell\", \"bar_lb\": 35,")).errors,
+        )
+        assertEquals(
+            emptyList(),
+            PlanImport.parse(planWith("\"implement\": \"dumbbell\", \"implementCount\": 1,")).errors,
+        )
     }
 
     @Test
-    fun `a declared dumbbell implies no implement count today`() {
+    fun `a declared dumbbell leaves the raw count alone`() {
         val plan = PlanImport.parse(planWith("\"implement\": \"dumbbell\",")).plan
         assertNull(plan!!.sessions[0].exercises[0].implementCount)
     }
