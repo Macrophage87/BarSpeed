@@ -414,9 +414,16 @@ data class PlanFile(
      * A `progression` naming a dimension this exercise's sets do not have
      * (#214).
      *
-     * Sits with the inert-declaration warnings because that is what it is: the
-     * plan looks like it said something and the post-set grid draws nothing.
-     * `"reps"` on a block of holds has no rep count to raise, and `"time"` on a
+     * NO LONGER AN INERT DECLARATION, and this warning is stronger than the
+     * ones it sits with. From #244 the declaration also words the post-set
+     * RATING: `"reps"` on a block of holds asks a plank "About 3-4 reps left"
+     * and freezes `rpeScale = "reps"` onto the row, and `"time"` on a rep
+     * block asks a squat how many more SECONDS it had. The grid still offers
+     * nothing; the rating is now actively worded in a dimension the sets do
+     * not have.
+     *
+     * WHAT THE GRID CANNOT DO is unchanged: `"reps"` on a block of holds has
+     * no rep count to raise, and `"time"` on a
      * block prescribed in reps has no hold to extend.
      *
      * ONE warning per exercise, for [sensorsInert]'s reason: a block of six
@@ -439,10 +446,14 @@ data class PlanFile(
         return when {
             declared == "reps" && exercise.sets.none { it.reps != null } ->
                 lead + "whose sets are all timed -- there is no rep count to raise, so the post-set " +
-                    "grid offers nothing. Declare \"time\" to step the hold up, or \"none\" to hold it."
+                    "grid offers nothing -- and the rating after each set is worded in that dimension " +
+                    "anyway, so the set is asked the wrong question and its exported \"rpeScale\" " +
+                    "records it. Declare \"time\" to step the hold up, or \"none\" to hold it."
             declared == "time" && exercise.sets.none { it.isTimed } ->
                 lead + "whose sets are all prescribed in reps -- there is no hold to extend, so the " +
-                    "post-set grid offers nothing. Declare \"reps\" or \"weight\", or \"none\" to hold it."
+                    "post-set grid offers nothing -- and the rating after each set is worded in that " +
+                    "dimension anyway, so the set is asked the wrong question and its exported " +
+                    "\"rpeScale\" records it. Declare \"reps\" or \"weight\", or \"none\" to hold it."
             else -> null
         }
     }

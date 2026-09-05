@@ -332,11 +332,15 @@ object EffortScale {
      * the change reaches the screen, the write and the export at once rather
      * than three times.
      *
-     * A NULL [progression] is an exercise whose plan declared nothing, and an
-     * ad-hoc set, which has no plan at all. Both read as
-     * [ProgressionKind.WEIGHT] -- that is what an omitted key MEANS, stated
-     * once on [ProgressionKind.ofPlan] -- so nothing recorded against a plan
-     * written before schema 1.11 is asked a different question than it was.
+     * A NULL [progression] is an AD-HOC set, which has no plan at all: every
+     * call site passes `slot?.progression`, so a null reaches here only when
+     * the SLOT is null. An exercise whose plan declared nothing never arrives
+     * here as null -- `PlannedSlot.progression` is a non-null
+     * [ProgressionKind] defaulting to WEIGHT, resolved by
+     * [ProgressionKind.ofPlan] when the plan is flattened, because that is
+     * what an omitted key MEANS. Both land on [ProgressionKind.WEIGHT], which
+     * is why nothing recorded against a plan written before schema 1.11 is
+     * asked a different question than it was.
      * Taking the null here rather than resolving it at the call site is what
      * makes the ad-hoc case pinnable: `:app` has no reachable test seam, so a
      * `?: WEIGHT` written there is a rule nothing on the CI path can fail.

@@ -284,10 +284,22 @@ object NextSetNudgePolicy {
      * `size / 2`, and that is a choice with a reason. It makes rung 6 to rung
      * 4 a real move on every row -- +1 to +2 reps, +5 to +10 s, +5 to +20 lb
      * -- which is the direction the owner named when he said the add point is
-     * rung 4 and not rung 6. On the pound row it also lands the suggestion on
-     * 20 lb, exactly the figure rung 4's own caption says was left. `size / 2 -
-     * 1` would have put rung 4 on the same +1 rep as rung 6 and made the rung
-     * decide nothing at all on a rep exercise.
+     * rung 4 and not rung 6. `size / 2 - 1` would have put rung 4 on the same
+     * +1 rep as rung 6 and made the rung decide nothing at all on a rep
+     * exercise.
+     *
+     * A SUGGESTION IS NOT ITS RUNG'S CAPTION, and only one cell of six reads
+     * as though it were. On the pound row this lands rung 4 on 20 lb, the
+     * LOWER BOUND of the band its own caption names (`"Could have added 20-30
+     * lb"`); in kilograms it lands on 10 kg, which is exactly that rung's
+     * caption (`"Could have added 10 kg"`). The other rungs do NOT agree with
+     * their captions and are not meant to: rung 6 suggests +5 lb / +2.5 kg
+     * beside captions reading `"Could have added 10-15 lb"` and `"Could have
+     * added 5 kg"`, because rung 6 maps to index 0, the smallest step in the
+     * row -- which is what *"the add point is rung 4 and not rung 6"*
+     * encodes. The caption says how much the lifter reckons was left; the
+     * suggestion says how much to actually add next set, and on the rung
+     * below the add point those are deliberately different numbers.
      *
      * TWO RUNGS SHARE A SUGGESTION ON THE REP ROW, because it is two long and
      * there are three rungs. Written down rather than left as an accident:

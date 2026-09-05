@@ -434,9 +434,11 @@ data class SetFeedback(
      * plan is editable and deletable, so an exercise's `progression` can move
      * -- or the whole plan can be gone -- while the set that was rated under
      * it is still on the rest screen. This is the same value
-     * `completedSetOf` writes into the row's `rpeScale`, resolved once by
-     * `EffortScale.askFor`, so the popup and the archive cannot disagree about
-     * which question was asked.
+     * `completedSetOf` writes into the row's `rpeScale`, resolved by TWO
+     * calls to `EffortScale.askFor` on the same frozen [PendingSetWrite] --
+     * one in `completedSetOf` and one here in `restingState` -- so they
+     * cannot differ today, and nothing in this repository would catch it if
+     * one call's arguments moved and the other's did not.
      */
     val rpeAsk: EffortAsk,
 ) {
