@@ -82,12 +82,32 @@ data class ExerciseDef(
      * of every rep is downward. This is what the voice guide announces and what
      * the tempo digits are positioned against.
      */
-    val startsAtTop: Boolean get() = (startsWith == StartPhase.ECCENTRIC) == concentricUp
+    val startsAtTop: Boolean get() = Companion.startsAtTop(startsWith, concentricUp)
 
     /** Maps measured sensor motion into the lifter's frame; see [sensorInverted]. */
     val sensorToLifter: Double get() = (if (sensorInverted) -1.0 else 1.0) * travelRatio
 
     companion object {
+        /**
+         * [ExerciseDef.startsAtTop] for a caller holding the two fields that
+         * decide it rather than a whole definition.
+         *
+         * The property above delegates here, so the rule is stated once. It is
+         * a function because the prep countdown asks it while holding a start
+         * phase and a drive direction read off a plan slot
+         * ([StartCuePolicy], #241), and a second copy of the
+         * expression written at that call site would be a second fact able to
+         * disagree with this one.
+         *
+         * `LiftDirection.startsAtTop` in `:core:dsp` is a THIRD copy of the
+         * same expression, left standing rather than folded in here: it is
+         * numerically sensitive DSP code and this change has no behavioural
+         * business in it. The two are pinned equal by
+         * `StartCueVoiceContractTest`, which is the module that can see both.
+         */
+        fun startsAtTop(startsWith: StartPhase, concentricUp: Boolean): Boolean =
+            (startsWith == StartPhase.ECCENTRIC) == concentricUp
+
         val SEED: List<ExerciseDef> =
             listOf(
                 ExerciseDef("back_squat", "Back Squat"),
