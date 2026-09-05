@@ -19,11 +19,12 @@ import kotlin.test.assertTrue
  *
  * ## Provenance
  *
- * Thirteen `-reps.csv` files, one per capture that already has both an
- * `imu-a` (or `imu-b`) stream and a `-cues.csv` on this classpath. Each is
- * copied byte for byte out of `<session>/extracted/<setNN>_<exercise>
- * _reps.csv` in the owner's capture directory, which is not in this
- * repository. Every field below is read from that session's own `meta.json`:
+ * Thirteen `-reps.csv` files over thirteen distinct sets of sessions 36, 37
+ * and 38 -- the only sessions in the owner's capture directory that exported
+ * `repMarks` at all, sessions 30 to 35 having written none. Each is copied
+ * byte for byte out of `<session>/extracted/<setNN>_<exercise>_reps.csv`
+ * there, and that directory is not in this repository. Every field below is
+ * read from that session's own `meta.json`:
  *
  * | fixture | session | set | exercise | tempo | load | reps / planned |
  * |---|---|---|---|---|---|---|
@@ -45,6 +46,20 @@ import kotlin.test.assertTrue
  * and session 38 is 2026-09-04 on 0.1.50; all three name the sensor as a
  * WitMotion WT901BLECL. Every one of the thirteen sets carries
  * `repsManual: true`.
+ *
+ * The rule is the exporting SET, not the cue track. Sixteen captures on this
+ * classpath carry a `-cues.csv` and no rep file, three of them from these
+ * same three sessions. `field-backsquat-wrapping-s36-set01` is session 36 set
+ * 1's role-`a` stream and `field-backsquat-4011-6rep-s36-set01` its role-`b`
+ * one -- one set, two fixtures, and the marks are committed once, beside the
+ * role-`b` stream `meta.json` names as the analysed one.
+ * `field-rdl-wrapping-s36-set05` is byte for byte the same file as
+ * `field-rdl-3010-10rep-s36-set05`, committed twice under two names, and
+ * again the marks sit beside one of the two.
+ * `field-ropedeadhang-hold20-s37-set11` is a timed hold and its session wrote
+ * no rep file for it. `thirteen captures carry marks and sixteen carry cues
+ * without them` asserts that split against the resource directory, so this
+ * paragraph cannot drift from the directory again.
  *
  * ## The finding these pins exist for
  *
@@ -83,21 +98,30 @@ class RepMarkTrackTest {
     private fun hasSidecar(f: String, suffix: String): Boolean = javaClass.getResource("/$f$suffix") != null
 
     /**
-     * The provenance rule this file's KDoc states, read off the resource
-     * directory instead of asserted in prose.
+     * The Provenance paragraph, read off the resource directory instead of
+     * asserted in prose.
      *
-     * "one per capture that already has both an `imu-a` (or `imu-b`) stream
-     * and a `-cues.csv` on this classpath" is a claim about which files are
-     * present, and nothing has ever listed the directory to check it. This
-     * lists it.
+     * The commit before this one pushed this test stating the paragraph's OLD
+     * rule -- that every cue-bearing capture carries a rep file -- and it
+     * failed on sixteen captures. This is the same listing against the rule
+     * that holds.
+     *
+     * Three assertions, not one total: a total would let the marked set and
+     * the cue-only set move in opposite directions and still add up.
      */
     @Test
-    fun `every capture with a cue track carries a rep file`() {
+    fun `thirteen captures carry marks and sixteen carry cues without them`() {
+        val captures = FieldCorpus.onClasspath()
+        assertEquals(corpus.map { it.first }.sorted(), captures.filter { hasSidecar(it, "-reps.csv") })
+        val cuedOnly = captures.filter { hasSidecar(it, "-cues.csv") && !hasSidecar(it, "-reps.csv") }
+        assertEquals(16, cuedOnly.size)
         assertEquals(
-            emptyList(),
-            FieldCorpus.onClasspath().filter {
-                hasSidecar(it, "-cues.csv") && !hasSidecar(it, "-reps.csv")
-            },
+            listOf(
+                "field-backsquat-wrapping-s36-set01",
+                "field-rdl-wrapping-s36-set05",
+                "field-ropedeadhang-hold20-s37-set11",
+            ),
+            cuedOnly.filter { Regex("-s3[678]-set").containsMatchIn(it) },
         )
     }
 

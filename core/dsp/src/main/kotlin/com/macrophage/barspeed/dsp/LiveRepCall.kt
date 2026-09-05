@@ -37,9 +37,11 @@ sealed interface RepCall {
  * `onQualifiedRun`, `eccentricPending`, `countRep` -- which is a second,
  * hand-written statement of what [RepSegmenter] does for the batch path. Two
  * statements of one rule is how the app comes to show one number and export
- * another. This class deletes the second statement from the decision that
- * gets SPOKEN: it hands [RepSegmenter.segment] the velocity the tracker has
- * published so far and speaks the count that comes back.
+ * another. This class is written to REPLACE the second statement in the
+ * decision that gets SPOKEN: it hands [RepSegmenter.segment] the velocity the
+ * tracker has published so far and speaks the count that comes back. It
+ * deletes nothing yet -- nothing constructs it, `StreamingSetTracker.countRep`
+ * still runs on every set, and the app still shows what that counted.
  *
  * WHAT IS AND IS NOT SHARED, stated because "the same detector" is exactly the
  * claim that hardens into more than it is. The PAIRING AND QUALIFICATION rule
@@ -79,9 +81,9 @@ sealed interface RepCall {
  *
  * One segmentation per sample over the whole set so far, so the work grows
  * linearly within a set. Measured over the thirteen mark-carrying captures on
- * the machine that ran the suite -- see `LiveRepCallTest` -- and reported
- * there rather than claimed here, because it is a measurement of a JVM on a
- * desktop and says nothing certain about a phone.
+ * the machine that ran the suite and reported in this commit's body rather
+ * than claimed here, because it is a measurement of a JVM on a desktop and
+ * says nothing certain about a phone.
  *
  * ## What this class does not do
  *
@@ -90,7 +92,12 @@ sealed interface RepCall {
  * two and `VoiceMilestonePolicy` the third. **Nothing in `:app` calls this
  * yet**: on today's sets `SetVoicePolicy.sensorCounts` is false for a
  * rep-based straight set, and un-gating it is blocked on evidence this corpus
- * cannot supply -- see `LiveRepCallTest`'s measured scoring and issue #145.
+ * cannot supply -- see `LiveRepCallCorpusTest`'s measured scoring and issue
+ * #145.
+ *
+ * The live count `RecordScreen` DRAWS is still `StreamingSetTracker.repCount`.
+ * Un-gating the voice without moving the screen too makes the two disagree;
+ * that move is owed by the un-gating commit.
  */
 class LiveRepCaller(
     private val direction: LiftDirection = LiftDirection(),
