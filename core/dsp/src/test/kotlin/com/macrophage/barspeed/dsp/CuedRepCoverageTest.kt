@@ -15,11 +15,16 @@ import kotlin.test.assertTrue
  *
  * ## What the corpus says today
  *
- * Twenty-seven of the forty committed captures carry a cue track, and the
- * twenty-two in [cueTracked] are scored here. Across them the metronome
- * called 190 reps; 79 produce a counted rep and 111 produce none. Eight
- * counted reps
+ * Twenty-nine of the forty-two committed captures carry a cue track, and the
+ * twenty-two in [cueTracked] are scored here. Across them the metronome called
+ * 190 reps; 79 produce a counted rep and 111 produce none. Eight counted reps
  * land outside every cued window. All four figures are pinned below.
+ *
+ * The census read "twenty-seven of the forty" until this commit. It was
+ * measured before this branch was rebased onto `origin/main`, which had
+ * committed two more captures of its own for issue #245; both digits are
+ * re-counted off the resource directory at the rebased tree rather than
+ * adjusted by two.
  *
  * The resource directory holds MORE captures than the corpus does. Four
  * arrived with issue #133 for a rotation measure and two with issue #245 for
@@ -44,8 +49,8 @@ import kotlin.test.assertTrue
  *
  * ## What this does NOT say
  *
- * It does not say the counter no longer invents reps. Twelve captures carry no
- * cue track, and previously identified survivors are in that group --
+ * It does not say the counter no longer invents reps. Thirteen captures carry
+ * no cue track, and previously identified survivors are in that group --
  * field-ohp-100hz-bursty keeps runs of 1.553, 1.604 and 1.892 m against a
  * 0.766 m median, all UNPINNED figures quoted in [LiveCapCalibrationTest].
  * Nothing here disproves them. The boundaries between the three groups are
@@ -200,7 +205,7 @@ class CuedRepCoverageTest {
     )
 
     /**
-     * The thirteen this file does not score, twelve of which carry no cue
+     * The fourteen this file does not score, thirteen of which carry no cue
      * track at all.
      *
      * `field-rdl-3010-10rep-s36-set04` is here by choice and the choice is
@@ -609,7 +614,7 @@ class CuedRepCoverageTest {
         // confirmed nor disproved by any cue track.
         //
         // [outsideCorpusTotals] is subtracted first, because this file's own
-        // lists cover THIRTY-THREE captures and those totals cover twenty-one.
+        // lists cover FORTY-TWO captures and those totals cover twenty-one.
         // Without it the subtraction below silently changes meaning: it would
         // read as "reps on captures with no cue track" while actually being
         // that plus the later captures' own counted reps.
@@ -641,9 +646,12 @@ class CuedRepCoverageTest {
     @Test
     fun `half the reps the lifter performed produce no count at all`() {
         // Issue 94 as a per-rep fact rather than a per-set total, across every
-        // training class the corpus covers. The rate is 56%, and it has got
+        // training class the corpus covers. The rate is 58%, and it has got
         // worse at each widening of the corpus: 42% over the seven captures
-        // this started with, 47% over fourteen, 56% over twenty.
+        // this started with, 47% over fourteen, 56% over twenty and 58% over
+        // twenty-two. The 56% this note carried was the twenty-capture figure
+        // left standing beside a twenty-two-capture assertion of 111 of 190,
+        // which is 58.4%.
         val c = DspConfig()
         val tol = CueTrack.WINDOW_TOLERANCE_MS.toLong()
         var cued = 0
@@ -721,19 +729,29 @@ class CuedRepCoverageTest {
         // because the tracker could not be told which way the drive moves. It
         // can now, and those seven are gone.
         //
-        // THE INVARIANT NO LONGER HOLDS AND THIS IS A REGRESSION, not a figure
-        // that moved. `field-latpulldown-1120-12rep-s38-set14`, committed on
-        // this branch for issue #72, puts a second counted rep inside one of
-        // its windows, so the drive-down doubled count is 1 where issue #102
-        // left it at 0. The commit that added the capture changed the
-        // assertion from 0 to 1 and dropped ", since issue 102" from its
-        // message while leaving this comment saying the guard holds; both were
-        // mine. `captures holding a window with two counted reps in it` names
-        // the capture rather than totalling it, so the next change to this
-        // area cannot lose which one it is.
+        // THE INVARIANT NO LONGER HOLDS. `field-latpulldown-1120-12rep-s38-set14`,
+        // committed on this branch for issue #72, puts a second counted rep
+        // inside one of its windows, so the drive-down doubled count is 1
+        // where issue #102 left it at 0. The commit that added the capture
+        // changed the assertion from 0 to 1 and dropped ", since issue 102"
+        // from its message while leaving this comment saying the guard holds;
+        // both were mine. `captures holding a window with two counted reps in
+        // it` names the capture rather than totalling it, so the next change
+        // to this area cannot lose which one it is.
+        //
+        // THIS BRANCH DID NOT CAUSE IT, and that is MEASURED rather than
+        // reasoned from the diff. The same capture, dropped onto
+        // `origin/main`'s classpath at
+        // 2f7efa5f7cbcafec9c1ffcb34afda43ef01d09f9 with no code from this
+        // branch present, and scored by this file's own `countedReps` model,
+        // gives 7 counted reps, 5 matched windows, 7 empty, ONE doubled and 1
+        // stray -- identical to what this branch's tree gives. So the doubled
+        // window is REVEALED by the capture and not created by the change.
+        // The word "regression" was in this comment and is deleted: a
+        // regression is a behaviour that got worse, and no behaviour moved.
         //
         // The seven leg-curl windows are still gone -- the map below has no
-        // `field-legcurl-*` key -- so issue #102's fix is not what regressed.
+        // `field-legcurl-*` key -- so issue #102's fix is not what exposed it.
         // What is new is a stack-mounted, drive-down capture that is not a leg
         // curl. Whether one doubled window on one capture warrants reopening
         // #102 or a new issue is the owner's call and no issue is filed here.

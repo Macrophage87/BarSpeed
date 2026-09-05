@@ -231,8 +231,12 @@ class GyroGateTest {
             // the straddle test is what keeps this one out.
             "field-reardeltfly-s32-set06",
             // Session 38 set 14, committed for issue #72: a lat pulldown
-            // measured off the stack, 1.3 deg of roll excursion in its own
-            // meta.json, so nothing rotates and the gate holds.
+            // declaring `sensorOnStack` AND `sensorInverted` true, whose
+            // committed roll column runs -86.2372 to -84.9792 deg over 6404
+            // samples -- 1.258 deg of excursion -- so the analysed stream does
+            // not rotate and the gate holds. This read "measured off the
+            // stack", which is the opposite of what the set declares; the
+            // mount-word sweep below fixed set 4 and left this one standing.
             "field-latpulldown-1120-12rep-s38-set14",
         )
         val fails = listOf(

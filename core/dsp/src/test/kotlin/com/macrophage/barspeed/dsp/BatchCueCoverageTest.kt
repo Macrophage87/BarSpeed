@@ -69,8 +69,12 @@ import kotlin.test.assertTrue
  * double- and under-counting -- an artefact of reps completing near a window
  * boundary. `the headline does not rest on which end of a detection is
  * assigned` scores the corpus under the start, midpoint and end rules. The
- * three disagree per-capture on seventeen of the twenty captures here, and the
- * matched total moves twelve windows of 170 across them.
+ * three disagree per-capture on nineteen of the twenty-two captures here, and
+ * the matched total moves thirteen windows of 190 across them. This read
+ * "seventeen of the twenty" and "twelve windows of 170"; that is the corpus
+ * before session 38's two captures, and it is still what `origin/main`
+ * measures at 2f7efa5f7cbcafec9c1ffcb34afda43ef01d09f9 over its own twenty --
+ * 147, 141 and 135 matched.
  *
  * Arrival timestamps, not the DSP's reconstructed clock: `VelocityEstimator`
  * places sample i at `i * dt`, which drifts from arrival by up to
@@ -151,6 +155,36 @@ class BatchCueCoverageTest {
      * four barbell captures and three cable ones -- but its cable captures
      * have no `-cues.csv`, so nothing could score the split per mark. See
      * `the gap by sensor mount, which is what issue 72 named`.
+     *
+     * WHAT WAS LEFT BEHIND, so the two committed here cannot read as the
+     * session. Session 38 recorded EIGHTEEN sets, every one carrying a cue
+     * track, sixteen of them dynamic and two rope dead hangs -- counted off
+     * `field-38/extracted` in the owner's capture directory, which is not in
+     * this repository. Two are committed here (four files: two `imu-a`
+     * streams and their tracks); a further two, set 5 and set 2, are on the
+     * classpath already from issue #245. The other fourteen are on no
+     * classpath and are not scored by anything.
+     *
+     * WHY THESE TWO. Issue #72's claim is a mount split on the seated
+     * overhead press, so one capture of each mount from ONE session was the
+     * smallest pair that holds day, lifter, sensor and firmware fixed: set 4
+     * is the seated overhead press the issue is named after with
+     * `sensorOnStack` false, and set 14 is the session's FIRST lat pulldown,
+     * declaring `sensorOnStack` true. The session's other stack-mounted work
+     * is two triceps pushdowns and the two later lat pulldowns, sets 15 and
+     * 16, which repeat set 14; set 5 repeats the press and is committed on
+     * `origin/main` for #245, sitting in `notRepCorpus` below rather than
+     * being scored here. Picking the first of a repeated exercise rather than
+     * its best set is deliberate and is not a claim that the others agree.
+     *
+     * WHAT NEITHER OF THEM COVERS. Both captures added for #72 are
+     * CONCENTRIC-FIRST, so neither exercises this branch's own eccentric-first
+     * `loweredSince` fallback in `RepSegmenter.pairEccentricFirst` -- the
+     * largest production change on the branch. The field coverage for that
+     * fallback comes from a capture this branch did not add:
+     * `field-inclinepress-3010-12rep-s38-set02`, eccentric-first 3010,
+     * committed on `origin/main` for #245 and scored in
+     * `the notRepCorpus captures the fallback moves, and what each is`.
      *
      * BOTH SETS ARE TWO-SENSOR CAPTURES and only role a is committed. Each
      * declares `sensorsArmed` 2 and `sensorRolesExpected` [a, b], each wrote a
@@ -252,9 +286,12 @@ class BatchCueCoverageTest {
      * guard below able to catch the next capture nobody classified.
      *
      * Being out of every figure above does not make them unaffected: the
-     * slow-eccentric fallback moves ONE of the four, and
-     * `the notRepCorpus capture the fallback moves is a duplicate of a scored
-     * one` is what keeps that from being an unpinned claim in a commit body.
+     * slow-eccentric fallback moves TWO of the six, and
+     * `the notRepCorpus captures the fallback moves, and what each is` is what
+     * keeps that from being an unpinned claim in a commit body. It said ONE of
+     * the FOUR, measured before this branch was rebased onto `origin/main`,
+     * which had committed two more of these six meanwhile; the second mover is
+     * one of that pair.
      */
     private val notRepCorpus = listOf(
         "field-backsquat-wrapping-s36-set01",
@@ -441,24 +478,37 @@ class BatchCueCoverageTest {
     }
 
     @Test
-    fun `the notRepCorpus capture the fallback moves is a duplicate of a scored one`() {
-        // Issue #72 round 1 finding 4. This branch was 66 commits behind main
-        // when its figures were measured, and main had added four captures the
-        // figures above deliberately exclude. One of them, and only one, is
-        // moved by the slow-eccentric fallback -- and it is moved because it
-        // is the SAME BYTES as a capture the cost table already accounts for.
+    fun `the notRepCorpus captures the fallback moves, and what each is`() {
+        // Issue #72 rounds 1 and 2. TWO of these six are moved by the
+        // slow-eccentric fallback. The note here said ONE of four; that was
+        // measured while this branch was 66 commits behind main, and the
+        // rebase onto 2f7efa5f7cbcafec9c1ffcb34afda43ef01d09f9 brought in two
+        // more captures, one of which moves.
         //
-        // The three others do not move: both `field-ohp-prepinflated-*` sets
-        // are recorded concentric-first in their own session archive
+        // `field-rdl-wrapping-s36-set05` moves because it is the SAME BYTES as
+        // `field-rdl-3010-10rep-s36-set05`, which the cost table above already
+        // accounts for. Byte equality rather than a matching rep count: two
+        // files that happen to agree today would let the duplicate silently
+        // diverge.
+        //
+        // `field-inclinepress-3010-12rep-s38-set02` is the one genuinely new
+        // thing the rebase brought. It is a dumbbell incline press at tempo
+        // 3010, ECCENTRIC-FIRST, committed on `origin/main` for issue #245 --
+        // and it is the only committed capture that gives this branch's
+        // eccentric-first `loweredSince` fallback any field coverage at all,
+        // because both captures #72 added are concentric-first. Its figures
+        // are pinned in [PrepDetectionFieldTest], which reads it with its cue
+        // track and its work-start instant; what is pinned here is only the
+        // unbounded span count, so the two files cannot drift into agreeing by
+        // construction.
+        //
+        // The remaining three do not move: both `field-ohp-prepinflated-*`
+        // sets are recorded concentric-first in their own session archive
         // (SetEndWindowTest reads the same directions off it), so
         // `pairEccentricFirst` is never reached on them, and
         // `field-backsquat-wrapping-s36-set01` is eccentric-first and resolves
-        // no orphan drive at all.
-        //
-        // Byte equality rather than a matching rep count: two files that
-        // happen to agree today would let the duplicate silently diverge, and
-        // the claim being pinned is that there is nothing new here to
-        // adjudicate.
+        // no orphan drive at all. `field-ohp-3010-8rep-s38-set05` is
+        // concentric-first.
         val duplicate = load("field-rdl-wrapping-s36-set05")
         val scoredTwin = load("field-rdl-3010-10rep-s36-set05")
         assertEquals(scoredTwin, duplicate, "the two files are the same capture under two names")
@@ -473,6 +523,34 @@ class BatchCueCoverageTest {
         )
         assertEquals(11, spans.size, "spans on the duplicate")
         assertEquals(spans.size, spans(Scored("field-rdl-3010-10rep-s36-set05", eccFirst, Family.BARBELL_LOWER)).size)
+        // The incline press, unbounded by cue or instant: 13 spans where
+        // `origin/main` resolves 11, against a hand count of 12.
+        assertEquals(
+            13,
+            spans(Scored("field-inclinepress-3010-12rep-s38-set02", eccFirst, Family.BARBELL_UPPER)).size,
+            "spans on the eccentric-first incline press the fallback moves",
+        )
+        // And the three that do not move, so a change that started moving one
+        // of them cannot pass as unchanged.
+        assertEquals(
+            mapOf(
+                "field-backsquat-wrapping-s36-set01" to 7,
+                "field-ohp-prepinflated-s37-set03" to 11,
+                "field-ohp-prepinflated-s37-set04" to 7,
+                "field-ohp-3010-8rep-s38-set05" to 15,
+            ),
+            mapOf(
+                "field-backsquat-wrapping-s36-set01" to
+                    spans(Scored("field-backsquat-wrapping-s36-set01", eccFirst, Family.BARBELL_LOWER)).size,
+                "field-ohp-prepinflated-s37-set03" to
+                    spans(Scored("field-ohp-prepinflated-s37-set03", conFirst, Family.BARBELL_UPPER)).size,
+                "field-ohp-prepinflated-s37-set04" to
+                    spans(Scored("field-ohp-prepinflated-s37-set04", conFirst, Family.BARBELL_UPPER)).size,
+                "field-ohp-3010-8rep-s38-set05" to
+                    spans(Scored("field-ohp-3010-8rep-s38-set05", conFirst, Family.BARBELL_UPPER)).size,
+            ),
+            "spans on the four notRepCorpus captures the fallback leaves alone",
+        )
     }
 
     @Test
@@ -509,9 +587,13 @@ class BatchCueCoverageTest {
         // What survives is the corpus figure, which is what the issue quotes:
         // the three rules put the matched total within THIRTEEN windows of
         // each other -- 168, 163 and 155 in the map below, and the assertTrue
-        // bound beneath it reads <= 14 -- which is 6.8% of 190. It was exactly
-        // 14 of 170 before session 38's two captures arrived; the bound is
-        // left where it was rather than tightened onto the new measurement.
+        // bound beneath it reads <= 14 -- which is 6.8% of 190. The sentence
+        // "it was exactly 14 of 170 before session 38's two captures arrived"
+        // stood here and is DELETED rather than reworded: at
+        // 2f7efa5f7cbcafec9c1ffcb34afda43ef01d09f9 the same three rules over
+        // main's own twenty captures give 147, 141 and 135, a spread of TWELVE
+        // of 170, so the 14 described no tree either side of the rebase. The
+        // bound is left at 14 rather than tightened onto the new measurement.
         // That is a real spread and not the 2.4% this note used to claim, so
         // the choice of
         // rule is stated rather than waved away: the start rule is used
@@ -534,7 +616,7 @@ class BatchCueCoverageTest {
         val matched = byRule.values.map { it.matched }
         assertTrue(
             matched.max() - matched.min() <= 14,
-            "the assignment rule moves the matched total by ${matched.max() - matched.min()} windows of 170",
+            "the assignment rule moves the matched total by ${matched.max() - matched.min()} windows of 190",
         )
     }
 
@@ -722,10 +804,12 @@ class BatchCueCoverageTest {
         // bar half" and "the stack half" here until now; that was wrong of me
         // and the words are deleted rather than softened.
         // `marks in the not-on-stack half, by family` measures its 132 marks
-        // as 56 barbell-upper against 32 barbell-lower, 24 leg-press, 12
-        // dumbbell rear-delt-fly and 8 pull-up, so fewer than half of them
-        // stand on a barbell at all. On the other side, 46 of the 58 on-stack
-        // marks are the same leg-curl machine.
+        // as 56 barbell-upper and 32 barbell-lower against 24 leg-press, 12
+        // dumbbell rear-delt-fly and 8 pull-up, so 88 of the 132 stand on a
+        // barbell and 44 do not. The words "fewer than half of them stand on a
+        // barbell at all" were here and are deleted: 56 + 32 is 88, which is
+        // two thirds. On the other side, 46 of the 58 on-stack marks are the
+        // same leg-curl machine.
         //
         // THE WITHIN-SESSION PAIR IS THE FIGURE TO READ FIRST, and it is the
         // only one here that holds day, lifter, sensor and firmware fixed:
@@ -744,16 +828,20 @@ class BatchCueCoverageTest {
         // WHAT SESSION 38 IS FIRST AT is narrower than this comment used to
         // claim. It said session 38 was "the first committed session holding
         // both mounts"; that is false and is deleted. Session 26 (2026-08-17)
-        // is issue #72's own session and already holds both -- the four
+        // is issue #72's own session and already holds both BY ISSUE #72'S OWN
+        // ACCOUNT OF IT -- the issue's table calls its three cable sets
+        // stack-mounted -- though NO COMMITTED BYTE DECLARES THEM SO: the four
         // barbell captures scored here plus `field-cablerow-static-8rep`,
         // `field-facepull-static-12rep` and `field-pallof-static-12rep`, the
         // three cable sets the issue's table records at 0.2-0.7 deg of roll,
-        // all seven listed together in [FieldDataRegressionTest]. None of
-        // those three carries a `-cues.csv`, which is why all three sit in
-        // `notScored` and why nothing could score a mount split PER METRONOME
-        // MARK until session 38. That is the true statement: session 38 is the
-        // first committed session carrying a cue track on a capture of each
-        // mount.
+        // are all seven listed together in [FieldDataRegressionTest], and all
+        // three cable sets take `LiftDirection(startsWith = CONCENTRIC)` in
+        // [RepRefusalCorpusTest], whose `sensorOnStack` defaults to FALSE.
+        // None of those three carries a `-cues.csv`, which is why all three
+        // sit in `notScored` and why nothing could score a mount split PER
+        // METRONOME MARK until session 38. That is the true statement: session
+        // 38 is the first committed session carrying a cue track on a capture
+        // of each DECLARED mount.
         //
         // THIS IS A BATCH-PATH CLAIM AND THE LIVE PATH DOES NOT SUPPORT IT.
         // [CuedRepCoverageTest] scores the counter the lifter watches during
