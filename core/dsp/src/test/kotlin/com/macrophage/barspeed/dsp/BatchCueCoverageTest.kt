@@ -103,7 +103,17 @@ class BatchCueCoverageTest {
         javaClass.getResourceAsStream("/$n.csv")!!.readBytes().decodeToString(),
     )
 
-    /** Session 26's seated leg curl: concentric-first, drive DOWN, stack-mounted, inverted. */
+    /**
+     * The seated leg curl the four `field-legcurl-1030-*` captures were
+     * recorded on: concentric-first, drive DOWN, stack-mounted, inverted.
+     *
+     * NOT session 26, which is what this line said until now, and the error
+     * was mine. The three 12-rep captures are 2026-08-18 on app 0.1.39
+     * ([LegCurlCueTrackTest] states both) and `field-legcurl-1030-10rep` is
+     * session 31 set 11 ([VelocityLossTest] states it, citing issue #126).
+     * Session 26 is 2026-08-17 and is where this corpus's four barbell
+     * captures come from ([BarbellCueTrackTest]).
+     */
     private val legCurl = LiftDirection(
         startsWith = StartPhase.CONCENTRIC,
         concentricUp = false,
@@ -135,19 +145,39 @@ class BatchCueCoverageTest {
      *
      * The last two are session 38 (2026-09-04, app 0.1.50, WitMotion
      * WT901BLECL), added for issue #72 because that issue is a claim about the
-     * MOUNT and no committed session held both mounts. Every field below is
-     * read from that session's own `meta.json`:
+     * MOUNT and no committed session carried a metronome track on a capture of
+     * each mount. This paragraph used to say "no committed session held both
+     * mounts", which is false and is deleted: session 26 holds both already --
+     * four barbell captures and three cable ones -- but its cable captures
+     * have no `-cues.csv`, so nothing could score the split per mark. See
+     * `the gap by sensor mount, which is what issue 72 named`.
+     *
+     * BOTH SETS ARE TWO-SENSOR CAPTURES and only role a is committed. Each
+     * declares `sensorsArmed` 2 and `sensorRolesExpected` [a, b], each wrote a
+     * role-b IMU file, and each set's `analysedRole` is a. So every figure
+     * below and every figure this file scores is one of two streams recorded
+     * simultaneously, and the role-b stream is not on the classpath for
+     * anything here to cross-check against. The b files are NOT committed and
+     * nothing in this round measured them beyond the summary each reports.
+     *
+     * Every field below is read from that session's own `meta.json`:
      *
      * - `field-ohp-3010-8rep-s38-set04` -- set 4, seated_overhead_press, tempo
      *   3010, 13.607771100301063 kg (30.0 lb), 8 performed of 8 planned,
      *   RPE 7, concentric-first, drive up, `sensorOnStack` false,
      *   `travelRatio` 1.0, 4988 samples at 99.36242279338514 Hz, roll
      *   excursion 360.0 deg, `analysedRole` a. This is the exercise issue #72
-     *   is named after.
+     *   is named after. Its role-b sensor reports `rollExcursion_deg` 360.0
+     *   as well, over 4988 samples at 99.35846350015939 Hz. On the 360 itself
+     *   see [GyroGateTest]: it is a wraparound artifact, not a rotation.
      * - `field-latpulldown-1120-12rep-s38-set14` -- set 14, lat_pulldown, tempo
      *   1120, 34.019427750752655 kg (75.0 lb), 12 performed of 12 planned,
      *   RPE 6, concentric-first, drive DOWN, `sensorOnStack` and
-     *   `sensorInverted` both true, `travelRatio` 1.0, 6404 samples at
+     *   `sensorInverted` both true, `travelRatio` 1.0. Its role-b sensor
+     *   reports `rollExcursion_deg` 17.7 against role a's 1.3, over 6400
+     *   samples at 99.34946979459392 Hz -- so "nothing rotates on this set"
+     *   is a statement about the committed stream and not about the set.
+     *   Role a is 6404 samples at
      *   99.36374922408443 Hz, roll excursion 1.3 deg, `analysedRole` a.
      */
     private val scored = listOf(
@@ -679,29 +709,71 @@ class BatchCueCoverageTest {
 
     @Test
     fun `the gap by sensor mount, which is what issue 72 named`() {
-        // Issue #72's title is a mount split: 53% of the reps found on
-        // bar-mounted seated overhead press against 104% on a stack. This
-        // measures the same split on the corpus that exists now, scored per
-        // window rather than as a ratio of totals -- 104% was a total that
-        // cancelled misses against inventions, and the issue's own thread
-        // records that being found out.
+        // Issue #72's title is a mount split: 53% of the reps found on seated
+        // overhead press with the sensor off the stack against 104% on a
+        // stack. This measures the same split on the corpus that exists now,
+        // scored per window rather than as a ratio of totals -- 104% was a
+        // total that cancelled misses against inventions, and the issue's own
+        // thread records that being found out.
         //
         // The split is read from `sensorOnStack`, which is the geometry each
         // set DECLARED, not a judgement made here about where the sensor was.
-        // Rows are (marks, matched).
+        // The two groups are NOT-ON-STACK and ON-STACK. They were called "the
+        // bar half" and "the stack half" here until now; that was wrong of me
+        // and the words are deleted rather than softened.
+        // `marks in the not-on-stack half, by family` measures its 132 marks
+        // as 56 barbell-upper against 32 barbell-lower, 24 leg-press, 12
+        // dumbbell rear-delt-fly and 8 pull-up, so fewer than half of them
+        // stand on a barbell at all. On the other side, 46 of the 58 on-stack
+        // marks are the same leg-curl machine.
         //
-        // THE SPLIT THE ISSUE NAMED HAS INVERTED, and session 38 is what makes
-        // that sayable: it is the first committed session holding both mounts,
-        // recorded the same day by the same lifter on the same sensor. The bar
-        // half matches 120 of 132 marks, 90.9%; the stack half matches 48 of
-        // 58, 82.8%. The direction of the gap is now the opposite of the one
-        // the issue was filed on. What remains is a gap, and it is on the
-        // STACK.
+        // THE WITHIN-SESSION PAIR IS THE FIGURE TO READ FIRST, and it is the
+        // only one here that holds day, lifter, sensor and firmware fixed:
+        // session 38 set 4, off the stack, matches 8 of 8; session 38 set 14,
+        // on the stack, matches 10 of 12.
+        //
+        // Corpus-wide the rows are 120 of 132 not-on-stack (90.9%) against 48
+        // of 58 on-stack (82.8%) -- the opposite direction to the one #72 was
+        // filed on. Those two groups are different exercises recorded on
+        // different days across at least three app versions (0.1.37 in
+        // [BarbellCueTrackTest], 0.1.39 in [LegCurlCueTrackTest], 0.1.50 in
+        // the entry above), so they support "the direction #72 named is not
+        // the direction this corpus shows" and are not a measurement of the
+        // mount.
+        //
+        // WHAT SESSION 38 IS FIRST AT is narrower than this comment used to
+        // claim. It said session 38 was "the first committed session holding
+        // both mounts"; that is false and is deleted. Session 26 (2026-08-17)
+        // is issue #72's own session and already holds both -- the four
+        // barbell captures scored here plus `field-cablerow-static-8rep`,
+        // `field-facepull-static-12rep` and `field-pallof-static-12rep`, the
+        // three cable sets the issue's table records at 0.2-0.7 deg of roll,
+        // all seven listed together in [FieldDataRegressionTest]. None of
+        // those three carries a `-cues.csv`, which is why all three sit in
+        // `notScored` and why nothing could score a mount split PER METRONOME
+        // MARK until session 38. That is the true statement: session 38 is the
+        // first committed session carrying a cue track on a capture of each
+        // mount.
+        //
+        // THIS IS A BATCH-PATH CLAIM AND THE LIVE PATH DOES NOT SUPPORT IT.
+        // [CuedRepCoverageTest] scores the counter the lifter watches during
+        // the set, and on its figures session 38 set 4 matches 0 of its 8 cued
+        // reps and set 14 matches 5 of 12: its BARBELL_UPPER row goes 48 -> 56
+        // cued against 34 -> 42 empty, so that family's matched total stays at
+        // 14 across the addition. Issue #72's own stated consequence is the
+        // in-set feedback that shapes the next set, so the path that carries
+        // the consequence is the one showing no improvement.
         //
         // This says nothing about over-detection, which these two rows cannot
-        // see: `spans against the metronome's marks` is where the bar half's
-        // 142 detections against 132 marks are readable, and the empty column
-        // is the only thing measured here.
+        // see: `spans against the metronome's marks` is where the not-on-stack
+        // group's 142 detections against 132 marks are readable, and the empty
+        // column is the only thing measured here.
+        val s38press = scored.single { it.fixture == "field-ohp-3010-8rep-s38-set04" }
+        assertEquals(8, windows(s38press.fixture).size, "marks the metronome called on session 38 set 4")
+        assertEquals(8, coverage(s38press).matched, "marks matched on session 38 set 4")
+        val s38pull = scored.single { it.fixture == "field-latpulldown-1120-12rep-s38-set14" }
+        assertEquals(12, windows(s38pull.fixture).size, "marks the metronome called on session 38 set 14")
+        assertEquals(10, coverage(s38pull).matched, "marks matched on session 38 set 14")
         val expected = mapOf(
             false to listOf(132, 120),
             true to listOf(58, 48),
@@ -710,19 +782,28 @@ class BatchCueCoverageTest {
             listOf(group.sumOf { windows(it.fixture).size }, group.sumOf { coverage(it).matched })
         }
         assertEquals(expected, actual, "by sensorOnStack: marks, matched")
-        // RED, this commit: the comment above and [GyroGateTest] both call the
-        // not-on-stack half "bar-mounted" and its 132 marks "the bar half". If
-        // that word is accurate, every one of those 132 marks stands on a
-        // barbell. Asserted exactly as the prose states it so the corpus, not
-        // a reader, settles whether it is true.
+        // What the not-on-stack group is actually made of. The previous commit
+        // asserted {BARBELL_UPPER=132} -- the claim the deleted words made --
+        // and it failed with exactly this map.
         val notOnStackByFamily = scored.filter { !it.direction.sensorOnStack }
             .groupBy { it.family }
             .mapValues { (_, g) -> g.sumOf { windows(it.fixture).size } }
         assertEquals(
-            mapOf(Family.BARBELL_UPPER to 132),
+            mapOf(
+                Family.BARBELL_UPPER to 56,
+                Family.BARBELL_LOWER to 32,
+                Family.MACHINE_LOWER to 24,
+                Family.ACCESSORY to 12,
+                Family.BODYWEIGHT_UPPER to 8,
+            ),
             notOnStackByFamily,
             "marks in the not-on-stack half, by family",
         )
+        // And the on-stack side: one leg-curl machine and one other capture.
+        val onStack = scored.filter { it.direction.sensorOnStack }
+            .associate { it.fixture to windows(it.fixture).size }
+        assertEquals(46, onStack.filterKeys { it.startsWith("field-legcurl-") }.values.sum(), "leg-curl marks")
+        assertEquals(58, onStack.values.sum(), "on-stack marks in total")
         // And the exercise the issue's headline is about, named rather than
         // matched by prefix. It reported 17 of 32 reps found across four
         // seated-overhead-press sets, 53%. This corpus now holds four
@@ -748,12 +829,10 @@ class BatchCueCoverageTest {
         assertEquals(4, headline.size, "the seated overhead press captures")
         assertEquals(32, headline.sumOf { windows(it.fixture).size }, "marks across them")
         assertEquals(30, headline.sumOf { coverage(it).matched }, "marks matched across them")
-        // Session 38's set, on its own: every mark matched. It is the newest
-        // capture of the exercise the issue is named after and it is the only
-        // one of the four with no empty window.
-        val s38 = scored.single { it.fixture == "field-ohp-3010-8rep-s38-set04" }
-        assertEquals(8, windows(s38.fixture).size, "marks the metronome called on session 38 set 4")
-        assertEquals(8, coverage(s38).matched, "marks matched on session 38 set 4")
+        // Session 38's set, asserted at the top of this test, is the only one
+        // of the four with no empty window, and it is the newest capture of
+        // the exercise the issue is named after.
+        //
         // THIS FIGURE DOES NOT MOVE with the slow-eccentric fallback, and a
         // draft of that change's red asserted that it would. The rotating
         // set's empty window is a PAIRING loss the fallback does not reach:

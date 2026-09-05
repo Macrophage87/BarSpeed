@@ -251,8 +251,15 @@ class GyroGateTest {
             // percentiles of 2.31, 5.63 and 3.61.
             "field-backsquat-wrapping-s36-set01",
             // Session 38 set 4, committed for issue #72: the same seated
-            // overhead press this issue is named after, bar-mounted, 360 deg
-            // of roll excursion, and its distribution straddles.
+            // overhead press this issue is named after, sensor off the stack,
+            // and its gyro distribution straddles. This comment used to read
+            // "bar-mounted, 360 deg of roll excursion, and its distribution
+            // straddles", putting the 360 beside the straddle as though it
+            // caused it. Both halves of that are deleted: the word bar-mounted
+            // is not what `sensorOnStack` false says, and the 360 is a
+            // wraparound artifact rather than a rotation -- see
+            // `session 38 set 4's roll excursion is a wraparound, not a
+            // rotation` below. Nothing here attributes the straddle to roll.
             "field-ohp-3010-8rep-s38-set04",
             "field-ohp-prepinflated-s37-set03",
             "field-ohp-prepinflated-s37-set04",
@@ -271,19 +278,43 @@ class GyroGateTest {
     }
 
     @Test
-    fun `session 38 set 4's roll excursion is a rotation comparable to issue 72's table`() {
-        // RED, this commit. The comment beside `field-ohp-3010-8rep-s38-set04`
-        // in the list above reads "360 deg of roll excursion, and its
-        // distribution straddles", putting the two side by side as though the
-        // first explained the second, and issue #72's table quotes 31-52 deg
-        // of roll for the same exercise. If the 360 is a rotation of the same
-        // kind, the capture's own roll column spans no more than that table's
-        // worst row. Measured from the committed column rather than taken from
-        // `meta.json`, because `meta.json` reports the summary and the column
-        // reports what it was computed from.
+    fun `session 38 set 4's roll excursion is a wraparound, not a rotation`() {
+        // `meta.json` reports `rollExcursion_deg` 360.0 for this set, and the
+        // previous commit asserted the reading that number invites: that it is
+        // a rotation comparable to the 31-52 deg issue #72's table quotes for
+        // the same exercise, so the roll column would span no more than 52
+        // deg. It failed at 359.989, which is the tell rather than the finding.
+        //
+        // What the column actually shows is the estimator's roll output
+        // running the full circle and wrapping: it reaches both ends of the
+        // representable range and spends almost all of the set within 30 deg
+        // of the seam, with only 910 of 4988 samples anywhere in the middle.
+        // A sensor genuinely swinging 360 deg through eight overhead presses
+        // is not what this is.
+        //
+        // Two further reasons not to read 360.0 as rotation, both from
+        // `meta.json`: this set's OTHER sensor, role b, reports 360.0 as well
+        // over the same 4988 samples, and the pulldown recorded on the same
+        // day reports 1.3 on role a against 17.7 on role b. A summary that
+        // reports the same 360.0 for two differently-mounted sensors is
+        // reporting the wrap, not the mount.
+        //
+        // So 360.0 IS NOT COMPARABLE to the issue's 31-52 deg column, and no
+        // comment in this file may use it to explain why the gate fails here.
+        // Measured from the committed column rather than from `meta.json`,
+        // because the summary is what is in question.
         val roll = load("field-ohp-3010-8rep-s38-set04").map { it.rollDeg }
-        val span = roll.max() - roll.min()
-        assertTrue(span <= 52.0, "roll span of session 38 set 4, against issue 72's 31-52 deg: $span")
+        assertEquals(4988, roll.size, "samples in the committed role-a stream")
+        assertEquals(-179.9945, roll.min(), 1e-9, "lowest roll_deg")
+        assertEquals(179.9945, roll.max(), 1e-9, "highest roll_deg")
+        assertEquals(2077, roll.count { it < -150.0 }, "samples below -150 deg")
+        assertEquals(2001, roll.count { it > 150.0 }, "samples above 150 deg")
+        assertEquals(910, roll.count { it >= -150.0 && it <= 150.0 }, "samples anywhere between")
+        // The lat pulldown from the same session is the contrast: 1.3 deg in
+        // `meta.json` and a column that never approaches the seam.
+        val pulldown = load("field-latpulldown-1120-12rep-s38-set14").map { it.rollDeg }
+        assertTrue(pulldown.max() - pulldown.min() < 2.0, "pulldown roll span: ${pulldown.max() - pulldown.min()}")
+        assertEquals(0, pulldown.count { it < -150.0 || it > 150.0 }, "pulldown samples near the seam")
     }
 
     @Test
