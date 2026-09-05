@@ -2,6 +2,7 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -443,12 +444,53 @@ class PlanImportWarningTest {
         assertTrue(warning.contains("80 lb"), warning)
         assertTrue(warning.contains("2 × 40 lb"), warning)
         assertTrue(warning.contains("TOTAL"), warning)
+        // Green here, and it is what stops the gate widening from rewriting
+        // the message for a plan that DID write the key: the author is asked
+        // about the number they typed, by its name.
+        assertTrue(warning.contains("\"implementCount\": 2"), warning)
 
         val kg = parse(
             """{"exercise":"dumbbell_bench_press","implementCount":2,"sets":[{"reps":10,"load_kg":30}]}""",
         ).warnings.first()
         assertTrue(kg.contains("30 kg"), kg)
         assertTrue(kg.contains("2 × 15 kg"), kg)
+    }
+
+    /**
+     * A `"dumbbell"` with no count is a declared PAIR, and this warning has to
+     * see it (round 2 finding 1, #253).
+     *
+     * `resolvedImplementCount` exists so the word alone supplies the 2 it
+     * means. PlanQueue and PlanDetailScreen were both moved onto it; this gate
+     * is the THIRD reader of the count and stayed on the raw key, so on the
+     * exact population #253 asks authors to write -- the word and no number --
+     * the card splits 80 lb into two 40s while the last surface before the
+     * lifter picks the weight up says nothing about which figure was meant.
+     *
+     * The message must name what the plan actually wrote. A warning telling an
+     * author their plan "declares \"implementCount\": 2" over a document with
+     * no such key sends them looking for a line that is not there.
+     */
+    @Test
+    fun `a dumbbell declared by word alone still states both figures`() {
+        val result = parse(
+            """{"exercise":"dumbbell_bench_press","implement":"dumbbell","sets":[{"reps":10,"load_lb":80}]}""",
+        )
+
+        assertEquals(emptyList(), result.errors, "a declared dumbbell is not a reason to refuse the plan")
+        val warning = assertNotNull(
+            result.warnings.firstOrNull { "TOTAL" in it },
+            "expected the pair note on a dumbbell declared by word alone: ${result.warnings}",
+        )
+        assertTrue(warning.contains("80 lb"), warning)
+        assertTrue(warning.contains("2 × 40 lb"), warning)
+        assertTrue(warning.contains("\"implement\": \"dumbbell\""), warning)
+        assertFalse(warning.contains("implementCount"), warning)
+        // The word IS the declaration, so nothing here is undeclared.
+        assertTrue(
+            result.warnings.none { "but no \"implement\"" in it },
+            "the word is the declaration: ${result.warnings}",
+        )
     }
 
     /**
