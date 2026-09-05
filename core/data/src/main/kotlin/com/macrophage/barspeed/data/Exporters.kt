@@ -324,10 +324,11 @@ class SessionExporter(
             //
             // DERIVED here rather than stored, and derivable at all only
             // because both inputs were frozen on the row when the set was
-            // recorded: its own prescription, and the drive direction and kind
-            // of its geometry. So a set recorded long before this key existed
-            // gains the word on re-export, exactly as velocityLossBasis above
-            // is re-asked of the stored reps rather than republished.
+            // recorded: its own prescription, and the plane, drive direction
+            // and kind of its geometry. So a set recorded long before this
+            // key existed gains the word on re-export, exactly as
+            // velocityLossBasis above is re-asked of the stored reps rather
+            // than republished.
             //
             // Null where the regime is not decidable, and null means the key
             // is omitted -- a set with no stored geometry, a hold or a carry,

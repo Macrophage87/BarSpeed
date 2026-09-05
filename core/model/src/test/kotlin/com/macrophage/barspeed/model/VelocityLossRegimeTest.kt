@@ -14,10 +14,10 @@ import kotlin.test.assertTrue
  * each row breaks one clause of `VelocityLossRegime.of` and names the tests
  * that go red -- not a red CI run that could not have existed.
  *
- * The table is written as a cross product of the three inputs rather than as
+ * The table is written as a cross product of the four inputs rather than as
  * one assertion per interesting case, because the failure this guards against
  * is a rule read off digit 3 blindly: that is invisible unless the SAME tempo
- * is asserted against both drive directions.
+ * is asserted against both drive directions and both planes.
  */
 class VelocityLossRegimeTest {
     /**

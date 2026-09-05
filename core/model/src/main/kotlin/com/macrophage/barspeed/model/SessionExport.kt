@@ -1636,8 +1636,17 @@ data class SetExport(
      * [velocityLossPct] IS STILL PUBLISHED IN BOTH. The word says how to read
      * the number; it does not withhold it.
      *
-     * DERIVED at export time from [tempoPrescribed] and the drive direction
-     * and kind of the set's frozen [geometry] -- all three already on the row,
+     * AND THIS KEY IS PUBLISHED ON EVERY SET THE RULE CAN PLACE A WORD ON,
+     * including sets carrying no [velocityLossPct] at all -- one too short
+     * for a best-to-last figure, one whose last resolved rep was its fastest.
+     * It names which question the figure WOULD answer, so it stands whether
+     * or not the figure came out; that is the opposite of [rpeScale], which
+     * is withheld on a set with no [rpe] because a word with no number beside
+     * it names a grid that was drawn rather than a rating that was given.
+     *
+     * DERIVED at export time from [tempoPrescribed] and the plane, drive
+     * direction and kind of the set's frozen [geometry] -- all four already
+     * on the row,
      * so no column and no `DATABASE_VERSION` hop. That is the opposite of
      * [rpeScale], which records which question a lifter was SHOWN and cannot
      * be re-derived. [VelocityLossRegime] is the one statement of the rule.

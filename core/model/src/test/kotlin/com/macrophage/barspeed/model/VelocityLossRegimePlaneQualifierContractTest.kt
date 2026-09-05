@@ -32,8 +32,9 @@ import kotlin.test.assertTrue
  * as well as copied by the COPY PLAN PROMPT button, and nothing in this
  * repository can run a Compose screen. The corrected passage was read off a
  * device once, on the headless AVD barspeed-api35, and that was a bench run
- * rather than a check CI repeats -- see the commit that added this
- * paragraph. What a coach's model then DOES with the copy stays [Field].
+ * rather than a check CI repeats -- see the commit "Say what the plane pin
+ * does not cover, and what the bench saw instead", whose body records it.
+ * What a coach's model then DOES with the copy stays [Field].
  *
  * The Kotlin twin is pinned by [VelocityLossRegimeTest] and
  * `VelocityLossRegimeTempoScheduleContractTest` for its BEHAVIOUR; what cannot
