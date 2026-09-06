@@ -17,6 +17,8 @@ import java.util.zip.ZipInputStream
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -164,7 +166,7 @@ class SetJournalTest {
         journal.appendCue(cues.first())
         journal.sync()
         val found = store.orphans().single()
-        assertEquals(emptyList(), found.imuSamples)
+        assertNull(found.imu, "a set with no sensor was listed as a stream file with no rows")
         assertEquals(false, found.header.imuConnected)
     }
 
@@ -210,7 +212,8 @@ class SetJournalTest {
         assertEquals(0, found.header.orderIdx)
         assertEquals(true, found.header.imuConnected)
         assertEquals(false, found.header.secondaryImuConnected)
-        assertEquals(cues, found.cues)
+        assertEquals(2L, found.cues?.rows)
+        assertEquals(cues, CueCsv.decode(File(found.directory, SetJournal.CUES).readText()))
     }
 
     // ---- the second accelerometer, issue #156 -------------------------------
@@ -298,8 +301,8 @@ class SetJournalTest {
         journal.sync()
 
         val found = store.orphans().single()
-        assertEquals(1, found.imuSamples.size, "the armed stream picked up the other one's rows")
-        assertEquals(2, found.secondaryImuSamples.size)
+        assertEquals(1L, found.imu?.rows, "the armed stream picked up the other one's rows")
+        assertEquals(2L, found.secondaryImu?.rows)
         assertEquals(listOf(SensorRole.A, SensorRole.B), found.header.sensorRoles)
         assertEquals(SensorRole.A, found.header.armedRole)
     }
@@ -319,8 +322,8 @@ class SetJournalTest {
         journal.sync()
 
         val found = store.orphans().single()
-        assertEquals(imu.size, found.imuSamples.size)
-        assertEquals(emptyList(), found.secondaryImuSamples)
+        assertEquals(imu.size.toLong(), found.imu?.rows)
+        assertNull(found.secondaryImu)
         assertEquals(emptyList(), found.header.sensorRoles)
         assertEquals(null, found.header.armedRole)
     }
@@ -348,9 +351,9 @@ class SetJournalTest {
         File(dir, SetJournal.IMU).writeText(ImuCsv.encode(imu))
 
         val found = store().orphans().single()
-        assertEquals(imu.size, found.imuSamples.size)
+        assertEquals(imu.size.toLong(), found.imu?.rows)
         assertEquals(emptyList(), found.header.sensorRoles)
-        assertEquals(emptyList(), found.secondaryImuSamples)
+        assertNull(found.secondaryImu)
     }
 
     /**
@@ -370,7 +373,7 @@ class SetJournalTest {
         File(dir, SetJournal.IMU).writeText(ImuCsv.encode(imu))
         File(dir, "imu-b.csv").writeText(ImuCsv.encode(imu))
 
-        assertEquals(emptyList(), store().orphans().single().secondaryImuSamples)
+        assertNull(store().orphans().single().secondaryImu)
     }
 
     // ---- the streams --------------------------------------------------------
@@ -393,7 +396,9 @@ class SetJournalTest {
         val journal = requireNotNull(store.open(header()))
         hr.forEach { journal.appendHr(it) }
         journal.sync()
-        assertEquals(hr, store.orphans().single().hrSamples)
+        val found = store.orphans().single()
+        assertEquals(hr.size.toLong(), found.hr?.rows)
+        assertEquals(hr, HrCsv.decode(File(found.directory, SetJournal.HRM).readText()))
     }
 
     @Test
@@ -402,7 +407,9 @@ class SetJournalTest {
         val journal = requireNotNull(store.open(header()))
         cues.forEach { journal.appendCue(it) }
         journal.sync()
-        assertEquals(cues, store.orphans().single().cues)
+        val found = store.orphans().single()
+        assertEquals(cues.size.toLong(), found.cues?.rows)
+        assertEquals(cues, CueCsv.decode(File(found.directory, SetJournal.CUES).readText()))
     }
 
     /**
@@ -416,7 +423,7 @@ class SetJournalTest {
         val journal = requireNotNull(store.open(header()))
         imu.forEach { journal.appendImu(it) }
         journal.sync()
-        assertEquals(imu.size, store.orphans().single().imuSamples.size)
+        assertEquals(imu.size.toLong(), store.orphans().single().imu?.rows)
     }
 
     // ---- finding them again -------------------------------------------------
@@ -458,21 +465,35 @@ class SetJournalTest {
      * entire capture over its last forty bytes -- two minutes of lifting lost
      * to the one line nobody finished writing.
      *
-     * The complete samples are kept and the partial one is dropped. Not
-     * repaired, not guessed at: a half-written row is not a measurement.
+     * The complete samples are kept and the partial one is dropped by the
+     * DECODER. Not repaired, not guessed at: a half-written row is not a
+     * measurement. The decode is done here, in the test, because the listing
+     * no longer does one anywhere (#271).
+     *
+     * THE LISTING COUNTS THE TRUNCATED ROW AND THE DECODER DROPS IT, so the
+     * two differ by exactly one on this capture and that is the rule
+     * `JournalScanPolicy.of` states: the row was begun, its bytes are in the
+     * zip, and a card that omitted it would understate the capture at the
+     * moment the lifter is deciding whether to keep it.
      */
     @Test
     fun `a capture cut off mid-line keeps every complete sample`() = runTest {
-        onDisk(imuText = ImuCsv.encode(imu) + "1020,0.0345678,-0.04")
-        assertEquals(imu.size, store().orphans().single().imuSamples.size)
+        val ragged = "1020,0.0345678,-0.04"
+        val dir = onDisk(imuText = ImuCsv.encode(imu) + ragged)
+        assertEquals(imu.size + 1L, store().orphans().single().imu?.rows, "the begun row was not counted")
+        val text = File(dir, SetJournal.IMU).readText()
+        assertFailsWith<IllegalArgumentException>("the half-written row decodes, so this pins nothing") {
+            ImuCsv.decode(text)
+        }
+        assertEquals(imu.size, ImuCsv.decode(text.removeSuffix(ragged)).size)
     }
 
     @Test
     fun `a capture cut off mid-line still reports the rest of its streams`() = runTest {
         onDisk(imuText = ImuCsv.encode(imu) + "1020,0.03", cueText = CueCsv.encode(cues))
         val found = store().orphans().single()
-        assertEquals(imu.size, found.imuSamples.size)
-        assertEquals(cues, found.cues)
+        assertEquals(imu.size + 1L, found.imu?.rows)
+        assertEquals(cues.size.toLong(), found.cues?.rows)
     }
 
     /**
@@ -533,7 +554,8 @@ class SetJournalTest {
         val journal = requireNotNull(store.open(header()))
         imu.forEach { journal.appendImu(it) }
         journal.sync()
-        assertEquals(ImuCsv.encode(imu), ImuCsv.encode(store.orphans().single().imuSamples))
+        val onDisk = File(store.orphans().single().directory, SetJournal.IMU).readText()
+        assertEquals(ImuCsv.encode(imu), ImuCsv.encode(ImuCsv.decode(onDisk)))
     }
 
     // ---- lifecycle ----------------------------------------------------------
@@ -586,10 +608,14 @@ class SetJournalTest {
         journal.appendRepMark(1_900L)
         journal.sync()
         val found = store.orphans().single()
-        assertEquals(listOf(1_100L, 1_900L), found.repMarks)
+        assertEquals(2L, found.repMarks?.rows)
         assertEquals(
-            listOf(VoiceCue(1_050L, "Rep 1")),
-            found.cues,
+            listOf(1_100L, 1_900L),
+            RepMarkCsv.decode(File(found.directory, SetJournal.REPS).readText()),
+        )
+        assertEquals(
+            1L,
+            found.cues?.rows,
             "a cue the app spoke was counted as a rep the lifter performed",
         )
     }
@@ -687,6 +713,38 @@ class SetJournalTest {
         val entries = unzip(store.zip(store.orphans().single()))
         assertEquals(ragged, entries.getValue(SetJournal.IMU), "the zip repaired or truncated the raw capture")
         assertEquals(CueCsv.encode(cues), entries.getValue(SetJournal.CUES))
+    }
+
+    /**
+     * THE PUBLISHED `header.json`, BYTE FOR BYTE, AND IT DOES NOT MOVE.
+     *
+     * #271 changed how a journal directory is READ -- streams are counted
+     * rather than decoded -- and the one artifact that leaves the phone must
+     * not have noticed. The document is asserted as a literal string rather
+     * than by re-encoding the class, which would re-acquire whatever the class
+     * happens to do today and pin nothing.
+     *
+     * The dual-role case is the one pinned because it is the one that is
+     * TRANSFORMED (#211): the recorded `analysedRole` is published as
+     * `armedRole`, and `analysedRole` is republished with the answer derived
+     * from the rows in the directory -- which are now newline counts. Two rows
+     * is below `MIN_ANALYSABLE_FRAMES`, so there is nowhere to fall back to
+     * and the armed role stands.
+     */
+    @Test
+    fun `the published header is the document this pins, byte for byte`() = runTest {
+        val store = store()
+        onDisk(
+            header = header().copy(sensorRoles = listOf(SensorRole.A, SensorRole.B), armedRole = SensorRole.A),
+            imuText = ImuCsv.encode(imu),
+        )
+        val entries = unzip(store.zip(store.orphans().single()))
+        assertEquals(
+            "{\"exerciseId\":\"back_squat\",\"exerciseName\":\"Back Squat\",\"sessionId\":null," +
+                "\"sessionStartedAtMs\":900,\"startedAtMs\":1000,\"orderIdx\":0,\"imuConnected\":true," +
+                "\"sensorRoles\":[\"A\",\"B\"],\"armedRole\":\"A\",\"analysedRole\":\"A\"}",
+            entries.getValue(SetJournalStore.HEADER_FILE),
+        )
     }
 
     private fun unzip(bytes: ByteArray): Map<String, String> {

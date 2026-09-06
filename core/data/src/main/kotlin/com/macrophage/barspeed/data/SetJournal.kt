@@ -126,33 +126,49 @@ data class SetJournalHeader(
 )
 
 /**
- * An interrupted set found on disk, and everything of it that survived.
+ * An interrupted set found on disk, MEASURED rather than decoded.
  *
- * [repMarks] are the epoch-ms instants at which a rep was counted, by the
+ * Every stream is a [JournalStreamScan] -- a byte length and a row count taken
+ * from a count of newline bytes -- and no field of this type holds a sample, a
+ * cue or a mark. Issue #271: the listing decoded every stream under
+ * `files/inflight` on every launch, and one journal file holding hundreds of
+ * megabytes with no newline in any of them exhausted the phone's 256 MB heap
+ * inside `BufferedReader.readLine` before Home had finished drawing. A
+ * recovered capture is offered back as a zip of its files or discarded, and
+ * neither of those needs a sample in memory.
+ *
+ * A STREAM FIELD IS NULL WHEN THE FILE IS NOT THERE, which is not the same
+ * fact as a file with zero rows in it. A manually counted set has no `imu.csv`
+ * at all; an armed sensor that went silent leaves one holding a header row and
+ * nothing under it. Collapsing the two into a zero is the defect this
+ * repository calls absence rendered as a value.
+ *
+ * [repMarks] counts the epoch-ms instants at which a rep was counted, by the
  * lifter thumbing the button or by the guided cadence runner. Marks rather
  * than a running total, because a total rewritten on every tap can be stale by
  * one while a mark is a fact with a clock on it -- and because the rep count
  * of a set nobody finished is recoverable from no stream at all: the sensor
- * records what the bar did, never what the lifter decided it was worth.
+ * records what the bar did, never what the lifter decided it was worth. The
+ * instants themselves stay in `reps.csv` and travel in the zip; what the card
+ * asks for is how many there were.
  */
 data class OrphanedSet(
     val header: SetJournalHeader,
-    val imuSamples: List<ImuSample>,
-    val hrSamples: List<HrSample>,
-    val cues: List<VoiceCue>,
-    val repMarks: List<Long>,
     val directory: File,
+    /** The ARMED unit's stream, `imu.csv`; null when the file is absent. */
+    val imu: JournalStreamScan? = null,
     /**
-     * The second accelerometer's capture, empty on every set that had one
-     * sensor and on every capture written before the app could have two.
-     *
-     * [imuSamples] keeps its meaning -- the ARMED unit's stream, whatever it
-     * turned out to hold -- so nothing that already reads this type sees a
-     * different number. Defaulted for the same reason, as are the two fields
-     * added after it: a positional constructor call in a test or a screen
-     * keeps compiling and keeps meaning what it meant.
+     * The second accelerometer's stream, named for the role the HEADER
+     * declared for it (#156); null when the header declares none or the file
+     * is absent.
      */
-    val secondaryImuSamples: List<ImuSample> = emptyList(),
+    val secondaryImu: JournalStreamScan? = null,
+    /** `hrm.csv`; null when the file is absent. */
+    val hr: JournalStreamScan? = null,
+    /** `cues.csv`; null when the file is absent. */
+    val cues: JournalStreamScan? = null,
+    /** `reps.csv`; null when the file is absent. */
+    val repMarks: JournalStreamScan? = null,
     /**
      * Which role's capture the figures would be computed from, decided from
      * the rows that are actually in this directory (#211).
@@ -168,8 +184,11 @@ data class OrphanedSet(
      * NOTHING IS ANALYSED HERE. A recovered orphan is offered back as a zip or
      * discarded; this is a statement about the capture, published so that the
      * person holding the zip is not left to work it out from two file sizes.
-     * It is also why deriving it costs nothing that matters -- the rows have
-     * already been decoded by the time this is answered.
+     * It is derived from the ROW COUNTS above rather than from a decode, and
+     * on a stream the scan could not count whole -- oversize or malformed --
+     * the count it is given is a lower bound, so an unreadable armed stream
+     * reads here as an armed unit that delivered nothing. That is the honest
+     * answer for a file no reader can get samples out of.
      */
     val analysedRole: SensorRole? = null,
     /**
@@ -182,7 +201,38 @@ data class OrphanedSet(
      * separable by looking at [analysedRole] alone.
      */
     val analysedFellBack: Boolean = false,
-)
+    /**
+     * THE DECODED STREAMS, AND THE #271 DEFECT ITSELF. Nothing reads these.
+     *
+     * They are the fields this type used to publish, kept for exactly as long
+     * as it takes to put the red differentials on the record: the two tests
+     * that pin a 300 MB newline-free `imu.csv` and a three-million-row one
+     * have to be shown failing against the decode they exist to remove, and a
+     * red that is never pushed is a red that never happened. The commit that
+     * removes them is the fix, and it removes `SetJournalStore`'s per-line
+     * decode with them.
+     *
+     * Do not read them. Every reader moved to the counts above in the same
+     * commit that added these.
+     */
+    val decodedImuSamples: List<ImuSample> = emptyList(),
+    val decodedSecondaryImuSamples: List<ImuSample> = emptyList(),
+    val decodedHrSamples: List<HrSample> = emptyList(),
+    val decodedCues: List<VoiceCue> = emptyList(),
+    val decodedRepMarks: List<Long> = emptyList(),
+) {
+    /** Every stream file the directory actually holds, in a fixed order. */
+    val streams: List<JournalStreamScan> get() = listOfNotNull(imu, secondaryImu, hr, cues, repMarks)
+
+    /**
+     * What the capture occupies on disk, streams only.
+     *
+     * `header.json` is excluded deliberately: it is a few hundred bytes on
+     * every capture, and this number exists to tell the lifter how much of
+     * their phone a capture is holding -- which is entirely the streams.
+     */
+    val bytes: Long get() = streams.sumOf { it.bytes }
+}
 
 /**
  * The durable tail of a set that is still being performed.
@@ -518,11 +568,18 @@ class SetJournalStore(
      * as data anyway. A file format has no compiler standing behind it.
      */
     private fun read(dir: File): OrphanedSet? {
+        val headerFile = File(dir, HEADER_FILE)
+        // The one whole-file read left on this path, and therefore the one
+        // place a directory can still cost unbounded memory to list (#271).
+        // A header this format writes is a few hundred bytes; one larger than
+        // the bound is refused for the same reason a future JOURNAL_VERSION is.
+        if (!headerFile.isFile || headerFile.length() > JournalScanPolicy.HEADER_MAX_BYTES) return null
         val header =
             runCatching {
-                json.decodeFromString(SetJournalHeader.serializer(), File(dir, HEADER_FILE).readText())
+                json.decodeFromString(SetJournalHeader.serializer(), headerFile.readText())
             }.getOrNull() ?: return null
         if (header.journalVersion > JOURNAL_VERSION) return null
+        val imu = scan(dir, SetJournal.IMU)
         val imuSamples = decode(dir, SetJournal.IMU) { ImuCsv.decode(it) }
         // The second stream's role comes from the header's own declaration
         // rather than from whichever imu-*.csv happens to be on disk. The
@@ -532,6 +589,7 @@ class SetJournalStore(
         // armed for -- a leftover from a build, or a directory the lifter
         // copied -- and present it as this capture's second sensor.
         val secondaryRole = header.sensorRoles.firstOrNull { it != header.armedRole }
+        val secondary = secondaryRole?.let { role -> scan(dir, SetJournal.secondaryImuFile(role)) }
         val secondarySamples =
             secondaryRole?.let { role -> decode(dir, SetJournal.secondaryImuFile(role)) { ImuCsv.decode(it) } }
                 .orEmpty()
@@ -540,31 +598,92 @@ class SetJournalStore(
         // (#211). The header is closed before the first sample line and can
         // only name the unit the set ARMED; on a capture whose armed unit went
         // silent it named a file with no rows in it. The counts come from the
-        // lists decoded just above, so nothing here can judge one stream and
-        // publish another, and the rule is `SensorCapturePolicy.analysedFrom`
-        // -- the single writer the recording path decides with -- rather than
-        // a second reading of it here.
+        // scans above -- newline counts, not decodes -- so nothing here can
+        // judge one stream and publish another, and the rule is
+        // `SensorCapturePolicy.analysedFrom`, the single writer the recording
+        // path decides with, rather than a second reading of it here.
         val analysed =
             SensorCapturePolicy.analysedFrom(
                 armed = header.armedRole,
                 expected = header.sensorRoles,
                 framesByRole =
                 buildMap {
-                    header.armedRole?.let { put(it, imuSamples.size) }
-                    secondaryRole?.let { put(it, secondarySamples.size) }
+                    header.armedRole?.let { put(it, frames(imu)) }
+                    secondaryRole?.let { put(it, frames(secondary)) }
                 },
             )
         return OrphanedSet(
             header = header,
-            imuSamples = imuSamples,
-            hrSamples = decode(dir, SetJournal.HRM) { HrCsv.decode(it) },
-            cues = decode(dir, SetJournal.CUES) { CueCsv.decode(it) },
-            repMarks = decode(dir, SetJournal.REPS) { line -> RepMarkCsv.decodeLine(line) },
             directory = dir,
-            secondaryImuSamples = secondarySamples,
+            imu = imu,
+            secondaryImu = secondary,
+            hr = scan(dir, SetJournal.HRM),
+            cues = scan(dir, SetJournal.CUES),
+            repMarks = scan(dir, SetJournal.REPS),
             analysedRole = analysed.role,
             analysedFellBack = analysed.fellBack,
+            decodedImuSamples = imuSamples,
+            decodedSecondaryImuSamples = secondarySamples,
+            decodedHrSamples = decode(dir, SetJournal.HRM) { HrCsv.decode(it) },
+            decodedCues = decode(dir, SetJournal.CUES) { CueCsv.decode(it) },
+            decodedRepMarks = decode(dir, SetJournal.REPS) { line -> RepMarkCsv.decodeLine(line) },
         )
+    }
+
+    /**
+     * A stream file's row count as the frame count
+     * [SensorCapturePolicy.analysedFrom] takes.
+     *
+     * An absent file is zero frames, which is what it has always been here: a
+     * role the header armed and no file to show for it delivered nothing. The
+     * clamp is not defensive dressing -- `rows` is a `Long` because a file's
+     * newline count is not bounded by anything this code controls, and the
+     * policy's map is `Int`.
+     */
+    private fun frames(stream: JournalStreamScan?): Int =
+        (stream?.rows ?: 0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+
+    /**
+     * One stream file measured with a fixed buffer and never decoded (#271).
+     *
+     * Null when the file is not there, which is a different fact from a file
+     * with no rows in it and is kept as one all the way to the card.
+     *
+     * The loop holds [JournalScanPolicy.BUFFER_BYTES] and nothing else however
+     * large the file turns out to be, and it stops early in two cases: at
+     * [JournalScanPolicy.SCAN_CAP_BYTES], and as soon as a whole buffer has
+     * gone by with no newline in it. The second is what bounds #271's actual
+     * file -- 300 MB with no newline anywhere -- to a single buffer's work
+     * rather than to a read of the whole thing.
+     *
+     * A read that throws yields null rather than propagating: a directory the
+     * scan cannot open must not be what stops the other interrupted sets being
+     * listed, and [SetJournalStore.zip] copies the bytes as they lie whatever
+     * this made of them.
+     */
+    private fun scan(dir: File, name: String): JournalStreamScan? {
+        val file = File(dir, name)
+        if (!file.isFile) return null
+        return runCatching {
+            val bytes = file.length()
+            val buffer = ByteArray(JournalScanPolicy.BUFFER_BYTES)
+            var newlines = 0L
+            var scanned = 0L
+            var endsWithNewline = false
+            file.inputStream().use { stream ->
+                while (scanned < JournalScanPolicy.SCAN_CAP_BYTES) {
+                    val want =
+                        minOf(buffer.size.toLong(), JournalScanPolicy.SCAN_CAP_BYTES - scanned).toInt()
+                    val read = stream.read(buffer, 0, want)
+                    if (read <= 0) break
+                    for (i in 0 until read) if (buffer[i] == NEWLINE) newlines++
+                    scanned += read.toLong()
+                    endsWithNewline = buffer[read - 1] == NEWLINE
+                    if (newlines == 0L && scanned >= JournalScanPolicy.BUFFER_BYTES.toLong()) break
+                }
+            }
+            JournalScanPolicy.of(name, bytes, newlines, scanned, endsWithNewline)
+        }.getOrNull()
     }
 
     /**
@@ -673,5 +792,15 @@ class SetJournalStore(
 
         /** `root/s<sessionStart>/set<n>-<ms>` sits two levels down. */
         const val WALK_DEPTH = 2
+
+        /**
+         * The byte the listing counts, and the whole of what it reads a stream
+         * file for (#271).
+         *
+         * Every stream this format writes is line-oriented ASCII, so a newline
+         * byte cannot occur inside a field and counting bytes needs no decoder
+         * and no character set.
+         */
+        private val NEWLINE: Byte = '\n'.code.toByte()
     }
 }

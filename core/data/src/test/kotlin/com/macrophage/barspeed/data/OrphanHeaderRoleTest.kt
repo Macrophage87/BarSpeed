@@ -256,7 +256,7 @@ class OrphanHeaderRoleTest {
         journal.sync()
 
         val orphan = store.orphans().single()
-        assertEquals(enough - 1, orphan.imuSamples.size, "the armed stream is not the short one this pins")
+        assertEquals((enough - 1).toLong(), orphan.imu?.rows, "the armed stream is not the short one this pins")
         assertEquals(SensorRole.B, orphan.analysedRole, "a short armed delivery was read as a capture")
         assertTrue(orphan.analysedFellBack)
         assertEquals("B", text(published(orphan, store), "analysedRole"))

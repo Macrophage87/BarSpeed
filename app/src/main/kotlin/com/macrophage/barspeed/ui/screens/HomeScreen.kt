@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.macrophage.barspeed.data.InterruptedSetSummary
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescueCompleteness
 import com.macrophage.barspeed.data.RescuedDatabase
@@ -302,11 +303,13 @@ private fun volumeUnit(unit: WeightUnit): String = when (unit) {
  * sparkline; an interrupted set has been through no analysis and has neither,
  * and rendering one as history would put invented figures beside real ones.
  *
- * The two numbers shown are the ones that let the lifter check this against
- * their own memory of what happened: how many samples of each captured stream
- * reached the disk, and when the last of them did. Neither is stated when no
- * sensor was connected -- a count of zero would otherwise read as a
- * measurement, when what it means is that there was nothing to measure.
+ * The numbers shown are the ones that let the lifter check this against their
+ * own memory of what happened: how many rows of each captured stream reached
+ * the disk, and how much of the phone the capture is holding. A count is not
+ * stated when no sensor was connected -- a count of zero would otherwise read
+ * as a measurement, when what it means is that there was nothing to measure --
+ * and [InterruptedSetSummary] in `:core:data` is where that ruling lives, so
+ * it is pinned on every push rather than only drawn.
  */
 @Composable
 private fun InterruptedSetNotice(
@@ -315,7 +318,6 @@ private fun InterruptedSetNotice(
     onDiscard: (OrphanedSet) -> Unit,
 ) {
     if (interrupted.isEmpty()) return
-    val clock = DateTimeFormatter.ofPattern("HH:mm:ss")
     Column(modifier = Modifier.fillMaxWidth()) {
         for (orphan in interrupted) {
             Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
@@ -330,7 +332,7 @@ private fun InterruptedSetNotice(
                     Text(orphan.header.exerciseName, style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        interruptedDetail(orphan, clock),
+                        InterruptedSetSummary.lines(orphan).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = BarColors.Sub,
                     )
@@ -349,51 +351,6 @@ private fun InterruptedSetNotice(
             }
         }
     }
-}
-
-/**
- * What survived, in the terms the field check reads.
- *
- * The sample counts and the last sample's wall clock are what distinguish a
- * capture that genuinely reached the filesystem from one the app merely
- * remembered. With neither sensor connected there is no count to give and the
- * card says so in words rather than printing a zero.
- *
- * BOTH recovered streams are counted, issue #156. The armed unit is the one
- * that can be flat while the second one captured the whole set, and this card
- * is the only thing standing between that capture and the DISCARD button
- * beside it.
- *
- * ARMED, not analysed: an orphan is zipped or discarded and never analysed,
- * and since #207 the two words no longer name the same stream.
- */
-private fun interruptedDetail(orphan: OrphanedSet, clock: DateTimeFormatter): String {
-    val reps = orphan.repMarks.size
-    val second =
-        when {
-            orphan.secondaryImuSamples.isNotEmpty() ->
-                ", ${orphan.secondaryImuSamples.size} from the second sensor"
-            orphan.header.secondaryImuConnected -> ", none from the second sensor"
-            else -> ""
-        }
-    val lastMs =
-        listOfNotNull(
-            orphan.imuSamples.lastOrNull()?.timestampMs,
-            orphan.secondaryImuSamples.lastOrNull()?.timestampMs,
-        ).maxOrNull()
-    val parts =
-        listOfNotNull(
-            when {
-                orphan.header.imuConnected -> "${orphan.imuSamples.size} from the armed sensor$second"
-                second.isNotEmpty() -> "no armed sensor connected$second"
-                else -> "no sensor connected"
-            },
-            lastMs?.let {
-                "last at ${clock.format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()))}"
-            },
-            if (reps > 0) "$reps reps counted" else null,
-        )
-    return parts.joinToString(" · ")
 }
 
 /**

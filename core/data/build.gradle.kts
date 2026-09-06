@@ -50,6 +50,18 @@ tasks.withType<Test>().configureEach {
     javaLauncher.set(
         javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) },
     )
+    // 256 MB, matching the growth limit the phone killed the app against in
+    // #271, and set on the module's real unit-test tasks rather than on a
+    // task of its own: a new Test task would not be reached by `./gradlew
+    // test`, which is CI's command, so a bound that only exists there is a
+    // bound CI never applies. Gradle's default is 512 MB, which is enough to
+    // decode the journal that took the phone down and would let the two
+    // JournalScanHeapTest pins pass while blind.
+    //
+    // Every other test in this module runs under it too. That is the point:
+    // nothing in :core:data has any business needing a quarter of a gigabyte,
+    // and if one ever does, this is where it says so.
+    maxHeapSize = "256m"
 }
 
 room {

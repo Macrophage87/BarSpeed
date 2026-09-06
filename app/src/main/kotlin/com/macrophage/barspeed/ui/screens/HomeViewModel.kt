@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
+import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +28,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.TimeUnit
+
+/** Logcat tag for the one thing on this screen that is logged rather than shown. */
+private const val TAG = "HomeViewModel"
 
 /** One history row: session summary plus a per-set mean-velocity sparkline. */
 data class HistoryRow(
@@ -169,10 +173,31 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         refreshRescued()
     }
 
-    /** Re-scan private storage. Cheap: an empty root is the normal case. */
+    /**
+     * Re-scan private storage. Cheap: an empty root is the normal case, and
+     * since #271 a non-empty one costs one fixed buffer per stream file rather
+     * than a decode of every sample in it.
+     *
+     * A FAILING SCAN LISTS NOTHING; IT DOES NOT TAKE THE APP DOWN WITH IT.
+     * This runs from `init` and from a `LaunchedEffect` on the first screen of
+     * every cold launch, so whatever it throws is thrown before the lifter can
+     * reach anything else -- which is precisely what #271 was on the phone:
+     * `OutOfMemoryError` inside the scan, eight times, 8 s after Home drew,
+     * with no way to open the app and delete the capture that caused it. The
+     * catch is `Throwable`-wide for that reason: an `Error` here is exactly the
+     * case that must not be fatal. What is lost is one card; what is kept is
+     * the app. `orphans()` does not suspend, so the usual objection to a
+     * `Throwable`-wide catch inside a coroutine -- that it swallows
+     * `CancellationException` -- has nothing to bite on here.
+     */
     fun refreshInterrupted() {
         viewModelScope.launch {
-            interruptedFlow.value = withContext(Dispatchers.IO) { container.setJournals.orphans() }
+            interruptedFlow.value =
+                withContext(Dispatchers.IO) {
+                    runCatching { container.setJournals.orphans() }
+                        .onFailure { Log.w(TAG, "interrupted-set scan failed; listing none", it) }
+                        .getOrDefault(emptyList())
+                }
         }
     }
 
