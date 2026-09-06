@@ -679,13 +679,33 @@ object SetAnalyzer {
     private fun round3(x: Double) = Math.round(x * 1000.0) / 1000.0
 
     /**
-     * What the rest screen says on a set refused for
+     * The verdict published on a set refused for
      * [NoRepsReason.MOUNT_NOT_DECLARED].
      *
      * It states what the app DID -- moved the analysis, found no declaration
      * for the unit it moved to -- and claims nothing about a battery, a link
-     * or a mounting it cannot see. A blank set with no note is #138's defect
-     * on a new population, so the note is not optional.
+     * or a mounting it cannot see.
+     *
+     * "WHAT THE REST SCREEN SAYS" OPENED THIS KDOC AND IS DELETED. The rest
+     * screen does not say it. `LastSetDetail.RepQualityCard` is that screen's
+     * only reader of `verdicts`, and on a set that is not timed it returns at
+     * `if (analysis.reps.isEmpty()) return` before reaching any of the three
+     * charts that render them -- so a set refused here draws a "Last set"
+     * card and then nothing. The lifter is left with a blank set and no
+     * reason during the one window in which the set can still be corrected.
+     * That is #138's defect on a new population and it is UNFIXED; this
+     * commit's body names it as a remainder rather than assuming it away.
+     *
+     * WHERE THE VERDICT DOES ARRIVE. `SessionRepository.recordSet` serialises
+     * the whole [SetAnalysis] into `SetRecordEntity.analysisJson`, and
+     * `SessionDetailScreen` decodes it and draws `verdicts.forEach` OUTSIDE
+     * its `reps.isNotEmpty()` block, so the history screen shows the line.
+     * NOT the JSON export: `verdicts` is not a key of any exported object --
+     * `Exporters.kt` never reads the field. What the export carries for this
+     * set is `summary.noRepsReason`, the machine-readable half.
+     *
+     * All of that is read from source. Nothing in this repository has
+     * rendered either screen on a device.
      */
     const val MOUNT_NOT_DECLARED_VERDICT =
         "Analysis moved to the other sensor, whose mounting is not declared — no figures for this set."
