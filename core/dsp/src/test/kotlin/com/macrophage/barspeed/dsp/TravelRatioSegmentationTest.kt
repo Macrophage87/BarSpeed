@@ -160,6 +160,15 @@ class TravelRatioSegmentationTest {
         // any capture in the corpus has ever been analysed at. If a fix for
         // #70 changes these five figures it has changed a stored set's
         // published rep count, which is not what #70 asks for.
+        //
+        // A DIVERGENCE THIS PINS AS EXPECTED WITHOUT NAMING IT, until now: on
+        // field-backsquat-10hz.csv the LIVE count is 4 where the BATCH count
+        // on the same stream is 6, and `countTrusted` is still true. That is
+        // pre-existing -- it is characterization here, it predates this branch
+        // and this branch does not move it -- and it is NOT what #70 asks
+        // about. A live counter reading two reps short while calling itself
+        // trusted is its own defect and is raised as an adjacent one rather
+        // than fixed here.
         val oneToOne = ratios.indexOf(1.0)
         assertEquals(6, batchCounts("field-backsquat-10hz.csv", ::barbell)[oneToOne], "barbell batch at 1:1")
         assertEquals(12, batchCounts("field-legcurl-1030-12rep.csv", ::stack)[oneToOne], "stack batch at 1:1")
