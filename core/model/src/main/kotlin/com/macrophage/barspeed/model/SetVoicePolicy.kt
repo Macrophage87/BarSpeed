@@ -29,8 +29,8 @@ enum class SetVoiceGuide {
     /**
      * The sensor-driven counter: bare digits for each second of a detected
      * eccentric or concentric, and a rep call at each detected lockout. Runs
-     * on exactly one shape of set nothing else is counting: an explosive lift
-     * with a sensor connected.
+     * only where nothing else is counting: an explosive lift, tempo'd or
+     * not, with a sensor connected.
      */
     SENSOR_COUNT,
 }

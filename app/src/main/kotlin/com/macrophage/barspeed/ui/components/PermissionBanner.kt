@@ -133,10 +133,9 @@ private fun bannerHeadline(step: BlePermissionStep): String = if (step == BlePer
 
 // Two branches naming demo mode came out of this when #262 removed the mode.
 // They said the permission was not needed and that the sensor was not used,
-// which was true of demo streaming and is now true of nothing. Every step
-// states the consequence for the bar sensor and nothing else, which is what
-// these sentences named before demo mode and still name; the heart-rate strap
-// is on the same permission and has never been mentioned here.
+// which was true of demo streaming and is now true of nothing. The
+// heart-rate strap is on the same permission and has never been mentioned
+// here.
 private fun consequence(step: BlePermissionStep): String {
     val name = permissionLabel()
     return when {

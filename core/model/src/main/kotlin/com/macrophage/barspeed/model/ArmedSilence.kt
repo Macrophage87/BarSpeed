@@ -480,8 +480,7 @@ object ArmedSilencePolicy {
      * caller that forgot it draws a blank card on the configuration the owner
      * trains most, which is the failure this issue is.
      *
-     * NOTHING OUTSIDE THE DELIVERY STATES CAN SILENCE IT. Two suppressions
-     * are left and both are delivery states: [advice] answers null for
+     * TWO DELIVERY STATES SILENCE IT. [advice] answers null for
      * [ArmedDelivery.DELIVERING] and for [ArmedDelivery.TOO_SOON], so a
      * [silent] holding only those, or a [sole] holding one of them, still
      * says nothing -- and an empty [silent] with a null [sole] is a set with

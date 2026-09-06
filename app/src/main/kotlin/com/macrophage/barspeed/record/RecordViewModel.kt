@@ -4107,15 +4107,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * `appScope` is created once per process in `AppContainer` and is never
      * cancelled.
      *
-     * Dispatched on `Main.immediate`, which is the load-bearing half. `appScope`
-     * is `SupervisorJob() + Dispatchers.Default`, so launching unqualified would
-     * put every `stateFlow.value = stateFlow.value.copy(...)` below on a
-     * background thread. Those are non-atomic read-modify-writes and there are
-     * dozens of them in this file, so an off-main writer is how the RESTING
-     * transition gets lost and the screen strands on a set that was in fact
-     * written. Until #262 demo mode was one, writing to that flow off the main
-     * thread through `launchDemoStream`; it is gone, and this reasoning is
-     * what keeps the next one from being added. `Main.immediate` keeps every one of them
+     * Dispatched on `Main.immediate`, which is the load-bearing half.
+     * `appScope` is `SupervisorJob() + Dispatchers.Default`, so
+     * launching unqualified would put every `stateFlow.value =
+     * stateFlow.value.copy(...)` below on a background thread. Those are
+     * non-atomic read-modify-writes and there are dozens of them in this
+     * file, so an off-main writer is how the RESTING transition gets lost
+     * and the screen strands on a set that was in fact written. Until #262
+     * demo mode was one, writing to that flow off the main thread through
+     * `launchDemoStream`; it is gone, and this reasoning is what keeps the
+     * next one from being added. `Main.immediate` keeps every one of them
      * exactly where it is today, and keeps this write, [rateLastSet] and
      * [overrideLastSetReps] in tap order now that all three have left
      * `viewModelScope`.

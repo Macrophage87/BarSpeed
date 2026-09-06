@@ -770,7 +770,7 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
     if (!state.imuConnected) {
         // The permission banner replaces this card's advice rather than sitting
         // beside it. Since #262 the card is the whole of what a missing sensor
-        // adds to this page: one title, one line, and the plan below it.
+        // adds to this page.
         val permissionHeld by LocalBlePermissionUi.current.step.collectAsState()
         // Latched, not read straight from state.imuState: AutoConnectManager's
         // else branch retries immediately after every Failed -- calls
