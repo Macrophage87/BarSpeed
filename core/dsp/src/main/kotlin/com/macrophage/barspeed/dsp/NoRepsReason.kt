@@ -135,7 +135,11 @@ enum class NoRepsReason(val wireName: String) {
     /**
      * The segmenter resolved spans and the set's own end cue excluded all of
      * them: every detected drive began after the app stopped prescribing. See
-     * [SetEnd]. This is the one value that does not mean segmentation failed.
+     * [SetEnd]. Segmentation did not fail: the drives are real detections
+     * off a real stream, and the set's own end cue is what excluded them.
+     * This said "the one value that does not mean segmentation failed" and
+     * that is deleted -- [BEFORE_WORK_START] and [MOUNT_NOT_DECLARED] do not
+     * mean it either.
      */
     @SerialName("afterSetEndCue")
     AFTER_SET_END_CUE("afterSetEndCue"),
@@ -225,8 +229,11 @@ enum class NoRepsReason(val wireName: String) {
      * exercise's declared geometry describes a MOUNT -- so nothing on the
      * record says which geometry that unit needs. Issue #247.
      *
-     * THE ONE VALUE THAT IS NOT A SEGMENTATION GATE, and the KDoc above is
-     * corrected for it rather than left standing: the segmenter never ran.
+     * THE ONLY VALUE SET BEFORE THE SEGMENTER RUNS AT ALL, and the KDoc
+     * above is corrected for it rather than left standing: the segmenter
+     * never ran. That, and not "the one value that is not a segmentation
+     * gate", is what is unique about it -- [AFTER_SET_END_CUE] and
+     * [BEFORE_WORK_START] are not segmentation failures either.
      * [of] cannot return this and never will; it takes a census, and there is
      * no census when nothing was segmented. `SetAnalyzer.analyze` sets it
      * before the first span, which also makes this the first value reachable

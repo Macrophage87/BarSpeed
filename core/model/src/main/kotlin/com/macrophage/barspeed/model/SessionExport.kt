@@ -609,8 +609,11 @@ data class SessionExport(
          * so only by OMISSION: `reps: []`, `summary: {}`, no
          * `velocityLossBasis`, which is byte-identical to a manual set
          * recorded with no sensor at all. The key is drawn from
-         * [VALID_NO_REPS_REASONS] and names WHICH GATE of the segmenter
-         * emptied the list, nothing more.
+         * [VALID_NO_REPS_REASONS] and names why the list is empty, nothing
+         * more. "Names WHICH GATE of the segmenter emptied the list" stood
+         * here and is deleted: it was true of every value 1.18 shipped and is
+         * false of `mountNotDeclared`, added at 1.20, which is set before the
+         * segmenter runs at all.
          *
          * Additive on the terms 1.4 and 1.5 were not: nothing already written
          * changes type, meaning or presence, and a reader that ignores the key
