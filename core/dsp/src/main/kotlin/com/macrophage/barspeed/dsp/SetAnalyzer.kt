@@ -244,6 +244,17 @@ object SetAnalyzer {
      * prep ended, or null for a set that has none. [WorkStart] is where what
      * that means is written down. It is the head-of-stream companion of
      * [cues]: one says when the work began, the other when it was called over.
+     *
+     * [analysedUnitFellBack] is `RecordedSensors.analysedFellBack`: true when
+     * [samples] came from a unit the set did not arm, because the armed one
+     * delivered too few frames to run on. It exists because [direction] is the
+     * EXERCISE's declaration and, on a cable machine, describes where the
+     * ARMED unit was mounted -- see [LiftDirection.mountSpecific]. Issue #247.
+     *
+     * ACCEPTED AND NOT YET CONSULTED. This commit adds the parameter and the
+     * vocabulary so the differentials that follow it can be written and shown
+     * failing; the analysis it selects is byte-identical with the flag set
+     * either way. Nothing calls it with true yet.
      */
     fun analyze(
         samples: List<ImuSample>,
@@ -253,6 +264,10 @@ object SetAnalyzer {
         config: DspConfig = DspConfig(),
         cues: List<VoiceCue> = emptyList(),
         workStartedAtMs: Long? = null,
+        // The suppression comes off in the commit that consults it; detekt
+        // reads an accepted-and-ignored parameter as dead, which for one
+        // commit it is.
+        @Suppress("UnusedParameter") analysedUnitFellBack: Boolean = false,
     ): SetAnalysis {
         val raw = VelocityEstimator.estimate(samples, config, direction.measuredPlane)
         val series = orient(raw, direction, config).mappedToLifter(direction.sensorToLifter)

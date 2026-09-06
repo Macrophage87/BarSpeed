@@ -1135,6 +1135,49 @@ data class SessionExport(
          * FALSE on a set the lifter counted correctly. This entry said the
          * change "adds no key to this document" and stopped there; that was
          * true and incomplete, and the omission is corrected here.
+         *
+         * 1.20 carries a SECOND change, filed under the same number because
+         * 1.20 is unreleased: `git tag --sort=-creatordate | head -1` is
+         * v0.1.52 and `git show
+         * v0.1.52:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.19"`, both read this round rather than
+         * relayed, so the number above is still this line of work's own mint
+         * and takes further entries.
+         *
+         * THE CHANGE (#247): `summary.noRepsReason` gains a NINTH word,
+         * `mountNotDeclared`, and a set that would previously have published
+         * figures now publishes none. It fires on one shape only -- the
+         * analysis moved off the unit the set armed, and the exercise's
+         * geometry declares a MOUNT (`sensorOnStack`, `sensorInverted`, or a
+         * `travelRatio` other than 1.0) rather than only the lift. The
+         * declared geometry belongs to the ARMED unit, so running the DSP over
+         * a different unit under it swapped the concentric and the eccentric
+         * outright: the drive became the return, tempo grading inverted, and
+         * `velocityLoss_pct` was computed over the wrong stroke, at an
+         * unchanged rep count, with nothing in the document saying so.
+         *
+         * THE ALTERNATIVE WAS TO INFER THE OTHER UNIT'S MOUNT AND IT IS
+         * REFUSED. Field-38 recorded a triceps pushdown and a lat pulldown
+         * under the SAME declaration -- `sensorOnStack` true, `sensorInverted`
+         * true -- with, on the owner's word, the two units co-mounted on the
+         * stack for one and split between stack and bar for the other. One
+         * declaration, two mounts, so inferring the partner's geometry from
+         * the declaration is a coin flip whose losing half publishes an
+         * inverted record silently. Refusing keeps the capture: every stream
+         * is archived either way and can be re-derived under any geometry.
+         *
+         * NOT PURELY ADDITIVE, and in a direction a reader must be told about.
+         * `noRepsReason` is a CLOSED enum, so a validator running the 1.19
+         * schema rejects the new word; and on the shape above a set now
+         * publishes `reps: []` and an empty `summary` where it used to publish
+         * a full one. `sensors.analysedFellBack` was already true on exactly
+         * those sets and remains the statement that the analysis moved.
+         *
+         * NOT RETROACTIVE, for the reason every entry here gives: the value is
+         * computed when the set is analysed and frozen into the stored
+         * analysis, and nothing re-runs the segmenter at export time. No set
+         * already on disk gains the word or loses its figures.
+         * `DATABASE_VERSION` does not move -- no column changes.
          */
         const val SCHEMA_VERSION = "1.20"
 
@@ -1197,7 +1240,10 @@ data class SessionExport(
          * from the side that can see both.
          *
          * Each value names WHICH GATE emptied the rep list and claims nothing
-         * about the bar or the lifter. `runsExceedDisplacementCap` in
+         * about the bar or the lifter, with ONE exception: `mountNotDeclared`
+         * says the segmenter was never run, because the analysis had moved
+         * onto a unit whose mount nothing on the record declares (#247, schema
+         * 1.20). `runsExceedDisplacementCap` in
          * particular says the set's movement runs displaced further than any
          * real phase can, which the DSP reads as unanchored integration drift;
          * no capture in this repository has been checked against a tape
@@ -1213,6 +1259,7 @@ data class SessionExport(
                 "phasesUnpaired",
                 "driveBelowMinRom",
                 "beforeWorkStart",
+                "mountNotDeclared",
             )
 
         /**

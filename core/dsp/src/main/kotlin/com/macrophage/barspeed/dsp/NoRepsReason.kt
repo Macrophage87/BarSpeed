@@ -83,7 +83,9 @@ data class SegmentationCensus(
  *
  * ## What these names claim
  *
- * Each names WHICH GATE emptied the rep list, and nothing beyond it. They are
+ * Each names WHICH GATE emptied the rep list, and nothing beyond it, with one
+ * exception named where it is declared: [MOUNT_NOT_DECLARED] says the
+ * segmenter was never run at all. They are
  * statements about the pipeline, not about the lifter or the implement: a set
  * reporting [RUNS_EXCEED_DISPLACEMENT_CAP] displaced further than any real
  * phase can, which `DspConfig.maxRunDisplacementM` reads as unanchored
@@ -98,12 +100,20 @@ data class SegmentationCensus(
  * is what this answers; under-resolution stopping short is the same defect
  * and is still unsayable. `BlankAnalysisTest` pins that limit.
  *
- * IT ALSO CANNOT BE REACHED BY A SET THE ANALYZER NEVER SAW.
+ * A SET THE ANALYZER NEVER SAW IS STILL MOSTLY UNSAYABLE.
  * `RecordViewModel.runSetWrite` builds a placeholder `SetAnalysis` for a
  * timed set and for any set carrying fewer than eight samples, and that
  * object's `noRepsReason` is the default null. So a DYNAMIC set that captured
  * 1-7 samples still publishes an empty summary with no reason, which is the
  * same absence #138 is about arriving by a different route.
+ *
+ * THAT PARAGRAPH SAID "IT ALSO CANNOT BE REACHED BY A SET THE ANALYZER NEVER
+ * SAW", AS A UNIVERSAL, AND IT IS DELETED RATHER THAN REWORDED. It was true
+ * of every value that existed when it was written and is false now:
+ * [MOUNT_NOT_DECLARED] is set inside `SetAnalyzer.analyze` before the
+ * segmenter is reached, so exactly one population of unsegmented sets can
+ * now say why it is blank. The placeholder sets above still cannot, and
+ * that half of the sentence stands.
  *
  * No committed capture is named here as an example of it.
  * `field-rdl-3010-10rep-s36-set04` was, with one surviving rep against a
@@ -209,6 +219,45 @@ enum class NoRepsReason(val wireName: String) {
      */
     @SerialName("driveBelowMinRom")
     DRIVE_BELOW_MIN_ROM("driveBelowMinRom"),
+
+    /**
+     * The analysis was pointed at a unit the set did not arm, and the
+     * exercise's declared geometry describes a MOUNT -- so nothing on the
+     * record says which geometry that unit needs. Issue #247.
+     *
+     * THE ONE VALUE THAT IS NOT A SEGMENTATION GATE, and the KDoc above is
+     * corrected for it rather than left standing: the segmenter never ran.
+     * [of] cannot return this and never will; it takes a census, and there is
+     * no census when nothing was segmented. `SetAnalyzer.analyze` sets it
+     * before the first span, which also makes this the first value reachable
+     * by a set the segmenter never saw -- the gap this type's own KDoc
+     * describes as "unsayable" is narrowed by exactly this one case and is
+     * otherwise unchanged.
+     *
+     * WHY REFUSING BEATS GUESSING. `SensorCapturePolicy.analysedStream` moves
+     * the analysis onto the partner when the armed unit delivered too few
+     * frames. On a cable machine the declared geometry belongs to the ARMED
+     * unit, and analysing the partner under it swaps the concentric and the
+     * eccentric outright -- `FallbackMountGeometryTest` measures the swap on
+     * a synthetic pair as 1.89 s and 0.98 s exchanged, at an unchanged rep
+     * count. The tempting repair is to assume the partner is on the lifter's
+     * side and invert the geometry for it. Field-38 is why that is not done:
+     * the pushdown and the pulldown of that session carry the SAME
+     * declaration -- `sensorOnStack` true, `sensorInverted` true -- and,
+     * on the owner's word, different second-unit mounts. One declaration,
+     * two mounts, so an inference from the declaration alone is a coin flip
+     * and half of its outcomes publish an inverted record silently.
+     *
+     * So the set publishes no figures and keeps its capture. Every stream is
+     * archived either way, and a reader who knows where the units were can
+     * re-derive the set from the raw CSV under any geometry; a published
+     * inversion cannot be told from a real one by anybody.
+     *
+     * NOT RETROACTIVE. The value is computed when a set is analysed and
+     * frozen into its stored analysis, so no set already on disk gains it.
+     */
+    @SerialName("mountNotDeclared")
+    MOUNT_NOT_DECLARED("mountNotDeclared"),
     ;
 
     companion object {

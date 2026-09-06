@@ -66,6 +66,31 @@ data class LiftDirection(
      */
     val sensorToLifter: Double get() = (if (sensorInverted) -1.0 else 1.0) * travelRatio
 
+    /**
+     * True when this geometry describes where ONE UNIT is mounted rather than
+     * the lift itself, so it does not transfer to a second unit (#247).
+     *
+     * The three terms are the ones that would be different for a unit clipped
+     * somewhere else on the same machine. [sensorInverted] says this unit
+     * moves opposite to the load, [sensorOnStack] says it rides the stack and
+     * therefore travels vertically whatever the lifter does, and
+     * [travelRatio] scales its travel against the lifter's. [startsWith],
+     * [concentricUp] and [plane] are NOT here: which phase opens a rep, which
+     * way the lifter drives and which plane the lifter works in are facts
+     * about the exercise, and clipping a unit somewhere else does not change
+     * any of them.
+     *
+     * IT IS A PROPERTY OF THE DECLARATION, NOT A READING OF THE HARDWARE.
+     * Nothing in this repository records where any unit was mounted; this
+     * says only that the declaration names a mount, so a stream from some
+     * OTHER unit cannot be assumed to be described by it.
+     *
+     * `travelRatio != 1.0` is an exact comparison against the type default on
+     * purpose. The value is whatever a plan declared or the app seeded, never
+     * a measurement, so there is no tolerance to carry.
+     */
+    val mountSpecific: Boolean get() = sensorOnStack || sensorInverted || travelRatio != 1.0
+
     /** True when every rep opens with a downward movement. */
     val startsAtTop: Boolean get() = (startsWith == StartPhase.ECCENTRIC) == concentricUp
 
