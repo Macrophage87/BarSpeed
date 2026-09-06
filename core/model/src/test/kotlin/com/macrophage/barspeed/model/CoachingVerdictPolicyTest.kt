@@ -54,4 +54,43 @@ class CoachingVerdictPolicyTest {
         val all = listOf(stop, tempo)
         assertEquals(all, CoachingVerdictPolicy.forRegime(all, VelocityLossRegime.CONTROLLED))
     }
+
+    @Test
+    fun `a controlled set does not read significant fatigue`() {
+        // #261, the whole of it. #250 withheld the velocity pill on this card;
+        // this sentence went on being drawn underneath the gap it left.
+        val all = listOf(shortfall, fatigue, tempo)
+        assertEquals(
+            listOf(shortfall, tempo),
+            CoachingVerdictPolicy.forRegime(all, VelocityLossRegime.CONTROLLED),
+            "the fatigue sentence is withheld and the order of the rest is kept",
+        )
+    }
+
+    @Test
+    fun `a controlled set withholds the sentence whatever figure it carries`() {
+        // The figure is interpolated into the line, so a reader that matched
+        // the whole sentence would suppress one archive row and miss the next.
+        for (text in listOf("35.1", "42.8", "79.1", "100.0")) {
+            val line = "High velocity loss ($text%) — significant fatigue this set."
+            assertEquals(
+                emptyList(),
+                CoachingVerdictPolicy.forRegime(listOf(line), VelocityLossRegime.CONTROLLED),
+                "withheld at $text%",
+            )
+        }
+    }
+
+    @Test
+    fun `the fatigue sentence is the only line a controlled set withholds`() {
+        // Paired with the differential above: that one shows the line goes,
+        // this one shows nothing else does. A filter that dropped the list
+        // would pass the first and fail this.
+        val all = listOf(shortfall, stop, fatigue, tempo)
+        assertEquals(
+            listOf(shortfall, stop, tempo),
+            CoachingVerdictPolicy.forRegime(all, VelocityLossRegime.CONTROLLED),
+            "four lines in, three out, the plan's own stop among them",
+        )
+    }
 }
