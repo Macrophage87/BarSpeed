@@ -732,6 +732,37 @@ class ArmedSilencePolicyTest {
         )
     }
 
+    /**
+     * CHARACTERIZATION, issue #262. The delivery state decides whether the card
+     * speaks, and it is the only thing that does.
+     *
+     * Exhaustive over [ArmedDelivery] and over both shapes -- a silent role and
+     * a silent unroled unit -- with the advised set written out rather than
+     * read back from [ArmedSilencePolicy.advice], so a pin on "which states
+     * speak" cannot agree with the implementation by construction.
+     *
+     * This is what remains after #262 removes the demo escape: no argument to
+     * this function can suppress a sentence about a unit that is armed and
+     * silent, so a lifter looking at a dead sensor is told so on every set.
+     */
+    @Test
+    fun `the delivery state alone decides whether the card speaks`() {
+        val speaks =
+            setOf(ArmedDelivery.NOT_LINKED, ArmedDelivery.LINK_WITHOUT_SENSOR, ArmedDelivery.LINKED_SILENT)
+        ArmedDelivery.entries.forEach { state ->
+            assertEquals(
+                state in speaks,
+                ArmedSilencePolicy.message(mapOf(SensorRole.A to state), sole = null, demoMode = false) != null,
+                "$state as a silent role",
+            )
+            assertEquals(
+                state in speaks,
+                ArmedSilencePolicy.message(emptyMap(), state, demoMode = false) != null,
+                "$state as the sole unroled unit",
+            )
+        }
+    }
+
     // ---- #225: the grace floor, and the card in demo mode ---------------------
 
     /**

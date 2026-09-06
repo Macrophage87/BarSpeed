@@ -148,4 +148,93 @@ class SetVoicePolicyTest {
             }
         }
     }
+
+    /**
+     * CHARACTERIZATION, issue #262. Every shape with demo mode OFF, written out
+     * rather than computed, so the removal of the parameter can be checked
+     * against a table that does not move with the code.
+     *
+     * Thirty-two rows: four [ExerciseKind]s against tempo, timed and sensor.
+     * They are literals on purpose -- a expectation re-derived from
+     * `LeadInPolicy.prepCase` and the sensor term would agree with the
+     * implementation by construction and could not catch the collapse of
+     * `demoMode || (kind == EXPLOSIVE && imuConnected)` going wrong.
+     *
+     * This is the whole behaviour that must survive #262, because demo mode is
+     * the only other input and after the removal there is no other value for
+     * it to take.
+     */
+    @Test
+    fun `every non-demo shape answers from a table written out by hand`() {
+        NON_DEMO_TABLE.forEach { (shape, expected) ->
+            assertEquals(
+                expected,
+                SetVoicePolicy.guidesFor(
+                    shape.hasTempo,
+                    shape.isTimed,
+                    shape.kind,
+                    false,
+                    shape.imuConnected,
+                ),
+                "$shape",
+            )
+        }
+        assertEquals(
+            ExerciseKind.entries.size * 2 * 2 * 2,
+            NON_DEMO_TABLE.size,
+            "the table stopped covering every shape",
+        )
+        assertEquals(NON_DEMO_TABLE.size, NON_DEMO_TABLE.map { it.first }.toSet().size, "a shape is listed twice")
+    }
+
+    /** One row of the hand-written table: a set shape with demo mode out of it. */
+    private data class Shape(
+        val kind: ExerciseKind,
+        val hasTempo: Boolean,
+        val isTimed: Boolean,
+        val imuConnected: Boolean,
+    )
+
+    private companion object {
+        private val CUED = setOf(SetVoiceGuide.CUED_CADENCE)
+        private val TIMED = setOf(SetVoiceGuide.TIMED_CLOCK)
+        private val SENSOR = setOf(SetVoiceGuide.SENSOR_COUNT)
+        private val SILENT = emptySet<SetVoiceGuide>()
+
+        private val NON_DEMO_TABLE: List<Pair<Shape, Set<SetVoiceGuide>>> =
+            listOf(
+                Shape(ExerciseKind.DYNAMIC, hasTempo = false, isTimed = false, imuConnected = false) to SILENT,
+                Shape(ExerciseKind.DYNAMIC, hasTempo = false, isTimed = false, imuConnected = true) to SILENT,
+                Shape(ExerciseKind.DYNAMIC, hasTempo = false, isTimed = true, imuConnected = false) to TIMED,
+                Shape(ExerciseKind.DYNAMIC, hasTempo = false, isTimed = true, imuConnected = true) to TIMED,
+                Shape(ExerciseKind.DYNAMIC, hasTempo = true, isTimed = false, imuConnected = false) to CUED,
+                Shape(ExerciseKind.DYNAMIC, hasTempo = true, isTimed = false, imuConnected = true) to CUED,
+                Shape(ExerciseKind.DYNAMIC, hasTempo = true, isTimed = true, imuConnected = false) to TIMED,
+                Shape(ExerciseKind.DYNAMIC, hasTempo = true, isTimed = true, imuConnected = true) to TIMED,
+                Shape(ExerciseKind.HOLD, hasTempo = false, isTimed = false, imuConnected = false) to SILENT,
+                Shape(ExerciseKind.HOLD, hasTempo = false, isTimed = false, imuConnected = true) to SILENT,
+                Shape(ExerciseKind.HOLD, hasTempo = false, isTimed = true, imuConnected = false) to TIMED,
+                Shape(ExerciseKind.HOLD, hasTempo = false, isTimed = true, imuConnected = true) to TIMED,
+                Shape(ExerciseKind.HOLD, hasTempo = true, isTimed = false, imuConnected = false) to CUED,
+                Shape(ExerciseKind.HOLD, hasTempo = true, isTimed = false, imuConnected = true) to CUED,
+                Shape(ExerciseKind.HOLD, hasTempo = true, isTimed = true, imuConnected = false) to TIMED,
+                Shape(ExerciseKind.HOLD, hasTempo = true, isTimed = true, imuConnected = true) to TIMED,
+                Shape(ExerciseKind.CARRY, hasTempo = false, isTimed = false, imuConnected = false) to SILENT,
+                Shape(ExerciseKind.CARRY, hasTempo = false, isTimed = false, imuConnected = true) to SILENT,
+                Shape(ExerciseKind.CARRY, hasTempo = false, isTimed = true, imuConnected = false) to TIMED,
+                Shape(ExerciseKind.CARRY, hasTempo = false, isTimed = true, imuConnected = true) to TIMED,
+                Shape(ExerciseKind.CARRY, hasTempo = true, isTimed = false, imuConnected = false) to CUED,
+                Shape(ExerciseKind.CARRY, hasTempo = true, isTimed = false, imuConnected = true) to CUED,
+                Shape(ExerciseKind.CARRY, hasTempo = true, isTimed = true, imuConnected = false) to TIMED,
+                Shape(ExerciseKind.CARRY, hasTempo = true, isTimed = true, imuConnected = true) to TIMED,
+                Shape(ExerciseKind.EXPLOSIVE, hasTempo = false, isTimed = false, imuConnected = false) to SILENT,
+                Shape(ExerciseKind.EXPLOSIVE, hasTempo = false, isTimed = false, imuConnected = true) to SENSOR,
+                Shape(ExerciseKind.EXPLOSIVE, hasTempo = false, isTimed = true, imuConnected = false) to TIMED,
+                Shape(ExerciseKind.EXPLOSIVE, hasTempo = false, isTimed = true, imuConnected = true) to TIMED,
+                Shape(ExerciseKind.EXPLOSIVE, hasTempo = true, isTimed = false, imuConnected = false) to SILENT,
+                Shape(ExerciseKind.EXPLOSIVE, hasTempo = true, isTimed = false, imuConnected = true) to SENSOR,
+                Shape(ExerciseKind.EXPLOSIVE, hasTempo = true, isTimed = true, imuConnected = false) to TIMED,
+                Shape(ExerciseKind.EXPLOSIVE, hasTempo = true, isTimed = true, imuConnected = true) to TIMED,
+            )
+    }
 }
