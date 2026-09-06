@@ -85,6 +85,20 @@ data class LiftDirection(
      * says only that the declaration names a mount, so a stream from some
      * OTHER unit cannot be assumed to be described by it.
      *
+     * FALSE SAYS NOTHING ABOUT A SECOND UNIT. All three terms are read off
+     * the declaration the ARMED unit's set carried, so false says that
+     * declaration names no mount -- never that a partner unit shares the
+     * mount, and never that the partner has none. The mirrored case is real
+     * and is NOT handled: a cable set declared from the lifter's END is
+     * mount-free by these terms, so a fallback onto a partner clipped to the
+     * STACK passes this gate and is analysed, publishing the same swapped
+     * concentric and eccentric that `FallbackMountGeometryTest` measures in
+     * the other direction. Refusing on `analysedUnitFellBack` alone would
+     * close it and would also refuse every ordinary two-unit fallback, which
+     * is not this change's trade. Raised as a remainder of #247, not fixed
+     * by it: closing it needs a per-unit mount on the record, and nothing
+     * captures one.
+     *
      * `travelRatio != 1.0` is an exact comparison against the type default on
      * purpose. The value is whatever a plan declared or the app seeded, never
      * a measurement, so there is no tolerance to carry.

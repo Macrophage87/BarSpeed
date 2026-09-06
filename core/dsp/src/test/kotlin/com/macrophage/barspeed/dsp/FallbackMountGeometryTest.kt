@@ -321,9 +321,18 @@ class FallbackMountGeometryTest {
     }
 
     /**
-     * AND A FALLBACK UNDER A MOUNT-FREE DECLARATION IS UNCHANGED. Two
-     * dumbbells, two units, one on each: the declaration names no mount, so
-     * either unit's stream is described by it and the analysis proceeds.
+     * AND A FALLBACK UNDER A MOUNT-FREE DECLARATION IS UNCHANGED: the gate
+     * does not fire and the analysis proceeds.
+     *
+     * "THE DECLARATION NAMES NO MOUNT, SO EITHER UNIT'S STREAM IS DESCRIBED
+     * BY IT" STOOD HERE AND IS DELETED. It does not follow.
+     * [LiftDirection.mountSpecific] reads the ARMED unit's declaration and
+     * nothing else, so false is a fact about that declaration and carries no
+     * information about where a partner was clipped. What this pins is the
+     * gate's condition -- a mount-free declaration is not refused -- and the
+     * case it leaves open, a mount-free declaration over a partner that IS
+     * mount-specific, is named at [LiftDirection.mountSpecific] as an
+     * unfixed remainder.
      */
     @Test
     fun `a fallback under a mount-free declaration is analysed as before`() {
