@@ -27,6 +27,11 @@ import kotlin.test.assertTrue
  * entry under an unreleased 1.19, not a mint. v0.1.50 ships 1.18, read at the
  * tag rather than assumed.
  *
+ * v0.1.51 has since SHIPPED 1.19, read at the tag rather than assumed, and the
+ * exporter constant moved to 1.20. The key stays filed under 1.19 and the
+ * version guard below still asserts 1.19 is accepted; what expired is the
+ * premise that the number was still open.
+ *
  * ## Why the key exists
  *
  * `velocityLoss_pct` is best rep to last rep and it answers two different

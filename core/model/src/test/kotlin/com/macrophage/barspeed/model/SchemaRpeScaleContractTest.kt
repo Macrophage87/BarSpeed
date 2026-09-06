@@ -18,7 +18,9 @@ import kotlin.test.assertTrue
  * ELEVEN OF THE TWELVE METHODS ARE RED AT THIS COMMIT, measured by running
  * the suite here rather than asserted. The twelfth is the guard that the
  * schema NUMBER does not move, which is green on both sides and is the point:
- * this key is a further entry under an unreleased 1.19, not a mint.
+ * this key is a further entry under an unreleased 1.19, not a mint. v0.1.51
+ * has since SHIPPED 1.19 and the exporter constant moved to 1.20, which the
+ * version pin below already states in full.
  *
  * The eleven fail because the published schema has no such property,
  * `SetExport` has no such field, the version log's last entry is the TENTH,

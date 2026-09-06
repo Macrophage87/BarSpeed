@@ -1063,10 +1063,36 @@ data class SessionExport(
          * v0.1.51:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
          * reads `SCHEMA_VERSION = "1.19"` -- read at the tag rather than
          * assumed, which is the rule the ninth 1.19 entry states for v0.1.50.
-         * The change below was written as a TWELFTH 1.19 entry while 1.19 was
-         * still unreleased; the release closed that number underneath it, so
-         * it is renumbered rather than left claiming a version it cannot be
-         * part of. This is the FIRST 1.20 entry.
+         * The change below was written as a FURTHER ENTRY under 1.19 while
+         * 1.19 was still unreleased; the release closed that number
+         * underneath it, so it is renumbered rather than left claiming a
+         * version it cannot be part of. This is the FIRST 1.20 entry.
+         *
+         * IT WAS DRAFTED AS THE ELEVENTH, not the twelfth. A sentence here
+         * said "written as a TWELFTH 1.19 entry" and it is DELETED: the
+         * newest pre-rebase form of the commit subject "Write the export
+         * entry the ecc-first fallback has owed since round 1" files this
+         * change as `1.19 carries an ELEVENTH change`, and the TWELFTH in
+         * the log above is #250's `velocityLossRegime`, which came from
+         * `main` and not from this branch. Two older forms of the same
+         * commit filed it as the TENTH and the FIFTH; the ordinal moved
+         * with every rebase, which is why the entry now carries a number
+         * of its own instead.
+         *
+         * THE ELEVEN ENTRIES ABOVE THAT STAND UNDER AN OPEN 1.19 ARE LEFT
+         * STANDING, on the precedent the NINTH 1.19 entry sets for 1.18.
+         * Each was true when it landed, and all eleven -- SECOND through
+         * TWELFTH -- plus the mint above them shipped together in v0.1.51:
+         * `git show v0.1.51:core/model/.../SessionExport.kt` carries every
+         * one of the twelve, read at the tag rather than assumed. What
+         * expired is the premise, not the entries. Five of the eleven say
+         * in so many words that 1.19 is unreleased -- the FIFTH, SIXTH,
+         * TENTH, ELEVENTH and TWELFTH -- and the other six file under the
+         * mint without using the word. The published JSON twin of this log
+         * says SIX, because its eighth entry carries the word where this
+         * one's does not; each copy states the count for itself. Nothing
+         * filed under 1.19 moves to 1.20: 1.19 is still accepted and still
+         * published.
          *
          * WHAT AN OLDER READER DOES, and it is not symmetric. `schemaVersion`
          * is a CLOSED enum and the published schema sets

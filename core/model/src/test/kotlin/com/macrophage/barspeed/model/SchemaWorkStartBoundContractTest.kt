@@ -23,6 +23,12 @@ import kotlin.test.assertTrue
  * `main` -- v0.1.50 declares 1.18, so 1.19 is unreleased and takes further
  * entries. That is asserted below off the published enum rather than argued.
  *
+ * v0.1.51 has since SHIPPED 1.19, read at the tag rather than assumed, and
+ * the exporter constant moved to 1.20. The key stays filed under 1.19; what
+ * expired is the premise that the number was still open, and the version
+ * method below already reads the shipped state -- it pins `SCHEMA_VERSION` at
+ * 1.20 and requires 1.19 to still be in the published enum.
+ *
  * GREEN PINS on keys the commit before this one introduced, not differentials:
  * neither the schema key nor the eighth `noRepsReason` word exists before it,
  * so nothing here could have been shown failing first. What WAS shown failing
