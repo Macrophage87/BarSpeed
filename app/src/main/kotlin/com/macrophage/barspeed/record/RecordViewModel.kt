@@ -4208,6 +4208,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                             // no window -- WorkStart is where that means
                             // "bound nothing".
                             workStartedAtMs = p.prepWindow?.workStartedAtMs,
+                            // Whether p.samples came off the unit this set
+                            // ARMED, which is what decides whether
+                            // p.exercise.liftDirection() describes them
+                            // (#247). SensorCapturePolicy.analysedStream moves
+                            // the analysis onto the partner when the armed
+                            // unit delivered too few frames; the geometry it
+                            // is handed is the EXERCISE's and, on a cable
+                            // machine, belongs to the armed unit's mount.
+                            // Read off the same declaration the row and the
+                            // export publish, so the three cannot disagree
+                            // about whether the analysis moved.
+                            analysedUnitFellBack = p.sensors?.analysedFellBack == true,
                         )
                     p.manualReps != null ->
                         SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))

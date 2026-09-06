@@ -251,10 +251,17 @@ object SetAnalyzer {
      * EXERCISE's declaration and, on a cable machine, describes where the
      * ARMED unit was mounted -- see [LiftDirection.mountSpecific]. Issue #247.
      *
-     * ACCEPTED AND NOT YET CONSULTED. This commit adds the parameter and the
-     * vocabulary so the differentials that follow it can be written and shown
-     * failing; the analysis it selects is byte-identical with the flag set
-     * either way. Nothing calls it with true yet.
+     * TRUE AND MOUNT-SPECIFIC IS REFUSED, not adjusted. See
+     * [NoRepsReason.MOUNT_NOT_DECLARED] for why the tempting adjustment --
+     * assume the partner is on the lifter's side and drop the inversion -- is
+     * not made: one field session recorded two exercises under the same
+     * declaration with different second-unit mounts, so the adjustment is a
+     * coin flip and half its outcomes publish an inverted record silently.
+     *
+     * FALSE IS EVERY ORDINARY SET, single-sensor ones included, and nothing
+     * about them changes. So is a dual set whose armed unit delivered: the
+     * declaration describes the unit the figures came from, which is what it
+     * has always meant.
      */
     fun analyze(
         samples: List<ImuSample>,
@@ -264,12 +271,31 @@ object SetAnalyzer {
         config: DspConfig = DspConfig(),
         cues: List<VoiceCue> = emptyList(),
         workStartedAtMs: Long? = null,
-        // The suppression comes off in the commit that consults it; detekt
-        // reads an accepted-and-ignored parameter as dead, which for one
-        // commit it is.
-        @Suppress("UnusedParameter") analysedUnitFellBack: Boolean = false,
+        analysedUnitFellBack: Boolean = false,
     ): SetAnalysis {
         val raw = VelocityEstimator.estimate(samples, config, direction.measuredPlane)
+        // The analysis moved onto a unit the set did not arm, and [direction]
+        // describes where the ARMED unit was mounted. Nothing on the record
+        // says where this one is, and reading it under the other unit's mount
+        // swaps the concentric and the eccentric outright at an unchanged rep
+        // count -- FallbackMountGeometryTest measures the swap. Issue #247.
+        //
+        // AFTER the estimator and before anything geometric. The sample rate
+        // is a property of the timestamps and owes nothing to the mount, so it
+        // is measured and published: SessionRepository.recordSet writes it into
+        // RawStreamEntity.sampleRateHz, and a placeholder 0.0 there would leave
+        // the archive publishing "sampleRate_hz": 0.0 over a capture that has a
+        // rate. Everything below this line reads `direction`.
+        if (analysedUnitFellBack && direction.mountSpecific) {
+            return SetAnalysis(
+                reps = emptyList(),
+                sampleRateHz = raw.sampleRateHz,
+                velocityLossPct = null,
+                tempoCompliance = null,
+                verdicts = listOf(MOUNT_NOT_DECLARED_VERDICT),
+                noRepsReason = NoRepsReason.MOUNT_NOT_DECLARED,
+            )
+        }
         val series = orient(raw, direction, config).mappedToLifter(direction.sensorToLifter)
         val segmentation = RepSegmenter.segmentDetailed(series, direction, config)
         val spans = segmentation.spans
@@ -651,6 +677,18 @@ object SetAnalyzer {
     private fun round2(x: Double) = Math.round(x * 100.0) / 100.0
 
     private fun round3(x: Double) = Math.round(x * 1000.0) / 1000.0
+
+    /**
+     * What the rest screen says on a set refused for
+     * [NoRepsReason.MOUNT_NOT_DECLARED].
+     *
+     * It states what the app DID -- moved the analysis, found no declaration
+     * for the unit it moved to -- and claims nothing about a battery, a link
+     * or a mounting it cannot see. A blank set with no note is #138's defect
+     * on a new population, so the note is not optional.
+     */
+    const val MOUNT_NOT_DECLARED_VERDICT =
+        "Analysis moved to the other sensor, whose mounting is not declared — no figures for this set."
 }
 
 /** Deterministic rule-based coaching verdicts shown on the rest screen. */
