@@ -3650,7 +3650,7 @@ internal fun RestHeader(state: RecordState, viewModel: RecordViewModel) {
                     feedback.effectiveLoadKg.takeIf { it > 0 }?.let { state.weightUnit.format(it) } ?: "BW"
                 // The ADDED load, NEVER the total. feedback.effectiveLoadKg is
                 // SetLoadPolicy.totalKg -- the lifter's own mass included on
-                // body-weight work -- so halving it would read "2 x 50 kg" for
+                // body-weight work -- so halving it would read "2 × 50 kg" for
                 // a 20 kg weighted dip at 80 kg body weight. The total on
                 // screen stays the total; only the split comes off the added
                 // load.

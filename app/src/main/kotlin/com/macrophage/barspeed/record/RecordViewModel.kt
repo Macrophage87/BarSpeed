@@ -367,7 +367,7 @@ data class SetFeedback(
      * number from [loadKg]: that one is [SetLoadPolicy.totalKg], the lifter's
      * own mass included. Carried separately because it is the only one of the
      * two that may be divided across implements -- halving [loadKg] would
-     * print "2 x 50 kg" for a 20 kg weighted dip at 80 kg body weight.
+     * print "2 × 50 kg" for a 20 kg weighted dip at 80 kg body weight.
      */
     val addedKg: Double,
     /**
@@ -1479,9 +1479,9 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  * (#175).
  *
  * EVERY FIELD, AND WHICH SLOT IT COMES FROM. Moving the anchor from the
- * upcoming slot to the finished one changed the source of every field the
- * copy does not reset, so all twenty-four are stated here rather than the one
- * a reviewer happened to name. `AppendedSlotTest.APPEND_DECISIONS` holds the
+ * upcoming slot to the finished one changed where every inherited and
+ * carried field comes from, so every field the copy does not reset is stated
+ * here rather than the one a reviewer happened to name. `AppendedSlotTest.APPEND_DECISIONS` holds the
  * same table and is asserted against the class BOTH ways: a new field cannot
  * be added without an answer, and a wrongly-grouped answer reds on the entry
  * itself in each of the six directions an entry can be moved between the
@@ -1493,19 +1493,23 @@ private fun planSessionState(s: RecordState, planSession: PlanSessionDef, queue:
  *
  *  - From the anchor, because the appended set IS one more set of that
  *    exercise: `exercise`, `geometry`, `side`, `implementCount`,
- *    `exerciseNotes`, `exerciseNotesBehindTap`, `targetMeanConVelMps`,
- *    `velocityLossStopPct`, `restS`, `prepS`, `sensors`. `side` follows the
- *    set just DONE, so a unilateral block appends another set on the side
- *    whose load was wrong rather than the side coming up.
+ *    `implement`, `barKg`, `progression`, `exerciseNotes`,
+ *    `exerciseNotesBehindTap`, `targetMeanConVelMps`, `velocityLossStopPct`,
+ *    `restS`, `prepS`, `sensors`. `side` follows the set just DONE, so a
+ *    unilateral block appends another set on the side whose load was wrong
+ *    rather than the side coming up. `implement` and `barKg` follow it for
+ *    the reason the list has no other answer available: one more set of the
+ *    anchor's exercise is done on the anchor's implement, off the anchor's
+ *    bar (#253).
  *  - From what is standing for that exercise, via [carriedValues]:
  *    `loadKg`, `reps`, `durationS`, `tempo`.
  *  - Cleared or recomputed: `plannedLoadKg`, `plannedReps`,
- *    `plannedDurationS`, `plannedTempo`, `setIndexInExercise`,
+ *    `plannedDurationS`, `plannedTempo`, `plannedSide`, `setIndexInExercise`,
  *    `setsInExercise`, `isExerciseChange`, `isAddedSet`, and `warmup`.
  *
  * `warmup` is the one that describes the ANCHOR SET'S PURPOSE rather than
  * the exercise, which is why it is the one that had to move groups. `side`
- * is a statement about the set, as the bullet above says; the remaining ten
+ * is a statement about the set, as the bullet above says; the remaining
  * inherited fields all answer "how is this exercise performed", and the
  * appended set performs it the same way.
  *

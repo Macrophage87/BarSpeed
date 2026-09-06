@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
  * REFUSED rather than resolved, in every case here, for the reason the
  * bodyweight pair is refused: whichever way a contradiction were settled
  * quietly, the settlement would become an INSTRUCTION the lifter follows with
- * a bar in their hands. "2 x 97.5 lb dumbbells" for a barbell set, or a bar
+ * a bar in their hands. "2 × 97.5 lb dumbbells" for a barbell set, or a bar
  * weight silently ignored on a machine, is worse than a plan that does not
  * import.
  *

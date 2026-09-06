@@ -56,8 +56,15 @@ class PlateSetCharacterizationTest {
         }
     }
 
+    // NOT a pin on the SIZE of the pound set, which is what the old name
+    // claimed. Adding a plate the app does not stock leaves all five of these
+    // still reachable on their own, so this stays green with 35.0 in
+    // PlateMath.LB_PLATES. Measured: that mutation reds the two pins that name
+    // the set's contents -- `the pound set has no 35 and splits 35 per side
+    // into 25 plus 10` and `the pound set is 45 25 10 5 and 2p5, heaviest
+    // first` -- and leaves this one alone.
     @Test
-    fun `the pound set is exactly five plates`() {
+    fun `each pound plate is reachable on its own`() {
         listOf(2.5, 5.0, 10.0, 25.0, 45.0).forEach { plate ->
             assertEquals(listOf(plate), lb(45.0 + 2 * plate).platesPerSide, "$plate lb a side")
         }

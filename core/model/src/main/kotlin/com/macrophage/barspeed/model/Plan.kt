@@ -246,7 +246,7 @@ data class PlanFile(
      * REFUSED rather than resolved, all of it, for the reason the bodyweight
      * pair is refused: what these keys produce is an INSTRUCTION the lifter
      * follows with a bar in their hands, so a contradiction settled quietly
-     * becomes a wrong loading rather than a wrong number in a file. "2 x 97.5
+     * becomes a wrong loading rather than a wrong number in a file. "2 × 97.5
      * lb dumbbells" for a barbell set is worse than a plan that does not
      * import, because the plan that does not import gets fixed.
      *
@@ -843,7 +843,7 @@ data class PlanExerciseDef(
      * instruction someone follows with a bar in their hands.
      *
      * A SINGLE dumbbell is `"other"`, not `"dumbbell"`. The word here means a
-     * PAIR -- it is what makes the card say "2 x 45 lb dumbbells" without the
+     * PAIR -- it is what makes the card say "2 × 45 lb dumbbells" without the
      * plan spelling out [implementCount] -- and there is nothing to say about
      * one dumbbell that the load figure does not already say.
      *

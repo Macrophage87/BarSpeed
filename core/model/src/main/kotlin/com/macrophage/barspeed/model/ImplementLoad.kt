@@ -8,8 +8,9 @@ package com.macrophage.barspeed.model
  * DIVIDE ONLY. Every load in this app is the TOTAL added load across
  * everything held, before this file existed and after it. Nothing here
  * multiplies a load, and nothing here returns a number that is stored,
- * exported or summed: [decomposition] returns a string, its only callers are
- * screens, and [PlanSetDef.resolvedLoadKg] takes no implement count. Every
+ * exported or summed: [decomposition] returns a string, its callers are
+ * screens and [ImplementLine.forCard], which returns a string too, and
+ * [PlanSetDef.resolvedLoadKg] takes no implement count. Every
  * division by an implement count in this feature terminates in a String and
  * reaches nothing that is stored, exported or summed. That is the whole
  * safety case and it is mechanical rather than a promise — a count cannot
