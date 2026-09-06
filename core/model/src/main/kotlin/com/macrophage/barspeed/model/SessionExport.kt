@@ -611,9 +611,14 @@ data class SessionExport(
          * recorded with no sensor at all. The key is drawn from
          * [VALID_NO_REPS_REASONS] and names why the list is empty, nothing
          * more. "Names WHICH GATE of the segmenter emptied the list" stood
-         * here and is deleted: it was true of every value 1.18 shipped and is
-         * false of `mountNotDeclared`, added at 1.20, which is set before the
-         * segmenter runs at all.
+         * here and is deleted. It was never true: `afterSetEndCue`, which 1.18
+         * itself shipped, names a set whose spans the set's own END CUE
+         * excluded, and that value's own KDoc says segmentation did not fail.
+         * It is false of `mountNotDeclared` too, added at 1.20 and set before
+         * the segmenter runs at all. This is the THIRD framing of the
+         * sentence: the second was written by "Refuse the analysis when the
+         * fallback unit's mounting is unknown", which claimed the clause had
+         * been true of everything 1.18 shipped, and review round 2 missed it.
          *
          * Additive on the terms 1.4 and 1.5 were not: nothing already written
          * changes type, meaning or presence, and a reader that ignores the key
@@ -1175,9 +1180,11 @@ data class SessionExport(
          * NOT PURELY ADDITIVE, and in a direction a reader must be told about.
          * `noRepsReason` is a CLOSED enum, so a validator running the 1.19
          * schema rejects the new word; and on the shape above a set now
-         * publishes `reps: []` and an empty `summary` where it used to publish
-         * a full one. `sensors.analysedFellBack` was already true on exactly
-         * those sets and remains the statement that the analysis moved.
+         * publishes `reps: 0` -- the count key is an integer and `repMetrics`
+         * is not written at all -- and an empty `summary`, unless the lifter
+         * states or corrects the count, where it used to publish a full one.
+         * `sensors.analysedFellBack` was already true on exactly those sets
+         * and remains the statement that the analysis moved.
          *
          * NOT RETROACTIVE, for the reason every entry here gives: the value is
          * computed when the set is analysed and frozen into the stored
