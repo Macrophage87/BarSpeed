@@ -209,16 +209,33 @@ data class PlanFile(
      * Silent when no set declares a positive load. There is then no number to
      * have got backwards, and a warning with nothing in it is how a warning
      * decays into noise.
+     *
+     * Reads the RESOLVED count, so a plan writing `"implement": "dumbbell"`
+     * and no number is in scope: the word means a pair, the card divides by
+     * it, and this warning has to describe the same plan the card draws.
+     * Round 2 of #253 found this reader still on the raw key after
+     * PlanQueue and PlanDetailScreen had both been moved off it -- the third
+     * reader of the count, and the one that change missed.
+     *
+     * What the message NAMES is still what the author wrote: the key when they
+     * wrote the key, the word when the word was the whole declaration. A
+     * warning quoting an `"implementCount"` line to someone whose document has
+     * none sends them looking for a line that is not there.
      */
     private fun pairVsLoad(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
-        val n = exercise.implementCount ?: return null
+        val n = exercise.resolvedImplementCount ?: return null
         if (n < 2) return null
         val set = exercise.sets.firstOrNull { (it.loadLb ?: it.loadKg ?: 0.0) > 0 } ?: return null
         val unit = if (set.loadLb != null) "lb" else "kg"
         val total = set.loadLb ?: set.loadKg ?: return null
         val whole = "${plainNumber(total)} $unit"
+        // Null here means the count came from the word alone: every other
+        // implement resolves to exactly what the plan wrote, so a resolved
+        // count with no raw one is a declared dumbbell and nothing else.
+        val declared = exercise.implementCount?.let { "\"implementCount\": $it" }
+            ?: "\"implement\": \"dumbbell\", which is $n of them"
         return "sessions[$si].exercises[$ei]: ${exercise.exercise} declares " +
-            "\"implementCount\": $n, so this plan's $whole means $n × ${plainNumber(total / n)} $unit " +
+            "$declared, so this plan's $whole means $n × ${plainNumber(total / n)} $unit " +
             "in hand, not $whole in each. load_kg/load_lb is always the TOTAL across everything " +
             "held — if $whole was what was on one of them, write the total of all $n here instead."
     }
