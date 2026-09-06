@@ -76,7 +76,6 @@ import com.macrophage.barspeed.model.SetVoicePolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.SideChoicePolicy
 import com.macrophage.barspeed.model.Stage
-import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
@@ -2600,7 +2599,6 @@ data class RecordState(
     /** The dot and the SETUP advice both need the whole state, not just these booleans. */
     val imuState: ConnectionState = ConnectionState.Disconnected,
     val hrmState: ConnectionState = ConnectionState.Disconnected,
-    val demoMode: Boolean = false,
     val sessionId: Long? = null,
     val setsCompleted: Int = 0,
     /**
@@ -3117,7 +3115,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     private var hrJob: Job? = null
     private var tickJob: Job? = null
     private var restJob: Job? = null
-    private var demoJob: Job? = null
     private var guidedCadence: GuidedCadenceRunner? = null
     private var setStartedAtMs = 0L
 
@@ -3333,10 +3330,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleWeightUnit() =
         viewModelScope.launch { container.settings.setWeightUnit(stateFlow.value.weightUnit.other()) }
 
-    fun toggleDemoMode() {
-        stateFlow.value = stateFlow.value.copy(demoMode = !stateFlow.value.demoMode)
-    }
-
     /** The START on the preview (#202); [askOrStartSession] decides. */
     fun requestPlanSession(planSession: PlanSessionDef) =
         askOrStartSession(stateFlow, planSession, System.currentTimeMillis(), ::startPlanSession)
@@ -3510,9 +3503,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // The bar sensor is RECORD-ONLY for standard lifts: the lifter (or the
         // voice guide) counts the reps, while sensor data feeds velocity/power
         // analysis. Explosive lifts stay sensor-counted (single drives, peak
-        // velocity is the point) unless no sensor is present. Demo mode keeps
-        // sensor counting to showcase the live tracking.
-        var manualSet = !s.currentIsTimed && !s.demoMode &&
+        // velocity is the point) unless no sensor is present. A `!s.demoMode`
+        // term sat in front of this until #262 and collapsed with the mode.
+        var manualSet = !s.currentIsTimed &&
             (exercise.kind != ExerciseKind.EXPLOSIVE || !s.imuConnected)
         // Guided cadence: the app calls the tempo out loud and counts the reps
         // itself — the DEFAULT for all tempo work. A missed phase switch in
@@ -3537,7 +3530,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             hasTempo = guidedTempo != null,
             isTimed = s.currentIsTimed,
             kind = exercise.kind,
-            demoMode = s.demoMode,
             imuConnected = s.imuConnected,
         )
         // The word the prep of a hold or a carry ends on, at the instant the
@@ -3594,7 +3586,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     autoConnect.imuSamplesB, imuBufferB, { journal }, role, ::onSecondarySample,
                 )
             }
-        if (s.demoMode && !s.currentIsTimed) startDemoStream(s, exercise)
         hrJob =
             viewModelScope.launch {
                 autoConnect.hrSamples.collect { hr ->
@@ -3902,7 +3893,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         collectJobB?.cancel()
         hrJob?.cancel()
         tickJob?.cancel()
-        demoJob?.cancel()
         guidedCadence?.cancel()
         val s = stateFlow.value
         // The set has to SAY it is over, or nothing on the record does. A
@@ -4120,11 +4110,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * Dispatched on `Main.immediate`, which is the load-bearing half. `appScope`
      * is `SupervisorJob() + Dispatchers.Default`, so launching unqualified would
      * put every `stateFlow.value = stateFlow.value.copy(...)` below on a
-     * background thread. Those are non-atomic read-modify-writes, there are
-     * dozens of them in this file, and demo mode already writes to that flow off
-     * the main thread through `launchDemoStream`; adding a second off-main
-     * writer is how the RESTING transition gets lost and the screen strands on a
-     * set that was in fact written. `Main.immediate` keeps every one of them
+     * background thread. Those are non-atomic read-modify-writes and there are
+     * dozens of them in this file, so an off-main writer is how the RESTING
+     * transition gets lost and the screen strands on a set that was in fact
+     * written. Until #262 demo mode was one, writing to that flow off the main
+     * thread through `launchDemoStream`; it is gone, and this reasoning is
+     * what keeps the next one from being added. `Main.immediate` keeps every one of them
      * exactly where it is today, and keeps this write, [rateLastSet] and
      * [overrideLastSetReps] in tap order now that all three have left
      * `viewModelScope`.
@@ -4471,18 +4462,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = previewCancelledState(stateFlow.value)
     }
 
-    /** Demo/replay mode (spec 5): synthesizes a realistic set through the full pipeline. */
-    private fun startDemoStream(s: RecordState, exercise: ExerciseDef) {
-        val slot = s.currentSlot
-        demoJob =
-            viewModelScope.launchDemoStream(
-                reps = (if (s.adHoc) s.repsInput.toIntOrNull() else slot?.reps) ?: DEMO_REPS,
-                tempo = (if (s.adHoc) s.tempoInput else slot?.tempo)?.let { Tempo.parseOrNull(it) },
-                eccentricFirst = exercise.startsWith == StartPhase.ECCENTRIC,
-                onSample = ::onSample,
-            )
-    }
-
     /**
      * The record flow's owner is going away: the "record" nav entry was popped
      * — RecordScreen draws a Back button in the top bar in every stage — or the
@@ -4564,9 +4543,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         const val DEFAULT_REST_S = 150
         const val REST_COUNTDOWN_FROM_S = 3
-
-        /** Reps synthesized for a demo set when nothing planned one. */
-        const val DEMO_REPS = 5
 
         /** ~2 minutes of beats at typical training heart rates. */
         const val ROLLING_HRV_BEATS = 150

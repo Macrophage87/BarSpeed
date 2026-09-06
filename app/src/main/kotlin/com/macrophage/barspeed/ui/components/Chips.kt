@@ -76,10 +76,13 @@ fun rememberArmedDelivery(state: ConnectionState, frameAtMs: Long?, armedAtMs: L
 
 /**
  * Status-bar style connection dot: volt when live, amber while reconnecting,
- * red on a failure, grey when never tried. [demoActive] overrides to volt
- * regardless of [state] -- demo mode fabricates samples with no sensor
- * present, and the dot exists to answer "is a sensor talking to me," which
- * demo mode is deliberately lying about everywhere else on screen too.
+ * red on a failure, grey when never tried.
+ *
+ * A `demoActive` parameter overrode the whole thing to volt until #262:
+ * demo mode fabricated samples with no sensor present, and this dot exists
+ * to answer "is a sensor talking to me," which was the one question demo
+ * mode could not lie about the way it lied everywhere else on the screen.
+ * With the mode gone the colour is the link's own, always.
  *
  * [delivery] is what makes that question answerable rather than merely asked
  * (#213). Without it a volt dot means the app ISSUED a notification subscribe
@@ -95,26 +98,15 @@ fun rememberArmedDelivery(state: ConnectionState, frameAtMs: Long?, armedAtMs: L
  * other direction.
  */
 @Composable
-fun SensorDot(
-    label: String,
-    state: ConnectionState,
-    modifier: Modifier = Modifier,
-    demoActive: Boolean = false,
-    delivery: ArmedDelivery? = null,
-) {
-    // The when below has a subject, deliberately, so a fifth ConnectionState
-    // variant fails this compile instead of falling into a silent else.
-    // demoActive is checked outside it because it is not a fact about state.
+fun SensorDot(label: String, state: ConnectionState, modifier: Modifier = Modifier, delivery: ArmedDelivery? = null) {
+    // The when has a subject, deliberately, so a fifth ConnectionState variant
+    // fails this compile instead of falling into a silent else.
     val color =
-        if (demoActive) {
-            BarColors.Volt
-        } else {
-            when (state) {
-                is ConnectionState.Connected -> connectedTone(delivery)
-                is ConnectionState.Connecting -> BarColors.Amber
-                is ConnectionState.Failed -> BarColors.Red
-                is ConnectionState.Disconnected -> BarColors.Ghost
-            }
+        when (state) {
+            is ConnectionState.Connected -> connectedTone(delivery)
+            is ConnectionState.Connecting -> BarColors.Amber
+            is ConnectionState.Failed -> BarColors.Red
+            is ConnectionState.Disconnected -> BarColors.Ghost
         }
     Text(
         "$label ●",

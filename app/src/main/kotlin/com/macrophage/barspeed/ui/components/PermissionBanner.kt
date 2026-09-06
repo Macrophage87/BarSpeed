@@ -31,11 +31,6 @@ import com.macrophage.barspeed.ui.BarColors
  * missing and a system dialog would be raised over a lifter under a loaded bar,
  * and from FINISHED, which is after the loss.
  *
- * [demoMode] changes what may be claimed rather than whether this draws. Demo
- * streaming does not touch the sensor and works with every BLE permission
- * denied, so "sets record with no bar-speed data" would be false next to a chip
- * reading "Demo mode ON".
- *
  * The 8dp gap below is carried on the modifier here, not by a `Spacer` at the
  * call site, so it exists exactly when the banner draws. Devices used to pair
  * its own `Spacer` with this call, which paid the gap even when this returned
@@ -44,12 +39,12 @@ import com.macrophage.barspeed.ui.BarColors
  * matches the other four.
  */
 @Composable
-fun PermissionBanner(demoMode: Boolean = false, modifier: Modifier = Modifier) {
+fun PermissionBanner(modifier: Modifier = Modifier) {
     val step by LocalBlePermissionUi.current.step.collectAsState()
     if (step == BlePermissionStep.GRANTED) return
     Card(modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(Modifier.padding(12.dp)) {
-            PermissionBannerBody(step, demoMode, headline = true)
+            PermissionBannerBody(step, headline = true)
         }
     }
 }
@@ -70,7 +65,7 @@ fun PermissionBanner(demoMode: Boolean = false, modifier: Modifier = Modifier) {
  * at all; see [PermissionBanner] for the one caller that still owns it here.
  */
 @Composable
-fun PermissionBannerBody(step: BlePermissionStep, demoMode: Boolean = false, headline: Boolean = false) {
+fun PermissionBannerBody(step: BlePermissionStep, headline: Boolean = false) {
     val ui = LocalBlePermissionUi.current
     if (step == BlePermissionStep.GRANTED) return
 
@@ -83,7 +78,7 @@ fun PermissionBannerBody(step: BlePermissionStep, demoMode: Boolean = false, hea
                 color = BarColors.Amber,
             )
         }
-        Text(consequence(demoMode, step), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+        Text(consequence(step), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
         if (step == BlePermissionStep.SETTINGS_ONLY || step == BlePermissionStep.ASK_AGAIN_OR_SETTINGS) {
             Text(
                 "If no dialog appears, turn it on in Settings → Permissions → ${permissionLabel()}.",
@@ -136,21 +131,18 @@ private fun bannerHeadline(step: BlePermissionStep): String = if (step == BlePer
     "Bar sensor blocked"
 }
 
-private fun consequence(demoMode: Boolean, step: BlePermissionStep): String {
+// Two branches naming demo mode came out of this when #262 removed the mode.
+// They said the permission was not needed and that the sensor was not used,
+// which was true of demo streaming and is now true of nothing: with the mode
+// gone the only reason to hold this permission is the bar sensor, so every
+// step states the consequence for the sensor and nothing else.
+private fun consequence(step: BlePermissionStep): String {
     val name = permissionLabel()
     return when {
         // Same reasoning as bannerHeadline: nothing has been denied yet, so
         // "is denied" / "cannot reach" would be false here. State only that a
         // request is outstanding.
-        step == BlePermissionStep.AWAITING_ANSWER ->
-            if (demoMode) {
-                "BarSpeed is asking for $name. Demo mode does not need it."
-            } else {
-                "BarSpeed is asking for $name…"
-            }
-        // Never a recommendation to use demo instead: what demo writes into a
-        // set is a separate and unaddressed question.
-        demoMode -> "$name is denied, so the bar sensor cannot be reached. Demo mode does not use it."
+        step == BlePermissionStep.AWAITING_ANSWER -> "BarSpeed is asking for $name…"
         BlePermissionPolicy.denialBlocksRecording(Build.VERSION.SDK_INT) ->
             "Without $name, BarSpeed cannot reach the bar sensor and sets record with no bar-speed data."
         else -> "Without $name, BarSpeed cannot find new sensors. A sensor already paired still connects."

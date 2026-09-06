@@ -31,7 +31,6 @@ your training and write the next block.
 - **Exports**: token-efficient session JSON for LLM analysis (optionally with
   per-rep detail incl. drive power), and a self-contained raw zip for Python/R
   — per-set sensor CSVs plus the full session.json analysis in one archive.
-- **Demo mode**: try the whole flow with synthesized bar motion, no hardware.
 
 ## Get a training plan out of Claude and into the app
 

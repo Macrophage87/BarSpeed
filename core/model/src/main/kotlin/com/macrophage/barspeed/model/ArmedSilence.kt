@@ -480,25 +480,19 @@ object ArmedSilencePolicy {
      * caller that forgot it draws a blank card on the configuration the owner
      * trains most, which is the failure this issue is.
      *
-     * [demoMode] takes no default either, and for the same reason (#225 item
-     * 7). IN DEMO MODE THERE IS NOTHING TO SAY: `startDemoStream` fabricates
-     * samples with no sensor present, so the set DOES record and "It will
-     * record nothing this set" is the one claim demo mode makes FALSE rather
-     * than merely fictional -- `SensorDot` beside this card already takes
-     * `demoActive` for that reason. The suppression is whole rather than per
-     * state: with no unit paired there is nothing to switch on, bring near the
-     * phone or power-cycle, so every sentence [advice] can produce names a
-     * remedy the lifter cannot carry out.
-     *
-     * It is the SENTENCE that is suppressed and not the reading. What a set
-     * recorded in demo mode stores is decided at the set's end by
-     * [storedDeliveryByRole] and [storedSoleSilence], which do not take this
-     * flag: a demo set's buffer is not empty, so no word is stored for it
-     * anyway, and gating the archive on a display flag is how a display
-     * decision comes to change what is recorded.
+     * NOTHING ELSE CAN SILENCE IT. There is one suppression left, [silent]'s
+     * and [sole]'s own emptiness, and it means the units are delivering. A
+     * `demoMode` argument was the second until #262 (added by #225 item 7):
+     * demo mode fabricated samples with no sensor present, so the set did
+     * record and "It will record nothing this set" was the one claim it made
+     * false rather than merely fictional. That mode is gone, so a lifter
+     * standing over a unit that is armed and sending nothing is told so on
+     * every set, and the removal of the escape cannot change what is
+     * recorded: [storedDeliveryByRole] and [storedSoleSilence] never took the
+     * flag, because gating the archive on a display flag is how a display
+     * decision comes to change what is stored.
      */
-    fun message(silent: Map<SensorRole, ArmedDelivery>, sole: ArmedDelivery?, demoMode: Boolean): String? {
-        if (demoMode) return null
+    fun message(silent: Map<SensorRole, ArmedDelivery>, sole: ArmedDelivery?): String? {
         val sentences =
             silent.entries.mapNotNull { (role, delivery) -> advice(delivery, role) } +
                 listOfNotNull(sole?.let { advice(it, null) })

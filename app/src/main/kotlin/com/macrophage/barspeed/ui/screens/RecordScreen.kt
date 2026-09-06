@@ -250,7 +250,6 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
                         SensorDot(
                             roster.analysed?.name ?: "IMU",
                             state.imuState,
-                            demoActive = state.demoMode,
                             delivery = deliveryA,
                         )
                         roster.secondary?.let {
@@ -770,8 +769,8 @@ private fun PreviewBlockCard(block: PreviewBlock, unit: WeightUnit) {
 private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
     if (!state.imuConnected) {
         // The permission banner replaces this card's advice rather than sitting
-        // beside it. The demo chip below is a sibling in this Column and stays
-        // either way: it is the only demo toggle on this screen.
+        // beside it. Since #262 the card is the whole of what a missing sensor
+        // adds to this page: one title, one line, and the plan below it.
         val permissionHeld by LocalBlePermissionUi.current.step.collectAsState()
         // Latched, not read straight from state.imuState: AutoConnectManager's
         // else branch retries immediately after every Failed -- calls
@@ -817,13 +816,8 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
                         color = BarColors.Sub,
                     )
                 } else {
-                    PermissionBannerBody(step = permissionHeld, demoMode = state.demoMode)
+                    PermissionBannerBody(step = permissionHeld)
                 }
-                FilterChip(
-                    selected = state.demoMode,
-                    onClick = viewModel::toggleDemoMode,
-                    label = { Text(if (state.demoMode) "Demo mode ON" else "Demo mode off") },
-                )
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -868,11 +862,10 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
  */
 private fun imuAdviceText(advice: SensorAdvice): String = when (advice) {
     SensorAdvice.PAIR_OR_POWER ->
-        "Pair or power on the WitMotion sensor, or check the phone's own Bluetooth. " +
-            "You can also enable demo mode to try the app with synthesized data."
+        "Pair or power on the WitMotion sensor, or check the phone's own Bluetooth."
     SensorAdvice.UNRESPONSIVE ->
         "The sensor answered and then stopped responding -- pairing again is unlikely to help. " +
-            "Power-cycle it, or enable demo mode to try the app with synthesized data."
+            "Power-cycle it."
 }
 
 @Composable
@@ -898,7 +891,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     // showing. Without that, a refusal on the rest path would be a set that
     // silently failed to start.
     BodyWeightRefusal(state, viewModel)
-    PermissionBanner(demoMode = state.demoMode)
+    PermissionBanner()
     val slot = state.currentSlot
     if (slot != null) {
         if (slot.isExerciseChange) {
@@ -938,22 +931,17 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     // voice guide) counts; explosive lifts stay sensor-counted.
     val kind = state.currentSlot?.exercise?.kind
         ?: state.exerciseOptions.firstOrNull { it.id == state.selectedExerciseId }?.kind
-    val manual = !state.currentIsTimed && !state.demoMode &&
+    // A `!state.demoMode` term sat in front of this until #262 and collapsed
+    // with the mode; it is the same decision RecordViewModel.beginSet makes.
+    val manual = !state.currentIsTimed &&
         (kind != ExerciseKind.EXPLOSIVE || !state.imuConnected)
     Button(onClick = viewModel::beginSet, modifier = Modifier.fillMaxWidth().height(56.dp)) {
         Text(if (manual) "START SET — you count" else "START SET", fontWeight = FontWeight.Bold)
     }
     Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (!state.imuConnected && !state.currentIsTimed) {
-            FilterChip(
-                selected = state.demoMode,
-                onClick = viewModel::toggleDemoMode,
-                label = { Text(if (state.demoMode) "Demo mode ON" else "Enable demo mode") },
-            )
-        }
-        AudioCueChip(state, viewModel)
-    }
+    // The Row went with the demo chip (#262). It spaced two chips; one chip
+    // lays out identically without it, at the same Start alignment.
+    AudioCueChip(state, viewModel)
     SessionCloseControls(state, viewModel)
 }
 
@@ -1092,10 +1080,12 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
  * ARMING since #225 -- before that both were floored by the later of the two
  * instants, so re-pointing one link excused the other.
  *
- * IT SAYS NOTHING IN DEMO MODE (#225 item 7). `startDemoStream` fabricates
- * samples with no sensor present, so the set records and the sentence this
- * card draws is the one claim demo mode makes false; `SensorDot` above already
- * takes `demoActive` for that reason.
+ * NOTHING SUPPRESSES IT ANY MORE. It said nothing in demo mode (#225 item 7),
+ * because that mode fabricated samples with no sensor present, so the set did
+ * record and this card's sentence was the one claim it made false. #262
+ * removed the mode and the escape with it: a unit that is armed and sending
+ * nothing is named here on every set, and `ArmedSilencePolicy.message` now has
+ * no argument that can silence it.
  *
  * Drawn on READY and on RESTING. READY is drawn once per session --
  * `startNextSet` writes READY and calls `beginSet` in the same frame -- so a
@@ -1134,7 +1124,6 @@ private fun ArmedSilenceCard(state: RecordState) {
         ArmedSilencePolicy.message(
             state.armedDelivery(nowMs.longValue),
             state.soleSilenceOver(state.imuArmedAtMs, nowMs.longValue),
-            state.demoMode,
         ) ?: return
     Spacer(Modifier.height(8.dp))
     Card(Modifier.fillMaxWidth()) {
@@ -3068,7 +3057,7 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     }
     // Sets two onwards start from here, not from READY, and this is the screen
     // where the lifter has a rest period to spend fixing it.
-    PermissionBanner(demoMode = state.demoMode)
+    PermissionBanner()
     // Same reason as the banner above it, for the sensor rather than the
     // permission: READY renders at most once per session, so a card drawn only
     // there names a silent unit before set one and never again. Every set from

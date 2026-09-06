@@ -29,8 +29,8 @@ enum class SetVoiceGuide {
     /**
      * The sensor-driven counter: bare digits for each second of a detected
      * eccentric or concentric, and a rep call at each detected lockout. Runs
-     * on a set nothing else is counting -- an explosive lift with a sensor, or
-     * demo mode.
+     * on exactly one shape of set nothing else is counting: an explosive lift
+     * with a sensor connected.
      */
     SENSOR_COUNT,
 }
@@ -79,24 +79,25 @@ object SetVoicePolicy {
      * The guides that speak during the work of this set.
      *
      * [hasTempo], [isTimed] and [kind] are the set's prescription;
-     * [demoMode] and [imuConnected] are the device. The pairing of the first
-     * three is not re-derived here -- [LeadInPolicy.prepCase] owns it, and a
-     * cued set is exactly the set whose prep runs into a cadence.
+     * [imuConnected] is the device. The pairing of the first three is not
+     * re-derived here -- [LeadInPolicy.prepCase] owns it, and a cued set is
+     * exactly the set whose prep runs into a cadence.
+     *
+     * A `demoMode` argument sat beside [imuConnected] until #262 and was the
+     * other way the sensor counter could be reached: demo mode fabricated a
+     * stream with no sensor present, so it ran the counter to show the live
+     * readout working. The mode is gone and the term with it, which is why
+     * the sensor counter now requires a connected sensor and nothing else can
+     * substitute for one.
      */
-    fun guidesFor(
-        hasTempo: Boolean,
-        isTimed: Boolean,
-        kind: ExerciseKind,
-        demoMode: Boolean,
-        imuConnected: Boolean,
-    ): Set<SetVoiceGuide> {
+    fun guidesFor(hasTempo: Boolean, isTimed: Boolean, kind: ExerciseKind, imuConnected: Boolean): Set<SetVoiceGuide> {
         val cued = LeadInPolicy.prepCase(hasTempo, isTimed, kind) == PrepCase.CUED
         // `!isTimed` is #217. A set measured on the clock is guided by the
         // clock: there is one movement, it lasts the whole set, and there are
         // no strokes for a phase counter to count. What it counted instead was
         // whatever the sensor made of a lifter hanging still.
         val sensor = !cued && !isTimed &&
-            (demoMode || (kind == ExerciseKind.EXPLOSIVE && imuConnected))
+            kind == ExerciseKind.EXPLOSIVE && imuConnected
         return buildSet {
             if (cued) add(SetVoiceGuide.CUED_CADENCE)
             if (isTimed) add(SetVoiceGuide.TIMED_CLOCK)
@@ -110,11 +111,6 @@ object SetVoicePolicy {
      * The one question `RecordViewModel` asks per arriving sample, so it is
      * answered here rather than by a call site re-reading a set for a member.
      */
-    fun sensorCounts(
-        hasTempo: Boolean,
-        isTimed: Boolean,
-        kind: ExerciseKind,
-        demoMode: Boolean,
-        imuConnected: Boolean,
-    ): Boolean = SetVoiceGuide.SENSOR_COUNT in guidesFor(hasTempo, isTimed, kind, demoMode, imuConnected)
+    fun sensorCounts(hasTempo: Boolean, isTimed: Boolean, kind: ExerciseKind, imuConnected: Boolean): Boolean =
+        SetVoiceGuide.SENSOR_COUNT in guidesFor(hasTempo, isTimed, kind, imuConnected)
 }
