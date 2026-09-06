@@ -13,8 +13,11 @@ import kotlin.test.assertTrue
  * which cannot import the producer -- the same arrangement, and the same
  * reason, as `VelocityLossRegimeTempoScheduleContractTest`. This module depends
  * on both, so this is the only place the two statements can be compared at all.
- * Without it, editing the sentence would silently stop the suppression working
- * and nothing would fail.
+ * That it catches the drift is measured, not asserted: a mutation run recorded
+ * in this branch's tip commit body reworded the produced sentence to "Large
+ * velocity loss (" and observed this class red while every pin in
+ * `:core:model` stayed green. The reader's own tests hold their own copy of
+ * the text, so this module is the only place a producer-side reword is seen.
  */
 class CoachingVerdictPolicyContractTest {
     private fun rep(index: Int, meanConVelMps: Double) = RepAnalysis(

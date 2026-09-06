@@ -687,7 +687,8 @@ object CoachingRules {
         // FATIGUE_PREFIX is pinned against the text below by
         // CoachingVerdictPolicyContractTest in this module, so editing the
         // sentence without moving the constant fails a test rather than
-        // silently unwiring the suppression.
+        // silently unwiring the suppression -- measured by a mutation run
+        // recorded in this branch's tip commit body, not asserted here.
         velocityLossPct?.let { loss ->
             if (loss > 35.0 && targets.velocityLossStopPct == null) {
                 out += "High velocity loss ($loss%) — significant fatigue this set."

@@ -61,9 +61,14 @@ object CoachingVerdictPolicy {
     /**
      * The head of the fatigue sentence, up to the interpolated figure.
      *
-     * Stable across the whole archive: the only commit that has ever added or
-     * removed this string on `SetAnalyzer.kt` is "Rename project to BarSpeed;
-     * add branch-protection script", by `git log -S` over that path.
+     * The words were written by "Milestones 1-3: project skeleton, CI/CD,
+     * protocol codecs, DSP core", at the pre-rename path
+     * `core/dsp/.../accelerometerlifting/dsp/SetAnalyzer.kt`, and no commit
+     * since has changed them: an unfiltered `git log -S "High velocity loss ("`
+     * over the tree names that commit, one test file, and this branch, and
+     * nothing else. A path-filtered log on today's `SetAnalyzer.kt` instead
+     * names only "Rename project to BarSpeed; add branch-protection script",
+     * which moved the package directory and left the sentence alone.
      */
     const val FATIGUE_PREFIX = "High velocity loss ("
 
