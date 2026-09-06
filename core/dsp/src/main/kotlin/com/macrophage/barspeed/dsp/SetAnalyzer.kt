@@ -676,17 +676,18 @@ object CoachingRules {
                     "later reps exceeded the plan."
             }
         }
-        // THIS SENTENCE STILL SAYS FATIGUE ON A CONTROLLED SET (#261).
+        // WRITTEN ON EVERY SET, WITHHELD ON SOME (#261).
         //
-        // It fires on the figure alone and knows nothing about the set's
-        // regime, so on a tempo-prescribed set -- where the drive's speed was
-        // the prescription and #250 made the card draw range consistency
-        // INSTEAD of a velocity pill -- the lifter reads no velocity number
-        // and this line underneath it. Named here rather than fixed here: the
-        // string is frozen into every set's stored analysisJson at record
-        // time, so changing this rule leaves every set already in the archive
-        // reading the same, and suppressing it is a render-side change on the
-        // screens that hold the regime.
+        // This rule fires on the figure alone and goes on doing so: the
+        // sentence is frozen into the set's analysisJson at record time, so a
+        // regime test here would leave every set already in the archive
+        // reading exactly the same. The suppression is the reader's, in
+        // CoachingVerdictPolicy (:core:model), which withholds this line -- and
+        // only this line -- on a set VelocityLossRegime calls CONTROLLED. Its
+        // FATIGUE_PREFIX is pinned against the text below by
+        // CoachingVerdictPolicyContractTest in this module, so editing the
+        // sentence without moving the constant fails a test rather than
+        // silently unwiring the suppression.
         velocityLossPct?.let { loss ->
             if (loss > 35.0 && targets.velocityLossStopPct == null) {
                 out += "High velocity loss ($loss%) — significant fatigue this set."

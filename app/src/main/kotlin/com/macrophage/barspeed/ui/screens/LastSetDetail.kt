@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
+import com.macrophage.barspeed.model.CoachingVerdictPolicy
 import com.macrophage.barspeed.model.EffortCorrectionPolicy
 import com.macrophage.barspeed.model.LastSetRecordPolicy
 import com.macrophage.barspeed.model.SetLimiter
@@ -663,12 +664,22 @@ private fun Stepper(label: String, figure: String, corrected: Boolean, onDown: (
 @Composable
 private fun RepQualityCard(feedback: SetFeedback) {
     val analysis = feedback.analysis
+    // Which of this set's frozen verdict lines the rest screen shows, decided
+    // once here and handed to whichever renderer runs below (#261). The chip
+    // row above already withholds the velocity pill on a controlled set, and
+    // "significant fatigue this set" was still being printed under the gap.
+    // The decision is CoachingVerdictPolicy's in :core:model, where a test
+    // reaches it; nothing in this file decides anything.
+    //
+    // On a hold or a carry the regime is null and this is the identity, which
+    // is what the timed branch below wants: those verdicts are about the clock.
+    val verdicts = CoachingVerdictPolicy.forRegime(analysis.verdicts, feedback.velocityLossRegime)
     // Timed sets have no reps; surface the hold verdicts instead of a chart.
     if (feedback.actualDurationS != null) {
-        if (analysis.verdicts.isEmpty()) return
+        if (verdicts.isEmpty()) return
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp)) {
-                analysis.verdicts.forEach {
+                verdicts.forEach {
                     Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                 }
             }
@@ -685,9 +696,9 @@ private fun RepQualityCard(feedback: SetFeedback) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
             when {
-                feedback.explosive -> PeakVelocityChart(analysis)
-                targetEccS != null -> EccTempoChart(analysis, targetEccS)
-                else -> ConVelocityChart(analysis)
+                feedback.explosive -> PeakVelocityChart(analysis, verdicts)
+                targetEccS != null -> EccTempoChart(analysis, targetEccS, verdicts)
+                else -> ConVelocityChart(analysis, verdicts)
             }
         }
     }

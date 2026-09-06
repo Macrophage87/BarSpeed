@@ -70,8 +70,10 @@ object CoachingVerdictPolicy {
         // Velocity loss IS the autoregulation figure here, so the sentence is
         // the reading the card already leads with.
         regime.readsVelocityLoss -> verdicts
-        // The seam, filled in by c3. Until then a controlled set draws exactly
-        // what it draws today, so wiring the screens to this changes nothing.
-        else -> verdicts
+        // The prescribed tempo fixed the drive's speed, so the sentence is a
+        // fatigue claim about a set where a slowing rep is a count held
+        // poorly. It is withheld; everything else the set was told is drawn,
+        // in the order it was written.
+        else -> verdicts.filterNot { it.startsWith(FATIGUE_PREFIX) }
     }
 }

@@ -3782,8 +3782,15 @@ private fun FeedbackChips(feedback: SetFeedback, hrBpm: Int?, hrvMs: Int? = null
     }
 }
 
+/**
+ * [verdicts] is handed in rather than read off [analysis], because whether a
+ * stored verdict line is shown depends on the SET's regime and a chart holds no
+ * regime. `CoachingVerdictPolicy.forRegime` decides it once at the call site
+ * above, where the regime is (#261). The same holds for [EccTempoChart] and
+ * [ConVelocityChart] below.
+ */
 @Composable
-internal fun PeakVelocityChart(analysis: SetAnalysis) {
+internal fun PeakVelocityChart(analysis: SetAnalysis, verdicts: List<String>) {
     Text("Peak velocity per rep (m/s)", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     Spacer(Modifier.height(8.dp))
     val peaks = analysis.reps.map { it.peakConVelMps }
@@ -3804,13 +3811,13 @@ internal fun PeakVelocityChart(analysis: SetAnalysis) {
             color = BarColors.Sub,
         )
     }
-    analysis.verdicts.take(2).forEach {
+    verdicts.take(2).forEach {
         Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     }
 }
 
 @Composable
-internal fun EccTempoChart(analysis: SetAnalysis, targetEccS: Double) {
+internal fun EccTempoChart(analysis: SetAnalysis, targetEccS: Double, verdicts: List<String>) {
     Text(
         "Rep quality — ecc time (bars) vs ${trim(targetEccS)} s target (line)",
         style = MaterialTheme.typography.bodySmall,
@@ -3839,13 +3846,13 @@ internal fun EccTempoChart(analysis: SetAnalysis, targetEccS: Double) {
     // that it is reachable by a test. No test on the CI path reaches this file.
     val insight = CoachingRules.eccentricTempoInsight(analysis.reps, targetEccS, TEMPO_TOLERANCE_S)
     Text(insight, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
-    analysis.verdicts.take(2).forEach {
+    verdicts.take(2).forEach {
         Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     }
 }
 
 @Composable
-internal fun ConVelocityChart(analysis: SetAnalysis) {
+internal fun ConVelocityChart(analysis: SetAnalysis, verdicts: List<String>) {
     Text("Mean concentric velocity per rep", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     Spacer(Modifier.height(8.dp))
     val velocities = analysis.reps.map { it.meanConVelMps }
@@ -3864,7 +3871,7 @@ internal fun ConVelocityChart(analysis: SetAnalysis) {
             color = BarColors.Sub,
         )
     }
-    analysis.verdicts.take(2).forEach {
+    verdicts.take(2).forEach {
         Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     }
 }

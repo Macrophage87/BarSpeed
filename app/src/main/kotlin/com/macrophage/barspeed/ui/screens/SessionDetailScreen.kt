@@ -37,6 +37,7 @@ import androidx.navigation.NavController
 import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
+import com.macrophage.barspeed.model.CoachingVerdictPolicy
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.VelocityLossRegime
@@ -224,7 +225,8 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
             // there would hide it on the rows it matters most for.
             VoidRow(record, viewModel)
             analysis?.let { a ->
-                SetChips(record, a, viewModel.velocityLossRegime(record))
+                val regime = viewModel.velocityLossRegime(record)
+                SetChips(record, a, regime)
                 // What the ratio in the chip above does not cover. History
                 // carried no qualifier at all, so a set graded on the drive
                 // alone read as a fully compliant one. #56.
@@ -244,7 +246,13 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
                         Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                     }
                 }
-                a.verdicts.forEach {
+                // The SAME regime the chips above were drawn from, so the card
+                // cannot withhold the velocity pill and then print a fatigue
+                // sentence in the gap it left (#261). The stored verdicts are
+                // frozen text and stay frozen; this decides which of them this
+                // reader shows, and CoachingVerdictPolicy in :core:model is
+                // where that decision is made and tested.
+                CoachingVerdictPolicy.forRegime(a.verdicts, regime).forEach {
                     Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                 }
             }
