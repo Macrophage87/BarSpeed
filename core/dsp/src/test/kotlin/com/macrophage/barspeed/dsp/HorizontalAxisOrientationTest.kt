@@ -33,8 +33,15 @@ import kotlin.test.assertTrue
  * ## Why this is synthetic
  *
  * No committed capture can exercise it. Reaching `orient` needs
- * `plane == HORIZONTAL` AND `!sensorOnStack`, and nothing committed declares
- * the first. The three captures of horizontal exercises --
+ * `plane == HORIZONTAL` AND `!sensorOnStack`, and no committed CAPTURE is
+ * scored with both. "Nothing committed declares the first" stood here and is
+ * deleted: `plane = MovementPlane.HORIZONTAL` is written at sites all over
+ * this classpath -- `LiftDirectionTest`, `CueTrackOriginTest`,
+ * `PhaseTempoTargetTest`, `TempoScheduleTest` and this file among them -- and
+ * every one is a hand-built `LiftDirection` in a test, over synthetic samples
+ * or with `sensorOnStack = true`. What no committed CAPTURE has is a scored
+ * geometry carrying both halves. The three captures of
+ * horizontal exercises --
  * `field-cablerow-static-8rep`, `field-facepull-static-12rep` and
  * `field-pallof-static-12rep` -- are scored everywhere on this classpath as
  * `LiftDirection(startsWith = CONCENTRIC)`, whose `plane` defaults to VERTICAL
@@ -146,10 +153,17 @@ class HorizontalAxisOrientationTest {
 
     @Test
     fun `the committed horizontal captures cannot reach this code at all`() {
-        // Why the two tests above are synthetic. These three sets are the only
-        // horizontal-plane exercises in the corpus and every one is
-        // stack-mounted, so measuredPlane resolves to VERTICAL and orient never
-        // runs. Forced onto the horizontal axis they yield no movement at all.
+        // Why the two tests above are synthetic. These three captures of
+        // horizontal exercises are scored everywhere on this classpath as
+        // LiftDirection(startsWith = CONCENTRIC), whose plane defaults to
+        // VERTICAL, so orient never runs. Forced onto the horizontal axis they
+        // yield no movement at all.
+        //
+        // "every one is stack-mounted" stood here and is deleted, not
+        // reworded: no committed byte declares the mount for any of the three.
+        // The commit "Name the plane and the frame the live caller does not
+        // share" said deleting the same claim from this file's class KDoc left
+        // one statement standing; it left two, and this was the other.
         val c = DspConfig()
         listOf(
             "field-cablerow-static-8rep" to 44.0,

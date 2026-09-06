@@ -344,11 +344,30 @@ object RepSegmenter {
      * this one and the figures are re-measured rather than adjusted. See
      * `BatchCueCoverageTest`.
      *
-     * ONE OF THE THREE CLOSES A REAL MISS AND TWO OVERSHOOT. The bench set
+     * ONE OF THE FOUR CLOSES A REAL MISS AND THREE OVERSHOOT. The bench set
      * goes 4 published against 6 counted by hand to 5 against 6; the Romanian
-     * deadlift goes 10 against 10 to 11 against 10, and the back squat 8
-     * against 6 to 9 against 6. A matched window is not a correct rep count
-     * and this fallback does not claim to fix the count.
+     * deadlift set 5 goes 10 against 10 to 11 against 10, the back squat 8
+     * against 6 to 9 against 6, and field-rdl-3010-10rep-s36-set04 also goes
+     * 10 against 10 to 11 against 10. Set 4 is the fourth and it is OUTSIDE
+     * the scored corpus -- it is in `BatchCueCoverageTest`'s `notScored`,
+     * having no committed cue track -- so it fills no window and is pinned in
+     * `BlankAnalysisTest` as an unadjudicated cost instead. This note said
+     * THREE and TWO; both are corrected here.
+     *
+     * SIX captures move in all, measured over the whole resource directory
+     * rather than over the cue-tracked subset: three inside the scored corpus
+     * (bench s37 set05 4 -> 5, rdl s36 set05 10 -> 11, back squat s36 set01
+     * 8 -> 9) and three outside it (rdl s36 set04 10 -> 11,
+     * field-rdl-wrapping-s36-set05 10 -> 11, and
+     * field-inclinepress-3010-12rep-s38-set02 11 -> 13 against 12 counted by
+     * hand). Both sides measured by the same scratch harness in two
+     * worktrees -- one at 40e27afa2b01d6f8006ed5b39c85a96eaf2a70e8 with this
+     * branch's two IMU captures and their cue tracks dropped onto its
+     * classpath and no code from this branch, one here -- run as
+     * `./gradlew -PjvmOnly :core:dsp:test --tests
+     * com.macrophage.barspeed.dsp.ZzFixRoundTest --rerun-tasks`. The harness
+     * is scratch and is not committed. A matched window is not a correct rep
+     * count and this fallback does not claim to fix the count.
      *
      * The corpus exercises this FIRING and none of its guards -- no committed
      * capture has an orphan drive under the floor or a lowering between
@@ -452,9 +471,18 @@ object RepSegmenter {
      * which demotes on a strict `disp > maxRunDisplacementM`: a run sitting
      * exactly on the cap was never called drift and is not called drift here.
      *
-     * CORPUS-NEUTRAL when it was added. The largest travel of any run
-     * licensing a drive anywhere in the committed corpus is 1.809 m, on
-     * `field-backsquat-4011-6rep-s36-set01`, against a 2.0 m cap.
+     * CORPUS-NEUTRAL when it was added. The sentence that stood here --
+     * "the largest travel of any run licensing a drive anywhere in the
+     * committed corpus is 1.809 m, on `field-backsquat-4011-6rep-s36-set01`,
+     * against a 2.0 m cap" -- is DELETED, as `pairEccentricFirst`'s KDoc
+     * deleted its twin for being mis-scoped. It is replaced by the bound that
+     * is actually pinned: the largest movement run of ANY kind over all
+     * forty-two committed captures is 1.982 m, asserted by
+     * `LiveCapCalibrationTest` and `LiveDisplacementCapTest`, so no run of any
+     * kind reaches the 2.0 m cap and the margin is 0.018 m. That is an upper
+     * bound over every run rather than over licensing runs alone; the
+     * licensing subset is not separately measured and no figure is claimed
+     * for it here.
      *
      * `pairsBelowMinRom` is NOT incremented for a drive this rejects. That
      * census counts pairs the floor discarded and a drive with no eccentric is

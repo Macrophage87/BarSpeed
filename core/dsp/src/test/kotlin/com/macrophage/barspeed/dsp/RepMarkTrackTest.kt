@@ -36,11 +36,17 @@ import kotlin.test.assertTrue
  * | `field-ohp-prepinflated-s37-set04` | 37 | 4 | seated overhead press | 3010 | 22.68 kg (50 lb) | 5 / 8 |
  * | `field-bench-3010-6rep-s37-set05` | 37 | 5 | bench press | 3010 | 47.63 kg (105 lb) | 6 / 6 |
  * | `field-bench-3010-6rep-s37-set06` | 37 | 6 | bench press | 3010 | 49.90 kg (110 lb) | 6 / 6 |
- * | `field-pullup-3010-8rep-s37-set09` | 37 | 9 | assisted pull-up | 3010 | 23.44 kg (52 lb) | 8 / 8 |
+ * | `field-pullup-3010-8rep-s37-set09` | 37 | 9 | assisted pull-up | 3010 | 23.44 kg (51.7 lb) | 8 / 8 |
  * | `field-inclinepress-3010-12rep-s38-set02` | 38 | 2 | dumbbell incline press | 3010 | 27.22 kg (60 lb) | 12 / 10 |
  * | `field-ohp-3010-8rep-s38-set04` | 38 | 4 | seated overhead press | 3010 | 13.61 kg (30 lb) | 8 / 8 |
  * | `field-ohp-3010-8rep-s38-set05` | 38 | 5 | seated overhead press | 3010 | 13.61 kg (30 lb) | 8 / 8 |
  * | `field-latpulldown-1120-12rep-s38-set14` | 38 | 14 | lat pulldown | 1120 | 34.02 kg (75 lb) | 12 / 12 |
+ *
+ * The pull-up row's load column read `23.44 kg (52 lb)`. That is corrected to
+ * `51.7 lb`: field-37's `meta.json` set 9 records `load_kg`
+ * 23.443564147942737 and `load_lb` 51.7, and 52 lb is 23.59 kg, so the cell
+ * contradicted its own kg figure as well as the file it says every field is
+ * read from. Every other cell of that row is unchanged.
  *
  * Session 36 is 2026-09-01 on app 0.1.47, session 37 is 2026-09-02 on 0.1.48
  * and session 38 is 2026-09-04 on 0.1.50; all three name the sensor as a

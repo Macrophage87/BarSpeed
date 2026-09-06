@@ -575,13 +575,20 @@ class BatchCueCoverageTest {
         // over the twenty captures scored before session 38's two arrived.
         //
         // field-bench-3010-6rep-s37-set05 is the clearest single case. It
-        // resolves FOUR detections, not the one this note used to claim, and
-        // the longest of them runs 4.29 s. Its drive starts inside the last
-        // window; its midpoint falls 226 ms past that window's close, which
-        // WINDOW_TOLERANCE_MS of 150 ms does not cover, and there is no
-        // window after it -- so the start rule matches it and the midpoint
-        // rule scores it a stray. Measured at this commit from the span
-        // timestamps and the window bounds this file computes.
+        // resolves FIVE detections here and four at
+        // 2f7efa5f7cbcafec9c1ffcb34afda43ef01d09f9, the fifth added by this
+        // branch's slow-eccentric fallback. The longest of the five runs
+        // 4.29 s. Its drive starts inside the last window; its midpoint falls
+        // 226 ms past that window's close, which WINDOW_TOLERANCE_MS of 150 ms
+        // does not cover, and there is no window after it -- so the start rule
+        // matches it and the midpoint rule scores it a stray.
+        //
+        // The FOUR that stood here was main's figure carried into a file whose
+        // own `spans against the metronome's marks, capture by capture` row
+        // for this fixture reads 5, so the two could not both be true. All
+        // three figures re-measured at this commit from the span timestamps
+        // and the window bounds this file computes: 5 detections, longest
+        // drive 4.294 s, midpoint 226 ms past the last window's close.
         //
         // What survives is the corpus figure, which is what the issue quotes:
         // the three rules put the matched total within THIRTEEN windows of
@@ -672,10 +679,17 @@ class BatchCueCoverageTest {
      *   [RunThresholds.minPhaseS].
      * - [Loss.BELOW_MIN_ROM] -- the drive run cleared every gate and then
      *   displaced less than [RunThresholds.minRomM]. `DspConfig.minRomM`'s own
-     *   KDoc says what these are: reps whose displacement RECONSTRUCTION
-     *   failed, not reps that were small. Lowering the floor to admit them
-     *   publishes velocities taken from the same broken reconstruction, so
-     *   this bucket is not addressable in the segmenter either.
+     *   KDoc records that ON THE THREE CUE-TRACKED LEG-CURL CAPTURES the floor
+     *   separates failed reconstructions from small reps at 0.10 m, and calls
+     *   that separation ACCIDENTAL and FRAGILE -- it filters on reconstruction
+     *   quality while claiming to filter on rep size. Nothing here checks
+     *   which of the two each of these eight windows is, so the bucket is
+     *   UNADJUDICATED, not shown unaddressable. The sentence that stood here
+     *   said these were "reps whose displacement RECONSTRUCTION failed, not
+     *   reps that were small" and that this bucket "is not addressable in the
+     *   segmenter either"; both are deleted rather than reworded, because they
+     *   restate a measurement over three leg curls as a property of eight
+     *   windows spread across this corpus.
      * - [Loss.PAIRING] -- a fully qualifying drive run of a rep's size sits in
      *   the window and the segmenter published nothing for it. The only bucket
      *   where the signal is good and the loss is a rule.

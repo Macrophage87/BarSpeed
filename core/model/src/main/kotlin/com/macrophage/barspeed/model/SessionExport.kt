@@ -1095,6 +1095,15 @@ data class SessionExport(
          * re-exports unchanged. `DATABASE_VERSION` does not move.
          * `RepSegmenter.pairEccentricFirst` in `:core:dsp` is where the rule
          * lives.
+         *
+         * NOT PURELY ADDITIVE. No key changes type or stops being written, but
+         * an eccentric-first set may now publish MORE reps, so every figure
+         * derived from `reps` moves with the array -- including
+         * `repMetricsComplete`, which `Exporters.kt` computes as
+         * `reps.size == record.actualReps` and which can therefore now read
+         * FALSE on a set the lifter counted correctly. This entry said the
+         * change "adds no key to this document" and stopped there; that was
+         * true and incomplete, and the omission is corrected here.
          */
         const val SCHEMA_VERSION = "1.20"
 

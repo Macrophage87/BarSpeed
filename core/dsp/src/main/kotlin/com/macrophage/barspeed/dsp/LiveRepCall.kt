@@ -72,22 +72,34 @@ sealed interface RepCall {
  * What the divergence does to a real handle-mounted set is unmeasured and is
  * not claimed here.
  *
- * ## Why the announcement lands at the inter-rep rest
+ * ## Why the announcement lands one sample after the drive
  *
- * Nothing here has a rest detector, and it does not need one. A [RepSpan]
+ * Nothing here has a rest detector, and it does not have one. A [RepSpan]
  * ends at `conEndIdx`, the last sample of the drive, and
  * `RepSegmenter.classifyRunsDetailed` cannot close a run until a sample of a
- * different type arrives -- which after a completed drive is the first still
- * sample of the rest. [countDetected] counts only spans whose drive run has
- * closed, so the earliest prefix a rep can be spoken from is the one that has
- * already seen the rest begin, and the announcement instant IS the detected
- * rest instant.
+ * DIFFERENT RUN TYPE arrives -- STILL, or the opposite sign when the
+ * turnaround crosses the dead band in one frame. [countDetected] counts only
+ * spans whose drive run has closed, so the earliest prefix a rep can be
+ * spoken from is the one holding that next sample. NOTHING HERE MEASURES
+ * STILLNESS, so the call lands one sample after the drive run closes and no
+ * further claim about what the lifter was doing at that instant is available.
  *
- * On a `start: top` lift that rest is at the top and on a `start: bottom`
- * lift it is at the bottom, which is what issue #145's "the top" generalizes
- * to. It falls out of the drive ending rather than being decided here, so
- * there is no second rule about where the lifter is to disagree with the
- * first.
+ * The heading and three sentences that stood here are deleted rather than
+ * reworded: they said the announcement lands "at the inter-rep rest", that
+ * the closing sample is "the first still sample of the rest", and that "the
+ * announcement instant IS the detected rest instant". The third is refuted by
+ * the second bullet above -- an opposite-sign sample closes the run too --
+ * and the first two describe a rest this class never detects.
+ *
+ * WHERE THAT INSTANT IS ON THE LIFT depends on the phase order. On an
+ * ECCENTRIC-FIRST lift the drive ends at the start position, which is issue
+ * #145's "the top" for a `start: top` lift and the bottom for a
+ * `start: bottom` one. On a CONCENTRIC-FIRST lift -- eight of the thirteen
+ * mark-carrying captures here -- the drive ends at the FAR END of the stroke,
+ * which is neither the start position nor a rest. The sentence that read "on
+ * a `start: top` lift that rest is at the top and on a `start: bottom` lift
+ * it is at the bottom" is deleted for asserting the eccentric-first case of
+ * both.
  *
  * Waiting for the run to close is also what makes a spoken number final. An
  * OPEN run can still travel past `maxRunDisplacementM` and stop being a rep;
@@ -99,11 +111,15 @@ sealed interface RepCall {
  *
  * ## Cost
  *
- * One segmentation per sample over the whole set so far, so the work grows
- * linearly within a set. Measured over the thirteen mark-carrying captures on
- * the machine that ran the suite and reported in this commit's body rather
- * than claimed here, because it is a measurement of a JVM on a desktop and
- * says nothing certain about a phone.
+ * One segmentation per sample over the whole set so far, so the work PER
+ * SAMPLE grows linearly within a set and the TOTAL grows with the square of
+ * its length. Measured over the thirteen mark-carrying captures on the
+ * machine that ran the suite and reported in the body of the commit
+ * "Correct eight prose claims round 1 found wrong, and pin two of them"
+ * rather than claimed here, because it is a measurement of a JVM on a desktop
+ * and says nothing certain about a phone. Not the body of "Speak only the
+ * reps whose drive the detector has finished watching": that commit's bounds
+ * were retracted by the correcting commit's finding 2.
  *
  * ## What this class does not do
  *
@@ -148,9 +164,12 @@ class LiveRepCaller(
      * set was spent standing behind a number the detector had withdrawn, and
      * the only value that means anything is zero.
      *
-     * It is zero on every committed capture and, given [countDetected]'s
-     * closed-run rule, on any stream at all -- so this field never fires and
-     * that is the point of it. Removing the increment reds nothing, which is
+     * It is zero on the THIRTEEN mark-carrying captures
+     * `LiveRepCallCorpusTest` feeds it. The other twenty-nine committed
+     * captures are never fed to a [LiveRepCaller], so nothing here measures
+     * them. The closed-run rule in [countDetected] is the REASON to expect
+     * zero on any stream; the pin MEASURES thirteen of them. "It is zero on
+     * every committed capture" stood here and is deleted. Removing the increment reds nothing, which is
      * stated here rather than left for a reader to discover; what guards the
      * property is the pin plus the mutation that reverts the rule, not this
      * counter on its own.
@@ -211,6 +230,14 @@ class LiveRepCaller(
      *
      * Strictly `<`, not `<=`. A span ending exactly on the last sample is the
      * open run, and admitting it admits every case this excludes.
+     *
+     * WHAT THE RULE COSTS AT THE END OF A SET. A rep becomes speakable only
+     * once a sample of another run type has arrived, so a stream that ENDS
+     * INSIDE ITS LAST DRIVE never hears that rep's number -- the
+     * velocity-loss-stop case, where the lifter racks the bar the instant the
+     * drive finishes. What that costs a real set is unmeasured: no committed
+     * capture is a velocity-loss stop and nothing here counts how often a
+     * stream ends mid-drive.
      */
     private fun countDetected(series: VelocitySeries): Int =
         RepSegmenter.segment(series, direction, config).count { it.conEndIdx < series.size - 1 }
