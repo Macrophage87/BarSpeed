@@ -7,6 +7,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -34,21 +35,36 @@ class ShippedPlanExampleTest {
     }
 
     /**
-     * The shipped example declares an `implement` on every exercise whose card
-     * has something to say, and says "other" out loud on the single-dumbbell
-     * row (#253).
+     * The shipped example declares an `implement` on EVERY exercise, names a
+     * bar on one of the barbell lifts, and says "other" out loud where the
+     * answer is that there is nothing to draw (#253).
      *
      * The example is the only plan a generating model is shown in full, and
-     * the single-dumbbell case is the one it will get wrong by default: the id
-     * says dumbbell and the answer is "other", because the word means a PAIR.
-     * A key demonstrated nowhere in the example is a key most generated plans
-     * will omit -- and omitting this one costs the lifter the loading line
-     * entirely.
+     * two cases are the ones it will get wrong by default. The single dumbbell
+     * is one: the id says dumbbell and the answer is "other", because the word
+     * means a PAIR. The exercises that get NO line are the other, and they are
+     * why this pin covers all ten rather than the four with a loading -- an
+     * omitted key cannot be told from an author who never considered it, which
+     * is exactly the state the published description tells authors not to
+     * leave a plan in. A key demonstrated nowhere in the example is a key most
+     * generated plans will omit, and omitting this one costs the lifter the
+     * loading line entirely.
+     *
+     * `bar_lb` is pinned here for one reason: it is the 1.12 key whose absence
+     * from the example would leave ajv never validating it and no reader ever
+     * seeing where on an exercise it goes.
      */
     @Test
-    fun `the shipped example declares an implement on the lifts that have a loading`() {
+    fun `the shipped example declares an implement on every exercise, and a bar on one`() {
         val plan = shippedExample()
-        val byId = plan.sessions.flatMap { it.exercises }.associateBy { it.exercise }
+        val exercises = plan.sessions.flatMap { it.exercises }
+        exercises.forEach {
+            assertNotNull(
+                it.implement,
+                "${it.exercise} declares no implement - an omission cannot be told from a decision",
+            )
+        }
+        val byId = exercises.associateBy { it.exercise }
         assertEquals(Implement.BARBELL, byId.getValue("back_squat").resolvedImplement)
         assertEquals(Implement.BARBELL, byId.getValue("bench_press").resolvedImplement)
         assertEquals(Implement.DUMBBELL, byId.getValue("dumbbell_bench_press").resolvedImplement)
@@ -56,6 +72,13 @@ class ShippedPlanExampleTest {
         // the key off, which would be indistinguishable from not having
         // thought about it.
         assertEquals("other", byId.getValue("single_arm_dumbbell_row").implement)
+        val barred = exercises.filter { it.resolvedBarKg != null }
+        assertEquals(
+            1,
+            barred.size,
+            "the example should name exactly one bar override, and names ${barred.map { it.exercise }}",
+        )
+        assertTrue(plan.validate().isEmpty(), "expected clean validation: ${plan.validate()}")
     }
 
     /**
