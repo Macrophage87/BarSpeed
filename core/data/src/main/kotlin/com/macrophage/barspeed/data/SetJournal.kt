@@ -201,25 +201,6 @@ data class OrphanedSet(
      * separable by looking at [analysedRole] alone.
      */
     val analysedFellBack: Boolean = false,
-    /**
-     * THE DECODED STREAMS, AND THE #271 DEFECT ITSELF. Nothing reads these.
-     *
-     * They are the fields this type used to publish, kept for exactly as long
-     * as it takes to put the red differentials on the record: the two tests
-     * that pin a 300 MB newline-free `imu.csv` and a three-million-row one
-     * have to be shown failing against the decode they exist to remove, and a
-     * red that is never pushed is a red that never happened. The commit that
-     * removes them is the fix, and it removes `SetJournalStore`'s per-line
-     * decode with them.
-     *
-     * Do not read them. Every reader moved to the counts above in the same
-     * commit that added these.
-     */
-    val decodedImuSamples: List<ImuSample> = emptyList(),
-    val decodedSecondaryImuSamples: List<ImuSample> = emptyList(),
-    val decodedHrSamples: List<HrSample> = emptyList(),
-    val decodedCues: List<VoiceCue> = emptyList(),
-    val decodedRepMarks: List<Long> = emptyList(),
 ) {
     /** Every stream file the directory actually holds, in a fixed order. */
     val streams: List<JournalStreamScan> get() = listOfNotNull(imu, secondaryImu, hr, cues, repMarks)
@@ -580,7 +561,6 @@ class SetJournalStore(
             }.getOrNull() ?: return null
         if (header.journalVersion > JOURNAL_VERSION) return null
         val imu = scan(dir, SetJournal.IMU)
-        val imuSamples = decode(dir, SetJournal.IMU) { ImuCsv.decode(it) }
         // The second stream's role comes from the header's own declaration
         // rather than from whichever imu-*.csv happens to be on disk. The
         // header is written and closed before the first sample line of any
@@ -590,9 +570,6 @@ class SetJournalStore(
         // copied -- and present it as this capture's second sensor.
         val secondaryRole = header.sensorRoles.firstOrNull { it != header.armedRole }
         val secondary = secondaryRole?.let { role -> scan(dir, SetJournal.secondaryImuFile(role)) }
-        val secondarySamples =
-            secondaryRole?.let { role -> decode(dir, SetJournal.secondaryImuFile(role)) { ImuCsv.decode(it) } }
-                .orEmpty()
         // Which stream this capture's figures would come from, decided from
         // the rows that are in the directory rather than from the header
         // (#211). The header is closed before the first sample line and can
@@ -622,11 +599,6 @@ class SetJournalStore(
             repMarks = scan(dir, SetJournal.REPS),
             analysedRole = analysed.role,
             analysedFellBack = analysed.fellBack,
-            decodedImuSamples = imuSamples,
-            decodedSecondaryImuSamples = secondarySamples,
-            decodedHrSamples = decode(dir, SetJournal.HRM) { HrCsv.decode(it) },
-            decodedCues = decode(dir, SetJournal.CUES) { CueCsv.decode(it) },
-            decodedRepMarks = decode(dir, SetJournal.REPS) { line -> RepMarkCsv.decodeLine(line) },
         )
     }
 
@@ -740,34 +712,6 @@ class SetJournalStore(
      * compared against the recorded one, not this line.
      */
     private fun roleElement(role: SensorRole) = JsonPrimitive(role.name)
-
-    /**
-     * Everything up to the first line that will not parse.
-     *
-     * A process killed mid-append leaves a final line with fewer fields than
-     * the format has columns, and `ImuCsv.decode` does `require(f.size >= 10)`
-     * -- it THROWS on precisely that line. Handing it the file whole therefore
-     * discarded the entire capture over the forty bytes nobody finished
-     * writing: two minutes of lifting lost, and lost silently, because the
-     * throw was caught and the result was an empty list rather than a crash.
-     *
-     * So the file is parsed a line at a time and the first refusal ends the
-     * read. The partial row is dropped rather than repaired or guessed at -- a
-     * half-written row is not a measurement -- and everything before it is
-     * kept, which also means a stream damaged in the middle costs only what
-     * follows the damage instead of all of it.
-     */
-    private fun <T> decode(dir: File, name: String, parse: (String) -> List<T>): List<T> {
-        val file = File(dir, name)
-        if (!file.isFile) return emptyList()
-        val out = mutableListOf<T>()
-        file.useLines { lines ->
-            for (line in lines) {
-                out += runCatching { parse(line) }.getOrNull() ?: break
-            }
-        }
-        return out
-    }
 
     companion object {
         /** Bumped when the on-disk layout stops being readable by older code. */
