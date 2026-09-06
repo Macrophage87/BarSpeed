@@ -2,11 +2,13 @@ package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
+import com.macrophage.barspeed.model.Tempo
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -241,5 +243,101 @@ class FallbackMountGeometryTest {
         assertEquals(18, SetAnalyzer.analyze(samples, lifterSide).reps.size, "under the lifter-side geometry")
         assertEquals(33.5, SetAnalyzer.analyze(samples, declared).velocityLossPct, "declared")
         assertEquals(79.3, SetAnalyzer.analyze(samples, lifterSide).velocityLossPct, "lifter-side")
+    }
+
+    // ---------------------------------------------------------------------
+    // The differentials. Everything above pins what shipped; everything below
+    // states what must be true instead, and is red until the analyzer reads
+    // `analysedUnitFellBack`.
+    // ---------------------------------------------------------------------
+
+    /** A prescription, so the refusal can be shown to withhold a graded tempo too. */
+    private val pulldownTargets = SetTargets(plannedReps = 12, tempo = Tempo.parse("1120"))
+
+    @Test
+    fun `a fallback under a mount-specific declaration publishes no figures`() {
+        val handle = stream(handleTrack(), inverted = false)
+        val refused = SetAnalyzer.analyze(handle, declared, targets = pulldownTargets, analysedUnitFellBack = true)
+
+        assertTrue(refused.reps.isEmpty(), "figures were published from a unit the declaration does not describe")
+        assertEquals(NoRepsReason.MOUNT_NOT_DECLARED, refused.noRepsReason, "the blank set does not say why")
+        assertNull(refused.velocityLossPct, "velocity loss survived the refusal")
+        assertNull(refused.tempoCompliance, "the tempo was graded against a stroke nothing identified")
+        assertEquals(
+            listOf("Analysis moved to the other sensor, whose mounting is not declared — no figures for this set."),
+            refused.verdicts,
+            "the lifter is told nothing about why the set is blank",
+        )
+    }
+
+    /**
+     * The refusal still measures the sample rate, which comes off the
+     * timestamps and owes nothing to geometry.
+     *
+     * A hard requirement rather than a nicety: `SessionRepository.recordSet`
+     * writes `analysis.sampleRateHz` into `RawStreamEntity.sampleRateHz`, and
+     * a 0.0 there is the number `ImuCsv`'s own header tells a downstream
+     * consumer to divide by. A refusal that returned a placeholder zero would
+     * republish that defect on a new population.
+     */
+    @Test
+    fun `the refusal reports the rate it measured rather than a zero`() {
+        val handle = stream(handleTrack(), inverted = false)
+        val analysed = SetAnalyzer.analyze(handle, declared)
+        val refused = SetAnalyzer.analyze(handle, declared, analysedUnitFellBack = true)
+
+        assertTrue(refused.sampleRateHz > 0.0, "a zero rate would reach the raw stream row as a measurement")
+        assertEquals(analysed.sampleRateHz, refused.sampleRateHz, "the refusal invented a rate of its own")
+    }
+
+    /** The field pair, same rule: role b under the stack declaration is refused rather than read. */
+    @Test
+    fun `the field-38 partner is refused when the analysis fell back to it`() {
+        val samples = load("field-latpulldown-1120-12rep-s38-set14-imu-b")
+        val refused = SetAnalyzer.analyze(samples, declared, analysedUnitFellBack = true)
+
+        assertTrue(refused.reps.isEmpty(), "the 13 reps of a stream read under the wrong mount were published")
+        assertEquals(NoRepsReason.MOUNT_NOT_DECLARED, refused.noRepsReason)
+        assertEquals(99.34946979459392, refused.sampleRateHz, "the measured rate is still published")
+    }
+
+    /**
+     * Over-refusal is the defect a refusal invites, so both halves of the
+     * condition are asserted from the other side.
+     *
+     * A SINGLE-UNIT SET IS UNCHANGED. That is every ordinary set: nothing
+     * fell back, so nothing is refused however the geometry is declared.
+     */
+    @Test
+    fun `a set that did not fall back is analysed under its declaration as before`() {
+        val stack = stream(handleTrack(), inverted = true)
+
+        assertEquals(
+            SetAnalyzer.analyze(stack, declared),
+            SetAnalyzer.analyze(stack, declared, analysedUnitFellBack = false),
+            "the flag changed a set that never fell back",
+        )
+        assertEquals(5, SetAnalyzer.analyze(stack, declared, analysedUnitFellBack = false).reps.size)
+    }
+
+    /**
+     * AND A FALLBACK UNDER A MOUNT-FREE DECLARATION IS UNCHANGED. Two
+     * dumbbells, two units, one on each: the declaration names no mount, so
+     * either unit's stream is described by it and the analysis proceeds.
+     */
+    @Test
+    fun `a fallback under a mount-free declaration is analysed as before`() {
+        val freeWeight = LiftDirection(startsWith = StartPhase.CONCENTRIC, concentricUp = true)
+        val samples = stream(handleTrack(), inverted = false)
+
+        assertEquals(
+            SetAnalyzer.analyze(samples, freeWeight),
+            SetAnalyzer.analyze(samples, freeWeight, analysedUnitFellBack = true),
+            "a fallback was refused on a declaration that names no mount",
+        )
+        assertTrue(
+            SetAnalyzer.analyze(samples, freeWeight, analysedUnitFellBack = true).reps.isNotEmpty(),
+            "the mount-free fallback published nothing",
+        )
     }
 }
