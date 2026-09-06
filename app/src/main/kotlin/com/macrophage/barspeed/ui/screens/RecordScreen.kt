@@ -1080,12 +1080,14 @@ private fun sensorCaptureDetail(roster: SensorRoster): String? {
  * ARMING since #225 -- before that both were floored by the later of the two
  * instants, so re-pointing one link excused the other.
  *
- * NOTHING SUPPRESSES IT ANY MORE. It said nothing in demo mode (#225 item 7),
- * because that mode fabricated samples with no sensor present, so the set did
- * record and this card's sentence was the one claim it made false. #262
- * removed the mode and the escape with it: a unit that is armed and sending
- * nothing is named here on every set, and `ArmedSilencePolicy.message` now has
- * no argument that can silence it.
+ * ONLY THE DELIVERY STATE SUPPRESSES IT NOW. It said nothing in demo mode
+ * (#225 item 7), because that mode fabricated samples with no sensor present,
+ * so the set did record and this card's sentence was the one claim it made
+ * false. #262 removed the mode and that escape with it. What is left is the
+ * states themselves -- `ArmedSilencePolicy.advice` answers null for
+ * DELIVERING and for TOO_SOON, the three-second grace named above -- so a
+ * unit still sending nothing once the grace has passed is named on every
+ * set.
  *
  * Drawn on READY and on RESTING. READY is drawn once per session --
  * `startNextSet` writes READY and calls `beginSet` in the same frame -- so a

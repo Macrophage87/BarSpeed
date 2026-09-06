@@ -80,9 +80,10 @@ fun rememberArmedDelivery(state: ConnectionState, frameAtMs: Long?, armedAtMs: L
  *
  * A `demoActive` parameter overrode the whole thing to volt until #262:
  * demo mode fabricated samples with no sensor present, and this dot exists
- * to answer "is a sensor talking to me," which was the one question demo
- * mode could not lie about the way it lied everywhere else on the screen.
- * With the mode gone the colour is the link's own, always.
+ * to answer "is a sensor talking to me," so the parameter made it answer yes
+ * when nothing was talking -- deliberately, to match what the rest of the
+ * screen was already showing. With the mode gone the colour is the link's
+ * own, always.
  *
  * [delivery] is what makes that question answerable rather than merely asked
  * (#213). Without it a volt dot means the app ISSUED a notification subscribe

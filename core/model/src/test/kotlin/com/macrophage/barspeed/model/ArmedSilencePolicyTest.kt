@@ -745,8 +745,8 @@ class ArmedSilencePolicyTest {
      * `message(.., demoMode = true) == null` is DELETED rather than reworded,
      * because it asserted an answer for an input that no longer exists. What
      * replaces it is this -- no argument to this function can suppress a
-     * sentence about a unit that is armed and silent, so a lifter looking at a
-     * dead sensor is told so on every set.
+     * sentence about a unit the grace window has already judged silent, so a
+     * lifter looking at a dead sensor is told so on every set.
      */
     @Test
     fun `the delivery state alone decides whether the card speaks`() {

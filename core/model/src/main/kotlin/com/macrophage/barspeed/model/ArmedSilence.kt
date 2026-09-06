@@ -480,16 +480,20 @@ object ArmedSilencePolicy {
      * caller that forgot it draws a blank card on the configuration the owner
      * trains most, which is the failure this issue is.
      *
-     * NOTHING ELSE CAN SILENCE IT. There is one suppression left, [silent]'s
-     * and [sole]'s own emptiness, and it means the units are delivering. A
-     * `demoMode` argument was the second until #262 (added by #225 item 7):
-     * demo mode fabricated samples with no sensor present, so the set did
-     * record and "It will record nothing this set" was the one claim it made
-     * false rather than merely fictional. That mode is gone, so a lifter
-     * standing over a unit that is armed and sending nothing is told so on
-     * every set, and the removal of the escape cannot change what is
-     * recorded: [storedDeliveryByRole] and [storedSoleSilence] never took the
-     * flag, because gating the archive on a display flag is how a display
+     * NOTHING OUTSIDE THE DELIVERY STATES CAN SILENCE IT. Two suppressions
+     * are left and both are delivery states: [advice] answers null for
+     * [ArmedDelivery.DELIVERING] and for [ArmedDelivery.TOO_SOON], so a
+     * [silent] holding only those, or a [sole] holding one of them, still
+     * says nothing -- and an empty [silent] with a null [sole] is a set with
+     * no armed unit to report on at all. A `demoMode` argument was the one
+     * suppression that was not a delivery state until #262 (added by #225
+     * item 7): demo mode fabricated samples with no sensor present, so
+     * the set did record and "It will record nothing this set" was the one
+     * claim it made false rather than merely fictional. That mode is gone,
+     * so a lifter standing over a unit that is armed and sending nothing is
+     * told so on every set, and the removal of the escape cannot change what
+     * is recorded: [storedDeliveryByRole] and [storedSoleSilence] never took
+     * the flag, because gating the archive on a display flag is how a display
      * decision comes to change what is stored.
      */
     fun message(silent: Map<SensorRole, ArmedDelivery>, sole: ArmedDelivery?): String? {
