@@ -260,6 +260,12 @@ enum class NoRepsReason(val wireName: String) {
      * re-derive the set from the raw CSV under any geometry; a published
      * inversion cannot be told from a real one by anybody.
      *
+     * WHAT A REFUSED SET RECORDS FOR ITS REP COUNT. `SessionRepository`'s
+     * `recordSet` stores `actualReps = manualReps ?: analysis.reps.size`, so a
+     * refused set records 0 reps unless the lifter corrects the count: session
+     * volume counts it as 0 and the export publishes `reps: 0`. Raw streams
+     * are archived either way.
+     *
      * NOT RETROACTIVE. The value is computed when a set is analysed and
      * frozen into its stored analysis, so no set already on disk gains it.
      */

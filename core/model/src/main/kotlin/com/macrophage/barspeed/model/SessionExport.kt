@@ -1156,8 +1156,11 @@ data class SessionExport(
          * declared geometry belongs to the ARMED unit, so running the DSP over
          * a different unit under it swapped the concentric and the eccentric
          * outright: the drive became the return, tempo grading inverted, and
-         * `velocityLoss_pct` was computed over the wrong stroke, at an
-         * unchanged rep count, with nothing in the document saying so.
+         * `velocityLoss_pct` was computed over the wrong stroke, at a rep
+         * count that need not move with it -- identical on the synthetic
+         * negation pair, 13 under the declared stack geometry against 18 under
+         * the lifter-side one on field-38 set 14's partner -- with nothing in
+         * the document saying so.
          *
          * THE ALTERNATIVE WAS TO INFER THE OTHER UNIT'S MOUNT AND IT IS
          * REFUSED. Field-38 recorded a triceps pushdown and a lat pulldown

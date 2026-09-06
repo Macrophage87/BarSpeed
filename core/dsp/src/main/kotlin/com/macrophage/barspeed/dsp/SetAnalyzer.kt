@@ -277,8 +277,11 @@ object SetAnalyzer {
         // The analysis moved onto a unit the set did not arm, and [direction]
         // describes where the ARMED unit was mounted. Nothing on the record
         // says where this one is, and reading it under the other unit's mount
-        // swaps the concentric and the eccentric outright at an unchanged rep
-        // count -- FallbackMountGeometryTest measures the swap. Issue #247.
+        // swaps the concentric and the eccentric outright at a rep count that
+        // need not move with it -- identical on the synthetic negation pair, 13
+        // under the declared stack geometry against 18 under the lifter-side
+        // one on field-38 set 14's partner. FallbackMountGeometryTest measures
+        // both. Issue #247.
         //
         // AFTER the estimator and before anything geometric. The sample rate
         // is a property of the timestamps and owes nothing to the mount, so it
