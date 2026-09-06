@@ -245,8 +245,7 @@ class AnchorSupplyByMountTest {
         // The fifth is the counter-example inside the bar family and is named
         // as one: the RDL's median is 6.42 deg/s, BELOW the gate, so it does
         // not straddle, the clause still applies, and its figures are
-        // bit-identical to before issue #87. It still resolves nothing.
-        // Whatever costs that set its reps, the gyro gate is not it.
+        // bit-identical to before issue #87.
         assertSupply("field-rdl-3010-10rep-s36-set05", 6.423, 48.504, 35.545, 11)
     }
 
@@ -281,9 +280,9 @@ class AnchorSupplyByMountTest {
         //
         // The RDL was the counter-example at 0 of 10 -- it does not straddle
         // the gyro gate, so #87 never reached it. #94 does reach it, because
-        // what stopped it was an over-cap run and not anchor supply, and it
-        // resolves 10 of 10. The two mechanisms are disjoint and this line is
-        // the evidence for that.
+        // what stopped it was an over-cap run and not anchor supply. It
+        // resolves 11 against 10 performed. The two mechanisms are disjoint
+        // and this line is the evidence for that.
         assertEquals(9, batchReps("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC, 24.948), "ohp, 6 performed")
         assertEquals(
             5,

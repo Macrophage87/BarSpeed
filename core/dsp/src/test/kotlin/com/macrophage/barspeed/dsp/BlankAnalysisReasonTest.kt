@@ -349,14 +349,14 @@ class BlankAnalysisReasonTest {
         // reps, so they carry no reason -- the key's absence is the record
         // that #87 reached them.
         assertNull(reasonFor("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC), "ohp s37 set02, 9 resolved")
-        assertNull(reasonFor("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC), "bench s37 set05, 4 resolved")
+        assertNull(reasonFor("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC), "bench s37 set05, 5 resolved")
         assertNull(reasonFor("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC), "bench s37 set06, 6 resolved")
         // And the neighbour whose 123.64 m runaway issue #94 removes carries
         // none either. That is the limit, asserted rather than described: this
         // key answers emptiness and nothing else.
         assertNull(
             reasonFor("field-rdl-3010-10rep-s36-set04", StartPhase.ECCENTRIC),
-            "the RDL that resolves ten reps of ten states no reason",
+            "the RDL that resolves eleven spans against ten performed states no reason",
         )
     }
 
@@ -421,7 +421,7 @@ class BlankAnalysisReasonTest {
             SetAnalyzer.analyze(load(fixture), LiftDirection(startsWith), loadKg = 52.163122551154075).noRepsReason
         // The Romanian deadlift used to be the first two rows here, both
         // RUNS_EXCEED_DISPLACEMENT_CAP. Since issue #94's runaway correction
-        // it resolves ten spans read either way and carries no reason at all,
+        // it resolves spans read either way and carries no reason at all,
         // so the null is the assertion: the key answers emptiness, and this
         // set is not empty any more.
         assertNull(
@@ -454,9 +454,9 @@ class BlankAnalysisReasonTest {
         fun reasonOf(fixture: String, startsWith: StartPhase): NoRepsReason? =
             SetAnalyzer.analyze(load(fixture), LiftDirection(startsWith), loadKg = 24.948).noRepsReason
         assertNull(reasonOf("field-ohp-3010-6rep-s37-set02", StartPhase.CONCENTRIC), "ohp s37 set02, 9 resolved")
-        assertNull(reasonOf("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC), "bench s37 set05, 4 resolved")
+        assertNull(reasonOf("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC), "bench s37 set05, 5 resolved")
         assertNull(reasonOf("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC), "bench s37 set06, 6 resolved")
-        assertNull(reasonOf("field-rdl-3010-10rep-s36-set04", StartPhase.ECCENTRIC), "the RDL that resolves 10 of 10")
+        assertNull(reasonOf("field-rdl-3010-10rep-s36-set04", StartPhase.ECCENTRIC), "the RDL that resolves 11 of 10")
     }
 
     @Test

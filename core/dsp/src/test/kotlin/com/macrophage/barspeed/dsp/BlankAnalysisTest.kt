@@ -22,10 +22,7 @@ import kotlin.test.assertTrue
  * and it is asserted below rather than described here.
  *
  * These are CHARACTERIZATION pins. They record what the pipeline does at this
- * commit; none of them says the result is right. In particular the
- * `field-rdl-3010-10rep-s36-set04` figures below pin a set that resolves ONE
- * rep out of ten performed, which is a failure this file does not fix and
- * does not describe as fixed.
+ * commit; none of them says the result is right.
  *
  * ## What issue #87 moved and what it did not
  *
@@ -64,9 +61,7 @@ import kotlin.test.assertTrue
  *
  * It is the immediate neighbour of `field-rdl-3010-10rep-s36-set05`, already
  * committed: same session, same exercise, same tempo, same load, same hand
- * count, recorded four minutes earlier. Set 05 resolves nothing and set 04
- * resolves one, so the pair is the difference between a blank analysis and a
- * nearly-blank one on two sets a lifter would call identical.
+ * count, recorded four minutes earlier.
  */
 class BlankAnalysisTest {
     private fun load(n: String): List<ImuSample> = ImuCsv.decode(
@@ -164,7 +159,7 @@ class BlankAnalysisTest {
         //
         // ONE capture qualifies at this commit, and it is the sensor that
         // never moved. Two did before issue #94's runaway correction; the
-        // Romanian deadlift that was the other now resolves ten spans on the
+        // Romanian deadlift that was the other now resolves 11 spans on the
         // phase its plan declares. That is #138's exemplar leaving the corpus,
         // and it is the strongest single statement this branch can make about
         // the defect: no capture of a healthy stream with reps in it publishes
@@ -258,7 +253,7 @@ class BlankAnalysisTest {
         // correction: this is the diagnosis of the defect, so it has to be
         // taken on the input to the correction and not on its output. On the
         // shipped series the same capture now has 52 movement runs, none over
-        // the cap, and resolves ten spans.
+        // the cap, and resolves eleven spans.
         //
         // 67.95 s of a 10-rep hip hinge collapses into FOUR sign-runs, of
         // which three displace further than DspConfig.maxRunDisplacementM and
@@ -344,7 +339,7 @@ class BlankAnalysisTest {
             loadKg = 52.163122551154075,
         )
         assertEquals(11, analysis.reps.size, "reps published to the lifter")
-        // Ten reps and STILL no velocity loss, for a different reason: the
+        // Eleven reps and STILL no velocity loss, for a different reason: the
         // last rep resolved is the fastest of the set, so VelocityLoss
         // withholds the figure rather than publishing a negative drawdown.
         // Absence stays absence, and it is now absence for a stated reason
