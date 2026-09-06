@@ -138,7 +138,6 @@ class TimedSetScriptTest {
             hasTempo = false,
             isTimed = true,
             kind = ExerciseKind.HOLD,
-            demoMode = false,
             imuConnected = true,
         )
         val script = replay(SET11_TARGET_S, SET11_WORK_STARTED_MS, SET11_SENSOR_COUNTS, guides = guides)
@@ -159,7 +158,6 @@ class TimedSetScriptTest {
             hasTempo = false,
             isTimed = true,
             kind = ExerciseKind.HOLD,
-            demoMode = false,
             imuConnected = true,
         )
         val script = replay(SET11_TARGET_S, SET11_WORK_STARTED_MS, SET11_SENSOR_COUNTS, guides = guides)

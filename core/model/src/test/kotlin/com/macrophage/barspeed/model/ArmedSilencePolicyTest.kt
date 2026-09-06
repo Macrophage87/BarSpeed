@@ -238,7 +238,7 @@ class ArmedSilencePolicyTest {
         assertEquals(
             "Sensor B is connected but has sent no data. It will record nothing this set unless you " +
                 "power-cycle it.",
-            ArmedSilencePolicy.message(silent, sole = null, demoMode = false),
+            ArmedSilencePolicy.message(silent, sole = null),
             "the sentence the SETUP window would have shown on every set of field-37",
         )
     }
@@ -256,7 +256,7 @@ class ArmedSilencePolicyTest {
             )
 
         assertEquals(listOf(SensorRole.B, SensorRole.A), silent.keys.toList(), "the armed order was not kept")
-        val message = assertNotNull(ArmedSilencePolicy.message(silent, sole = null, demoMode = false))
+        val message = assertNotNull(ArmedSilencePolicy.message(silent, sole = null))
         assertTrue(
             message.indexOf("Sensor B") < message.indexOf("Sensor A"),
             "the message reordered the units the lifter has to go and find: $message",
@@ -279,7 +279,7 @@ class ArmedSilencePolicyTest {
             )
 
         assertEquals(emptyMap(), silent)
-        assertNull(ArmedSilencePolicy.message(silent, sole = null, demoMode = false))
+        assertNull(ArmedSilencePolicy.message(silent, sole = null))
     }
 
     /**
@@ -296,7 +296,7 @@ class ArmedSilencePolicyTest {
 
         assertEquals(mapOf(SensorRole.B to ArmedDelivery.TOO_SOON), silent, "a fact the export needs was dropped")
         assertNull(
-            ArmedSilencePolicy.message(silent, sole = null, demoMode = false),
+            ArmedSilencePolicy.message(silent, sole = null),
             "the app told the lifter something it did not know",
         )
     }
@@ -559,7 +559,7 @@ class ArmedSilencePolicyTest {
 
         assertEquals(ArmedDelivery.TOO_SOON, sole, "a fact a short set needs to store was dropped")
         assertNull(
-            ArmedSilencePolicy.message(emptyMap(), sole, demoMode = false),
+            ArmedSilencePolicy.message(emptyMap(), sole),
             "the app accused a link one second into its connect",
         )
     }
@@ -606,11 +606,11 @@ class ArmedSilencePolicyTest {
         assertEquals(
             "The bar sensor is connected but has sent no data. It will record nothing this set unless you " +
                 "power-cycle it.",
-            ArmedSilencePolicy.message(emptyMap(), ArmedDelivery.LINKED_SILENT, demoMode = false),
+            ArmedSilencePolicy.message(emptyMap(), ArmedDelivery.LINKED_SILENT),
             "the sentence a single-sensor lifter reads before the set starts",
         )
         assertNull(
-            ArmedSilencePolicy.message(emptyMap(), null, demoMode = false),
+            ArmedSilencePolicy.message(emptyMap(), null),
             "the card drew for a set with nothing to say",
         )
     }
@@ -733,17 +733,20 @@ class ArmedSilencePolicyTest {
     }
 
     /**
-     * CHARACTERIZATION, issue #262. The delivery state decides whether the card
-     * speaks, and it is the only thing that does.
+     * The delivery state decides whether the card speaks, and since #262 it is
+     * the only thing that does.
      *
      * Exhaustive over [ArmedDelivery] and over both shapes -- a silent role and
      * a silent unroled unit -- with the advised set written out rather than
      * read back from [ArmedSilencePolicy.advice], so a pin on "which states
      * speak" cannot agree with the implementation by construction.
      *
-     * This is what remains after #262 removes the demo escape: no argument to
-     * this function can suppress a sentence about a unit that is armed and
-     * silent, so a lifter looking at a dead sensor is told so on every set.
+     * The demo escape is gone with the mode: the case that pinned
+     * `message(.., demoMode = true) == null` is DELETED rather than reworded,
+     * because it asserted an answer for an input that no longer exists. What
+     * replaces it is this -- no argument to this function can suppress a
+     * sentence about a unit that is armed and silent, so a lifter looking at a
+     * dead sensor is told so on every set.
      */
     @Test
     fun `the delivery state alone decides whether the card speaks`() {
@@ -752,52 +755,18 @@ class ArmedSilencePolicyTest {
         ArmedDelivery.entries.forEach { state ->
             assertEquals(
                 state in speaks,
-                ArmedSilencePolicy.message(mapOf(SensorRole.A to state), sole = null, demoMode = false) != null,
+                ArmedSilencePolicy.message(mapOf(SensorRole.A to state), sole = null) != null,
                 "$state as a silent role",
             )
             assertEquals(
                 state in speaks,
-                ArmedSilencePolicy.message(emptyMap(), state, demoMode = false) != null,
+                ArmedSilencePolicy.message(emptyMap(), state) != null,
                 "$state as the sole unroled unit",
             )
         }
     }
 
-    // ---- #225: the grace floor, and the card in demo mode ---------------------
-
-    /**
-     * DIFFERENTIAL, issue #225 item 7. Demo mode says nothing about sensors.
-     *
-     * `RecordViewModel.startDemoStream` fabricates samples with no sensor
-     * present, so the set DOES record and "It will record nothing this set" is
-     * the one claim demo mode makes FALSE rather than merely fictional -- the
-     * dot beside it already takes `demoActive` for that reason. The
-     * suppression is whole rather than per-state: with no unit paired there is
-     * nothing to switch on, bring near the phone or power-cycle, so every
-     * sentence this function can produce names a remedy the lifter cannot
-     * carry out.
-     */
-    @Test
-    fun `demo mode says nothing about a sensor the set is not using`() {
-        val silent =
-            ArmedSilencePolicy.silent(
-                listOf(SensorRole.A, SensorRole.B),
-                mapOf(SensorRole.A to ArmedDelivery.NOT_LINKED, SensorRole.B to ArmedDelivery.LINKED_SILENT),
-            )
-
-        assertNotNull(
-            ArmedSilencePolicy.message(silent, sole = null, demoMode = false),
-            "the card stopped speaking outside demo mode",
-        )
-        assertNull(
-            ArmedSilencePolicy.message(silent, sole = null, demoMode = true),
-            "demo mode told the lifter the set would record nothing while it fabricates samples",
-        )
-        assertNull(
-            ArmedSilencePolicy.message(emptyMap(), ArmedDelivery.LINKED_SILENT, demoMode = true),
-            "the one-sensor sentence survived demo mode",
-        )
-    }
+    // ---- #225: the grace floor -----------------------------------------------
 
     /**
      * DIFFERENTIAL, issue #225 item 8. A short set does not excuse a link the

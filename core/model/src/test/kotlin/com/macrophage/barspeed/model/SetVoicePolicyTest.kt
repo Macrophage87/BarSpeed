@@ -6,8 +6,8 @@ import kotlin.test.assertEquals
 /**
  * Who speaks on a set of each shape.
  *
- * The set of shapes is exhaustive: every [ExerciseKind] against tempo, timed,
- * demo and sensor.
+ * The set of shapes is exhaustive: every [ExerciseKind] against tempo, timed
+ * and sensor.
  *
  * These were c1's characterization of what `RecordViewModel.beginSet` computed
  * before the decision was lifted out of it. The timed case is no longer that
@@ -19,9 +19,8 @@ class SetVoicePolicyTest {
         hasTempo: Boolean = false,
         isTimed: Boolean = false,
         kind: ExerciseKind = ExerciseKind.DYNAMIC,
-        demoMode: Boolean = false,
         imuConnected: Boolean = true,
-    ) = SetVoicePolicy.guidesFor(hasTempo, isTimed, kind, demoMode, imuConnected)
+    ) = SetVoicePolicy.guidesFor(hasTempo, isTimed, kind, imuConnected)
 
     /** A tempo'd rep-based lift is paced by the metronome and by nothing else. */
     @Test
@@ -56,18 +55,6 @@ class SetVoicePolicyTest {
         assertEquals(emptySet(), guides(kind = ExerciseKind.EXPLOSIVE, imuConnected = false))
     }
 
-    /** Demo mode drives the stream itself and shows the live counter working. */
-    @Test
-    fun `demo mode is counted by the sensor path it is demonstrating`() {
-        assertEquals(setOf(SetVoiceGuide.SENSOR_COUNT), guides(demoMode = true))
-    }
-
-    /** A tempo'd demo set is still paced: the cadence wins over the demo counter. */
-    @Test
-    fun `a tempo'd demo set is guided by the cadence`() {
-        assertEquals(setOf(SetVoiceGuide.CUED_CADENCE), guides(hasTempo = true, demoMode = true))
-    }
-
     /**
      * A timed set is guided by its clock and by nothing else.
      *
@@ -81,6 +68,10 @@ class SetVoicePolicyTest {
      * with a sensor connected are what field-37's sets 11, 12 and 13 were; a
      * timed set carrying a tempo string is reachable on the ad-hoc path, which
      * has no validator (#217).
+     *
+     * A fourth row asserted the same answer with demo mode on. It is DELETED
+     * rather than reworded, with the two cases above it, because #262 removed
+     * the input: a row naming a state the app cannot be in describes nothing.
      */
     @Test
     fun `a timed set is guided by its clock alone`() {
@@ -90,14 +81,13 @@ class SetVoicePolicyTest {
             setOf(SetVoiceGuide.TIMED_CLOCK),
             guides(isTimed = true, hasTempo = true, kind = ExerciseKind.HOLD),
         )
-        assertEquals(setOf(SetVoiceGuide.TIMED_CLOCK), guides(isTimed = true, demoMode = true))
     }
 
     /**
      * No set is guided by two voices at once.
      *
-     * The whole contract, over every shape: kind against tempo, timed, demo
-     * and sensor. Two voices counting different quantities in overlapping
+     * The whole contract, over every shape: kind against tempo, timed and
+     * sensor. Two voices counting different quantities in overlapping
      * vocabularies is what a lifter cannot resolve -- on field-37's set 11 the
      * bare `1` the sensor counter spoke landed 0.186 s before
      * `workStartedAt_ms`, 0.184 s before the `Hold` row that meant the clock
@@ -108,15 +98,13 @@ class SetVoicePolicyTest {
         for (kind in ExerciseKind.entries) {
             for (hasTempo in listOf(false, true)) {
                 for (isTimed in listOf(false, true)) {
-                    for (demo in listOf(false, true)) {
-                        for (imu in listOf(false, true)) {
-                            val g = SetVoicePolicy.guidesFor(hasTempo, isTimed, kind, demo, imu)
-                            assertEquals(
-                                true,
-                                g.size <= 1,
-                                "$kind tempo=$hasTempo timed=$isTimed demo=$demo imu=$imu speaks with $g",
-                            )
-                        }
+                    for (imu in listOf(false, true)) {
+                        val g = SetVoicePolicy.guidesFor(hasTempo, isTimed, kind, imu)
+                        assertEquals(
+                            true,
+                            g.size <= 1,
+                            "$kind tempo=$hasTempo timed=$isTimed imu=$imu speaks with $g",
+                        )
                     }
                 }
             }
@@ -134,15 +122,13 @@ class SetVoicePolicyTest {
         for (kind in ExerciseKind.entries) {
             for (hasTempo in listOf(false, true)) {
                 for (isTimed in listOf(false, true)) {
-                    for (demo in listOf(false, true)) {
-                        for (imu in listOf(false, true)) {
-                            assertEquals(
-                                SetVoiceGuide.SENSOR_COUNT in
-                                    SetVoicePolicy.guidesFor(hasTempo, isTimed, kind, demo, imu),
-                                SetVoicePolicy.sensorCounts(hasTempo, isTimed, kind, demo, imu),
-                                "$kind tempo=$hasTempo timed=$isTimed demo=$demo imu=$imu",
-                            )
-                        }
+                    for (imu in listOf(false, true)) {
+                        assertEquals(
+                            SetVoiceGuide.SENSOR_COUNT in
+                                SetVoicePolicy.guidesFor(hasTempo, isTimed, kind, imu),
+                            SetVoicePolicy.sensorCounts(hasTempo, isTimed, kind, imu),
+                            "$kind tempo=$hasTempo timed=$isTimed imu=$imu",
+                        )
                     }
                 }
             }
@@ -150,30 +136,30 @@ class SetVoicePolicyTest {
     }
 
     /**
-     * CHARACTERIZATION, issue #262. Every shape with demo mode OFF, written out
-     * rather than computed, so the removal of the parameter can be checked
-     * against a table that does not move with the code.
+     * Every shape a set can have, answered from a table written out by hand.
      *
-     * Thirty-two rows: four [ExerciseKind]s against tempo, timed and sensor.
-     * They are literals on purpose -- a expectation re-derived from
-     * `LeadInPolicy.prepCase` and the sensor term would agree with the
-     * implementation by construction and could not catch the collapse of
-     * `demoMode || (kind == EXPLOSIVE && imuConnected)` going wrong.
+     * Thirty-two rows -- four [ExerciseKind]s against tempo, timed and sensor
+     * -- and since #262 removed demo mode that is the whole input space rather
+     * than a slice of it.
      *
-     * This is the whole behaviour that must survive #262, because demo mode is
-     * the only other input and after the removal there is no other value for
-     * it to take.
+     * They are literals on purpose. An expectation re-derived from
+     * [LeadInPolicy.prepCase] and the sensor term would agree with the
+     * implementation by construction, and could not catch the sensor term
+     * losing a clause.
+     *
+     * The rows are the ones #262's c0 pinned before the removal, minus the
+     * argument, and that is the evidence the removal preserved behaviour: the
+     * same thirty-two expectations, measured green on both sides of it.
      */
     @Test
-    fun `every non-demo shape answers from a table written out by hand`() {
-        NON_DEMO_TABLE.forEach { (shape, expected) ->
+    fun `every shape answers from a table written out by hand`() {
+        SHAPE_TABLE.forEach { (shape, expected) ->
             assertEquals(
                 expected,
                 SetVoicePolicy.guidesFor(
                     shape.hasTempo,
                     shape.isTimed,
                     shape.kind,
-                    false,
                     shape.imuConnected,
                 ),
                 "$shape",
@@ -181,13 +167,13 @@ class SetVoicePolicyTest {
         }
         assertEquals(
             ExerciseKind.entries.size * 2 * 2 * 2,
-            NON_DEMO_TABLE.size,
+            SHAPE_TABLE.size,
             "the table stopped covering every shape",
         )
-        assertEquals(NON_DEMO_TABLE.size, NON_DEMO_TABLE.map { it.first }.toSet().size, "a shape is listed twice")
+        assertEquals(SHAPE_TABLE.size, SHAPE_TABLE.map { it.first }.toSet().size, "a shape is listed twice")
     }
 
-    /** One row of the hand-written table: a set shape with demo mode out of it. */
+    /** One row of the hand-written table: everything a set's voice depends on. */
     private data class Shape(
         val kind: ExerciseKind,
         val hasTempo: Boolean,
@@ -201,7 +187,7 @@ class SetVoicePolicyTest {
         private val SENSOR = setOf(SetVoiceGuide.SENSOR_COUNT)
         private val SILENT = emptySet<SetVoiceGuide>()
 
-        private val NON_DEMO_TABLE: List<Pair<Shape, Set<SetVoiceGuide>>> =
+        private val SHAPE_TABLE: List<Pair<Shape, Set<SetVoiceGuide>>> =
             listOf(
                 Shape(ExerciseKind.DYNAMIC, hasTempo = false, isTimed = false, imuConnected = false) to SILENT,
                 Shape(ExerciseKind.DYNAMIC, hasTempo = false, isTimed = false, imuConnected = true) to SILENT,
