@@ -1056,8 +1056,47 @@ data class SessionExport(
          * stops being written -- but NOT to a validator, because the key is a
          * CLOSED enum, so a reader validating against 1.18 rejects a document
          * carrying it.
+         *
+         * 1.20: MINTED HERE, because 1.19 HAS SHIPPED and a shipped number
+         * takes no further entries. `git tag --sort=-creatordate | head -1` is
+         * v0.1.51, and `git show
+         * v0.1.51:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.19"` -- read at the tag rather than
+         * assumed, which is the rule the ninth 1.19 entry states for v0.1.50.
+         * The change below was written as a TWELFTH 1.19 entry while 1.19 was
+         * still unreleased; the release closed that number underneath it, so
+         * it is renumbered rather than left claiming a version it cannot be
+         * part of. This is the FIRST 1.20 entry.
+         *
+         * WHAT AN OLDER READER DOES, and it is not symmetric. `schemaVersion`
+         * is a CLOSED enum and the published schema sets
+         * `"additionalProperties": false` at its root, so the 1.19 schema
+         * v0.1.51 shipped REJECTS a 1.20 document on the version string alone,
+         * before looking at a single key. The 1.20 schema still lists every
+         * version from 1.0 through 1.19, so it ACCEPTS a 1.19 document
+         * unchanged. And because this entry adds, removes and retypes NO key,
+         * a 1.19 READER that does not validate reads a 1.20 document
+         * correctly -- the rejection is the validator's, not the reader's.
+         *
+         * THE CHANGE (#72): on an ECCENTRIC-FIRST set a rep may now omit
+         * `ecc_s`. The key was already nullable and already omitted on
+         * concentric-first sets, where a drive with no detectable return has
+         * always been published on the drive alone; what changes is the SET OF
+         * SETS that can emit such a rep. Before this, an eccentric-first set
+         * required both phases, so a rep whose lowering never became a phase
+         * was DELETED rather than published without one -- and which of the
+         * two a lifter got was decided by nothing but the phase the plan
+         * declared the set opens with. A reader that treats a missing `ecc_s`
+         * as "this rep had no eccentric" was already wrong on concentric-first
+         * sets and is now wrong on more sets; the right reading is "the
+         * eccentric was not measured", never zero. Not retroactive: the
+         * segmentation is frozen into the stored analysis at record time and
+         * nothing re-runs the segmenter at export time, so an old session
+         * re-exports unchanged. `DATABASE_VERSION` does not move.
+         * `RepSegmenter.pairEccentricFirst` in `:core:dsp` is where the rule
+         * lives.
          */
-        const val SCHEMA_VERSION = "1.19"
+        const val SCHEMA_VERSION = "1.20"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -1067,7 +1106,7 @@ data class SessionExport(
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
-                "1.16", "1.17", "1.18", "1.19",
+                "1.16", "1.17", "1.18", "1.19", "1.20",
             )
 
         /**

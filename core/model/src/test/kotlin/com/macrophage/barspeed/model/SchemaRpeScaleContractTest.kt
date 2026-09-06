@@ -94,14 +94,17 @@ class SchemaRpeScaleContractTest {
     }
 
     /**
-     * The number does not move. 1.19 is UNRELEASED -- v0.1.50 shipped 1.18,
-     * read at the tag rather than assumed -- so this is a further entry under
-     * it and not a mint, the rule every entry under 1.19 already states.
+     * The key is filed under 1.19 and STAYS there. "The number does not move"
+     * stood here on the premise that 1.19 was unreleased; v0.1.51 has since
+     * shipped it, read at the tag rather than assumed, and the exporter's
+     * constant moved to 1.20. That renumbers nothing already filed: 1.19 is
+     * still accepted and still published, which is what this pin now asserts.
      */
     @Test
-    fun `the schema version is still 1_19 and the key rides under it`() {
-        assertEquals("1.19", SessionExport.SCHEMA_VERSION)
+    fun `the key rides under 1_19, which v0_1_51 shipped, and the exporter is past it`() {
+        assertEquals("1.20", SessionExport.SCHEMA_VERSION)
         assertContains(SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.19")
+        assertContains(SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.20")
     }
 
     // ---- 2. the two version logs, which must carry the same entry ----

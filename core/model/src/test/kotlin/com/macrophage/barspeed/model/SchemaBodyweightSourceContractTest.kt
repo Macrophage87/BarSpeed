@@ -106,16 +106,25 @@ class SchemaBodyweightSourceContractTest {
      * the published enum, and the example `ci.yml` hands to ajv. The example
      * half is pinned by `SchemaContractTest`'s `the published example
      * declares the version the exporter writes`.
+     *
+     * RENAMED from `the exporter writes 1_19 and 1_18 is still readable`,
+     * which stopped being true when v0.1.51 shipped 1.19 and the exporter
+     * moved to 1.20. The four keys this file is about are still filed under
+     * 1.19; what moved is the constant, and asserting the filing number by
+     * reading the constant is the mistake `SchemaNoRepsReasonContractTest`
+     * already deleted once for 1.18.
      */
     @Test
-    fun `the exporter writes 1_19 and 1_18 is still readable`() {
+    fun `the exporter writes 1_20 and 1_19 and 1_18 are both still readable`() {
         assertEquals(
-            "1.19",
+            "1.20",
             SessionExport.SCHEMA_VERSION,
-            "the exporter no longer writes 1.19, which is the number these four changes were minted under",
+            "v0.1.51 shipped 1.19, so the exporter must be past it",
         )
-        assertTrue("1.19" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
-        assertTrue("1.19" in versionEnum(), "the published enum does not accept the version written")
+        assertTrue("1.20" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
+        assertTrue("1.20" in versionEnum(), "the published enum does not accept the version written")
+        assertTrue("1.19" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.19 left the accepted set")
+        assertTrue("1.19" in versionEnum(), "1.19 left the published enum, so this is a break beyond the key")
         assertTrue("1.18" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.18 left the accepted set")
         assertTrue("1.18" in versionEnum(), "1.18 left the published enum, so this is a break beyond the key")
     }

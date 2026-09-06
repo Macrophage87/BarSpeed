@@ -93,10 +93,17 @@ class SchemaVelocityLossRegimeContractTest {
         assertContains(SetExport.serializer().descriptor.elementNames.toList(), "velocityLossRegime")
     }
 
+    /**
+     * The key is filed under 1.19 and stays there; v0.1.51 shipped 1.19 and
+     * the exporter's constant moved to 1.20. Renamed from `the schema version
+     * is still 1_19 and the key rides under it`, whose first clause the
+     * release made false.
+     */
     @Test
-    fun `the schema version is still 1_19 and the key rides under it`() {
-        assertEquals("1.19", SessionExport.SCHEMA_VERSION)
+    fun `the key rides under 1_19, which v0_1_51 shipped, and the exporter is past it`() {
+        assertEquals("1.20", SessionExport.SCHEMA_VERSION)
         assertContains(SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.19")
+        assertContains(SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.20")
     }
 
     // ---- 2. the version log ----

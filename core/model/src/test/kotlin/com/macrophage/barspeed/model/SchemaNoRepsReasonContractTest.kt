@@ -60,7 +60,10 @@ class SchemaNoRepsReasonContractTest {
         // that. Which number the key is filed under is asserted below, off the
         // log entry itself; the constant is pinned in
         // SchemaBodyweightSourceContractTest.
-        assertEquals("1.19", SessionExport.SCHEMA_VERSION, "1.18 is released, so the exporter must be past it")
+        // v0.1.51 has since shipped 1.19 too, so the constant moved again,
+        // for the same reason and by the same rule. Read the shipped number
+        // at the tag, never from a definition.
+        assertEquals("1.20", SessionExport.SCHEMA_VERSION, "1.19 is released, so the exporter must be past it")
         assertTrue("1.18" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the number this key rides under is refused")
         assertTrue("1.18" in exportVersionEnum(), "the published enum dropped the number this key rides under")
         assertTrue("1.17" in exportVersionEnum(), "1.17 stopped being readable, so this is not additive")

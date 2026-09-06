@@ -110,13 +110,18 @@ class SchemaWorkStartBoundContractTest {
      * commit.
      */
     @Test
-    fun `the eighth no-reps word is published, under a number that has not shipped`() {
+    fun `the eighth no-reps word is published, under 1_19, which v0_1_51 shipped`() {
         val declared = setProperties()["summary"]!!.jsonObject["properties"]!!.jsonObject["noRepsReason"]!!
             .jsonObject["enum"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
         assertTrue("beforeWorkStart" in declared, "the published schema does not accept the word")
         assertTrue("beforeWorkStart" in SessionExport.VALID_NO_REPS_REASONS, "the exporter does not declare the word")
-        assertEquals("1.19", SessionExport.SCHEMA_VERSION, "the entry rides under the version the exporter writes")
-        assertTrue("1.19" in exportVersionEnum(), "the published enum does not carry the number")
+        // The name said "a number that has not shipped" and the assertion read
+        // the entry's filing number off the exporter's constant. v0.1.51
+        // shipped 1.19 and the constant moved to 1.20, so both are corrected:
+        // the word is still filed under 1.19, and 1.19 is still published.
+        assertEquals("1.20", SessionExport.SCHEMA_VERSION, "v0.1.51 shipped 1.19, so the exporter must be past it")
+        assertTrue("1.19" in exportVersionEnum(), "the published enum dropped the number this word rides under")
+        assertTrue("1.20" in exportVersionEnum(), "the published enum does not carry the version written")
         assertTrue("1.18" in exportVersionEnum(), "1.18 stopped being readable, so this is not additive")
     }
 
