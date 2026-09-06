@@ -329,9 +329,11 @@ object RepSegmenter {
      * NO NEW CONSTANT. The gate reuses `minRomM`, `maxRunDisplacementM` and
      * the dead band; there is nothing here fitted to this corpus.
      *
-     * Measured over the TWENTY-TWO cue-tracked captures the corpus holds
-     * after this branch was rebased onto
-     * 2f7efa5f7cbcafec9c1ffcb34afda43ef01d09f9: marks matched 165 -> 168 of
+     * Measured over the TWENTY-TWO cue-tracked captures the corpus holds at
+     * this commit -- the twenty at
+     * 2f7efa5f7cbcafec9c1ffcb34afda43ef01d09f9 plus the two this branch adds
+     * at "Re-measure the mount gap on the first session holding both mounts":
+     * marks matched 165 -> 168 of
      * 190, empty 25 -> 22, and doubled and stray BOTH unchanged at 14 and 22
      * -- every one of the three added spans lands in a window that was empty.
      * Both sides measured by the same scoring code in two worktrees, one at

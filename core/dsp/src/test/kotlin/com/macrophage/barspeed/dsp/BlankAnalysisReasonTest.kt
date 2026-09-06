@@ -421,7 +421,8 @@ class BlankAnalysisReasonTest {
             SetAnalyzer.analyze(load(fixture), LiftDirection(startsWith), loadKg = 52.163122551154075).noRepsReason
         // The Romanian deadlift used to be the first two rows here, both
         // RUNS_EXCEED_DISPLACEMENT_CAP. Since issue #94's runaway correction
-        // it resolves spans read either way and carries no reason at all,
+        // it resolves eleven spans read as eccentric-first and thirteen read
+        // as concentric-first and carries no reason either way,
         // so the null is the assertion: the key answers emptiness, and this
         // set is not empty any more.
         assertNull(

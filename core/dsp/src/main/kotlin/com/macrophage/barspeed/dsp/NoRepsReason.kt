@@ -108,7 +108,9 @@ data class SegmentationCensus(
  * No committed capture is named here as an example of it.
  * `field-rdl-3010-10rep-s36-set04` was, with one surviving rep against a
  * movement run displacing 123.64 m; issue #94's runaway correction took it to
- * ten reps against the ten the lifter counted, so the example is deleted
+ * ten reps against the ten the lifter counted -- ten as of
+ * f8446fb8097c5c85d6c4bcf712d51c57b583491c; this branch's slow-eccentric
+ * fallback moves the same capture to eleven -- so the example is deleted
  * rather than repointed at another capture.
  *
  * It also cannot be answered for a set already recorded. The value is computed
@@ -147,7 +149,7 @@ enum class NoRepsReason(val wireName: String) {
      * NO COMMITTED CAPTURE REACHES THIS. It needs a set whose every kept
      * detection finished before its own work-start instant, which is a set the
      * lifter handled during the countdown and then did nothing measurable in;
-     * none of the forty captures here is one, and this is written from the
+     * none of the forty-two captures here is one, and this is written from the
      * rule rather than from an observation.
      */
     @SerialName("beforeWorkStart")
