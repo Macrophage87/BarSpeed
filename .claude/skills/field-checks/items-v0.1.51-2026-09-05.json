@@ -1,5 +1,5 @@
 {
- "heading": "Next session, from 2026-09-05 (v0.1.51)",
+ "heading": "v0.1.51, next session",
  "items": [
   {
    "tag": "v0.1.51",
@@ -7,10 +7,8 @@
    "title": "Every exercise header names its dimension",
    "intro": "Nothing here was seen on a real phone.",
    "checks": [
-    "Before START: every exercise header in the session preview names one dimension.",
-    "Same plan on the plan detail screen: same headers.",
-    "An exercise declared <b>\"progression\": \"none\"</b> reads \"holds load\".",
-    "An exercise that omits the key reads \"steps up by weight\".",
+    "Before START, every exercise header in the preview and on the plan detail screen names one dimension.",
+    "A \"progression\": \"none\" exercise reads \"holds load\"; one that omits the key reads \"steps up by weight\".",
     "Plan detail still reads at a large font size."
    ],
    "tier": "App"
@@ -21,10 +19,9 @@
    "title": "Install over v0.1.50 and open the history",
    "intro": "If a card ever says the database was moved aside into files/rescued/, mail me that file the moment it appears: that is the rollback path and the app will be empty.",
    "checks": [
-    "After installing v0.1.51 over v0.1.50, the app opens.",
-    "History: past sets still read.",
+    "After installing v0.1.51 over v0.1.50 the app opens and History still reads the old sets.",
     "No old row shows a scale word.",
-    "Export once afterwards: I check the old sets re-export with the body-weight source reading \"default\"."
+    "Export once afterwards and send it: I check the old sets re-export with the body-weight source \"default\" and no scale key."
    ],
    "tier": "App"
   },
@@ -34,9 +31,7 @@
    "title": "The copied plan prompt says 1.12",
    "intro": "Ten seconds, no gym needed.",
    "checks": [
-    "Copy the plan prompt out of the app and paste it somewhere.",
-    "The prose sentence says schema <b>1.12</b>.",
-    "The JSON skeleton says <b>1.12</b>."
+    "Copy the plan prompt out of the app: the prose sentence and the JSON skeleton both say schema 1.12."
    ],
    "tier": "App"
   },
@@ -57,9 +52,19 @@
    "title": "The SETUP card and its latch",
    "intro": "",
    "checks": [
-    "While pairing, <b>UNRESPONSIVE</b> reads clearly different from <b>PAIR OR POWER</b> on the SETUP card at your text size.",
-    "The advice on the card survives a reconnect cycle.",
-    "The advice on the card survives a screen rotation."
+    "While pairing, UNRESPONSIVE reads clearly different from PAIR OR POWER on the SETUP card.",
+    "The card's advice survives a reconnect cycle and a screen rotation."
+   ],
+   "tier": "App"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#262",
+   "title": "No sensor: the record page shows the plan",
+   "intro": "Demo mode is gone. With the sensor off the page shows one line of sensor advice and the plan.",
+   "checks": [
+    "With the sensor off and a plan imported, the record page shows the plan under a one-line sensor card, and no demo chip anywhere.",
+    "START SET runs a manual set (you count) and the voice guide still runs."
    ],
    "tier": "App"
   },
@@ -229,6 +234,32 @@
   },
   {
    "tag": "v0.1.51",
+   "ref": "#250",
+   "title": "Velocity loss only on max-intent sets",
+   "intro": "A set with no tempo, an explosive lift, or an X concentric is max intent; a numbered concentric digit is controlled. The chips were seen only on the emulator.",
+   "checks": [
+    "After a controlled-tempo set, the post-set chip shows ROM spread and no velocity-loss chip.",
+    "After a set with no tempo or an X concentric, the velocity-loss chip is back.",
+    "The history card for each shows the same choice.",
+    "Does a ROM spread figure mean anything to you at a glance, or does it need a tone band?"
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
+   "ref": "#253",
+   "title": "The Up next card's second line",
+   "intro": "The plan's implement key decides the line: bar loading per side, the dumbbell pair, or nothing. The tiny blue text is gone.",
+   "checks": [
+    "On a barbell set the second line reads the per-side loading (195 lb on a 45 lb bar: \"45 + 25 + 5 per side\"), readable from the rack without picking the phone up.",
+    "With a non-standard bar declared, the line names the bar (\"25 + 5 per side, 35 lb bar\"): does naming it earn its width?",
+    "On a dumbbell set the line reads the pair (\"2 × 40 lb dumbbells\").",
+    "On an other set there is no second line and no blue caption anywhere."
+   ],
+   "tier": "Tier 1"
+  },
+  {
+   "tag": "v0.1.51",
    "ref": "#185",
    "title": "Both units on one stack, once",
    "intro": "Field-38 sets 12-13 already gave one co-mounted pair; one more on a different machine lets the co-mount maths start.",
@@ -306,6 +337,18 @@
    "tier": "Tier 2"
   },
   {
+   "tag": "v0.1.51",
+   "ref": "#251",
+   "title": "Stepping the tempo to X between sets",
+   "intro": "Between sets, the tempo stepper reaches X below 1 on the concentric digit only.",
+   "checks": [
+    "On a press, tap minus on the concentric digit at 1: it reads X and the header says \"Tempo 30X0 / Plan says 3010\".",
+    "On the eccentric digit, minus stops at 1 and never offers X.",
+    "Two bench sets, one at 30X0 and one at 3010: does the beat labelled X get driven harder than the same beat labelled 1?"
+   ],
+   "tier": "Tier 2"
+  },
+  {
    "tag": "Open issue",
    "ref": "#54 #55",
    "title": "Other Android versions",
@@ -315,16 +358,6 @@
     "API 26-30 device: the app installs and scans at all."
    ],
    "tier": "Deferred"
-  },
-  {
-   "tag": "Field-38 question",
-   "ref": "ask 4",
-   "title": "Set 18: was the limiter prompt shown?",
-   "intro": "Set 18 (the second rope dead hang) exported <b>failed</b> and <b>failedByLifter</b> with no limiter word, while set 16 (lat pulldown) and set 17 (the first dead hang) both carry <b>muscle</b>. Owner 2026-09-05: the prompt was shown, \"I believe that I put muscle as the limiter, not sure though.\"",
-   "checks": [
-    "On the next hands-full hold that fails, note whether you answered the limiter and what you chose; I compare with the export."
-   ],
-   "tier": "Answer"
   }
  ]
 }
