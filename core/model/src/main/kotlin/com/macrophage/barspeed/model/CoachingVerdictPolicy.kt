@@ -46,6 +46,16 @@ package com.macrophage.barspeed.model
  *
  * A null regime shows every line, which is exactly what all three screens drew
  * before #250 existed. Absence claims nothing and withholds nothing.
+ *
+ * ## What this function is, and is not, evidence for
+ *
+ * The three call sites are Compose, and nothing on the CI path renders a
+ * Compose screen, so what is gated on every push is this decision and the
+ * prefix contract in `:core:dsp` -- never that the history card or the rest
+ * screen actually came out shorter by one line. NO SCREENSHOT OF EITHER CARD
+ * WAS TAKEN FOR THIS CHANGE: the bench emulator needs about 3 GB of free
+ * memory and the machine held between 0.38 and 1.15 GB across a bounded
+ * thirty-minute wait. That render is outstanding, not done.
  */
 object CoachingVerdictPolicy {
     /**
