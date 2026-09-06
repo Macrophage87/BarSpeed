@@ -41,9 +41,23 @@ import kotlin.test.assertTrue
  * its own reasons.
  *
  * WHAT THIS STILL CANNOT SAY: nothing here is Android, so this does not
- * establish that the phone's launch survives -- only that the listing, which
- * is the code the phone's stack named, costs a fixed buffer. The device leg is
- * the emulator run on this branch.
+ * establish that a launch survives -- only that the listing, which is the code
+ * the phone's stack named, costs a fixed buffer.
+ *
+ * THE DEVICE LEG WAS RUN AND IT IS AN EMULATOR, NOT THE PHONE. On
+ * `barspeed-api35` headless, with these same two files pushed under
+ * `files/inflight/s1/set0-1` at the app's own uid, v0.1.51 (versionCode 52)
+ * died 6 s after launch with
+ * `FATAL EXCEPTION: main / java.lang.OutOfMemoryError: Failed to allocate a
+ * 134250512 byte allocation ... growth limit 201326592` on
+ * `Arrays.copyOf <- AbstractStringBuilder.ensureCapacityInternal <-
+ * StringBuilder.append <- BufferedReader.readLine <-
+ * com.macrophage.barspeed.data.a.a <- N1.n0.q` -- the phone's stack, obfuscated
+ * frame names included. This branch's debug build, same files, drew the card
+ * reading `the armed sensor's stream could not be read - 314.6 MB on disk -
+ * unreadable: imu.csv` and did not crash; DISCARD removed the directory.
+ * The emulator is not the lifter's Samsung SM-S948U and its heap limit is not
+ * the phone's, so what this establishes is the mechanism, not the phone.
  */
 class JournalScanHeapTest {
     private val root: File = Files.createTempDirectory("journal-heap").toFile()
