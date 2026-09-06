@@ -47,10 +47,18 @@ class CoachingVerdictPolicyContractTest {
 
     @Test
     fun `no other line CoachingRules can write starts with that prefix`() {
-        // Every other verdict kind the rules can produce, gathered on one set:
-        // the resolved-reps note, the shortfall, the bar-speed note, the
-        // prescribed stop and a tempo phase line. Exactly none of them may be
-        // taken for the fatigue sentence.
+        // FOUR of the other verdict kinds, gathered on one set: the
+        // resolved-reps note, the shortfall, the bar-speed note and the
+        // prescribed stop. Exactly none of them may be taken for the fatigue
+        // sentence.
+        //
+        // THREE are NOT covered here, and this pin says nothing about them:
+        // the tempo phase line (this call passes tempoCompliance = null, so
+        // no phase line is written), the over-plan line (countedReps is below
+        // plannedReps here, and the shortfall and the over-plan line cannot
+        // both appear on one set), and the no-reps-detected line (the rules
+        // return early on an empty rep list, so it cannot appear beside any
+        // of these).
         val targets = SetTargets(
             plannedReps = 6,
             countedReps = 5,
