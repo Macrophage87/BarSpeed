@@ -1058,11 +1058,16 @@ data class SessionExport(
          * carrying it.
          *
          * 1.20: MINTED HERE, because 1.19 HAS SHIPPED and a shipped number
-         * takes no further entries. `git tag --sort=-creatordate | head -1` is
-         * v0.1.51, and `git show
-         * v0.1.51:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * takes no further entries. `git tag --sort=-creatordate | head -1`
+         * is v0.1.52, and `git show
+         * v0.1.52:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
          * reads `SCHEMA_VERSION = "1.19"` -- read at the tag rather than
          * assumed, which is the rule the ninth 1.19 entry states for v0.1.50.
+         * This entry named v0.1.51 as what that command returns. That was
+         * true when it was written and is not now: v0.1.52 has since been
+         * cut, and the sentence is corrected rather than left standing. Both
+         * releases ship 1.19 -- neither bumped the number -- so 1.20 is still
+         * this branch's own mint and did not have to move a second time.
          * The change below was written as a FURTHER ENTRY under 1.19 while
          * 1.19 was still unreleased; the release closed that number
          * underneath it, so it is renumbered rather than left claiming a
