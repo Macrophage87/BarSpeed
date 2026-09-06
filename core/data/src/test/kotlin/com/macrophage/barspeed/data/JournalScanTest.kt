@@ -121,6 +121,32 @@ class JournalScanTest {
         assertTrue(stub.counted)
     }
 
+    /**
+     * The boundary the two cases above straddle, pinned at the byte. The rule
+     * is a strict `>`: a newline-free file of exactly one buffer is an
+     * ordinary stub, one byte more is #271's shape. Either direction of
+     * off-by-one here is a real defect -- a warning on every 64 KB stub, or a
+     * runaway file reported as a countable one.
+     */
+    @Test
+    fun `the malformed boundary is one byte past the buffer`() {
+        val atBuffer =
+            scan(
+                bytes = JournalScanPolicy.BUFFER_BYTES.toLong(),
+                newlines = 0,
+                endsWithNewline = false,
+            )
+        assertFalse(atBuffer.malformed)
+        val pastBuffer =
+            scan(
+                bytes = JournalScanPolicy.BUFFER_BYTES.toLong() + 1L,
+                newlines = 0,
+                scannedBytes = JournalScanPolicy.BUFFER_BYTES.toLong(),
+                endsWithNewline = false,
+            )
+        assertTrue(pastBuffer.malformed)
+    }
+
     // ---- what the card says -------------------------------------------------
 
     private fun header(imuConnected: Boolean = true, secondaryImuConnected: Boolean = false) = SetJournalHeader(

@@ -31,16 +31,21 @@ data class JournalStreamScan(
  * here opens a file, and every rule the listing decides by is here rather than
  * inside the loop that reads bytes.
  *
- * THE LISTING NEVER DECODES A STREAM. Issue #271: a journal file under
- * `files/inflight` held hundreds of megabytes with no newline in any of them,
- * and `BufferedReader.readLine` grew one line's `StringBuilder` until the
- * phone's 256 MB heap was gone. The scan was replayed on every launch, so the
- * app could not start at all -- eight `OutOfMemoryError` crashes in the
- * dropbox between 03:47:58 and 04:16:22, at process runtimes of 8 to 176
- * seconds, and two driven launches that died 8 s after Home drew with the same
+ * THE LISTING NEVER DECODES A STREAM. Issue #271, stated as what was
+ * observed rather than as what was there. On the phone, a `:core:data` lines
+ * sequence grew ONE line's `StringBuilder` past a 256 MiB growth limit: eight
+ * `OutOfMemoryError` crashes in the dropbox between 03:47:58 and 04:16:22, at
+ * process runtimes of 8 to 176 seconds, and two driven launches that died 8 s
+ * after Home drew with the same
  * `Arrays.copyOf <- ensureCapacityInternal <- BufferedReader.readLine` stack.
- * A count of bytes cannot do that: it holds one fixed buffer whatever the file
- * turns out to be.
+ * The scan runs on every launch, so the app could not start at all.
+ *
+ * NOBODY EVER LISTED THE PHONE'S `files/inflight`, so the newline-free journal
+ * file behind those crashes is INFERRED, not seen. What supports the inference
+ * is a reproduction: the same APK, given a known 300 MB newline-free
+ * `imu.csv` on the emulator, hit that stack frame for frame. A count of bytes
+ * cannot do that whatever the file turns out to be -- it holds one fixed
+ * buffer.
  */
 object JournalScanPolicy {
     /**
@@ -93,11 +98,20 @@ object JournalScanPolicy {
      * mid-append leaves a final line with no newline after it, and that line
      * is counted: it is a row the writer began, the zip carries its bytes
      * verbatim, and reporting it as absent would understate a capture at
-     * exactly the moment the lifter is deciding whether to keep it. It is NOT
-     * a decodable sample -- `ImuCsv.decode` refuses it -- so this count and
-     * the number of samples a later decode of the same file yields can differ
-     * by one. That difference is deliberate and is the only one there is on a
-     * well-formed file.
+     * exactly the moment the lifter is deciding whether to keep it.
+     *
+     * WHETHER A LATER DECODE AGREES DEPENDS ON WHERE THE KILL FELL. An earlier
+     * form of this block said flatly that `ImuCsv.decode` refuses such a row
+     * and that the two counts therefore differ by one; that is deleted. Decode
+     * splits on commas and requires ten of the header's eleven fields. A kill
+     * past the tenth column -- inside `sample_idx` -- leaves those ten whole,
+     * so a decode counts the row too and the two numbers AGREE. A kill short
+     * of the end of the tenth field does not make the decoder skip the line,
+     * it makes it THROW -- `require(f.size >= 10)`, or `toDouble` on the
+     * partial tenth -- so a decode of that file yields no samples at all
+     * rather than one fewer. Nothing on this path decodes anything, which is
+     * the whole of #271; the rule is stated because a reader comparing this
+     * count against a decoded export will otherwise assume one.
      *
      * A file holding a header row and nothing else is zero rows, with or
      * without its trailing newline. An empty file is zero rows.
@@ -141,6 +155,14 @@ object JournalScanPolicy {
  * capture needed: hundreds of megabytes is itself the finding. The size is
  * formatted by `ByteSize`, which is where this repository states a byte count
  * in a lifter's units, rather than by a second rule here.
+ *
+ * A CLOCK THE SCAN CAN STILL SUPPORT WAS NOT RESTORED, DELIBERATELY.
+ * `SetJournalHeader.startedAtMs` is in the parsed header and needs no decode,
+ * so this card could say when the set began; it does not, and shows no time at
+ * all. The line that went was the last sample's timestamp -- when the capture
+ * STOPPED -- and that is the fact a lifter deciding whether to keep a
+ * recovered set is after. A start time standing in the same place would read
+ * as the same line with a different number.
  */
 object InterruptedSetSummary {
     /**

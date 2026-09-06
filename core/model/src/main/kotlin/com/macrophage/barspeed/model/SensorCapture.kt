@@ -811,9 +811,23 @@ object SensorCapturePolicy {
      * measured off disk, from newline bytes and never from a decode (#271).
      * Those are the same quantity observed at two moments -- to within the one
      * row a process killed mid-append leaves without its newline, which the
-     * byte scan counts and a decode refuses -- and this function is
-     * deliberately incapable of telling them apart; what it cannot do is grade
-     * one of them by a different rule.
+     * byte scan always counts and a decode may or may not -- and this function
+     * is deliberately incapable of telling them apart; what it cannot do is
+     * grade one of them by a different rule.
+     *
+     * THAT CLAUSE USED TO SAY A DECODE "REFUSES" THE UNTERMINATED ROW, AS A
+     * UNIVERSAL. Deleted, because it is not one. `ImuCsv.decode` splits the
+     * line on commas and requires ten of the header's eleven fields, so where
+     * the kill fell decides. Past the tenth column -- anywhere inside
+     * `sample_idx`, the eleventh -- the ten fields are whole, the row decodes
+     * like any other, and the two counts AGREE. Short of the end of the tenth
+     * field the decode does not skip the line, it THROWS:
+     * `require(f.size >= 10)` on a line that lost whole fields, `toDouble` on
+     * one that lost part of the tenth, and either way the decode of that file
+     * yields no samples at all rather than one fewer. The single exception is
+     * a truncated tenth field that still parses as a number, which decodes
+     * with a wrong angle in it. So the two counts either agree or the decode
+     * does not finish; they do not differ by one.
      */
     fun analysedFrom(
         armed: SensorRole?,

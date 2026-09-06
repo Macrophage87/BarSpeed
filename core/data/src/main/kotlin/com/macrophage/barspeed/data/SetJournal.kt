@@ -131,17 +131,30 @@ data class SetJournalHeader(
  * Every stream is a [JournalStreamScan] -- a byte length and a row count taken
  * from a count of newline bytes -- and no field of this type holds a sample, a
  * cue or a mark. Issue #271: the listing decoded every stream under
- * `files/inflight` on every launch, and one journal file holding hundreds of
- * megabytes with no newline in any of them exhausted the phone's 256 MB heap
- * inside `BufferedReader.readLine` before Home had finished drawing. A
- * recovered capture is offered back as a zip of its files or discarded, and
- * neither of those needs a sample in memory.
+ * `files/inflight` on every launch, and on the phone a `:core:data` lines
+ * sequence grew one line past a 256 MiB growth limit inside
+ * `BufferedReader.readLine` before Home had finished drawing. The phone's
+ * directory was never listed, so the newline-free journal file behind that is
+ * INFERRED rather than observed; what supports it is a reproduction, the same
+ * APK hitting the same stack frame for frame on the emulator from a known
+ * 300 MB newline-free `imu.csv`. A recovered capture is offered back as a zip
+ * of its files or discarded, and neither of those needs a sample in memory.
  *
  * A STREAM FIELD IS NULL WHEN THE FILE IS NOT THERE, which is not the same
  * fact as a file with zero rows in it. A manually counted set has no `imu.csv`
  * at all; an armed sensor that went silent leaves one holding a header row and
  * nothing under it. Collapsing the two into a zero is the defect this
  * repository calls absence rendered as a value.
+ *
+ * IT IS ALSO NULL WHEN THE FILE IS THERE AND THE SCAN COULD NOT OPEN OR READ
+ * IT. `SetJournalStore`'s byte loop runs inside `runCatching { }.getOrNull()`
+ * so that one unreadable directory cannot stop the other interrupted sets
+ * being listed, and the price is paid here: a stream lost to an IO failure is
+ * indistinguishable from one that was never written. It is listed as absent,
+ * it is not counted in [bytes], and `InterruptedSetSummary` does not name it
+ * among the unreadable files -- only a stream the scan measured and could not
+ * count whole is named there. The bytes are still on disk and
+ * [SetJournalStore.zip] still copies them into the recovered capture.
  *
  * [repMarks] counts the epoch-ms instants at which a rep was counted, by the
  * lifter thumbing the button or by the guided cadence runner. Marks rather
@@ -689,8 +702,12 @@ class SetJournalStore(
      * an armed unit that delivered nothing. And a row the writer began but
      * never terminated counts as a row, so a stream carrying seven whole
      * samples and a ragged eighth line reaches
-     * `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES` where a decode of the same
-     * bytes would not.
+     * `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES` (8) where a decode of the
+     * same bytes MAY not. The flat "would not" is deleted: `ImuCsv.decode`
+     * needs ten of the header's eleven fields, so it counts that eighth row
+     * whenever the kill fell past the tenth column, and short of that it
+     * throws on `require(f.size >= 10)` rather than skipping the line -- which
+     * yields no samples at all, not seven.
      *
      * IT TRANSFORMS THE PARSED TEXT RATHER THAN RE-ENCODING THE DECODED
      * HEADER, so a key written by a build this one has never heard of survives

@@ -46,7 +46,9 @@ import kotlin.test.assertTrue
  *
  * THE DEVICE LEG WAS RUN AND IT IS AN EMULATOR, NOT THE PHONE. On
  * `barspeed-api35` headless, with a header.json and a 300 MB newline-free
- * imu.csv -- the runaway fixture above, not the three-million-row one --
+ * imu.csv -- the runaway fixture this class pins in `a 300 MB stream with no
+ * newline is listed by its size and never read`, not the three-million-row
+ * one --
  * pushed under `files/inflight/s1/set0-1` at the app's own uid, v0.1.51
  * (versionCode 52) died 6 s after launch with
  * `FATAL EXCEPTION: main / java.lang.OutOfMemoryError: Failed to allocate a
