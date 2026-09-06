@@ -678,6 +678,20 @@ class SetJournalStore(
      * reason -- they are already the canonical format a `field-*.csv`
      * regression fixture is written in, and this file is not one.
      *
+     * WHAT THE BYTE-FOR-BYTE PIN COVERS, AND WHAT CAN STILL MOVE. #271's
+     * `SetJournalTest.the published header is the document this pins, byte for
+     * byte` asserts ONE document as a literal string -- the transformed
+     * dual-role case, armed `A` with two rows on disk -- and it is not a claim
+     * that this file is unchanged for every capture. `analysedRole` and
+     * `analysedFellBack` are derived from newline counts now rather than from a
+     * decode, and the two differ in two places. A stream the scan cannot count
+     * whole is handed a lower bound, so an unreadable armed stream publishes as
+     * an armed unit that delivered nothing. And a row the writer began but
+     * never terminated counts as a row, so a stream carrying seven whole
+     * samples and a ragged eighth line reaches
+     * `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES` where a decode of the same
+     * bytes would not.
+     *
      * IT TRANSFORMS THE PARSED TEXT RATHER THAN RE-ENCODING THE DECODED
      * HEADER, so a key written by a build this one has never heard of survives
      * into the zip instead of being silently dropped by a decoder configured

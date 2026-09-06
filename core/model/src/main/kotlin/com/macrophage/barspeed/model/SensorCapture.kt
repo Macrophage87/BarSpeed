@@ -808,9 +808,12 @@ object SensorCapturePolicy {
      *
      * THE CALLER STILL CHOOSES ITS COUNTS. The recording path counts the
      * buffers it is about to store; the orphan store counts the rows it
-     * decoded off disk. Those are the same quantity observed at two moments,
-     * and this function is deliberately incapable of telling them apart --
-     * what it cannot do is grade one of them by a different rule.
+     * measured off disk, from newline bytes and never from a decode (#271).
+     * Those are the same quantity observed at two moments -- to within the one
+     * row a process killed mid-append leaves without its newline, which the
+     * byte scan counts and a decode refuses -- and this function is
+     * deliberately incapable of telling them apart; what it cannot do is grade
+     * one of them by a different rule.
      */
     fun analysedFrom(
         armed: SensorRole?,
