@@ -115,30 +115,40 @@ object RestEffortPromptPolicy {
      *   withhold the failure tile for different reasons and only one of them
      *   has to be carried back through the write.
      */
-    // A SEAM ARTEFACT, and it goes with the seam. [tappedFailed] and
-    // [derivedFailed] are genuinely unread at this commit, because every branch
-    // below answers null; they are in the signature now so that the fix is a
-    // change to this body and not to the call site as well, and so that the red
-    // differential can be written against the real shape. The suppression is
-    // deleted in the same commit that reads them. It is stated here rather than
-    // worked around by giving the linter a dead branch to look at.
-    @Suppress("UnusedParameter")
     fun prompt(timed: Boolean, rpe: Int?, tappedFailed: Boolean, derivedFailed: Boolean): RestEffortPrompt? = when {
         // A set already carrying a rating has answered this question. First,
         // so that a timed set which DID reach the in-set grid is not asked
         // twice, and so that the prompt closes itself the moment the tap
         // lands rather than needing the screen to remember it did.
         rpe != null -> null
-        // SEAM ONLY AT THIS COMMIT. Every branch below answers null, which is
-        // exactly what the app does today: nothing on the rest screen asks a
-        // finished set how it felt, and `EffortCorrectionPolicy.lineText` was
-        // landed the same way for the same reason. The differential is the
-        // commit after the reds, and it lands HERE -- in this `when` -- so the
-        // screen's wiring is in place and behaviour-preserving until it does.
-        timed -> null
-        // A rep set was rated at the moment it ended. Written out rather than
-        // folded into the line above, because this branch is the one that
-        // stays null when the differential lands.
+        // A hold or a carry, unrated. This is the whole of #283: neither of
+        // the two ways a timed set ends draws a grid, so the question has to
+        // be asked afterwards or not at all. How it ended is not read here --
+        // only which failure fact it arrived with, because that is all the row
+        // carries, and both of the questions those facts answer are about the
+        // TILE rather than about whether to ask.
+        timed ->
+            RestEffortPrompt(
+                // Offered only where no failure stands. The two reasons for
+                // withholding it are different and both apply: where the
+                // lifter tapped it the tile re-stores what stands, and where
+                // the app derived it the tile would store a TAPPED failure on
+                // the one path a duration correction is meant to be able to
+                // clear. Where NEITHER stands the set met its target, so the
+                // lifter's own word is the only thing that can say it broke --
+                // which is `SetEndControlPolicy`'s rule for the in-set grid.
+                failedTile = !tappedFailed && !derivedFailed,
+                // The lifter's own verdict and nothing else. `derivedFailed`
+                // is deliberately absent: it is re-derived at every write from
+                // the count, so carrying it here would say the lifter claimed
+                // a shortfall they never claimed, and `SetRatingTracker.rate`
+                // ORs the derived half back in on its own.
+                carriesFailed = tappedFailed,
+            )
+        // A rep set was rated at the moment it ended, because there the grid
+        // IS the end-set control. Written out rather than folded into the line
+        // above, so that widening this to an unrated rep set is a visible
+        // change to this branch.
         else -> null
     }
 }
