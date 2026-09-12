@@ -2961,9 +2961,11 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * stood there are inside the popup the button opens. THREE things are still drawn
  * above it, and all three for the same reason. The first is
  * [RestEffortPromptSection] (#283), the effort question a set nothing asked at
- * its end is asked here instead -- which is every hold, because a hold ends on
- * its clock or on the failure control and neither draws a grid. It is above the
- * other two because both depend on its answer. The second is the reason page the app opens BY
+ * its end is asked here instead -- which is a hold that RAN ITS CLOCK, because
+ * such a hold ends itself and draws no grid. A hold the lifter ended with the
+ * failure control is asked nothing at all: "if you can't do it, it's failed" is
+ * the owner's rule on #283, and the reason page below is that set's page. It is
+ * above the other two because both depend on its answer. The second is the reason page the app opens BY
  * ITSELF, drawn here under the header: the screen scrolls to 0 on entering
  * RESTING, so a question drawn below the fold is a question the lifter starts
  * the next set without seeing. See [SetLimiterPagePlacement]. The field report for v0.1.37 is
@@ -3037,12 +3039,13 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     RestHeader(state, viewModel)
     Spacer(Modifier.height(6.dp))
     // FIRST of the three things drawn above the fold, and above the limiter
-    // page deliberately (#283). A hold is never asked how it went while it is
-    // ending -- the clock ends it, or the failure control does -- so this is
-    // the only place the question can be put, and it is the question the two
-    // rows below it depend on: the limiter page asks why a set ended and the
-    // headroom grid acts on the rung this stores. Decides nothing itself; see
-    // [RestEffortPromptSection].
+    // page deliberately (#283). A hold that runs its clock out is never asked
+    // how it went while it is ending -- the clock ends it -- so this is the
+    // only place that question can be put, and it is the question the two rows
+    // below it depend on: the limiter page asks why a set ended and the
+    // headroom grid acts on the rung this stores. A hold ended by the failure
+    // control is asked nothing here; it gets the reason page below and no
+    // effort question. Decides nothing itself; see [RestEffortPromptSection].
     RestEffortPromptSection(state, viewModel)
     // Drawn HERE, above everything but the header, because the screen
     // scrolls to 0 on entering RESTING. A question below the fold is a
@@ -3107,7 +3110,8 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // A FIFTH writer now sits ABOVE this row and the count above is no longer
     // the whole picture: RestEffortPromptSection, drawn a few lines up, reaches
     // lastSetRpe and lastSetFailed through the same ratedState. On a hold that
-    // is what makes this row appear at all. The column behaviour between the
+    // ran its clock that is what makes this row appear at all; on one broken
+    // early the question never draws. The column behaviour between the
     // two is a [Field] question; see [NextSetNudgeSection]'s KDoc, which is the
     // canonical copy of this paragraph rather than a second one to keep in step.
     // Decides nothing itself; see [NextSetNudgeSection].

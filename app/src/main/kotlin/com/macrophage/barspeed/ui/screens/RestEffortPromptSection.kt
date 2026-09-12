@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,32 +18,51 @@ import androidx.compose.ui.unit.dp
 import com.macrophage.barspeed.model.RestEffortPromptPolicy
 import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
-import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.SectionCaption
 
 /**
- * "How hard was that set?", asked on the rest screen about a set nothing asked
- * when it ended (#283).
+ * "How hard was that set?", asked on the rest screen about a hold that ran its
+ * clock and was never asked (#283).
  *
  * ## Nothing here decides anything
  *
- * Whether to draw at all, whether the failure tile is among the tiles, and what
- * a tap carries as `failed`, are all `RestEffortPromptPolicy.prompt`'s answers,
- * pinned in `:core:model` on the CI path. This file projects [RecordState] onto
- * that function's four inputs and draws the result, for the reason every other
- * rule on this screen has been lifted out for: no test in this repository can
- * render a composable.
+ * Whether to draw at all is `RestEffortPromptPolicy.prompt`'s answer, pinned in
+ * `:core:model` on the CI path. This file projects [RecordState] onto that
+ * function's four inputs and draws the result, for the reason every other rule
+ * on this screen has been lifted out for: no test in this repository can render
+ * a composable.
+ *
+ * ## Only a set that did what it was asked is asked
+ *
+ * The owner's rule: *"Don't ask for an RPE on failed sets, if you can't do it,
+ * it's failed."* So this question is drawn for a timed set carrying no rating
+ * and no failure of either kind, and for nothing else. A hold the lifter ended
+ * with the failure control gets the limiter and reason page below and no effort
+ * question at all; a hold the app judged short of its target gets the same.
+ *
+ * TWO CONSEQUENCES FOR THIS FILE, both of which used to be decisions the policy
+ * made and are now invariants:
+ *
+ *  - the failure tile is filtered out of the ladder, because a set with nothing
+ *    saying it fell short cannot be asked to say it failed on the rest screen
+ *    after it already finished. Seven tiles, not eight.
+ *  - every tap therefore carries `failed = false`, and it is written as
+ *    `failed = option.failed` rather than as the literal so the filter and the
+ *    write cannot come to disagree about which tiles are on screen.
+ *
+ * Neither is test-gated: they are `:app` rules and `:app` has no reachable seam
+ * for them, so they are compile- and lint-gated only.
  *
  * ## The ladder is the FROZEN one
  *
  * `feedback.rpeAsk` is the noun resolved when the set was WRITTEN (#244), never
  * the plan re-read -- an exercise's `progression` can be edited, or its whole
  * plan deleted, while this question is still on screen. On a hold that resolves
- * to `EffortAsk.TIME`, so the rungs read "Could have gone about 15 s longer"
- * and the failure tile reads "Broke early — failed". A hold on an exercise whose
- * plan declares `"reps"` is asked in reps here, because that is what
- * `EffortScale.askFor` froze onto the row and what the plan gate already warns
- * the lifter about; it is that function's business and not this one's.
+ * to `EffortAsk.TIME`, so the rungs read "Could have gone about 15 s longer". A
+ * hold on an exercise whose plan declares `"reps"` is asked in reps here,
+ * because that is what `EffortScale.askFor` froze onto the row and what the plan
+ * gate already warns the lifter about; it is that function's business and not
+ * this one's.
  *
  * `timed` is computed ONCE and handed to both the policy and the ladder, so the
  * decision to ask and the wording of the question cannot disagree about which
@@ -61,13 +79,6 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  * about the export, the plan or the database changes for this question to be
  * answerable, which is why #283 is a screen change.
  *
- * `failed = option.failed || ask.carriesFailed` is the load-bearing half.
- * `SetRatingTracker.rate` ASSIGNS its `failed` argument to the tapped fact
- * rather than OR-ing it, so on a hold the lifter broke early a headroom tap
- * passing false would withdraw the lifter's own verdict and republish
- * `failedByLifter` false. Read from source; no test in this repository can
- * execute that tracker, and no device run has confirmed it.
- *
  * ## Why SKIP and the tap both set `answered`
  *
  * `answered` is composable state keyed on `setsCompleted`, hoisted above every
@@ -77,12 +88,14 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  * nothing, because absence is already what the row carries, so there is nothing
  * for the record to remember.
  *
- * The tap needs it as much as the skip does, and that is the non-obvious part.
- * Tapping the FAILURE tile stores `rpe` null, so the policy would answer
- * non-null again on the next composition and the question would redraw itself
- * with its tile now withheld. A rung's tap does close the question through the
- * policy, since a non-null `rpe` withholds it; `answered` makes both taps
- * behave the same way rather than one of them by luck.
+ * A rung's tap closes the question through the policy on its own, since a
+ * non-null `rpe` withholds it, and it sets `answered` as well so that both ways
+ * out of this row behave the same rather than one of them by luck. THAT HAS A
+ * COST AND IT IS A CAPTURE-PATH ONE: `answered` is set on the tap, before the
+ * write returns. `applyRating` publishes the new rating only if
+ * `SetRatingTracker.rate` returns non-null, so on a set with no attached row
+ * the tap stores nothing AND the question is gone for that rest; the Correct
+ * popup is then the only route back. Read from source, never observed.
  *
  * ## Placement, and what is NOT claimed about it
  *
@@ -100,15 +113,9 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  *
  * ## NOTHING HERE HAS BEEN RENDERED
  *
- * No bench run happened, and the blocker was memory rather than the emulator
- * slot -- the lock file
- * `<scratch>/emulator.lock` was free throughout. Free physical
- * memory was polled 31 times on 2026-09-12, 16:43:50 to 17:12:26 local, against
- * the roughly 3 GB a headless `barspeed-api35` boot needs: peak 747 MB, floor
- * 215 MB, and the last 26 samples peaked at 639 MB. The AVD was never started,
- * so no device was started and none was killed. Every claim in this file about
- * what DRAWS is read from source; the tile count, the wording, the placement and
- * what the export carries afterwards are all carried as [Field] items.
+ * No bench run happened. Every claim in this file about what DRAWS is read from
+ * source; the tile count, the wording, the placement and what the export
+ * carries afterwards are all carried as [Field] items.
  */
 @Composable
 internal fun RestEffortPromptSection(state: RecordState, viewModel: RecordViewModel) {
@@ -120,35 +127,26 @@ internal fun RestEffortPromptSection(state: RecordState, viewModel: RecordViewMo
     var answered by remember(state.setsCompleted) { mutableStateOf(false) }
     val feedback = state.lastFeedback ?: return
     val timed = feedback.actualDurationS != null
-    val ask =
-        RestEffortPromptPolicy.prompt(
-            timed = timed,
-            rpe = state.lastSetRpe,
-            tappedFailed = state.lastSetTappedFailed,
-            // The shortfall the app worked out for itself: the effective
-            // verdict minus the lifter's own tap, which is the same pair
-            // `DraftEffortSection` reads and the only way to recover the
-            // derived half from a state that stores the OR.
-            derivedFailed = state.lastSetFailed && !state.lastSetTappedFailed,
-        ) ?: return
+    RestEffortPromptPolicy.prompt(
+        timed = timed,
+        rpe = state.lastSetRpe,
+        tappedFailed = state.lastSetTappedFailed,
+        // The shortfall the app worked out for itself: the effective verdict
+        // minus the lifter's own tap, which is the same pair
+        // `DraftEffortSection` reads and the only way to recover the derived
+        // half from a state that stores the OR. Handed over separately from
+        // the tapped fact even though both now answer null, so that this call
+        // site cannot quietly start reading only one of them.
+        derivedFailed = state.lastSetFailed && !state.lastSetTappedFailed,
+    ) ?: return
     if (answered) return
-    val options = rpeOptions(timed, feedback.explosive, state.weightUnit, feedback.rpeAsk).filter {
-        ask.failedTile || !it.failed
-    }
+    // The failure tile is not among these. The policy has already established
+    // that nothing on this row says the set fell short, and a tile offering to
+    // say so after the set finished is the ask the owner's rule forbids.
+    val options = rpeOptions(timed, feedback.explosive, state.weightUnit, feedback.rpeAsk).filter { !it.failed }
     Spacer(Modifier.height(6.dp))
     // The owner's own words for the thing a hold never showed him.
     SectionCaption("How hard was that set?")
-    if (!ask.failedTile) {
-        // One sentence for both routes to a withheld tile. The row already
-        // reads failed either way, and saying which route it came by would put
-        // the derived/tapped distinction in front of a lifter it means nothing
-        // to; what they need to know is that answering does not undo it.
-        Text(
-            "Already recorded as failed — saying how it felt does not change that.",
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Sub,
-        )
-    }
     Spacer(Modifier.height(6.dp))
     options.chunked(2).forEach { row ->
         Row(
@@ -157,7 +155,7 @@ internal fun RestEffortPromptSection(state: RecordState, viewModel: RecordViewMo
         ) {
             row.forEach { option ->
                 RpeTile(option, selected = false, modifier = Modifier.weight(1f)) {
-                    viewModel.rateLastSet(option.rpe, failed = option.failed || ask.carriesFailed)
+                    viewModel.rateLastSet(option.rpe, failed = option.failed)
                     answered = true
                 }
             }
