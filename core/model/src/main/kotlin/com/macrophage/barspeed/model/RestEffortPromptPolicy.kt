@@ -62,9 +62,13 @@ data class RestEffortPrompt(
  * moment. It ends when its clock reaches the target, which `RecordViewModel`
  * does by calling `endSet()` with no rating at all, or when the lifter taps the
  * standalone failure control, which calls `endSet(SetRating(null, failed =
- * true))`. Neither path draws a grid, so every hold has been stored with `rpe`
- * null and the rest screen has simply begun. Field session 38's two dead hangs
- * export `rpe` null.
+ * true))`. Neither path draws a grid, so every hold ended by either of those
+ * two paths has been stored with `rpe` null and the rest screen has simply
+ * begun. The qualifier is load-bearing and an unqualified "every hold" is
+ * deleted rather than left standing: a third way out exists on some holds, the
+ * in-set grid, and the bullet under "Why it is keyed on the RATING and not on
+ * the plan" contradicts the absolute outright. Field session 38's two dead
+ * hangs export `rpe` null.
  *
  * That is the one dimension a hold PROGRESSES in. `EffortScale.askFor` answers
  * `EffortAsk.TIME` for a hold and the timed headroom rungs are worded in
@@ -83,9 +87,19 @@ data class RestEffortPrompt(
  *    an ad-hoc set to fall through.
  *  - A timed set that DID get the in-set grid, which
  *    `SetEndControlPolicy.controls` draws for a hold whose completion the app
- *    cannot judge, arrives already rated and owes nothing. The rating being
- *    present is what withholds the second ask; no separate branch counts how
- *    the set ended.
+ *    cannot judge, owes nothing ONLY WHERE THE LIFTER TAPPED A RATING TILE.
+ *    The other two ways out of that grid store no `rpe` at all: its failure
+ *    tile ends the set with `SetRating(null, failed = true)`, and END SET EARLY
+ *    calls `endSet()` with no rating. A set that left by either of those
+ *    reaches the rest screen UNRATED and IS asked here -- with the failure tile
+ *    withheld both times, for the two different reasons [RestEffortPrompt]
+ *    keeps apart. After the in-set failure tile `tappedFailed` stands. After
+ *    END SET EARLY, which on a started timed set is drawn only where
+ *    `setTargetMet` is false, `derivedFailed` stands: both that flag and
+ *    `setTargetMet` are `TimedSetEndPolicy.fellShort` against the
+ *    prescription, so the button being offered and the shortfall being derived
+ *    are one answer asked twice. The rating being present is what withholds the
+ *    second ask; no separate branch counts how the set ended.
  *
  * ## What is deliberately NOT widened
  *

@@ -3103,6 +3103,13 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // hazard is UNMEASURED and is a [Field] question, not a property claimed
     // here; the bench never appended a set from a rest in which this row could
     // appear.
+    //
+    // A FIFTH writer now sits ABOVE this row and the count above is no longer
+    // the whole picture: RestEffortPromptSection, drawn a few lines up, reaches
+    // lastSetRpe and lastSetFailed through the same ratedState. On a hold that
+    // is what makes this row appear at all. The column behaviour between the
+    // two is a [Field] question; see [NextSetNudgeSection]'s KDoc, which is the
+    // canonical copy of this paragraph rather than a second one to keep in step.
     // Decides nothing itself; see [NextSetNudgeSection].
     NextSetNudgeSection(state, viewModel)
     NextSetBlock(state, viewModel)

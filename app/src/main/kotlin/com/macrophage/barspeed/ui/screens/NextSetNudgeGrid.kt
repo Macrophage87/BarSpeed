@@ -114,6 +114,18 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  * AFTER this row rather than before it. Acting on any of them can move the
  * next target under the finger that acted.
  *
+ * A FIFTH WRITER NOW SITS ABOVE THIS ROW, so "all four are below it" is no
+ * longer the whole picture. `RestEffortPromptSection` (#283) asks a hold how
+ * hard it was, drawn from `RestingStage` above this call, and its tap reaches
+ * `lastSetRpe` and `lastSetFailed` through the same `ratedState` the Correct
+ * popup's re-rating uses. So on a hold this row's first appearance is now
+ * caused from ABOVE: a tap on one of the question's three headroom rungs is
+ * what makes `HeadroomTier.ofRpe(lastSetRpe)` stop returning null, and the same
+ * tap closes the question, so the block above this row disappears in the
+ * composition that draws this row. Whether those two movements net out in the
+ * column, and where that leaves the finger that just tapped, is a [Field]
+ * question and is not claimed here. Nothing on this screen has been rendered.
+ *
  * THE APPEND CASE CHANGED DIRECTION WITH THE MOVE, and it is the one to watch.
  * On the last set of an exercise `setsLeftInExercise` is 0 and `nextSlot` may
  * be null, so this row draws nothing; appending a set of the same exercise
