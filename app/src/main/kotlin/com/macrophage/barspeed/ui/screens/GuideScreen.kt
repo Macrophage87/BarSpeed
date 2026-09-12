@@ -94,7 +94,7 @@ When I share BarSpeed session exports, read the effort fields with this key. "rp
 - rpe null with neither flag = I skipped rating that set, or the set ended before the app could ask.
 
 How to read the rest of a session export, so you don't over-trust it:
-- "reps" is authoritative — I counted it, or the voice guide did. The accelerometer is RECORD-ONLY on standard lifts.
+- "reps" is the count the set was RECORDED as, and "repsSource" says WHOSE count it is: "sensor" = the accelerometer counted it live and I did not argue; "corrected" = it counted and I then disagreed, with "liveReps" holding what it said; "manual" = I tapped it; "metronome" = the voice guide counted on its own schedule; "analysis" = nobody counted during the set and the figure is the segmenter's, taken afterwards. ABSENT on a timed set, where nothing counted reps at all. On the FIRST straight-reps sessions treat "sensor" as a measurement rather than a verified count -- my own hand count is the ground truth there, the detector has never been scored against a real straight-reps set, and where "repMetricsComplete": false on such a set the live and batch detectors disagree about how many reps happened.
 - "bodyWeight_kg" is the body-weight term of "load_kg" — the mass the load arithmetic actually added, so the added or assisting load is "load_kg" minus it. It is ABSENT on loaded work, where no body went into the load; ABSENT on rows recorded before database v17, which had no column for it; and ABSENT on a body-weight set where no body weight was held. The last two are INDISTINGUISHABLE in the document. Absent is not zero.
 - "repMetrics" is the sensor's separate per-rep opinion. When "repMetricsComplete": false it did NOT resolve every rep, so treat the array as a sample of the set, not the set — and treat any summary built from it the same way.
 - "tempoCompliance" scores the two MOVEMENT digits only ("scoredPhases" says which). Pauses are measured and reported but never scored, because separating a real pause from a very slow movement needs displacement, which is the least trustworthy thing here. From schema 1.16 a rep publishes only ONE of "bottomPause_s" and "topPause_s" -- the turnaround between its two phases -- and the end where the rep BOUNDARY falls publishes nothing, because the stillness there is rest and not a pause; treat an absent key as unmeasurable, not as zero. A rep carrying BOTH keys is pre-1.16 data whatever the document's "schemaVersion" says: the per-rep figures are frozen into the set's row when the set is RECORDED and only copied out at export, so every rep published from a set recorded before this version carries both, with the old quantities, and the one at the end where that rep's BOUNDARY falls is the interval to the next drive rather than a pause. Do not compare those two figures with each other or with a post-1.16 rep's single one. Prefer "actualEccConRatio" vs "prescribedEccConRatio" — the contrast is what a tempo block trains and it survives a constant timing offset.
@@ -128,10 +128,13 @@ private val SECTIONS =
             "Start a session from the home screen. Each set shows live bar velocity, the tempo ring, " +
                 "and per-rep bars; explosive lifts show peak velocity and cadence; holds and carries " +
                 "get a countdown. Equipment busy? SWITCH EXERCISE reorders the queue. Barbell sets " +
-                "show which plates to load per side. The bar sensor is RECORD-ONLY on standard " +
-                "lifts: it measures velocity and power while the reps are counted by you (tap) or " +
-                "by the voice guide on tempo sets — a miscounted phase switch can't corrupt the " +
-                "count. Explosive lifts stay sensor-counted. " +
+                "show which plates to load per side. WHO COUNTS depends on the set: a tempo " +
+                "set is counted by the voice guide, a set with no sensor connected is counted by " +
+                "you (tap), and a straight-reps set with the sensor on is counted BY THE SENSOR " +
+                "— it names each rep aloud and the ring shows the same number. If it misses one, " +
+                "+1 REP THE SENSOR MISSED moves the count up by one and it keeps counting; the " +
+                "export then says the count was corrected and still carries what the sensor " +
+                "said. Holds and carries are never counted in reps. " +
                 "Right when a set ends, tap how hard it felt — on every set, whether or not it hit " +
                 "its target, warm-up always among the choices. A set that met its target also gets " +
                 "a 'failed the set' tile; one stopped short does not, because it is logged as " +

@@ -125,15 +125,28 @@ sealed interface RepCall {
  *
  * It does not decide whether the voice is on, whether this set is counted by
  * the sensor at all, or what words are said. `SetVoicePolicy` owns the first
- * two and `VoiceMilestonePolicy` the third. **Nothing in `:app` calls this
- * yet**: on today's sets `SetVoicePolicy.sensorCounts` is false for a
- * rep-based straight set, and un-gating it is blocked on evidence this corpus
- * cannot supply -- see `LiveRepCallCorpusTest`'s measured scoring and issue
- * #145.
+ * two and `VoiceMilestonePolicy` the third.
  *
- * The live count `RecordScreen` DRAWS is still `StreamingSetTracker.repCount`.
- * Un-gating the voice without moving the screen too makes the two disagree;
- * that move is owed by the un-gating commit.
+ * `:app` CALLS THIS NOW, on the owner's rule of 2026-09-12 -- "The sensor
+ * should count the reps" -- for every rep-based set with no prescribed tempo
+ * and an IMU connected (#286). `RecordViewModel`'s `SensorRepCounter` holds one
+ * per set and feeds it the samples `StreamingSetTracker` publishes; the count
+ * it returns is what the voice says, what the ring draws and what the row
+ * records.
+ *
+ * TWO SENTENCES ARE DELETED HERE RATHER THAN REWORDED, both of them true when
+ * written and false now: that **nothing in `:app` calls this yet**, and that
+ * "the live count `RecordScreen` DRAWS is still `StreamingSetTracker.repCount`
+ * ... that move is owed by the un-gating commit." The move was made in the
+ * same commit as the un-gating: the screen and the voice read one field, and
+ * the tracker's own `repCount` is drawn nowhere.
+ *
+ * WHAT IS STILL OWED is the EVIDENCE, which is unchanged. No committed capture
+ * is a no-tempo max-intent set, `LiveRepCallCorpusTest` scores this against
+ * thirteen guided captures whose marks are the GUIDE's calls, and issue #145's
+ * F1 capture -- a straight-rep set with independent per-rep truth -- has not
+ * been recorded. The first deadlift session is what measures whether the
+ * number this class speaks is right.
  */
 class LiveRepCaller(
     private val direction: LiftDirection = LiftDirection(),

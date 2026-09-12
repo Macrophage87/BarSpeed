@@ -67,6 +67,17 @@ class SchemaRepsSourceContractTest {
     private val exampleText: String =
         javaClass.getResourceAsStream("/examples/session-export.example.json")!!.readBytes().decodeToString()
 
+    /**
+     * The copy of the plan contract the COPY PLAN PROMPT button puts on a
+     * lifter's clipboard, read off the test classpath the way
+     * [SchemaRpeScaleContractTest] reads it.
+     */
+    private val prompt: String =
+        checkNotNull(
+            javaClass.getResourceAsStream("/kotlin/com/macrophage/barspeed/ui/screens/GuideScreen.kt"),
+        ) { "GuideScreen.kt is not on the test classpath - see the include filter in core/model/build.gradle.kts" }
+            .readBytes().decodeToString()
+
     // ---- 1. the published keys and their Kotlin twins ----
 
     @Test
@@ -171,6 +182,38 @@ class SchemaRepsSourceContractTest {
             "the published caveat still says the recorded and segmented counts agree by construction",
         )
         assertTrue("repsSource" in d, "the caveat does not point at the key that now says whose count it is")
+    }
+
+    /**
+     * THE COPY THE COACH ACTUALLY RECEIVES says whose count `reps` is.
+     *
+     * `PLAN_PROMPT` is the canonical statement of this contract -- it is what
+     * the button copies to the clipboard -- and it told the coach that
+     * *"`reps` is authoritative -- I counted it, or the voice guide did. The
+     * accelerometer is RECORD-ONLY on standard lifts."* Both halves are false
+     * from #286: the accelerometer counts a straight-reps set, and `reps` may
+     * be its figure rather than a person's. A schema key the shipped prompt
+     * contradicts is the *duplicate documentation drifts* class, and it has
+     * shipped a real defect here before -- the prompt told the model to emit
+     * `start` values the app's own schema rejected.
+     */
+    @Test
+    fun `the shipped plan prompt tells the coach to read the counter word`() {
+        assertTrue("repsSource" in prompt, "the prompt the coach receives does not mention repsSource")
+        SessionExport.VALID_REPS_SOURCES.forEach {
+            assertTrue(
+                '"' + it + '"' in prompt,
+                "the prompt does not say what the counter word $it means",
+            )
+        }
+        assertFalse(
+            "The accelerometer is RECORD-ONLY on standard lifts" in prompt,
+            "the prompt still tells the coach the accelerometer never counts",
+        )
+        assertTrue(
+            "hand count" in prompt.lowercase(),
+            "the prompt does not tell the coach the hand count is the ground truth on the first captures",
+        )
     }
 
     // ---- 3. the version log ----

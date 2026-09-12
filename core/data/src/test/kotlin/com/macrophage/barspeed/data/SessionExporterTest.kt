@@ -853,10 +853,14 @@ class SessionExporterTest {
     /**
      * The summary-only export ships the numbers and withholds the warning.
      *
-     * A standard lift is manually counted by construction: the bar sensor is
-     * record-only and the lifter or the voice guide does the counting, so the
-     * stored count and the segmenter's count are two independent opinions and
-     * they routinely differ. Ten reps recorded, three segmented, and
+     * The stored count and the segmenter's count are two independent opinions
+     * and they routinely differ. The sentence that stood here said a standard
+     * lift is "manually counted by construction: the bar sensor is record-only
+     * and the lifter or the voice guide does the counting", which was true when
+     * written and is not now -- #286 makes a straight-reps set with a sensor
+     * SENSOR-counted, and the two opinions there are the live detector and the
+     * batch one, over different velocity estimates. What this test turns on is
+     * unchanged: the counts differ and the caveat that says so is withheld. Ten reps recorded, three segmented, and
      * `summary.json` states velocity loss, tempo compliance and a full summary
      * block computed over those three -- while the one field that says so is
      * suppressed because per-rep detail was not requested.
