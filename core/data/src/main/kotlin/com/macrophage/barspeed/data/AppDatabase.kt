@@ -552,6 +552,53 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
+         * DECLARED AND EMPTY, and not in [MIGRATIONS] below.
+         *
+         * The scaffold #286's live rep count needs and nothing more: the
+         * differentials in `Migration17To18Test` name a migration, and a test
+         * naming a symbol that does not exist fails to compile rather than
+         * failing. So the symbol arrives here first, doing nothing, with
+         * [DATABASE_VERSION] still 17 and the chain unchanged -- the state
+         * `Migration16To17Test` records its own half having been red at.
+         *
+         * Filling it in, registering it and moving the constant are one
+         * commit, with `18.json` and the column.
+         */
+        internal val MIGRATION_17_18 =
+            object : Migration(17, 18) {
+                override fun migrate(db: SupportSQLiteDatabase) = Unit
+            }
+
+        /**
+         * Every hop, in order, as one list.
+         *
+         * Extracted from the `addMigrations` call below, which named all
+         * sixteen inline. A hop can be DECLARED and left out of that call, and
+         * the failure lands on the lifter's phone as Room refusing to open the
+         * database rather than anywhere a test can see it -- so the list a test
+         * can read is the list the builder uses, and not a second copy of it.
+         */
+        internal val MIGRATIONS: Array<Migration> =
+            arrayOf(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9,
+                MIGRATION_9_10,
+                MIGRATION_10_11,
+                MIGRATION_11_12,
+                MIGRATION_12_13,
+                MIGRATION_13_14,
+                MIGRATION_14_15,
+                MIGRATION_15_16,
+                MIGRATION_16_17,
+            )
+
+        /**
          * Open the database, having first made sure opening it cannot destroy
          * it. Issue #101.
          *
@@ -592,24 +639,10 @@ abstract class AppDatabase : RoomDatabase() {
                 compiledVersion = DATABASE_VERSION,
             )
             return Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
-                .addMigrations(
-                    MIGRATION_1_2,
-                    MIGRATION_2_3,
-                    MIGRATION_3_4,
-                    MIGRATION_4_5,
-                    MIGRATION_5_6,
-                    MIGRATION_6_7,
-                    MIGRATION_7_8,
-                    MIGRATION_8_9,
-                    MIGRATION_9_10,
-                    MIGRATION_10_11,
-                    MIGRATION_11_12,
-                    MIGRATION_12_13,
-                    MIGRATION_13_14,
-                    MIGRATION_14_15,
-                    MIGRATION_15_16,
-                    MIGRATION_16_17,
-                )
+                // One at a time rather than a spread: detekt's `SpreadOperator`
+                // is on, and a copy of the array per open is a cost with no
+                // reader. The list is still the single statement of the chain.
+                .apply { MIGRATIONS.forEach { addMigrations(it) } }
                 .build()
         }
     }
