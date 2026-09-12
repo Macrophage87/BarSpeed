@@ -20,6 +20,7 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RepMetricsExport
+import com.macrophage.barspeed.model.RepsSourcePolicy
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SessionExport
@@ -267,6 +268,16 @@ class SessionExporter(
             bodyWeightKg = record.bodyWeightKg,
             reps = record.actualReps,
             repsManual = record.repsManual,
+            // WHOSE count that figure is (#286). Derived rather than stored,
+            // and derived HERE rather than at each writer: the manifest below
+            // asks the same extension, so the two documents cannot come to
+            // disagree about who counted a set.
+            repsSource = record.publishedRepsSource,
+            // What the sensor counted, beside what the set is recorded as.
+            // Published straight off the row and never recomputed -- the live
+            // figure cannot be rebuilt from the stored stream, which yields the
+            // BATCH count over a different velocity estimate.
+            liveReps = record.liveReps,
             plannedReps = record.plannedReps,
             durationS = phase.durationS,
             abandonedInPrep = phase.abandonedInPrep,
@@ -608,6 +619,36 @@ private val SetRecordEntity.publishedLimiter: String?
     get() = SetLimiter.ofStored(limiter)?.stored
 
 /**
+ * Whose count this row's [SetRecordEntity.actualReps] is, as the published
+ * word (#286).
+ *
+ * One definition read by both export writers, [publishedLimiterNote]'s reason:
+ * the session document is serialised by kotlinx and the archive's manifest is
+ * assembled as text by a different function, and a rule written twice drifts.
+ *
+ * The RULE is `RepsSourcePolicy`'s, in `:core:model` where a table covers every
+ * row of it. What this adds is the two inputs the policy cannot read off a row
+ * itself:
+ *
+ * - TIMED is `actualDurationS != null`. That column is written only by
+ *   `recordedTimedSeconds`, which returns null on every set that is not a hold
+ *   or a carry, so the column IS the timed marker. `AbandonedSetPolicy` reads
+ *   it the same way one field up. The PUBLISHED duration is not used, because a
+ *   set abandoned in its prep publishes no duration and is still a timed set.
+ * - HAS TEMPO is `tempo != null`, the prescription frozen onto the row when the
+ *   set was recorded -- never a plan read at export time, which can have been
+ *   edited or deleted since.
+ */
+private val SetRecordEntity.publishedRepsSource: String?
+    get() =
+        RepsSourcePolicy.publishedWord(
+            liveReps = liveReps,
+            repsManual = repsManual,
+            timed = actualDurationS != null,
+            hasTempo = tempo != null,
+        )
+
+/**
  * The free-text note as it may be PUBLISHED: only where an answer stands
  * beside it (#189).
  *
@@ -941,6 +982,17 @@ class RawExporter(
         flag("voided", record.voided)
         str("voidReason", record.publishedVoidReason)
         flag("repsManual", record.repsManual)
+        // Whose count `reps` above is, and what the sensor counted (#286). Here
+        // as well as in session.json because the archive has to stand on its
+        // own: a reader who opens the CSVs alone has this file and nothing else,
+        // and `reps` without it is an integer with four possible authors.
+        //
+        // [num] drops a null, which is what withholds the live count from every
+        // set no live counter ran on -- and writes a real 0, which is also
+        // right: a sensor-counted set whose detector resolved nothing counted
+        // zero.
+        str("repsSource", record.publishedRepsSource)
+        num("liveReps", record.liveReps)
         str("tempoPrescribed", record.tempo)
         // The prep, both halves. [num] drops a null, which is right -- a set
         // that ran no voice guide has no prep -- and writes a real 0, which is

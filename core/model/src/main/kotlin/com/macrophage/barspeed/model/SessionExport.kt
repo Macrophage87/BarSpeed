@@ -1191,6 +1191,51 @@ data class SessionExport(
          * analysis, and nothing re-runs the segmenter at export time. No set
          * already on disk gains the word or loses its figures.
          * `DATABASE_VERSION` does not move -- no column changes.
+         *
+         * ALSO UNDER 1.20, a SECOND entry rather than a mint, because v0.1.52
+         * ships 1.19 -- read by
+         * `git show v0.1.52:core/model/.../SessionExport.kt` rather than
+         * assumed -- and nothing has shipped 1.20 yet: a set carries
+         * [SetExport.repsSource], the word saying WHOSE COUNT its `reps` figure
+         * is, and [SetExport.liveReps], what the sensor's live detector counted
+         * while the set was performed (#286).
+         *
+         * `reps` was one integer carrying four different claims. The sensor
+         * counting live, the lifter's own taps, the cadence guide's schedule
+         * and the batch segmenter's figure taken after the set all land in it,
+         * and only one bit separated them: `repsManual`, true both for a tally
+         * the lifter kept and for a correction of a count something else made.
+         * On the straight-reps barbell work #284 traces, whose count the number
+         * is is the FIRST question to ask of it.
+         *
+         * DERIVED, NOT STORED. `RepsSourcePolicy` takes the row's live count,
+         * its `repsManual` flag, whether it is measured in seconds and whether
+         * a tempo was prescribed, and returns one of `sensor`, `manual`,
+         * `metronome`, `corrected` or `analysis`. Two collapses are stated
+         * rather than hidden: a corrected manual set reads `manual` and a
+         * corrected guided set reads `metronome`, because nothing on the row
+         * records that the rest-screen control was used, and both words are
+         * still honest about whose figure the count is.
+         *
+         * ABSENT ON A TIMED SET, and absence means one thing only -- nothing
+         * counted reps. A hold publishes whatever the segmenter made of one
+         * long movement, and no counter stands behind it.
+         *
+         * NOT PURELY ADDITIVE, in one respect a reader must be told about.
+         * [SetExport.repMetricsComplete] changes what it is measured AGAINST.
+         * Its description said that when `repsManual` is false the recorded
+         * count IS the segmenter's count, so the two agree by construction --
+         * true while every such row carried the segmenter's own figure, and
+         * false from here: on a sensor-counted set `repsManual` is false and
+         * the recorded count is the LIVE one, so a false value is the live and
+         * batch detectors disagreeing. That sentence is DELETED rather than
+         * reworded, here and in the published schema. No key changes type and
+         * none stops being written.
+         *
+         * NOT RETROACTIVE either. `liveReps` is a column written when the set
+         * is recorded (`DATABASE_VERSION` 18) and nothing backfills it, so
+         * every row already on disk publishes `manual`, `metronome`,
+         * `analysis` or no word at all -- which is what those rows were.
          */
         const val SCHEMA_VERSION = "1.20"
 
@@ -1317,6 +1362,18 @@ data class SessionExport(
         val VALID_RPE_SCALES = setOf("load", "reps", "time", "feel")
 
         /**
+         * Whose count a set's `reps` figure is, lowercased [RepsSource] wire
+         * words (#286).
+         *
+         * Derived from the enum rather than written out, the arrangement
+         * [VALID_VELOCITY_LOSS_REGIMES] uses: the WIRE word is what a row is
+         * compared against, so a reordered enum cannot reinterpret an export,
+         * and a word added to the enum without being published is caught by
+         * `SchemaRepsSourceContractTest` rather than shipping.
+         */
+        val VALID_REPS_SOURCES = RepsSource.entries.map { it.wireName }.toSet()
+
+        /**
          * The words a set's `velocityLossRegime` may take, #250.
          *
          * DERIVED from the enum rather than written out, so the published
@@ -1377,6 +1434,59 @@ data class SetExport(
     val reps: Int,
     /** True when reps were entered or corrected manually rather than sensor-counted. */
     val repsManual: Boolean = false,
+    /**
+     * WHOSE COUNT [reps] is, as the published word (1.20, #286).
+     *
+     * One of [SessionExport.VALID_REPS_SOURCES]. `sensor` is the sensor's live
+     * count as the lifter heard it; `manual` the lifter's own taps;
+     * `metronome` the cadence guide's schedule, which it kept whether or not
+     * the lifter followed it; `corrected` a sensor count the lifter then
+     * disagreed with, with [liveReps] beside it holding what the sensor said;
+     * and `analysis` the batch segmenter's figure, taken after the set from
+     * the archived stream.
+     *
+     * DERIVED at export by `RepsSourcePolicy` from [liveReps], [repsManual],
+     * whether the set is measured in seconds and whether a tempo was
+     * prescribed -- no column holds the word. Two collapses follow and are
+     * stated rather than hidden: a corrected MANUAL set reads `manual` and a
+     * corrected GUIDED set reads `metronome`, because nothing on the row
+     * records that the rest-screen control was used.
+     *
+     * ABSENT on a timed set, where nothing counted reps at all, and absence
+     * means that and nothing else -- never a sixth word and never a stand-in
+     * for `manual`.
+     *
+     * READ `sensor` AS A MEASUREMENT AND NOT A VERIFIED COUNT. The live
+     * detector has never been scored against a real straight-reps set: the
+     * batch detector over-counts all six committed concentric-first captures
+     * that carry a hand count, by +1 to +4 (#284), and the thirteen
+     * mark-carrying captures are guided sets whose marks are the GUIDE's calls
+     * rather than a lifter's. On the first straight-reps captures the LIFTER'S
+     * HAND COUNT is the ground truth and this word says which counter to score
+     * against it (#286).
+     */
+    val repsSource: String? = null,
+    /**
+     * What the sensor's LIVE detector counted while the set was performed
+     * (1.20, #286).
+     *
+     * The figure the lifter heard, published whether or not it is still
+     * [reps]: a rest-screen correction rewrites the count and never touches
+     * this, so `repsSource` `corrected` and this key together say what was
+     * corrected and to what.
+     *
+     * NOT the batch segmenter's count, which is `repMetrics.length` where
+     * per-rep detail was asked for and is the figure [repMetricsComplete]
+     * compares [reps] against. The live detector runs the same pairing rule
+     * over a CAUSAL velocity estimate, so the two disagree wherever the
+     * estimates do.
+     *
+     * ABSENT where no live counter ran: a set the lifter counted, a set the
+     * guide counted, a timed set, and every set recorded before database v18.
+     * A sensor-counted set whose detector resolved nothing publishes 0, and 0
+     * is a count.
+     */
+    val liveReps: Int? = null,
     val plannedReps: Int? = null,
     /**
      * Hold/carry seconds recorded for timed sets (planks, farmer's walks).
@@ -1895,10 +2005,21 @@ data class SetExport(
      * caveat that only appears alongside the array leaves the summary-only
      * reader holding the numbers without the warning.
      *
-     * True is weaker than it looks and should not be read as an independent
-     * check: when [repsManual] is false the stored rep count IS the segmenter's
-     * count, so the two agree by construction. Only false carries information
-     * the reader could not derive from [repsManual] alone.
+     * WHAT IT IS MEASURED AGAINST depends on who counted, which [repsSource]
+     * now says. On a `manual`, `metronome` or `corrected` set this compares the
+     * segmenter with a count a person or the guide kept, and false is the two
+     * disagreeing. On a `sensor` set it compares the segmenter with the LIVE
+     * detector -- the same pairing rule over a causal velocity estimate against
+     * a retroactively drift-corrected one -- so false there is the two
+     * ESTIMATES disagreeing, which is the figure #286's first field session is
+     * read for. On an `analysis` set the two agree by construction and this
+     * says nothing.
+     *
+     * The sentence that stood here -- "when [repsManual] is false the stored
+     * rep count IS the segmenter's count, so the two agree by construction" --
+     * is DELETED rather than reworded. It was true while every such row carried
+     * the segmenter's own figure, and stopped being true when a sensor-counted
+     * set began recording the live count with [repsManual] false.
      *
      * Null is a third state, not a synonym for false: the segmenter resolved no
      * reps at all, so there is no figure left to qualify.

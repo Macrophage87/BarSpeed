@@ -204,6 +204,11 @@ class SessionExportRepMarksTest {
                 "load_lb",
                 "reps",
                 "repsManual",
+                // #286. The fixture is a tap-counted set with no tempo and no
+                // live count, so the derived word is `manual` -- and the key is
+                // on the SET, which is why this pin moves in the commit that
+                // publishes it rather than a commit later.
+                "repsSource",
                 "plannedReps",
                 "voiceCues",
                 "repMarks",
@@ -213,7 +218,7 @@ class SessionExportRepMarksTest {
             "the detailed set object's key set moved",
         )
         assertEquals(
-            setOf("load_kg", "load_lb", "reps", "repsManual", "plannedReps", "summary"),
+            setOf("load_kg", "load_lb", "reps", "repsManual", "repsSource", "plannedReps", "summary"),
             setObject(streams, includeRepDetail = false).keys,
             "the summary set object's key set moved",
         )
