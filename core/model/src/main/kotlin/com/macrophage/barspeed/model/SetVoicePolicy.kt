@@ -27,10 +27,22 @@ enum class SetVoiceGuide {
     TIMED_CLOCK,
 
     /**
-     * The sensor-driven counter: bare digits for each second of a detected
-     * eccentric or concentric, and a rep call at each detected lockout. Runs
-     * only where nothing else is counting: an explosive lift, tempo'd or
-     * not, with a sensor connected.
+     * The sensor-driven counter: a rep call at each detected drive, and bare
+     * digits for each second of a detected phase on a set that was PRESCRIBED a
+     * tempo with nothing to play it.
+     *
+     * Runs where nothing else is counting and a sensor is connected, which
+     * since #286 is every rep-based set with no tempo -- the straight-reps
+     * barbell work as well as the explosive lifts, on the owner's rule of
+     * 2026-09-12: "The sensor should count the reps."
+     *
+     * `CountingPolicy.counterFor` is the decision; this file reads it rather
+     * than restating it. Two statements of "the sensor is counting this set"
+     * drift, and the way they drift is the app speaking a count it does not
+     * record. The sentence that stood here -- "Runs only where nothing else is
+     * counting: an explosive lift, tempo'd or not, with a sensor connected" --
+     * is deleted rather than reworded: it was the whole rule, and it is now
+     * one case of it.
      */
     SENSOR_COUNT,
 }
@@ -72,7 +84,10 @@ enum class SetVoiceGuide {
  *
  * This decides only WHO may speak. What they say, whether the audio-cues
  * toggle lets them say it, and which counter the set's reps are read from are
- * three other questions with three other owners.
+ * three other questions with three other owners -- the third is
+ * [CountingPolicy], which the sensor term below now READS: the voice follows
+ * the counter, and `SetVoicePolicyTest > the sensor speaks on exactly the sets
+ * the sensor counts` asserts it over every shape (#286).
  */
 object SetVoicePolicy {
     /**
@@ -92,12 +107,17 @@ object SetVoicePolicy {
      */
     fun guidesFor(hasTempo: Boolean, isTimed: Boolean, kind: ExerciseKind, imuConnected: Boolean): Set<SetVoiceGuide> {
         val cued = LeadInPolicy.prepCase(hasTempo, isTimed, kind) == PrepCase.CUED
-        // `!isTimed` is #217. A set measured on the clock is guided by the
-        // clock: there is one movement, it lasts the whole set, and there are
-        // no strokes for a phase counter to count. What it counted instead was
-        // whatever the sensor made of a lifter hanging still.
-        val sensor = !cued && !isTimed &&
-            kind == ExerciseKind.EXPLOSIVE && imuConnected
+        // WHO COUNTS decides who speaks, so this is read from
+        // `CountingPolicy` rather than stated a second time (#286). The terms
+        // it replaces were `!cued && !isTimed && kind == EXPLOSIVE &&
+        // imuConnected`, and the clause that moved is the EXPLOSIVE one: a
+        // straight-reps set with a sensor connected is counted by the sensor
+        // now, so it is spoken by the sensor too. The other three clauses are
+        // unchanged and live in that decision -- including `!isTimed`, which is
+        // #217: a set measured on the clock is guided by the clock, there are
+        // no strokes for a phase counter to count, and what the counter counted
+        // instead was whatever the sensor made of a lifter hanging still.
+        val sensor = CountingPolicy.counterFor(hasTempo, isTimed, kind, imuConnected) == RepCounter.SENSOR
         return buildSet {
             if (cued) add(SetVoiceGuide.CUED_CADENCE)
             if (isTimed) add(SetVoiceGuide.TIMED_CLOCK)

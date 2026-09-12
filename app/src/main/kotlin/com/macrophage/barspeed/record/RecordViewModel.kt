@@ -14,7 +14,10 @@ import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.data.SetJournal
 import com.macrophage.barspeed.data.SetJournalHeader
 import com.macrophage.barspeed.data.SetJournalStore
+import com.macrophage.barspeed.dsp.LiftDirection
+import com.macrophage.barspeed.dsp.LiveRepCaller
 import com.macrophage.barspeed.dsp.LiveSetState
+import com.macrophage.barspeed.dsp.RepCall
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.SetEnd
@@ -34,6 +37,7 @@ import com.macrophage.barspeed.model.ArmedLinks
 import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.CountingPolicy
 import com.macrophage.barspeed.model.EffortAsk
 import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseDef
@@ -56,6 +60,9 @@ import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RemoveSetControl
 import com.macrophage.barspeed.model.RemoveSetTarget
+import com.macrophage.barspeed.model.RepCountPolicy
+import com.macrophage.barspeed.model.RepCounter
+import com.macrophage.barspeed.model.RepTap
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.RestClockPolicy
 import com.macrophage.barspeed.model.RestControl
@@ -483,12 +490,14 @@ data class SetFeedback(
     val rpeAsk: EffortAsk,
 ) {
     // Against [recordedReps] rather than the analysis, so this and the box's
-    // struck pair read the same left-hand figure. Behaviour-identical at this
-    // commit and pinned by nothing: the ONE construction site sets both
-    // `recordedReps = p.manualReps ?: analysis.reps.size` and
-    // `repsOverride = p.manualReps`, so a null override implies a null
-    // manualReps implies `recordedReps == analysis.reps.size`, and no copy
-    // site writes the override back to null.
+    // struck pair read the same left-hand figure. Pinned by nothing: the ONE
+    // construction site sets `recordedReps = p.manualReps ?: p.liveReps ?:
+    // analysis.reps.size` and `repsOverride = p.manualReps`, so a null override
+    // still means this reads [recordedReps]. The clause that stood here --
+    // "a null override implies a null manualReps implies `recordedReps ==
+    // analysis.reps.size`" -- is DELETED: since #286 a null override on a
+    // sensor-counted set means recordedReps is the LIVE count, which is not the
+    // analysis's and is the number the lifter heard.
     val effectiveReps: Int get() = repsOverride ?: recordedReps
 
     /** The added load this set stands at now, the correction ahead of the record. */
@@ -566,6 +575,16 @@ private data class PendingSetWrite(
      */
     val targetReps: Int?,
     val manualReps: Int?,
+    /**
+     * What the sensor's live detector counted during the set, or null where no
+     * live counter ran (#286).
+     *
+     * `RepCountPolicy.recorded` produces this and [manualReps] together, and
+     * both are non-null on exactly one shape of set: a sensor-counted one the
+     * lifter corrected. `SetRecordEntity.liveReps` states what the column means
+     * and what its null covers.
+     */
+    val liveReps: Int?,
     val side: String?,
     /**
      * The arm the PLAN prescribed, frozen beside [side] the way [plannedReps]
@@ -860,6 +879,9 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
         rpeScale = EffortScale.askFor(p.isTimed, p.slot?.progression).word,
         plannedReps = p.plannedReps,
         manualReps = p.manualReps,
+        // What the sensor counted, beside what the set is recorded as (#286).
+        // Both come off the frozen write, so a retry stores the same pair.
+        liveReps = p.liveReps,
         actualDurationS = p.actualDurationS,
         plannedDurationS = p.plannedDurationS,
         side = p.side,
@@ -1854,19 +1876,28 @@ private fun jumpedToExerciseState(s: RecordState, exerciseId: String): RecordSta
  * it out: every field it writes is written to the same value it was written to
  * inline.
  */
-private fun inSetState(s: RecordState, manualSet: Boolean, guidedSet: Boolean, leadInRunning: Boolean): RecordState =
-    s.copy(
-        stage = Stage.IN_SET,
-        setElapsedS = 0,
-        live = LiveSetState(),
-        manualSet = manualSet,
-        manualReps = 0,
-        guidedSet = guidedSet,
-        guidedLabel = "",
-        guidedCountdown = 0,
-        guidedFinished = false,
-        leadInRunning = leadInRunning,
-    )
+private fun inSetState(
+    s: RecordState,
+    manualSet: Boolean,
+    guidedSet: Boolean,
+    sensorCounted: Boolean,
+    leadInRunning: Boolean,
+): RecordState = s.copy(
+    stage = Stage.IN_SET,
+    setElapsedS = 0,
+    live = LiveSetState(),
+    manualSet = manualSet,
+    manualReps = 0,
+    // Cleared with the tally beside it: a count left over from the last set
+    // would be drawn as this one's until the detector resolves a drive.
+    sensorCounted = sensorCounted,
+    sensorReps = 0,
+    guidedSet = guidedSet,
+    guidedLabel = "",
+    guidedCountdown = 0,
+    guidedFinished = false,
+    leadInRunning = leadInRunning,
+)
 
 /**
  * The seconds a finished timed set records, or null for a set that is not
@@ -2048,12 +2079,16 @@ private fun restingState(
             // field below, which reads the same declaration.
             kind = p.exercise.kind,
             analysis = analysis,
-            // What the row was written with, and the reason it cannot be read
-            // back off the two fields beside it: `repsOverride` one field down
-            // is seeded from the SAME tally, so on a manual set the two are
-            // equal and neither is a correction, while `analysis.reps.size` is
-            // 0 for every set no sensor counted.
-            recordedReps = p.manualReps ?: analysis.reps.size,
+            // What the row was written with, by the same precedence
+            // SessionRepository.recordSet applies (#286): a count a person
+            // stated, then what the sensor called live, then the batch
+            // segmenter's. `repsOverride` one field down is seeded from the
+            // stated figure alone, so on a manual set the two are equal and
+            // neither is a correction, and on an uncorrected sensor-counted set
+            // the override is null and this is the live count -- the number the
+            // lifter watched all set, which is what the correction control must
+            // open from.
+            recordedReps = p.manualReps ?: p.liveReps ?: analysis.reps.size,
             // The WORKING targets, not the plan's frozen prescription. This
             // feedback is about the set just finished -- what it was trying to
             // do -- and the hold verdict beside it reads the same pair: a
@@ -2509,6 +2544,34 @@ data class RecordState(
     /** Sensorless rep set: the lifter taps to count reps. */
     val manualSet: Boolean = false,
     val manualReps: Int = 0,
+    /**
+     * The SENSOR is counting the set in progress (#286): a rep-based lift with
+     * no prescribed tempo and an IMU connected.
+     *
+     * `CountingPolicy.counterFor` decides it, frozen at [RecordViewModel.beginSet]
+     * like everything else about a set's arming. It picks the in-set branch and
+     * the START SET label, and it is the state in which a `+1 REP` tap is a
+     * CORRECTION of the sensor's count rather than the count itself.
+     *
+     * Never true at the same time as [manualSet] or [guidedSet]: all three are
+     * read off one [RepCounter].
+     */
+    val sensorCounted: Boolean = false,
+    /**
+     * The count a sensor-counted set stands at -- what the ring draws and what
+     * the voice has just said, which are one number by construction (#252's
+     * rule applied to the sensor's counter).
+     *
+     * `LiveRepCaller`'s spoken total plus whatever the lifter has corrected it
+     * by, through `RepCountPolicy.displayedCount`. NOT [live]'s `repCount`:
+     * that is `StreamingSetTracker`'s own second statement of the pairing rule,
+     * and what the app speaks and records comes from the batch detector's rule
+     * instead.
+     *
+     * 0 before the first call, which is the honest figure there: no drive has
+     * been resolved yet.
+     */
+    val sensorReps: Int = 0,
     /** Active guided-cadence set: the app calls the tempo and counts the reps. */
     val guidedSet: Boolean = false,
     val guidedLabel: String = "",
@@ -2900,7 +2963,9 @@ data class RecordState(
      * count. A sensor total is never trusted here — a low miscount would
      * otherwise leave a lifter who finished every rep with no way to end the set
      * except by logging it as a failure — and a set with no target has nothing
-     * to fall short of.
+     * to fall short of. Since #286 that refusal covers the straight-reps set as
+     * well as the explosive one: the sensor counts it, so nothing here judges
+     * it, and the lifter ends it and rates it as they do an explosive set.
      */
     val setTargetMet: Boolean
         get() = when {
@@ -3006,6 +3071,80 @@ data class RecordState(
  * where it was -- which is what the two functions in [RecordViewModel] did
  * before this class took them.
  */
+/**
+ * The sensor's rep count for ONE set: the caller, what it has called, and what
+ * the lifter has corrected it by (#145, #286).
+ *
+ * Outside [RecordViewModel] for the reason [VoiceMilestones] below is: that
+ * class is measured AT detekt's `LargeClass` limit, and this cluster is four
+ * fields and two decisions that say nothing about recording. Nothing here
+ * touches state, the journal or the voice -- the view model does that with the
+ * number this returns.
+ *
+ * `LiveRepCaller` applies `RepSegmenter`'s own pairing rule to the velocity
+ * `StreamingSetTracker` publishes, so the number spoken comes from the BATCH
+ * detector's rule over a causal estimate rather than from the tracker's second
+ * statement of that rule. `LiveRepCall`'s KDoc states what is and is not shared
+ * between the two.
+ */
+private class SensorRepCounter {
+    private var caller: LiveRepCaller? = null
+
+    /** What the detector has called, 0 before the first rep and after a reset. */
+    var called = 0
+        private set
+
+    /**
+     * How many reps the lifter has added with `+1 REP` during this set.
+     *
+     * An OFFSET rather than a replacement, `RepCountPolicy.correctedCount`'s
+     * rule: the detector goes on counting behind the correction, so a lifter
+     * who adds the rep it missed at three still reads six when it has called
+     * five. Non-zero is also what makes the stored count the LIFTER's, which
+     * the export publishes as `corrected`.
+     */
+    var correctionDelta = 0
+        private set
+
+    /**
+     * Arm for a set the sensor counts, or DISARM for one it does not.
+     *
+     * A null direction is a set with another counter, and it clears the figures
+     * as well as the caller: a count left over from the last set would be read
+     * by [endSet]'s frozen write as this one's.
+     */
+    fun begin(direction: LiftDirection?) {
+        caller = direction?.let { LiveRepCaller(it) }
+        called = 0
+        correctionDelta = 0
+    }
+
+    /**
+     * One published sample. The count to SAY where the detector called a rep,
+     * and null where it said nothing -- which is every sample but one per rep,
+     * and every sample of a set nothing is counting.
+     */
+    fun feed(live: LiveSetState, timestampMs: Long): Int? {
+        val call = caller?.feed(live, timestampMs) ?: return null
+        if (call !is RepCall.Speak) return null
+        called = call.count
+        return shown()
+    }
+
+    /** One `+1 REP` tap: the count the set now stands at. */
+    fun correct(): Int {
+        correctionDelta += 1
+        return shown()
+    }
+
+    private fun shown(): Int = RepCountPolicy.displayedCount(
+        counter = RepCounter.SENSOR,
+        tally = 0,
+        liveCount = called,
+        correctionDelta = correctionDelta,
+    )
+}
+
 private class VoiceMilestones(private val speak: (String) -> Unit) {
     private var announceReps = false
     private var plannedReps: Int? = null
@@ -3022,13 +3161,20 @@ private class VoiceMilestones(private val speak: (String) -> Unit) {
         announcedRep = 0
     }
 
-    /** One live frame: the tempo count, then the rep call. */
-    fun onLive(phase: Phase, elapsedS: Double, repCount: Int) {
+    /**
+     * One live frame's TEMPO COUNT: the bare digits through a detected phase.
+     *
+     * `onLive(phase, elapsedS, repCount)` stood here and did this and then
+     * called [announceRep]. Split by #286, because the two are now asked on
+     * different sets: the digits only where a tempo was prescribed with nothing
+     * to play it, and the rep call from the live rep caller's count rather than
+     * from the tracker's. A caller that wants both asks for both.
+     */
+    fun onPhase(phase: Phase, elapsedS: Double) {
         val next = VoiceMilestonePolicy.phaseCount(phase, elapsedS, countedPhase, spokenSecond)
         countedPhase = next.phase
         spokenSecond = next.second
         next.speak?.let(speak)
-        announceRep(repCount)
     }
 
     /**
@@ -3259,6 +3405,37 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * questions and was wrong for this one on every timed set (#217).
      */
     private var sensorVoiceRuns = false
+
+    /**
+     * Who counts the set in progress (#286), frozen at [beginSet].
+     *
+     * Read after the set by [endSet] to decide which figures the row is written
+     * with, and by [addManualRep] to decide what a tap means. Frozen rather than
+     * re-derived for the reason the armed sensors are: the lifter can label or
+     * forget a device mid-session, and a tap landing after that must not mean
+     * something different from every tap before it.
+     */
+    private var setCounter: RepCounter = RepCounter.MANUAL
+
+    /** The sensor's count for the set in progress; see [SensorRepCounter]. */
+    private val sensorCounter = SensorRepCounter()
+
+    /**
+     * Whether the sensor's voice counts the SECONDS of each phase as well as
+     * calling the reps.
+     *
+     * True only on a set PRESCRIBED a tempo with nothing to play it -- an
+     * explosive lift carrying a tempo string, which `LeadInPolicy.prepCase`
+     * gives no cadence. There the digits are the only tempo feedback there is.
+     *
+     * False on a straight-reps set, and that is a decision rather than an
+     * omission: with no tempo prescribed there is nothing for a per-second
+     * digit to be measured against, and a lifter hearing "one, two, three"
+     * through a pull and then "Rep 4" is hearing two counters at once. What
+     * that sounds like in a gym is a [Field] question nothing here can answer,
+     * so the app does not create it.
+     */
+    private var sensorSpeaksPhaseSeconds = false
 
     init {
         viewModelScope.mirrorLinkStates(autoConnect, stateFlow)
@@ -3498,20 +3675,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 s.currentSlot?.reps
             }
-        // Never announce reps on timed sets: a carry's gait can trip the rep detector.
-        milestones.startSet(announceReps = !s.currentIsTimed, plannedReps = plannedRepsForSet)
-        // The bar sensor is RECORD-ONLY for standard lifts: the lifter (or the
-        // voice guide) counts the reps, while sensor data feeds velocity/power
-        // analysis. Explosive lifts stay sensor-counted (single drives, peak
-        // velocity is the point) unless no sensor is present. A `!s.demoMode`
-        // term sat in front of this until #262 and collapsed with the mode.
-        var manualSet = !s.currentIsTimed &&
-            (exercise.kind != ExerciseKind.EXPLOSIVE || !s.imuConnected)
         // Guided cadence: the app calls the tempo out loud and counts the reps
         // itself — the DEFAULT for all tempo work. A missed phase switch in
         // sensor counting corrupts the whole set, so the app's own count wins;
-        // the sensor still records for velocity/power metrics. Explosive lifts
-        // (concentric is the metric) stay sensor-counted.
+        // the sensor still records for velocity/power metrics.
         val guidedTempo =
             (if (s.adHoc) s.tempoInput.ifBlank { null } else s.currentSlot?.tempo)?.let { Tempo.parseOrNull(it) }
         // The same rule the import gate warns an inert prep_s against and the
@@ -3521,17 +3688,48 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // A cadence runner runs on exactly the sets whose prep runs into one,
         // read from the case rather than restated, so it cannot drift from it.
         val guidedSet = prepCase == PrepCase.CUED
-        if (guidedSet) manualSet = true
-        // Who speaks while the work is under way, decided in `:core:model` and
-        // pinned there. `manualSet` above still answers its other three
-        // questions and is deliberately not derived from this: they agreed
-        // only by accident, and on a timed set they disagreed (#217).
-        sensorVoiceRuns = SetVoicePolicy.sensorCounts(
-            hasTempo = guidedTempo != null,
-            isTimed = s.currentIsTimed,
-            kind = exercise.kind,
-            imuConnected = s.imuConnected,
+        // WHO COUNTS THIS SET, decided in `:core:model` over a table of every
+        // shape a set can have (#286). This block used to open with
+        // `var manualSet = !s.currentIsTimed && (exercise.kind != EXPLOSIVE ||
+        // !s.imuConnected)`, forced true again below for a guided set, and that
+        // one boolean answered four questions. The three the app still asks are
+        // read off this counter instead, so they cannot disagree.
+        val counter = CountingPolicy.counterFor(guidedTempo != null, s.currentIsTimed, exercise.kind, s.imuConnected)
+        setCounter = counter
+        // The lifter's or the guide's tally IS the count on these sets, which is
+        // the question `manualSet` is asked most often -- and it still gates
+        // which in-set branch draws and which counter completion is judged
+        // against. Thirty-one of the thirty-two shapes answer exactly as the
+        // expression above did; the straight-reps set with a sensor connected is
+        // the one that moved, and `CountingPolicyTest > the lift changes one row
+        // and names it` is where that is asserted.
+        val manualSet = CountingPolicy.tallyIsTheCount(counter)
+        val sensorCounted = counter == RepCounter.SENSOR
+        // Never announce reps on timed sets: a carry's gait can trip the rep
+        // detector. And never hand the SENSOR's counter a planned count: the
+        // milestone word at that count is "Done", every spoken word is written
+        // to the cue track, and `SetEnd.of` reads "Done" as the set having been
+        // called over -- so the counter reaching the prescription would bound
+        // the analysed rep list there and drop every later drive (#285). A
+        // straight-reps set is exactly the set where the lifter may do more reps
+        // than were prescribed. The rule is CountingPolicy's; a MANUAL set keeps
+        // the milestone it has today, so #285 stays open for manual sets.
+        milestones.startSet(
+            announceReps = !s.currentIsTimed,
+            plannedReps = CountingPolicy.milestonePlannedReps(counter, plannedRepsForSet),
         )
+        // Who speaks while the work is under way, decided in `:core:model` and
+        // pinned there. `SetVoicePolicyTest > the sensor speaks on exactly the
+        // sets the sensor counts` asserts that this and the counter above are
+        // one decision over every shape.
+        sensorVoiceRuns =
+            SetVoicePolicy.sensorCounts(guidedTempo != null, s.currentIsTimed, exercise.kind, s.imuConnected)
+        sensorSpeaksPhaseSeconds = sensorCounted && guidedTempo != null
+        // The live rep caller (#145), armed for the first time here. Handed the
+        // direction the tracker beside it was built from, so both read the same
+        // lift; a caller built with a different geometry would call reps off a
+        // stroke the tracker is not integrating.
+        sensorCounter.begin(if (sensorCounted) exercise.liftDirection() else null)
         // The word the prep of a hold or a carry ends on, at the instant the
         // set's clock starts. Non-null on every TIMED prep and on nothing else:
         // LeadInPolicy pairs the case with the word, so this is one decision
@@ -3600,7 +3798,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Both lead-ins in one expression, read from the two branches below:
         // set here rather than at the runner's first push, so no frame of a
         // lead-in renders as a set already under way.
-        stateFlow.value = inSetState(s, manualSet, guidedSet, leadInRunning = timedStartWord != null || guidedSet)
+        stateFlow.value =
+            inSetState(s, manualSet, guidedSet, sensorCounted, leadInRunning = timedStartWord != null || guidedSet)
         if (timedStartWord != null) {
             val speaks = LeadInPolicy.speaks(prepCase, s.audioCues)
             startTimedPrep(prepS, timedStartWord, speaks) { startSetTimer(timedTargetS) }
@@ -3632,8 +3831,32 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Manual/guided sets: the app (or the lifter) is the counter — the
         // sensor keeps recording for velocity metrics, but its phase counts and
         // rep calls must stay silent or two voices count over each other.
-        if (!sensorVoiceRuns || !stateFlow.value.audioCues) return
-        milestones.onLive(live.phase, live.currentPhaseElapsedS, live.repCount)
+        if (!sensorVoiceRuns) return
+        // The phase digits, on the one shape that still gets them: a set
+        // prescribed a tempo with nothing to play it. See
+        // [sensorSpeaksPhaseSeconds] for why a straight-reps set does not.
+        if (sensorSpeaksPhaseSeconds && stateFlow.value.audioCues) {
+            milestones.onPhase(live.phase, live.currentPhaseElapsedS)
+        }
+        // The rep call (#145). Fed the tracker's own published sample rather
+        // than a second integrator over the same stream, and the ARRIVAL stamp
+        // rather than the reconstructed clock, so a cue written from it lines up
+        // against the IMU stream and the rep marks.
+        sensorCounter.feed(live, sample.timestampMs)?.let(::saySensorCount)
+    }
+
+    /**
+     * The count the sensor has just reached: draw it and say it.
+     *
+     * ONE NUMBER for both, which is the whole point. The ring reads `sensorReps`
+     * and the voice is handed the same value, so the screen cannot show one
+     * count while the voice says another -- #252's defect on the guided ring,
+     * and the one shipped on explosive sets, where the ring drew
+     * `StreamingSetTracker.repCount` while the row stored the segmenter's.
+     */
+    private fun saySensorCount(shown: Int) {
+        stateFlow.value = stateFlow.value.copy(sensorReps = shown)
+        if (stateFlow.value.audioCues) milestones.announceRep(shown)
     }
 
     /**
@@ -3822,22 +4045,46 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         voice?.speak(utterance)
     }
 
-    /** Tap-to-count for sensorless sets; announces milestones like sensor reps. */
+    /**
+     * The `+1 REP` tap, which means different things to different counters
+     * (#286).
+     *
+     * On a MANUAL set it IS the count. On a SENSOR-counted set it is a
+     * CORRECTION of the count the sensor called -- the lifter disagreeing with
+     * the detector while the set is under way, which #284 measured the detector
+     * earning: 6 for 5 performed on a synthetic hitch, 1 for 5 on a synthetic
+     * drop. On a guided or timed set it does nothing, and no screen offers it.
+     *
+     * `CountingPolicy.tapMeaning` is the rule, so the three cases are a table in
+     * `:core:model` rather than a chain of flags here.
+     */
     fun addManualRep() {
         val s = stateFlow.value
-        if (!s.manualSet) return
         // Ending a set takes a few hundred ms of analysis and gzipping, and the
         // in-set screen stays up for all of it. A tap landing in that window
         // would count a rep onto a set already written at the old count, and
         // could swap the effort grid back in for a set that is over.
         if (endingSet) return
-        val count = s.manualReps + 1
-        // The one fact in a set that no reprocessing of any stream can rebuild.
-        // The sensor records what the bar did; it never records what the lifter
-        // decided a rep was worth.
-        journal?.appendRepMark(System.currentTimeMillis())
-        stateFlow.value = s.copy(manualReps = count)
-        if (s.audioCues) milestones.announceRep(count)
+        when (CountingPolicy.tapMeaning(setCounter)) {
+            RepTap.COUNT -> {
+                val count = s.manualReps + 1
+                // The one fact in a set that no reprocessing of any stream can
+                // rebuild. The sensor records what the bar did; it never records
+                // what the lifter decided a rep was worth.
+                journal?.appendRepMark(System.currentTimeMillis())
+                stateFlow.value = s.copy(manualReps = count)
+                if (s.audioCues) milestones.announceRep(count)
+            }
+            // NO REP MARK, deliberately. The marks are the per-rep instants
+            // of a set the LIFTER counted and the export reads them that way;
+            // writing only the corrections into that stream would mix two
+            // counters' instants with nothing saying which is which, and a
+            // partial record of when the reps happened is worse than none. The
+            // correction is recorded as the COUNT instead, and the sensor's own
+            // figure survives beside it in `liveReps`.
+            RepTap.CORRECTION -> saySensorCount(sensorCounter.correct())
+            RepTap.IGNORED -> return
+        }
     }
 
     /** Rest-screen correction when the sensor miscounted (or the set was manual). */
@@ -3981,7 +4228,15 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             s.adHoc -> s.tempoInput.ifBlank { null }
             else -> slot?.tempo
         }
-        val manualReps = if (s.manualSet) s.manualReps else null
+        // The two rep figures the row is written with, from one decision in
+        // `:core:model` (#286). `stated` is the count a person or the guide gave
+        // -- null on a sensor-counted set the lifter did not correct, which is
+        // what leaves `repsManual` false and lets the export publish `sensor`
+        // rather than `corrected`. `live` is what the detector called, kept
+        // whether or not it is still the figure the set is recorded as.
+        val recordedReps =
+            RepCountPolicy.recorded(setCounter, s.manualReps, sensorCounter.called, sensorCounter.correctionDelta)
+        val manualReps = recordedReps.stated
         // Which buffer the DSP is pointed at, and what the row says about the
         // choice (#207). Frozen here with everything else, from the buffers as
         // they stand at the end of the set.
@@ -4020,6 +4275,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 plannedReps = plannedReps,
                 targetReps = targetReps,
                 manualReps = manualReps,
+                liveReps = recordedReps.live,
                 side = side,
                 plannedSide = plannedSide,
                 tempoText = tempoText,
@@ -4065,7 +4321,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     // The working target: SetAnalyzer grades the reps it
                     // detected against what the set was trying to do.
                     plannedReps = targetReps,
-                    countedReps = if (s.manualSet) s.manualReps else null,
+                    // What the SET was counted as, whoever counted it (#286).
+                    // It was `if (s.manualSet) s.manualReps else null`, so a
+                    // sensor-counted set handed the analyzer nothing and its
+                    // coaching line "Sensor resolved N of M reps" could not
+                    // appear. It can now, and on a straight-reps set it is the
+                    // batch count against the LIVE count -- the comparison the
+                    // first deadlift session is read for.
+                    countedReps = recordedReps.stated ?: recordedReps.live,
                     tempo = tempoText?.let { Tempo.parseOrNull(it) },
                     targetMeanConcentricVelocityMps = slot?.targetMeanConVelMps,
                     velocityLossStopPct = slot?.velocityLossStopPct,

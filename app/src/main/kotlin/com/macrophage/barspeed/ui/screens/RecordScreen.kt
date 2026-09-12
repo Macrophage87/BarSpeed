@@ -73,6 +73,7 @@ import com.macrophage.barspeed.model.BlePermissionStep
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.CountingPolicy
 import com.macrophage.barspeed.model.DualSensorSetup
 import com.macrophage.barspeed.model.EffortAsk
 import com.macrophage.barspeed.model.EffortClaim
@@ -927,16 +928,25 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     }
     SensorCaptureLine(state)
     Spacer(Modifier.height(12.dp))
-    // The bar sensor is record-only for standard lifts: the lifter (or the
-    // voice guide) counts; explosive lifts stay sensor-counted.
+    // WHO IS ABOUT TO COUNT, from the same decision RecordViewModel.beginSet
+    // makes (#286). The expression here read
+    // `!state.currentIsTimed && (kind != EXPLOSIVE || !state.imuConnected)` and
+    // said "you count" whenever it was true -- which included every tempo'd set,
+    // where the METRONOME counts, because this copy of the rule never looked at
+    // the tempo. The label is CountingPolicy's now, and the whole point of
+    // reading it from there is that a second copy cannot be wrong on its own.
     val kind = state.currentSlot?.exercise?.kind
         ?: state.exerciseOptions.firstOrNull { it.id == state.selectedExerciseId }?.kind
-    // A `!state.demoMode` term sat in front of this until #262 and collapsed
-    // with the mode; it is the same decision RecordViewModel.beginSet makes.
-    val manual = !state.currentIsTimed &&
-        (kind != ExerciseKind.EXPLOSIVE || !state.imuConnected)
+    val tempoText = if (state.adHoc) state.tempoInput.ifBlank { null } else state.currentSlot?.tempo
+    val counter =
+        CountingPolicy.counterFor(
+            hasTempo = tempoText?.let { Tempo.parseOrNull(it) } != null,
+            isTimed = state.currentIsTimed,
+            kind = kind ?: ExerciseKind.DYNAMIC,
+            imuConnected = state.imuConnected,
+        )
     Button(onClick = viewModel::beginSet, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-        Text(if (manual) "START SET — you count" else "START SET", fontWeight = FontWeight.Bold)
+        Text(CountingPolicy.startSetLabel(counter), fontWeight = FontWeight.Bold)
     }
     Spacer(Modifier.height(8.dp))
     // The Row went with the demo chip (#262). It spaced two chips; one chip
@@ -2162,10 +2172,48 @@ private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
         ExplosiveSetStage(state, viewModel, slot)
         return
     }
+    // WHAT REACHES HERE. Nothing did, until #286. Every non-timed, non-guided
+    // set was `manualSet` and took the branch above, and the only set that was
+    // not was an explosive lift with a sensor, which takes the one before it --
+    // so this velocity readout and its per-rep bars were unreachable in the
+    // shipped app. The straight-reps set the SENSOR counts lands here now, which
+    // is why the count and the correction button are added below rather than a
+    // fourth stage being written: velocity and the per-rep bars are exactly what
+    // a max-intent set wants on screen beside the count.
+    SensorCountedSetStage(state, viewModel, slot)
+}
+
+/**
+ * In-set display for a set the SENSOR is counting: the count the voice is
+ * saying, the live velocity, the per-rep bars, and one button for the rep the
+ * detector missed.
+ */
+@Composable
+private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel, slot: PlannedSlot?) {
+    val plannedReps = if (state.adHoc) state.repsInput.toIntOrNull() else slot?.reps
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         InSetHeader(state, slot)
         Spacer(Modifier.height(10.dp))
         TempoRing(state, slot)
+        Spacer(Modifier.height(10.dp))
+        // The count, stated where a lifter mid-set can read it without waiting
+        // for the ring to settle. The SAME field the voice was handed, so the
+        // number on screen is the number that was spoken (#252).
+        Text(
+            "SENSOR COUNT",
+            style = MaterialTheme.typography.labelMedium,
+            color = BarColors.Sub,
+            letterSpacing = 2.sp,
+        )
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("${state.sensorReps}", style = MaterialTheme.typography.displayLarge)
+            Text(
+                plannedReps?.let { " of $it" } ?: " reps",
+                style = MaterialTheme.typography.titleMedium,
+                color = BarColors.Sub,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        }
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
@@ -2182,7 +2230,23 @@ private fun InSetStage(state: RecordState, viewModel: RecordViewModel) {
         }
         Spacer(Modifier.height(14.dp))
         LiveRepBars(state, slot)
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
+        // The rep the detector missed. A CORRECTION of the sensor's count rather
+        // than a count of its own -- `CountingPolicy.tapMeaning` is what makes
+        // that true, and the wording says so, because a button reading "+1 REP"
+        // beside a number the sensor is already moving reads as a second
+        // counter. Gone once the set has ended, ManualSetStage's reason: the
+        // count is frozen into the write and addManualRep already ignores taps
+        // from that moment, so a live-looking 72dp target would do nothing.
+        if (state.setWrite == SetWriteState.NONE) {
+            OutlinedButton(
+                onClick = viewModel::addManualRep,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+            ) {
+                Text("+1 REP THE SENSOR MISSED", style = MaterialTheme.typography.titleMedium)
+            }
+            Spacer(Modifier.height(10.dp))
+        }
         EndSetControl(state, viewModel)
     }
 }
@@ -2375,8 +2439,12 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         InSetHeader(state, slot)
         Spacer(Modifier.height(10.dp))
+        // The SPOKEN count, not `live.repCount` (#286). The tracker's own count
+        // is a second statement of the pairing rule and the voice no longer says
+        // it; drawing it here would put a different number on screen from the
+        // one the lifter just heard, and the row stores the spoken one.
         val repProgress =
-            plannedReps?.takeIf { it > 0 }?.let { state.live.repCount / it.toFloat() } ?: 0f
+            plannedReps?.takeIf { it > 0 }?.let { state.sensorReps / it.toFloat() } ?: 0f
         ProgressRing(progress = repProgress) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
@@ -2399,7 +2467,7 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
                     )
                 }
                 Text(
-                    "rep ${state.live.repCount}" + (plannedReps?.let { " of $it" } ?: ""),
+                    "rep ${state.sensorReps}" + (plannedReps?.let { " of $it" } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = BarColors.Sub,
                 )
@@ -2408,8 +2476,8 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
         Spacer(Modifier.height(8.dp))
         // Cadence matters for cyclical ballistic work (kettlebell swings).
         val cadence =
-            if (state.live.repCount >= 2 && state.setElapsedS > 0) {
-                state.live.repCount * 60 / state.setElapsedS
+            if (state.sensorReps >= 2 && state.setElapsedS > 0) {
+                state.sensorReps * 60 / state.setElapsedS
             } else {
                 null
             }
@@ -2657,7 +2725,7 @@ private fun TempoRing(state: RecordState, slot: PlannedSlot?) {
             )
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    if (moving) String.format(Locale.US, "%.1f", elapsed) else "${state.live.repCount}",
+                    if (moving) String.format(Locale.US, "%.1f", elapsed) else "${state.sensorReps}",
                     style = MaterialTheme.typography.displayLarge,
                 )
                 Text(
@@ -2675,7 +2743,7 @@ private fun TempoRing(state: RecordState, slot: PlannedSlot?) {
                 )
             } else if (!moving) {
                 Text(
-                    "rep ${state.live.repCount + 1} ready",
+                    "rep ${state.sensorReps + 1} ready",
                     style = MaterialTheme.typography.bodySmall,
                     color = BarColors.Sub,
                 )
