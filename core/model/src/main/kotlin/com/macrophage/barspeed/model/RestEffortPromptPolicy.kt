@@ -96,10 +96,14 @@ data class RestEffortPrompt(
  *    keeps apart. After the in-set failure tile `tappedFailed` stands. After
  *    END SET EARLY, which on a started timed set is drawn only where
  *    `setTargetMet` is false, `derivedFailed` stands: both that flag and
- *    `setTargetMet` are `TimedSetEndPolicy.fellShort` against the
- *    prescription, so the button being offered and the shortfall being derived
- *    are one answer asked twice. The rating being present is what withholds the
- *    second ask; no separate branch counts how the set ended.
+ *    `setTargetMet` ask `TimedSetEndPolicy.fellShort` against the same
+ *    prescription. NOT against the same figure, and the gap is named rather
+ *    than smoothed over -- the control gate asks it of the LIVE elapsed count
+ *    while the write asks it of the recorded seconds, which are the same
+ *    measurement read a moment apart on a hold the lifter ended. Read from
+ *    source; no test here can execute either caller. The rating being present
+ *    is what withholds the second ask; no separate branch counts how the set
+ *    ended.
  *
  * ## What is deliberately NOT widened
  *
