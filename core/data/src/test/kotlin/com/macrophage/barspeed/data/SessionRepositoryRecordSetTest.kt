@@ -432,7 +432,7 @@ class SessionRepositoryRecordSetTest {
     }
 
     @Test
-    fun `the sensor rep count is stored when the lifter did not count`() = runTest {
+    fun `the batch analysis count is stored when nothing counted in the set`() = runTest {
         val dao = FakeSessionDao()
         repo(dao).recordSet(sessionId = 1L, orderIdx = 0, set = completedSet(manualReps = null))
         assertEquals(3, dao.sets.single().actualReps)

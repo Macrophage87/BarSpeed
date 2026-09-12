@@ -142,17 +142,22 @@ class Migration16To17Test {
     }
 
     /**
-     * The compiled version, the committed baseline and the migration's own
-     * endpoints are one number.
+     * The committed baselines and the migration's own endpoints are one number,
+     * inside a chain that does not overshoot the compiled version.
      *
-     * The assertion the NEWEST hop owes the constant, moved here from
-     * [Migration15To16Test] the way that file took it from its predecessor: a
-     * constant left behind at 16 ships a build whose schema the chain cannot
-     * reach, and Room throws on the lifter's phone.
+     * THE FIRST ASSERTION USED TO READ `assertEquals(17, DATABASE_VERSION)`.
+     * It moved to [Migration17To18Test] with the newest hop, exactly as this
+     * file took it from [Migration15To16Test]: only the newest hop can assert
+     * the constant, and what every earlier hop can still say is that it does
+     * not end BEYOND it -- a chain overshooting the schema this build compiles
+     * is a build Room throws on.
      */
     @Test
-    fun `the compiled version, the committed baseline and the migration agree on seventeen`() {
-        assertEquals(17, DATABASE_VERSION, "DATABASE_VERSION is not the version this migration ends at")
+    fun `the baseline and the migration agree on seventeen, inside a chain reaching the compiled version`() {
+        assertTrue(
+            AppDatabase.MIGRATION_16_17.endVersion <= DATABASE_VERSION,
+            "this migration ends beyond DATABASE_VERSION, so the chain overshoots the schema this build compiles",
+        )
         assertEquals(17, declaredVersion(17), "17.json does not describe version 17")
         assertEquals(16, declaredVersion(16), "16.json does not describe version 16")
         assertEquals(16, AppDatabase.MIGRATION_16_17.startVersion)

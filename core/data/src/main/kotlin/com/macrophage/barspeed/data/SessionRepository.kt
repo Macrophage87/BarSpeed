@@ -46,6 +46,21 @@ data class CompletedSet(
     /** Lifter-counted reps for sensorless sets; overrides the analysis count. */
     val manualReps: Int? = null,
     /**
+     * What the sensor's live detector counted during the set, or null where no
+     * live counter ran (#286).
+     *
+     * [SetRecordEntity.liveReps] states what the column means and what its null
+     * covers; this is the object that fills it. It is the count the LIFTER
+     * HEARD, so it goes on the row even when [manualReps] corrects it -- the
+     * pair is what lets the export publish `corrected` beside the figure that
+     * was corrected.
+     *
+     * `RepCountPolicy.recorded` in `:core:model` is what produces the pair, and
+     * it never returns a stated count beside a live one except on a corrected
+     * sensor set.
+     */
+    val liveReps: Int? = null,
+    /**
      * Timed sets (planks, carries): recorded and planned hold/carry seconds.
      *
      * `actualDurationS` is the seconds the set was working to on a set that
@@ -403,8 +418,18 @@ class SessionRepository(
                 // reading of the plan taken here: the plan can have been
                 // edited between the tap and this write (#244).
                 rpeScale = set.rpeScale,
-                actualReps = set.manualReps ?: set.analysis.reps.size,
+                // Three counters in precedence order, and the order is the
+                // trust order rather than an accident: a count a PERSON stated
+                // wins, then the count the sensor called while the lifter was
+                // watching it, then the batch segmenter's -- which is what a
+                // set nobody counted has always stored (#286).
+                actualReps = set.manualReps ?: set.liveReps ?: set.analysis.reps.size,
                 repsManual = set.manualReps != null,
+                // Stored whether or not it is the figure above. A correction
+                // rewrites actualReps and cannot reach this, which is the whole
+                // point of the column: the sensor's own count survives the
+                // lifter disagreeing with it.
+                liveReps = set.liveReps,
                 plannedReps = set.plannedReps,
                 actualDurationS = set.actualDurationS,
                 plannedDurationS = set.plannedDurationS,
@@ -648,7 +673,16 @@ class SessionRepository(
         sessionDao.updateVoided(setId = setId, voided = voided, reason = stored)
     }
 
-    /** Lifter correction of a miscounted (or uncounted) set's reps. */
+    /**
+     * Lifter correction of a miscounted (or uncounted) set's reps.
+     *
+     * WHAT IT DOES NOT REWRITE: `liveReps`. The DAO's query moves `actualReps`
+     * and sets `repsManual`, and leaving the sensor's own count where it is is
+     * deliberate (#286) -- it is what the lifter heard, the export publishes it
+     * beside the word `corrected`, and it is the figure a hand count is scored
+     * against afterwards. Rewriting it would destroy the measurement on exactly
+     * the sets where the detector was wrong.
+     */
     suspend fun overrideReps(setId: Long, reps: Int) = sessionDao.overrideReps(setId, reps)
 
     /**

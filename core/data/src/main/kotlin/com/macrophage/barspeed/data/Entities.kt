@@ -153,6 +153,35 @@ data class SetRecordEntity(
     val actualReps: Int,
     /** True when actualReps was entered or corrected by the lifter, not the sensor. */
     val repsManual: Boolean = false,
+    /**
+     * What the sensor's LIVE detector counted while the set was performed, or
+     * null where no live counter ran (v18, #286).
+     *
+     * The figure the lifter heard and watched, kept whether or not
+     * [actualReps] still equals it. A rest-screen correction rewrites
+     * [actualReps] and [repsManual] and never touches this, which is what lets
+     * the export publish `corrected` beside what was corrected -- and what
+     * lets a first deadlift session's hand count be scored against the live
+     * count on the very sets where the sensor was wrong.
+     *
+     * NOT the batch segmenter's count. That one is re-derivable from the
+     * archived stream at any time and is in `analysisJson`; this one exists
+     * only while the set is being performed, over a causal velocity estimate
+     * the batch path does not have. `LiveRepCall`'s KDoc names the divergence.
+     *
+     * NULL means one thing: no live counter ran on this set. That is a set the
+     * lifter counted, a set the guide counted, a timed set, and every row
+     * written before this column existed. It is NEVER written for "the
+     * detector found nothing" -- a sensor-counted set that resolved no rep
+     * stores 0, and telling those two apart is the whole reason the column
+     * holds a count rather than a flag.
+     *
+     * Nothing backfills it and nothing can, which is why a row written before
+     * v18 publishes `analysis` rather than `sensor` when `repsManual` is
+     * false: with no live figure, what such a row's [actualReps] held was the
+     * segmenter's own count.
+     */
+    val liveReps: Int? = null,
     val plannedReps: Int? = null,
     /**
      * Timed sets (planks, carries): recorded and planned hold/carry seconds.

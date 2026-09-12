@@ -39,8 +39,8 @@ import java.io.File
  * What was new at 11 was that a committed baseline existed for the version
  * below it, so for the first time in this repository a migration had a
  * document to be read against; 12 was the second such bump, 13 the third,
- * 14 the fourth, 15 the fifth, 16 the sixth and 17 the seventh, with
- * `16.json` as its baseline.
+ * 14 the fourth, 15 the fifth, 16 the sixth, 17 the seventh and 18 the
+ * eighth, with `17.json` as its baseline.
  *
  * A CORRECTION TO WHAT STOOD HERE, named rather than reworded around. This
  * paragraph read "BOTH bumps of this cluster reach the emulator in the SAME
@@ -54,10 +54,13 @@ import java.io.File
  * exercise installs first: v0.1.44, the last tag carrying the old version --
  * not v0.1.43, which carries 10.
  *
- * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read rather than carried
- * forward: v0.1.50 is the newest tag and
- * `git show v0.1.50:core/data/.../AppDatabase.kt` reads
- * `DATABASE_VERSION = 16`, so only 16 -> 17 has NOT SHIPPED. A stock v0.1.50
+ * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read at this commit rather
+ * than carried forward: v0.1.52 is the newest tag and
+ * `git show v0.1.52:core/data/.../AppDatabase.kt` reads
+ * `DATABASE_VERSION = 17`, so only 17 -> 18 has NOT SHIPPED. The reading
+ * below was v0.1.50 at 16 and is superseded rather than kept beside this
+ * one: 16 -> 17 HAS shipped, which is why #286's column mints 18 instead
+ * of riding on 17. A stock v0.1.50
  * install therefore runs 16 -> 17 alone, an install still on v0.1.49 runs
  * 14 -> 15 -> 16 -> 17 in one open, and a phone still on v0.1.44 runs
  * 12 -> 13 -> 14 -> 15 -> 16 -> 17, which is why the emulator exercise
@@ -85,7 +88,7 @@ import java.io.File
  * exists, and every value it ever held went stale before the next round read
  * it.
  */
-const val DATABASE_VERSION = 17
+const val DATABASE_VERSION = 18
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -552,21 +555,38 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
-         * DECLARED AND EMPTY, and not in [MIGRATIONS] below.
+         * `liveReps` on set_records: what the sensor's live detector counted
+         * while the set was performed (#286).
          *
-         * The scaffold #286's live rep count needs and nothing more: the
-         * differentials in `Migration17To18Test` name a migration, and a test
-         * naming a symbol that does not exist fails to compile rather than
-         * failing. So the symbol arrives here first, doing nothing, with
-         * [DATABASE_VERSION] still 17 and the chain unchanged -- the state
-         * `Migration16To17Test` records its own half having been red at.
+         * A NEW HOP RATHER THAN A SECOND COLUMN ON 17, and the test is which
+         * versions have shipped. v0.1.52 carries `DATABASE_VERSION = 17`, read
+         * by `git show v0.1.52:core/data/.../AppDatabase.kt` rather than
+         * assumed, so an installed build has already run 16 -> 17 and
+         * extending that hop would leave a phone that already migrated without
+         * the column. [MIGRATION_16_17] above took two columns on one hop for
+         * the opposite reason, stated at that hop: 17 had not shipped then.
          *
-         * Filling it in, registering it and moving the constant are one
-         * commit, with `18.json` and the column.
+         * INTEGER, NULLABLE, NO DEFAULT. Nullable because no build before this
+         * one stored a live count and nothing can be invented for those rows.
+         * No default because a defaulted 0 would say the sensor counted zero
+         * reps on every set in the archive -- absence rendered as a value, and
+         * the one reading that makes the derived `repsSource` word lie.
+         *
+         * NO BACKFILL, and there is nothing to backfill FROM. Re-running the
+         * detector over a stored stream produces the BATCH count, a different
+         * number over a different velocity estimate, and writing it here would
+         * state that the lifter heard a count the app never spoke.
+         *
+         * [Migration17To18Test] pins the shape, the single statement, the
+         * refusal to write into any existing row, and that the hop is in
+         * [MIGRATIONS] at all. None of it executes SQLite; a bench run is
+         * owed.
          */
         internal val MIGRATION_17_18 =
             object : Migration(17, 18) {
-                override fun migrate(db: SupportSQLiteDatabase) = Unit
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN liveReps INTEGER")
+                }
             }
 
         /**
@@ -596,6 +616,7 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_14_15,
                 MIGRATION_15_16,
                 MIGRATION_16_17,
+                MIGRATION_17_18,
             )
 
         /**
@@ -621,11 +642,11 @@ abstract class AppDatabase : RoomDatabase() {
          * was deleted there rather than reworded. A crash with the data
          * recoverable beats a clean start with it gone.
          *
-         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 17
-         * here, so a rollback from this build to any build carrying 16 or less
-         * enters the rescue; the first version at which that was true of a
-         * stock install was 10, and what it exposes on screen is stated at the
-         * constant, with issue #118. An ordinary forward install runs the
+         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 18
+         * here, so a rollback from this build to any build carrying 17 or less
+         * enters the rescue -- which now includes v0.1.52, the newest tag. The
+         * first version at which that was true of a stock install was 10, and
+         * what it exposes on screen is stated at the constant, with issue #118. An ordinary forward install runs the
          * migration chain and never comes near it.
          *
          * The EXISTING migrations are untouched, and a missing UPGRADE
