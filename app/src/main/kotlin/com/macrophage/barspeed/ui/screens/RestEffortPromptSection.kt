@@ -111,6 +111,18 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  * what the lifter sees. `:app` has no reachable test seam for a Compose layout.
  * See the [Field] items in the commit body.
  *
+ * ## FOUR OF THE SEVEN TILES OPEN THE REASON PAGE
+ *
+ * `ratedNearFailure` is true from rpe 7 up, so a tap on any proximity rung
+ * makes `SetLimiter.prompts` true, and the page captioned "What limited that
+ * set? - optional" draws below in the composition that removes this row.
+ * Before #283 such a hold had `rpe` null and `failed` false, so
+ * `offersCorrection` was false and no page drew. The three headroom rungs
+ * open the headroom row instead.
+ *
+ * [Field] Tap rpe 9 on a clock-run hold -- does a reason tile land under the
+ * finger?
+ *
  * ## NOTHING HERE HAS BEEN RENDERED
  *
  * No bench run happened. Every claim in this file about what DRAWS is read from
