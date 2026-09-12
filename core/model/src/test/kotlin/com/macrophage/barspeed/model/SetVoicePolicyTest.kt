@@ -31,14 +31,24 @@ class SetVoicePolicyTest {
     }
 
     /**
-     * An untempo'd rep-based lift with a sensor says nothing.
+     * An untempo'd rep-based lift is counted by whoever is counting it: the
+     * sensor where one is connected, and nobody where none is.
      *
-     * The bar sensor is record-only there: the lifter counts, and the app's
-     * counter stays out of it.
+     * DELETED AND REPLACED, not reworded. This test read `an untempo'd dynamic
+     * set has no voice at all` and asserted the empty set for both rows, with
+     * a KDoc saying "the bar sensor is record-only there: the lifter counts,
+     * and the app's counter stays out of it". That was true of the shipped app
+     * and is what issue #286 changes on the owner's rule of 2026-09-12: "The
+     * sensor should count the reps." A pin describing what the app used to do
+     * reads later as a pin on what it should do.
+     *
+     * The sensorless row is unchanged and is the half that still holds: with no
+     * sensor there is nothing for the sensor counter to count, and the lifter
+     * counts silently.
      */
     @Test
-    fun `an untempo'd dynamic set has no voice at all`() {
-        assertEquals(emptySet(), guides())
+    fun `an untempo'd dynamic set with a sensor is counted aloud by the sensor`() {
+        assertEquals(setOf(SetVoiceGuide.SENSOR_COUNT), guides())
         assertEquals(emptySet(), guides(imuConnected = false))
     }
 
@@ -104,6 +114,38 @@ class SetVoicePolicyTest {
                             true,
                             g.size <= 1,
                             "$kind tempo=$hasTempo timed=$isTimed imu=$imu speaks with $g",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * THE VOICE FOLLOWS THE COUNTER, on every shape a set can have.
+     *
+     * Two statements of "the sensor is counting this set" -- one here deciding
+     * who speaks, one in [CountingPolicy] deciding who counts -- are two rules,
+     * and the way they drift is the app speaking a count it does not record or
+     * recording one it never spoke. That is the defect shipped on explosive
+     * lifts today in the other direction: the ring drew
+     * `StreamingSetTracker.repCount` while the row stored the batch
+     * segmenter's figure.
+     *
+     * RED before #286's fix, on the one shape the two disagreed about: the
+     * untempo'd dynamic set with a sensor connected, where `guidesFor`
+     * required `kind == EXPLOSIVE` and [CountingPolicy.counterFor] does not.
+     */
+    @Test
+    fun `the sensor speaks on exactly the sets the sensor counts`() {
+        for (kind in ExerciseKind.entries) {
+            for (hasTempo in listOf(false, true)) {
+                for (isTimed in listOf(false, true)) {
+                    for (imu in listOf(false, true)) {
+                        assertEquals(
+                            CountingPolicy.sensorCounts(hasTempo, isTimed, kind, imu),
+                            SetVoicePolicy.sensorCounts(hasTempo, isTimed, kind, imu),
+                            "$kind tempo=$hasTempo timed=$isTimed imu=$imu: the voice and the counter disagree",
                         )
                     }
                 }
@@ -190,7 +232,9 @@ class SetVoicePolicyTest {
         private val SHAPE_TABLE: List<Pair<Shape, Set<SetVoiceGuide>>> =
             listOf(
                 Shape(ExerciseKind.DYNAMIC, hasTempo = false, isTimed = false, imuConnected = false) to SILENT,
-                Shape(ExerciseKind.DYNAMIC, hasTempo = false, isTimed = false, imuConnected = true) to SILENT,
+                // #286: the straight-reps set with a sensor connected. This
+                // row read SILENT, which was true of the shipped app.
+                Shape(ExerciseKind.DYNAMIC, hasTempo = false, isTimed = false, imuConnected = true) to SENSOR,
                 Shape(ExerciseKind.DYNAMIC, hasTempo = false, isTimed = true, imuConnected = false) to TIMED,
                 Shape(ExerciseKind.DYNAMIC, hasTempo = false, isTimed = true, imuConnected = true) to TIMED,
                 Shape(ExerciseKind.DYNAMIC, hasTempo = true, isTimed = false, imuConnected = false) to CUED,
