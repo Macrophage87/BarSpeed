@@ -2,106 +2,127 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 /**
- * RED AT THIS COMMIT, all four (#283).
+ * RED AT THIS COMMIT: four of the five tests below (#283).
  *
- * `RestEffortPromptPolicy.prompt` answers null for every timed set today, which
- * is the app's own behaviour lifted into a pure function: a hold ends on its
- * clock or on the standalone failure control, neither draws a grid, and the rest
- * screen has never asked. Each case below therefore fails on
- * `assertNotNull` until the fix lands in the commit after this one. The cases
- * that are ALREADY true -- a rep set owes nothing, a rated set owes nothing --
- * are in `RestEffortPromptBaselineTest` and stay green throughout, which is what
- * makes this file the differential and that one the baseline.
+ * The owner's rule, which this file pins and which the tree at
+ * `edaec37e7df144361379a8ba77cfb2442c3b0291` violates: *"Don't ask for an RPE on
+ * failed sets, if you can't do it, it's failed."* So the rest screen's effort
+ * question is owed by ONE set and no other -- a timed set that ran its clock and
+ * carries no rating. A hold the lifter ended with the failure control owes
+ * nothing, and a hold the app judged short owes nothing either.
  *
- * The three end-states are the three ways a hold reaches the rest screen, and
- * they are distinguished by which failure fact stands rather than by how the
- * set ended, because that is all the row carries:
+ * `RestEffortPromptPolicy.prompt` at this commit answers non-null for EVERY
+ * unrated timed set, failures included, and hands the screen a pair saying
+ * whether to draw a failure tile and what a tap must carry back as `failed`. The
+ * four tests that name a failed hold therefore fail here on `assertNull`, and so
+ * does the cross-product contract, which fails on the three failed-and-unrated
+ * timed combinations. The fifth test -- the clean hold that IS asked -- passes at
+ * this commit and after the fix, and is written out here rather than in the
+ * baseline file because it is the surviving half of the same rule: it is labelled
+ * green rather than quietly counted among the reds.
  *
- *  - ran to its clock: no failure of either kind.
- *  - the lifter tapped the failure control: `tappedFailed`, and `derivedFailed`
- *    too where the hold also fell below `TimedSetEndPolicy.CLOSE_ENOUGH_FRACTION`
- *    of its prescription. Field session 38's dead hangs are that pair.
- *  - the app judged it short and the lifter never said so: `derivedFailed`
- *    alone, which is what END SET EARLY during a hold's lead-in leaves.
+ * Nothing here reads a field of the returned prompt. Under the owner's rule the
+ * question is drawn only for a hold that met its target, so there is no failure
+ * tile to decide about and every tap carries `failed = false`; the pair
+ * `failedTile`/`carriesFailed` no longer varies and the fix deletes it. That
+ * leaves PRESENCE as the whole answer, which is what these assertions read, and
+ * it is also why they compile unchanged against both trees -- the red is an
+ * assertion failure rather than a compile error, and the fix commit touches no
+ * test file.
  */
 class RestEffortPromptDifferentialTest {
     @Test
-    fun `a hold that ran to its clock is asked how hard it was`() {
-        val prompt =
+    fun `a hold the lifter ended with the failure control is not asked how hard it was`() {
+        assertNull(
             RestEffortPromptPolicy.prompt(
                 timed = true,
                 rpe = null,
-                tappedFailed = false,
+                tappedFailed = true,
                 derivedFailed = false,
-            )
-        assertNotNull(prompt, "a hold that ended on its own clock was never asked how it went")
-        // The tile is offered here and only here. Nothing on the row says this
-        // set fell short -- TimedSetEndPolicy.recordedSeconds stores the target
-        // itself on an auto-ended hold -- so the lifter's own word is the only
-        // thing that can say it broke, which is SetEndControlPolicy's rule for
-        // a set that met its target applied to the same question asked later.
-        assertEquals(true, prompt.failedTile, "a hold that met its target cannot say it broke")
-        assertEquals(false, prompt.carriesFailed, "a rung tapped on a clean hold would store a failure")
+            ),
+            "a hold the lifter gave up on was asked for a rating anyway",
+        )
     }
 
     @Test
-    fun `a hold the lifter broke early keeps that verdict whatever rung is tapped`() {
-        val prompt =
+    fun `a hold the lifter broke early and the app also judged short is not asked`() {
+        // Field session 38's two dead hangs are this pair: the lifter tapped the
+        // failure control AND the recorded seconds fell below
+        // TimedSetEndPolicy.CLOSE_ENOUGH_FRACTION of the prescription, so both
+        // facts stand on one row. Neither of them owes a question.
+        assertNull(
             RestEffortPromptPolicy.prompt(
                 timed = true,
                 rpe = null,
                 tappedFailed = true,
                 derivedFailed = true,
-            )
-        assertNotNull(prompt, "a hold ended on the failure control was never asked how it went")
-        // Withheld because the verdict is already on the row: the tile would
-        // re-store what stands.
-        assertEquals(false, prompt.failedTile, "the failure tile was offered to a set that already failed")
-        // THE LOAD-BEARING ONE. SetRatingTracker.rate assigns tappedFailed from
-        // its argument rather than OR-ing it, so a headroom tap passing false
-        // would withdraw the lifter's own verdict and republish failedByLifter
-        // false on a plank they actually dropped.
-        assertEquals(true, prompt.carriesFailed, "a headroom tap would clear the lifter's own failure verdict")
+            ),
+            "a hold that failed by both routes was asked for a rating",
+        )
     }
 
     @Test
-    fun `a hold the app judged short is asked without being made to tap a failure`() {
-        val prompt =
+    fun `a hold the app judged short of its target is not asked how hard it was`() {
+        // The shortfall the lifter never tapped: a timed set ended during its
+        // LEAD-IN, where SetEndControlPolicy.controls answers END_UNRATED and
+        // the write derives the failure from the near-zero count. "If you can't
+        // do it, it's failed" covers this one too -- the set did not deliver its
+        // clock, so there is nothing to rate.
+        assertNull(
             RestEffortPromptPolicy.prompt(
                 timed = true,
                 rpe = null,
                 tappedFailed = false,
                 derivedFailed = true,
-            )
-        assertNotNull(prompt, "a hold recorded short of target was never asked how it went")
-        // Withheld for the OTHER reason, and it is not the same reason: the
-        // shortfall here is DERIVED, so correcting the held seconds re-derives
-        // it. A tapped failure is the one a correction cannot clear, and this
-        // is the path a mis-measured hold arrives on.
-        assertEquals(false, prompt.failedTile, "a derived shortfall was offered a tile that stores a tapped one")
-        assertEquals(false, prompt.carriesFailed, "a shortfall the lifter never claimed was stored as their word")
+            ),
+            "a hold recorded short of its target was asked for a rating",
+        )
     }
 
     @Test
-    fun `every unrated timed set is asked, and none is asked to state a verdict twice`() {
-        for (tapped in listOf(false, true)) {
-            for (derived in listOf(false, true)) {
-                val prompt =
-                    RestEffortPromptPolicy.prompt(
-                        timed = true,
-                        rpe = null,
-                        tappedFailed = tapped,
-                        derivedFailed = derived,
-                    )
-                assertNotNull(prompt, "an unrated timed set owed no question: tapped=$tapped derived=$derived")
-                assertFalse(
-                    prompt.failedTile && prompt.carriesFailed,
-                    "the grid both offered a failure tile and carried one: tapped=$tapped derived=$derived",
-                )
+    fun `a hold that ran its clock unrated is the one set still asked`() {
+        // GREEN at this commit as well as after the fix. Nothing on the row says
+        // this set fell short -- TimedSetEndPolicy.recordedSeconds stores the
+        // target itself on an auto-ended hold -- and no rating stands, so this
+        // is the hold the owner watched finish and walk on unasked.
+        assertNotNull(
+            RestEffortPromptPolicy.prompt(
+                timed = true,
+                rpe = null,
+                tappedFailed = false,
+                derivedFailed = false,
+            ),
+            "a hold that ended on its own clock was never asked how it went",
+        )
+    }
+
+    @Test
+    fun `only an unrated timed set with no failure standing is asked`() {
+        // The contract over the whole cross product the policy takes, so that
+        // widening it in any of the four inputs is a visible failure here and
+        // not a case nobody enumerated.
+        for (timed in listOf(false, true)) {
+            for (rpe in listOf(null, 1, 6, 10)) {
+                for (tapped in listOf(false, true)) {
+                    for (derived in listOf(false, true)) {
+                        val asked =
+                            RestEffortPromptPolicy.prompt(
+                                timed = timed,
+                                rpe = rpe,
+                                tappedFailed = tapped,
+                                derivedFailed = derived,
+                            ) != null
+                        assertEquals(
+                            timed && rpe == null && !tapped && !derived,
+                            asked,
+                            "wrong ask: timed=$timed rpe=$rpe tapped=$tapped derived=$derived",
+                        )
+                    }
+                }
             }
         }
     }
