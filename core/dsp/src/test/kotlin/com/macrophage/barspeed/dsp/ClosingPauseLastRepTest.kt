@@ -53,6 +53,29 @@ class ClosingPauseLastRepTest {
         sensorOnStack = true,
     )
 
+    /**
+     * Three lifts that are not on this session, carried only by the corpus pin
+     * below so that all four homes for the rep call are covered by it.
+     *
+     * `benchPress` is ECCENTRIC-first, which is the geometry that leaves
+     * `1110`'s digit-2 pause inside the rep and `2011`'s at the end of it.
+     */
+    private val benchPress = LiftDirection(startsWith = StartPhase.ECCENTRIC, concentricUp = true)
+
+    private val legCurl = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = false,
+        sensorInverted = true,
+        sensorOnStack = true,
+    )
+
+    private val facePull = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = true,
+        plane = MovementPlane.HORIZONTAL,
+        sensorOnStack = true,
+    )
+
     private val set03 = "field-ohp-3010-6rep-s39-set03"
     private val set05 = "field-ohp-1110-6rep-s39-set05"
     private val set07 = "field-latpulldown-1120-6rep-s39-set07"
@@ -176,31 +199,125 @@ class ClosingPauseLastRepTest {
     }
 
     @Test
-    fun `the guide scripts both tracks row for row, the short ending included`() {
-        // CHARACTERIZATION of what ships at 35f0862a. The script is a model of
-        // a loop in `:app` no test reaches, and on these two plans it
-        // reproduces the archive exactly once #243's numbering is applied --
-        // which is what makes the archive evidence about the script, and what
-        // makes the short ending the script's own rather than a device artefact.
+    fun `the guide scripts both tracks row for row, and moves only the terminal Done`() {
+        // #265. The script reproduces every row of both archives, at the second
+        // the archive has it, with ONE row moved: the terminal `Done`, which
+        // 0.1.50 spoke at second 17 on set 5 and 23 on set 7 -- one closing
+        // pause short -- and which now lands at 18 and 24. Nothing else moves,
+        // no row is added and none is removed.
+        //
+        // The rep NUMBERS differ throughout and that is #243's and not this:
+        // 0.1.50 counted finished reps, so the archive's `Rep 1` is the guide's
+        // `Rep 2` at the same second. `asCalledNow` applies that one shift.
         listOf(
             Triple(set05, plan("1110", seatedOhp), 17),
             Triple(set07, plan("1120", latPulldown), 23),
-        ).forEach { (fixture, p, doneAt) ->
+        ).forEach { (fixture, p, archivedDoneAt) ->
+            val archived = asCalledNow(cadenceRows(fixture))
+            val scripted = scriptRows(p, reps)
             assertEquals(
-                asCalledNow(cadenceRows(fixture)),
-                scriptRows(p, reps),
-                "$fixture: the script against the track it was recorded from",
+                archived.dropLast(1),
+                scripted.dropLast(1),
+                "$fixture: every row but the ending, against the track it was recorded from",
             )
             assertEquals(
-                doneAt to CadenceVoice.DONE,
-                scriptRows(p, reps).last(),
-                "$fixture: where the script puts Done",
+                archived.size,
+                scripted.size,
+                "$fixture: a restored pause moves a row and adds none",
             )
             assertEquals(
-                reps * p.deliveredCycleS - 1,
-                scriptRows(p, reps).last().first,
-                "$fixture: one second short of $reps x ${p.deliveredCycleS}",
+                archivedDoneAt to CadenceVoice.DONE,
+                archived.last(),
+                "$fixture: where 0.1.50 put Done",
             )
+            assertEquals(
+                (reps * p.deliveredCycleS) to CadenceVoice.DONE,
+                scripted.last(),
+                "$fixture: and where it lands once the last rep keeps its closing pause",
+            )
+        }
+    }
+
+    @Test
+    fun `a set is as long as its prescription on every tempo, closing pause or not`() {
+        // #265 as the general rule rather than two tracks: the last call of a
+        // bounded set is `Done` at reps x deliveredCycleS, on all four homes
+        // for the rep call and at one, two, six and twelve reps.
+        //
+        // This is the assertion the shipped guide fails. Before #265 the three
+        // closing-pause rows below ended a second early -- the pause was
+        // delivered on reps 1 to N-1 and cut on the last -- and every other row
+        // already held, because a plan whose rep ends on its second stroke has
+        // no beat after the one `Done` follows.
+        val corpus = listOf(
+            // case 1, a closing pause carries the call: the affected family.
+            Triple("2011", benchPress, 5),
+            Triple("1110", seatedOhp, 6),
+            Triple("1120", latPulldown, 6),
+            // case 2, merged into the NEXT rep's opening stroke.
+            Triple("3010", benchPress, 10),
+            Triple("3010", benchPress, 1),
+            // case 3, merged into the rep's OWN last stroke.
+            Triple("2010", seatedOhp, 8),
+            Triple("1030", legCurl, 12),
+            Triple("20X0", seatedOhp, 6),
+            Triple("2011", facePull, 12),
+            // case 4, no home for a call at all.
+            Triple("1010", seatedOhp, 6),
+            Triple("1110", benchPress, 2),
+        )
+        // The corpus cannot be weakened into one that would pass either way:
+        // three of its rows must have a beat after the one the rep completes
+        // on, which is the only shape #265 fires on.
+        assertEquals(
+            3,
+            corpus.count { (tempo, direction, _) ->
+                plan(tempo, direction).let { it.beats.lastIndex > it.repCompleteAfterBeat }
+            },
+            "rows whose rep ends in a closing pause",
+        )
+        corpus.forEach { (tempo, direction, n) ->
+            val p = plan(tempo, direction)
+            val last = CadenceVoice.script(p, n).last()
+            assertEquals(
+                CadenceVoice.DONE,
+                last.utterance,
+                "$tempo on ${direction.plane}/${direction.startsWith}: the last call of a bounded set",
+            )
+            assertEquals(
+                n * p.deliveredCycleS,
+                last.atSecond,
+                "$tempo on ${direction.plane}/${direction.startsWith}, $n reps: " +
+                    "Done at $n x ${p.deliveredCycleS}, beats ${p.beats.map { it.label to it.seconds }}",
+            )
+        }
+    }
+
+    @Test
+    fun `the last rep's restored closing pause is silent, so the set says one word more than before`() {
+        // What the lifter hears, and what the archive gains: nothing but a
+        // second of silence before `Done`. The closing pause has no word of its
+        // own (`CadenceBeat.spokenLabel` is null) and there is no next rep to
+        // announce, so the beat the last rep gets back speaks nothing and
+        // writes nothing. That is why the row count above is unchanged.
+        listOf(
+            Triple(set05, plan("1110", seatedOhp), listOf(15 to "Up", 16 to "Down", 18 to CadenceVoice.DONE)),
+            Triple(
+                set07,
+                plan("1120", latPulldown),
+                listOf(20 to "Up", 21 to "1", 22 to "Down", 24 to CadenceVoice.DONE),
+            ),
+        ).forEach { (fixture, p, lastRep) ->
+            val opensAt = (reps - 1) * p.deliveredCycleS
+            assertEquals(
+                lastRep,
+                scriptRows(p, reps).filter { it.first >= opensAt },
+                "$fixture: the last rep, from second $opensAt",
+            )
+            val closing = p.beats.last()
+            assertEquals(null, closing.spokenLabel, "$fixture: the beat the last rep gets back has no word")
+            assertEquals(false, closing.isStroke, "$fixture: and is not counted out loud")
+            assertEquals(1, closing.seconds, "$fixture: one second, which is what the prescription asked for")
         }
     }
 
