@@ -97,6 +97,18 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  * WHETHER IT FITS ABOVE THE FOLD IS NOT CLAIMED, and neither is anything about
  * what the lifter sees. `:app` has no reachable test seam for a Compose layout.
  * See the [Field] items in the commit body.
+ *
+ * ## NOTHING HERE HAS BEEN RENDERED
+ *
+ * No bench run happened, and the blocker was memory rather than the emulator
+ * slot -- the lock file
+ * `<scratch>/emulator.lock` was free throughout. Free physical
+ * memory was polled 31 times on 2026-09-12, 16:43:50 to 17:12:26 local, against
+ * the roughly 3 GB a headless `barspeed-api35` boot needs: peak 747 MB, floor
+ * 215 MB, and the last 26 samples peaked at 639 MB. The AVD was never started,
+ * so no device was started and none was killed. Every claim in this file about
+ * what DRAWS is read from source; the tile count, the wording, the placement and
+ * what the export carries afterwards are all carried as [Field] items.
  */
 @Composable
 internal fun RestEffortPromptSection(state: RecordState, viewModel: RecordViewModel) {
