@@ -2958,8 +2958,12 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * correction to it -- sits below the next-set block, in [LastSetDetail]. Since
  * #237 that is a BOX stating the record in one line, a Correct button, and a
  * rep-quality card carrying a 64dp chart; the six inline correction rows that
- * stood there are inside the popup the button opens. TWO things are still drawn
- * above it, and both for the same reason. The first is the reason page the app opens BY
+ * stood there are inside the popup the button opens. THREE things are still drawn
+ * above it, and all three for the same reason. The first is
+ * [RestEffortPromptSection] (#283), the effort question a set nothing asked at
+ * its end is asked here instead -- which is every hold, because a hold ends on
+ * its clock or on the failure control and neither draws a grid. It is above the
+ * other two because both depend on its answer. The second is the reason page the app opens BY
  * ITSELF, drawn here under the header: the screen scrolls to 0 on entering
  * RESTING, so a question drawn below the fold is a question the lifter starts
  * the next set without seeing. See [SetLimiterPagePlacement]. The field report for v0.1.37 is
@@ -2969,7 +2973,7 @@ private fun EndSetRpeGrid(state: RecordState, viewModel: RecordViewModel, failed
  * measured on a device -- see the bench-harness evidence in the commit that
  * moved START.
  *
- * The second is [NextSetNudgeSection], the headroom grid, moved above
+ * The third is [NextSetNudgeSection], the headroom grid, moved above
  * [NextSetBlock] by #236: it is one tap that acts on the rating just given,
  * and below the Up next card plus five adjustment controls it was below the
  * fold too. The owner's field report after v0.1.50 is that it got lost there.
@@ -3032,6 +3036,14 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
         }
     RestHeader(state, viewModel)
     Spacer(Modifier.height(6.dp))
+    // FIRST of the three things drawn above the fold, and above the limiter
+    // page deliberately (#283). A hold is never asked how it went while it is
+    // ending -- the clock ends it, or the failure control does -- so this is
+    // the only place the question can be put, and it is the question the two
+    // rows below it depend on: the limiter page asks why a set ended and the
+    // headroom grid acts on the rung this stores. Decides nothing itself; see
+    // [RestEffortPromptSection].
+    RestEffortPromptSection(state, viewModel)
     // Drawn HERE, above everything but the header, because the screen
     // scrolls to 0 on entering RESTING. A question below the fold is a
     // question the lifter starts the next set without seeing, and starting
