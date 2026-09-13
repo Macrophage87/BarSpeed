@@ -4503,6 +4503,15 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Stopped early = failed. Judged only where the count is trustworthy:
         // timed sets against the clock, manual/guided sets against the app's
         // own rep count — never against a possibly-miscounted sensor total.
+        // Since #286 a straight-reps set with a sensor is no longer in the
+        // manual class, so nothing auto-fails it either: p.manualReps is null
+        // on such a set unless the lifter corrected the count, the branch below
+        // falls through to false, and a short set is recorded as failed only if
+        // the lifter taps the failed tile. Auto-failing on a live count the
+        // detector may have undercounted would write a failure the lifter never
+        // made. setTargetMet's KDoc states the same refusal on the control side
+        // and the two still match; what changed is which sets are in the manual
+        // class, not the rule.
         val stoppedEarly =
             when {
                 // #168: the same function the in-set control gate asks, so the
