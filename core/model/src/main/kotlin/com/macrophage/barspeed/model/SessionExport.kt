@@ -1208,14 +1208,16 @@ data class SessionExport(
          * On the straight-reps barbell work #284 traces, whose count the number
          * is is the FIRST question to ask of it.
          *
-         * DERIVED, NOT STORED. `RepsSourcePolicy` takes the row's live count,
-         * its `repsManual` flag, whether it is measured in seconds and whether
-         * a tempo was prescribed, and returns one of `sensor`, `manual`,
-         * `metronome`, `corrected` or `analysis`. Two collapses are stated
-         * rather than hidden: a corrected manual set reads `manual` and a
-         * corrected guided set reads `metronome`, because nothing on the row
-         * records that the rest-screen control was used, and both words are
-         * still honest about whose figure the count is.
+         * DERIVED, NOT STORED. `RepsSourcePolicy` takes the row's live
+         * count, its `repsManual` flag, whether it is measured in seconds and
+         * whether a CADENCE RAN -- derived from the frozen tempo and the
+         * frozen geometry's kind, because an explosive lift carrying a tempo
+         * is paced by nothing -- and returns one of `sensor`, `manual`,
+         * `metronome`, `corrected` or `analysis`. Three collapses are stated
+         * rather than hidden: a corrected manual set reads `manual`, a
+         * corrected guided set reads `metronome`, and a row with no stored
+         * geometry reads its tempo as the guide because nothing on it says
+         * what kind of exercise it was.
          *
          * ABSENT ON A TIMED SET, and absence means one thing only -- nothing
          * counted reps. A hold publishes whatever the segmenter made of one
@@ -1446,11 +1448,21 @@ data class SetExport(
      * the archived stream.
      *
      * DERIVED at export by `RepsSourcePolicy` from [liveReps], [repsManual],
-     * whether the set is measured in seconds and whether a tempo was
-     * prescribed -- no column holds the word. Two collapses follow and are
-     * stated rather than hidden: a corrected MANUAL set reads `manual` and a
-     * corrected GUIDED set reads `metronome`, because nothing on the row
-     * records that the rest-screen control was used.
+     * whether the set is measured in seconds, and whether A CADENCE RAN --
+     * which is `RepsSourcePolicy.guideCounted` over the frozen tempo and the
+     * frozen geometry's kind, not the tempo alone. No column holds the word.
+     *
+     * THREE COLLAPSES follow and are stated rather than hidden. A corrected
+     * MANUAL set reads `manual` and a corrected GUIDED set reads `metronome`,
+     * because nothing on the row records that the rest-screen control was
+     * used. The third is a row with NO STORED GEOMETRY: it cannot say what
+     * kind of exercise it was, so its tempo is read as the guide -- which is
+     * what a tempo'd row almost always was. It matters for one shape, an
+     * EXPLOSIVE LIFT CARRYING A TEMPO: no cadence is played on one, because it
+     * is judged on peak velocity, so the lifter taps its count. With the
+     * geometry on the row that set publishes `manual`; without it the tempo is
+     * all there is to read and it publishes `metronome` for a set no guide
+     * counted.
      *
      * ABSENT on a timed set, where nothing counted reps at all, and absence
      * means that and nothing else -- never a sixth word and never a stand-in
@@ -1464,6 +1476,22 @@ data class SetExport(
      * rather than a lifter's. On the first straight-reps captures the LIFTER'S
      * HAND COUNT is the ground truth and this word says which counter to score
      * against it (#286).
+     *
+     * WHAT IT HAS BEEN SCORED ON, in figures rather than in words, every one
+     * of them computed by `LiveRepCallCorpusTest`: over the thirteen committed
+     * captures that carry rep marks the live detector makes 35 calls against
+     * 103 marks, 11 of them in the right window, and four of the thirteen say
+     * nothing at all. Per capture on the five seated overhead presses, calls
+     * against the lifter's own hand count: 0 calls for 6 hand reps on session
+     * 37 set 2, 3 for 7 on set 3, 1 for 5 on set 4, 0 for 8 on session 38 set
+     * 4 and 2 for 8 on set 5. EVERY ONE OF THE THIRTEEN IS A TEMPO'D SET, so
+     * those figures score the detector on paced work and not on the straight
+     * reps this word is for; which way that moves on a faster set is UNTESTED
+     * and this KDoc does not guess. The measured bottleneck is the velocity
+     * estimate rather than the pairing rule -- the batch path resolves 5 to 15
+     * spans per set on these same captures where the live caller speaks 0 to 8
+     * -- and no committed capture is a no-tempo max-intent set of any
+     * exercise.
      */
     val repsSource: String? = null,
     /**

@@ -62,7 +62,7 @@ enum class RepsSource(val wireName: String) {
  * `repsManual` true is a correction, and a row with no live count and
  * `repsManual` true is a tally.
  *
- * ## The two collapses, stated rather than hidden
+ * ## The three collapses, stated rather than hidden
  *
  * A corrected MANUAL set reads `manual` and a corrected METRONOME set reads
  * `metronome`. Both are honest about whose figure the count is -- a corrected
@@ -71,6 +71,12 @@ enum class RepsSource(val wireName: String) {
  * control was used. A row written before the live count existed reads
  * `analysis` whenever `repsManual` is false, which is what such a row's
  * `actualReps` was: `set.manualReps ?: set.analysis.reps.size`.
+ *
+ * The third is [guideCounted]'s: a row with NO STORED GEOMETRY cannot say what
+ * kind of exercise it was, so its tempo is read as the guide. That is right for
+ * almost every such row and wrong for one shape -- an explosive lift carrying a
+ * tempo, which no cadence paces -- and where the geometry IS stored that shape
+ * reads `manual`, which is what it is.
  */
 object RepsSourcePolicy {
     /**

@@ -11,6 +11,7 @@ import com.macrophage.barspeed.model.AbandonedSetPolicy
 import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseExport
+import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.FailureProvenancePolicy
 import com.macrophage.barspeed.model.GeometryExport
 import com.macrophage.barspeed.model.GeometrySourceExport
@@ -272,7 +273,7 @@ class SessionExporter(
             // and derived HERE rather than at each writer: the manifest below
             // asks the same extension, so the two documents cannot come to
             // disagree about who counted a set.
-            repsSource = record.publishedRepsSource,
+            repsSource = record.publishedRepsSource(geometry?.kind),
             // What the sensor counted, beside what the set is recorded as.
             // Published straight off the row and never recomputed -- the live
             // figure cannot be rebuilt from the stored stream, which yields the
@@ -635,23 +636,33 @@ private val SetRecordEntity.publishedLimiter: String?
  *   or a carry, so the column IS the timed marker. `AbandonedSetPolicy` reads
  *   it the same way one field up. The PUBLISHED duration is not used, because a
  *   set abandoned in its prep publishes no duration and is still a timed set.
- * - HAS TEMPO is `tempo != null`, the prescription frozen onto the row when the
- *   set was recorded -- never a plan read at export time, which can have been
- *   edited or deleted since.
+ * - A CADENCE HAVING RUN is `RepsSourcePolicy.guideCounted` over two frozen
+ *   facts: the `tempo` prescribed onto the row when the set was recorded --
+ *   never a plan read at export time, which can have been edited or deleted
+ *   since -- and [kind], the kind of exercise the same row's geometry froze.
+ *   BOTH, because a tempo is not a cadence: an explosive lift is judged on peak
+ *   velocity and is paced by nothing whatever tempo is written on it, so the
+ *   tempo alone published `metronome` for a set the lifter tapped rep by rep.
+ *   [kind] is null on a row with no stored geometry, where the fallback is the
+ *   tempo and the collapse is the policy's to state.
+ *
+ * @param kind the frozen geometry's exercise kind, or null where the row stores
+ *   no geometry. Passed rather than looked up: the exercise catalogue at export
+ *   time is not what the set was recorded against, `custom_exercises` stores no
+ *   kind at all, and `ExerciseDef`'s kind for an id outside the seed list is its
+ *   own admitted guess.
  */
-private val SetRecordEntity.publishedRepsSource: String?
-    get() =
-        RepsSourcePolicy.publishedWord(
-            liveReps = liveReps,
-            repsManual = repsManual,
-            timed = actualDurationS != null,
-            // STILL THE RAW TEMPO AT THIS COMMIT, and that is the defect the
-            // next two commits measure and fix: a tempo string is not a cadence
-            // on an explosive lift, so this publishes `metronome` for a set the
-            // lifter tapped. `RepsSourcePolicy.guideCounted` is the input this
-            // argument wants and nothing passes it yet.
-            guideCounted = tempo != null,
-        )
+private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?): String? = RepsSourcePolicy.publishedWord(
+    liveReps = liveReps,
+    repsManual = repsManual,
+    timed = actualDurationS != null,
+    guideCounted =
+    RepsSourcePolicy.guideCounted(
+        hasTempo = tempo != null,
+        isTimed = actualDurationS != null,
+        kind = kind,
+    ),
+)
 
 /**
  * The free-text note as it may be PUBLISHED: only where an answer stands
@@ -996,7 +1007,13 @@ class RawExporter(
         // set no live counter ran on -- and writes a real 0, which is also
         // right: a sensor-counted set whose detector resolved nothing counted
         // zero.
-        str("repsSource", record.publishedRepsSource)
+        //
+        // The geometry is decoded ONCE here and read again by the geometry block
+        // below, so the kind the counter word is derived from and the kind this
+        // manifest publishes are one fact. session.json decodes it once for the
+        // same reason, at the top of `setExport`.
+        val geometry = sessionRepository.decodeGeometry(record)
+        str("repsSource", record.publishedRepsSource(geometry?.kind))
         num("liveReps", record.liveReps)
         str("tempoPrescribed", record.tempo)
         // The prep, both halves. [num] drops a null, which is right -- a set
@@ -1021,7 +1038,7 @@ class RawExporter(
         //
         // Omitted entirely for a set that carries no stored geometry, which is
         // every set recorded before the column existed.
-        sessionRepository.decodeGeometry(record)?.let { g ->
+        geometry?.let { g ->
             str("startsWith", g.startsWith.name.lowercase())
             str("concentric", if (g.concentricUp) "up" else "down")
             str("plane", if (g.horizontal) "horizontal" else "vertical")
