@@ -90,6 +90,7 @@ import com.macrophage.barspeed.model.PlanValueCaption
 import com.macrophage.barspeed.model.PreviewBlock
 import com.macrophage.barspeed.model.RecordExitPolicy
 import com.macrophage.barspeed.model.RemoveSetControl
+import com.macrophage.barspeed.model.RepCallNotePolicy
 import com.macrophage.barspeed.model.RestControl
 import com.macrophage.barspeed.model.RestControlPolicy
 import com.macrophage.barspeed.model.RestControls
@@ -2309,7 +2310,7 @@ private fun GuidedSetStage(state: RecordState, viewModel: RecordViewModel, slot:
         // starts the lifter is moving, and the line the voice is about to say
         // is no use after it has said it.
         if (state.leadInRunning) {
-            StartCueBlock(startCueFor(state, slot))
+            StartCueBlock(startCueFor(state, slot), RepCallNotePolicy.noteFor(state.repCallAtDriveEnd))
         } else {
             Text(
                 "Follow the voice — the app counts the reps.",
@@ -2335,20 +2336,28 @@ private fun GuidedSetStage(state: RecordState, viewModel: RecordViewModel, slot:
  * It decides nothing. Every word comes from [StartCuePolicy], in `:core:model`,
  * where a test runs on every push; nothing in this file is reachable by one.
  *
+ * [repCallNote] is `RepCallNotePolicy`'s decision, also in `:core:model`, drawn
+ * under the phrase and only on a set whose plan says the rep number at the end of
+ * each drive (#266). Body type and the subdued colour: it confirms a habit the
+ * lifter already has rather than telling them which way to move.
+ *
  * `[Field]` -- NO DEVICE HAS DRAWN THIS. The lane that added it could not run
  * the emulator: free physical memory was polled every 60 s for 30 minutes and
  * never rose above 1.52 GB against the bench-test recipe's ~3 GB floor, so the
- * AVD was never booted and no screenshot exists. What is unverified is
+ * AVD was never booted and no screenshot exists. The lane that added the rep-call
+ * note could not run one either -- free RAM under 1 GB -- so the block now has
+ * three lines and none of them has been rendered. What is unverified is
  * everything only a renderer can answer, and the longest phrase is the one to
  * check: `"Start at the BOTTOM, first movement UP"` is 38 characters at
  * `headlineSmall`, and whether it wraps to two lines, wraps mid-word, or clips
  * on a narrow phone at a large font scale has not been observed. Next time the
  * emulator is free: import a plan declaring one `"start": "top"` and one
- * `"start": "bottom"` exercise, START each, and screenshot the countdown at
+ * `"start": "bottom"` exercise, and one `1010` slot on a concentric-first lift so
+ * the note is drawn, START each, and screenshot the countdown at
  * `wm size 360x800` and at `font_scale 2.0` as well as at the defaults.
  */
 @Composable
-private fun StartCueBlock(cue: StartCue) {
+private fun StartCueBlock(cue: StartCue, repCallNote: String?) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Text(
             cue.phrase,
@@ -2359,6 +2368,20 @@ private fun StartCueBlock(cue: StartCue) {
         cue.marker?.let {
             Spacer(Modifier.height(4.dp))
             Text(it, style = MaterialTheme.typography.bodyMedium, color = BarColors.Amber)
+        }
+        // Under the #241 line, and only on the sets whose plan counts at the end
+        // of each drive (#266). Body type rather than the headline the line above
+        // uses: it confirms a habit the lifter already has -- "people are used to
+        // the reps being counted at lockout" -- rather than telling them which
+        // way to move, which is the one thing a wrong guess ruins the set over.
+        repCallNote?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                it,
+                style = MaterialTheme.typography.bodyMedium,
+                color = BarColors.Sub,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }

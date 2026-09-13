@@ -90,6 +90,13 @@ object CadenceVoice {
      * rep, and the call rows mark the rep boundaries it used to mark.
      * `CueTrack.calledReps` in the test source set counts `Down` rows and says
      * so in its own KDoc.
+     *
+     * The beat handed the announcement is not always the rep's first. On a
+     * prescription with no free second at the start of the rep, [CadencePlan.of]
+     * puts the call on the beat that opens as the concentric ends, and this
+     * function does not know or care which beat it was handed -- the word
+     * replaced is that beat's, and on a `1110` with a mid-rep pause it is `Hold`
+     * rather than a stroke word (#266). Export 1.20's FOURTH entry publishes it.
      */
     fun beatCall(beat: CadenceBeat, announcement: String?): SpokenCall? {
         val label = beat.spokenLabel
@@ -117,11 +124,17 @@ object CadenceVoice {
      * any, would not move.
      *
      * No count is dropped. A merged call used to silence this stroke's first
-     * count to widen its own window, and rep 1 -- which never carries a call --
-     * kept it, which is how the merged calls in the 0.1.43 archives were dated
-     * at all (issue 176). That asymmetry is gone; what remains is that rep 1
-     * counts from ONE because its word is not replaced, so a track reads
+     * count to widen its own window, and rep 1 -- which carried no call on any
+     * plan then -- kept it, which is how the merged calls in the 0.1.43 archives
+     * were dated at all (issue 176). That asymmetry is gone; what remains is
+     * that a stroke whose word survives counts from ONE, so a track reads
      * `Down 1 2` on rep 1 and `Rep 2 2 3` on rep 2.
+     *
+     * A plan that counts at the end of the drive (#266) does carry a call on rep
+     * 1, and it changes no count on any rep of any such plan: those
+     * prescriptions are two one-second strokes, and a one-second stroke has no
+     * interior second to count. A mid-rep `Hold` is not a stroke and is not
+     * counted either.
      */
     fun countCall(beat: CadenceBeat, announcement: String?, second: Int): SpokenCall? {
         if (!beat.isStroke || second >= beat.seconds) return null
@@ -169,7 +182,12 @@ object CadenceVoice {
         val calls = mutableListOf<ScriptedCall>()
         var second = 0
         var rep = 1
-        var pending: String? = null
+        // Rep 1's call, on the plans that have one. A call riding beat 0 is not
+        // spoken on rep 1 -- that word is the start cue under #241's contract --
+        // so those plans open with nothing pending and rep 2 is the first named.
+        // A call at the end of the drive replaces a LATER beat's word, which rep
+        // 1 has as much as any other rep, so rep 1 is named there (#266).
+        var pending: String? = if (plan.announcesAtConcentricEnd) plan.announcementFor(rep, plannedReps) else null
         var lastRep = false
         while (true) {
             for ((index, beat) in plan.beats.withIndex()) {

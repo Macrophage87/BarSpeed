@@ -1357,15 +1357,22 @@ data class SessionExport(
          * number be at the start of the rep, and replace the relevant up or
          * down, etc." Three things change in `voiceCues` and no key moves.
          *
-         * WHEN A CALL IS HEARD IS NOW UNIFORM. Every `Rep N` and `Last rep`
-         * row from a guided set lands on the first second of the rep it names.
-         * From 1.13 through 1.19 it was not uniform and the published
-         * description says so: on the two schedules that merged the call into a
-         * stroke it was spoken during the rep it named, and on the schedule
-         * whose prescription ends in a pause it was spoken in the previous
-         * rep's closing pause, before that rep had begun. That rule is the
-         * reading rule for every set recorded under those versions and is kept
-         * as theirs, on the precedent the 1.13 entries set.
+         * WHERE A CALL IS HEARD, on every schedule with a free second at the
+         * START of the rep: every `Rep N` and `Last rep` row from such a set
+         * lands on the first second of the rep it names. From 1.13 through 1.19
+         * that was not so and the published description says so: on the two
+         * schedules that merged the call into a stroke it was spoken during the
+         * rep it named, and on the schedule whose prescription ends in a pause
+         * it was spoken in the previous rep's closing pause, before that rep had
+         * begun. That rule is the reading rule for every set recorded under
+         * those versions and is kept as theirs, on the precedent the 1.13
+         * entries set.
+         *
+         * THIS ENTRY SAID THE 1.20 PLACEMENT WAS UNIFORM. The FOURTH entry below
+         * gives 1.20 a second placement, so that sentence is DELETED rather than
+         * scoped: it was written under 1.20 about 1.20, and a claim about the
+         * version being described cannot be filed as history of a shipped one the
+         * way the 1.13-through-1.19 rule can.
          *
          * THE FIRST STROKE'S WORD IS WRITTEN ONCE PER SET, NOT ONCE PER REP,
          * and this is the half a reader must act on. The call replaces it, and
@@ -1420,6 +1427,73 @@ data class SessionExport(
          * 13 (app 0.1.52), field-39 sets 3, 5 and 7 (0.1.50) and session 33 sets
          * 1, 5 and 13 (0.1.43). No beat moves on any of them, and no set
          * changes length.
+         *
+         * 1.20 carries a FOURTH change, filed under the same number because
+         * 1.20 is unreleased: `git tag --sort=-creatordate | head -1` is
+         * v0.1.52 and `git show
+         * v0.1.52:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.19"`, both read this round rather than
+         * relayed from the entries above.
+         *
+         * THE CHANGE (#266): a schedule with NO free second at the start of the
+         * rep -- two one-second strokes and no closing pause -- now names the rep
+         * AT THE END OF THE DRIVE, where it named no rep at all. The owner asked
+         * for it after field-39, whose two `1010` sets counted nothing aloud:
+         * *"When you can't have a rep call or an up or down, have the end of the
+         * concentric phase be the rep number."* And on why that instant: *"People
+         * are used to the reps being counted at lockout, so this would be an easy
+         * cue."* So a `1010` press publishes `Up`, `Rep 1`, `Up`, `Rep 2`, and so on, where
+         * field-39's archive publishes `Up`, `Down`, `Up`, `Down` and so on.
+         *
+         * WHICH SETS, and it is the (tempo, lift) pair's answer as always. Only
+         * the dense prescriptions, and only on a lift whose DRIVE opens the rep:
+         * the number lands on the beat that opens as the concentric ends, which
+         * on a `1010` is the return's beat and on a `1110` with a mid-rep pause is
+         * the `Hold`. The same prescription on a lift whose drive CLOSES the rep
+         * publishes no call at all, exactly as before, because the instant its
+         * drive ends is the next rep's first second.
+         *
+         * THE CALL IS PUBLISHED ON EVERY REP INCLUDING REP 1, which no other
+         * schedule does. A set of six publishes `Rep 1` through `Rep 5`, then
+         * `Last rep`, then `Done`. The reason rep 1 is silent elsewhere is that
+         * the call would take the word the set OPENS on, which is under the start
+         * cue's own contract; here it takes a later beat's word, so the opening
+         * word survives. A set of ONE publishes `Last rep` and no number, because
+         * the rep in hand is the planned last from its first rep.
+         *
+         * THE REPLACED WORD IS PUBLISHED NOWHERE IN SUCH A SET, and this is the
+         * half a reader must act on. The THIRD entry's rule -- the first stroke's
+         * word once per set -- had rep 1 keeping it; here there is no rep that
+         * keeps it, so a `1010` concentric-first set of six publishes six `Up`
+         * rows and NO `Down` row, where an archive before 1.20 publishes six of
+         * each. A consumer counting stroke rows to count reps gets zero and must
+         * count the call rows instead, one per rep. The OTHER stroke's word is
+         * still published on every rep, so a guided track still carries a stroke
+         * word in every rep -- which is what the discriminator between this
+         * counter and the unguided one rests on, since the unguided one publishes
+         * none. "Both words in rep 1", which the THIRD entry offered, does not
+         * hold on these sets.
+         *
+         * NO TEMPO COUNT MOVES. These prescriptions are two one-second strokes,
+         * and a one-second stroke has no interior second to count; a mid-rep
+         * `Hold` is not a stroke and is not counted either. So the renumbering
+         * the THIRD entry describes cannot arise here, and a bare digit still
+         * means a tempo count.
+         *
+         * NOT ADDITIVE, and not retroactive. No key is added, removed or
+         * retyped; the CONTENTS of an existing array change, which is the shape
+         * the THIRD entry carries too. Cue rows are stored as they are spoken, so
+         * no archive already on disk moves -- field-39's own two tracks are
+         * committed as fixtures and are the before side of this entry.
+         * `DATABASE_VERSION` does not move and the plan schema is untouched:
+         * nothing about the prescription changes, only what is said over it.
+         *
+         * WHAT IT IS PINNED AGAINST. `LockoutRepCallTest` in `:core:dsp` asserts
+         * field-39 sets 4 and 9 as recorded, then the rows the guide writes
+         * instead, at the same thirteen seconds with the same thirteen rows; the
+         * `1110` geometry is synthetic and pinned beside it. No beat moves and no
+         * set changes length, which `CadencePlanTest` holds across every tempo
+         * any plan can express.
          */
         const val SCHEMA_VERSION = "1.20"
 

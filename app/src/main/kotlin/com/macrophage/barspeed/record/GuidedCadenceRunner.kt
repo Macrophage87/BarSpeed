@@ -111,7 +111,16 @@ class GuidedCadenceRunner(
                 onWorkStarted()
                 val plan = CadencePlan.of(schedule)
                 var rep = 1
-                var pending: String? = null
+                // Rep 1's call, on the plans that have one. A call riding beat 0
+                // is not spoken on rep 1 — that word is the start cue under
+                // #241's contract — so those plans open with nothing pending and
+                // rep 2 is the first named. A call at the end of the drive
+                // replaces a LATER beat's word, which rep 1 has like any other
+                // rep, so rep 1 is named there (#266). The same two lines are in
+                // CadenceVoice.script, which models this loop; LockoutRepCallTest
+                // scores that model against two recorded 1010 sets.
+                var pending: String? =
+                    if (plan.announcesAtConcentricEnd) plan.announcementFor(rep, plannedReps) else null
                 var lastRep = false
                 while (true) {
                     for ((index, beat) in plan.beats.withIndex()) {

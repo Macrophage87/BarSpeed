@@ -36,7 +36,7 @@ data class CadenceBeat(
  * visible rather than hidden. `Tempo.parse` accepts `"3-0-1.5-0"`; no captured
  * session has ever used such a tempo.
  *
- * ## Where the rep announcement goes: the start of the rep, in place of a word
+ * ## Where the rep announcement goes: in place of a word, inside the rep
  *
  * `VoiceCounter` speaks with `TextToSpeech.QUEUE_FLUSH`: every utterance
  * cancels the one before it. An announcement therefore needs the next second to
@@ -56,7 +56,7 @@ data class CadenceBeat(
  * at the start of the rep, and replace the relevant up or down, etc."* The
  * number takes the word's second, and the word is not spoken.
  *
- * Two cases, and the second is not this file's to place:
+ * Three cases:
  *
  * 1. **The rep's FIRST stroke, on every rep after the first, in place of that
  *    stroke's spoken label.** The lifter hears the rep begin: `"Rep 3"` where
@@ -66,15 +66,28 @@ data class CadenceBeat(
  *    prescription with a second to spare anywhere: a closing pause of at least
  *    [ANNOUNCE_BEAT_S], or a stroke of at least [CALL_MIN_STROKE_S] at either
  *    end of the rep.
- * 2. **Not spoken here.** Two one-second strokes and no closing pause -- `1010`
- *    on every lift, and `1110` on the geometries whose digits stay in
- *    prescription order -- so every second of the cycle already carries a word
- *    and replacing one would delete the only instruction the rep has. The owner
- *    ruled on those separately, 2026-09-12: *"We already ruled on the 1010
- *    question. Rep count is at lockout."* That is #266, the number at the end
- *    of the concentric with a prep note, and it is NOT built here: these plans
- *    still announce nothing, and the rep number is on screen only, driven by
- *    `onRepCounted`. See "The SCREEN named finished reps until #252" below.
+ * 2. **The beat that opens as the CONCENTRIC ENDS, on every rep including the
+ *    first, in place of that beat's word** (#266). Two one-second strokes and
+ *    no closing pause, so no second at the START of the rep is free, and the
+ *    owner ruled these separately, 2026-09-12: *"We already ruled on the 1010
+ *    question. Rep count is at lockout."* And on why that instant: *"People
+ *    are used to the reps being counted at lockout, so this would be an easy
+ *    cue."* So a `1010` press goes `Up, Rep 1, Up, Rep 2, ...`. Rep 1 IS named
+ *    here, unlike case 1, because the word being spent is a later beat's and
+ *    rep 1 has one of those like any other rep; what rep 1 keeps on every plan
+ *    is beat 0's word, which is under #241's contract. The prep countdown says
+ *    the rule once, through `RepCallNotePolicy` in `:core:model`, read off
+ *    [announcesAtConcentricEnd].
+ * 3. **Not spoken at all.** The same dense prescription on a lift whose
+ *    CONCENTRIC IS THE STROKE THE REP ENDS ON -- `1010` and `1110` on the
+ *    eccentric-first geometries. Case 2's instant exists, but the beat that
+ *    opens there belongs to the NEXT rep, and putting the number on it would
+ *    name a rep already finished on a schedule where every other call names
+ *    the rep in hand (#243/#252), would leave [LAST_REP] no beat at all -- the
+ *    last rep's call would fall on `Done`'s own second -- or would be case 1's
+ *    placement, which the owner ruled against for exactly these plans. So the
+ *    rep number stays on screen only here, driven by `onRepCounted`. See "The
+ *    SCREEN named finished reps until #252" below.
  *
  * The behaviour before issue 106 was a third option and is not available: it
  * inserted a one-second beat the prescription did not ask for.
@@ -103,6 +116,13 @@ data class CadenceBeat(
  * replaces that rule is in the same entry -- the call rows land on the first
  * second of each rep, one per rep after the first, and rep 1's own stroke word
  * is still there.
+ *
+ * **Case 2 spends the word on every rep, rep 1 included**, so a `1010`
+ * concentric-first set carries NO row of the replaced word at all -- six `Up`
+ * rows and no `Down` -- and `calledReps` returns 0 rather than 1 on it. That is
+ * the FOURTH entry under export 1.20. The set is still attributable to this
+ * guide, because the other stroke's word is written on every rep and the
+ * unguided counter never says a stroke word.
  *
  * ## No home moves a beat
  *
@@ -212,7 +232,7 @@ data class CadenceBeat(
  * the caption, and what that leaves unverified is recorded once, in
  * `GuidedRepCaption`'s KDoc, rather than repeated here.
  *
- * ## Rep 1 is announced on no plan, and the reason is not the old one
+ * ## Rep 1's own BEAT 0 is never spent, and the reason is not the old one
  *
  * The old reason is DELETED rather than kept beside the new one, because it was
  * an argument about where a call could fit: a call rode a beat of the rep it
@@ -221,8 +241,9 @@ data class CadenceBeat(
  * impossible on others, and where it was possible it cost rep 1 the only tempo
  * count those plans had (#147). Neither clause survives #293 -- the call takes
  * the opening stroke's word, every rep has one, and nothing is given up -- so
- * announcing rep 1 is now perfectly possible on every plan that speaks and is
- * still not done. Three reasons, and the third is the one that would cost data:
+ * announcing rep 1 is now perfectly possible on every plan that speaks. Where
+ * the call rides BEAT 0 it is still not done, for three reasons, the third of
+ * which would cost data:
  *
  * 1. Rep 1's number is not in doubt. It follows the prep countdown, whose last
  *    word is `Brace`, and **the stroke word after that countdown IS rep 1
@@ -242,6 +263,15 @@ data class CadenceBeat(
  *
  * Silence about rep 1 is not a wrong number.
  *
+ * **Case 2 names rep 1 and none of the three reasons applies to it**, which is
+ * why it does. The word it spends is not beat 0's: on a `1010` it is the
+ * return's, on a `1110` with a mid-rep pause it is the `Hold`. So the start cue
+ * still opens the set and #241's contract is untouched (reason 2); the guide
+ * still writes a stroke word in every rep of the set, which is all the
+ * discriminator needs (reason 3); and reason 1 is about a number the lifter is
+ * not in doubt about, not about a beat that must stay silent. What the lifter
+ * hears on rep 1 of a `1010` press is `Up, Rep 1` -- the owner's own example.
+ *
  * Nothing here touches the UNGUIDED counter,
  * `VoiceMilestonePolicy.repMilestone` in `:core:model`. That one speaks at the
  * instant a rep is counted rather than on a metronome schedule, so its
@@ -253,24 +283,32 @@ data class CadenceBeat(
  * name different reps; the discriminator is the stroke words this file places,
  * published in `voiceCues` and pinned by `CueTrackOriginTest`. From #293 a
  * guided rep carries ONE of the two stroke words rather than both -- the number
- * takes the other's second -- and rep 1 carries both, which is what the
- * discriminator now rests on.
+ * takes the other's second -- and rep 1 carries both. Under case 2 rep 1 carries
+ * one as well, because the number takes a later beat's word on every rep, so
+ * what the discriminator rests on is the weaker fact that survives both cases:
+ * a guided track carries a stroke word in every rep and the unguided counter
+ * carries none in any.
  *
- * ## What this file does not place, and what was rejected
+ * ## What this file still does not place, and what was rejected
  *
  * A SCHEDULE of two one-second strokes with no closing pause has a word in
- * every second of its cycle and stays silent here -- case 2 above, which is
- * #266's. `1010` resolves to one on every lift. `1110` resolves to one only
- * when the digits are left in prescription order: `TempoSchedule.of` swaps the
- * two strokes whenever digit 1 is not the stroke the lift opens with, and the
- * swap carries digit 2's pause to the END of the rep, where it is a one-second
- * closing pause and the plan speaks. Across the four geometries
- * [com.macrophage.barspeed.model.ExerciseDef] can express, `1110` announces on
- * a concentric-first lift whose concentric is up and on an eccentric-first lift
- * whose concentric is down. An earlier version of this paragraph named `1110`
- * flatly as uncarryable, which is false on two of those four and is deleted
- * rather than softened. Four ways of forcing a call into such a schedule were
- * considered and rejected:
+ * every second of its cycle -- case 2 or case 3 above, depending on which
+ * stroke the drive is. `1010` resolves to one of the two on every lift. `1110`
+ * does so only when the digits are left in prescription order:
+ * `TempoSchedule.of` swaps the two strokes whenever digit 1 is not the stroke
+ * the lift opens with, and the swap carries digit 2's pause to the END of the
+ * rep, where it is a one-second closing pause and case 1 takes it. Across the
+ * four geometries [com.macrophage.barspeed.model.ExerciseDef] can express,
+ * `1110` takes case 1 on a concentric-first lift whose concentric is up and on
+ * an eccentric-first lift whose concentric is down. An earlier version of this
+ * paragraph named `1110` flatly as uncarryable, which is false on two of those
+ * four and is deleted rather than softened.
+ *
+ * Case 2 is the "replace a beat's LABEL" move below, applied to the beat that
+ * opens as the drive ends instead of the rep's first beat, and it carries that
+ * bullet's cost with it. The three other ways of forcing a call into such a
+ * schedule are still rejected as written -- a bare digit, a clipped call, a
+ * call placed mid-stroke. Four ways were considered:
  *
  * - **Speak a bare digit** rather than `"Rep 3"`, on the theory that a shorter
  *   utterance survives a shorter window. Bare digits are already the most
@@ -355,10 +393,13 @@ data class CadencePlan(
     /**
      * Beat index carrying the rep announcement, or null when it is not spoken.
      *
-     * It is 0 or null on every plan [of] builds -- the rep's first stroke, or
-     * nothing -- and stays an INDEX rather than becoming a flag because #266 has
-     * to put a call on a different beat: the end of the concentric, on the
-     * plans this one leaves silent.
+     * Three values on the plans [of] builds: 0, the rep's first stroke; 1, the
+     * beat that opens as the concentric ends, on a prescription with no free
+     * second at the start of the rep whose drive OPENS the rep (#266); and null,
+     * on the same prescription where the drive CLOSES the rep. It stays an INDEX
+     * rather than a flag for exactly that reason -- the second case needed a
+     * different beat, not a different mood -- and [announcesAtConcentricEnd] is
+     * how a caller asks which of the two speaking cases it has.
      *
      * An `announceMerged` flag used to sit beside it, true when the call rode a
      * stroke's own word. It is deleted with the merge (#293): a call replaces
@@ -374,10 +415,14 @@ data class CadencePlan(
      * Beats of the rep an announcement is ABOUT that are still to come when it
      * is spoken, counting the beat it opens; 0 when nothing is announced.
      *
-     * It is the WHOLE rep on every plan that speaks, from #293, and the property
-     * is kept rather than replaced by that sentence: it is the measurement the
-     * sentence rests on, and it is what reds if a later change puts a call back
-     * inside the rep.
+     * It is the WHOLE rep on a plan whose call opens the rep (#293), and the
+     * beats after the drive on a plan that counts at the drive's end (#266) --
+     * one on a `1010`, two on a `1110` with a mid-rep pause. A sentence here
+     * said "the WHOLE rep on every plan that speaks", which #266 makes false;
+     * it is deleted rather than qualified. The property is kept rather than
+     * replaced by prose either way: it is the measurement the sentences rest on,
+     * and it is what reds if a later change moves a call further into the rep
+     * than the beat the owner named.
      *
      * Three shapes were reachable before #293 and the arithmetic still reads one
      * timeline, so the two that are now unreachable are worth naming as the
@@ -426,7 +471,17 @@ data class CadencePlan(
      *
      * The decision, not the delivery: WHERE the returned words land is
      * [announceOnBeat]'s business, and from #293 that is the first second of the
-     * rep this names, in place of that rep's first stroke word.
+     * rep this names, in place of that rep's first stroke word -- or, on the
+     * prescriptions with no free second there, the beat that opens as that rep's
+     * concentric ends (#266). Both are inside the rep this names.
+     *
+     * WHICH REPS ARE ASKED ABOUT differs with that, and the caller decides it,
+     * not this function. A plan whose call opens the rep is never asked about
+     * rep 1 -- beat 0's word on rep 1 is the start cue (#241) -- and a plan that
+     * counts at the drive's end is, because the word it spends is a later
+     * beat's. `CadenceVoice.script` and `GuidedCadenceRunner` both read
+     * [announcesAtConcentricEnd] to decide, and pinning them equal is
+     * `MergedCallCueTrackTest`'s and `LockoutRepCallTest`'s job.
      *
      * [plannedReps] is null on a set with no prescribed count, which has no
      * last rep to warn about.
@@ -469,13 +524,14 @@ data class CadencePlan(
          * no window argument applies to a call at all -- it takes a whole
          * second that used to carry a word.
          *
-         * What the threshold decides now is which plans this file places a call
-         * on. A cycle with a two-second stroke anywhere, or a closing pause, has
-         * a second that is not already an instruction; a cycle of two one-second
-         * strokes and no pause does not, and the owner ruled those count at
-         * lockout instead (#266). The boundary is the owner's, not an
-         * arithmetic consequence, and `CadencePlanTest` pins it by behaviour --
-         * a two-second stroke at either end speaks, `1010` and the unswapped
+         * What the threshold decides now is which plans get the call at the
+         * START of the rep. A cycle with a two-second stroke anywhere, or a
+         * closing pause, has a second there that is not already an instruction;
+         * a cycle of two one-second strokes and no pause does not, and the owner
+         * ruled those count at lockout instead (#266) -- case 2 or case 3 by
+         * geometry. The boundary is the owner's, not an arithmetic consequence,
+         * and `CadencePlanTest` pins it by behaviour -- a two-second stroke at
+         * either end opens the rep with the call, `1010` and the unswapped
          * `1110` do not -- rather than by this name.
          *
          * One threshold and not two, because the question is how LONG a stroke
@@ -487,8 +543,9 @@ data class CadencePlan(
          * quantity, and the two come apart in both directions: raise
          * COUNT_ALOUD_FROM_S to 3 and a two-second stroke falls silent after its
          * label, while an alias would rise and drop the announcement; lower it
-         * to 1 and an alias would fall and let `1010` speak, which is #266's to
-         * decide.
+         * to 1 and an alias would fall and move `1010`'s number from the end of
+         * the drive back to the start of the rep, which is the placement the
+         * owner ruled against for it (#266).
          */
         const val CALL_MIN_STROKE_S = 2
 
@@ -539,11 +596,14 @@ data class CadencePlan(
                 // and renumbers that stroke's counts from the number.
                 return CadencePlan(beats, secondStroke, announceOnBeat = 0)
             }
-            // Two one-second strokes and no closing pause, so every second of
-            // the cycle is an instruction and replacing one would delete it.
-            // The rep number is on screen only here; the owner ruled these
-            // count at lockout instead, which is #266 and not built yet.
-            return CadencePlan(beats, secondStroke, announceOnBeat = null)
+            // Two one-second strokes and no closing pause, so no second at the
+            // START of the rep is free. The owner ruled these count at the
+            // LOCKOUT instead (#266), which is the beat that opens as the
+            // concentric ends -- index 1 when the concentric is the stroke the
+            // rep opens with, and no beat of this cycle at all when it is the
+            // stroke the rep ends on. See "Where the rep announcement goes".
+            val driveEnd = if (schedule.first.isConcentric) 1 else null
+            return CadencePlan(beats, secondStroke, announceOnBeat = driveEnd)
         }
 
         private fun stroke(label: String, seconds: Int) = CadenceBeat(

@@ -14,6 +14,7 @@ import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.data.SetJournal
 import com.macrophage.barspeed.data.SetJournalHeader
 import com.macrophage.barspeed.data.SetJournalStore
+import com.macrophage.barspeed.dsp.CadencePlan
 import com.macrophage.barspeed.dsp.LiftDirection
 import com.macrophage.barspeed.dsp.LiveRepCaller
 import com.macrophage.barspeed.dsp.LiveSetState
@@ -2593,6 +2594,21 @@ data class RecordState(
      */
     val leadInRunning: Boolean = false,
 
+    /**
+     * True when THIS set's plan says the rep number at the end of each drive
+     * rather than at the start of the rep (#266), so the prep countdown can say
+     * so once.
+     *
+     * Read off the same [TempoSchedule] the runner is handed, at the moment the
+     * set begins, rather than resolved a second time from the exercise: two
+     * resolutions of one question are two facts that can disagree, and the way
+     * they disagree is the screen promising a placement the voice does not use.
+     *
+     * False on every set that is not a guided cadence, including a hold and a
+     * carry, because none of them has a rep number at all.
+     */
+    val repCallAtDriveEnd: Boolean = false,
+
     /** True once the voice guide has called the prescription all the way through. */
     val guidedFinished: Boolean = false,
     val setElapsedS: Int = 0,
@@ -3811,7 +3827,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             val speaks = LeadInPolicy.speaks(prepCase, s.audioCues)
             startTimedPrep(prepS, timedStartWord, speaks) { startSetTimer(timedTargetS) }
         } else if (guidedSet && guidedTempo != null) {
-            startGuidedCadence(TempoSchedule.of(guidedTempo, exercise.liftDirection()), plannedRepsForSet, prepS)
+            val schedule = TempoSchedule.of(guidedTempo, exercise.liftDirection())
+            // The prep countdown tells the lifter where the rep number lands, on
+            // the plans that put it at the end of the drive and on no others
+            // (#266). The plan is built from the schedule the runner is about to
+            // be handed, so the screen cannot promise a placement the voice does
+            // not use.
+            stateFlow.value = stateFlow.value.copy(
+                repCallAtDriveEnd = CadencePlan.of(schedule).announcesAtConcentricEnd,
+            )
+            startGuidedCadence(schedule, plannedRepsForSet, prepS)
         }
     }
 
