@@ -299,6 +299,40 @@ class RepsSourcePublishedTest {
     }
 
     /**
+     * AN EXPLOSIVE LIFT'S TEMPO IS NOT A CADENCE, so the count is the lifter's.
+     *
+     * `LeadInPolicy.prepCase` gives an explosive lift no cadence whatever tempo
+     * is written on it -- it is judged on peak velocity and is deliberately
+     * unpaced -- so `CountingPolicy.counterFor` hands the set to the lifter,
+     * the `+1 REP` taps ARE its count, and `repsManual` is true because a
+     * person stated the figure. Reading the frozen tempo alone publishes
+     * `metronome` for a set no guide ever counted, and a coach reading it
+     * credits a schedule that never ran and discounts the one count on the row
+     * that a person actually made.
+     *
+     * The kind is on the row: `geometryJson` carries `ResolvedGeometry.kind`,
+     * and `setExport` already decodes it for `velocityLossRegime`.
+     */
+    @Test
+    fun `an explosive lift carrying a tempo publishes the lifter as its counter`() = runTest {
+        val row = row(repsManual = true, tempo = "3010", geometryKind = ExerciseKind.EXPLOSIVE)
+        assertEquals("manual", setObject(row).word(), "an unpaced explosive set published the guide's word")
+        assertEquals("manual", manifestSet(row).word(), "an unpaced explosive set published the guide's word")
+    }
+
+    /**
+     * The same set with the sensor on is the sensor's, which is the near
+     * neighbour: the fix above must not reach a shape the live count settles
+     * one branch earlier.
+     */
+    @Test
+    fun `an explosive lift the sensor counted is still the sensor's`() = runTest {
+        val row = row(liveReps = 3, tempo = "3010", geometryKind = ExerciseKind.EXPLOSIVE)
+        assertEquals("sensor", setObject(row).word())
+        assertEquals("sensor", manifestSet(row).word())
+    }
+
+    /**
      * A row written before the live count existed publishes `analysis`, which
      * is what its figure was.
      */

@@ -155,6 +155,64 @@ class SchemaRepsSourceContractTest {
         )
     }
 
+    /**
+     * THE FIGURES, in both published copies of the reading key.
+     *
+     * "The live detector has never been scored against a real straight-reps
+     * set" is true and is not the whole truth: it HAS been scored, on the
+     * thirteen committed captures that carry rep marks, and the numbers are
+     * poor. A coach told only that the evidence is missing reads `sensor` as
+     * untested; a coach told what it scored reads it as tested and bad on
+     * paced work, which is the state it is in. `LiveRepCallCorpusTest`
+     * computes every figure quoted here.
+     *
+     * BOTH COPIES, checked against the SAME strings, because that is the only
+     * drift this file can catch: `:core:model` cannot see `:core:dsp`'s
+     * corpus, so nothing mechanical compares these figures with the table that
+     * produced them. What is enforced is that the schema and the prompt the
+     * coach receives say the same thing.
+     */
+    @Test
+    fun `the reading key states what the live detector has been scored on`() {
+        val documents = mapOf("the published schema" to description("repsSource"), "the plan prompt" to prompt)
+        val figures =
+            listOf(
+                "35 calls against 103 marks",
+                "11 of them in the right window",
+                "four of the thirteen say nothing",
+                "0 calls for 6 hand reps on session 37 set 2, 3 for 7 on set 3, 1 for 5 on set 4, " +
+                    "0 for 8 on session 38 set 4 and 2 for 8 on set 5",
+                "every one of the thirteen is a tempo'd set",
+            )
+        documents.forEach { (name, text) ->
+            figures.forEach {
+                assertTrue(it.lowercase() in text.lowercase(), "$name does not state: $it")
+            }
+        }
+    }
+
+    /**
+     * THE SET NO GUIDE PACED, named in both copies.
+     *
+     * An explosive lift carrying a tempo is given no cadence -- it is judged on
+     * peak velocity -- so the lifter taps its count, and the derivation read
+     * the tempo alone and published `metronome` for it. That is fixed rather
+     * than documented, and what the reading key must still say is the one case
+     * left: a row with no stored geometry cannot say what kind of exercise it
+     * was, so its tempo is read as the guide.
+     */
+    @Test
+    fun `the reading key names the explosive set no guide paced`() {
+        val documents = mapOf("the published schema" to description("repsSource"), "the plan prompt" to prompt)
+        documents.forEach { (name, text) ->
+            assertTrue(
+                "explosive lift carrying a tempo" in text.lowercase(),
+                "$name does not name the lift a tempo does not pace",
+            )
+            assertTrue("no stored geometry" in text.lowercase(), "$name does not name the collapse that is left")
+        }
+    }
+
     /** The live count's description says where it comes from and when it is absent. */
     @Test
     fun `the published live count description says whose figure it is and when it is absent`() {
