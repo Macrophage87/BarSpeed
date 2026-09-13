@@ -252,5 +252,12 @@ class ManualDoneBoundTest {
         val analysis = analyse(stopped, manualTargets())
         assertEquals(8, analysis.reps.size, "detections kept inside the app's own set-end call")
         assertEquals(7, analysis.detectionsAfterSetEndCue, "detections dropped by it")
+        assertEquals(
+            62.2,
+            analysis.velocityLossPct!!,
+            0.05,
+            "velocity loss over the bounded list -- the figure the published 1.20 entry and " +
+                "SessionExport's KDoc both state",
+        )
     }
 }

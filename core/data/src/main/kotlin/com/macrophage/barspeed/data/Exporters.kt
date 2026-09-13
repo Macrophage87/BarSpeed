@@ -833,8 +833,19 @@ class RawExporter(
                 // Which terminal word may bound it depends on whether a
                 // CADENCE ran, and that is `RepsSourcePolicy.guideCounted`
                 // over the two frozen facts this exporter already publishes
-                // `repsSource` from -- never the tempo alone, which reads an
-                // unpaced explosive lift as guided. `Done` is also the
+                // `repsSource` from. Not the tempo alone WHERE THE GEOMETRY
+                // IS STORED, which is what keeps an unpaced explosive lift
+                // from reading as guided; on a row with no stored geometry
+                // `guideCounted` falls back to the tempo. It also reads the
+                // tempo COLUMN, which holds the string as prescribed, while
+                // `RecordViewModel` freezes the live `cadenceGuided` from a
+                // PARSED tempo -- so on a row whose tempo string
+                // `Tempo.parseOrNull` rejects, the two derivations disagree
+                // wherever the tempo is what decides: any row with no stored
+                // geometry, and a stored-geometry row that is not explosive.
+                // A stored-geometry explosive row answers false either way.
+                // On those shapes the raw manifest's roll window may be
+                // bounded where the stored rep list was not. `Done` is also the
                 // rep-count milestone a lifter counting their own set hears
                 // at the planned count, so on such a set it bounds nothing
                 // and the roll sweep below covers the whole capture (#285).

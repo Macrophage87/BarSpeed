@@ -118,4 +118,19 @@ class RollExcursionExportContractTest {
             "the prompt does not tell the reader how an unwindowed set identifies itself",
         )
     }
+
+    /**
+     * The reading key has to say that a `Done` row is not always a bound, or a
+     * reader holding a manually counted set's archive reads `wholeCapture`
+     * beside a terminal cue as a contradiction rather than as the rule (#285).
+     * The versioned document's half of this is pinned by
+     * `SchemaManualSetEndContractTest`; this is the half an analysis is handed.
+     */
+    @Test
+    fun `the analysis prompt says a Done row does not always bound the window`() {
+        assertTrue(
+            "does NOT put a terminal bound on this window unless a cadence ran" in analysisPrompt,
+            "the prompt lets a reader take every Done row as a terminal bound on the roll window",
+        )
+    }
 }
