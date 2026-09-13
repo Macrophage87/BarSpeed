@@ -12,11 +12,17 @@ import kotlin.test.assertEquals
  *
  * On a manually counted set with audio cues on, the lifter's `+1 REP` tap at
  * the planned count speaks `"Done"`: `VoiceMilestonePolicy.repMilestone`
- * returns that word at `repCount == plannedReps`, every spoken word is written
- * to the cue track, and `"Done"` is the word [SetEnd] reads as the set having
- * been called over. So the milestone the lifter hears as *"that is the number
- * you asked for"* is byte-identical, in the cue track, to the metronome's
- * terminal call, and [SetAnalyzer] drops every drive begun after it.
+ * returns that word at `repCount == plannedReps`, and every spoken word is
+ * written to the cue track. So the milestone the lifter hears as *"that is the
+ * number you asked for"* is byte-identical, in the cue track, to the
+ * metronome's terminal call -- and the analyser used to read it as one, which
+ * dropped every drive begun after the tap from the figures.
+ *
+ * The rule these pins hold is that the WORD's AUTHOR decides, and that the
+ * prescription is what says who it was: only a cadence speaks `Done` as a call
+ * to stop lifting, and `Set ended` is the app's own and is never a milestone.
+ * The owner's rule behind it -- a manual count is the count, and a lifter who
+ * taps past the prescription did those reps.
  *
  * ## Provenance of the cue track, which is SYNTHETIC
  *
@@ -46,7 +52,9 @@ import kotlin.test.assertEquals
  * six, by +1 to +4. So the seven detections that begin after the synthetic
  * `Done` are NOT seven over-plan reps, and nothing here claims the 15-detection
  * figure is nearer the truth than the 8-detection one. What is pinned is which
- * DECISION the cue track makes, not whether the segmenter was right.
+ * DECISION the cue track makes, not whether the segmenter was right. The
+ * segmenter's over-count on concentric-first captures is #284's subject and is
+ * untouched here.
  */
 class ManualDoneBoundTest {
     private fun load(name: String) =
@@ -167,18 +175,18 @@ class ManualDoneBoundTest {
     }
 
     // ------------------------------------------------------------------
-    // Today's behaviour, pinned before it is changed.
+    // What the analyzer does with each of the two words.
     // ------------------------------------------------------------------
 
     /**
-     * The word the lifter's own tap writes is the word the rule reads.
+     * The word the lifter's own tap writes is the same word the cadence writes.
      *
      * Asserted against [SetEnd] directly, not through the analyzer, because
      * this is the whole of the mechanism: nothing downstream can tell the two
-     * `Done`s apart because nothing upstream wrote anything that differs.
+     * `Done`s apart from the STRING, so the prescription has to say.
      */
     @Test
-    fun `today a manual set's rep-count milestone is read as the set being called over`() {
+    fun `a manual set's rep-count milestone is the same word a cadence's call is`() {
         assertEquals(
             SetEnd.Cued(milestoneAtMs),
             SetEnd.calledOver(manualTrack),
@@ -192,23 +200,27 @@ class ManualDoneBoundTest {
     }
 
     /**
-     * The cost, in the figures the lifter reads.
+     * THE DIFFERENTIAL. A manual set's milestone must not move the rep list.
      *
-     * The unbounded figures are the same stream with no cue track at all, which
-     * is what a manual set recorded with audio cues OFF publishes today -- so
-     * these two rows are the same set recorded with one display toggle moved.
+     * The owner's rule: a manual count is the count. A lifter who taps more
+     * reps than were planned did those reps, and the analysis includes them.
+     *
+     * Pinned against the same stream with NO cue track at all -- which is what
+     * a manual set recorded with audio cues OFF publishes -- because the two
+     * must now agree. Before this, they did not: the audio-cues toggle moved a
+     * stored rep list by seven detections and 17 points of velocity loss, which
+     * is the "one flag, several jobs" class with a display switch on one end
+     * and the archive on the other.
      */
     @Test
-    fun `today the manual milestone drops the detections that began after the tap`() {
-        val bounded = analyse(manualTrack, manualTargets())
-        assertEquals(8, bounded.reps.size, "detections kept once the tap bounds the set")
-        assertEquals(7, bounded.detectionsAfterSetEndCue, "detections dropped by the tap")
-        assertEquals(62.2, bounded.velocityLossPct!!, 0.05, "velocity loss over the bounded list")
-
-        val unbounded = analyse(emptyList(), manualTargets())
-        assertEquals(15, unbounded.reps.size, "detections this stream resolves with nothing bounding it")
-        assertEquals(null, unbounded.detectionsAfterSetEndCue, "no cue track says when the set ended")
-        assertEquals(79.2, unbounded.velocityLossPct!!, 0.05, "velocity loss over the whole stream")
+    fun `a manual set's rep-count milestone does not bound the analysed rep list`() {
+        val spoken = analyse(manualTrack, manualTargets())
+        val silent = analyse(emptyList(), manualTargets())
+        assertEquals(15, spoken.reps.size, "detections kept with the milestone on the record")
+        assertEquals(null, spoken.detectionsAfterSetEndCue, "no boundary ran, which is not a boundary that dropped 0")
+        assertEquals(79.2, spoken.velocityLossPct!!, 0.05, "velocity loss over the whole set")
+        assertEquals(silent.reps.size, spoken.reps.size, "audio cues on or off, the same set")
+        assertEquals(silent.velocityLossPct, spoken.velocityLossPct, "and the same figure")
     }
 
     /**
@@ -219,7 +231,7 @@ class ManualDoneBoundTest {
      * defect.
      */
     @Test
-    fun `today a guided set's Done bounds the analysed rep list`() {
+    fun `a guided set's Done still bounds the analysed rep list`() {
         val analysis = analyse(guidedTrack(), guidedTargets())
         assertEquals(13, analysis.reps.size, "detections kept inside the cadence's own call")
         assertEquals(2, analysis.detectionsAfterSetEndCue, "detections dropped by the cadence's Done")
@@ -230,10 +242,12 @@ class ManualDoneBoundTest {
      *
      * Nothing but the app's own set-end call speaks this word --
      * `SetEnd.terminalCall` is its only writer -- so it is never a milestone
-     * and bounds whoever counted the set.
+     * and bounds whoever counted the set. This is the cell of the two-by-two
+     * that makes the rule a rule about the WORD's author rather than about
+     * manual sets.
      */
     @Test
-    fun `today Set ended bounds a set with no tempo`() {
+    fun `Set ended bounds a set no cadence ran on`() {
         val stopped = manualTrack.dropLast(1) + VoiceCue(milestoneAtMs, SetEnd.STOPPED)
         val analysis = analyse(stopped, manualTargets())
         assertEquals(8, analysis.reps.size, "detections kept inside the app's own set-end call")
