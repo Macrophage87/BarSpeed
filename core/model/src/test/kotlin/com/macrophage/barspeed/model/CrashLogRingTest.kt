@@ -80,7 +80,7 @@ class CrashLogRingTest {
     fun `flattening happens before the cut, so the count of dropped characters is of the flattened line`() {
         val ring = CrashLogRing(capacity = 2, maxLineChars = 5)
         ring.add("ab\ncd\nefgh")
-        assertEquals(listOf("ab cd [+4 chars]"), ring.lines())
+        assertEquals(listOf("ab cd [+5 chars]"), ring.lines())
     }
 
     @Test

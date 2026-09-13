@@ -24,8 +24,20 @@ import kotlin.test.assertTrue
 class CrashRecordRenderTest {
     private fun frame(cls: String, method: String, file: String, line: Int) = StackTraceElement(cls, method, file, line)
 
-    private fun thrown(message: String?, frames: List<StackTraceElement>, cause: Throwable? = null): Throwable =
-        IllegalStateException(message, cause).also { it.stackTrace = frames.toTypedArray() }
+    /**
+     * A throwable with a fixed stack, so the pins below are about the renderer
+     * and not about where this file happens to live.
+     *
+     * The one-argument constructor when there is no cause, and the difference
+     * matters: `Throwable(message, null)` marks the cause INITIALISED to null,
+     * after which `initCause` throws IllegalStateException -- which is exactly
+     * how the cyclic-chain pin below has to build its cycle.
+     */
+    private fun thrown(message: String?, frames: List<StackTraceElement>, cause: Throwable? = null): Throwable {
+        val error = if (cause == null) IllegalStateException(message) else IllegalStateException(message, cause)
+        error.stackTrace = frames.toTypedArray()
+        return error
+    }
 
     private val fooFrame = frame("com.macrophage.barspeed.Foo", "bar", "Foo.kt", 10)
 
