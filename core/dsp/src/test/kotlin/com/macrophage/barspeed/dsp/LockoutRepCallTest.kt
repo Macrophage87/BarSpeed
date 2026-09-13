@@ -398,7 +398,17 @@ class LockoutRepCallTest {
         assertEquals(225 * 6, checked, "(tempo, lift) pairs checked")
         // The partition is not vacuous in either direction: a rule that never
         // fired, or one that always did, fails one of these two.
-        assertEquals(12, driveEnd, "pairs that count at the drive's end")
+        //
+        // 36 is MEASURED, and the commit that wrote this line guessed 12 -- a
+        // number asserted without being run, which is the defect class this
+        // repository names most often. 36 is 12 per concentric-first lift times
+        // the three of the six here that are one: the four (d1, d3) pairs whose
+        // strokes both coerce under CALL_MIN_STROKE_S, times the three values of
+        // the pause that does NOT land last, with the one that does pinned at
+        // zero. The three eccentric-first lifts -- the bench press, the
+        // drive-down ecc-first lift and the horizontal one, whose LiftDirection
+        // default startsWith is ECCENTRIC -- contribute none.
+        assertEquals(36, driveEnd, "pairs that count at the drive's end")
     }
 
     @Test
