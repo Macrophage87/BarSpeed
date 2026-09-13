@@ -54,6 +54,22 @@ import kotlin.test.assertTrue
  * their sets is what issue #245 asks; nothing in this file answers it.
  */
 class PrepDetectionFieldTest {
+    /**
+     * Every capture analysed here is a metronome-guided set -- all 34 cue
+     * tracks committed to this corpus carry cadence stroke words or a hold's
+     * clock -- so the prescription they are analysed under declares that a
+     * cadence RAN. `SetEnd.of` reads it, because `Done` on a set with no
+     * cadence is the rep-count milestone a lifter's own tap spoke (#285).
+     *
+     * The tempo DIGITS are deliberately not declared: the rule reads whether a
+     * cadence ran and never what it prescribed, and this repository does not
+     * record a prescribed tempo string for every capture in this corpus.
+     */
+    private val guidedPrescription = SetTargets(cadenceGuided = true)
+
+    /** [guidedPrescription]'s one fact, for the pins that ask [SetEnd] directly. */
+    private val guided = guidedPrescription.cadenceGuided
+
     private fun load(f: String): List<ImuSample> =
         ImuCsv.decode(javaClass.getResourceAsStream("/$f.csv")!!.readBytes().decodeToString())
 
@@ -75,11 +91,11 @@ class PrepDetectionFieldTest {
     private val pressKg = 27.215542200602126
 
     private fun analyse(f: String, d: LiftDirection, kg: Double) =
-        SetAnalyzer.analyze(load(f), d, kg, SetTargets(), DspConfig(), track(f))
+        SetAnalyzer.analyze(load(f), d, kg, guidedPrescription, DspConfig(), track(f))
 
     /** The same set, handed the work-start instant its own `-prep.csv` carries. */
     private fun bounded(f: String, d: LiftDirection, kg: Double) =
-        SetAnalyzer.analyze(load(f), d, kg, SetTargets(), DspConfig(), track(f), prep(f).second)
+        SetAnalyzer.analyze(load(f), d, kg, guidedPrescription, DspConfig(), track(f), prep(f).second)
 
     @Test
     fun `set 5 reproduces every rep figure its session published`() {
@@ -334,7 +350,7 @@ class PrepDetectionFieldTest {
         val b = analyse(press, pressDirection, pressKg)
         assertEquals(0, b.detectionsAfterSetEndCue, "set 2 detections after Done")
         assertTrue(
-            SetEnd.of(track(ohp)) is SetEnd.Cued && SetEnd.of(track(press)) is SetEnd.Cued,
+            SetEnd.of(track(ohp), guided) is SetEnd.Cued && SetEnd.of(track(press), guided) is SetEnd.Cued,
             "both sets named their own end",
         )
     }

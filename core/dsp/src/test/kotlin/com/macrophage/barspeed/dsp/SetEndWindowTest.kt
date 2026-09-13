@@ -59,6 +59,22 @@ import kotlin.test.assertTrue
  * to avoid.
  */
 class SetEndWindowTest {
+    /**
+     * Every capture analysed here is a metronome-guided set -- all 34 cue
+     * tracks committed to this corpus carry cadence stroke words or a hold's
+     * clock -- so the prescription they are analysed under declares that a
+     * cadence RAN. `SetEnd.of` reads it, because `Done` on a set with no
+     * cadence is the rep-count milestone a lifter's own tap spoke (#285).
+     *
+     * The tempo DIGITS are deliberately not declared: the rule reads whether a
+     * cadence ran and never what it prescribed, and this repository does not
+     * record a prescribed tempo string for every capture in this corpus.
+     */
+    private val guidedPrescription = SetTargets(cadenceGuided = true)
+
+    /** [guidedPrescription]'s one fact, for the pins that ask [SetEnd] directly. */
+    private val guided = guidedPrescription.cadenceGuided
+
     private fun load(name: String) =
         ImuCsv.decode(javaClass.getResourceAsStream("/$name")!!.readBytes().decodeToString())
 
@@ -118,7 +134,7 @@ class SetEndWindowTest {
      */
     @Test
     fun `a set with nothing saying when it ended is not bounded and says so`() {
-        assertEquals(SetEnd.NotCued, SetEnd.of(emptyList()))
+        assertEquals(SetEnd.NotCued, SetEnd.of(emptyList(), guided))
         assertNull(SetEnd.NotCued.detectionsAfter(listOf(1L, 2L, 3L)), "detections after an absent boundary")
         assertTrue(SetEnd.NotCued.startedWithinSet(Long.MAX_VALUE), "no boundary excludes nothing")
     }
@@ -151,7 +167,7 @@ class SetEndWindowTest {
             VoiceCue(2_000L, "Done"),
             VoiceCue(3_000L, "Done"),
         )
-        assertEquals(SetEnd.Cued(2_000L), SetEnd.of(spoken))
+        assertEquals(SetEnd.Cued(2_000L), SetEnd.of(spoken, guided))
     }
 
     /**
@@ -168,7 +184,7 @@ class SetEndWindowTest {
             VoiceCue(5_000L, "1"),
             VoiceCue(6_000L, "Time"),
         )
-        assertEquals(SetEnd.NotCued, SetEnd.of(spoken))
+        assertEquals(SetEnd.NotCued, SetEnd.of(spoken, guided))
     }
 
     /**
@@ -195,7 +211,7 @@ class SetEndWindowTest {
      */
     @Test
     fun `the rest clock's seed instant is the Done stamp, and a hold has none`() {
-        val guided = listOf(
+        val guidedTrack = listOf(
             VoiceCue(1_000L, "Ready"),
             VoiceCue(2_000L, "Brace"),
             VoiceCue(3_000L, "Down"),
@@ -204,7 +220,7 @@ class SetEndWindowTest {
             VoiceCue(9_000L, "Last rep"),
             VoiceCue(13_517L, "Done"),
         )
-        assertEquals(SetEnd.Cued(13_517L), SetEnd.of(guided), "the Done stamp, unshifted")
+        assertEquals(SetEnd.Cued(13_517L), SetEnd.calledOver(guidedTrack), "the Done stamp, unshifted")
 
         val hold = listOf(
             VoiceCue(1_000L, "Hold"),
@@ -212,7 +228,7 @@ class SetEndWindowTest {
             VoiceCue(45_000L, "1"),
             VoiceCue(46_000L, "Time"),
         )
-        assertEquals(SetEnd.NotCued, SetEnd.of(hold), "a hold names no set-over cue")
+        assertEquals(SetEnd.NotCued, SetEnd.calledOver(hold), "a hold names no set-over cue")
     }
 
     /**
@@ -226,8 +242,13 @@ class SetEndWindowTest {
         val samples = load("$fixture.csv")
         assertEquals(
             1,
-            SetAnalyzer.analyze(samples, rearDeltFly, loadKg = loadKg, cues = track(fixture))
-                .detectionsAfterSetEndCue,
+            SetAnalyzer.analyze(
+                samples,
+                rearDeltFly,
+                loadKg = loadKg,
+                targets = guidedPrescription,
+                cues = track(fixture),
+            ).detectionsAfterSetEndCue,
             "detections beginning after Done",
         )
         assertNull(
@@ -387,7 +408,12 @@ class SetEndWindowTest {
         assertEquals(
             corpus.associate { (name, _, expected) -> name to expected },
             corpus.associate { (name, direction, _) ->
-                name to SetAnalyzer.analyze(load("$name.csv"), direction, cues = track(name)).detectionsAfterSetEndCue
+                name to SetAnalyzer.analyze(
+                    load("$name.csv"),
+                    direction,
+                    targets = guidedPrescription,
+                    cues = track(name),
+                ).detectionsAfterSetEndCue
             },
             "detections beginning after Done, per capture",
         )
@@ -418,7 +444,13 @@ class SetEndWindowTest {
     @Test
     fun `set 6's velocity loss drops thirty points once the tail is out of the set`() {
         val analysis =
-            SetAnalyzer.analyze(load("$fixture.csv"), rearDeltFly, loadKg = loadKg, cues = track(fixture))
+            SetAnalyzer.analyze(
+                load("$fixture.csv"),
+                rearDeltFly,
+                loadKg = loadKg,
+                targets = guidedPrescription,
+                cues = track(fixture),
+            )
         assertEquals(16, analysis.reps.size, "detections kept; the lifter performed 12 reps")
         assertEquals(1, analysis.detectionsAfterSetEndCue, "detections dropped")
         // This asserted the kept drives IN THE EXPORT'S OWN FIGURES, which
@@ -512,7 +544,12 @@ class SetEndWindowTest {
             Case(fixture, rearDeltFly, 16, VelocityLoss.Measured(67.0), 2.085),
         )
         corpus.forEach { case ->
-            val reps = SetAnalyzer.analyze(load("${case.name}.csv"), case.direction, cues = track(case.name)).reps
+            val reps = SetAnalyzer.analyze(
+                load("${case.name}.csv"),
+                case.direction,
+                targets = guidedPrescription,
+                cues = track(case.name),
+            ).reps
             assertEquals(case.reps, reps.size, "${case.name} detections kept")
             assertEquals(case.loss, VelocityLoss.of(reps), "${case.name} velocity loss")
             assertEquals(case.peakConVelMps, reps.maxOf { it.peakConVelMps }, "${case.name} peak drive velocity")

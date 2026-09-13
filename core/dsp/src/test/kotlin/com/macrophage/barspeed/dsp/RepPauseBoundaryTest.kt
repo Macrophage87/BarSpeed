@@ -72,6 +72,18 @@ import kotlin.test.assertTrue
  * change is readable from the test.
  */
 class RepPauseBoundaryTest {
+    /**
+     * Every capture analysed here is a metronome-guided set -- all 34 cue
+     * tracks committed to this corpus carry cadence stroke words or a hold's
+     * clock -- so the prescription they are analysed under declares that a
+     * cadence RAN. `SetEnd.of` reads it, because `Done` on a set with no
+     * cadence is the rep-count milestone a lifter's own tap spoke (#285).
+     *
+     * The tempo DIGITS are deliberately not declared: the rule reads whether a
+     * cadence ran and never what it prescribed, and this repository does not
+     * record a prescribed tempo string for every capture in this corpus.
+     */
+    private val guidedPrescription = SetTargets(cadenceGuided = true)
     private val fixture = "field-legpress-single-2011-8rep-s36-set07"
 
     private fun load(name: String) =
@@ -83,6 +95,7 @@ class RepPauseBoundaryTest {
         load("$fixture.csv"),
         LiftDirection(startsWith = StartPhase.CONCENTRIC),
         loadKg = 65.77089365145514,
+        targets = guidedPrescription,
         cues = track(fixture),
     )
 

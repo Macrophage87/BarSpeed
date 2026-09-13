@@ -35,10 +35,14 @@ import com.macrophage.barspeed.model.VoiceCue
  *
  * **A set with no end cue is [NotCued], and nothing is bounded.** An ad-hoc set
  * with the voice off says neither terminal word, and neither does any set
- * recorded before the app wrote cue tracks. There is then no instant to bound
- * at and none may be invented -- the end of the stream is when the lifter got
- * round to tapping, not when the set ended, and the last sample would be a
- * boundary that excludes nothing while looking like a rule that ran.
+ * recorded before the app wrote cue tracks. Nor -- since #285 -- does a set
+ * carrying `Done` on which no CADENCE ran, because on such a set that word is
+ * the rep-count milestone the LIFTER's own tap spoke and not a call to stop
+ * lifting; [of] is where that is decided and argued. There is then no instant
+ * to bound at and none may be invented -- the end of the stream is when the
+ * lifter got round to tapping, not when the set ended, and the last sample
+ * would be a boundary that excludes nothing while looking like a rule that
+ * ran.
  * [detectionsAfter] reports null there rather than 0, because "nothing said
  * when the set ended" and "the set ended and nothing came after" are different
  * facts and a reader of a stored analysis has to be able to tell them apart.
@@ -72,12 +76,14 @@ import com.macrophage.barspeed.model.VoiceCue
  *
  * ## Which cue, and on which clock
  *
- * [TERMINAL_CUES] is the whole of the vocabulary that means the set is over --
- * [DONE] when the prescription was called through, [STOPPED] when it was not
- * -- see [STOPPED] for the two populations that covers. Every other cue calls
- * a stroke or counts one. `Time`
- * ends a TIMED set, and a timed set publishes no rep list at all, so widening
- * the vocabulary to it would add a case with nothing in it.
+ * [TERMINAL_CUES] is the whole of the vocabulary that means the set is over on
+ * the RECORD -- [DONE] when the prescription was called through, [STOPPED]
+ * when it was not -- see [STOPPED] for the two populations that covers. It is
+ * NOT the whole of what may bound a rep list: [of] asks whether a cadence
+ * ran, and [DONE] on a set with none is a rep-count milestone (#285). Every other
+ * cue calls a stroke or counts one. `Time` ends a TIMED set, and a timed set
+ * publishes no rep list at all, so widening the vocabulary to it would add a
+ * case with nothing in it.
  *
  * The EARLIEST terminal cue by instant, not the last and not the first in list
  * order. The boundary is the moment the lifter was told to stop, and a second
@@ -192,10 +198,71 @@ sealed interface SetEnd {
          */
         val TERMINAL_CUES = setOf(DONE, STOPPED)
 
-        fun of(cues: List<VoiceCue>): SetEnd {
+        /**
+         * TWO QUESTIONS, TWO FUNCTIONS, and which one a caller wants is not a
+         * detail. [calledOver] is what the RECORD says: a terminal word was
+         * spoken on this set and here is when. [of] is what may BOUND THE
+         * ANALYSED REP LIST, which is a narrower thing, because one of the two
+         * terminal words is also the word the rep-count milestone speaks to a
+         * lifter counting their own set (#285).
+         *
+         * They were one function taking one argument. That function had two
+         * jobs -- the rest clock's seed instant and the analyser's boundary --
+         * and the two stop having one answer the moment a word can be terminal
+         * on the record without being a call to stop lifting.
+         */
+        fun calledOver(cues: List<VoiceCue>): SetEnd {
             val terminal = cues.filter { it.cue in TERMINAL_CUES }.minByOrNull { it.timestampMs }
             return terminal?.let { Cued(it.timestampMs) } ?: NotCued
         }
+
+        /**
+         * The boundary the analysed rep list is cut at, or [NotCued] where
+         * nothing on the record may cut it.
+         *
+         * [cadenceGuided] is whether a CADENCE RAN on this set --
+         * `SetTargets.cadenceGuided`, which `RecordViewModel` sets from the
+         * same `LeadInPolicy.prepCase == CUED` that decides whether a runner is
+         * built at all.
+         *
+         * WHY THE CADENCE DECIDES WHICH `Done` COUNTS. Only a cadence speaks
+         * [DONE] as a call to stop lifting. On a set with no cadence the lifter
+         * counts by tapping, and `VoiceMilestonePolicy.repMilestone` says the
+         * SAME WORD at the planned count as a MILESTONE -- the app telling them
+         * they have reached the number, not that the set is over. A lifter who
+         * taps past the prescription did those reps, and the analysis includes
+         * them. Issue #285.
+         *
+         * NOT `tempo != null`, which is the near neighbour and is a different
+         * predicate. A tempo is not a cadence: an untimed EXPLOSIVE lift
+         * carrying a tempo string is paced by nothing, and
+         * `RepsSourcePolicy.guideCounted` exists in `:core:model` because
+         * reading the tempo alone published `metronome` for a set the lifter
+         * tapped rep by rep. Deriving this boundary from the tempo would
+         * reproduce that error here.
+         *
+         * [STOPPED] bounds either way, cadence or no cadence.
+         * `SetEnd.terminalCall` is its only writer and it writes it as the set
+         * ends, so it is never a milestone.
+         *
+         * FALSE IS THE DEFAULT AND THAT IS THE SAFE DIRECTION. A caller that
+         * does not say keeps every detection, which loses no figure; the
+         * failure this rule exists for is figures being dropped silently.
+         */
+        fun of(cues: List<VoiceCue>, cadenceGuided: Boolean): SetEnd {
+            val terminal = cues.filter { boundsTheRepList(it.cue, cadenceGuided) }.minByOrNull { it.timestampMs }
+            return terminal?.let { Cued(it.timestampMs) } ?: NotCued
+        }
+
+        /**
+         * Whether one cue may cut the rep list, given whether a cadence ran.
+         *
+         * Written over the two words rather than over [TERMINAL_CUES] because
+         * the two now differ in what they may do, and a membership test would
+         * silently admit a third word added later.
+         */
+        private fun boundsTheRepList(cue: String, cadenceGuided: Boolean): Boolean =
+            cue == STOPPED || (cue == DONE && cadenceGuided)
 
         /**
          * What to say and write when a set ends, or null when nothing should
@@ -206,18 +273,18 @@ sealed interface SetEnd {
          * track as it stands at the moment the set is ending.
          *
          * Scoped to guided sets deliberately, and #141 argues why the other
-         * two cases are separate decisions. An unguided set ends by the same
-         * tap, and bounding those would change the figures of every manual set
-         * recorded from here on -- a far larger population, and one no capture
-         * held here measures. A timed set ends on `Time` and publishes no rep
-         * list, so there is nothing for a boundary to bound.
+         * two cases are separate decisions. A timed set ends on `Time` and
+         * publishes no rep list, so there is nothing for a boundary to bound.
          *
-         * The question asked is "is this set already bounded", through [of],
-         * rather than "was `Done` spoken". Those are the same question today
-         * and the first is the one that stays right: a second terminal word
-         * added to [TERMINAL_CUES] later would otherwise get a duplicate
-         * boundary written beside it, and the duplicate would be the earlier
-         * instant's neighbour rather than a visible defect.
+         * The question asked is "does the record already carry a terminal
+         * word", through [calledOver], rather than "was `Done` spoken". Those
+         * are the same question today and the first is the one that stays
+         * right: a second terminal word added to [TERMINAL_CUES] later would
+         * otherwise get a duplicate boundary written beside it, and the
+         * duplicate would be the earlier instant's neighbour rather than a
+         * visible defect. [calledOver] and not [of], because what must not be
+         * written twice is a WORD on the record, and that is the record's
+         * question.
          *
          * WHAT THIS DOES NOT BUY, stated here because the issue that asked for
          * it assumed otherwise. `endSet` cancels the sample collectors before
@@ -232,6 +299,6 @@ sealed interface SetEnd {
          * lifter hears the set end.
          */
         fun terminalCall(guided: Boolean, spoken: List<VoiceCue>): SpokenCall? =
-            if (guided && of(spoken) is NotCued) SpokenCall(STOPPED, listOf(STOPPED)) else null
+            if (guided && calledOver(spoken) is NotCued) SpokenCall(STOPPED, listOf(STOPPED)) else null
     }
 }

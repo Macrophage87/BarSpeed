@@ -137,6 +137,24 @@ data class SetTargets(
      */
     val countedReps: Int? = null,
     val tempo: Tempo? = null,
+    /**
+     * Whether a CADENCE RAN on this set -- `LeadInPolicy.prepCase == CUED`,
+     * the same question that decides whether `RecordViewModel` builds a
+     * `GuidedCadenceRunner` at all.
+     *
+     * NOT [tempo] `!= null`, and the difference is the reason this field
+     * exists rather than the tempo being read. A tempo is not a cadence: an
+     * untimed EXPLOSIVE lift carrying a tempo string is judged on peak
+     * velocity and is paced by nothing, which is why
+     * `RepsSourcePolicy.guideCounted` in `:core:model` asks the kind as well
+     * as the tempo before publishing `metronome`.
+     *
+     * Read by [SetEnd.of], which needs it because the cadence's terminal
+     * `Done` and the rep-count milestone's `Done` are one string in the cue
+     * track (#285). FALSE by default, which keeps every detection: a caller
+     * that does not say loses no figure.
+     */
+    val cadenceGuided: Boolean = false,
     val toleranceS: Double = 0.5,
     val targetMeanConcentricVelocityMps: Double? = null,
     val velocityLossStopPct: Double? = null,
@@ -307,7 +325,7 @@ object SetAnalyzer {
         // sample list, so this is exact, and comparing it against a cue costs
         // none of the skew CueTrack.MAX_SKEW_MS measures.
         val driveStartMs = spans.map { samples[it.conStartIdx].timestampMs }
-        val setEnd = SetEnd.of(cues)
+        val setEnd = SetEnd.calledOver(cues)
         // Bounded HERE, before any figure is derived from the list: velocity
         // loss, tempo compliance, the verdicts and everything the export
         // recomputes later all read this one list, so a rule applied at any of

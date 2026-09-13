@@ -62,6 +62,14 @@ import kotlin.test.assertNull
  * consumer an instant where they had an absence.
  */
 class FailedSetBoundaryTest {
+    /**
+     * Every capture in this corpus is a metronome-guided set -- all 34 cue
+     * tracks committed here carry cadence stroke words or a hold's clock -- so
+     * a cadence RAN on the sets these pins bound. `SetEnd.of` asks, because
+     * `Done` on a set with no cadence is the rep-count milestone a lifter's own
+     * tap spoke (#285).
+     */
+    private val guided = true
     private val fixture = "field-lateralraise-2011-s32-set09"
 
     /** The capture's own cue track, in the form the recorder hands to the analyzer. */
@@ -111,9 +119,9 @@ class FailedSetBoundaryTest {
     @Test
     fun `an abandoned guided set is not bounded and reports no count`() {
         val cues = track(fixture)
-        assertEquals(SetEnd.NotCued, SetEnd.of(cues), "nothing on this set's record ends it")
+        assertEquals(SetEnd.NotCued, SetEnd.calledOver(cues), "nothing on this set's record ends it")
         assertNull(
-            SetEnd.of(cues).detectionsAfter(listOf(1_787_341_220_000L, 1_787_341_226_000L)),
+            SetEnd.of(cues, guided).detectionsAfter(listOf(1_787_341_220_000L, 1_787_341_226_000L)),
             "no boundary, so no count -- and null rather than zero",
         )
     }
@@ -251,7 +259,7 @@ class FailedSetBoundaryTest {
     fun `the boundary row bounds the set session 32 could not bound`() {
         assertEquals(
             SetEnd.Cued(tapLowerBoundMs),
-            SetEnd.of(boundedTrack()),
+            SetEnd.of(boundedTrack(), guided),
             "a guided set the lifter ended is bounded at the word that ended it",
         )
     }
@@ -283,16 +291,16 @@ class FailedSetBoundaryTest {
         )
         assertEquals(
             0,
-            SetEnd.of(boundedTrack()).detectionsAfter(everyDriveStartWithinTheSet),
+            SetEnd.of(boundedTrack(), guided).detectionsAfter(everyDriveStartWithinTheSet),
             "every drive of a tap-ended set began before the tap",
         )
         assertNull(
-            SetEnd.of(track(fixture)).detectionsAfter(everyDriveStartWithinTheSet),
+            SetEnd.of(track(fixture), guided).detectionsAfter(everyDriveStartWithinTheSet),
             "and the unbounded track still refuses to answer, which is the state being replaced",
         )
         assertEquals(
             1,
-            SetEnd.of(boundedTrack()).detectionsAfter(everyDriveStartWithinTheSet + (tapLowerBoundMs + 1)),
+            SetEnd.of(boundedTrack(), guided).detectionsAfter(everyDriveStartWithinTheSet + (tapLowerBoundMs + 1)),
             "the rule is bounding, not merely reporting zero",
         )
     }
@@ -310,12 +318,18 @@ class FailedSetBoundaryTest {
     fun `the earliest terminal cue bounds the set whichever word it is`() {
         assertEquals(
             SetEnd.Cued(2_000L),
-            SetEnd.of(listOf(VoiceCue(1_000L, "Up"), VoiceCue(2_000L, SetEnd.STOPPED), VoiceCue(3_000L, SetEnd.DONE))),
+            SetEnd.of(
+                listOf(VoiceCue(1_000L, "Up"), VoiceCue(2_000L, SetEnd.STOPPED), VoiceCue(3_000L, SetEnd.DONE)),
+                guided,
+            ),
             "the abandoned-set word came first",
         )
         assertEquals(
             SetEnd.Cued(2_000L),
-            SetEnd.of(listOf(VoiceCue(1_000L, "Up"), VoiceCue(2_000L, SetEnd.DONE), VoiceCue(3_000L, SetEnd.STOPPED))),
+            SetEnd.of(
+                listOf(VoiceCue(1_000L, "Up"), VoiceCue(2_000L, SetEnd.DONE), VoiceCue(3_000L, SetEnd.STOPPED)),
+                guided,
+            ),
             "and Done came first here",
         )
     }
