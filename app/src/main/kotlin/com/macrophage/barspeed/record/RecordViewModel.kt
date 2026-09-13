@@ -3713,13 +3713,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val sensorCounted = counter == RepCounter.SENSOR
         // Never announce reps on timed sets: a carry's gait can trip the rep
         // detector. And never hand the SENSOR's counter a planned count: the
-        // milestone word at that count is "Done", every spoken word is written
-        // to the cue track, and `SetEnd.of` reads "Done" as the set having been
-        // called over -- so the counter reaching the prescription would bound
-        // the analysed rep list there and drop every later drive (#285). A
+        // milestone word at that count is "Done", and a sensor whose count runs
+        // ahead would be telling the lifter their set is over when it is not. A
         // straight-reps set is exactly the set where the lifter may do more reps
         // than were prescribed. The rule is CountingPolicy's; a MANUAL set keeps
-        // the milestone it has today, so #285 stays open for manual sets.
+        // the milestone, and #285 narrowed what the ANALYSER does with the word
+        // rather than changing what is said.
         milestones.startSet(
             announceReps = !s.currentIsTimed,
             plannedReps = CountingPolicy.milestonePlannedReps(counter, plannedRepsForSet),
@@ -4150,7 +4149,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val s = stateFlow.value
         // The set has to SAY it is over, or nothing on the record does. A
         // guided set the lifter ends early never reaches the runner's `Done`,
-        // so until #141 its cue track stopped on a stroke and `SetEnd.of`
+        // so until #141 its cue track stopped on a stroke and `SetEnd`
         // returned NotCued: the rep list was unbounded, `detectionsAfter`
         // reported null rather than a count, and the rest clock had no instant
         // to start from. Spoken as well as written, because the archive is a

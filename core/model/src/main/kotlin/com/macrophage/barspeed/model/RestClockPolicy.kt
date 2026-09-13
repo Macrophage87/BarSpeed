@@ -45,8 +45,15 @@ object RestClockPolicy {
      * The instant the rest period runs from.
      *
      * [setOverCueAtMs] is the stamp of the cue that called the set over --
-     * `SetEnd.of` in `:core:dsp` reads it off the set's own frozen cue track --
-     * or null when nothing on the record says when the set ended. [endedAtMs]
+     * `SetEnd.calledOver` in `:core:dsp` reads it off the set's own frozen cue
+     * track -- or null when nothing on the record says when the set ended.
+     *
+     * `calledOver` and NOT `SetEnd.of`, which is the narrower question of what
+     * may bound the ANALYSED REP LIST and excludes the rep-count milestone a
+     * lifter counting their own set hears at the planned count (#285). The two
+     * differ on exactly that set, and this one wants the milestone: the rest
+     * begins when the lifter stopped lifting, whoever said so, and the tap at
+     * the planned count is the best instant on the record for that. [endedAtMs]
      * is the instant the set write froze, which every set has.
      *
      * The cue when there is one, because that is when the lifter stopped

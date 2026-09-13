@@ -256,7 +256,9 @@ object SetAnalyzer {
      * [cues] is the set's own voice-cue track, which says when the app stopped
      * prescribing. Empty for a set that was not guided, and for every caller
      * that has no track to offer; [SetEnd] is where what that means is written
-     * down.
+     * down. It is read together with [SetTargets.cadenceGuided], because one of
+     * the two terminal words is also the rep-count milestone a lifter counting
+     * their own set hears at the planned count (#285).
      *
      * [workStartedAtMs] is `PrepWindow.workStartedAtMs`, the instant the set's
      * prep ended, or null for a set that has none. [WorkStart] is where what
@@ -325,7 +327,13 @@ object SetAnalyzer {
         // sample list, so this is exact, and comparing it against a cue costs
         // none of the skew CueTrack.MAX_SKEW_MS measures.
         val driveStartMs = spans.map { samples[it.conStartIdx].timestampMs }
-        val setEnd = SetEnd.calledOver(cues)
+        // WHICH terminal word may cut this list depends on whether a CADENCE
+        // ran, which is why the prescription is asked and not just the track.
+        // `Done` is spoken by the metronome as a call to stop lifting AND by
+        // the rep-count milestone at the planned count on a set the lifter
+        // counts by tapping, and the two are one string in the cue track. A
+        // lifter who taps past the prescription did those reps (#285).
+        val setEnd = SetEnd.of(cues, cadenceGuided = targets.cadenceGuided)
         // Bounded HERE, before any figure is derived from the list: velocity
         // loss, tempo compliance, the verdicts and everything the export
         // recomputes later all read this one list, so a rule applied at any of

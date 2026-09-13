@@ -158,15 +158,12 @@ object CountingPolicy {
      *
      * Null on a [RepCounter.SENSOR] set, and that is a defect fix rather than
      * a taste decision. `VoiceMilestonePolicy.repMilestone` says `"Done"` at
-     * the planned count, every spoken word is written to the cue track, and
-     * `"Done"` is the word `SetEnd.of` reads as the set having been called
-     * over -- so a counter reaching the planned count BOUNDS the analysed rep
-     * list at that instant and every drive begun after it is dropped from the
-     * analysis. Issue #285 measured the size of that bound, relayed rather
-     * than re-run: `field-ohp-3010-8rep-s38-set05` resolves 15 detections
-     * unbounded against 10 bounded. Which is nearer the truth is not readable
-     * there -- the hand count is 8, below both -- so the bound's cost is
-     * deciding the rep list silently.
+     * the planned count and every spoken word is written to the cue track, so
+     * a counter reaching the planned count puts a terminal word on the record
+     * at that instant. That word no longer bounds the analysed rep list of a
+     * set no cadence ran on -- `SetEnd.of` takes `SetTargets.cadenceGuided`
+     * since #285 -- but it is still what the lifter HEARS, and a sensor whose
+     * count runs ahead calling the set over is a wrong thing to say.
      *
      * A sensor-counted set is exactly the set where the counter can reach the
      * planned count without the lifter having finished, and a max-intent
@@ -174,8 +171,11 @@ object CountingPolicy {
      * than were prescribed. So the sensor names reps and never calls the set
      * over: `"Rep N"` on every rep, no `"Last rep"`, no `"Done"`.
      *
-     * A [RepCounter.MANUAL] set keeps the milestone it has today, so #285
-     * stays open for manual sets and is not narrowed by this decision.
+     * A [RepCounter.MANUAL] set keeps the milestone, and keeping it is the
+     * decision #285 took: the lifter hears the same word at the planned count,
+     * because the voice is the live channel and the count feedback is what it
+     * is for. What changed is what the ANALYSER does with the word, not what
+     * is said.
      */
     fun milestonePlannedReps(counter: RepCounter, plannedReps: Int?): Int? =
         if (counter == RepCounter.SENSOR) null else plannedReps

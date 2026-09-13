@@ -1285,6 +1285,62 @@ data class SessionExport(
          * whatever its stored `sources` object holds, and a row with no stored
          * geometry publishes neither the direction nor its source, as it
          * always has. `DATABASE_VERSION` does not move; no column changes.
+         *
+         * ALSO UNDER 1.20, a FOURTH entry rather than a mint, for the reason
+         * the entry above states -- `git show
+         * v0.1.52:core/model/.../SessionExport.kt` declares `"1.19"`, read at
+         * the tag this round, and nothing has shipped 1.20: a set's figures
+         * are bounded by its `Done` cue ONLY where a CADENCE ran (#285).
+         *
+         * 1.12 said the figures cover only the detections whose drive began
+         * at or before the set's own `Done`, and listed the sets nothing
+         * bounds. That list gains a fourth member, and on straight-reps
+         * barbell work it is the common one: a set the LIFTER counted by
+         * tapping. `VoiceMilestonePolicy` speaks `Done` at the planned count
+         * as a rep-count MILESTONE -- the app saying the number has been
+         * reached, not that the set is over -- and every spoken word is
+         * written to `voiceCues` as the same string a metronome's terminal
+         * call writes. So every drive begun after that tap was dropped from
+         * `repMetrics`, `velocityLoss_pct`, `velocityLossBasis`,
+         * `repMetricsComplete` and every field of `summary`. A lifter who
+         * does more reps than were prescribed did those reps, and they are
+         * analysed from here.
+         *
+         * `Set ended` still bounds every set, cadence or none: the app writes
+         * that word itself as the set ends and it is never a milestone.
+         *
+         * HOW A READER TELLS WHICH RULE APPLIED: [SetExport.tempoPrescribed].
+         * A `Done` row in `voiceCues` on a set carrying no `tempoPrescribed`
+         * bounded nothing. One caveat, because the two are not one field: the
+         * rule reads whether a CADENCE RAN -- `LeadInPolicy.prepCase == CUED`,
+         * a parsed tempo on an untimed non-explosive lift -- while
+         * `tempoPrescribed` publishes the string as prescribed, so an
+         * explosive lift carrying a tempo, or an ad-hoc tempo string the app
+         * could not parse, publishes a tempo and ran no cadence.
+         *
+         * NOT PURELY ADDITIVE, for the reason 1.12 was not: no key changes
+         * type or stops being written, but on a manually counted set that
+         * reached its planned count with the voice on, those figures are
+         * computed over a larger population of reps. Measured on the
+         * committed capture `field-ohp-3010-8rep-s38-set05` under a synthetic
+         * manual cue track, because no manual-set capture is committed here:
+         * 8 detections and 62.2% velocity loss bounded, 15 and 79.2%
+         * unbounded. NEITHER is claimed to be the truth -- the lifter
+         * hand-counted 8, and #284 measured this concentric-first corpus
+         * over-counting six captures of six. What the change removes is a
+         * rep list decided silently by a display toggle.
+         *
+         * NOT RETROACTIVE in `session.json`: the exporter re-derives these
+         * figures from the STORED rep list and nothing re-runs segmentation
+         * at export time, so every set already on disk publishes what it
+         * published before. RETROACTIVE in the raw archive's `meta.json`,
+         * which is the half a reader would otherwise be caught by:
+         * `rollExcursion_deg` IS recomputed from the stored streams at export
+         * time, so on a manually counted set whose track says `Done` its
+         * window now runs past the tap. `rollExcursionBasis` says so on the
+         * row -- `toTerminalCue` becomes `wholeCapture`, `workingWindow`
+         * becomes `fromWorkStart` -- so the change is readable rather than
+         * silent. `DATABASE_VERSION` does not move: no column changes.
          */
         const val SCHEMA_VERSION = "1.20"
 

@@ -829,6 +829,21 @@ class RawExporter(
                 // when it builds `session.json`, later in this same call, so a
                 // corrupt cue row fails the whole export there. Named and left
                 // alone: it is a defect of its own and not #133's.
+                //
+                // Which terminal word may bound it depends on whether a
+                // CADENCE ran, and that is `RepsSourcePolicy.guideCounted`
+                // over the two frozen facts this exporter already publishes
+                // `repsSource` from -- never the tempo alone, which reads an
+                // unpaced explosive lift as guided. `Done` is also the
+                // rep-count milestone a lifter counting their own set hears
+                // at the planned count, so on such a set it bounds nothing
+                // and the roll sweep below covers the whole capture (#285).
+                val cadenceGuided =
+                    RepsSourcePolicy.guideCounted(
+                        hasTempo = record.tempo != null,
+                        isTimed = record.actualDurationS != null,
+                        kind = sessionRepository.decodeGeometry(record)?.kind,
+                    )
                 var setEnd: SetEnd = SetEnd.NotCued
                 for (stream in streams) {
                     val name = entryName(idx, record, stream)
@@ -845,7 +860,10 @@ class RawExporter(
                         RawStreamEntity.KIND_HRM -> minBpmBySet[record.id] = minBpmFrom(text)
                         RawStreamEntity.KIND_PREP -> prepWindow = PrepWindowCsv.decode(text)
                         RawStreamEntity.KIND_CUES ->
-                            setEnd = runCatching { SetEnd.calledOver(CueCsv.decode(text)) }.getOrDefault(SetEnd.NotCued)
+                            setEnd =
+                                runCatching {
+                                    SetEnd.of(CueCsv.decode(text), cadenceGuided)
+                                }.getOrDefault(SetEnd.NotCued)
                     }
                 }
                 if (record.id !in minBpmBySet) minBpmBySet[record.id] = null

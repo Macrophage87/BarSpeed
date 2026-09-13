@@ -156,7 +156,9 @@ object RollExcursion {
      * window holds too little to say.
      *
      * [workStartedAtMs] is `PrepWindow.workStartedAtMs` or null where the set
-     * stored no window; [end] is [SetEnd.of] over the set's cue track. Both
+     * stored no window; [end] is [SetEnd.of] over the set's cue track AND its
+     * prescription, so a rep-count milestone on a set no cadence ran on does
+     * not close this window either (#285). Both
      * bounds are INCLUSIVE and are on the samples' own arrival clock, so no
      * conversion happens here and none can be got wrong.
      *
