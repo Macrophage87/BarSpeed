@@ -31,7 +31,11 @@ class CrashLogRing(
     capacity: Int = CAPACITY,
     maxLineChars: Int = MAX_LINE_CHARS,
 ) {
-    private val caps = "capacity=$capacity, maxLineChars=$maxLineChars"
+    private val lineCap = maxLineChars.coerceAtLeast(1)
+
+    private val held = ArrayDeque<String>(capacity.coerceAtLeast(1))
+
+    private val cap = capacity.coerceAtLeast(1)
 
     /**
      * Record one line, evicting the oldest once `capacity` is reached.
@@ -41,11 +45,17 @@ class CrashLogRing(
      * cannot be misread as the whole of what was logged.
      */
     fun add(line: String) {
-        TODO("add($line) with $caps lands with #272's green pins")
+        val flat = line.replace('\r', ' ').replace('\n', ' ')
+        val bounded =
+            if (flat.length > lineCap) flat.take(lineCap) + " [+${flat.length - lineCap} chars]" else flat
+        synchronized(held) {
+            while (held.size >= cap) held.removeFirst()
+            held.addLast(bounded)
+        }
     }
 
     /** The lines held, oldest first -- the order `CrashRecord.render` writes them in. */
-    fun lines(): List<String> = TODO("lines() with $caps lands with #272's green pins")
+    fun lines(): List<String> = synchronized(held) { held.toList() }
 
     companion object {
         /**

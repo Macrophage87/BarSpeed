@@ -1,6 +1,10 @@
 package com.macrophage.barspeed.model
 
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 
 /**
  * Which crash files a phone keeps, and what each one is called. Issue #272.
@@ -31,6 +35,18 @@ object CrashLogPolicy {
     /** The directory, under the app's own `filesDir`. */
     const val DIR = "crashes"
 
+    private const val PREFIX = "crash-"
+
+    private const val EXTENSION = ".txt"
+
+    /** Fixed width, zero-padded, UTC: the three properties the ordering rests on. */
+    private val NAME_FORMAT: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("yyyyMMdd'-'HHmmss'-'SSS'Z'").withZone(ZoneOffset.UTC)
+
+    /** How a parsed name reads back on a card: date, time, and the Z that says it is UTC. */
+    private val LABEL_FORMAT: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss'Z'").withZone(ZoneOffset.UTC)
+
     /**
      * e.g. 1789254897123 -> "crash-20260912-211457-123Z.txt".
      *
@@ -41,7 +57,7 @@ object CrashLogPolicy {
      * because a crash storm is real: #271's phone produced eight crashes in
      * 28 minutes and two inside the same second is not excluded.
      */
-    fun fileName(atMs: Long): String = TODO("fileName($atMs) lands with #272's green pins")
+    fun fileName(atMs: Long): String = PREFIX + NAME_FORMAT.format(Instant.ofEpochMilli(atMs)) + EXTENSION
 
     /**
      * The instant [fileName] encoded, or null when [name] is not one of ours.
@@ -50,7 +66,15 @@ object CrashLogPolicy {
      * write that file", and [toDelete] leans on it so a file the app did not
      * write can never be deleted by the pruner.
      */
-    fun instantOf(name: String): Instant? = TODO("instantOf($name) lands with #272's green pins")
+    fun instantOf(name: String): Instant? {
+        if (!name.startsWith(PREFIX) || !name.endsWith(EXTENSION)) return null
+        val stamp = name.substring(PREFIX.length, name.length - EXTENSION.length)
+        return try {
+            LocalDateTime.parse(stamp, NAME_FORMAT).toInstant(ZoneOffset.UTC)
+        } catch (parseFailure: DateTimeParseException) {
+            null
+        }
+    }
 
     /** True exactly when [instantOf] can read [name]. */
     fun isCrashFile(name: String): Boolean = instantOf(name) != null
@@ -64,7 +88,7 @@ object CrashLogPolicy {
      * not need it, and it would make three cards of near-identical strings
      * harder to tell apart rather than easier.
      */
-    fun labelFor(name: String): String? = TODO("labelFor($name) lands with #272's green pins")
+    fun labelFor(name: String): String? = instantOf(name)?.let { LABEL_FORMAT.format(it) }
 
     /**
      * Our crash files among [names], newest first, capped at [keep].
@@ -73,7 +97,7 @@ object CrashLogPolicy {
      * kept nor deleted, only left alone.
      */
     fun toKeep(names: List<String>, keep: Int = KEEP): List<String> =
-        TODO("toKeep(${names.size}, $keep) lands with #272's green pins")
+        names.filter(::isCrashFile).sortedDescending().take(keep.coerceAtLeast(0))
 
     /**
      * Our crash files that [keep] pushes off the end, oldest first.
@@ -84,6 +108,8 @@ object CrashLogPolicy {
      * the file it disagreed about would be the one that went. A file with a
      * name this object does not recognise is never in here, whatever it is.
      */
-    fun toDelete(names: List<String>, keep: Int = KEEP): List<String> =
-        TODO("toDelete(${names.size}, $keep) lands with #272's green pins")
+    fun toDelete(names: List<String>, keep: Int = KEEP): List<String> {
+        val kept = toKeep(names, keep).toSet()
+        return names.filter { isCrashFile(it) && it !in kept }.sorted()
+    }
 }

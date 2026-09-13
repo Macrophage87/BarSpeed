@@ -125,7 +125,28 @@ data class CrashRecord(
      * Ends with a trailing newline, so the file `cat`s cleanly and a later
      * appender could not join its first line onto the log's last.
      */
-    fun render(): String = TODO("render() lands with #272's green pins")
+    fun render(): String {
+        val logHeading =
+            when (logLines.size) {
+                0 -> "--- LOG (none) ---"
+                1 -> "--- LOG (1 line, oldest first) ---"
+                else -> "--- LOG (${logLines.size} lines, oldest first) ---"
+            }
+        val header =
+            listOf(
+                "BARSPEED CRASH REPORT",
+                "at: ${formatInstant(atMs)}",
+                "version: $versionName ($versionCode)",
+                "database: $databaseVersion",
+                "screen: ${screen ?: NOT_RECORDED}",
+                "thread: $threadName",
+                "heap: free $freeMemoryBytes B, total $totalMemoryBytes B, max $maxMemoryBytes B",
+                STACK_HEADING,
+                stack.ifBlank { NOT_RECORDED },
+                logHeading,
+            )
+        return (header + logLines).joinToString(separator = "\n", postfix = "\n")
+    }
 
     companion object {
         /** Millisecond-precision, fixed width, always UTC -- so the layout cannot vary with the clock. */
@@ -137,6 +158,12 @@ data class CrashRecord(
 
         /** Links of the `cause` chain rendered, the top-level throwable included. */
         const val MAX_CAUSES = 8
+
+        /** What a field the process could not supply reads as. Never a blank, never a plausible value. */
+        private const val NOT_RECORDED = "(not recorded)"
+
+        /** The one heading between the header block and the stack. */
+        private const val STACK_HEADING = "--- STACK ---"
 
         /** `2026-09-12T21:14:57.123Z`, the same instant [CrashLogPolicy.fileName] names the file after. */
         fun formatInstant(atMs: Long): String = INSTANT_FORMAT.format(Instant.ofEpochMilli(atMs))
@@ -159,7 +186,34 @@ data class CrashRecord(
          * looping, since `initCause` forbids self-reference but two throwables
          * naming each other is reachable.
          */
-        fun stackText(throwable: Throwable, maxFrames: Int = MAX_FRAMES, maxCauses: Int = MAX_CAUSES): String =
-            TODO("stackText(${throwable.javaClass.name}, $maxFrames, $maxCauses) lands with #272's green pins")
+        fun stackText(throwable: Throwable, maxFrames: Int = MAX_FRAMES, maxCauses: Int = MAX_CAUSES): String {
+            val frameCap = maxFrames.coerceAtLeast(0)
+            val causeCap = maxCauses.coerceAtLeast(1)
+            val out = mutableListOf<String>()
+            val seen = mutableListOf<Throwable>()
+            var current: Throwable? = throwable
+            var links = 0
+            while (current != null) {
+                if (seen.any { it === current }) {
+                    out += "... cause chain repeats a throwable already shown"
+                    break
+                }
+                seen += current
+                out += if (links == 0) current.toString() else "Caused by: $current"
+                val frames = current.stackTrace ?: emptyArray()
+                frames.take(frameCap).forEach { out += "\tat $it" }
+                if (frames.size > frameCap) {
+                    out += "\t... ${frames.size - frameCap} more frames dropped (cap $frameCap)"
+                }
+                links++
+                val next = current.cause
+                if (next != null && links >= causeCap) {
+                    out += "... cause chain truncated after $causeCap of its links"
+                    break
+                }
+                current = next
+            }
+            return out.joinToString("\n")
+        }
     }
 }
