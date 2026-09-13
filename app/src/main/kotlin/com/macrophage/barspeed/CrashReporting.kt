@@ -29,7 +29,13 @@ import com.macrophage.barspeed.model.CrashRecord
  * entry.
  */
 object AppLog {
-    /** The buffer a crash report reads. Allocated once, at class load, never at crash time. */
+    /**
+     * The buffer a crash report reads. Allocated once, at class load, never at
+     * crash time.
+     *
+     * That second sentence is true only because [CrashReporting.install] reads
+     * this field; see the comment there for why nothing else does.
+     */
     val recent = CrashLogRing()
 
     /** A warning: logcat, plus one line in the crash buffer. */
@@ -126,6 +132,10 @@ object CrashReporting {
     fun install(store: CrashLogStore) {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         if (previous is CrashHandler) return
+        // Force AppLog's class initializer here, at install time. Nothing in a
+        // healthy process touches this object, so without this line the ring is
+        // allocated inside recordOf, on the dying thread.
+        AppLog.recent.lines()
         Thread.setDefaultUncaughtExceptionHandler(
             CrashHandler(previous, store) { thread, error -> recordOf(thread, error) },
         )
