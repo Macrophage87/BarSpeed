@@ -102,7 +102,7 @@ import kotlin.test.assertTrue
  * is not one.
  */
 class TwoSecondStrokeCountTest {
-    /** field-38 sets 6 and 10, field-39 sets 1, 2 and 3: conc-first, drive up, vertical, off-stack. */
+    /** field-38 sets 6 and 10, field-39 sets 1, 2, 3 and 6: conc-first, drive up, vertical, off-stack. */
     private val driveUp = LiftDirection(startsWith = StartPhase.CONCENTRIC, concentricUp = true)
 
     /** field-38 set 14: lat_pulldown, conc-first, drive DOWN, vertical, on-stack, inverted. */
@@ -113,7 +113,7 @@ class TwoSecondStrokeCountTest {
         sensorOnStack = true,
     )
 
-    /** field-39 set 7: lat_pulldown, conc-first, drive UP as declared, vertical, on-stack, inverted. */
+    /** field-39 sets 7, 8 and 10: lat_pulldown, conc-first, drive UP as declared, vertical, on-stack, inverted. */
     private val pulldownDeclaredUp = LiftDirection(
         startsWith = StartPhase.CONCENTRIC,
         concentricUp = true,
@@ -128,7 +128,10 @@ class TwoSecondStrokeCountTest {
     private val s39set01 = "field-ohp-2011-6rep-s39-set01"
     private val s39set02 = "field-ohp-2010-6rep-s39-set02"
     private val s39set03 = "field-ohp-3010-6rep-s39-set03"
+    private val s39set06 = "field-ohp-20x0-6rep-s39-set06"
     private val s39set07 = "field-latpulldown-1120-6rep-s39-set07"
+    private val s39set08 = "field-latpulldown-2011-6rep-s39-set08"
+    private val s39set10 = "field-latpulldown-20x0-6rep-s39-set10"
 
     private data class Track(
         val fixture: String,
@@ -144,7 +147,10 @@ class TwoSecondStrokeCountTest {
         Track(s38set14, "1120", pulldownDrivesDown, 12),
         Track(s39set01, "2011", driveUp, 6),
         Track(s39set02, "2010", driveUp, 6),
+        Track(s39set06, "20X0", driveUp, 6),
         Track(s39set07, "1120", pulldownDeclaredUp, 6),
+        Track(s39set08, "2011", pulldownDeclaredUp, 6),
+        Track(s39set10, "20X0", pulldownDeclaredUp, 6),
     )
 
     /** The 3010 sets, which this commit must leave exactly as it found them. */
@@ -152,6 +158,13 @@ class TwoSecondStrokeCountTest {
         Track(s38set04, "3010", driveUp, 8),
         Track(s39set03, "3010", driveUp, 6),
     )
+
+    /**
+     * The track for a fixture, by name. Positional lookups into [affected] and
+     * [unaffected] were how four of these assertions addressed their set, and
+     * `affected.last()` silently re-aimed the moment the list grew.
+     */
+    private fun track(fixture: String) = (affected + unaffected).first { it.fixture == fixture }
 
     private fun plan(track: Track) = CadencePlan.of(TempoSchedule.of(Tempo.parse(track.tempo), track.direction))
 
@@ -252,7 +265,7 @@ class TwoSecondStrokeCountTest {
         // carried the call and the stroke gave up nothing.
         assertEquals(
             1,
-            plan(affected.last()).beats.count { it.isStroke && it.seconds >= CadencePlan.CALL_MIN_STROKE_S },
+            plan(track(s39set07)).beats.count { it.isStroke && it.seconds >= CadencePlan.CALL_MIN_STROKE_S },
             "field-39 set 7 has a two-second stroke as surely as the five that went quiet",
         )
     }
@@ -273,7 +286,7 @@ class TwoSecondStrokeCountTest {
                 20 to "Last rep", 21 to "Hold", 22 to "Down", 23 to "1",
                 24 to "Done",
             ),
-            CadenceVoice.script(plan(affected[3]), 6).map { it.atSecond to it.utterance },
+            CadenceVoice.script(plan(track(s39set01)), 6).map { it.atSecond to it.utterance },
             "field-39 set 1: six `1` counts where the archive has two, and the set is the same length",
         )
         assertEquals(
@@ -286,7 +299,7 @@ class TwoSecondStrokeCountTest {
                 15 to "Last rep", 16 to "Down", 17 to "1",
                 18 to "Done",
             ),
-            CadenceVoice.script(plan(affected[4]), 6).map { it.atSecond to it.utterance },
+            CadenceVoice.script(plan(track(s39set02)), 6).map { it.atSecond to it.utterance },
             "field-39 set 2: the same, on a three-second cycle",
         )
         // And the utterance is one word, so no second is asked to carry two
@@ -381,7 +394,7 @@ class TwoSecondStrokeCountTest {
                 20 to "Last rep", 21 to "Down", 22 to "1", 23 to "2",
                 24 to "Done",
             ),
-            CadenceVoice.script(plan(unaffected[1]), 6).map { it.atSecond to it.utterance },
+            CadenceVoice.script(plan(track(s39set03)), 6).map { it.atSecond to it.utterance },
             "field-39 set 3, 3010: `1 2` on the lowering of every rep, as it already was",
         )
         assertEquals(
