@@ -5,14 +5,18 @@ package com.macrophage.barspeed.dsp
  *
  * The two are not the same string and the split is load-bearing:
  * [utterance] is handed to TTS, [recorded] is handed to the cue track, and a
- * cue row is a persisted format every cue-track consumer matches exactly. A
- * merged rep call is spoken as one utterance -- `"Up, Rep 3"` -- because
- * `VoiceCounter` speaks with `QUEUE_FLUSH` and a second utterance a moment
- * later would cancel the first; the ROWS it writes stay separate words, so
- * nothing that counts `Up` rows sees a renamed one.
+ * cue row is a persisted format every cue-track consumer matches exactly.
  *
- * [recorded] may be empty: the lead-in's countdown digits are spoken and
- * deliberately not written down (`LeadInPlan.RECORDED`).
+ * A rep call used to be spoken as one utterance carrying two words --
+ * `"Up, Rep 3"` -- because `VoiceCounter` speaks with `QUEUE_FLUSH` and a second
+ * utterance a moment later would cancel the first, and it wrote the two as
+ * separate ROWS so that nothing counting `Up` rows saw a renamed one. From #293
+ * the call REPLACES the stroke word, so there is one word in the utterance and
+ * one row beside it: the word the lifter did not hear is not written down. The
+ * list stays a list because a caller may still need to stamp several rows at one
+ * instant, and because [recorded] may be empty -- the lead-in's countdown digits
+ * are spoken and deliberately not written (`LeadInPlan.RECORDED`).
+ *
  */
 data class SpokenCall(
     val utterance: String,
@@ -65,25 +69,33 @@ object CadenceVoice {
     /**
      * The call a beat opens with, or null when the beat opens in silence.
      *
-     * A pause has no word of its own, so an announcement handed to one is
-     * spoken alone; a stroke's announcement rides the stroke's word.
+     * **An announcement REPLACES the beat's own word** (#293): it is the whole
+     * utterance and the whole row, and the word is neither spoken nor written.
+     * The owner asked for that in those terms -- *"Have the rep number be at the
+     * start of the rep, and replace the relevant up or down, etc."* -- and it is
+     * what makes the number arrive at the start of the rep instead of a beat
+     * later or a rep early.
      *
-     * A merged call writes TWO rows at one instant, the stroke word and the
-     * call. It used to write only the stroke word, so on the tempo families
-     * that merge -- every one of the sixteen sets on the session that found it,
-     * 157 calls spoken and none written -- the archive was silent about a call
-     * the lifter heard (issue 176). The stroke row is unchanged and unrenamed, because
-     * the committed cue-track fixtures match those rows exactly and
-     * `CueTrack.calledReps` in the test source set counts them; the call is a
-     * row beside it, not a suffix on it.
+     * Two consequences, both deliberate. One second carries one utterance, so
+     * nothing is at risk of being flushed mid-word by the second after it. And a
+     * word the lifter did not hear is not written down: the row the archive
+     * loses is a row the app did not say, which is the same rule issue 176 fixed
+     * in the other direction -- it used to write only the stroke word, so on the
+     * families that merged (every one of the sixteen sets on the session that
+     * found it, 157 calls spoken and none written) the archive was silent about
+     * a call the lifter heard.
+     *
+     * What it costs a reader of an archive is published as export 1.20's THIRD
+     * entry: the first stroke's word appears once per SET rather than once per
+     * rep, and the call rows mark the rep boundaries it used to mark.
+     * `CueTrack.calledReps` in the test source set counts `Down` rows and says
+     * so in its own KDoc.
      */
     fun beatCall(beat: CadenceBeat, announcement: String?): SpokenCall? {
         val label = beat.spokenLabel
         return when {
-            label != null && announcement != null ->
-                SpokenCall("$label, $announcement", listOf(label, announcement))
-            label != null -> SpokenCall(label, listOf(label))
             announcement != null -> SpokenCall(announcement, listOf(announcement))
+            label != null -> SpokenCall(label, listOf(label))
             else -> null
         }
     }
@@ -93,15 +105,30 @@ object CadenceVoice {
      *
      * Counts land on the seconds INSIDE the stroke: the last second of a stroke
      * is the next beat's word, not a count. A stroke shorter than
-     * [GuidedCadence.COUNT_ALOUD_FROM_S] is not counted at all, and a stroke
-     * carrying a merged announcement gives up its first count to make room for
-     * it -- only when an announcement actually came, which rep 1 never has.
+     * [GuidedCadence.COUNT_ALOUD_FROM_S] is not counted at all.
+     *
+     * **A stroke whose word an announcement replaced is counted FROM the
+     * number** (#293). The number occupies the second the word had, so it is
+     * that stroke's first count and the rest continue from it: a three-second
+     * eccentric goes `"Rep 3"`, `2`, `3`. The owner's example is exactly that --
+     * *"a 3010 press goes Rep 3, 2, 3, Up"* -- and it is why the shift is tied
+     * to the WORD being replaced rather than to an announcement arriving: a
+     * wordless beat handed a call replaces nothing, so its counts, if it had
+     * any, would not move.
+     *
+     * No count is dropped. A merged call used to silence this stroke's first
+     * count to widen its own window, and rep 1 -- which never carries a call --
+     * kept it, which is how the merged calls in the 0.1.43 archives were dated
+     * at all (issue 176). That asymmetry is gone; what remains is that rep 1
+     * counts from ONE because its word is not replaced, so a track reads
+     * `Down 1 2` on rep 1 and `Rep 2 2 3` on rep 2.
      */
     fun countCall(beat: CadenceBeat, announcement: String?, second: Int): SpokenCall? {
         if (!beat.isStroke || second >= beat.seconds) return null
         if (beat.seconds < GuidedCadence.COUNT_ALOUD_FROM_S) return null
-        if (beat.suppressFirstCount && announcement != null && second == 1) return null
-        return SpokenCall(second.toString(), listOf(second.toString()))
+        val replacedAWord = announcement != null && beat.spokenLabel != null
+        val count = if (replacedAWord) second + 1 else second
+        return SpokenCall(count.toString(), listOf(count.toString()))
     }
 
     /**

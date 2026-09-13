@@ -131,13 +131,16 @@ data class LeadInPlan(val beats: List<LeadInBeat>, val prepS: Int) {
         /**
          * Seconds the launch phrase occupies at the END of the prep.
          *
-         * This is deliberately NOT written as [CadencePlan.MERGE_MIN_STROKE_S]
+         * This is deliberately NOT written as [CadencePlan.CALL_MIN_STROKE_S]
          * or [GuidedCadence.COUNT_ALOUD_FROM_S]. All three are 2 and all three
          * mean different things: how long the launch phrase is, the shortest
-         * stroke that can carry a merged rep announcement, and the shortest
-         * stroke that gets counted out loud. [CadencePlan.MERGE_MIN_STROKE_S]
-         * already carries this warning about the third; this is the same
-         * warning for the first.
+         * stroke whose presence leaves a prescription able to speak a rep call,
+         * and the shortest stroke that gets counted out loud.
+         * [CadencePlan.CALL_MIN_STROKE_S] already carries this warning about the
+         * third; this is the same warning for the first. (That constant was
+         * `MERGE_MIN_STROKE_S`, "the shortest stroke that can carry a merged rep
+         * announcement", until #293 replaced the stroke word with the call
+         * instead of merging the two.)
          *
          * The worked failure: alias this to COUNT_ALOUD_FROM_S, then raise
          * COUNT_ALOUD_FROM_S to 3 because three-second strokes are the only
