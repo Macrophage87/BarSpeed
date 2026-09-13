@@ -15,12 +15,12 @@ import kotlin.test.assertNull
  * could speak all eleven rep calls of a twelve-rep set and write none of them
  * down for as long as it did (issue 176).
  *
- * The cases chosen are eccentric-first, because [CadencePlan]'s case 2 is the
- * home whose PLACEMENT neither issue 176 nor issue 173 changed. Case 3 -- the
- * call merged into the rep's OWN last stroke -- is issue 173's subject and is
- * asserted with it, in `LastRepWarningTest`, along with #243 reversing the
- * answer it gave. WHICH rep a call names is #243's subject and moved on every
- * case at once, so it is asserted here as well.
+ * The cases chosen are eccentric-first, because an eccentric-first press is
+ * the geometry whose opening stroke is the long one -- so it is the geometry
+ * where the number replacing that stroke's word renumbers a count, which is the
+ * half of #293 a row list shows and a rule does not. WHICH rep a call names is
+ * #243's subject and is asserted here as well; WHERE it lands is #293's and has
+ * its own file, `RepCallPlacementTest`, over three sets on two later sessions.
  */
 class CadenceVoiceTest {
     private val benchPress = LiftDirection(startsWith = StartPhase.ECCENTRIC, concentricUp = true)
@@ -74,17 +74,29 @@ class CadenceVoiceTest {
     }
 
     @Test
-    fun `a closing pause has no word of its own, so a call spoken there is the row`() {
-        // Case 1. The announcement is the whole utterance and the whole row --
-        // this is the only home that has ever written a rep call down, and the
-        // "Rep 4" in the export schema's cue vocabulary comes from here.
+    fun `a closing pause says nothing at all now that no call rides it`() {
+        // Case 1 until #293: the pause was the only home that ever wrote a rep
+        // call down, and the "Rep 4" in the export schema's cue vocabulary came
+        // from it. The call opens the next rep instead, so on a 2011 bench press
+        // the pause is silent on every rep of the set.
         val p = plan("2011")
-        val closing = p.beats[p.announceOnBeat!!]
-        assertNull(closing.spokenLabel, "a closing pause is silent unless a call rides it")
-        assertNull(CadenceVoice.beatCall(closing, announcement = null), "and says nothing when none does")
-        val call = CadenceVoice.beatCall(closing, CadencePlan.LAST_REP)!!
-        assertEquals("Last rep", call.utterance)
-        assertEquals(listOf("Last rep"), call.recorded)
+        val closing = p.beats[2]
+        assertEquals(0, p.announceOnBeat, "the call is not on the pause any more")
+        assertNull(closing.spokenLabel, "a closing pause has no word of its own")
+        assertNull(CadenceVoice.beatCall(closing, announcement = null), "so it says nothing")
+        assertEquals(
+            emptyList(),
+            CadenceVoice.script(p, plannedReps = 5).filter { it.atSecond % p.deliveredCycleS == 3 },
+            "and nothing is spoken on the fourth second of any rep, which is the pause",
+        )
+        // The function still answers for a wordless beat handed a call, and no
+        // plan hands it one: a pause that carried a call would speak it alone.
+        // Kept because [CadenceBeat] can express such a beat and #266 may want
+        // one; asserted so it cannot quietly change under a later reader.
+        assertEquals(
+            SpokenCall("Last rep", listOf("Last rep")),
+            CadenceVoice.beatCall(closing, CadencePlan.LAST_REP),
+        )
     }
 
     @Test
@@ -100,15 +112,22 @@ class CadenceVoiceTest {
     }
 
     @Test
-    fun `a stroke gives up its first count only when a call actually rode it`() {
-        // Rep 1 has no announcement pending, so it keeps the count -- which is
-        // what makes a missing count in a recorded track the fingerprint of a
-        // merged call rather than a property of the tempo.
+    fun `a stroke whose word the number replaced is counted from the number`() {
+        // #293's second half, and the owner's own example: "a 3010 press goes
+        // Rep 3, 2, 3, Up". The number stands where the stroke's word stood, so
+        // it is that stroke's first count and the rest follow from it. No count
+        // is dropped -- the merged call used to buy its room by silencing one.
+        //
+        // Rep 1 carries no call, so its opening stroke keeps its word AND counts
+        // from one. A recorded track therefore reads "Down 1 2" on rep 1 and
+        // "Rep 2 2 3" on rep 2, which is a difference the lifter hears and a
+        // [Field] question this cannot answer.
         val down = plan("3010").beats[0]
-        assertEquals(true, down.suppressFirstCount, "3010 opens on the stroke that carries the call")
-        assertEquals("1", CadenceVoice.countCall(down, null, 1)!!.utterance, "rep 1 keeps it")
-        assertNull(CadenceVoice.countCall(down, "Rep 1", 1), "a rep that carries a call gives it up")
-        assertEquals("2", CadenceVoice.countCall(down, "Rep 1", 2)!!.utterance, "and gives up only the first")
+        assertEquals("1", CadenceVoice.countCall(down, null, 1)!!.utterance, "rep 1 counts from one")
+        assertEquals("2", CadenceVoice.countCall(down, null, 2)!!.utterance)
+        assertEquals("2", CadenceVoice.countCall(down, "Rep 2", 1)!!.utterance, "a called rep counts from the number")
+        assertEquals("3", CadenceVoice.countCall(down, "Rep 2", 2)!!.utterance)
+        assertNull(CadenceVoice.countCall(down, "Rep 2", 3), "and the stroke's last second is the next beat's word")
     }
 
     @Test
@@ -132,11 +151,13 @@ class CadenceVoiceTest {
                 1 to "1",
                 2 to "2",
                 3 to "Up",
-                4 to "Down, Rep 2",
-                6 to "2",
+                4 to "Rep 2",
+                5 to "2",
+                6 to "3",
                 7 to "Up",
-                8 to "Down, Last rep",
-                10 to "2",
+                8 to "Last rep",
+                9 to "2",
+                10 to "3",
                 11 to "Up",
                 12 to "Done",
             ),
@@ -180,8 +201,9 @@ class CadenceVoiceTest {
                 1 to "1",
                 2 to "2",
                 3 to "Up",
-                4 to "Down, Last rep",
-                6 to "2",
+                4 to "Last rep",
+                5 to "2",
+                6 to "3",
                 7 to "Up",
                 8 to "Done",
             ),
@@ -205,16 +227,20 @@ class CadenceVoiceTest {
     }
 
     @Test
-    fun `every word the guide speaks is a word the cue track carries`() {
-        // Issue 176, as the general rule. An utterance is one or two words --
-        // the stroke call, and the rep announcement merged into it -- and both
-        // were said out loud. The cue track is presented in
-        // session-export.schema.json as what the app said, so a word spoken and
-        // not written makes it a record of something else.
+    fun `every word the guide speaks is a word the cue track carries, one to a second`() {
+        // Issue 176, as the general rule, and #293 narrowing it. The cue track
+        // is presented in session-export.schema.json as what the app said, so a
+        // word spoken and not written makes it a record of something else -- and
+        // a word written and not spoken does the same in the other direction,
+        // which is why the stroke word the number replaces is not recorded.
+        //
+        // An utterance used to be one word or two, "Down, Rep 3" being the pair.
+        // It is exactly one now, on every plan in the corpus, so no second is
+        // asked to carry two things under QUEUE_FLUSH.
         corpus.forEach { (tempo, direction, reps) ->
             CadenceVoice.script(plan(tempo, direction), reps).forEach { call ->
                 assertEquals(
-                    call.utterance.split(", "),
+                    listOf(call.utterance),
                     call.recorded,
                     "$tempo on ${direction.plane}/${direction.startsWith}: \"${call.utterance}\" at ${call.atSecond}s",
                 )
@@ -256,22 +282,36 @@ class CadenceVoiceTest {
     }
 
     @Test
-    fun `a merged call writes down the call as well as the stroke it rode`() {
-        // Both homes that merge, so that fixing one and leaving the other is
-        // not available. The stroke word keeps its own row unchanged and
-        // unrenamed -- CueTrack.calledReps counts those rows, and every
-        // committed fixture matches them exactly.
-        val nextRepsOpener = plan("3010", benchPress).beats[0]
+    fun `a call replaces the stroke word it used to ride, in the record as well as in the ear`() {
+        // The two homes that used to merge, so that changing one and leaving the
+        // other is not available. Both wrote TWO rows at one instant -- the
+        // stroke word and the call -- and both now write ONE, the call.
+        //
+        // The stroke word is not renamed, and that distinction is the whole of
+        // why this is a published contract change rather than a rename: the word
+        // still means what it meant and is still written on rep 1, so a consumer
+        // matching `Down` rows matches fewer of them rather than different ones.
+        val opener = plan("3010", benchPress).beats[0]
         assertEquals(
-            SpokenCall("Down, Rep 3", listOf("Down", "Rep 3")),
-            CadenceVoice.beatCall(nextRepsOpener, "Rep 3"),
-            "case 2, merged into the next rep's opening stroke",
+            SpokenCall("Rep 3", listOf("Rep 3")),
+            CadenceVoice.beatCall(opener, "Rep 3"),
+            "the eccentric-first press, whose opener is the three-second stroke",
         )
-        val ownLastStroke = plan("2010", legPress).let { it.beats[it.announceOnBeat!!] }
         assertEquals(
-            SpokenCall("Down, Last rep", listOf("Down", CadencePlan.LAST_REP)),
-            CadenceVoice.beatCall(ownLastStroke, CadencePlan.LAST_REP),
-            "case 3, merged into the rep's own last stroke",
+            SpokenCall("Down", listOf("Down")),
+            CadenceVoice.beatCall(opener, announcement = null),
+            "and the same beat on rep 1, which carries no call",
+        )
+        val oneSecondOpener = plan("2010", legPress).beats[0]
+        assertEquals(
+            SpokenCall(CadencePlan.LAST_REP, listOf(CadencePlan.LAST_REP)),
+            CadenceVoice.beatCall(oneSecondOpener, CadencePlan.LAST_REP),
+            "the one-second opener, which used to send the call to the other stroke",
+        )
+        assertEquals(
+            SpokenCall("Up", listOf("Up")),
+            CadenceVoice.beatCall(oneSecondOpener, announcement = null),
+            "whose word is Up on a leg press, drive-up and concentric-first",
         )
     }
 

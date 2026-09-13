@@ -61,22 +61,47 @@ import kotlin.test.assertEquals
  * the counter might be wrong. It seems to end one early and not state last
  * rep."*
  *
- * The strings below are those tracks with the schedule #243 asks for: the call
- * names the rep it is calling FOR. Two things move and nothing else does --
- * every `Rep n` becomes `Rep n+1`, and `Last rep` is spoken on the final rep of
- * every plan that has a beat for it, on the same beat it would have used.
- * NOTHING moves in time: the seconds of every stroke, hold, count and `Done`
- * are the seconds the archives recorded. The only rows that appear or vanish
- * are the four restored `Last rep` calls and the four tempo counts the strokes
- * carrying them give up again.
+ * The strings below are those tracks with the schedule #243 and #293 ask for.
+ * #243 moved WHICH rep a call names -- every `Rep n` became `Rep n+1`, and
+ * `Last rep` is spoken on the final rep of every plan with a beat for it. #293
+ * moves WHERE it lands: onto the first second of the rep it names, in place of
+ * that rep's first stroke word.
  *
- * Rep 1 is announced on no plan, and that is deliberate rather than an
- * oversight. On the plans that carry a call in the previous rep's closing pause
- * there is no beat before the first rep to carry one, so announcing rep 1 would
- * be possible on some tempo families and impossible on others; and on the
- * families where it IS possible it would cost rep 1 the only tempo count those
- * plans have (#147). Silence on rep 1 is not a wrong number, so the report's
- * "one early" is answered without it.
+ * An earlier version of this paragraph said "NOTHING moves in time: the seconds
+ * of every stroke, hold, count and `Done` are the seconds the archives
+ * recorded." The first clause is deleted: the CALLS move in time on five of
+ * these six plans, by one or two seconds, onto the start of their own rep. What
+ * still holds, and is the obligation `CadencePlanTest` states over every tempo
+ * any plan can express, is that no BEAT moves: every stroke, hold and `Done`
+ * lands on the second the archives recorded, and the delivered cycle is the
+ * prescription's.
+ *
+ * Two rows per rep change instead of one. The stroke word the number replaces is
+ * not spoken -- so a `Down` or an `Up` leaves each of these tracks on every rep
+ * after the first -- and the tempo count that stroke used to give up comes back,
+ * renumbered so the count continues from the number: the owner's own example is
+ * "a 3010 press goes Rep 3, 2, 3, Up instead of Down, rep three, 2, Up".
+ *
+ * ## Rep 1 is announced on no plan, and #293 does not change that
+ *
+ * The reason did change, and the old one is deleted rather than kept beside the
+ * new one. It used to be that a call rode either the previous rep's closing
+ * pause -- which rep 1 does not have -- or a stroke with a tempo count to give
+ * up, which would have cost rep 1 the only count some plans have (#147).
+ * Neither is true now: the call takes the opening stroke's WORD, every rep has
+ * one, and nothing is given up. Three reasons stand in their place.
+ *
+ * 1. Rep 1's start is not in doubt. It follows the prep countdown, whose last
+ *    words are `Ready` and `Brace`, and the stroke word after them IS rep 1
+ *    beginning.
+ * 2. `StartCuePolicy` shows that word on the screen through the whole prep and
+ *    `StartCueVoiceContractTest` pins that the guide then SAYS it (#241).
+ *    Announcing rep 1 would replace the one utterance that contract is about.
+ * 3. It keeps one first-stroke word per set in the record. `Down` and `Up` are
+ *    the only discriminator a reader has between a guided track and the unguided
+ *    counter's (`CueTrackOriginTest`), and a `Rep 1` row would additionally
+ *    collide with the pre-1.19 archives, where `Rep 1` is what the guide said as
+ *    rep 1 FINISHED.
  */
 class RepCallScheduleTest {
     /** field-38 set 1: dumbbell_incline_press, ecc-first, drive up, vertical. */
@@ -104,85 +129,85 @@ class RepCallScheduleTest {
 
     private val bench3010x6 = spoken(
         "0:Down 1:1 2:2 3:Up",
-        "4:Down 4:Rep 2 6:2 7:Up",
-        "8:Down 8:Rep 3 10:2 11:Up",
-        "12:Down 12:Rep 4 14:2 15:Up",
-        "16:Down 16:Rep 5 18:2 19:Up",
-        "20:Down 20:Last rep 22:2 23:Up",
+        "4:Rep 2 5:2 6:3 7:Up",
+        "8:Rep 3 9:2 10:3 11:Up",
+        "12:Rep 4 13:2 14:3 15:Up",
+        "16:Rep 5 17:2 18:3 19:Up",
+        "20:Last rep 21:2 22:3 23:Up",
         "24:Done",
     )
 
     private val ohp3010x8 = spoken(
         "0:Up 1:Down 2:1 3:2",
-        "4:Up 5:Down 5:Rep 2 7:2",
-        "8:Up 9:Down 9:Rep 3 11:2",
-        "12:Up 13:Down 13:Rep 4 15:2",
-        "16:Up 17:Down 17:Rep 5 19:2",
-        "20:Up 21:Down 21:Rep 6 23:2",
-        "24:Up 25:Down 25:Rep 7 27:2",
-        "28:Up 29:Down 29:Last rep 31:2",
+        "4:Rep 2 5:Down 6:1 7:2",
+        "8:Rep 3 9:Down 10:1 11:2",
+        "12:Rep 4 13:Down 14:1 15:2",
+        "16:Rep 5 17:Down 18:1 19:2",
+        "20:Rep 6 21:Down 22:1 23:2",
+        "24:Rep 7 25:Down 26:1 27:2",
+        "28:Last rep 29:Down 30:1 31:2",
         "32:Done",
     )
 
     private val incline3010x10 = spoken(
         "0:Down 1:1 2:2 3:Up",
-        "4:Down 4:Rep 2 6:2 7:Up",
-        "8:Down 8:Rep 3 10:2 11:Up",
-        "12:Down 12:Rep 4 14:2 15:Up",
-        "16:Down 16:Rep 5 18:2 19:Up",
-        "20:Down 20:Rep 6 22:2 23:Up",
-        "24:Down 24:Rep 7 26:2 27:Up",
-        "28:Down 28:Rep 8 30:2 31:Up",
-        "32:Down 32:Rep 9 34:2 35:Up",
-        "36:Down 36:Last rep 38:2 39:Up",
+        "4:Rep 2 5:2 6:3 7:Up",
+        "8:Rep 3 9:2 10:3 11:Up",
+        "12:Rep 4 13:2 14:3 15:Up",
+        "16:Rep 5 17:2 18:3 19:Up",
+        "20:Rep 6 21:2 22:3 23:Up",
+        "24:Rep 7 25:2 26:3 27:Up",
+        "28:Rep 8 29:2 30:3 31:Up",
+        "32:Rep 9 33:2 34:3 35:Up",
+        "36:Last rep 37:2 38:3 39:Up",
         "40:Done",
     )
 
     private val fly2011x12 = spoken(
         "0:Up 1:Hold 2:Down 3:1",
-        "4:Up 5:Hold 6:Down 6:Rep 2",
-        "8:Up 9:Hold 10:Down 10:Rep 3",
-        "12:Up 13:Hold 14:Down 14:Rep 4",
-        "16:Up 17:Hold 18:Down 18:Rep 5",
-        "20:Up 21:Hold 22:Down 22:Rep 6",
-        "24:Up 25:Hold 26:Down 26:Rep 7",
-        "28:Up 29:Hold 30:Down 30:Rep 8",
-        "32:Up 33:Hold 34:Down 34:Rep 9",
-        "36:Up 37:Hold 38:Down 38:Rep 10",
-        "40:Up 41:Hold 42:Down 42:Rep 11",
-        "44:Up 45:Hold 46:Down 46:Last rep",
+        "4:Rep 2 5:Hold 6:Down 7:1",
+        "8:Rep 3 9:Hold 10:Down 11:1",
+        "12:Rep 4 13:Hold 14:Down 15:1",
+        "16:Rep 5 17:Hold 18:Down 19:1",
+        "20:Rep 6 21:Hold 22:Down 23:1",
+        "24:Rep 7 25:Hold 26:Down 27:1",
+        "28:Rep 8 29:Hold 30:Down 31:1",
+        "32:Rep 9 33:Hold 34:Down 35:1",
+        "36:Rep 10 37:Hold 38:Down 39:1",
+        "40:Rep 11 41:Hold 42:Down 43:1",
+        "44:Last rep 45:Hold 46:Down 47:1",
         "48:Done",
     )
 
     private val curl2010x12 = spoken(
         "0:Up 1:Down 2:1",
-        "3:Up 4:Down 4:Rep 2",
-        "6:Up 7:Down 7:Rep 3",
-        "9:Up 10:Down 10:Rep 4",
-        "12:Up 13:Down 13:Rep 5",
-        "15:Up 16:Down 16:Rep 6",
-        "18:Up 19:Down 19:Rep 7",
-        "21:Up 22:Down 22:Rep 8",
-        "24:Up 25:Down 25:Rep 9",
-        "27:Up 28:Down 28:Rep 10",
-        "30:Up 31:Down 31:Rep 11",
-        "33:Up 34:Down 34:Last rep",
+        "3:Rep 2 4:Down 5:1",
+        "6:Rep 3 7:Down 8:1",
+        "9:Rep 4 10:Down 11:1",
+        "12:Rep 5 13:Down 14:1",
+        "15:Rep 6 16:Down 17:1",
+        "18:Rep 7 19:Down 20:1",
+        "21:Rep 8 22:Down 23:1",
+        "24:Rep 9 25:Down 26:1",
+        "27:Rep 10 28:Down 29:1",
+        "30:Rep 11 31:Down 32:1",
+        "33:Last rep 34:Down 35:1",
         "36:Done",
     )
 
     private val pushdown1120x12 = spoken(
         "0:Down 1:Hold 2:Up 3:1",
-        "4:Down 5:Hold 6:Up 6:Rep 2",
-        "8:Down 9:Hold 10:Up 10:Rep 3",
-        "12:Down 13:Hold 14:Up 14:Rep 4",
-        "16:Down 17:Hold 18:Up 18:Rep 5",
-        "20:Down 21:Hold 22:Up 22:Rep 6",
-        "24:Down 25:Hold 26:Up 26:Rep 7",
-        "28:Down 29:Hold 30:Up 30:Rep 8",
-        "32:Down 33:Hold 34:Up 34:Rep 9",
-        "36:Down 37:Hold 38:Up 38:Rep 10",
-        "40:Down 41:Hold 42:Up 42:Rep 11",
-        "44:Down 45:Hold 46:Up 46:Last rep",
+        "4:Rep 2 5:Hold 6:Up 7:1",
+        "8:Rep 3 9:Hold 10:Up 11:1",
+        "12:Rep 4 13:Hold 14:Up 15:1",
+        "16:Rep 5 17:Hold 18:Up 19:1",
+        "20:Rep 6 21:Hold 22:Up 23:1",
+        "24:Rep 7 25:Hold 26:Up 27:1",
+        "28:Rep 8 29:Hold 30:Up 31:1",
+        "32:Rep 9 33:Hold 34:Up 35:1",
+        "36:Rep 10 37:Hold 38:Up 39:1",
+        "40:Rep 11 41:Hold 42:Up 43:1",
+        "44:Last rep 45:Hold 46:Up 47:1",
         "48:Done",
     )
 
@@ -224,9 +249,9 @@ class RepCallScheduleTest {
     @Test
     fun `the numbered calls run to the rep before the last, with none left over`() {
         // The report's first fact, answered. On a set of twelve the last number
-        // is "Rep 11" and it is spoken during the eleventh rep, not after it.
-        // Rep 1 is silent: see the class KDoc for why it is not announced on
-        // any plan rather than on some.
+        // is "Rep 11" and it opens the eleventh rep, rather than arriving after
+        // it or partway through it. Rep 1 is silent: see the class KDoc for why
+        // it is not announced on any plan rather than on some.
         corpus.forEach { row ->
             assertEquals(
                 (2..row.reps - 1).map { "${CadencePlan.REP_CALL_PREFIX}$it" },
@@ -248,6 +273,34 @@ class RepCallScheduleTest {
                 calls(row).count { it == CadencePlan.LAST_REP },
                 "${row.capture}: the final rep is named once and only once",
             )
+        }
+    }
+
+    @Test
+    fun `every call of every one of these six plans opens the rep it names`() {
+        // #293 over the plans two sessions actually ran, as a rule rather than
+        // six strings: the nth call is the first row of the nth rep. Five of the
+        // six moved for it -- the incline press already opened its rep -- and
+        // the seconds the calls used to land on are in the strings above, which
+        // the previous commit pinned against the tracks themselves.
+        corpus.forEach { row ->
+            val p = plan(row)
+            val rows = CadenceVoice.script(p, row.reps)
+                .flatMap { call -> call.recorded.map { call.atSecond to it } }
+            val calls = rows.filter { it.second == CadencePlan.LAST_REP || it.second.startsWith("Rep ") }
+            assertEquals(row.reps - 1, calls.size, "${row.capture}: one call per rep after the first")
+            calls.forEachIndexed { index, (second, label) ->
+                assertEquals(
+                    (index + 1) * p.deliveredCycleS,
+                    second,
+                    "${row.capture}: $label opens the rep it names",
+                )
+                assertEquals(
+                    second to label,
+                    rows.first { it.first >= second },
+                    "${row.capture}: and is the first thing said in that rep",
+                )
+            }
         }
     }
 
