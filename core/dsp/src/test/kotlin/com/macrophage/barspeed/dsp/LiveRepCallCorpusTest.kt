@@ -72,9 +72,12 @@ import kotlin.test.assertEquals
  * file now owns. The export's `repsSource` reading key -- in
  * `docs/schemas/session-export.schema.json`, in its Kotlin twin
  * `SetExport.repsSource`, and in `PLAN_PROMPT`, the copy the coach receives --
- * quotes the corpus totals and the five seated-overhead-press rows so that a
- * coach reading `sensor` knows what the detector has and has not been scored
- * on. Moving a number in the table above means moving it in all three, and
+ * quotes the corpus totals and five of these rows so that a coach reading
+ * `sensor` knows what the detector has and has not been scored on, plus the
+ * sixth capture's one call, which is not a row here at all and is pinned by
+ * `the seated overhead press has no marks, so its calls are counted and not
+ * scored` below. Moving a number in the table above means moving it in all
+ * three, and
  * `SchemaRepsSourceContractTest > the reading key states what the live detector
  * has been scored on` fails if the two published copies stop agreeing with each
  * other. It cannot see this table: `:core:model` has no access to this corpus,

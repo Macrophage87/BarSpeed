@@ -1481,10 +1481,13 @@ data class SetExport(
      * of them computed by `LiveRepCallCorpusTest`: over the thirteen committed
      * captures that carry rep marks the live detector makes 35 calls against
      * 103 marks, 11 of them in the right window, and four of the thirteen say
-     * nothing at all. Per capture on the five seated overhead presses, calls
+     * nothing at all. Per capture on the six seated overhead presses, calls
      * against the lifter's own hand count: 0 calls for 6 hand reps on session
      * 37 set 2, 3 for 7 on set 3, 1 for 5 on set 4, 0 for 8 on session 38 set
-     * 4 and 2 for 8 on set 5. EVERY ONE OF THE THIRTEEN IS A TEMPO'D SET, so
+     * 4, 2 for 8 on set 5, and 2 hand reps on the seated-overhead-press 2-rep
+     * capture, where the live caller makes 1 call; that capture carries no
+     * rep-mark track, so its calls can be counted but not scored and it is not
+     * one of the thirteen. EVERY ONE OF THE THIRTEEN IS A TEMPO'D SET, so
      * those figures score the detector on paced work and not on the straight
      * reps this word is for; which way that moves on a faster set is UNTESTED
      * and this KDoc does not guess. The measured bottleneck is the velocity
