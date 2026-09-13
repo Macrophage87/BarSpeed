@@ -549,6 +549,29 @@ data class CadencePlan(
  * record says was played.
  */
 object GuidedCadence {
-    /** Strokes at least this long get counted out loud second by second. */
+    /**
+     * Strokes at least this long get counted out loud second by second.
+     *
+     * **At 2 this threshold decides nothing that the stroke's length does not
+     * already decide, and lowering it changes no plan in the corpus.**
+     * [CadenceVoice.countCall] refuses `second >= beat.seconds` first -- the
+     * last second of a stroke is the next beat's word -- so a one-second stroke
+     * has no interior second to count and is silent at a threshold of 1 exactly
+     * as it is at 2. Issue #248 offered *"lower COUNT_ALOUD_FROM_S"* as one of
+     * two candidate fixes for a two-second stroke going quiet; it is inert, and
+     * it is written down here because a reader who tried it would see nothing
+     * change and conclude the count is decided somewhere they had not looked.
+     *
+     * It is a live CEILING in the other direction. Raise it to 3 and the
+     * two-second stroke loses its only count, which is #248's symptom put back
+     * by hand. `TwoSecondStrokeCountTest` is the pin that reds for it, and the
+     * measured cost is one digit per rep on the accessory sessions the owner
+     * runs most weeks.
+     *
+     * What actually silenced the two-second stroke was
+     * `CadenceBeat.suppressFirstCount`, deleted with the merge at #293: a rep
+     * call takes its stroke's WORD now and the stroke counts on from the
+     * number, so nothing is given up to make room for a call.
+     */
     const val COUNT_ALOUD_FROM_S = 2
 }

@@ -50,12 +50,22 @@ import kotlin.test.assertTrue
  *
  * The same comment reads the silent second as the unrecorded call itself. The
  * track refutes that in its own rows: on set 13 rep ONE carries a `1` at the
- * second second of its `Up` stroke and no later rep does. Nothing suppresses
- * that count except an announcement riding the same stroke
- * (`CadenceVoice.countCall` drops a stroke's first count only when an
- * announcement is non-null), and rep 1 has none pending yet. So the silence is the
+ * second second of its `Up` stroke and no later rep does. In the build that
+ * recorded these tracks nothing suppressed that count except an announcement
+ * riding the same stroke, and rep 1 has none pending yet. So the silence is the
  * GIVEN-UP TEMPO COUNT, and the call rode the stroke word one second earlier --
  * `"Up, Last rep"` as a single utterance, recorded as a bare `Up`.
+ *
+ * That sentence used to name `CadenceVoice.countCall` in the PRESENT tense --
+ * *"drops a stroke's first count only when an announcement is non-null"* -- and
+ * the clause is deleted rather than reworded, because it stopped being true of
+ * this repository at #293. The mechanism it described was
+ * `CadenceBeat.suppressFirstCount`, and that flag no longer exists: a call
+ * replaces its stroke's word and the stroke is counted FROM the number, so no
+ * count is given up on any plan. What made the flag worth naming is that a
+ * two-second stroke has exactly one interior count for it to take, which is
+ * #248; `TwoSecondStrokeCountTest` measures that on the sessions it was
+ * reported from.
  *
  * That leaves the conclusion of the measurement standing and sharpens it: the
  * missing counts are the fingerprint of the merged calls, so this track dates
