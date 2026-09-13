@@ -82,20 +82,49 @@ object RepsSourcePolicy {
      * omission: it is the absence of a counter, and it is the ONLY thing null
      * means.
      *
-     * [hasTempo] separates the guide's count from the lifter's. It is read off
-     * the row's frozen `tempo` string, which is what the set was prescribed,
-     * rather than re-derived from a plan that can have been edited since.
+     * [guideCounted] separates the guide's count from the lifter's, and it is
+     * WHETHER A CADENCE RAN rather than whether a tempo was written down --
+     * [guideCounted] the function is what a caller holding a row derives it
+     * with.
      */
-    fun published(liveReps: Int?, repsManual: Boolean, timed: Boolean, hasTempo: Boolean): RepsSource? = when {
+    fun published(liveReps: Int?, repsManual: Boolean, timed: Boolean, guideCounted: Boolean): RepsSource? = when {
         timed -> null
         liveReps != null && repsManual -> RepsSource.CORRECTED
         liveReps != null -> RepsSource.SENSOR
         !repsManual -> RepsSource.ANALYSIS
-        hasTempo -> RepsSource.METRONOME
+        guideCounted -> RepsSource.METRONOME
         else -> RepsSource.MANUAL
     }
 
     /** The same answer as the published word, for a caller that wants the string. */
-    fun publishedWord(liveReps: Int?, repsManual: Boolean, timed: Boolean, hasTempo: Boolean): String? =
-        published(liveReps, repsManual, timed, hasTempo)?.wireName
+    fun publishedWord(liveReps: Int?, repsManual: Boolean, timed: Boolean, guideCounted: Boolean): String? =
+        published(liveReps, repsManual, timed, guideCounted)?.wireName
+
+    /**
+     * Whether the CADENCE GUIDE counted a set of this shape -- the input
+     * [published] needs, which a stored tempo string is not.
+     *
+     * A tempo on the row says what the set was PRESCRIBED, never that anything
+     * played it. An EXPLOSIVE lift carrying a tempo is given no cadence at all
+     * -- it is judged on peak velocity and is deliberately unpaced -- so its
+     * count is the lifter's own taps, and reading the tempo alone publishes
+     * `metronome` for a set no guide ever counted.
+     *
+     * ONE STATEMENT OF WHO THE GUIDE COUNTS, not a second copy of it:
+     * [CountingPolicy.counterFor] is asked, so the word the export publishes
+     * and the counter the set actually ran under cannot drift apart. The
+     * `imuConnected = false` argument is not a claim about the device -- the
+     * metronome branch is decided before the sensor is consulted, and a set the
+     * sensor counted is settled by its live count one branch earlier in
+     * [published].
+     *
+     * [kind] IS NULLABLE, and null falls back to the tempo. That is the one
+     * collapse left: a row carrying no stored geometry does not say what kind of
+     * exercise it was, so a tempo'd row from before that column reads as guided,
+     * which is what such a row almost always was.
+     */
+    fun guideCounted(hasTempo: Boolean, isTimed: Boolean, kind: ExerciseKind?): Boolean = when (kind) {
+        null -> hasTempo
+        else -> CountingPolicy.counterFor(hasTempo, isTimed, kind, imuConnected = false) == RepCounter.METRONOME
+    }
 }

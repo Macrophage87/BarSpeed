@@ -2,7 +2,12 @@ package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.RepAnalysis
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.GeometrySource
+import com.macrophage.barspeed.model.GeometrySources
+import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SessionExport
+import com.macrophage.barspeed.model.StartPhase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -37,13 +42,14 @@ import kotlin.test.assertTrue
  *
  * ## The derivation, exercised through the real exporter
  *
- * The word is not stored. Each row here varies only the three columns the
- * derivation reads -- `liveReps`, `repsManual` and the timed marker -- plus the
- * frozen `tempo`, and asserts the word that comes out of the real exporter
- * rather than out of `RepsSourcePolicy` directly. `RepsSourcePolicyTest` in
- * `:core:model` covers the rule over its whole table; what is checked here is
+ * The word is not stored. Each row here varies only what the derivation reads
+ * -- `liveReps`, `repsManual`, the timed marker, the frozen `tempo` and the
+ * frozen geometry's kind -- and asserts the word that comes out of the real
+ * exporter rather than out of `RepsSourcePolicy` directly. `RepsSourcePolicyTest`
+ * in `:core:model` covers the rule over its whole table; what is checked here is
  * the WIRING, including which column the exporter reads for "this set is
- * measured in seconds".
+ * measured in seconds" and where it reads the kind that says whether a cadence
+ * ran at all.
  *
  * Nothing here executes Room, SQLite or Android.
  */
@@ -134,12 +140,42 @@ class RepsSourcePublishedTest {
             verdicts = emptyList(),
         )
 
+    /**
+     * The frozen geometry of a set of this kind, as the row stores it.
+     *
+     * Only [ResolvedGeometry.kind] is read by anything this file asserts; the
+     * rest is a plausible barbell set so that the geometry block the exporter
+     * publishes beside the counter word is a real one.
+     */
+    private fun geometryJson(kind: ExerciseKind) = json.encodeToString(
+        ResolvedGeometry.serializer(),
+        ResolvedGeometry(
+            startsWith = StartPhase.ECCENTRIC,
+            concentricUp = true,
+            horizontal = false,
+            sensorOnStack = false,
+            sensorInverted = false,
+            travelRatio = 1.0,
+            kind = kind,
+            bodyweight = false,
+            sources =
+            GeometrySources(
+                startsWith = GeometrySource.SEEDED,
+                concentric = GeometrySource.SEEDED,
+                plane = GeometrySource.SEEDED,
+                kind = GeometrySource.SEEDED,
+                travelRatio = GeometrySource.SEEDED,
+            ),
+        ),
+    )
+
     private fun row(
         liveReps: Int? = null,
         repsManual: Boolean = false,
         tempo: String? = null,
         actualDurationS: Int? = null,
         actualReps: Int = 5,
+        geometryKind: ExerciseKind? = null,
     ) = SetRecordEntity(
         id = 8L,
         sessionId = 1L,
@@ -157,6 +193,7 @@ class RepsSourcePublishedTest {
         startedAtMs = 1_788_342_174_823L,
         endedAtMs = 1_788_342_220_675L,
         analysisJson = json.encodeToString(SetAnalysis.serializer(), oneRep),
+        geometryJson = geometryKind?.let(::geometryJson),
     )
 
     private fun repositoryFor(row: SetRecordEntity): SessionRepository {
@@ -237,7 +274,26 @@ class RepsSourcePublishedTest {
      */
     @Test
     fun `a guided set publishes the metronome as its counter`() = runTest {
+        val row = row(repsManual = true, tempo = "3010", geometryKind = ExerciseKind.DYNAMIC)
+        assertEquals("metronome", setObject(row).word())
+        assertEquals("metronome", manifestSet(row).word())
+    }
+
+    /**
+     * A row with NO stored geometry reads its tempo as the guide, which is the
+     * one collapse the derivation cannot avoid.
+     *
+     * Such a row does not say what kind of exercise it was, so the tempo is all
+     * there is to read -- and a tempo'd row almost always was guided. This is
+     * the fixture the pin above used until the geometry was added to it, and it
+     * is kept as its own case rather than folded back in: the two rows publish
+     * the same word for different reasons, and only one of them is a
+     * measurement.
+     */
+    @Test
+    fun `a tempo on a row with no stored geometry still publishes the metronome`() = runTest {
         val row = row(repsManual = true, tempo = "3010")
+        assertNull(row.geometryJson, "the fixture is not the no-geometry shape")
         assertEquals("metronome", setObject(row).word())
         assertEquals("metronome", manifestSet(row).word())
     }

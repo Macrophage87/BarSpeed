@@ -59,6 +59,19 @@ import kotlin.test.assertEquals
  * both 40-char SHAs and the command that measured them, in the body of the
  * commit that added the [Row.batchSpans] column.
  *
+ * THESE FIGURES ARE PUBLISHED, which is new and is a maintenance burden this
+ * file now owns. The export's `repsSource` reading key -- in
+ * `docs/schemas/session-export.schema.json`, in its Kotlin twin
+ * `SetExport.repsSource`, and in `PLAN_PROMPT`, the copy the coach receives --
+ * quotes the corpus totals and the five seated-overhead-press rows so that a
+ * coach reading `sensor` knows what the detector has and has not been scored
+ * on. Moving a number in the table above means moving it in all three, and
+ * `SchemaRepsSourceContractTest > the reading key states what the live detector
+ * has been scored on` fails if the two published copies stop agreeing with each
+ * other. It cannot see this table: `:core:model` has no access to this corpus,
+ * so the agreement between the table and the documents is checked by nobody and
+ * is a hand rule.
+ *
  * So this does NOT clear #145's bar, which its own comment states as zero
  * wrong numbers, and nothing in `:app` is un-gated on the strength of it. The
  * bottleneck is measured and it is not the pairing rule this branch unified:

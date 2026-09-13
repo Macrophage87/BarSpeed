@@ -645,7 +645,12 @@ private val SetRecordEntity.publishedRepsSource: String?
             liveReps = liveReps,
             repsManual = repsManual,
             timed = actualDurationS != null,
-            hasTempo = tempo != null,
+            // STILL THE RAW TEMPO AT THIS COMMIT, and that is the defect the
+            // next two commits measure and fix: a tempo string is not a cadence
+            // on an explosive lift, so this publishes `metronome` for a set the
+            // lifter tapped. `RepsSourcePolicy.guideCounted` is the input this
+            // argument wants and nothing passes it yet.
+            guideCounted = tempo != null,
         )
 
 /**
