@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.StartPhase
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -49,6 +50,14 @@ import kotlin.test.assertEquals
  * 37 -- and seven speak at least one wrong number. `what a lifter hears while
  * the detector undercounts a twelve-rep pulldown` and `the back squat names a
  * seventh rep on a six-rep set` write out what that sounds like.
+ *
+ * #286's gate comment asks for the live count over SIX captures, and the sixth
+ * is not one of these thirteen: `field-seated-ohp-2rep` has no rep-mark track
+ * committed beside it, so there is nothing here to score it against. `the
+ * seated overhead press has no marks, so its calls are counted and not scored`
+ * counts its calls without scoring them -- ONE call for the two presses the
+ * lifter performed -- which is the figure that comment asked for and the most
+ * that capture can give.
  *
  * Those are AFTER numbers, and the total hides what the change did. The
  * closed-run rule that produced them -- the commit `Speak only the reps whose
@@ -224,6 +233,40 @@ class LiveRepCallCorpusTest {
             ),
             rows(),
         )
+    }
+
+    /**
+     * The sixth capture #286's gate comment names, counted and not scored.
+     *
+     * That comment asks for the live count over the six committed
+     * concentric-first captures the batch detector over-counts. Five of them
+     * are rows of the table above. `field-seated-ohp-2rep` is the sixth, and
+     * it carries NO rep-mark track -- no `-reps.csv` is committed beside it --
+     * so [rightCount] has nothing to score against and it cannot join
+     * [LiveRepCallCorpus] without making every corpus total mean two different
+     * things. Its calls can still be COUNTED, which is the figure the comment
+     * asked for, and counting them is all this does.
+     *
+     * The absence of the track is ASSERTED rather than assumed. The day one is
+     * committed beside the capture, this reds and says the capture belongs in
+     * the corpus instead of here.
+     *
+     * `CONCENTRIC` is the phase this set's own plan declares, the same one
+     * `FieldDataRegressionTest`'s `slow-eccentric seated press counts on the
+     * drive alone` and `BlankAnalysisTest`'s `seated OHP as its plan declares
+     * it` hand the batch path over the same capture.
+     */
+    @Test
+    fun `the seated overhead press has no marks, so its calls are counted and not scored`() {
+        val fixture = "field-seated-ohp-2rep"
+        assertEquals(
+            null,
+            javaClass.getResourceAsStream("/$fixture-reps.csv"),
+            "a rep-mark track is committed now, so this capture belongs in LiveRepCallCorpus",
+        )
+        val scored = score(fixture, LiftDirection(startsWith = StartPhase.CONCENTRIC))
+        assertEquals(1, scored.calls.size, "calls the live caller makes; the lifter performed 2 presses")
+        assertEquals(0, scored.contradicted, "samples on which the detector held fewer reps than it had said")
     }
 
     /**
