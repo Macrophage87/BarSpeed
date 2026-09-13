@@ -2910,9 +2910,11 @@ data class RecordState(
             // this one decides which controls the lifter is offered while the
             // write decides whether the set is recorded as failed.
             currentIsTimed -> !TimedSetEndPolicy.fellShort(setElapsedS, currentTimedTargetS)
-            // The guide finishing IS the set being done. Its rep count lands one
-            // stroke early, before the closing cue is even spoken, and a guided
-            // set given no rep target never finishes on its own at all.
+            // The guide finishing IS the set being done. Its rep count lands
+            // before the closing cue is spoken -- one stroke early on a tempo
+            // whose rep ends on its second stroke, and a stroke plus the
+            // closing pause early on one that ends in a pause (#265) -- and a
+            // guided set given no rep target never finishes on its own at all.
             guidedSet -> guidedFinished || currentTargetReps == null
             manualSet -> currentTargetReps?.let { manualReps >= it } ?: true
             else -> true

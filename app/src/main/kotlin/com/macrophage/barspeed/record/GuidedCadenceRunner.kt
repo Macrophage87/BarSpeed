@@ -120,7 +120,7 @@ class GuidedCadenceRunner(
                         onRepCounted(rep)
                         // The last rep is COUNTED here and the cycle may not be
                         // over: a prescription ending in a pause has a beat
-                        // left, and it is the hold the lifter is training.
+                        // left, and it is the hold the prescription is training.
                         // Play it out and speak DONE after it, which is what
                         // CadenceVoice.script's KDoc states once for both
                         // loops (#265). Nothing is announced in it -- there is

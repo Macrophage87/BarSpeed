@@ -252,6 +252,10 @@ class ClosingPauseLastRepTest {
         val corpus = listOf(
             // case 1, a closing pause carries the call: the affected family.
             Triple("2011", benchPress, 5),
+            // case 1 at one rep: lastRep is set on the first pass, so the
+            // fall-through must carry the closing pause with no rep ever
+            // announced.
+            Triple("2011", benchPress, 1),
             Triple("1110", seatedOhp, 6),
             Triple("1120", latPulldown, 6),
             // case 2, merged into the NEXT rep's opening stroke.
@@ -267,10 +271,10 @@ class ClosingPauseLastRepTest {
             Triple("1110", benchPress, 2),
         )
         // The corpus cannot be weakened into one that would pass either way:
-        // three of its rows must have a beat after the one the rep completes
+        // four of its rows must have a beat after the one the rep completes
         // on, which is the only shape #265 fires on.
         assertEquals(
-            3,
+            4,
             corpus.count { (tempo, direction, _) ->
                 plan(tempo, direction).let { it.beats.lastIndex > it.repCompleteAfterBeat }
             },
