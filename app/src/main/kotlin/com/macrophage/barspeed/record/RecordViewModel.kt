@@ -3784,8 +3784,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * [cueText] is what goes on the record: the phase that was called. It is a
      * persisted format -- every cue-track fixture and parser matches these
      * strings exactly -- so it must not pick up whatever else the voice happens
-     * to say at the same moment. [utterance] is what is spoken, and may carry a
-     * rep announcement alongside the cue.
+     * to say at the same moment. [utterance] is what is spoken.
      */
     // An expression body for the reason toggleAudioCues above is one: detekt
     // counts this class's lines of code against a LargeClass default of 600,
@@ -3795,12 +3794,21 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Speak one utterance and log every word of it that belongs on the record.
      *
-     * One utterance, several rows: the guide merges a rep call into a stroke's
-     * own word -- "Down, Rep 3" -- because TTS speaks with QUEUE_FLUSH and a
-     * second utterance would cancel the first. Both words were said, at the
-     * same instant, so both are written at ONE timestamp read once. Reading the
-     * clock per row would let two words of a single utterance straddle a
-     * millisecond boundary and appear as two things the app said in sequence.
+     * One utterance, several rows: a caller may hand over several words said
+     * at one instant, which is why [cueTexts] is a list. The guide MERGED a
+     * rep call into a stroke's own word until #293 -- "Down, Rep 3" -- because
+     * TTS speaks with QUEUE_FLUSH and a second utterance would cancel the
+     * first; it REPLACES the word now, so a cadence call is one word and one
+     * row and no caller left in this file hands over two.
+     *
+     * The instant is still read ONCE, before the rows, and that is the rule
+     * rather than a leftover of the merge: reading the clock per row would let
+     * two words of a single utterance straddle a millisecond boundary and
+     * appear as two things the app said in sequence.
+     *
+     * Words the app speaks and deliberately does not record never reach here:
+     * the lead-in's countdown digits go to [speakOnly], which the cadence
+     * callback picks on an empty row list.
      */
     private fun speakCues(cueTexts: List<String>, utterance: String) {
         val at = System.currentTimeMillis()

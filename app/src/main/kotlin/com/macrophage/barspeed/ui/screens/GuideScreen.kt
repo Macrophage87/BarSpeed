@@ -144,9 +144,10 @@ private val SECTIONS =
             "Voice count is ON by default: the eccentric counted out loud, each rep called at " +
                 "lockout, 'last rep', 'done', and the rest countdown. 'Guided tempo' goes further: " +
                 "the app calls the whole cadence, counting only the seconds strictly inside each " +
-                "stroke — a 3-second stroke calls '1, 2', never its own length — and the rep " +
-                "number rides into the NEXT stroke's word rather than standing on its own: on a " +
-                "bench 3010 that's 'Down, 1, 2, Up… Down, Rep 2, 2, Up…', not 'Up… Rep one'. " +
+                "stroke, and the rep number is spoken at the START of the rep IN PLACE OF " +
+                "that rep's first stroke word, with that stroke's counts continuing from the " +
+                "number: on a bench 3010 that's 'Down, 1, 2, Up… Rep 2, 2, 3, Up…'. Rep 1 " +
+                "keeps its word, so the first thing you hear after 'Brace' is the stroke. " +
                 "There's a lead-in first so you can get set on the bar — 5 seconds unless the " +
                 "plan says otherwise or you change it on the rest screen — and the app counts " +
                 "the reps for you. " +
