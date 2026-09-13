@@ -15,7 +15,9 @@ import kotlin.test.assertTrue
  * [StartCuePolicy.firstMovementWord] and `StartCueVoiceContractTest` are split,
  * for the same reason.
  *
- * ## Mutation coverage, run at e7311b41f5e053edf17e2dac0e8ddcb25734a69e
+ * ## Mutation coverage, run at "Correct round-1 findings: rep 1's silence is
+ * not universal any more" (its own pre-rebase SHA, e7311b41, is not an
+ * ancestor of `origin/main` and is cited here by subject instead)
  *
  * `:core:model:test --tests RepCallNoteTest` is 2 tests total in every run
  * below.
@@ -32,7 +34,7 @@ import kotlin.test.assertTrue
  *    `-> MAX_INTENT`), reds nothing in THIS file -- 0/2, because this file
  *    holds no pin on `VelocityLossRegime` at all. It reds six tests in
  *    `VelocityLossRegimeTest` and `SchemaVelocityLossRegimeContractTest`
- *    instead, run at the same SHA with `:core:model:test --rerun-tasks`:
+ *    instead, run at the same commit with `:core:model:test --rerun-tasks`:
  *    `every tempo field-38 prescribed is controlled`, `a numbered concentric
  *    digit is controlled`, `an X concentric with no drive direction is
  *    undecidable rather than guessed`, `an X in digit 3 is the eccentric on a

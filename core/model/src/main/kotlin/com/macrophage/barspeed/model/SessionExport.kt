@@ -1193,7 +1193,7 @@ data class SessionExport(
          * already on disk gains the word or loses its figures.
          * `DATABASE_VERSION` does not move -- no column changes.
          *
-         * ALSO UNDER 1.20, a SECOND entry rather than a mint, because v0.1.52
+         * ALSO UNDER 1.20, a THIRD entry rather than a mint, because v0.1.52
          * ships 1.19 -- read by
          * `git show v0.1.52:core/model/.../SessionExport.kt` rather than
          * assumed -- and nothing has shipped 1.20 yet: a set carries
@@ -1240,7 +1240,7 @@ data class SessionExport(
          * every row already on disk publishes `manual`, `metronome`,
          * `analysis` or no word at all -- which is what those rows were.
          *
-         * ALSO UNDER 1.20, a THIRD entry rather than a mint, and on a reading
+         * ALSO UNDER 1.20, a FOURTH entry rather than a mint, and on a reading
          * taken this round rather than a relayed one: `git tag
          * --sort=-creatordate | head -1` is v0.1.52 and `git show
          * v0.1.52:core/model/.../SessionExport.kt` reads
@@ -1287,7 +1287,7 @@ data class SessionExport(
          * geometry publishes neither the direction nor its source, as it
          * always has. `DATABASE_VERSION` does not move; no column changes.
          *
-         * ALSO UNDER 1.20, a FOURTH entry rather than a mint, for the reason
+         * ALSO UNDER 1.20, a FIFTH entry rather than a mint, for the reason
          * the entry above states -- `git show
          * v0.1.52:core/model/.../SessionExport.kt` declares `"1.19"`, read at
          * the tag this round, and nothing has shipped 1.20: a set's figures
@@ -1343,7 +1343,7 @@ data class SessionExport(
          * becomes `fromWorkStart` -- so the change is readable rather than
          * silent. `DATABASE_VERSION` does not move: no column changes.
          *
-         * 1.20 carries a THIRD change, filed under the same number because
+         * 1.20 carries a SIXTH change, filed under the same number because
          * 1.20 is unreleased: `git tag --sort=-creatordate | head -1` is
          * v0.1.52 and `git show
          * v0.1.52:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
@@ -1368,7 +1368,7 @@ data class SessionExport(
          * those versions and is kept as theirs, on the precedent the 1.13
          * entries set.
          *
-         * THIS ENTRY SAID THE 1.20 PLACEMENT WAS UNIFORM. The FOURTH entry below
+         * THIS ENTRY SAID THE 1.20 PLACEMENT WAS UNIFORM. The SEVENTH entry below
          * gives 1.20 a second placement, so that sentence is DELETED rather than
          * scoped: it was written under 1.20 about 1.20, and a claim about the
          * version being described cannot be filed as history of a shipped one the
@@ -1428,7 +1428,7 @@ data class SessionExport(
          * 1, 5 and 13 (0.1.43). No beat moves on any of them, and no set
          * changes length.
          *
-         * 1.20 carries a FOURTH change, filed under the same number because
+         * 1.20 carries a SEVENTH change, filed under the same number because
          * 1.20 is unreleased: `git tag --sort=-creatordate | head -1` is
          * v0.1.52 and `git show
          * v0.1.52:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
@@ -1462,7 +1462,7 @@ data class SessionExport(
          * the rep in hand is the planned last from its first rep.
          *
          * THE REPLACED WORD IS PUBLISHED NOWHERE IN SUCH A SET, and this is the
-         * half a reader must act on. The THIRD entry's rule -- the first stroke's
+         * half a reader must act on. The SIXTH entry's rule -- the first stroke's
          * word once per set -- had rep 1 keeping it; here there is no rep that
          * keeps it, so a `1010` concentric-first set of six publishes six `Up`
          * rows and NO `Down` row, where an archive before 1.20 publishes six of
@@ -1471,18 +1471,18 @@ data class SessionExport(
          * still published on every rep, so a guided track still carries a stroke
          * word in every rep -- which is what the discriminator between this
          * counter and the unguided one rests on, since the unguided one publishes
-         * none. "Both words in rep 1", which the THIRD entry offered, does not
+         * none. "Both words in rep 1", which the SIXTH entry offered, does not
          * hold on these sets.
          *
          * NO TEMPO COUNT MOVES. These prescriptions are two one-second strokes,
          * and a one-second stroke has no interior second to count; a mid-rep
          * `Hold` is not a stroke and is not counted either. So the renumbering
-         * the THIRD entry describes cannot arise here, and a bare digit still
+         * the SIXTH entry describes cannot arise here, and a bare digit still
          * means a tempo count.
          *
          * NOT ADDITIVE, and not retroactive. No key is added, removed or
          * retyped; the CONTENTS of an existing array change, which is the shape
-         * the THIRD entry carries too. Cue rows are stored as they are spoken, so
+         * the SIXTH entry carries too. Cue rows are stored as they are spoken, so
          * no archive already on disk moves -- field-39's own two tracks are
          * committed as fixtures and are the before side of this entry.
          * `DATABASE_VERSION` does not move and the plan schema is untouched:

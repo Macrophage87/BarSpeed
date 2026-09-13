@@ -248,7 +248,7 @@ class SchemaCueTrackContractTest {
         val voiceCues = schema["\$defs"]!!.jsonObject["set"]!!
             .jsonObject["properties"]!!.jsonObject["voiceCues"]!!.jsonObject["description"]!!
             .jsonPrimitive.content
-        assertTrue("1.20 carries a THIRD change" in versionLog, "the version log does not file the placement change")
+        assertTrue("1.20 carries a SIXTH change" in versionLog, "the version log does not file the placement change")
         assertTrue(
             "opens the rep it names" in voiceCues,
             "voiceCues does not say where a call lands from 1.20",
@@ -317,7 +317,7 @@ class SchemaCueTrackContractTest {
         val voiceCues = schema["\$defs"]!!.jsonObject["set"]!!
             .jsonObject["properties"]!!.jsonObject["voiceCues"]!!.jsonObject["description"]!!
             .jsonPrimitive.content
-        assertTrue("1.20 carries a FOURTH change" in versionLog, "the version log does not file the #266 placement")
+        assertTrue("1.20 carries a SEVENTH change" in versionLog, "the version log does not file the #266 placement")
         assertTrue(
             "at the end of the drive" in versionLog,
             "the version log does not say where the number lands on a schedule with no free opening second",

@@ -46,7 +46,7 @@ import kotlin.test.assertTrue
 class SchemaManualSetEndContractTest {
     private companion object {
         /** The opening words of this entry, and the anchor every pin below is scoped by. */
-        const val MARKER = "ALSO UNDER 1.20, a FOURTH entry"
+        const val MARKER = "ALSO UNDER 1.20, a FIFTH entry"
     }
 
     private val versionLog: String
