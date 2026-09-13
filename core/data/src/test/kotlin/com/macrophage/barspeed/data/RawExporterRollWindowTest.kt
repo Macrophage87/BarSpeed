@@ -127,6 +127,13 @@ class RawExporterRollWindowTest {
         actualReps = 5,
         startedAtMs = 1_000L,
         endedAtMs = 61_000L,
+        // A metronome-guided set, declared because the boundary depends on it:
+        // `Done` bounds a set a CADENCE ran on and is the rep-count milestone
+        // on a set the lifter counted by tapping, and `RepsSourcePolicy`
+        // derives which from this frozen tempo and the row's geometry (#285).
+        // `Set ended` bounds either way, which is why the early-stop case
+        // below needs no tempo to hold.
+        tempo = "3010",
         analysisJson =
         json.encodeToString(SetAnalysis.serializer(), SetAnalysis(emptyList(), 0.0, null, null, emptyList())),
     )

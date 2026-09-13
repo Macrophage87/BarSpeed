@@ -5,6 +5,7 @@ import com.macrophage.barspeed.dsp.LiftDirection
 import com.macrophage.barspeed.dsp.MovementPlane
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
+import com.macrophage.barspeed.dsp.SetTargets
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.SecondaryCapture
@@ -90,6 +91,15 @@ import kotlin.test.assertTrue
  * exporter's own mapping and nothing about what the database did with it.
  */
 class AnalysedRoleFallbackTest {
+    /**
+     * This capture is a metronome-guided set -- the row it is published from
+     * carries `tempo` "4011" and its cue track counts a cadence -- so the
+     * prescription it is analysed under declares that a cadence RAN.
+     * `SetEnd.of` reads it, because `Done` on a set with no cadence is the
+     * rep-count milestone a lifter's own tap spoke (#285).
+     */
+    private val guidedPrescription = SetTargets(cadenceGuided = true)
+
     /**
      * A DAO that hands back what was written to it, so one test can drive
      * `recordSet` and then export the row it produced.
@@ -212,7 +222,7 @@ class AnalysedRoleFallbackTest {
      * stored is the manual one.
      */
     private fun analysisOf(samples: List<ImuSample>): SetAnalysis = if (samples.size >= 8) {
-        SetAnalyzer.analyze(samples, squat, loadKg = loadKg, cues = cues())
+        SetAnalyzer.analyze(samples, squat, loadKg = loadKg, targets = guidedPrescription, cues = cues())
     } else {
         SetAnalysis(emptyList(), 0.0, null, null, listOf("Reps counted manually — no bar sensor."))
     }
@@ -267,7 +277,8 @@ class AnalysedRoleFallbackTest {
         assertEquals(5188, samples.size, "rows, against this set's own meta.json sensors[0].samples")
         assertEquals(
             99.36781609195401,
-            SetAnalyzer.analyze(samples, squat, loadKg = loadKg, cues = cues()).sampleRateHz,
+            SetAnalyzer.analyze(samples, squat, loadKg = loadKg, targets = guidedPrescription, cues = cues())
+                .sampleRateHz,
             "measured rate, against this set's own meta.json sensors[0].sampleRate_hz",
         )
         assertEquals(6, cues().count { it.cue == "Down" }, "metronome Down-cues, corroborating meta.json's reps 6")
@@ -275,7 +286,8 @@ class AnalysedRoleFallbackTest {
 
     @Test
     fun `the stream the app discarded resolves the summary the app published as empty`() {
-        val analysis = SetAnalyzer.analyze(roleA(), squat, loadKg = loadKg, cues = cues())
+        val analysis =
+            SetAnalyzer.analyze(roleA(), squat, loadKg = loadKg, targets = guidedPrescription, cues = cues())
         // Every figure in the published `summary` object is an average or an
         // extremum over this rep list, so an empty list is exactly what an
         // empty object is.
@@ -298,7 +310,7 @@ class AnalysedRoleFallbackTest {
         // stores a placeholder instead. So the summary this set published as
         // {} was never computed from any stream at all.
         val thrown = assertFailsWith<IllegalArgumentException> {
-            SetAnalyzer.analyze(emptyList(), squat, loadKg = loadKg, cues = cues())
+            SetAnalyzer.analyze(emptyList(), squat, loadKg = loadKg, targets = guidedPrescription, cues = cues())
         }
         assertEquals("Not enough samples (0)", thrown.message, "what the analyzer says about an absent stream")
     }
