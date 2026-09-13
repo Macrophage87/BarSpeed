@@ -10,10 +10,10 @@ import java.time.format.DateTimeFormatter
  * Issue #272. The owner is the only tester, and until this exists the only
  * route from "it crashed" to a stack trace is a cable and `adb`: #271 was
  * diagnosed from Android's own dropbox over wireless adb, which took a
- * pairing and eight dropbox records, and the one app frame in them was
- * obfuscated (`com.macrophage.barspeed.data.a.a`) and had to be inferred
- * rather than read. A file the app writes itself is shareable from the
- * phone with no cable at all.
+ * pairing and eight dropbox records, and the app frames in them were
+ * obfuscated (`com.macrophage.barspeed.data.a.a` and its caller `N1.n0.q`)
+ * and had to be inferred rather than read. A file the app writes itself is
+ * shareable from the phone with no cable at all.
  *
  * A data class plus a pure renderer, in :core:model, so the LAYOUT is pinned
  * by a test that runs on every push. The handler in :app that fills this in
