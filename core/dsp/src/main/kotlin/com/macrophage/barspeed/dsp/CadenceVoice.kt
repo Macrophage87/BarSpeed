@@ -115,11 +115,15 @@ object CadenceVoice {
      * ## [DONE] follows the whole of the last rep, closing pause included
      *
      * A rep is complete after [CadencePlan.repCompleteAfterBeat], and on the
-     * tempo families whose prescription ends in a pause that is not the last
-     * beat of the cycle. The set therefore runs to `plannedReps` x
-     * [CadencePlan.deliveredCycleS] on every plan: the beats after the
-     * completion beat are played on the last rep exactly as they are on reps 1
-     * to N-1, and `Done` comes after them.
+     * tempo families whose prescription ends in a pause that beat is not the
+     * last beat of the cycle: [CadencePlan.of] appends the closing pause AFTER
+     * the second stroke, so `repCompleteAfterBeat` is one short of
+     * `beats.lastIndex` there and exactly one beat is left.
+     *
+     * The set therefore runs to `plannedReps` x [CadencePlan.deliveredCycleS]
+     * on every plan: the beats after the completion beat are played on the
+     * last rep exactly as they are on reps 1 to N-1, and `Done` comes after
+     * them.
      *
      * Until #265 this returned at the completion beat, so the last rep of a
      * closing-pause tempo lost its pause -- the hold the prescription is
