@@ -82,7 +82,7 @@ import kotlin.test.assertEquals
  * renumbered so the count continues from the number: the owner's own example is
  * "a 3010 press goes Rep 3, 2, 3, Up instead of Down, rep three, 2, Up".
  *
- * ## Rep 1 is announced on no plan, and #293 does not change that
+ * ## Rep 1 is announced on none of the six plans below, and #293 does not change that
  *
  * The reason did change, and the old one is deleted rather than kept beside the
  * new one. It used to be that a call rode either the previous rep's closing
@@ -102,6 +102,12 @@ import kotlin.test.assertEquals
  *    counter's (`CueTrackOriginTest`), and a `Rep 1` row would additionally
  *    collide with the pre-1.19 archives, where `Rep 1` is what the guide said as
  *    rep 1 FINISHED.
+ *
+ * #266 DOES name rep 1, on one family, and none of the three reasons reaches it: a
+ * dense prescription whose drive OPENS the rep spends a LATER beat's word, not
+ * beat 0's. No plan below is one of them -- the six are 3010, 2011, 2010 and 1120,
+ * each with a free second at the start of the rep -- so what this file pins is
+ * unchanged.
  */
 class RepCallScheduleTest {
     /** field-38 set 1: dumbbell_incline_press, ecc-first, drive up, vertical. */

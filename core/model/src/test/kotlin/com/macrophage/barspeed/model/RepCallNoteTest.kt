@@ -14,6 +14,33 @@ import kotlin.test.assertTrue
  * `:core:model` cannot see a cadence plan. Split the way
  * [StartCuePolicy.firstMovementWord] and `StartCueVoiceContractTest` are split,
  * for the same reason.
+ *
+ * ## Mutation coverage, run at e7311b41f5e053edf17e2dac0e8ddcb25734a69e
+ *
+ * `:core:model:test --tests RepCallNoteTest` is 2 tests total in every run
+ * below.
+ *
+ * 1. Inverting `noteFor`'s condition (`if (repNumberAtDriveEnd)` to
+ *    `if (!repNumberAtDriveEnd)`) reds `the note is drawn only on a set whose
+ *    rep number lands at the end of the drive` -- 1/2.
+ * 2. Rewording [RepCallNotePolicy.AT_DRIVE_END] to drop "drive" (to "Rep
+ *    numbers mark the end of each working stroke") reds `the note is one
+ *    short line in the lifter's own words` -- 1/2.
+ * 3. Forcing `VelocityLossRegime.of` off [VelocityLossRegime.CONTROLLED] for
+ *    every numbered tempo, 1010 included (`ofTempo`'s
+ *    `!tempo.isExplosiveUpStroke -> CONTROLLED` branch changed to
+ *    `-> MAX_INTENT`), reds nothing in THIS file -- 0/2, because this file
+ *    holds no pin on `VelocityLossRegime` at all. It reds six tests in
+ *    `VelocityLossRegimeTest` and `SchemaVelocityLossRegimeContractTest`
+ *    instead, run at the same SHA with `:core:model:test --rerun-tasks`:
+ *    `every tempo field-38 prescribed is controlled`, `a numbered concentric
+ *    digit is controlled`, `an X concentric with no drive direction is
+ *    undecidable rather than guessed`, `an X in digit 3 is the eccentric on a
+ *    drive that moves down, so the set is controlled`, `a horizontal set with
+ *    a numbered digit 3 is controlled`, and `every regime word in the example
+ *    is the one the decision derives for that set` -- 6/1579. The claim that
+ *    1010 stays a tempo session under the controlled regime is pinned there,
+ *    not here, and no pin needed deleting.
  */
 class RepCallNoteTest {
     @Test

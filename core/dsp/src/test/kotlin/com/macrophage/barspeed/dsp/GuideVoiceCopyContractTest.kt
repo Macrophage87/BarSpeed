@@ -237,4 +237,17 @@ class GuideVoiceCopyContractTest {
                 "\", the note RepCallNotePolicy draws on a set that counts at the drive's end",
         )
     }
+
+    /**
+     * The eccentric-first half of the same dense-cadence family is deliberately
+     * NOT re-pinned here. `plan("1010", benchPress)` -- field-42 set 5's
+     * geometry, drive down -- has no beat for a call at all, so
+     * `spokenByRep(plan("1010", benchPress), 3)` produces stroke words only and
+     * no `Rep` string appears in any of them; a guide quote comparing that
+     * silence against itself would assert nothing the eccentric-first pin above
+     * does not already cover from the other side. What pins the silence itself
+     * -- that this geometry still says nothing, and the reason it does not -- is
+     * `LockoutRepCallTest`'s `the geometry whose drive ends the rep still says
+     * nothing, and why`.
+     */
 }
