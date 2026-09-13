@@ -1247,9 +1247,14 @@ data class SessionExport(
          * number still takes further entries. IT ADDS NO KEY TO THIS DOCUMENT
          * (#263): what the RAW ARCHIVE's `meta.json` publishes gains
          * `concentricSource` beside the `concentric` it already carried,
-         * naming which of `declared`, `seeded`, `inferred` or `default`
-         * supplied that direction -- the same word this document has published
-         * at `geometry.source.concentric` since the geometry block landed.
+         * naming which of `declared`, `seeded` or `default` supplied that
+         * direction -- never `inferred`, because guessing the drive from an
+         * id is deliberately refused. `SetGeometryPolicy.describe` resolves
+         * this one value with `inferable = false`, so the fourth word cannot
+         * be produced for it, and [GeometrySource.DEFAULT]'s own KDoc gives
+         * the reason. It is otherwise the same word this document has
+         * published at `geometry.source.concentric` since the geometry block
+         * landed.
          *
          * The manifest is the only file a reader who opens the archive's CSVs
          * has, and those samples are device-frame and carry no phase labels,

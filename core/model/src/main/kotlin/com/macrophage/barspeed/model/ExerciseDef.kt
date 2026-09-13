@@ -289,14 +289,16 @@ data class ExerciseDef(
          * in [STACK_MOUNTED_IDS], so this table mints no id of its own, and
          * `DriveDownFamilyTest` pins it as a subset of that one.
          *
-         * Four of [STACK_MOUNTED_IDS]' twelve are deliberately ABSENT, and
-         * they are why this is a second table rather than a reading of the
-         * first. `seated_row`, `seated_cable_row` and `cable_row` are
-         * horizontal pulls, with no up or down for a drive direction to be
-         * wrong about; `leg_extension` drives UP, so the default is right for
-         * it. The three assist-machine ids are absent for the same reason --
-         * an assisted pull-up drives up, and the counterweight travelling the
-         * other way is what `sensorInverted` describes, not this.
+         * Five of [STACK_MOUNTED_IDS]' twelve are here; the other SEVEN are
+         * deliberately ABSENT, and they are why this is a second table rather
+         * than a reading of the first. `seated_row`, `seated_cable_row` and
+         * `cable_row` are horizontal pulls, with no up or down for a drive
+         * direction to be wrong about; `leg_extension` drives UP, so the
+         * default is right for it. The three assist-machine ids are absent
+         * for the same reason as the leg extension -- an assisted pull-up
+         * drives up, and the counterweight travelling the other way is what
+         * `sensorInverted` describes, not this. `DriveDownFamilyTest` pins
+         * all seven by name.
          *
          * NOT [SEED] entries, for [STACK_MOUNTED_IDS]' reason, and that
          * premise is pinned rather than defended in code: no id here has a

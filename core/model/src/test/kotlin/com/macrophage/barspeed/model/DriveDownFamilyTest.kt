@@ -13,10 +13,11 @@ import kotlin.test.assertTrue
  * It mints no id of its own: every entry is an [ExerciseDef.STACK_MOUNTED_IDS]
  * entry, and which of those twelve belong is decided by the three families
  * [ExerciseDef.concentricUp]'s KDoc and the published plan schema both name --
- * leg curls, lat pulldowns, pushdowns. The four stack ids that are NOT here
- * are pinned by name, because the interesting failure is a widening rather
- * than a narrowing: `leg_extension` rides the same stack and drives UP, and a
- * table that swept in every id it could reach would warn on it.
+ * leg curls, lat pulldowns, pushdowns. Five of the twelve qualify; the SEVEN
+ * that are NOT here are pinned by name, because the interesting failure is a
+ * widening rather than a narrowing: `leg_extension` rides the same stack and
+ * drives UP, and a table that swept in every id it could reach would warn on
+ * it.
  *
  * Nothing here reads a plan. This table feeds a WARNING; the resolved
  * geometry is `DriveDownSeedBaselineTest`'s subject and does not move.
@@ -32,10 +33,12 @@ class DriveDownFamilyTest {
     }
 
     /**
-     * The exclusions, by name. A horizontal pull has no up or down for a drive
-     * direction to be wrong about, and a leg extension's drive really does go
-     * up -- so on all four the omitted key's default is correct and a warning
-     * would be noise.
+     * The exclusions, by name -- all SEVEN of them. A horizontal pull has no
+     * up or down for a drive direction to be wrong about; a leg extension's
+     * drive really does go up; and an assisted pull-up drives up too, its
+     * counterweight travelling the other way being what `sensorInverted`
+     * describes. So on all seven the omitted key's default is correct and a
+     * warning would be noise.
      */
     @Test
     fun `the stack ids that drive up or sideways are excluded, by name`() {
