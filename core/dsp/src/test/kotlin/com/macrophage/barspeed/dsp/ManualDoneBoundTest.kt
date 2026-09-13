@@ -1,7 +1,6 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.StartPhase
-import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.VoiceCue
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -81,14 +80,91 @@ class ManualDoneBoundTest {
     /** The instant the synthetic milestone lands, which is rep 8's drive end. */
     private val milestoneAtMs = 1_788_516_193_564L
 
-    /** A manual set is one with no tempo: nothing paced it and nobody but the lifter counted. */
-    private fun manualTargets() = SetTargets(plannedReps = 8)
+    /** A manual set: no cadence ran, so nobody but the lifter counted it. */
+    private fun manualTargets() = SetTargets(plannedReps = 8, cadenceGuided = false)
 
-    /** A guided set is one with a tempo: the cadence counted it and spoke its own `Done`. */
-    private fun guidedTargets() = SetTargets(plannedReps = 8, tempo = Tempo.parse("3010"))
+    /** A guided set: a cadence ran, counted the set and spoke its own `Done`. */
+    private fun guidedTargets() = SetTargets(plannedReps = 8, cadenceGuided = true)
 
     private fun analyse(cues: List<VoiceCue>, targets: SetTargets) =
         SetAnalyzer.analyze(samples, press, targets = targets, cues = cues)
+
+    // ------------------------------------------------------------------
+    // The two questions, separated. See SetEnd for why they are two.
+    // ------------------------------------------------------------------
+
+    /**
+     * `calledOver` answers the RECORD's question and is unchanged by any of
+     * this: a terminal word was spoken on this set and here is when.
+     *
+     * `RestClockPolicy`'s seed instant is this question, which is why it is
+     * still the milestone's own instant on a manual set. The rest after a set
+     * begins when the lifter stopped lifting, whoever said so.
+     */
+    @Test
+    fun `the record's answer is any terminal word, whoever spoke it`() {
+        assertEquals(
+            SetEnd.Cued(milestoneAtMs),
+            SetEnd.calledOver(manualTrack),
+            "the milestone is on the record and the record says so",
+        )
+        assertEquals(
+            SetEnd.Cued(milestoneAtMs),
+            SetEnd.calledOver(manualTrack.dropLast(1) + VoiceCue(milestoneAtMs, SetEnd.STOPPED)),
+            "and so is the app's own set-end call",
+        )
+        assertEquals(
+            SetEnd.NotCued,
+            SetEnd.calledOver(manualTrack.dropLast(1)),
+            "a track carrying no terminal word at all says nothing",
+        )
+    }
+
+    /**
+     * `of` answers what may BOUND THE REP LIST, and takes whether a cadence ran.
+     *
+     * Both branches over both words, because the rule is a two-by-two and only
+     * one of its four cells changes.
+     */
+    @Test
+    fun `the bound takes whether a cadence ran, and only Done depends on it`() {
+        val stopped = manualTrack.dropLast(1) + VoiceCue(milestoneAtMs, SetEnd.STOPPED)
+        assertEquals(
+            SetEnd.Cued(milestoneAtMs),
+            SetEnd.of(manualTrack, cadenceGuided = true),
+            "a cadence's Done bounds",
+        )
+        assertEquals(
+            SetEnd.NotCued,
+            SetEnd.of(manualTrack, cadenceGuided = false),
+            "a milestone's Done does not",
+        )
+        assertEquals(
+            SetEnd.Cued(milestoneAtMs),
+            SetEnd.of(stopped, cadenceGuided = true),
+            "Set ended bounds a guided set",
+        )
+        assertEquals(
+            SetEnd.Cued(milestoneAtMs),
+            SetEnd.of(stopped, cadenceGuided = false),
+            "and bounds a set no cadence ran on, because only the app's own set end writes it",
+        )
+    }
+
+    /**
+     * The default keeps every detection, which is the direction that loses no
+     * figure. A caller that says nothing gets no boundary rather than a
+     * boundary it did not ask for.
+     */
+    @Test
+    fun `a prescription that says nothing declares no cadence`() {
+        assertEquals(false, SetTargets().cadenceGuided, "the default")
+        assertEquals(
+            SetEnd.NotCued,
+            SetEnd.of(manualTrack, SetTargets().cadenceGuided),
+            "so nothing is bounded by default",
+        )
+    }
 
     // ------------------------------------------------------------------
     // Today's behaviour, pinned before it is changed.
@@ -105,7 +181,7 @@ class ManualDoneBoundTest {
     fun `today a manual set's rep-count milestone is read as the set being called over`() {
         assertEquals(
             SetEnd.Cued(milestoneAtMs),
-            SetEnd.of(manualTrack),
+            SetEnd.calledOver(manualTrack),
             "the milestone at the planned count reads as a terminal cue",
         )
         assertEquals(

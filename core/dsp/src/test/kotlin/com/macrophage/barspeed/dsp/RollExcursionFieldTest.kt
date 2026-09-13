@@ -66,7 +66,12 @@ class RollExcursionFieldTest {
             )
         val cues =
             CueTrack.read(fixture).map { VoiceCue(it.timestampMs, it.label) }
-        return Capture(fixture, samples, if (hasPrep) workStartedAtMs(fixture) else null, SetEnd.of(cues))
+        return Capture(
+            fixture,
+            samples,
+            if (hasPrep) workStartedAtMs(fixture) else null,
+            SetEnd.of(cues, cadenceGuided = true),
+        )
     }
 
     /**

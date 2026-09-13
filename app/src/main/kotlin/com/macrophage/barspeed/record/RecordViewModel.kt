@@ -4255,7 +4255,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // fallback for a set nothing called over are RestClockPolicy's.
         val restStartedAtMs =
             RestClockPolicy.startedAtMs(
-                setOverCueAtMs = (SetEnd.of(cueBuffer.toList()) as? SetEnd.Cued)?.atMs,
+                setOverCueAtMs = (SetEnd.calledOver(cueBuffer.toList()) as? SetEnd.Cued)?.atMs,
                 endedAtMs = endedAtMs,
             )
         pendingWrite =
@@ -4336,6 +4336,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                     // first deadlift session is read for.
                     countedReps = recordedReps.stated ?: recordedReps.live,
                     tempo = tempoText?.let { Tempo.parseOrNull(it) },
+                    // Whether a CADENCE RAN, which is not the same question as
+                    // whether a tempo was written down -- an explosive lift
+                    // carrying one is paced by nothing. Frozen from the set's
+                    // own prep case, the same value `guidedSet` is, so the
+                    // analyzer's set-end boundary and the runner that spoke
+                    // the terminal word cannot disagree about whether one ran
+                    // (#285).
+                    cadenceGuided = s.guidedSet,
                     targetMeanConcentricVelocityMps = slot?.targetMeanConVelMps,
                     velocityLossStopPct = slot?.velocityLossStopPct,
                 ),

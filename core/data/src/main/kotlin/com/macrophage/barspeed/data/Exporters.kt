@@ -845,7 +845,7 @@ class RawExporter(
                         RawStreamEntity.KIND_HRM -> minBpmBySet[record.id] = minBpmFrom(text)
                         RawStreamEntity.KIND_PREP -> prepWindow = PrepWindowCsv.decode(text)
                         RawStreamEntity.KIND_CUES ->
-                            setEnd = runCatching { SetEnd.of(CueCsv.decode(text)) }.getOrDefault(SetEnd.NotCued)
+                            setEnd = runCatching { SetEnd.calledOver(CueCsv.decode(text)) }.getOrDefault(SetEnd.NotCued)
                     }
                 }
                 if (record.id !in minBpmBySet) minBpmBySet[record.id] = null

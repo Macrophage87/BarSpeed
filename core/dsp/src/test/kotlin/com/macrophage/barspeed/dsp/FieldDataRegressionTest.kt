@@ -72,6 +72,18 @@ import kotlin.test.assertTrue
  * a fix is expected to red it, and to replace it with its inversion.
  */
 class FieldDataRegressionTest {
+    /**
+     * Every capture analysed here is a metronome-guided set -- all 34 cue
+     * tracks committed to this corpus carry cadence stroke words or a hold's
+     * clock -- so the prescription they are analysed under declares that a
+     * cadence RAN. `SetEnd.of` reads it, because `Done` on a set with no
+     * cadence is the rep-count milestone a lifter's own tap spoke (#285).
+     *
+     * The tempo DIGITS are deliberately not declared: the rule reads whether a
+     * cadence ran and never what it prescribed, and this repository does not
+     * record a prescribed tempo string for every capture in this corpus.
+     */
+    private val guidedPrescription = SetTargets(cadenceGuided = true)
     private fun load(name: String) =
         ImuCsv.decode(javaClass.getResourceAsStream("/$name")!!.readBytes().decodeToString())
 
@@ -1059,6 +1071,7 @@ class FieldDataRegressionTest {
             samples,
             direction,
             loadKg = 43.091275150953365,
+            targets = guidedPrescription,
             cues = track("field-backsquat-99hz-6rep"),
         )
         assertEquals(
@@ -1121,6 +1134,7 @@ class FieldDataRegressionTest {
             samples,
             direction,
             loadKg = 24.94758035055195,
+            targets = guidedPrescription,
             cues = track("field-legpress-2010-8rep"),
         )
         assertEquals(
@@ -1171,6 +1185,7 @@ class FieldDataRegressionTest {
             samples,
             direction,
             loadKg = 52.163122551154075,
+            targets = guidedPrescription,
             cues = track("field-legpress-single-2010-8rep"),
         )
         assertEquals(
@@ -1212,6 +1227,7 @@ class FieldDataRegressionTest {
             samples,
             direction,
             loadKg = 43.091275150953365,
+            targets = guidedPrescription,
             cues = track("field-rdl-3010-10rep"),
         )
         assertEquals(

@@ -21,7 +21,7 @@ class RollExcursionTest {
     private fun samples(vararg rollAtMs: Pair<Long, Double>): List<ImuSample> =
         rollAtMs.map { (t, roll) -> ImuSample(t, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, roll, 0.0, 0.0) }
 
-    private fun cuedAt(atMs: Long) = SetEnd.of(listOf(VoiceCue(atMs, SetEnd.DONE)))
+    private fun cuedAt(atMs: Long) = SetEnd.of(listOf(VoiceCue(atMs, SetEnd.DONE)), cadenceGuided = true)
 
     // ---- unwrap ------------------------------------------------------------
 
