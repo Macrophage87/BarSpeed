@@ -284,6 +284,70 @@ class SchemaCueTrackContractTest {
     }
 
     /**
+     * The published documents say where the number lands on a schedule that has
+     * no free second at the start of the rep (#266).
+     *
+     * The owner's rule: *"When you can't have a rep call or an up or down, have
+     * the end of the concentric phase be the rep number."* Two sentences the
+     * shipped document carries are made false by it and both are handled the way
+     * this log handles an expired claim, which is not the same way for each.
+     *
+     * - "WHEN a call is heard is uniform now" is DELETED. It was written under
+     *   1.20 about 1.20, so it cannot be scoped to a shipped version the way the
+     *   1.13-through-1.19 rule is: it is a claim about the version being
+     *   described, and there are two placements under that version now.
+     * - "on every schedule that speaks at all" is DELETED from `voiceCues` for
+     *   the same reason, and what replaces it says which schedules take which
+     *   placement rather than asserting one.
+     *
+     * What a reader must be able to work out from the document alone: that such
+     * a set names rep 1, which no other schedule does, and that the word the
+     * number replaces is published NOWHERE in the set rather than once. A
+     * consumer counting stroke rows to count reps gets zero on a `1010`
+     * concentric-first set and has to count the calls.
+     *
+     * `LockoutRepCallTest` in `:core:dsp` pins the behaviour against the two
+     * field-39 tracks; this pins that the published document states it.
+     */
+    @Test
+    fun `the published documents say the number lands at the end of the drive from 1_20`() {
+        val schema = schema("session-export.schema.json")
+        val versionLog = schema["properties"]!!.jsonObject["schemaVersion"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+        val voiceCues = schema["\$defs"]!!.jsonObject["set"]!!
+            .jsonObject["properties"]!!.jsonObject["voiceCues"]!!.jsonObject["description"]!!
+            .jsonPrimitive.content
+        assertTrue("1.20 carries a FOURTH change" in versionLog, "the version log does not file the #266 placement")
+        assertTrue(
+            "at the end of the drive" in versionLog,
+            "the version log does not say where the number lands on a schedule with no free opening second",
+        )
+        assertTrue(
+            "at the end of the drive" in voiceCues,
+            "voiceCues does not say where the number lands on such a schedule",
+        )
+        assertTrue(
+            "including rep 1" in voiceCues,
+            "voiceCues does not say that such a set names its first rep, which no other schedule does",
+        )
+        assertTrue(
+            "appears nowhere in such a set" in voiceCues,
+            "voiceCues does not say the replaced word is published on no rep of such a set",
+        )
+        // The two deletions, pinned by absence. A substring check on the new
+        // sentences would pass on a document that kept the false ones beside
+        // them, which is the mistake the 1.19 entry made once already.
+        assertFalse(
+            "on every schedule that speaks at all" in voiceCues,
+            "voiceCues still says every speaking schedule opens the rep with the call, false from #266",
+        )
+        assertFalse(
+            "WHEN a call is heard is uniform now" in versionLog,
+            "the version log still calls the 1.20 placement uniform, which it is not",
+        )
+    }
+
+    /**
      * The published vocabulary says how a consumer tells the two counters
      * apart.
      *

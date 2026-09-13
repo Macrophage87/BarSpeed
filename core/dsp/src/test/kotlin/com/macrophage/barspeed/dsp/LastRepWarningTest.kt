@@ -73,27 +73,39 @@ import kotlin.test.assertNull
  * only then the rep's own last stroke, so on those plans there was provably no
  * earlier slot. That argument is deleted rather than softened, because its
  * premise was that a call needs a stroke with a tempo count to give up. #293
- * replaces the opening stroke's WORD instead, which every plan has, so every
- * call opens the rep it names and no plan reaches a later beat. The owner asked
- * for exactly that, after a session on a 3010 overhead press: "It's hard to
- * follow. Have the rep number be at the start of the rep, and replace the
- * relevant up or down, etc."
+ * replaces the opening stroke's WORD instead, which every plan has, so no plan
+ * sends its call to a beat chosen for having a count. The owner asked for
+ * exactly that, after a session on a 3010 overhead press: "It's hard to follow.
+ * Have the rep number be at the start of the rep, and replace the relevant up or
+ * down, etc."
+ *
+ * ## Where the call lands is now TWO answers, not one
+ *
+ * Fifteen of the sixteen speaking rows below put it on beat 0, the rep's own
+ * first second. The sixteenth is #266's, and the owner ruled it separately:
+ * *"Rep count is at lockout."* On a schedule of two one-second strokes with no
+ * closing pause there is no free second at the START of the rep, so the number
+ * takes the second that opens as the DRIVE ends -- still inside the rep it
+ * names, one stroke in. A sentence here used to say "every call opens the rep it
+ * names"; it is deleted rather than qualified. What holds of all sixteen is
+ * weaker and is what the renamed test below asserts: no call is spoken before
+ * the rep it names has begun.
  *
  * ## What still cannot be said, and it is not a preference
  *
- * A SCHEDULE of two one-second strokes with no closing pause has a word in
- * every second of its cycle and no beat with a count to give up. It announces
- * NOTHING on any rep, and the final rep is no exception. `1010` resolves to one
- * on every lift; `1110` does so only when `TempoSchedule.of` leaves the digits
- * in prescription order, because the swap it performs on a lift that does not
- * open with digit 1's stroke carries digit 2's pause to the end of the rep,
- * where case 1 takes it. An earlier version of this paragraph named `1110`
- * flatly, which is false on a concentric-first lift whose concentric is up and
- * on an eccentric-first lift whose concentric is down, and it is deleted rather
- * than softened. The two rows below are the whole of the "some schedule has no
- * beat that fits any word" case: `1010` on a leg press, which `TempoSchedule.of`
- * SWAPS -- harmlessly, since its two strokes are equal and both its pauses are
- * zero -- and `1110` on a bench press, which it leaves unswapped.
+ * One shape is left silent: two one-second strokes, no closing pause, and the
+ * DRIVE as the stroke the rep ENDS on. The instant that drive finishes is the
+ * next rep's first second, so this rep has no beat to put its own number on --
+ * and putting it on the next rep's opening beat would name a finished rep on a
+ * schedule where every other call names the rep in hand (#243/#252), which is
+ * the frame error #173 was filed for. `LockoutRepCallTest` measures that
+ * argument; the row below is `1110` on a bench press, which `TempoSchedule.of`
+ * leaves unswapped.
+ *
+ * `1010` used to be in this case on every lift and now is not: it is silent only
+ * on the eccentric-first geometries, and `1010` on a leg press -- which
+ * `TempoSchedule.of` SWAPS, harmlessly, its two strokes being equal and both its
+ * pauses zero -- counts at the end of each drive.
  *
  * Nothing here touches `RecordViewModel`'s unguided counter, which speaks
  * through `VoiceMilestonePolicy.repMilestone` at the instant a rep is counted
@@ -144,8 +156,8 @@ class LastRepWarningTest {
      *
      * The expected column is written out per row rather than computed, so that
      * a production rule and this table cannot agree by sharing an expression.
-     * Every `Last rep` here is a plan with a beat that can carry a call; the
-     * two `null`s are the plans with no such beat on any rep at all.
+     * Every `Last rep` here is a plan with a beat that can carry a call; the one
+     * `null` is the plan with no such beat on any rep at all.
      */
     private val corpus = listOf(
         // A prescription that ends in a pause. The pause used to carry the call,
@@ -172,11 +184,14 @@ class LastRepWarningTest {
         // Eccentric-first, so the carrying stroke is the CONCENTRIC and the
         // working stroke is NOT finished when the call lands.
         Row("1120", benchPress, 12, CadencePlan.LAST_REP),
-        // The two plans that still say nothing on any rep: both strokes one
-        // second and no closing pause. The owner ruled these count at lockout
-        // instead (#266, "Rep count is at lockout"), which is not built yet and
-        // is not this file's subject.
-        Row("1010", legPress, 6, null),
+        // Two one-second strokes and no closing pause, with the DRIVE opening
+        // the rep: no free second at the start of the rep, so the number lands
+        // on the beat that opens as the drive ends (#266, "Rep count is at
+        // lockout"). The last rep is named there like any other.
+        Row("1010", legPress, 6, CadencePlan.LAST_REP),
+        // The same family with the drive CLOSING the rep, which is the one shape
+        // left with no beat for a call at all: the instant its drive ends is the
+        // next rep's, so nothing of this rep can carry the word.
         Row("1110", benchPress, 6, null),
     )
 
@@ -203,8 +218,8 @@ class LastRepWarningTest {
         }
         // A table of all-null or all-LAST_REP would pass a rule that ignores
         // the plan entirely, so the corpus is asserted to contain both.
-        assertEquals(15, outcomes.count { it == CadencePlan.LAST_REP }, "plans that name the last rep")
-        assertEquals(2, outcomes.count { it == null }, "plans with no beat for any call")
+        assertEquals(16, outcomes.count { it == CadencePlan.LAST_REP }, "plans that name the last rep")
+        assertEquals(1, outcomes.count { it == null }, "plans with no beat for any call")
 
         // And the two answers are the plan's, not the tempo's: a null is a plan
         // with no home for a call at all, never a plan that has one and
@@ -220,30 +235,55 @@ class LastRepWarningTest {
     }
 
     @Test
-    fun `no call is late now -- every one opens the rep it names`() {
+    fun `no call is late -- each lands in the rep it names, at its start or at its drive's end`() {
         // The replacement for `the late call is late because nothing earlier in
         // the rep could carry it`, which asserted the opposite and was true when
         // it was written. Eleven of these rows put the call on the beat the rep
-        // ENDS on, with one beat left; all fifteen now put it on the rep's first
-        // beat, with the whole rep ahead.
+        // ENDS on, with one beat left; fifteen now put it on the rep's first
+        // beat, with the whole rep ahead, and the sixteenth -- #266's -- puts it
+        // on the beat that opens as that rep's drive ends.
+        //
+        // RENAMED from `no call is late now -- every one opens the rep it names`,
+        // because the second half of that name is no longer true of every row
+        // and a name is a claim like any other. What survives is the first half:
+        // no call is spoken before the rep it names has begun, on any row.
         val speaking = corpus.filter { plan(it.tempo, it.direction).announceOnBeat != null }
-        assertEquals(15, speaking.size, "plans that speak at all")
+        assertEquals(16, speaking.size, "plans that speak at all")
+        assertEquals(
+            1,
+            speaking.count { plan(it.tempo, it.direction).announcesAtConcentricEnd },
+            "of which one counts at the drive's end, so neither branch below is vacuous",
+        )
         speaking.forEach { row ->
             val p = plan(row.tempo, row.direction)
-            assertEquals(0, p.announceOnBeat, "${row.describe()}: the call opens the rep")
-            assertEquals(
-                p.repCompleteAfterBeat + 1,
-                p.beatsOfRepLeftWhenAnnounced,
-                "${row.describe()}: every beat of the named rep is still to come",
-            )
             val cycle = p.deliveredCycleS
+            // Seconds from the start of the named rep to the call: 0 when the
+            // call opens the rep, the opening stroke's length when it lands at
+            // the end of the drive. Either way it is INSIDE the rep it names.
+            val offset = p.beats.take(p.announceOnBeat!!).sumOf { it.seconds }
+            if (p.announcesAtConcentricEnd) {
+                assertEquals(1, p.announceOnBeat, "${row.describe()}: the beat after the drive")
+                assertEquals(p.beats[0].seconds, offset, "${row.describe()}: one drive into the rep")
+                assertEquals(
+                    p.repCompleteAfterBeat,
+                    p.beatsOfRepLeftWhenAnnounced,
+                    "${row.describe()}: the beats after the drive are still to come",
+                )
+            } else {
+                assertEquals(0, p.announceOnBeat, "${row.describe()}: the call opens the rep")
+                assertEquals(
+                    p.repCompleteAfterBeat + 1,
+                    p.beatsOfRepLeftWhenAnnounced,
+                    "${row.describe()}: every beat of the named rep is still to come",
+                )
+            }
             val warning = CadenceVoice.script(p, row.reps)
                 .flatMap { call -> call.recorded.map { call.atSecond to it } }
                 .single { it.second == CadencePlan.LAST_REP }
             assertEquals(
-                (row.reps - 1) * cycle,
+                (row.reps - 1) * cycle + offset,
                 warning.first,
-                "${row.describe()}: and the warning lands on the final rep's first second",
+                "${row.describe()}: and the warning lands inside the final rep",
             )
         }
     }
@@ -303,7 +343,7 @@ class LastRepWarningTest {
         assertEquals("Rep 11", p.announcementFor(11, 12))
         assertEquals(CadencePlan.LAST_REP, p.announcementFor(12, 12), "the twelfth is named by word")
         assertEquals("Rep 12", p.announcementFor(12, plannedReps = null), "an unbounded set has no last rep at all")
-        assertNull(plan("1010", legPress).announcementFor(6, 6), "and no home means no call, on any rep")
+        assertNull(plan("1110", benchPress).announcementFor(6, 6), "and no home means no call, on any rep")
     }
 
     @Test
@@ -344,7 +384,10 @@ class LastRepWarningTest {
 
     @Test
     fun `the final rep no longer sounds like the first, because only it carries a call`() {
-        // Rep 1 carries no call on any plan, so before #243 -- with the final
+        // Rep 1 carries no call on any plan whose call opens the rep, which is
+        // every plan but #266's -- those replace a LATER beat's word and name rep
+        // 1 there. This one is a 1120 pushdown, whose call opens the rep. Before
+        // #243 -- with the final
         // rep's warning suppressed -- the two were word for word identical and
         // `Done` was the set's only ending marker. They are told apart now, and
         // from #293 the difference is exactly one word: rep 1 says `Down` where

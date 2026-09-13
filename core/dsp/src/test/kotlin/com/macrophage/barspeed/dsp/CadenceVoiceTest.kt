@@ -42,9 +42,10 @@ class CadenceVoiceTest {
     )
 
     /**
-     * (tempo, lift, planned reps) covering all four homes for the rep call:
-     * a closing pause, the next rep's first stroke, the rep's own last stroke,
-     * and no home at all.
+     * (tempo, lift, planned reps) covering every prescription family the call has
+     * ever been placed on: one with a closing pause, one whose opening stroke is
+     * long, one whose closing stroke is long, one that counts at the end of the
+     * drive (#266) and one that says nothing at all.
      */
     private val corpus = listOf(
         Triple("2011", benchPress, 5),
@@ -90,9 +91,10 @@ class CadenceVoiceTest {
             "and nothing is spoken on the fourth second of any rep, which is the pause",
         )
         // The function still answers for a wordless beat handed a call, and no
-        // plan hands it one: a pause that carried a call would speak it alone.
-        // Kept because [CadenceBeat] can express such a beat and #266 may want
-        // one; asserted so it cannot quietly change under a later reader.
+        // plan hands it one -- #266 included, whose call lands on a beat that has
+        // a word: the other stroke's, or a mid-rep `Hold`. A pause that carried
+        // a call would speak it alone. Kept because [CadenceBeat] can express
+        // such a beat; asserted so it cannot quietly change under a later reader.
         assertEquals(
             SpokenCall("Last rep", listOf("Last rep")),
             CadenceVoice.beatCall(closing, CadencePlan.LAST_REP),
@@ -138,7 +140,16 @@ class CadenceVoiceTest {
         assertEquals("Rep 2", p.announcementFor(2, plannedReps = 3), "the second rep is the one now due")
         assertEquals(CadencePlan.LAST_REP, p.announcementFor(3, plannedReps = 3), "the last rep is the one due")
         assertEquals("Rep 8", p.announcementFor(8, plannedReps = null), "no target, so no last rep to warn of")
+        // 1010 on this bench press is ECCENTRIC-first, which is the one shape
+        // with no beat for a call at all: the instant its drive ends belongs to
+        // the next rep (#266). The concentric-first reading of the same four
+        // digits decides a call, and `LockoutRepCallTest` holds it.
         assertNull(plan("1010").announcementFor(2, plannedReps = 3), "no home, so nothing is decided")
+        assertEquals(
+            "Rep 2",
+            plan("1010", legPress).announcementFor(2, plannedReps = 3),
+            "and the same digits on a concentric-first lift do decide one",
+        )
     }
 
     @Test
@@ -256,20 +267,20 @@ class CadenceVoiceTest {
         // words is written.
         //
         // It reads announcementFor for the expected side, which is the
-        // decision, against the script's rows, which are the delivery. A plan
-        // that decides to say nothing is covered too, in the two shapes the
-        // corpus carries. 1010 has no pause to give at either end, so it is a
-        // schedule of two one-second strokes on every lift -- this leg press
-        // included, even though TempoSchedule.of swaps it, because swapping
-        // two equal strokes and two zero pauses changes nothing. 1110 keeps
-        // its call-less shape only where the digits are left unswapped, as on
-        // this bench press: digit 2's one-second pause then sits INSIDE the
-        // rep and the rep closes on nothing, where the swap would carry that
-        // pause to the END of the rep and hand it the call. Neither of these
-        // two rows has a home, so both must record none.
+        // decision, against the script's rows, which are the delivery.
+        //
+        // WHICH REP IS FIRST NAMED is the plan's, not a constant. A plan whose
+        // call opens the rep says nothing on rep 1 -- that word is the start cue
+        // (#241) -- so rep 2 is the first named. A plan that counts at the end of
+        // the drive replaces a LATER beat's word, which rep 1 has like any other
+        // rep, so rep 1 is named (#266). The leg press 1010 row is the second
+        // kind; the bench press 1110 row is the one shape that still records no
+        // call at all, its digits left unswapped by TempoSchedule.of so that
+        // digit 2's pause sits INSIDE the rep and the drive closes it.
         corpus.forEach { (tempo, direction, reps) ->
             val p = plan(tempo, direction)
-            val decided = (2..reps).mapNotNull { p.announcementFor(it, reps) }
+            val firstNamed = if (p.announcesAtConcentricEnd) 1 else 2
+            val decided = (firstNamed..reps).mapNotNull { p.announcementFor(it, reps) }
             val recorded = CadenceVoice.script(p, reps)
                 .flatMap { it.recorded }
                 .filter { it == CadencePlan.LAST_REP || it.startsWith(CadencePlan.REP_CALL_PREFIX) }
@@ -317,10 +328,29 @@ class CadenceVoiceTest {
 
     @Test
     fun `a one-rep set is called through with no rep announcement at all`() {
-        // There is no finished rep to count and no rep after it to warn about.
+        // There is no rep after it to warn about, and its own number would have
+        // to take the word that opens the set.
         assertEquals(
             listOf(0 to "Down", 1 to "1", 2 to "2", 3 to "Up", 4 to "Done"),
             CadenceVoice.script(plan("3010"), plannedReps = 1).map { it.atSecond to it.utterance },
+        )
+    }
+
+    @Test
+    fun `a one-rep set that counts at the drive's end says the warning, and that is deliberate`() {
+        // #266's placement replaces a LATER beat's word, so a one-rep set has a
+        // beat for its own number -- and `announcementFor` renders the rep in
+        // hand as the warning whenever it is the planned last, which on a set of
+        // one it is from the first rep. So the lifter hears `Up, Last rep, Done`
+        // where a 3010 single says nothing.
+        //
+        // Pinned rather than special-cased: #243's substitution is one rule for
+        // every plan, and a second rule for sets of one would be a rule nothing
+        // in the corpus exercises. What the lifter loses is a number they were
+        // never in doubt about; what they gain is the set being called over.
+        assertEquals(
+            listOf(0 to "Up", 1 to CadencePlan.LAST_REP, 2 to "Done"),
+            CadenceVoice.script(plan("1010", legPress), plannedReps = 1).map { it.atSecond to it.utterance },
         )
     }
 }

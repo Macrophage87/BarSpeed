@@ -92,10 +92,13 @@ import kotlin.test.assertTrue
  * | `set08_lat_pulldown_cues.csv` | `field-latpulldown-2011-6rep-s39-set08` |
  * | `set10_lat_pulldown_cues.csv` | `field-latpulldown-20x0-6rep-s39-set10` |
  *
- * A sixth of that session's tracks, `field-ohp-1110-6rep-s39-set05-cues.csv`,
- * is present in this source set and unread by this file, on the same footing
- * as `1010`: `1110`'s digit-2 pause is inside the rep and no stroke of it
- * reaches [CadencePlan.CALL_MIN_STROKE_S].
+ * Three more of that session's tracks are present in this source set and unread
+ * by this file, for the same reason: no stroke of any of them reaches
+ * [CadencePlan.CALL_MIN_STROKE_S], so the digit rule below does not claim to
+ * cover them. `field-ohp-1110-6rep-s39-set05-cues.csv` is one;
+ * `field-ohp-1010-6rep-s39-set04-cues.csv` and
+ * `field-latpulldown-1010-6rep-s39-set09-cues.csv` are the other two, added by
+ * `LockoutRepCallTest`, which owns their rows.
  *
  * Sets 6, 8 and 10 arrived in round 1 of review, which found the list below
  * claiming to be "the sets #248 names" while holding six of them. They carry
@@ -473,14 +476,17 @@ class TwoSecondStrokeCountTest {
         }
         // `1010` is the plan with no long stroke, and the rule deliberately
         // does not reach it. The owner ruled it out of this issue in those
-        // words, so nothing here gates it and it still speaks its two stroke
-        // words and no number at all.
+        // words, so nothing here gates it: it speaks no DIGIT, which is what
+        // this file is about, and its rep number is #266's -- spoken at the end
+        // of each drive, in place of the return's word, on this concentric-first
+        // geometry. A sentence here said it "still speaks its two stroke words
+        // and no number at all"; both halves are now false and it is deleted.
         val straightReps = CadencePlan.of(TempoSchedule.of(Tempo.parse("1010"), driveUp))
         assertTrue(
             straightReps.beats.none { it.isStroke && it.seconds >= CadencePlan.CALL_MIN_STROKE_S },
             "1010 has no stroke this rule covers",
         )
-        assertNull(straightReps.announceOnBeat, "and it announces nothing, which #266 owns and #248 does not")
+        assertEquals(1, straightReps.announceOnBeat, "its number is at the drive's end, which #266 owns not #248")
         assertEquals(
             emptyList(),
             digits(scriptRows(straightReps, 6)),

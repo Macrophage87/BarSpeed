@@ -36,14 +36,21 @@ import kotlin.test.assertTrue
  * `Rep 1` where this plan now says `Rep 2`; what is read from it here is
  * WHERE a call sat in the cadence.)
  *
- * ## #293 makes the placement uniform, and that is what is pinned now
+ * ## #293 made the placement uniform, and #266 gives it a second case
  *
- * The call opens the rep it names, on every schedule that speaks at all, in
- * place of that rep's first stroke word. So the asymmetry this file was written
- * to hold -- inside the rep on two families, before it on the third -- is gone,
- * and the back squat above is the family that moved furthest: its call lands a
- * second LATER than the archive has it, on the rep it names rather than in the
- * tail of the one before.
+ * On every schedule with a free second at the start of the rep, the call opens
+ * the rep it names, in place of that rep's first stroke word. So the asymmetry
+ * this file was written to hold -- inside the rep on two families, before it on
+ * the third -- is gone, and the back squat above is the family that moved
+ * furthest: its call lands a second LATER than the archive has it, on the rep it
+ * names rather than in the tail of the one before.
+ *
+ * A sentence here said "on every schedule that speaks at all", and #266 makes it
+ * false rather than incomplete, so it is deleted. A schedule of two one-second
+ * strokes and no closing pause has no free second at the start of the rep; where
+ * its drive OPENS the rep, the number lands on the beat that opens as that drive
+ * ends -- still inside the rep it names, one stroke in. `LockoutRepCallTest`
+ * owns that placement and the two field-39 tracks it was measured on.
  *
  * ## What a consumer can and cannot tell from a row
  *
@@ -54,13 +61,16 @@ import kotlin.test.assertTrue
  * completes rather than on a schedule -- writes no word at all beyond digits,
  * `Rep N`, `Last rep` and `Done`.
  *
- * The GUIDED half is weaker from #293 than it was, and the weakening is pinned
- * below rather than described here: a guided rep used to carry BOTH stroke words
- * and now carries one of them on every rep after the first, because the rep
- * number takes the other's second. A guided track still carries a stroke word in
- * every rep, and both of them in rep 1, so the discriminator holds -- but a
- * reader counting `Down` rows to count reps now counts one per set on the
- * geometries whose first stroke is the `Down`.
+ * The GUIDED half is weaker from #293 than it was, and weaker again from #266;
+ * the weakening is pinned below rather than described here. A guided rep used to
+ * carry BOTH stroke words. From #293 it carries one of them on every rep after
+ * the first, because the rep number takes the other's second, and rep 1 carries
+ * both. From #266 a plan that counts at the end of the drive takes a later
+ * beat's word on every rep INCLUDING rep 1, so such a set carries the replaced
+ * word nowhere at all. What holds across all of it, and all the discriminator
+ * needs, is one stroke word in every rep of every guided set -- but a reader
+ * counting `Down` rows to count reps now counts one per set, or none, depending
+ * on the (tempo, lift) pair.
  *
  * `Hold` is deliberately NOT part of that test, and the trap is worth naming:
  * it is a PAUSE the prescription asked for, absent from every tempo without a
@@ -160,21 +170,22 @@ class CueTrackOriginTest {
     }
 
     /**
-     * The guided half of the discriminator: every rep writes a stroke word, and
-     * rep 1 writes both.
+     * The guided half of the discriminator: every rep writes a stroke word.
      *
      * This said BOTH words on EVERY rep until #293, and that is what the
      * published `voiceCues` description said too. The number takes one of the
-     * two on every rep after the first, so the claim is narrowed to what
-     * survives -- at least one stroke word in every rep, both in rep 1 -- which
-     * is still enough to tell a guided track from the unguided counter's, whose
-     * whole vocabulary is digits and rep calls.
+     * two, so the claim narrowed once to "at least one stroke word in every rep,
+     * both in rep 1" -- and #266 narrows it again, because a plan that counts at
+     * the end of the drive replaces a later beat's word on EVERY rep, rep 1
+     * included. The half that survives both narrowings is the half the
+     * discriminator needs: one stroke word in every rep of every guided set,
+     * where the unguided counter writes none in any rep.
      *
-     * The two families that speak no call at all keep both words on every rep,
-     * which is what makes the absence of a call readable rather than ambiguous.
+     * The family that speaks no call at all keeps both words on every rep, which
+     * is what makes the absence of a call readable rather than ambiguous.
      */
     @Test
-    fun `every rep of a guided track carries a stroke word, and rep 1 carries both`() {
+    fun `every rep of a guided track carries a stroke word, and rep 1 both where the call opens the rep`() {
         val vertical = setOf("Down", "Up")
         val horizontal = setOf("Drive", "Return")
         val cases = listOf(
@@ -183,16 +194,24 @@ class CueTrackOriginTest {
             Triple(plan("1120", pushdown), 12, vertical),
             Triple(plan("1010", inclinePress), 5, vertical),
             Triple(plan("1110", inclinePress), 5, vertical),
+            // #266's shape: concentric-first, so the number takes the RETURN's
+            // word on every rep including rep 1, and the drive's word is the one
+            // that survives. This is the case with no rep carrying both.
+            Triple(plan("1010", pushdown), 5, vertical),
             Triple(plan("3010", seatedRow), 8, horizontal),
         )
         cases.forEach { (p, reps, words) ->
             val cycle = p.deliveredCycleS
             val all = rows(p, reps)
-            val speaks = p.announceOnBeat != null
+            val replaced = p.announceOnBeat?.let { p.beats[it].spokenLabel }
             (1..reps).forEach { rep ->
                 val window = all.filter { it.first in (rep - 1) * cycle until rep * cycle }
                 val spoken = window.map { it.second }.filter { it in words }.toSet()
-                val expected = if (rep == 1 || !speaks) words else words - p.beats[0].spokenLabel!!
+                // A call takes the word of the beat it rides, on every rep it is
+                // spoken on: every rep but the first when it rides beat 0, and
+                // every rep including the first when it rides a later beat.
+                val keepsBoth = replaced == null || (rep == 1 && !p.announcesAtConcentricEnd)
+                val expected = if (keepsBoth) words else words - replaced
                 assertEquals(
                     expected,
                     spoken,
@@ -201,6 +220,19 @@ class CueTrackOriginTest {
                 assertTrue(spoken.isNotEmpty(), "rep $rep writes no stroke word, so no reader can attribute it")
             }
         }
+        // The discriminator narrows and does not break: a drive-end plan writes
+        // NO row of the replaced word anywhere in the set, so "both words in rep
+        // 1" is no longer the universal it was -- what survives is one stroke
+        // word in every rep, which is what tells this track from the unguided
+        // counter's, whose whole vocabulary is digits and rep calls.
+        val driveEnd = plan("1010", pushdown)
+        assertEquals("Up", driveEnd.beats[1].spokenLabel, "the return's word on a drive-down pushdown")
+        assertEquals(
+            emptyList(),
+            rows(driveEnd, 5).filter { it.second == "Up" },
+            "which a set recorded under this plan does not carry at all",
+        )
+        assertEquals(5, rows(driveEnd, 5).count { it.second == "Down" }, "while the drive is called on every rep")
     }
 
     /**

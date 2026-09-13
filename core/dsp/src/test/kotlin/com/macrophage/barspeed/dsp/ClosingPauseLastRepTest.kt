@@ -311,8 +311,11 @@ class ClosingPauseLastRepTest {
             Triple("1030", legCurl, 12),
             Triple("20X0", seatedOhp, 6),
             Triple("2011", facePull, 12),
-            // case 4, no home for a call at all.
+            // The number at the end of the drive (#266), which moves no beat and
+            // is therefore covered by this rule exactly as the others are.
             Triple("1010", seatedOhp, 6),
+            // The one shape with no home for a call at all: two one-second
+            // strokes, no closing pause, and the drive closing the rep.
             Triple("1110", benchPress, 2),
         )
         // The corpus cannot be weakened into one that would pass either way:

@@ -78,11 +78,18 @@ internal object CueTrack {
      * is. From that change the rep number is spoken in place of the first
      * stroke's word on every rep after the first, so on a lift whose first
      * stroke is the `Down` -- an eccentric-first press -- a newly recorded track
-     * carries ONE `Down` row for the whole set and this returns 1. On a
-     * concentric-first lift the `Down` is the second stroke and nothing changes.
-     * A rule that works either side of the boundary counts the rep calls plus
-     * rep 1's own first stroke word; nothing needs one yet, so it is described
-     * here and not written.
+     * carries ONE `Down` row for the whole set and this returns 1.
+     *
+     * A sentence here said that on a concentric-first lift the `Down` is the
+     * second stroke and nothing changes. #266 makes that false and it is deleted:
+     * on a concentric-first lift whose prescription has no free second at the
+     * start of the rep -- `1010` on every such lift -- the number takes the
+     * SECOND beat's word on every rep including rep 1, so a newly recorded track
+     * carries no `Down` row at all and this returns 0 for a set of six.
+     *
+     * A rule that works either side of both boundaries counts the rep calls plus
+     * whichever stroke word the plan did not spend; nothing needs one yet, so it
+     * is described here and not written.
      */
     fun calledReps(fixture: String): Int = movement(fixture, "Down").size
 }

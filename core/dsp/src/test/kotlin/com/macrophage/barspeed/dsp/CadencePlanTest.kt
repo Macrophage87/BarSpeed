@@ -73,6 +73,10 @@ class CadencePlanTest {
         Triple("bench 1110", "1110", benchPress),
         Triple("leg curl 1030", "1030", legCurl),
         Triple("leg curl 1020", "1020", legCurl),
+        // Concentric-first and drive-DOWN, so 1110's digit-2 pause stays inside
+        // the rep AND the drive is the stroke the rep opens with: the only
+        // shape in this corpus whose rep number lands on a `Hold` (#266).
+        Triple("leg curl 1110", "1110", legCurl),
         Triple("leg press 2010", "2010", legPress),
         Triple("leg press 3010", "3010", legPress),
         Triple("leg press 2011", "2011", legPress),
@@ -209,10 +213,16 @@ class CadencePlanTest {
 
     @Test
     fun `which pairs run a whole set with no spoken count`() {
-        // Issue 147, stated as a partition. A pair keeps its silence only when
-        // NEITHER stroke has a count to give up and the prescription leaves no
-        // closing pause -- both strokes one second, so every second of the
-        // cycle already has a word in it.
+        // Issue 147, stated as a partition, narrowed again by #266. A pair keeps
+        // its silence only when the prescription leaves no free second at the
+        // start of the rep -- both strokes one second, no closing pause -- AND
+        // the drive is the stroke the rep ENDS on, so the instant the drive
+        // finishes belongs to the next rep and there is no beat of this one to
+        // put the number on. Two of the three pairs that used to be silent are
+        // eccentric-first and stay silent; `leg press 1010` is concentric-first
+        // and now counts at the end of each drive. `LockoutRepCallTest` carries
+        // that rule, the two field-39 tracks it was measured on, and the
+        // argument for leaving the eccentric-first shape alone.
         //
         // The seven pairs that move out of the silent list are the complaint.
         // Two of them are recorded rather than reasoned about, both captured
@@ -228,15 +238,18 @@ class CadencePlanTest {
         // string: 2010 was silent on a leg press and never on a bench press,
         // from the same four digits.
         //
-        // What stays true of the three that remain: the rep NUMBER is on
+        // What stays true of the two that remain: the rep NUMBER is on
         // screen, driven by onRepCounted, so it is the metronome's own count
         // and not the sensor's, and since #252 the "Last rep" warning DOES
         // have an on-screen equivalent -- GuidedRepCaption.forRing draws
         // "last rep of N" on the last rep of any set that asked for a count,
-        // whether or not the plan speaks -- so on these three pairs the
-        // screen is the only channel that warns at all.
+        // whether or not the plan speaks -- so on these two pairs the
+        // screen is the only channel that warns at all. The owner cannot read it
+        // mid-set ("I'm not often able to look at the reps ring count while
+        // exersizing"), which is what makes the remaining silence worth naming
+        // rather than closing.
         assertEquals(
-            listOf("bench 1010", "bench 1110", "leg press 1010"),
+            listOf("bench 1010", "bench 1110"),
             named(carries = false),
             "pairs that run a whole set with no spoken rep count",
         )
@@ -247,15 +260,24 @@ class CadencePlanTest {
                 "bench 2010",
                 "leg curl 1030",
                 "leg curl 1020",
+                "leg curl 1110",
                 "leg press 2010",
                 "leg press 3010",
                 "leg press 2011",
+                "leg press 1010",
                 "face pull 2011",
                 "lat pulldown ecc-first 3010",
                 "chest press ecc-first 3010",
             ),
             named(carries = true),
             "pairs that speak it",
+        )
+        // And the two ways of speaking it partition those thirteen: the number
+        // opens the rep, or it lands on the beat that opens as the drive ends.
+        assertEquals(
+            listOf("leg curl 1110", "leg press 1010"),
+            corpus.filter { (_, t, d) -> plan(t, d).announcesAtConcentricEnd }.map { it.first },
+            "pairs that count at the end of the drive",
         )
         // Silence is total, not partial: nothing is half-said, and every stroke
         // word of a silent plan is spoken on every rep.
@@ -428,11 +450,21 @@ class CadencePlanTest {
         assertEquals(listOf("UP" to 1, "DOWN" to 2), shape(q), "closes on exactly two seconds")
         assertEquals(0, q.announceOnBeat, "which is equally enough for the plan to speak")
         assertEquals("Up", q.beats[0].spokenLabel, "and the word the number replaces is the one-second one")
-        // Two one-second strokes and no closing pause is the one shape that
-        // still says nothing. Raise the threshold to 3 and the two pins above
-        // red; lower it to 1 and this one does.
-        assertEquals(null, plan("1010", legPress).announceOnBeat, "1010 is #266's, on every lift")
-        assertEquals(null, plan("1110", benchPress).announceOnBeat, "as is 1110 where the pause stays inside the rep")
+        // Two one-second strokes and no closing pause is the shape that has no
+        // free second at the START of the rep, and it is #266's: the number
+        // lands on the beat that opens as the drive ends. Raise the threshold to
+        // 3 and the two pins above red; lower it to 1 and these two do.
+        assertEquals(1, plan("1010", legPress).announceOnBeat, "1010 counts at the drive's end here (#266)")
+        assertEquals(
+            null,
+            plan("1010", benchPress).announceOnBeat,
+            "and says nothing at all where the drive is the stroke the rep ends on",
+        )
+        assertEquals(
+            null,
+            plan("1110", benchPress).announceOnBeat,
+            "as does 1110 where the pause stays inside the rep and the drive closes it",
+        )
     }
 
     @Test
