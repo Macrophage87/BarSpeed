@@ -275,6 +275,61 @@ data class ExerciseDef(
         fun ridesStack(id: String): Boolean = id.lowercase() in STACK_MOUNTED_IDS
 
         /**
+         * Exercise ids whose DRIVE goes downward, so the default
+         * [concentricUp] `true` is the wrong one and an omitted `concentric`
+         * on one of them is an omission rather than a declaration of
+         * "drives up".
+         *
+         * DERIVED FROM TWO STATEMENTS THE APP ALREADY MAKES, and from
+         * nothing else. The families are [concentricUp]'s own KDoc -- lifts
+         * whose drive goes down, "leg curl, lat pulldown, triceps pushdown"
+         * -- which the published plan schema states in the same words at
+         * `$defs.exercise.concentric`: "Use 'down' for leg curls, lat
+         * pulldowns and pushdowns". The IDS are those three families' entries
+         * in [STACK_MOUNTED_IDS], so this table mints no id of its own, and
+         * `DriveDownFamilyTest` pins it as a subset of that one.
+         *
+         * Four of [STACK_MOUNTED_IDS]' twelve are deliberately ABSENT, and
+         * they are why this is a second table rather than a reading of the
+         * first. `seated_row`, `seated_cable_row` and `cable_row` are
+         * horizontal pulls, with no up or down for a drive direction to be
+         * wrong about; `leg_extension` drives UP, so the default is right for
+         * it. The three assist-machine ids are absent for the same reason --
+         * an assisted pull-up drives up, and the counterweight travelling the
+         * other way is what `sensorInverted` describes, not this.
+         *
+         * NOT [SEED] entries, for [STACK_MOUNTED_IDS]' reason, and that
+         * premise is pinned rather than defended in code: no id here has a
+         * seed entry, so there is no built-in drive direction for an omitted
+         * key to fall back to and the type default really does stand. If one
+         * is ever seeded, `DriveDownFamilyTest` reds and the warning this
+         * table feeds has to be re-decided.
+         *
+         * This table decides NOTHING about how a set resolves. A plan that
+         * omits `concentric` on a lat pulldown still records drive-up and
+         * still publishes that as [GeometrySource.DEFAULT]; guessing the
+         * drive from the id stays refused, for the reason [concentricUp]'s
+         * KDoc gives -- applied to a seated leg curl in field data it
+         * collapsed rep detection from 12 to 2. All this table does is let
+         * the import gate say out loud that the plan did not say (#263).
+         */
+        val DRIVE_DOWN_IDS: Set<String> =
+            setOf(
+                "lat_pulldown",
+                "triceps_pushdown",
+                "leg_curl",
+                "seated_leg_curl",
+                "lying_leg_curl",
+            )
+
+        /**
+         * Whether the app knows this exact id names a lift whose drive goes
+         * DOWN. [ridesStack]'s shape: an exact match against a shipped table,
+         * lowercased, never a reading of the words in an id.
+         */
+        fun drivesDown(id: String): Boolean = id.lowercase() in DRIVE_DOWN_IDS
+
+        /**
          * Exercise ids whose load IS the lifter's own body by construction, so
          * an omitted `bodyweight` on one of them is an omission rather than a
          * declaration of "loaded work" (#61, #227).
