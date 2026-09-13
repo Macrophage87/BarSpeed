@@ -143,3 +143,63 @@ object StartCuePolicy {
         GeometrySource.DEFAULT -> UNDECLARED_MARKER
     }
 }
+
+/**
+ * The one extra line the prep countdown draws about WHERE in the rep the guide
+ * will say the rep number (#266).
+ *
+ * Beside [StartCuePolicy] because it is the same kind of decision on the same
+ * screen at the same moment -- a phrase the lifter reads standing at the bar,
+ * under the line that tells them which way to move first -- and because `:app`,
+ * where the countdown is drawn, has almost no test source set: a phrase left in
+ * a composable is a phrase nothing on the CI path ever runs.
+ *
+ * ## Why a note is needed at all, and why only here
+ *
+ * On almost every prescription the number arrives at the START of the rep, in
+ * place of that rep's first stroke word, so the lifter hears `"Rep 3"` where
+ * they would have heard `"Down"` and nothing has to be explained (#293). On a
+ * prescription of two one-second strokes and no closing pause there is no free
+ * second at the start of the rep, and the owner ruled that those count at the
+ * END of the drive instead: *"People are used to the reps being counted at
+ * lockout, so this would be an easy cue."* and *"Have a note for that during
+ * prep phase."*
+ *
+ * The note confirms a habit rather than teaching one, which is why it is one
+ * short line and not an instruction. It is drawn only on the sets that use that
+ * rule: a line present on every set would say nothing, and a line present on
+ * the wrong set would tell the lifter to expect a number a second later than it
+ * comes.
+ *
+ * ## What decides the flag, which is NOT here
+ *
+ * `CadencePlan.announcesAtConcentricEnd` in `:core:dsp`, off the (tempo, lift)
+ * pair. `:core:model` declares no project dependency, so this side cannot see a
+ * plan and takes the answer as a Boolean; the two are pinned equal in
+ * `:core:dsp`, where a test can see both, exactly as `StartCueVoiceContractTest`
+ * pins [StartCuePolicy.firstMovementWord] against the schedule's own beat 0.
+ *
+ * `[Field]`: no device has drawn this line. What it looks like under the #241
+ * phrase on a narrow screen at a large font scale is unobserved, and the
+ * discharge is the same session that checks the #241 block itself.
+ */
+object RepCallNotePolicy {
+    /**
+     * Said when the rep number lands at the end of the drive.
+     *
+     * "Drive" rather than "concentric" deliberately: the lifter's word, and the
+     * one the app already uses aloud for the working stroke of a horizontal
+     * lift. "End of each drive" is also true of a vertical lift whose drive is
+     * DOWN -- a pulldown, a leg curl -- where "lockout" would not be.
+     */
+    const val AT_DRIVE_END = "Rep numbers mark the end of each drive"
+
+    /**
+     * The note for the set now being prepped, or null when it has none.
+     *
+     * Absence is a state rather than an empty string: null means the number
+     * arrives where it arrives on every other set, and the lifter has nothing
+     * extra to hold.
+     */
+    fun noteFor(repNumberAtDriveEnd: Boolean): String? = if (repNumberAtDriveEnd) AT_DRIVE_END else null
+}

@@ -154,4 +154,45 @@ class LockoutRepCallTest {
             assertEquals(cadenceRows(fixture), scriptRows(p, reps), "$fixture: script against archive")
         }
     }
+
+    /**
+     * CHARACTERIZATION of the flag the prep note will read, before anything sets
+     * it.
+     *
+     * `announcesAtConcentricEnd` is new and false on every (tempo, lift) pair
+     * the plan builder can produce: a call rides beat 0 or nothing rides at all,
+     * which is the partition #293 left. The sweep is the whole notation space so
+     * that "false everywhere" is a measurement rather than three examples, and
+     * it is what the next commit's differential inverts on the two sets above.
+     */
+    @Test
+    fun `no plan announces at the end of the drive yet`() {
+        val lifts = listOf(
+            seatedOhp,
+            latPulldown,
+            LiftDirection(startsWith = StartPhase.ECCENTRIC, concentricUp = true),
+            LiftDirection(startsWith = StartPhase.CONCENTRIC, concentricUp = false),
+            LiftDirection(startsWith = StartPhase.ECCENTRIC, concentricUp = false),
+            LiftDirection(plane = MovementPlane.HORIZONTAL),
+        )
+        var checked = 0
+        (0..4).forEach { d1 ->
+            (0..2).forEach { d2 ->
+                (0..4).forEach { d3 ->
+                    (0..2).forEach { d4 ->
+                        lifts.forEach { lift ->
+                            val p = plan("$d1$d2$d3$d4", lift)
+                            assertEquals(
+                                false,
+                                p.announcesAtConcentricEnd,
+                                "$d1$d2$d3$d4 on ${lift.plane}/${lift.startsWith}: beats=${p.beats.map { it.label }}",
+                            )
+                            checked++
+                        }
+                    }
+                }
+            }
+        }
+        assertEquals(225 * 6, checked, "(tempo, lift) pairs checked")
+    }
 }

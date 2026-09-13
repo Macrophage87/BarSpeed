@@ -399,6 +399,24 @@ data class CadencePlan(
         get() = if (announceOnBeat == null) 0 else repCompleteAfterBeat - announceOnBeat + 1
 
     /**
+     * True when the rep number lands at the END OF THE DRIVE rather than at the
+     * start of the rep -- the placement #266 gives the plans #293 leaves silent.
+     *
+     * Read as a Boolean by exactly one caller, the prep countdown, through
+     * `RepCallNotePolicy` in `:core:model`: a set announcing at the drive's end
+     * draws one line saying so and no other set does.
+     *
+     * Written as "[announceOnBeat] is past the rep's first beat" and not as a
+     * stored field, because [of] places a call on beat 0 or on the beat that
+     * opens as the concentric ends and on nothing else, so the two placements
+     * partition the speaking plans. A THIRD placement would make this sentence
+     * false, and a reader adding one should make it a field rather than widen
+     * the arithmetic: `CadencePlanTest` pins the partition by geometry, so the
+     * pin reds rather than the claim quietly drifting.
+     */
+    val announcesAtConcentricEnd: Boolean get() = announceOnBeat != null && announceOnBeat > 0
+
+    /**
      * What the guide says about rep [repNowDue] of [plannedReps], or null when
      * it says nothing.
      *
