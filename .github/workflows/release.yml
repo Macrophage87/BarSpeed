@@ -53,9 +53,28 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "release-artifacts/BarSpeed-${version}.apk"
           ls -l release-artifacts
 
+      # A minified release build always writes this file; its absence means
+      # minification silently turned off, which #274 wants noticed, not hidden.
+      # Without the mapping, a dropbox stack from a release build cannot be
+      # retraced from an obfuscated frame back to a source line.
+      - name: Name the mapping file for humans
+        run: |
+          set -euo pipefail
+          version="${{ github.event.inputs.tag || github.ref_name }}"
+          mapping="app/build/outputs/mapping/release/mapping.txt"
+          if [ ! -f "$mapping" ]; then
+            echo "::error::$mapping is missing -- release build did not minify, so no mapping was produced" >&2
+            exit 1
+          fi
+          mkdir -p release-artifacts
+          cp "$mapping" "release-artifacts/BarSpeed-${version}-mapping.txt"
+          ls -l release-artifacts
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: release-artifacts/BarSpeed-*.apk
+          files: |
+            release-artifacts/BarSpeed-*.apk
+            release-artifacts/BarSpeed-*-mapping.txt
           generate_release_notes: true
