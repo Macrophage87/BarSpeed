@@ -256,8 +256,9 @@ class ManualDoneBoundTest {
             62.2,
             analysis.velocityLossPct!!,
             0.05,
-            "velocity loss over the bounded list -- the figure the published 1.20 entry and " +
-                "SessionExport's KDoc both state",
+            "velocity loss over the bounded list -- the same figure the published 1.20 entry " +
+                "states for the Done-bounded case, because this Set ended cue sits at the " +
+                "instant the milestone did",
         )
     }
 }
