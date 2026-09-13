@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.RepCallNotePolicy
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import kotlin.test.Test
@@ -160,6 +161,80 @@ class GuideVoiceCopyContractTest {
             rendered.contains(example),
             "the guide's Voice section does not contain \"" + example + "\", which is what " +
                 "CadenceVoice.script says on reps 1 and 2 of a concentric-first 2011",
+        )
+    }
+
+    /**
+     * The guide's third worked example, and the one #266 is about.
+     *
+     * A dense prescription -- two one-second strokes and no closing pause --
+     * has no free second at the start of the rep, so `CadencePlan.of` puts the
+     * call on the beat that opens as the drive ends wherever the drive OPENS
+     * the rep, and nowhere at all where the drive CLOSES it. The guide's Voice
+     * section went on saying such a cadence "calls the strokes only: no rep
+     * number and no 'last rep'" of BOTH geometries, which is false of the
+     * concentric-first half from `Count the rep at the end of the drive where
+     * nothing else can carry it`. `GuideScreen.kt` is touched by no commit of
+     * that change.
+     *
+     * field-39 set 4's own geometry -- seated overhead press, concentric-first,
+     * drive up, 1010 -- which is the set the placement was designed on. Reps 1
+     * and 2, as the 3010 and 2011 examples above: rep 1 is named here, unlike
+     * every other cadence, so the pair shows the number arriving on the first
+     * rep and again on the second.
+     *
+     * The ellipsis is written as `…` rather than the character so this
+     * assertion does not depend on the encoding this file is compiled with.
+     */
+    @Test
+    fun `the guide's 1010 example is what the script says on those reps`() {
+        val reps = spokenByRep(plan("1010", seatedOhp), 3)
+        val example = reps[0] + "… " + reps[1] + "…"
+        assertTrue(
+            rendered.contains(example),
+            "the guide's Voice section does not contain \"" + example + "\", which is what " +
+                "CadenceVoice.script says on reps 1 and 2 of a concentric-first 1010",
+        )
+    }
+
+    /**
+     * What the last rep of a drive-end count is called, read off the script.
+     *
+     * `CadencePlan.announcementFor` returns [CadencePlan.LAST_REP] in place of
+     * the number on the last rep wherever a beat can carry a call, and #173's
+     * withholding of it on the plans whose only slot is late was reversed. So
+     * this family DOES warn, and the sentence the guide used to carry said the
+     * opposite in as many words ("no rep number and no 'last rep'"). Asserting
+     * on the phrase `last rep` alone would pass on the old copy too -- the
+     * section names it twice for other reasons -- so the assertion is the whole
+     * last cycle, stroke word included.
+     */
+    @Test
+    fun `the guide names what the last rep of a drive-end count is called`() {
+        val last = spokenByRep(plan("1010", seatedOhp), 3).last()
+        assertTrue(
+            rendered.contains(last),
+            "the guide's Voice section does not contain \"" + last + "\", which is what " +
+                "CadenceVoice.script says on the last rep of a concentric-first 1010",
+        )
+    }
+
+    /**
+     * The guide quotes the prep note the screen actually draws.
+     *
+     * `RecordScreen` draws `RepCallNotePolicy.noteFor` under the #241 start-cue
+     * line on exactly the sets whose plan counts at the drive's end, and the
+     * guide is where a lifter finds out what that line will say before they are
+     * standing at the bar reading it. Read from the constant rather than
+     * copied, so a reworded note cannot leave the guide quoting a line no
+     * screen draws.
+     */
+    @Test
+    fun `the guide quotes the prep note a drive-end count draws`() {
+        assertTrue(
+            rendered.contains(RepCallNotePolicy.AT_DRIVE_END),
+            "the guide's Voice section does not quote \"" + RepCallNotePolicy.AT_DRIVE_END +
+                "\", the note RepCallNotePolicy draws on a set that counts at the drive's end",
         )
     }
 }
