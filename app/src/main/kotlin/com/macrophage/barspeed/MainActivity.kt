@@ -12,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavType
@@ -135,6 +136,17 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppNav() {
     val navController = rememberNavController()
+    // #272: the one thing a crash report can say about WHERE the app was.
+    // The ROUTE PATTERN, not the resolved path -- `session/{sessionId}`, never
+    // `session/41`. A crash report is going to be mailed to whoever is
+    // diagnosing it, and the pattern is what identifies the screen; the id
+    // would add a row of the owner's own database to an attachment for no
+    // diagnostic gain.
+    LaunchedEffect(navController) {
+        navController.currentBackStackEntryFlow.collect { entry ->
+            CurrentScreen.route = entry.destination.route
+        }
+    }
     NavHost(navController = navController, startDestination = "home") {
         composable("home") { HomeScreen(navController) }
         composable("devices") { DevicesScreen(navController) }

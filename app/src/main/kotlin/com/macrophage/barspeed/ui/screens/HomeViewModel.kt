@@ -1,10 +1,11 @@
 package com.macrophage.barspeed.ui.screens
 
 import android.app.Application
-import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.macrophage.barspeed.AppLog
+import com.macrophage.barspeed.CrashReport
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescuedDatabase
@@ -29,7 +30,13 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-/** Logcat tag for the one thing on this screen that is logged rather than shown. */
+/**
+ * Logcat tag for the one thing on this screen that is logged rather than shown.
+ *
+ * Routed through [AppLog] rather than `android.util.Log` since #272, so the
+ * line reaches the crash buffer as well as logcat. It was the ONLY logging
+ * call in the tree when that buffer was added.
+ */
 private const val TAG = "HomeViewModel"
 
 /** One history row: session summary plus a per-set mean-velocity sparkline. */
@@ -168,9 +175,25 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val busyRescuesFlow = MutableStateFlow<Set<File>>(emptySet())
     val busyRescues: StateFlow<Set<File>> = busyRescuesFlow
 
+    /**
+     * Crash reports this app wrote about itself. Issue #272.
+     *
+     * A third flow of the same shape as [interrupted] and [rescued], for the
+     * same reason both of those give: a directory scan with no observer behind
+     * it does not belong in [state]'s combine, where it would re-run every
+     * time the weight unit changed.
+     *
+     * The scan opens nothing. `CrashLogStore.list` reads the directory entry
+     * and the file name and stops there, which is #271's whole lesson: that
+     * crash was a launch-time LISTING that decoded what it was listing.
+     */
+    private val crashReportsFlow = MutableStateFlow<List<CrashReport>>(emptyList())
+    val crashReports: StateFlow<List<CrashReport>> = crashReportsFlow
+
     init {
         refreshInterrupted()
         refreshRescued()
+        refreshCrashReports()
     }
 
     /**
@@ -195,7 +218,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             interruptedFlow.value =
                 withContext(Dispatchers.IO) {
                     runCatching { container.setJournals.orphans() }
-                        .onFailure { Log.w(TAG, "interrupted-set scan failed; listing none", it) }
+                        .onFailure { AppLog.w(TAG, "interrupted-set scan failed; listing none", it) }
                         .getOrDefault(emptyList())
                 }
         }
@@ -212,6 +235,25 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun refreshRescued(): Job = viewModelScope.launch {
         rescuedFlow.value = withContext(Dispatchers.IO) { container.rescuedDatabases.rescued() }
+    }
+
+    /**
+     * Re-scan the crash directory. Issue #272.
+     *
+     * `CrashLogStore.list` swallows its own failures and lists nothing, for
+     * the reason [refreshInterrupted] states at length: this runs from `init`
+     * and from a `LaunchedEffect` on the first screen of every cold launch,
+     * and a scan that throws there is the #271 shape exactly -- the app cannot
+     * be opened to deal with the thing that is breaking it. A crash-report
+     * scan that took the app down would be the most ironic version of that
+     * defect available.
+     *
+     * Returns the Job so [deleteCrashReport] can wait for the list on screen
+     * to reflect the disk before it reports done, the same reason
+     * [refreshRescued] does.
+     */
+    fun refreshCrashReports(): Job = viewModelScope.launch {
+        crashReportsFlow.value = withContext(Dispatchers.IO) { container.crashLogs.list() }
     }
 
     /**
@@ -344,6 +386,69 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 busyRescuesFlow.update { it - item.directory }
             }
+        }
+    }
+
+    /**
+     * Send one crash report off the phone. Issue #272.
+     *
+     * The only route it has: app-private storage is not browsable, so without
+     * this the trace that would explain a field crash is safe, on the phone,
+     * and out of reach of the one person who can send it. Nothing uploads it
+     * and there is no network call on this path -- the file goes where the
+     * owner points the system share sheet and nowhere else.
+     *
+     * `text/plain`, so a mail client shows it inline rather than as an opaque
+     * attachment.
+     *
+     * Streamed through `ShareUtil.shareStreamed` rather than read into a
+     * ByteArray. A crash file is bounded by construction and this is
+     * belt-and-braces, but #273 is the same shape one step along --
+     * `SetJournalStore.zip` reads every stream whole and is expected to run
+     * out of heap on an oversize journal -- and the trust is cheap to remove.
+     *
+     * Deliberately does NOT delete afterwards, the rule [shareInterrupted]
+     * and [shareRescued] already follow: a share can fail at the sheet,
+     * silently as far as this code can tell.
+     *
+     * Catches broadly and shows a Toast for the reason [shareRescued] gives:
+     * `startActivity` with no target throws ActivityNotFoundException, a
+     * RuntimeException, from the first screen of a cold launch -- and a crash
+     * inside the crash reporter is a particularly poor outcome.
+     */
+    fun shareCrashReport(report: CrashReport) {
+        viewModelScope.launch {
+            try {
+                ShareUtil.shareStreamed(getApplication(), report.file.name, "text/plain") { destination ->
+                    container.crashLogs.copyBounded(report.file, destination)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(getApplication(), "Couldn't send that crash report", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /**
+     * Throw one crash report away at the owner's word. Issue #272.
+     *
+     * No confirmation dialog, and the posture is chosen rather than copied.
+     * `RescuedDatabaseNotice` puts one in front of DISCARD because a rescued
+     * database can be an entire training history; [discardInterrupted] does
+     * not, because a set journal is one set. A crash report is neither -- it
+     * is a diagnostic
+     * about the app, not a record of anything the lifter did, and the app
+     * itself deletes the eleventh oldest without asking. A dialog guarding
+     * what the pruner already does unasked would be theatre.
+     *
+     * Awaits the rescan before returning, so the card cannot redraw from a
+     * stale list.
+     */
+    fun deleteCrashReport(report: CrashReport) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { container.crashLogs.delete(report) }
+            refreshCrashReports().join()
         }
     }
 

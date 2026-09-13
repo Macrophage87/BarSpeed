@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.macrophage.barspeed.CrashReport
 import com.macrophage.barspeed.data.InterruptedSetSummary
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescueCompleteness
@@ -73,6 +74,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
     val interrupted by viewModel.interrupted.collectAsState()
     val rescued by viewModel.rescued.collectAsState()
     val busyRescues by viewModel.busyRescues.collectAsState()
+    val crashReports by viewModel.crashReports.collectAsState()
     // Re-scanned every time this screen is composed, not only on first launch:
     // a set interrupted by a crash that left the process alive would otherwise
     // stay invisible until the app was killed and started again. The same
@@ -81,6 +83,11 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
     LaunchedEffect(Unit) {
         viewModel.refreshInterrupted()
         viewModel.refreshRescued()
+        // Re-scanned on every composition of this screen for a reason the
+        // other two do not have: a crash report is written by a process that
+        // is dying, so the ONLY way it can ever appear is a later launch, or a
+        // return to Home after a crash that left the process alive.
+        viewModel.refreshCrashReports()
     }
 
     Scaffold(
@@ -120,6 +127,9 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
             // training history, where an interrupted capture is one set.
             RescuedDatabaseNotice(rescued, busyRescues, viewModel::shareRescued, viewModel::discardRescued)
             InterruptedSetNotice(interrupted, viewModel::shareInterrupted, viewModel::discardInterrupted)
+            // Below both: a crash report is a diagnostic about the app, where
+            // the two cards above it are the lifter's own data.
+            CrashReportNotice(crashReports, viewModel::shareCrashReport, viewModel::deleteCrashReport)
             HeroCard(state) { navController.navigate("record") }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -345,6 +355,106 @@ private fun InterruptedSetNotice(
                         }
                         TextButton(onClick = { onDiscard(orphan) }) {
                             Text("DISCARD", color = BarColors.Red)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Crash reports the app wrote about itself, with a way to send one and a way
+ * to delete it. Issue #272.
+ *
+ * The same card shape as [InterruptedSetNotice] and [RescuedDatabaseNotice],
+ * because this screen is already where app-private files the owner may want
+ * off the phone are listed -- there is no separate export screen to extend.
+ * #272 asks for the crash files to sit "beside the session exports"; there is
+ * no list of session exports anywhere. Exports are per-session ACTIONS on
+ * `SessionDetailScreen`, and these three notice cards are the only list of
+ * shareable app-private artifacts this app has.
+ *
+ * COLLAPSED TO ONE CARD, however many reports there are, and that is a
+ * constraint of this screen rather than a preference. [HomeScreen]'s Column
+ * has no `verticalScroll` and the history `LazyColumn` below it is
+ * unweighted, so a card per report would push the lifter's own history off
+ * the bottom with no way to scroll it back -- and ten is the number the
+ * pruner keeps. The newest is named, the rest are behind OLDER.
+ *
+ * THE CAPTION IS NOT [InterruptedSetNotice]'s. That card says "Nothing
+ * deletes it but you", which is true of a set journal and FALSE here: the app
+ * itself deletes the eleventh oldest crash report without asking. Copying the
+ * caption across would have been a false claim on a card three lines long.
+ *
+ * TIMES ARE UTC, where [rescuedDetail] shows the device's own zone. Not an
+ * oversight: the crash file's NAME and its first header line are both UTC, so
+ * a card showing local time would give the owner a different string from the
+ * one inside the file they are about to send, at the moment they are trying
+ * to say which crash they mean. The trailing Z says which it is.
+ *
+ * Nothing here opens a crash file. `CrashLogStore.list` builds every string
+ * on this card from the file name and the directory entry, which is #271's
+ * lesson: that crash was a launch-time listing that decoded what it listed.
+ */
+@Composable
+private fun CrashReportNotice(
+    reports: List<CrashReport>,
+    onShare: (CrashReport) -> Unit,
+    onDelete: (CrashReport) -> Unit,
+) {
+    val newest = reports.firstOrNull() ?: return
+    var showOlder by remember { mutableStateOf(false) }
+    val older = reports.drop(1)
+    Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Column(Modifier.padding(14.dp)) {
+            Text(
+                if (reports.size == 1) "CRASH REPORT" else "CRASH REPORTS (${reports.size})",
+                style = MaterialTheme.typography.titleSmall,
+                color = BarColors.Amber,
+                letterSpacing = 2.sp,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(newest.label, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "${ByteSize.format(newest.bytes)} · the stack, the app version and the free memory",
+                style = MaterialTheme.typography.bodySmall,
+                color = BarColors.Sub,
+            )
+            Spacer(Modifier.height(6.dp))
+            SectionCaption("Kept on this phone, newest ten. Nothing sends it but you")
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onShare(newest) }) {
+                    Text("SEND IT TO ME", color = BarColors.Volt)
+                }
+                TextButton(onClick = { onDelete(newest) }) {
+                    Text("DELETE", color = BarColors.Red)
+                }
+                if (older.isNotEmpty()) {
+                    TextButton(onClick = { showOlder = !showOlder }) {
+                        Text(if (showOlder) "HIDE OLDER" else "OLDER (${older.size})", color = BarColors.Sub)
+                    }
+                }
+            }
+            if (showOlder) {
+                for (report in older) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            "${report.label} · ${ByteSize.format(report.bytes)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = BarColors.Sub,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { onShare(report) }) {
+                            Text("SEND", color = BarColors.Volt)
+                        }
+                        TextButton(onClick = { onDelete(report) }) {
+                            Text("DELETE", color = BarColors.Red)
                         }
                     }
                 }

@@ -12,6 +12,7 @@ import com.macrophage.barspeed.data.RescuedDatabaseStore
 import com.macrophage.barspeed.data.SessionExporter
 import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.data.SetJournalStore
+import com.macrophage.barspeed.model.CrashLogPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -56,6 +57,18 @@ class AppContainer(app: Application) {
      */
     val rescuedDatabases = RescuedDatabaseStore(File(app.filesDir, DatabaseRescue.RESCUE_DIR))
 
+    /**
+     * The crash reports [CrashHandler] has written, for Home's card to list
+     * and share. Issue #272.
+     *
+     * The same directory `LiftingApp.onCreate` hands the handler, recomputed
+     * from the same public constant rather than threaded through as a return
+     * value -- the pattern [rescuedDatabases] above already uses, and for a
+     * sharper reason here: the handler is installed BEFORE this container is
+     * constructed, so it cannot be given anything this container owns.
+     */
+    val crashLogs = CrashLogStore(File(app.filesDir, CrashLogPolicy.DIR))
+
     val deviceRegistry = DeviceRegistry(app)
     val bleScanner = BleScanner()
     val autoConnect = AutoConnectManager(app, deviceRegistry, appScope)
@@ -81,6 +94,12 @@ class LiftingApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // BEFORE the container, deliberately. #272: AppDatabase.build is the
+        // one place this app already knows a launch can die -- a migration or
+        // a rescue -- and a crash handler installed after it would miss
+        // exactly that crash. Nothing the handler reads comes from the
+        // container for the same reason.
+        CrashReporting.install(CrashLogStore(File(filesDir, CrashLogPolicy.DIR)))
         container = AppContainer(this)
         // Auto-connect to both preferred sensors from app launch (spec 4.1).
         container.autoConnect.start()
