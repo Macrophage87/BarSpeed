@@ -4,7 +4,7 @@ import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.assertNull
 
 /**
  * What the guided metronome plays, against what the plan prescribed.
@@ -18,9 +18,10 @@ import kotlin.test.assertTrue
  * string on its own, because TempoSchedule reorders the digits by plane and
  * start phase before the metronome sees them. Two pairs make that concrete:
  * 2011 takes the floor with a face pull and not with a bench press, and 3010
- * keeps its spoken rep call with a bench press but loses it with a drive-down
- * lift started on its eccentric, whose opening stroke is one second instead of
- * three. A test keyed on the notation would miss both.
+ * opens on a three-second stroke with a bench press and on a one-second one
+ * with a drive-down lift started on its eccentric -- so the rep call replaces a
+ * different word, and renumbers a different stroke's counts, from the same four
+ * digits. A test keyed on the notation would miss both.
  */
 class CadencePlanTest {
     private val benchPress = LiftDirection(startsWith = StartPhase.ECCENTRIC, concentricUp = true)
@@ -169,31 +170,41 @@ class CadencePlanTest {
     }
 
     @Test
-    fun `the announcement rides a closing pause the prescription already provides`() {
-        // Free: the pause exists either way, so nothing is added and no count
-        // is given up. Bench 2011 has a full second at the top.
+    fun `a prescription with a closing pause speaks the call on the next rep, not in the pause`() {
+        // #293. The pause used to carry the call, which was free in seconds and
+        // cost a place in the rep: the lifter heard "Rep 3" before rep 3 had
+        // begun. The call opens rep 3 instead, and the pause goes back to being
+        // silent -- no beat moves either way.
         val p = plan("2011", benchPress)
         // BREATHE is the closing pause; HOLD is the one between the strokes.
         assertEquals(listOf("DOWN" to 2, "UP" to 1, CadencePlan.BREATHE to 1), shape(p))
-        assertEquals(2, p.announceOnBeat, "announces on the closing pause")
-        assertEquals(false, p.announceMerged)
-        assertTrue(p.beats.none { it.suppressFirstCount })
+        assertEquals(0, p.announceOnBeat, "announces on the rep's first stroke, where it used to be beat 2")
+        assertEquals(4, p.deliveredCycleS, "and the cycle is the prescription's, as before")
+        assertNull(p.beats[2].spokenLabel, "the closing pause has no word of its own and gains none")
     }
 
     @Test
-    fun `with no closing pause the announcement merges into a stroke long enough to spare a count`() {
-        // TTS speaks with QUEUE_FLUSH, so an utterance needs silence after it or
-        // the next one cuts it off -- and the runner says something every
-        // second. The window is one second whatever the stroke length, so the
-        // only way to widen it is to give up that stroke's first count, which
-        // requires the stroke to have one. 3010 opens on a 3 s eccentric, so
-        // the lifter keeps the spoken rep number.
+    fun `the announcement takes the first stroke's word rather than riding beside it`() {
+        // #293, and the whole of what it costs. TTS speaks with QUEUE_FLUSH, so
+        // an utterance needs the next second to itself: a merged call put two
+        // words in one second -- "Down, Rep 3" -- and bought the room by
+        // silencing that stroke's first tempo count. The number takes the
+        // word's second outright now, so one second carries one utterance and
+        // no count is given up.
         val p = plan("3010", benchPress)
-        assertEquals(0, p.announceOnBeat, "merged into the opening stroke of the next rep")
-        assertEquals(true, p.announceMerged)
-        assertEquals(true, p.beats[0].suppressFirstCount, "that stroke gives up its first count")
-        assertEquals(false, p.beats[1].suppressFirstCount, "and only that stroke")
+        assertEquals(0, p.announceOnBeat, "the opening stroke of the rep the call names")
+        assertEquals("Down", p.beats[0].spokenLabel, "whose word is what the number replaces")
         assertEquals(4, p.deliveredCycleS, "and it still costs no time")
+        assertEquals(
+            SpokenCall("Rep 3", listOf("Rep 3")),
+            CadenceVoice.beatCall(p.beats[0], "Rep 3"),
+            "one word said and one row written, where there were two of each",
+        )
+        assertEquals(
+            listOf("2", "3"),
+            (1..2).mapNotNull { CadenceVoice.countCall(p.beats[0], "Rep 3", it)?.utterance },
+            "and the stroke is counted from the number: the owner's Rep 3, 2, 3",
+        )
     }
 
     @Test
@@ -246,28 +257,33 @@ class CadencePlanTest {
             named(carries = true),
             "pairs that speak it",
         )
-        // Silence is total, not partial: nothing is half-said, and no stroke
-        // gives up a count for a call that never comes.
+        // Silence is total, not partial: nothing is half-said, and every stroke
+        // word of a silent plan is spoken on every rep.
         val silent = named(carries = false)
         corpus.filter { it.first in silent }.forEach { (name, tempo, direction) ->
             val p = plan(tempo, direction)
-            assertEquals(false, p.announceMerged, name)
-            assertTrue(p.beats.none { it.suppressFirstCount }, "$name gives up no count")
+            assertNull(p.announcementFor(2, 6), "$name decides no call for any rep")
+            p.beats.forEach { beat ->
+                assertEquals(
+                    beat.spokenLabel,
+                    CadenceVoice.beatCall(beat, announcement = null)?.utterance,
+                    "$name: ${beat.label} keeps its word",
+                )
+            }
         }
     }
 
     @Test
-    fun `a one-second opener sends the rep call to the second stroke`() {
-        // Issue 147, and the fix for the list above. No closing pause to say
-        // the call in and a one-second opening stroke with no count to give up,
-        // so it goes to the OTHER stroke on the same terms the first would have
-        // had: merged into that stroke's own word, that stroke's first count
-        // given up to widen the window, and not one second added anywhere.
+    fun `a one-second opener keeps the call, because the call takes its word and not its count`() {
+        // Issue 147 gave these seven pairs a spoken rep count by sending the
+        // call to the OTHER stroke -- the only stroke with a count to give up --
+        // which put it one or two beats into the rep. #293 deletes that detour:
+        // the call replaces the opening stroke's word, which every plan has,
+        // whether or not that stroke is long enough to count aloud.
         //
-        // The beat index is the second stroke's, which is also the beat the rep
-        // completes after. It is 2 rather than 1 whenever the prescription puts
-        // an isometric pause between the strokes, so it is asserted per pair
-        // rather than as a constant.
+        // The beat index is 0 on all seven, where it used to be 1 or 2, and the
+        // second column is the beat the rep completes after, which is what the
+        // call is no longer tied to.
         listOf(
             Triple("leg curl 1030", 1, 3),
             Triple("leg curl 1020", 1, 2),
@@ -276,18 +292,22 @@ class CadencePlanTest {
             Triple("leg press 2011", 2, 2),
             Triple("face pull 2011", 2, 2),
             Triple("lat pulldown ecc-first 3010", 1, 3),
-        ).forEach { (name, beat, seconds) ->
+        ).forEach { (name, completionBeat, seconds) ->
             val (_, tempo, direction) = corpus.first { it.first == name }
             val p = plan(tempo, direction)
-            assertEquals(beat, p.announceOnBeat, "$name: the second stroke carries the call")
-            assertEquals(p.repCompleteAfterBeat, p.announceOnBeat, "$name: which is the rep-completion beat")
-            assertEquals(true, p.announceMerged, "$name: merged into that stroke's own word")
-            assertEquals(true, p.beats[beat].isStroke, "$name: and it is a stroke, not a pause")
-            assertEquals(seconds, p.beats[beat].seconds, "$name: seconds of the stroke that carries it")
+            assertEquals(0, p.announceOnBeat, "$name: the call opens the rep")
+            assertEquals(completionBeat, p.repCompleteAfterBeat, "$name: which is no longer where it rides")
+            assertEquals(true, p.beats[0].isStroke, "$name: and beat 0 is a stroke, so it has a word to give")
+            assertEquals(1, p.beats[0].seconds, "$name: one second of it, which is now enough")
             assertEquals(
-                listOf(beat),
-                p.beats.indices.filter { p.beats[it].suppressFirstCount },
-                "$name: exactly that stroke gives up its first count, and only it",
+                seconds,
+                p.beats[completionBeat].seconds,
+                "$name: the stroke that used to carry the call keeps its own word and both its counts",
+            )
+            assertEquals(
+                p.repCompleteAfterBeat + 1,
+                p.beatsOfRepLeftWhenAnnounced,
+                "$name: the whole rep is ahead of the lifter when the number lands",
             )
         }
     }
@@ -379,38 +399,40 @@ class CadencePlanTest {
         val pulldown = plan("3010", latPulldownEccFirst)
         assertEquals(listOf("UP" to 1, "DOWN" to 3), shape(pulldown), "drive-down, ecc-first")
         assertEquals(4, pulldown.deliveredCycleS)
-        assertEquals(1, pulldown.announceOnBeat, "one-second opener, so the second stroke takes the call")
-        assertEquals(true, pulldown.announceMerged)
-        assertEquals(true, pulldown.beats[1].suppressFirstCount, "and gives up its first count for it")
+        assertEquals(0, pulldown.announceOnBeat, "the call replaces its one-second opener's word")
+        assertEquals("Up", pulldown.beats[0].spokenLabel, "which is Up on this geometry, not Down")
 
         val chestPress = plan("3010", chestPressEccFirst)
         assertEquals(listOf("RETURN" to 3, "DRIVE" to 1), shape(chestPress), "horizontal, ecc-first")
         assertEquals(4, chestPress.deliveredCycleS)
         assertEquals(0, chestPress.announceOnBeat, "opens on a three-second stroke")
-        assertEquals(true, chestPress.announceMerged)
+        assertEquals("Return", chestPress.beats[0].spokenLabel, "whose word is a phase, having no up or down")
     }
 
     @Test
-    fun `the merge threshold is two seconds, and two seconds is enough`() {
-        // Pins the value itself, not just an interval around it. A 2 s opening
-        // stroke merges; the one-second cases below do not. Raise the threshold
-        // to 3 and this reds; lower it to 1 and the one-second pin reds.
-        assertEquals(2, CadencePlan.MERGE_MIN_STROKE_S)
+    fun `a two-second stroke at either end of the rep leaves the plan able to speak`() {
+        // The boundary between this issue's rule and #266's, pinned by
+        // behaviour rather than by a constant's name. A prescription with a
+        // two-second stroke speaks, wherever in the rep that stroke sits; a
+        // prescription of two one-second strokes and no closing pause says
+        // nothing here and takes #266's lockout placement instead. The owner
+        // ruled that boundary and it is not this change's to move: "We already
+        // ruled on the 1010 question. Rep count is at lockout."
         val p = plan("2010", benchPress)
         assertEquals(listOf("DOWN" to 2, "UP" to 1), shape(p), "opens on exactly two seconds")
-        assertEquals(0, p.announceOnBeat, "which is enough to carry the call")
-        assertEquals(true, p.announceMerged)
-        assertEquals(true, p.beats[0].suppressFirstCount)
-        // The same threshold on the same terms for the second stroke. Leg press
-        // 2010 is the same four digits resolved the other way round, so the
-        // two-second stroke is the one the rep ends on rather than opens with.
+        assertEquals(0, p.announceOnBeat, "so the plan speaks, and the call opens the rep")
+        // Leg press 2010 is the same four digits resolved the other way round,
+        // so the two-second stroke is the one the rep ends on rather than opens
+        // with -- and the call still opens the rep, on the one-second stroke.
         val q = plan("2010", legPress)
         assertEquals(listOf("UP" to 1, "DOWN" to 2), shape(q), "closes on exactly two seconds")
-        assertEquals(1, q.announceOnBeat, "which is equally enough")
-        assertEquals(true, q.beats[1].suppressFirstCount)
-        // And one second is not enough at either end of the rep. Raise the
-        // threshold to 3 and both pins above red; lower it to 1 and this reds.
-        assertEquals(null, plan("1010", legPress).announceOnBeat, "neither stroke has a count to give up")
+        assertEquals(0, q.announceOnBeat, "which is equally enough for the plan to speak")
+        assertEquals("Up", q.beats[0].spokenLabel, "and the word the number replaces is the one-second one")
+        // Two one-second strokes and no closing pause is the one shape that
+        // still says nothing. Raise the threshold to 3 and the two pins above
+        // red; lower it to 1 and this one does.
+        assertEquals(null, plan("1010", legPress).announceOnBeat, "1010 is #266's, on every lift")
+        assertEquals(null, plan("1110", benchPress).announceOnBeat, "as is 1110 where the pause stays inside the rep")
     }
 
     @Test
@@ -426,9 +448,16 @@ class CadencePlanTest {
     @Test
     fun `the cue vocabulary a plan can emit is the one the committed tracks use`() {
         // The persisted format. A plan's spokenLabel becomes a row in the set's
-        // cue track, and every fixture and parser matches these strings exactly
-        // -- CueTrack.calledReps counts rows equal to "Down". Anything that
-        // widens this set renames a column of history.
+        // cue track, and every fixture and parser matches these strings exactly.
+        // Anything that widens this set renames a column of history.
+        //
+        // WHAT #293 CHANGES IS THE POPULATION, NOT THE VOCABULARY: no word is
+        // renamed and none is added, and the first stroke's word is written on
+        // rep 1 only, because the rep number takes its second on every rep after
+        // that. `CueTrack.calledReps` counts rows equal to "Down" and therefore
+        // counts ONE on a newly recorded eccentric-first press; its own KDoc
+        // says so now, and the export's `voiceCues` entry says it to a reader of
+        // an archive.
         val emitted = listOf(
             "3010" to benchPress,
             "2011" to facePull,

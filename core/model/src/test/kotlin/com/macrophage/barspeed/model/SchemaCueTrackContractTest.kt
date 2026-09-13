@@ -215,6 +215,73 @@ class SchemaCueTrackContractTest {
     }
 
     /**
+     * The published documents say the call OPENS the rep it names, and what
+     * that costs a reader (#293).
+     *
+     * Three sentences of the shipped document are made false by the change and
+     * each is handled here in the way this log already handles an expired claim.
+     *
+     * - "WHEN a call is heard depends on the schedule and is not uniform" is
+     *   SCOPED rather than deleted: it is the reading rule for every set recorded
+     *   from 1.13 through 1.19, which is the only thing it was ever for, and the
+     *   1.13 entry's own precedent is that a rule for a shipped version is
+     *   history rather than a claim about the current app.
+     * - "Consumers matching a stroke row still match it unchanged" is DELETED as
+     *   an unscoped present-tense claim. It is exactly wrong from 1.20: the call
+     *   replaces the first stroke's word instead of riding beside it, so a
+     *   consumer matching those rows matches one per SET rather than one per rep
+     *   on the geometries whose first stroke is the one it matches.
+     * - "a guided track carries two of them on every rep" is DELETED for the
+     *   same reason and narrowed to what survives, which is still enough to
+     *   attribute a track: one stroke word in every rep, two in rep 1.
+     *
+     * `RepCallPlacementTest` and `CueTrackOriginTest` in `:core:dsp` pin the
+     * behaviour; this pins that the published document states it.
+     */
+    @Test
+    fun `the published documents say a call opens the rep it names from 1_20`() {
+        val schema = schema("session-export.schema.json")
+        val versionLog = schema["properties"]!!.jsonObject["schemaVersion"]!!
+            .jsonObject["description"]!!.jsonPrimitive.content
+        val voiceCues = schema["\$defs"]!!.jsonObject["set"]!!
+            .jsonObject["properties"]!!.jsonObject["voiceCues"]!!.jsonObject["description"]!!
+            .jsonPrimitive.content
+        assertTrue("1.20 carries a THIRD change" in versionLog, "the version log does not file the placement change")
+        assertTrue(
+            "opens the rep it names" in voiceCues,
+            "voiceCues does not say where a call lands from 1.20",
+        )
+        assertTrue(
+            "in place of that rep's first stroke word" in voiceCues,
+            "voiceCues does not say that the stroke word is replaced rather than joined",
+        )
+        assertTrue(
+            "in place of that rep's first stroke word" in versionLog,
+            "the version log does not say what the call replaces",
+        )
+        assertTrue(
+            "recorded from 1.13 through 1.19" in voiceCues,
+            "voiceCues does not scope the old placement rule to the versions it describes",
+        )
+        assertFalse(
+            "Consumers matching a stroke row still match it unchanged" in voiceCues,
+            "voiceCues still tells a consumer matching stroke rows that nothing changed, false from 1.20",
+        )
+        assertFalse(
+            "carries two of them on every rep" in voiceCues,
+            "voiceCues still says a guided rep carries both stroke words, false from 1.20",
+        )
+        assertTrue(
+            "in every rep" in voiceCues,
+            "voiceCues does not say what the discriminator narrows to",
+        )
+        assertTrue(
+            "to count reps" in voiceCues,
+            "voiceCues does not tell a reader how to count reps off a 1.20 track",
+        )
+    }
+
+    /**
      * The published vocabulary says how a consumer tells the two counters
      * apart.
      *

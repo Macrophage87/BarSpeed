@@ -119,43 +119,40 @@ class MergedCallCueTrackTest {
         }
     }
 
-    /** True when every element of [inner] appears in [outer], in order. */
-    private fun <T> isSubsequence(inner: List<T>, outer: List<T>): Boolean {
-        var i = 0
-        for (e in outer) if (i < inner.size && inner[i] == e) i++
-        return i == inner.size
-    }
-
-    /** The elements of [outer] left over once [inner] has been matched into it. */
-    private fun <T> surplus(inner: List<T>, outer: List<T>): List<T> {
-        var i = 0
-        return outer.filter { e ->
-            if (i < inner.size && inner[i] == e) {
-                i++
-                false
-            } else {
-                true
-            }
-        }
-    }
+    /**
+     * True when a row is one of the guide's rep calls.
+     *
+     * `isSubsequence` and `surplus` used to live here, matching an archive into
+     * the script as an ordered subsequence. They are deleted with the claim
+     * they served: from #293 the script CONTRADICTS a row every one of these
+     * tracks carries -- the first stroke word of every rep after the first --
+     * so "the recording is accounted for by the plan" is no longer a true
+     * statement to test, and a helper that computes a leftover under a broken
+     * premise reads as though it still were.
+     */
+    private fun isCall(row: String) = row == CadencePlan.LAST_REP || row.startsWith(CadencePlan.REP_CALL_PREFIX)
 
     /** The cue rows the plan says a set of [reps] reps writes, as (second, row). */
     private fun scriptRows(p: CadencePlan, reps: Int): List<Pair<Int, String>> =
         CadenceVoice.script(p, reps).flatMap { call -> call.recorded.map { call.atSecond to it } }
 
     @Test
-    fun `the tempo string does not say which plan case a set was paced on`() {
-        // The whole of the correction above, as an assertion. Same four digits,
-        // two lifts, two different homes for the rep call -- and the home is
-        // what decides whether the call still has a rep in front of it.
+    fun `the tempo string still does not say what the call replaces, or what it costs`() {
+        // The correction above, as an assertion. The three plans now put the
+        // call in the SAME place -- beat 0, the rep's first stroke -- and the
+        // (tempo, lift) pair still decides everything else about it: WHICH word
+        // it replaces, and whether that stroke has counts to renumber.
+        //
+        // Before #293 the pair decided the home itself: beat 0 on set 1, beat 1
+        // on set 5, beat 2 on set 13, from two tempo strings.
         val eccFirst = plan("3010", inclinePress)
         assertEquals(listOf("DOWN" to 3, "UP" to 1), eccFirst.beats.map { it.label to it.seconds }, "set 1")
-        assertEquals(0, eccFirst.announceOnBeat, "set 1 merges the call into the NEXT rep's opening stroke")
+        assertEquals(0, eccFirst.announceOnBeat, "set 1: the call opens the rep, as it already did")
         assertEquals(1, eccFirst.repCompleteAfterBeat, "which is not the beat the rep completes after")
 
         val concFirst = plan("3010", seatedOhp)
         assertEquals(listOf("UP" to 1, "DOWN" to 3), concFirst.beats.map { it.label to it.seconds }, "set 5")
-        assertEquals(1, concFirst.announceOnBeat, "set 5 merges it into the rep's own second stroke")
+        assertEquals(0, concFirst.announceOnBeat, "set 5: the same four digits, and the call moves off beat 1")
         assertEquals(1, concFirst.repCompleteAfterBeat, "which IS the beat the rep completes after")
 
         val fourSecond = plan("1120", pushdown)
@@ -164,9 +161,22 @@ class MergedCallCueTrackTest {
             fourSecond.beats.map { it.label to it.seconds },
             "set 13",
         )
-        assertEquals(2, fourSecond.announceOnBeat, "set 13 likewise")
+        assertEquals(0, fourSecond.announceOnBeat, "set 13: off beat 2, which is where its rep ends")
         assertEquals(2, fourSecond.repCompleteAfterBeat)
-        listOf(eccFirst, concFirst, fourSecond).forEach { assertEquals(true, it.announceMerged) }
+        // The whole of the named rep is ahead of the lifter on all three, which
+        // is what the placement is for.
+        listOf(eccFirst, concFirst, fourSecond).forEach { p ->
+            assertEquals(
+                p.repCompleteAfterBeat + 1,
+                p.beatsOfRepLeftWhenAnnounced,
+                "${p.beats.map { it.label to it.seconds }}: the call opens the rep it names",
+            )
+        }
+        // And the word it replaces is the pair's, not the tempo's: `Down` on
+        // the eccentric-first press, `Up` on the concentric-first overhead
+        // press, from the same `3010`.
+        assertEquals("Down", eccFirst.beats[0].spokenLabel, "set 1's first stroke word")
+        assertEquals("Up", concFirst.beats[0].spokenLabel, "set 5's, from the same four digits")
     }
 
     @Test
@@ -236,109 +246,125 @@ class MergedCallCueTrackTest {
     }
 
     @Test
-    fun `the model of the guide accounts for every row three real sets recorded`() {
-        // What holds CadenceVoice.script to the truth. The script is a model of
-        // a loop in :app that no test can run; these are three tracks that loop
-        // actually produced, on a phone, in a gym. Every row it wrote appears in
-        // the script at the same second of the cadence, in the same order.
+    fun `the guide no longer accounts for every row these three sets recorded`() {
+        // What #176 could assert and #293 ends. The script used to CONTAIN each
+        // 0.1.43 track as a subsequence -- it added the calls the app spoke and
+        // never wrote, and contradicted no row it did write. It cannot now: the
+        // number replaces the first stroke's word, so a word each archive
+        // carries on every rep is not spoken any more.
         //
-        // INCLUSION rather than equality, deliberately: what issue 176 changes
-        // is that the script starts accounting for rows the shipped app spoke
-        // and did not write, so the script may exceed a 0.1.43 track and may
-        // never contradict one. Which rows it adds is asserted where they are
-        // added, not here.
+        // Both directions, per set, written out. What LEAVES each archive is one
+        // stroke word per rep after the first -- plus, on set 1, the `2` that
+        // stroke now says a second earlier. What ARRIVES is the calls, which are
+        // #176's subject, and the counts the carrying stroke used to give up.
+        assertEquals(
+            listOf(
+                4 to "Down", 6 to "2", 8 to "Down", 10 to "2", 12 to "Down", 14 to "2",
+                16 to "Down", 18 to "2", 20 to "Down", 22 to "2", 24 to "Down", 26 to "2",
+                28 to "Down", 30 to "2", 32 to "Down", 34 to "2", 36 to "Down", 38 to "2",
+            ),
+            cadenceRows(set01) - scriptRows(plan("3010", inclinePress), 10).toSet(),
+            "set 1: nine Down words the number replaces, and the count each of those strokes renumbers",
+        )
+        assertEquals(
+            listOf(4 to "Up", 8 to "Up", 12 to "Up", 16 to "Up", 20 to "Up", 24 to "Up", 28 to "Up"),
+            cadenceRows(set05) - scriptRows(plan("3010", seatedOhp), 8).toSet(),
+            "set 5: seven Up words and nothing else -- its lowering keeps its own word and its counts",
+        )
+        assertEquals(
+            listOf(
+                4 to "Down", 8 to "Down", 12 to "Down", 16 to "Down", 20 to "Down", 24 to "Down",
+                28 to "Down", 32 to "Down", 36 to "Down", 40 to "Down", 44 to "Down",
+            ),
+            cadenceRows(set13) - scriptRows(plan("1120", pushdown), 12).toSet(),
+            "set 13: eleven Down words",
+        )
+        // And the row counts, so the population is readable rather than
+        // inferred from two lists.
         listOf(
-            Triple(set01, plan("3010", inclinePress), 10),
-            Triple(set05, plan("3010", seatedOhp), 8),
-            Triple(set13, plan("1120", pushdown), 12),
-        ).forEach { (fixture, p, reps) ->
-            val recorded = cadenceRows(fixture)
-            val script = scriptRows(p, reps)
-            assertTrue(
-                isSubsequence(recorded, script),
-                "$fixture: the recording is not accounted for by the plan.\nrecorded: $recorded\nscript:   $script",
-            )
-            val (lastSecond, lastRow) = recorded.last()
-            assertEquals(CadenceVoice.DONE, lastRow, "$fixture: the last row of a completed set")
-            assertEquals(
-                reps * p.deliveredCycleS,
-                lastSecond,
-                "$fixture: and its Done lands where the prescription says it does",
-            )
+            Triple(set01, scriptRows(plan("3010", inclinePress), 10), 32 to 41),
+            Triple(set05, scriptRows(plan("3010", seatedOhp), 8), 26 to 33),
+            Triple(set13, scriptRows(plan("1120", pushdown), 12), 38 to 49),
+        ).forEach { (fixture, scripted, counts) ->
+            val (archived, now) = counts
+            assertEquals(archived, cadenceRows(fixture).size, "$fixture: rows in the 0.1.43 archive")
+            assertEquals(now, scripted.size, "$fixture: rows the guide writes for the same set now")
         }
     }
 
     @Test
-    fun `the rows the guide now adds to set 1 are nine calls, at the nine instants it spoke`() {
-        // Issue 176 against a real track rather than a constructed plan: the
-        // ten-rep incline press said a rep call at the start of every rep after
-        // the first, and its cue track names none of them. These are the
-        // instants, on the cadence clock, that the archive is missing.
+    fun `the calls set 1 spoke and never wrote are named now, at the same nine instants`() {
+        // Issue 176 against a real track: the ten-rep incline press said a rep
+        // call at the start of every rep after the first, and its cue track
+        // names none of them. These are the instants, on the cadence clock, that
+        // the archive is missing -- and on THIS plan #293 does not move them,
+        // because its call already opened the rep. What moves is that the `Down`
+        // those nine instants carried is not spoken, and the stroke is counted
+        // from the number instead.
         //
-        // The INSTANTS are what 0.1.43 spoke on, unchanged. The WORDS are not:
-        // #243 moved the number onto the rep being called for, so where that
-        // session heard "Rep 1" at second 4 the guide now says "Rep 2" there,
-        // about the rep beginning on that second. Nine calls either way.
-        val recorded = cadenceRows(set01)
+        // The WORDS are not 0.1.43's either: #243 moved the number onto the rep
+        // being called for, so where that session heard "Rep 1" at second 4 the
+        // guide now says "Rep 2" there.
+        val scripted = scriptRows(plan("3010", inclinePress), 10)
         assertEquals(
             listOf(
-                4 to "Rep 2",
-                8 to "Rep 3",
-                12 to "Rep 4",
-                16 to "Rep 5",
-                20 to "Rep 6",
-                24 to "Rep 7",
-                28 to "Rep 8",
-                32 to "Rep 9",
-                36 to "Last rep",
+                4 to "Rep 2", 8 to "Rep 3", 12 to "Rep 4", 16 to "Rep 5", 20 to "Rep 6",
+                24 to "Rep 7", 28 to "Rep 8", 32 to "Rep 9", 36 to CadencePlan.LAST_REP,
             ),
-            surplus(recorded, scriptRows(plan("3010", inclinePress), 10)),
+            scripted.filter { isCall(it.second) },
             "the calls the guide adds to set 1's archive",
         )
-    }
-
-    @Test
-    fun `the rows the fix adds to set 13 ride the stroke word that silenced a count`() {
-        // The same on the 1120 pushdown, whose call rides the LAST stroke of
-        // the rep it announces. Restricted to the reps before the final one:
-        // what the final rep's call should be is issue 173's question, asserted
-        // with it, and this assertion must not answer it in passing.
-        //
-        // Each added row lands two seconds into a four-second rep, which is the
-        // "Up" the track does record -- and one second before the slot the
-        // track leaves silent, which is the count given up to make room.
-        val recorded = cadenceRows(set13)
-        val finalRepStarts = 11 * plan("1120", pushdown).deliveredCycleS
-        assertEquals(
-            (1..10).map { (it * 4 + 2) to "Rep ${it + 1}" },
-            surplus(recorded, scriptRows(plan("1120", pushdown), 12)).filter { it.first < finalRepStarts },
-            "the calls the guide adds to set 13's archive, before its last rep",
+        assertTrue(
+            cadenceRows(set01).none { isCall(it.second) },
+            "$set01 names a rep call, which no 0.1.43 track does",
         )
     }
 
     @Test
-    fun `the final rep of every one of these plans is named now, on the beat 0_1_43 used`() {
-        // Issue 176 makes what the final rep says OBSERVABLE, which is the
-        // whole reason it travels with any change to it: before it, a
-        // suppressed warning and a spoken one wrote the same cue track and no
-        // session could tell them apart.
+    fun `set 13's calls open the rep, two seconds before the silence the archive shows`() {
+        // The same on the 1120 pushdown, whose call rode the LAST stroke of the
+        // rep it announced. It opens the rep now: second 4 rather than 6 for rep
+        // 2, in place of the `Down` the archive has at 4, and the `Up` stroke
+        // keeps the `1` it used to give up -- which the archive shows missing on
+        // every rep but the first.
+        val scripted = scriptRows(plan("1120", pushdown), 12)
+        assertEquals(
+            (2..11).map { (it - 1) * 4 to "Rep $it" } + listOf(44 to CadencePlan.LAST_REP),
+            scripted.filter { isCall(it.second) },
+            "set 13's calls, one per rep after the first, each opening its rep",
+        )
+        assertEquals(
+            12,
+            scripted.count { it.second == "1" },
+            "and the count that stroke gave up is spoken on all twelve reps",
+        )
+        assertEquals(
+            1,
+            cadenceRows(set13).count { it.second == "1" },
+            "where the archive carries it once, on rep 1",
+        )
+    }
+
+    @Test
+    fun `the final rep of all three plans opens on its warning`() {
+        // Issue 176 makes what the final rep says OBSERVABLE, and #173 then
+        // #243 decided that it is said at all. #293 decides WHERE: the warning
+        // opens the final rep in place of its first stroke word, so the lifter
+        // hears it with the whole rep in front of them on every one of the
+        // three. #173's report -- "It sometimes says last rep, done, with no rep
+        // in between" -- was about a warning that arrived with one beat left.
         //
-        // Each row here is (the last rep's window in the 0.1.43 archive, the
-        // same window as the guide now scripts it). One row is added on each:
-        // the `Last rep` that 0.1.43 spoke into the final stroke and never
-        // wrote down, which #173 then withheld and #243 speaks again -- on the
-        // same second, now that the calls before it name the rep in hand
-        // rather than the one behind it. The tempo count on the second after
-        // it stays given up, exactly as the recorded track shows it was.
+        // Each row is (the last rep's window in the 0.1.43 archive, the same
+        // window as the guide scripts it now).
         listOf(
             Triple(
                 Triple(set13, plan("1120", pushdown), 12),
                 listOf(44 to "Down", 45 to "Hold", 46 to "Up", 48 to CadenceVoice.DONE),
                 listOf(
-                    44 to "Down",
+                    44 to CadencePlan.LAST_REP,
                     45 to "Hold",
                     46 to "Up",
-                    46 to CadencePlan.LAST_REP,
+                    47 to "1",
                     48 to CadenceVoice.DONE,
                 ),
             ),
@@ -346,11 +372,22 @@ class MergedCallCueTrackTest {
                 Triple(set05, plan("3010", seatedOhp), 8),
                 listOf(28 to "Up", 29 to "Down", 31 to "2", 32 to CadenceVoice.DONE),
                 listOf(
-                    28 to "Up",
+                    28 to CadencePlan.LAST_REP,
                     29 to "Down",
-                    29 to CadencePlan.LAST_REP,
+                    30 to "1",
                     31 to "2",
                     32 to CadenceVoice.DONE,
+                ),
+            ),
+            Triple(
+                Triple(set01, plan("3010", inclinePress), 10),
+                listOf(36 to "Down", 38 to "2", 39 to "Up", 40 to CadenceVoice.DONE),
+                listOf(
+                    36 to CadencePlan.LAST_REP,
+                    37 to "2",
+                    38 to "3",
+                    39 to "Up",
+                    40 to CadenceVoice.DONE,
                 ),
             ),
         ).forEach { (input, archived, scripted) ->
@@ -363,32 +400,24 @@ class MergedCallCueTrackTest {
                 scriptRows(p, reps).count { it.second == CadencePlan.LAST_REP },
                 "$fixture: the set names its last rep once",
             )
+            assertEquals(
+                finalRepStarts to CadencePlan.LAST_REP,
+                scriptRows(p, reps).first { it.second == CadencePlan.LAST_REP },
+                "$fixture: and says it on the final rep's first second",
+            )
         }
-        // The case that never lost the warning: set 1 is the same session and
-        // the same four digits, its call opens the final rep's FIRST stroke,
-        // and its window is untouched by #243. What issue 176 adds to its
-        // archive is that same warning, at second 36, where the recorded track
-        // has the bare `Down` it rode.
-        val set01Plan = plan("3010", inclinePress)
-        val finalRep = 9 * set01Plan.deliveredCycleS
-        assertEquals(
-            listOf(36 to "Down", 38 to "2", 39 to "Up", 40 to CadenceVoice.DONE),
-            cadenceRows(set01).filter { it.first >= finalRep },
-            "$set01, recorded",
-        )
-        assertEquals(
-            listOf(36 to "Down", 36 to CadencePlan.LAST_REP, 38 to "2", 39 to "Up", 40 to CadenceVoice.DONE),
-            scriptRows(set01Plan, 10).filter { it.first >= finalRep },
-            "$set01, scripted",
-        )
     }
 
     @Test
-    fun `the final rep of a merged-on-its-own-last-stroke set has one stroke left when the call lands`() {
+    fun `what 0_1_43 left after the call on the final rep, which is what #293 moves`() {
         // Issue #173, stated in the rows rather than in the KDoc that deferred
-        // it to a session. The call rides the last stroke word of the LAST rep,
-        // so between hearing it and hearing "Done" the lifter has that stroke
-        // and no further rep -- two seconds on set 13, three on set 5.
+        // it to a session. ARCHIVE ONLY: every figure here is read from a
+        // recording and none of it moves. On 0.1.43 the call rode the last
+        // stroke word of the LAST rep on these two sets, so between hearing it
+        // and hearing "Done" the lifter had that stroke and no further rep --
+        // two seconds on set 13, three on set 5. The guide now opens the final
+        // rep with the warning instead, which `the final rep of all three plans
+        // opens on its warning` above pins on the scripted side.
         //
         // What is between them is NOT nothing on set 5, and an earlier draft of
         // this test asserted that it was: the three-second eccentric counts
@@ -406,9 +435,10 @@ class MergedCallCueTrackTest {
                 "$fix: what the app says between the last stroke call and Done",
             )
         }
-        // The eccentric-first 3010 is the counter-case: its call lands on the
-        // NEXT rep's opening stroke, so a whole rep follows it, and the two
-        // seconds before "Done" carry the rest of that rep's own cadence.
+        // The eccentric-first 3010 is the counter-case even in 0.1.43: its call
+        // rode the opening stroke of the rep it named, so a whole rep followed
+        // it, and the two seconds before "Done" carry the rest of that rep's own
+        // cadence. That is the placement #293 gives the other two.
         val rows = CueTrack.read(set01)
         val done = rows.first { it.label == "Done" }
         val lastStroke = rows.last { it.label in setOf("Down", "Up") }

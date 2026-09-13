@@ -73,6 +73,16 @@ internal object CueTrack {
      * This is the figure that corroborates the per-set hand counts the
      * regression suite asserts as "performed". Those were bare numbers in a
      * test with nothing behind them until these tracks were committed.
+     *
+     * ONLY VALID ON A TRACK RECORDED BEFORE #293, which every committed fixture
+     * is. From that change the rep number is spoken in place of the first
+     * stroke's word on every rep after the first, so on a lift whose first
+     * stroke is the `Down` -- an eccentric-first press -- a newly recorded track
+     * carries ONE `Down` row for the whole set and this returns 1. On a
+     * concentric-first lift the `Down` is the second stroke and nothing changes.
+     * A rule that works either side of the boundary counts the rep calls plus
+     * rep 1's own first stroke word; nothing needs one yet, so it is described
+     * here and not written.
      */
     fun calledReps(fixture: String): Int = movement(fixture, "Down").size
 }

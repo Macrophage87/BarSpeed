@@ -57,9 +57,14 @@ import kotlin.test.assertTrue
  * exersizing"* -- the voice is the live channel, so where in the rep a word
  * lands is the whole of what the lifter gets.
  *
- * CHARACTERIZATION at this commit: every expectation below is what the shipped
- * guide says, and the three archives are what it said. Nothing here is a
- * proposal.
+ * ## What is pinned here, and against what
+ *
+ * The three archives are FACTS and are asserted as recorded; the script side is
+ * what the guide says after #293. The commit before this one asserted the two
+ * were equal, which they were: the shipped script reproduced all three tracks
+ * row for row, and that is the licence for moving it. Every row the script now
+ * says differently is named below, in both directions -- the archive rows it no
+ * longer writes and the rows it writes instead.
  */
 class RepCallPlacementTest {
     /** field-41 set 1: seated_overhead_press, CONC-first, drive up, vertical, off-stack. */
@@ -126,18 +131,33 @@ class RepCallPlacementTest {
         CadenceVoice.script(p, reps).flatMap { call -> call.recorded.map { call.atSecond to it } }
 
     @Test
-    fun `the plans these three sets were paced on, which two tempo strings do not say`() {
+    fun `the call opens the rep on all three plans, whichever stroke the tempo puts first`() {
+        // The beats do not move -- they are the prescription's, and
+        // `CadencePlanTest` pins that against every tempo any plan can express.
+        // What moves is WHERE the call rides: beat 0, the rep's first stroke,
+        // on all three. Two of the three used to ride the rep's own LAST
+        // stroke, which is a second into the rep on the overhead press and a
+        // second into the pull-up.
         val ohpPlan = plan(tracks[0])
         assertEquals(listOf("UP" to 1, "DOWN" to 3), ohpPlan.beats.map { it.label to it.seconds }, "field-41 set 1")
-        assertEquals(1, ohpPlan.announceOnBeat, "the call rides the rep's own last stroke")
+        assertEquals(0, ohpPlan.announceOnBeat, "the call opens the rep, where it rode beat 1 before")
 
         val benchPlan = plan(tracks[1])
         assertEquals(listOf("DOWN" to 3, "UP" to 1), benchPlan.beats.map { it.label to it.seconds }, "field-42 set 5")
-        assertEquals(0, benchPlan.announceOnBeat, "the same four digits, and the call rides the rep's first stroke")
+        assertEquals(0, benchPlan.announceOnBeat, "the same four digits, and the same beat as before")
 
         val pullUpPlan = plan(tracks[2])
         assertEquals(listOf("UP" to 1, "DOWN" to 4), pullUpPlan.beats.map { it.label to it.seconds }, "field-42 set 13")
-        assertEquals(1, pullUpPlan.announceOnBeat, "a four-second lowering, carrying the call")
+        assertEquals(0, pullUpPlan.announceOnBeat, "likewise, and the four-second lowering keeps its own word")
+        // The whole rep is ahead of the lifter when they hear its number, on
+        // every one of the three. That is the point of #293 stated as a number.
+        listOf(ohpPlan, benchPlan, pullUpPlan).forEach { p ->
+            assertEquals(
+                p.repCompleteAfterBeat + 1,
+                p.beatsOfRepLeftWhenAnnounced,
+                "${p.beats.map { it.label to it.seconds }}: every beat of the named rep is still to come",
+            )
+        }
     }
 
     @Test
@@ -190,18 +210,125 @@ class RepCallPlacementTest {
     }
 
     @Test
-    fun `the shipped guide scripts all three tracks row for row`() {
-        // The licence for changing the script at all: it reproduces what the
-        // app said, on real sets, before anything here moves. These three have
-        // no closing pause, so #265 -- the last rep's restored pause -- does
-        // not separate the archives from the current script either.
+    fun `the guide now writes these rows over the same three plans`() {
+        // Every row of the new script, at the second it lands on, against the
+        // archives pinned above. Written out rather than derived, so a rule and
+        // this table cannot agree by sharing an expression.
+        //
+        // Rep 1 is untouched on all three: it keeps its stroke word, its own
+        // counts and its place. Every rep after it opens on its number.
+        assertEquals(
+            listOf(
+                0 to "Up", 1 to "Down", 2 to "1", 3 to "2",
+                4 to "Rep 2", 5 to "Down", 6 to "1", 7 to "2",
+                8 to "Rep 3", 9 to "Down", 10 to "1", 11 to "2",
+                12 to "Rep 4", 13 to "Down", 14 to "1", 15 to "2",
+                16 to "Rep 5", 17 to "Down", 18 to "1", 19 to "2",
+                20 to "Rep 6", 21 to "Down", 22 to "1", 23 to "2",
+                24 to "Rep 7", 25 to "Down", 26 to "1", 27 to "2",
+                28 to "Last rep", 29 to "Down", 30 to "1", 31 to "2",
+                32 to "Done",
+            ),
+            scriptRows(plan(tracks[0]), 8),
+            "field-41 set 1: the number takes the `Up` slot and the lowering is counted on every rep",
+        )
+        assertEquals(
+            listOf(
+                0 to "Down", 1 to "1", 2 to "2", 3 to "Up",
+                4 to "Rep 2", 5 to "2", 6 to "3", 7 to "Up",
+                8 to "Rep 3", 9 to "2", 10 to "3", 11 to "Up",
+                12 to "Rep 4", 13 to "2", 14 to "3", 15 to "Up",
+                16 to "Rep 5", 17 to "2", 18 to "3", 19 to "Up",
+                20 to "Last rep", 21 to "2", 22 to "3", 23 to "Up",
+                24 to "Done",
+            ),
+            scriptRows(plan(tracks[1]), 6),
+            "field-42 set 5: the owner's own example -- `Rep 3, 2, 3, Up`",
+        )
+        assertEquals(
+            listOf(
+                0 to "Up", 1 to "Down", 2 to "1", 3 to "2", 4 to "3",
+                5 to "Rep 2", 6 to "Down", 7 to "1", 8 to "2", 9 to "3",
+                10 to "Rep 3", 11 to "Down", 12 to "1", 13 to "2", 14 to "3",
+                15 to "Rep 4", 16 to "Down", 17 to "1", 18 to "2", 19 to "3",
+                20 to "Rep 5", 21 to "Down", 22 to "1", 23 to "2", 24 to "3",
+                25 to "Rep 6", 26 to "Down", 27 to "1", 28 to "2", 29 to "3",
+                30 to "Rep 7", 31 to "Down", 32 to "1", 33 to "2", 34 to "3",
+                35 to "Last rep", 36 to "Down", 37 to "1", 38 to "2", 39 to "3",
+                40 to "Done",
+            ),
+            scriptRows(plan(tracks[2]), 8),
+            "field-42 set 13: a four-second lowering counted `1 2 3` on every rep",
+        )
+        // And no set gets longer or shorter for it: `Done` still lands at reps
+        // x the delivered cycle, which is the obligation `CadencePlanTest`
+        // states as a rule over every tempo.
         tracks.forEach { track ->
+            val p = plan(track)
             assertEquals(
-                cadenceRows(track.fixture),
-                scriptRows(plan(track), track.reps),
-                "${track.fixture}: ${track.tempo}, ${track.reps} reps",
+                track.reps * p.deliveredCycleS to CadenceVoice.DONE,
+                scriptRows(p, track.reps).last(),
+                "${track.fixture}: the set is as long as its prescription",
             )
         }
+    }
+
+    @Test
+    fun `the rows that vanish from each archive, and the rows that arrive`() {
+        // The difference in both directions, per set, so neither half can be
+        // read off a single list. What LEAVES is one stroke word per rep after
+        // the first -- the word the number replaces -- and, on the two
+        // one-second openers, the merged call row at its old second. What
+        // ARRIVES is the number at the rep's own first second, and the tempo
+        // count the carrying stroke used to give up.
+        tracks.forEach { track ->
+            val archived = cadenceRows(track.fixture)
+            val scripted = scriptRows(plan(track), track.reps)
+            assertEquals(
+                archived.size,
+                scripted.size,
+                "${track.fixture}: a word is replaced and a count restored, so the row COUNT does not move",
+            )
+        }
+        // field-41 set 1: seven `Up` rows and the eighth rep's go, with the
+        // eight merged calls that rode `Down`; the numbers arrive four seconds
+        // earlier each, and seven `1` counts arrive on the lowering.
+        assertEquals(
+            listOf(
+                4 to "Up", 5 to "Rep 2", 8 to "Up", 9 to "Rep 3", 12 to "Up", 13 to "Rep 4", 16 to "Up",
+                17 to "Rep 5", 20 to "Up", 21 to "Rep 6", 24 to "Up", 25 to "Rep 7", 28 to "Up",
+                29 to "Last rep",
+            ),
+            cadenceRows(ohp) - scriptRows(plan(tracks[0]), 8).toSet(),
+            "field-41 set 1: rows the archive has and the guide no longer writes",
+        )
+        assertEquals(
+            listOf(
+                4 to "Rep 2", 6 to "1", 8 to "Rep 3", 10 to "1", 12 to "Rep 4", 14 to "1", 16 to "Rep 5",
+                18 to "1", 20 to "Rep 6", 22 to "1", 24 to "Rep 7", 26 to "1", 28 to "Last rep", 30 to "1",
+            ),
+            scriptRows(plan(tracks[0]), 8) - cadenceRows(ohp).toSet(),
+            "field-41 set 1: rows the guide writes that the archive does not have",
+        )
+        // field-42 set 5: the eccentric-first bench press, where the call was
+        // already on the rep's first second. Five `Down` rows leave, and the
+        // counts on that stroke move up by one.
+        assertEquals(
+            listOf(
+                4 to "Down", 6 to "2", 8 to "Down", 10 to "2", 12 to "Down",
+                14 to "2", 16 to "Down", 18 to "2", 20 to "Down", 22 to "2",
+            ),
+            cadenceRows(bench) - scriptRows(plan(tracks[1]), 6).toSet(),
+            "field-42 set 5: the stroke word the number replaces, and the one count that stroke used to speak",
+        )
+        assertEquals(
+            listOf(
+                5 to "2", 6 to "3", 9 to "2", 10 to "3", 13 to "2",
+                14 to "3", 17 to "2", 18 to "3", 21 to "2", 22 to "3",
+            ),
+            scriptRows(plan(tracks[1]), 6) - cadenceRows(bench).toSet(),
+            "field-42 set 5: that stroke counted from the number -- two counts where the archive has one",
+        )
     }
 
     @Test
@@ -231,6 +358,48 @@ class RepCallPlacementTest {
     }
 
     @Test
+    fun `the population each track would have if it were recorded again`() {
+        // The same three vocabularies, from the script rather than the archive.
+        // The stroke word the number replaces drops to ONE row per set -- rep
+        // 1's, which keeps it -- and the count that stroke used to give up is
+        // spoken on every rep.
+        assertEquals(
+            mapOf("Up" to 1, "Down" to 8, "1" to 8, "2" to 8, "Rep 2" to 1, "Rep 3" to 1, "Rep 4" to 1) +
+                mapOf("Rep 5" to 1, "Rep 6" to 1, "Rep 7" to 1, "Last rep" to 1, "Done" to 1),
+            scriptRows(plan(tracks[0]), 8).groupingBy { it.second }.eachCount(),
+            "field-41 set 1: one `Up` row in the set, and eight `1` counts where the archive has one",
+        )
+        assertEquals(
+            mapOf("Down" to 1, "1" to 1, "2" to 6, "3" to 5, "Up" to 6, "Rep 2" to 1, "Rep 3" to 1) +
+                mapOf("Rep 4" to 1, "Rep 5" to 1, "Last rep" to 1, "Done" to 1),
+            scriptRows(plan(tracks[1]), 6).groupingBy { it.second }.eachCount(),
+            "field-42 set 5: one `Down` row, and a `3` the archive never carried",
+        )
+        assertEquals(
+            mapOf("Up" to 1, "Down" to 8, "1" to 8, "2" to 8, "3" to 8, "Rep 2" to 1, "Rep 3" to 1) +
+                mapOf("Rep 4" to 1, "Rep 5" to 1, "Rep 6" to 1, "Rep 7" to 1, "Last rep" to 1, "Done" to 1),
+            scriptRows(plan(tracks[2]), 8).groupingBy { it.second }.eachCount(),
+            "field-42 set 13: the four-second lowering counted `1 2 3` on all eight reps",
+        )
+        // What this costs a consumer counting rep starts off stroke words, and
+        // it is the reason #293 carries an export entry: `CueTrack.calledReps`
+        // counts `Down` rows, so on the eccentric-first bench press it would
+        // read ONE rep for a set of six. The rep is still datable -- the call
+        // rows land on the rep's first second, one per rep after the first --
+        // but not by that rule.
+        assertEquals(
+            1,
+            scriptRows(plan(tracks[1]), 6).count { it.second == "Down" },
+            "field-42 set 5: `Down` rows in a six-rep set, which used to be six",
+        )
+        assertEquals(
+            6,
+            cadenceRows(bench).count { it.second == "Down" },
+            "and what the archive of that same set carries",
+        )
+    }
+
+    @Test
     fun `what the lifter hears, second by second, on the 3010 bench press`() {
         // The utterances rather than the rows, which is the only place the
         // merge is visible: one second carries two words, spoken as one
@@ -238,48 +407,66 @@ class RepCallPlacementTest {
         assertEquals(
             listOf(
                 0 to "Down", 1 to "1", 2 to "2", 3 to "Up",
-                4 to "Down, Rep 2", 6 to "2", 7 to "Up",
-                8 to "Down, Rep 3", 10 to "2", 11 to "Up",
-                12 to "Down, Rep 4", 14 to "2", 15 to "Up",
-                16 to "Down, Rep 5", 18 to "2", 19 to "Up",
-                20 to "Down, Last rep", 22 to "2", 23 to "Up",
+                4 to "Rep 2", 5 to "2", 6 to "3", 7 to "Up",
+                8 to "Rep 3", 9 to "2", 10 to "3", 11 to "Up",
+                12 to "Rep 4", 13 to "2", 14 to "3", 15 to "Up",
+                16 to "Rep 5", 17 to "2", 18 to "3", 19 to "Up",
+                20 to "Last rep", 21 to "2", 22 to "3", 23 to "Up",
                 24 to "Done",
             ),
             CadenceVoice.script(plan(tracks[1]), 6).map { it.atSecond to it.utterance },
-            "field-42 set 5: the rep number rides the stroke word and the stroke's first count is given up",
+            "field-42 set 5: the owner's `Rep 3, 2, 3, Up` against the archive's `Down, Rep 3` then `2`",
         )
+        // One second, one utterance, on all three plans. A merged call put two
+        // words in one second -- "Down, Rep 3" -- and TTS runs with
+        // QUEUE_FLUSH, so the second word is what the lifter hears the start
+        // of. Nothing the guide says carries two words now.
+        tracks.forEach { track ->
+            CadenceVoice.script(plan(track), track.reps).forEach { call ->
+                assertEquals(
+                    listOf(call.utterance),
+                    call.recorded,
+                    "${track.fixture}: \"${call.utterance}\" at ${call.atSecond}s is one word, one row",
+                )
+            }
+        }
     }
 
     @Test
-    fun `the rep number arrives one stroke into the rep on the two one-second openers`() {
-        // What the owner's "at the start of the rep" is measured against. On
-        // the two concentric-first sets the call lands on the rep's SECOND
-        // stroke -- a second into a four-second rep on the overhead press, a
-        // second into a five-second rep on the pull-up -- and the stroke it
-        // rides is the lowering, so the drive is already over when the number
-        // arrives.
-        listOf(Track(ohp, "3010", seatedOhp, 8), Track(pullUp, "4010", assistedPullUp, 8)).forEach { track ->
+    fun `the rep number opens the rep it names, on every rep after the first`() {
+        // The owner's "at the start of the rep", as a rule over all three
+        // rather than three row lists: every call lands on the FIRST second of
+        // the rep it names, and there is exactly one per rep after the first.
+        // Two of the three used to arrive a second later, on the lowering, with
+        // the drive already over.
+        tracks.forEach { track ->
             val p = plan(track)
-            val cycle = p.deliveredCycleS
             val calls = scriptRows(p, track.reps)
                 .filter { it.second == CadencePlan.LAST_REP || it.second.startsWith(CadencePlan.REP_CALL_PREFIX) }
             assertEquals(track.reps - 1, calls.size, "${track.fixture}: one call per rep after the first")
             calls.forEachIndexed { index, (second, row) ->
-                val repStarts = (index + 1) * cycle
-                assertEquals(repStarts + 1, second, "${track.fixture}: $row lands a second into its own rep")
+                assertEquals(
+                    (index + 1) * p.deliveredCycleS,
+                    second,
+                    "${track.fixture}: $row opens the rep it names",
+                )
             }
+            // Rep 1 says nothing about itself and keeps the word the prep
+            // countdown showed it (#241). The first thing the lifter hears
+            // after the countdown is still the stroke.
+            assertEquals(
+                p.beats[0].spokenLabel,
+                scriptRows(p, track.reps).first().second,
+                "${track.fixture}: rep 1 opens on its stroke word",
+            )
         }
-        // And on the eccentric-first bench press it already lands on the
-        // rep's first second, beside the stroke word rather than in place of
-        // it. Same four digits as the overhead press.
-        val benchPlan = plan(tracks[1])
-        assertEquals(
-            listOf(4, 8, 12, 16, 20),
-            scriptRows(benchPlan, 6)
-                .filter { it.second == CadencePlan.LAST_REP || it.second.startsWith(CadencePlan.REP_CALL_PREFIX) }
-                .map { it.first },
-            "field-42 set 5: every call on the first second of the rep it names",
-        )
-        assertEquals(2, benchPlan.beatsOfRepLeftWhenAnnounced, "and both beats of that rep are still to come")
+        // Where the archive put the same calls, so the move is a measurement
+        // rather than a claim: a second later on the two one-second openers,
+        // and on the same second on the eccentric-first bench press.
+        listOf(ohp to 4, pullUp to 5, bench to 4).forEach { (fixture, cycle) ->
+            val firstCall = cadenceRows(fixture).first { it.second.startsWith(CadencePlan.REP_CALL_PREFIX) }
+            val expected = if (fixture == bench) cycle else cycle + 1
+            assertEquals(expected, firstCall.first, "$fixture: where 0.1.52 spoke the call for rep 2")
+        }
     }
 }

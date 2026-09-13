@@ -23,11 +23,11 @@ import kotlin.test.assertTrue
  * `sensorOnStack`, `sensorInverted` -- so the plans reconstructed here are the
  * plans those sets were paced on.
  *
- * | set | exercise | tempo | plan case | closing pause |
+ * | set | exercise | tempo | where 0.1.50 said the call | closing pause |
  * |---|---|---|---|---|
  * | 3 | seated OHP | 3010 | merged into the rep's own last stroke | none |
- * | 5 | seated OHP | 1110 | a closing pause carries the call | 1 s |
- * | 7 | lat pulldown | 1120 | a closing pause carries the call | 1 s |
+ * | 5 | seated OHP | 1110 | in the PREVIOUS rep's closing pause | 1 s |
+ * | 7 | lat pulldown | 1120 | in the PREVIOUS rep's closing pause | 1 s |
  *
  * Two of the session's ten sets have a closing pause and they are exactly
  * these two; set 3 is here as the case that must not move.
@@ -36,10 +36,24 @@ import kotlin.test.assertTrue
  *
  * 0.1.50 is BEFORE #243, so every `Rep N` row in these tracks counts FINISHED
  * reps: the row the archive writes as `Rep 1` is the row the guide now speaks
- * as `Rep 2`, at the same second. [asCalledNow] applies that one shift and
- * nothing else, so a difference this file reports is a difference in PLACEMENT
- * rather than #243 being re-litigated here. `RepCallScheduleTest` owns the
- * numbering.
+ * as `Rep 2`. [asCalledNow] applies that one shift and nothing else, so a
+ * difference this file reports is a difference in PLACEMENT rather than #243
+ * being re-litigated here. `RepCallScheduleTest` owns the numbering.
+ *
+ * ## What #293 moves on these two tracks
+ *
+ * An earlier version of this file said the shift was "at the same second". It
+ * is not, from #293 on, and the phrase is deleted rather than qualified: the
+ * call no longer rides the closing pause at all. It opens the FIRST STROKE of
+ * the rep it names, in place of that stroke's word, so on set 5 the call the
+ * archive has at second 2 is spoken at second 3 and the `Up` that second used
+ * to carry is not spoken. `RepCallPlacementTest` carries the rule and two more
+ * sessions; what these two tracks add is the closing-pause family, which is
+ * the only one whose call used to be spoken before its rep had begun.
+ *
+ * #265 -- the last rep keeping its closing pause -- is unaffected and still
+ * asserted here: it is about the beat AFTER the last rep completes, and no beat
+ * moves for #293.
  */
 class ClosingPauseLastRepTest {
     /** meta.json sets 3 and 5: seated_overhead_press, conc-first, drive up, vertical, off-stack. */
@@ -199,43 +213,74 @@ class ClosingPauseLastRepTest {
     }
 
     @Test
-    fun `the guide scripts both tracks row for row, and moves only the terminal Done`() {
-        // #265. The script reproduces every row of both archives, at the second
-        // the archive has it, with ONE row moved: the terminal `Done`, which
-        // 0.1.50 spoke at second 17 on set 5 and 23 on set 7 -- one closing
-        // pause short -- and which now lands at 18 and 24. Nothing else moves,
-        // no row is added and none is removed.
+    fun `the guide scripts both tracks with the call moved off the closing pause`() {
+        // #293 against the two recordings. Every row is written out, so the
+        // three differences from the archives pinned above are readable
+        // together: the call opens the next rep instead of closing this one,
+        // the stroke word it replaces is not spoken, and the terminal `Done`
+        // keeps the second #265 gave it.
+        assertEquals(
+            listOf(
+                0 to "Up", 1 to "Down",
+                3 to "Rep 2", 4 to "Down",
+                6 to "Rep 3", 7 to "Down",
+                9 to "Rep 4", 10 to "Down",
+                12 to "Rep 5", 13 to "Down",
+                15 to CadencePlan.LAST_REP, 16 to "Down",
+                18 to CadenceVoice.DONE,
+            ),
+            scriptRows(plan("1110", seatedOhp), reps),
+            "set 5, 1110: six reps of a three-second cycle, `Up` spoken once",
+        )
+        assertEquals(
+            listOf(
+                0 to "Up", 1 to "1", 2 to "Down",
+                4 to "Rep 2", 5 to "2", 6 to "Down",
+                8 to "Rep 3", 9 to "2", 10 to "Down",
+                12 to "Rep 4", 13 to "2", 14 to "Down",
+                16 to "Rep 5", 17 to "2", 18 to "Down",
+                20 to CadencePlan.LAST_REP, 21 to "2", 22 to "Down",
+                24 to CadenceVoice.DONE,
+            ),
+            scriptRows(plan("1120", latPulldown), reps),
+            "set 7, 1120: the two-second pull counted from the number rather than from its word",
+        )
+    }
+
+    @Test
+    fun `what each closing-pause track loses and gains, against its own archive`() {
+        // The difference in both directions rather than as two row lists. What
+        // LEAVES is the first stroke's word on every rep after the first, and
+        // the call at the second the archive spoke it. What ARRIVES is that
+        // call one second later, on the rep it names, and on set 7 the count
+        // that stroke now speaks as `2` rather than `1`.
         //
-        // The rep NUMBERS differ throughout and that is #243's and not this:
-        // 0.1.50 counted finished reps, so the archive's `Rep 1` is the guide's
-        // `Rep 2` at the same second. `asCalledNow` applies that one shift.
+        // Row counts are NOT equal here, unlike the merged families: a call
+        // that used to have a silent second of its own now shares a second
+        // with nothing, so five rows per set go and four arrive on set 5.
         listOf(
-            Triple(set05, plan("1110", seatedOhp), 17),
-            Triple(set07, plan("1120", latPulldown), 23),
-        ).forEach { (fixture, p, archivedDoneAt) ->
-            val archived = asCalledNow(cadenceRows(fixture))
-            val scripted = scriptRows(p, reps)
-            assertEquals(
-                archived.dropLast(1),
-                scripted.dropLast(1),
-                "$fixture: every row but the ending, against the track it was recorded from",
-            )
-            assertEquals(
-                archived.size,
-                scripted.size,
-                "$fixture: a restored pause moves a row and adds none",
-            )
-            assertEquals(
-                archivedDoneAt to CadenceVoice.DONE,
-                archived.last(),
-                "$fixture: where 0.1.50 put Done",
-            )
-            assertEquals(
-                (reps * p.deliveredCycleS) to CadenceVoice.DONE,
-                scripted.last(),
-                "$fixture: and where it lands once the last rep keeps its closing pause",
-            )
+            Triple(set05, plan("1110", seatedOhp), 18),
+            Triple(set07, plan("1120", latPulldown), 24),
+        ).forEach { (fixture, p, archivedRows) ->
+            assertEquals(archivedRows, asCalledNow(cadenceRows(fixture)).size, "$fixture: rows in the archive")
         }
+        assertEquals(
+            listOf(2 to "Rep 2", 3 to "Up", 5 to "Rep 3", 6 to "Up", 8 to "Rep 4", 9 to "Up") +
+                listOf(11 to "Rep 5", 12 to "Up", 14 to CadencePlan.LAST_REP, 15 to "Up", 17 to CadenceVoice.DONE),
+            asCalledNow(cadenceRows(set05)) - scriptRows(plan("1110", seatedOhp), reps).toSet(),
+            "set 5: rows the archive has that the guide no longer writes",
+        )
+        assertEquals(
+            listOf(3 to "Rep 2", 6 to "Rep 3", 9 to "Rep 4", 12 to "Rep 5", 15 to CadencePlan.LAST_REP) +
+                listOf(18 to CadenceVoice.DONE),
+            scriptRows(plan("1110", seatedOhp), reps) - asCalledNow(cadenceRows(set05)).toSet(),
+            "set 5: rows the guide writes that the archive does not have",
+        )
+        assertEquals(
+            13,
+            scriptRows(plan("1110", seatedOhp), reps).size,
+            "set 5: thirteen rows where the archive has eighteen -- five `Up` words are not spoken",
+        )
     }
 
     @Test
@@ -298,18 +343,26 @@ class ClosingPauseLastRepTest {
     }
 
     @Test
-    fun `the last rep's restored closing pause is silent, so the set says one word more than before`() {
-        // What the lifter hears, and what the archive gains: nothing but a
+    fun `the last rep's restored closing pause is silent, and adds no row`() {
+        // What the lifter hears in the beat #265 gave back: nothing but a
         // second of silence before `Done`. The closing pause has no word of its
         // own (`CadenceBeat.spokenLabel` is null) and there is no next rep to
         // announce, so the beat the last rep gets back speaks nothing and
-        // writes nothing. That is why the row count above is unchanged.
+        // writes nothing.
+        //
+        // The last rep's own rows DO move, and that is #293 rather than #265:
+        // the warning opens the rep in place of its first stroke word, so `Up`
+        // is not spoken on it and on set 7 the pull is counted `2`.
         listOf(
-            Triple(set05, plan("1110", seatedOhp), listOf(15 to "Up", 16 to "Down", 18 to CadenceVoice.DONE)),
+            Triple(
+                set05,
+                plan("1110", seatedOhp),
+                listOf(15 to CadencePlan.LAST_REP, 16 to "Down", 18 to CadenceVoice.DONE),
+            ),
             Triple(
                 set07,
                 plan("1120", latPulldown),
-                listOf(20 to "Up", 21 to "1", 22 to "Down", 24 to CadenceVoice.DONE),
+                listOf(20 to CadencePlan.LAST_REP, 21 to "2", 22 to "Down", 24 to CadenceVoice.DONE),
             ),
         ).forEach { (fixture, p, lastRep) ->
             val opensAt = (reps - 1) * p.deliveredCycleS
@@ -328,33 +381,37 @@ class ClosingPauseLastRepTest {
     @Test
     fun `a tempo with no closing pause is scripted these rows, and this is the control`() {
         // Set 3, the same session and the same lift, whose rep ends on its
-        // second stroke. Nothing about the last rep can move here: there is no
-        // beat after the one the rep completes on. Pinned as the whole row
-        // list so a change that lengthens EVERY set's last rep -- the shape of
-        // issue 106, a beat the prescription did not ask for -- reds here
-        // rather than passing as a fix.
+        // second stroke. Nothing about the last rep can move here for #265:
+        // there is no beat after the one the rep completes on. Pinned as the
+        // whole row list so a change that lengthens EVERY set's last rep -- the
+        // shape of issue 106, a beat the prescription did not ask for -- reds
+        // here rather than passing as a fix.
+        //
+        // Its WORDS move for #293, on the same seconds: the call opens the rep
+        // in place of `Up`, and the three-second lowering keeps its own word
+        // and both its counts on every rep rather than giving the first up.
         assertEquals(
             listOf(
                 0 to "Up", 1 to "Down", 2 to "1", 3 to "2",
-                4 to "Up", 5 to "Down", 5 to "Rep 2", 7 to "2",
-                8 to "Up", 9 to "Down", 9 to "Rep 3", 11 to "2",
-                12 to "Up", 13 to "Down", 13 to "Rep 4", 15 to "2",
-                16 to "Up", 17 to "Down", 17 to "Rep 5", 19 to "2",
-                20 to "Up", 21 to "Down", 21 to "Last rep", 23 to "2",
+                4 to "Rep 2", 5 to "Down", 6 to "1", 7 to "2",
+                8 to "Rep 3", 9 to "Down", 10 to "1", 11 to "2",
+                12 to "Rep 4", 13 to "Down", 14 to "1", 15 to "2",
+                16 to "Rep 5", 17 to "Down", 18 to "1", 19 to "2",
+                20 to "Last rep", 21 to "Down", 22 to "1", 23 to "2",
                 24 to CadenceVoice.DONE,
             ),
             scriptRows(plan("3010", seatedOhp), reps),
-            "set 3, 3010: Done at 6 x 4 and every row of the cycle where the archive has it",
+            "set 3, 3010: Done at 6 x 4, the call opening each rep, and the lowering counted on all six",
         )
         assertEquals(
             reps * plan("3010", seatedOhp).deliveredCycleS,
             scriptRows(plan("3010", seatedOhp), reps).last().first,
             "set 3 already ends where the prescription says",
         )
-        // The one row that is NOT the archive's, and it is #243's rather than
-        // this file's subject: 0.1.50 withheld `Last rep` on a merged schedule
-        // and kept the final `1` at second 22, where the guide now speaks the
-        // warning at 21 and that count is given up.
+        // The archive's own last rep, for comparison: 0.1.50 withheld
+        // `Last rep` on a merged schedule (#243) and kept the final `1` at
+        // second 22. The guide now says the warning at 20, in place of `Up`,
+        // and the `1` at 22 is spoken again.
         assertEquals(
             listOf(20 to "Up", 21 to "Down", 22 to "1", 23 to "2", 24 to "Done"),
             cadenceRows(set03).filter { it.first >= 20 },
