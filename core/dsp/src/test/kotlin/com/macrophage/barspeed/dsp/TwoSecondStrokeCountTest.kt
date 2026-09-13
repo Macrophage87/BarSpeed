@@ -81,11 +81,24 @@ import kotlin.test.assertTrue
  * `field-bicepscurl-2010-12rep-s38-set10-cues.csv`, copied byte for byte.
  *
  * `field-39/f7ad0cb9-BarSpeedv0.1.5020260905_080515raw.zip`, `"epoch":
- * "2026-09-05T12:05:15.479Z"`, ten sets. Its
- * `set01_seated_overhead_press_cues.csv` and
- * `set02_seated_overhead_press_cues.csv` are committed as
- * `field-ohp-2011-6rep-s39-set01-cues.csv` and
- * `field-ohp-2010-6rep-s39-set02-cues.csv`, likewise byte for byte.
+ * "2026-09-05T12:05:15.479Z"`, ten sets. Five of its cue tracks are committed
+ * here, likewise byte for byte:
+ *
+ * | source | committed as |
+ * |---|---|
+ * | `set01_seated_overhead_press_cues.csv` | `field-ohp-2011-6rep-s39-set01` |
+ * | `set02_seated_overhead_press_cues.csv` | `field-ohp-2010-6rep-s39-set02` |
+ * | `set06_seated_overhead_press_cues.csv` | `field-ohp-20x0-6rep-s39-set06` |
+ * | `set08_lat_pulldown_cues.csv` | `field-latpulldown-2011-6rep-s39-set08` |
+ * | `set10_lat_pulldown_cues.csv` | `field-latpulldown-20x0-6rep-s39-set10` |
+ *
+ * Sets 6, 8 and 10 arrived in round 1 of review, which found the list below
+ * claiming to be "the sets #248 names" while holding six of them. They carry
+ * what field-39 added to the issue that field-38 could not: `20X0` is a tempo
+ * no other fixture in this source set holds, and set 8 is `2011` on the
+ * on-stack inverted geometry rather than set 1's upright one. The fixture
+ * names spell `X` lowercase because every other resource here is lowercase;
+ * the tempo strings in the tracks below are the `meta.json` spelling, `20X0`.
  *
  * Four more fixtures already in this source set are read rather than re-added:
  * `field-latpulldown-1120-12rep-s38-set14`, `field-ohp-3010-8rep-s38-set04`,
@@ -140,7 +153,23 @@ class TwoSecondStrokeCountTest {
         val reps: Int,
     )
 
-    /** The sets #248 names, with the rep count each set's `meta.json` planned and performed. */
+    /**
+     * The sets scored as affected, with the rep count each set's `meta.json`
+     * planned and performed: field-38 sets 6, 10 and 14, and field-39 sets 1,
+     * 2, 6, 8 and 10 -- every set of that session the issue's own field-39
+     * table puts at 2 spoken digits -- plus field-39 set 7, the discriminator
+     * it puts at 6.
+     *
+     * It is NOT every set #248 names, and the residue is written down rather
+     * than left to be inferred from the tables below. #248's field-38 table
+     * names eleven sets. Five of them -- 7, 9, 11, 13 and 16 -- over-performed
+     * or failed against their prescription and are excluded by the rule the
+     * class comment states. The other three match it and are simply not
+     * committed here: set 8 is a `2011` seated lateral raise, sets 12 and 15
+     * are `1120` triceps pushdown and lat pulldown, and each repeats a tempo
+     * and a geometry this list already carries, so what the guide says over
+     * them is read from `CadencePlan.of` rather than measured off an archive.
+     */
     private val affected = listOf(
         Track(s38set06, "2011", driveUp, 12),
         Track(s38set10, "2010", driveUp, 12),
@@ -254,7 +283,10 @@ class TwoSecondStrokeCountTest {
                 s38set14 to (2 to 12),
                 s39set01 to (2 to 6),
                 s39set02 to (2 to 6),
+                s39set06 to (2 to 6),
                 s39set07 to (6 to 6),
+                s39set08 to (2 to 6),
+                s39set10 to (2 to 6),
             ),
             archived,
             "digits spoken per set, against reps performed, on the shipped 0.1.50 build",
@@ -266,7 +298,7 @@ class TwoSecondStrokeCountTest {
         assertEquals(
             1,
             plan(track(s39set07)).beats.count { it.isStroke && it.seconds >= CadencePlan.CALL_MIN_STROKE_S },
-            "field-39 set 7 has a two-second stroke as surely as the five that went quiet",
+            "field-39 set 7 has a two-second stroke as surely as the eight that went quiet",
         )
     }
 
@@ -317,17 +349,79 @@ class TwoSecondStrokeCountTest {
     }
 
     @Test
+    fun `what the three sets round 1 added sound like, before and after`() {
+        // 20X0 is the shape the corpus was missing, and the archive is what it
+        // sounded like: a three-second cycle, `1` on rep 1 and rep 6, four
+        // silent reps between. The explosive stroke is delivered as a
+        // one-second beat, which is why the cycle is three and not two.
+        assertEquals(
+            listOf(
+                0 to "Up", 1 to "Down", 2 to "1",
+                3 to "Up", 4 to "Down", 4 to "Rep 1",
+                6 to "Up", 7 to "Down", 7 to "Rep 2",
+                9 to "Up", 10 to "Down", 10 to "Rep 3",
+                12 to "Up", 13 to "Down", 13 to "Rep 4",
+                15 to "Up", 16 to "Down", 17 to "1",
+                18 to "Done",
+            ),
+            cadenceRows(s39set06),
+            "field-39 set 6, 20X0, as 0.1.50 recorded it",
+        )
+        // And now, on all three. Written out rather than derived, so a rule and
+        // these lists cannot agree by sharing an expression.
+        assertEquals(
+            listOf(
+                0 to "Up", 1 to "Down", 2 to "1",
+                3 to "Rep 2", 4 to "Down", 5 to "1",
+                6 to "Rep 3", 7 to "Down", 8 to "1",
+                9 to "Rep 4", 10 to "Down", 11 to "1",
+                12 to "Rep 5", 13 to "Down", 14 to "1",
+                15 to "Last rep", 16 to "Down", 17 to "1",
+                18 to "Done",
+            ),
+            CadenceVoice.script(plan(track(s39set06)), 6).map { it.atSecond to it.utterance },
+            "field-39 set 6, 20X0: the number takes the explosive stroke's word and the lowering counts",
+        )
+        assertEquals(
+            listOf(
+                0 to "Up", 1 to "Hold", 2 to "Down", 3 to "1",
+                4 to "Rep 2", 5 to "Hold", 6 to "Down", 7 to "1",
+                8 to "Rep 3", 9 to "Hold", 10 to "Down", 11 to "1",
+                12 to "Rep 4", 13 to "Hold", 14 to "Down", 15 to "1",
+                16 to "Rep 5", 17 to "Hold", 18 to "Down", 19 to "1",
+                20 to "Last rep", 21 to "Hold", 22 to "Down", 23 to "1",
+                24 to "Done",
+            ),
+            CadenceVoice.script(plan(track(s39set08)), 6).map { it.atSecond to it.utterance },
+            "field-39 set 8, 2011 on-stack and inverted: the same rows set 1 gets off-stack and upright",
+        )
+        assertEquals(
+            listOf(
+                0 to "Up", 1 to "Down", 2 to "1",
+                3 to "Rep 2", 4 to "Down", 5 to "1",
+                6 to "Rep 3", 7 to "Down", 8 to "1",
+                9 to "Rep 4", 10 to "Down", 11 to "1",
+                12 to "Rep 5", 13 to "Down", 14 to "1",
+                15 to "Last rep", 16 to "Down", 17 to "1",
+                18 to "Done",
+            ),
+            CadenceVoice.script(plan(track(s39set10)), 6).map { it.atSecond to it.utterance },
+            "field-39 set 10, 20X0 on-stack and inverted: the same rows set 6 gets off-stack",
+        )
+    }
+
+    @Test
     fun `the digit population of every affected set, before and after`() {
-        // A POPULATION rather than a placement: what changes on these six sets
+        // A POPULATION rather than a placement: what changes on these nine sets
         // is how many seconds of the set say a number at all. Both columns are
         // computed, neither is restated from the issue.
         assertEquals(
-            listOf(2, 2, 2, 2, 2, 6),
+            listOf(2, 2, 2, 2, 2, 2, 6, 2, 2),
             affected.map { digits(cadenceRows(it.fixture)).size },
             "digits per set as recorded by 0.1.50",
         )
         assertEquals(
-            listOf(12, 12, 12, 6, 6, 6),
+            listOf(12, 12, 12, 6, 6, 6, 6, 6, 6),
             affected.map { digits(scriptRows(plan(it), it.reps)).size },
             "digits per set as the guide writes them now: one per rep, on every set",
         )
@@ -339,11 +433,17 @@ class TwoSecondStrokeCountTest {
     }
 
     @Test
-    fun `every rep of every plan with a two-second stroke is counted out loud`() {
-        // The guard, as a rule over the corpus rather than six row lists: on
-        // any plan carrying a stroke of at least CALL_MIN_STROKE_S seconds,
-        // every rep window holds at least one bare digit. This is the
-        // assertion that reds if a call ever eats a count again.
+    fun `every rep of every set pinned in this file is counted out loud`() {
+        // The guard, as a rule over the corpus rather than a row list per set:
+        // over the tracks [affected] and [unaffected] name, each first checked
+        // to carry a stroke of at least CALL_MIN_STROKE_S seconds, every rep
+        // window holds at least one bare digit. This is the assertion that reds
+        // if a call ever eats a count again.
+        //
+        // It is a rule over THOSE tracks and not over every plan a lifter could
+        // write. What it covers is five tempos -- 2011, 2010, 20X0, 1120, 3010
+        // -- on three geometries, and what it says about any other prescription
+        // is nothing.
         (affected + unaffected).forEach { track ->
             val p = plan(track)
             assertTrue(
