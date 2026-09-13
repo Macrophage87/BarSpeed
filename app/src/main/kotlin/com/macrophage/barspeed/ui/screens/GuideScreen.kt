@@ -147,7 +147,10 @@ private val SECTIONS =
                 "stroke, and the rep number is spoken at the START of the rep IN PLACE OF " +
                 "that rep's first stroke word, with that stroke's counts continuing from the " +
                 "number: on a bench 3010 that's 'Down, 1, 2, Up… Rep 2, 2, 3, Up…'. Rep 1 " +
-                "keeps its word, so the first thing you hear after 'Brace' is the stroke. " +
+                "keeps its word, so the first word of the set is the stroke, not 'Rep 1'. " +
+                "A cadence with no pause at the end and no stroke longer than a second — 1010, " +
+                "and 1110 on some lifts — has no second to spare, so it calls the strokes " +
+                "only: no rep number and no 'last rep', with the count on screen. " +
                 "There's a lead-in first so you can get set on the bar — 5 seconds unless the " +
                 "plan says otherwise or you change it on the rest screen — and the app counts " +
                 "the reps for you. " +

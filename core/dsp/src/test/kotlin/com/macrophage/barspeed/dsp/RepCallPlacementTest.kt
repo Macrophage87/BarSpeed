@@ -401,9 +401,9 @@ class RepCallPlacementTest {
 
     @Test
     fun `what the lifter hears, second by second, on the 3010 bench press`() {
-        // The utterances rather than the rows, which is the only place the
-        // merge is visible: one second carries two words, spoken as one
-        // utterance because TTS runs with QUEUE_FLUSH.
+        // The utterances rather than the rows, because the utterance is where
+        // the owner's sentence is readable: one second, one word, where the
+        // archive carried two.
         assertEquals(
             listOf(
                 0 to "Down", 1 to "1", 2 to "2", 3 to "Up",

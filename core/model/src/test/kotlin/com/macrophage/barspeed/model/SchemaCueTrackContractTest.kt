@@ -172,9 +172,11 @@ class SchemaCueTrackContractTest {
      * Round 2 of #243 found the two sentences that landed with 1.19 stronger
      * than the schedule under them. Both said a call is heard during the rep it
      * names -- the version log as "each during the rep it names", `voiceCues`
-     * as "'Last rep' on the final rep itself" -- and that is true of the two
-     * schedules that MERGE the call into a stroke and false of the one that
-     * hands it a closing pause, where it rides the PREVIOUS rep's tail. The
+     * as "'Last rep' on the final rep itself" -- and that WAS true of the two
+     * schedules that merged the call into a stroke and false of the one that
+     * handed it a closing pause, where it rode the previous rep's tail. No
+     * schedule does either from 1.20; these sentences are the reading rule for
+     * 1.13 through 1.19 archives, which is what the assertions below pin. The
      * version log said so itself four sentences later, so the document
      * contradicted itself on the one fact a consumer aligns rows by.
      *

@@ -1233,12 +1233,12 @@ data class SessionExport(
          * rep 1, which is what the published discriminator between this
          * counter and the unguided one now rests on.
          *
-         * NO TWO ROWS SHARE AN INSTANT ANY MORE. 1.13's fifth change published
-         * a merged call as two rows at one `t_ms`, the stroke word and the
-         * call; a replacing call is one row. The sentence that told a consumer
-         * matching stroke rows it was unaffected is DELETED from the published
-         * description rather than qualified, because from this version such a
-         * consumer is affected in the way stated above.
+         * THE GUIDE NO LONGER WRITES TWO ROWS AT ONE INSTANT BY DESIGN. 1.13's
+         * fifth change published a merged call as two rows at one `t_ms`, the
+         * stroke word and the call; a replacing call is one row and the
+         * replaced word is not written at all. Each utterance still reads the
+         * clock for itself, so two rows from different utterances may
+         * coincide.
          *
          * THE TEMPO COUNTS OF THAT STROKE ARE RENUMBERED, not dropped. The
          * number stands where the word stood, so it is that stroke's first
