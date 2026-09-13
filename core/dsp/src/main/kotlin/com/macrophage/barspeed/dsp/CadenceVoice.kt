@@ -111,6 +111,27 @@ object CadenceVoice {
      * Bounded sets only. A set with no planned rep count runs until the lifter
      * stops it, so it has no last rep and no script; the runner's loop is the
      * only account of one.
+     *
+     * ## [DONE] follows the whole of the last rep, closing pause included
+     *
+     * A rep is complete after [CadencePlan.repCompleteAfterBeat], and on the
+     * tempo families whose prescription ends in a pause that is not the last
+     * beat of the cycle. The set therefore runs to `plannedReps` x
+     * [CadencePlan.deliveredCycleS] on every plan: the beats after the
+     * completion beat are played on the last rep exactly as they are on reps 1
+     * to N-1, and `Done` comes after them.
+     *
+     * Until #265 this returned at the completion beat, so the last rep of a
+     * closing-pause tempo lost its pause -- the hold the prescription is
+     * training. Measured on field-39, whose two closing-pause sets read 17.023 s
+     * against 6 x 3 and 23.029 s against 6 x 4; the owner's word on hearing it
+     * was *"that very much feels short"*. The pause is silent and there is no
+     * next rep to announce, so the restored beat speaks nothing and writes no
+     * cue row: one row moves a second later and none is added.
+     *
+     * The instant the rest countdown runs from is the terminal cue's own
+     * (`RestClockPolicy.startedAtMs`, #172), so it moves with `Done` by
+     * construction and nothing else has to be told.
      */
     fun script(plan: CadencePlan, plannedReps: Int): List<ScriptedCall> {
         require(plannedReps >= 1) { "a set has at least one rep" }
@@ -118,6 +139,7 @@ object CadenceVoice {
         var second = 0
         var rep = 1
         var pending: String? = null
+        var lastRep = false
         while (true) {
             for ((index, beat) in plan.beats.withIndex()) {
                 val announcement = pending?.takeIf { index == plan.announceOnBeat }
@@ -129,12 +151,20 @@ object CadenceVoice {
                 }
                 second += beat.seconds
                 if (index != plan.repCompleteAfterBeat) continue
+                // The last rep is complete here and the cycle may not be. Play
+                // what the prescription still has left, announcing nothing --
+                // there is no rep after this one -- and say DONE at the end of
+                // it.
                 if (rep >= plannedReps) {
-                    calls += ScriptedCall(second, DONE, listOf(DONE))
-                    return calls
+                    lastRep = true
+                    continue
                 }
                 rep++
                 pending = plan.announcementFor(rep, plannedReps)
+            }
+            if (lastRep) {
+                calls += ScriptedCall(second, DONE, listOf(DONE))
+                return calls
             }
         }
     }

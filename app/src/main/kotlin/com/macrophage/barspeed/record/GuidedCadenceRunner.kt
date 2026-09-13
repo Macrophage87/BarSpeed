@@ -110,6 +110,7 @@ class GuidedCadenceRunner(
                 val plan = CadencePlan.of(schedule)
                 var rep = 1
                 var pending: String? = null
+                var lastRep = false
                 while (true) {
                     for ((index, beat) in plan.beats.withIndex()) {
                         val announcement = pending?.takeIf { index == plan.announceOnBeat }
@@ -117,14 +118,25 @@ class GuidedCadenceRunner(
                         play(beat, announcement)
                         if (index != plan.repCompleteAfterBeat) continue
                         onRepCounted(rep)
+                        // The last rep is COUNTED here and the cycle may not be
+                        // over: a prescription ending in a pause has a beat
+                        // left, and it is the hold the lifter is training.
+                        // Play it out and speak DONE after it, which is what
+                        // CadenceVoice.script's KDoc states once for both
+                        // loops (#265). Nothing is announced in it -- there is
+                        // no rep after this one.
                         if (plannedReps != null && rep >= plannedReps) {
-                            speak(listOf(CadenceVoice.DONE), CadenceVoice.DONE)
-                            update("DONE", 0, 1)
-                            onFinished()
-                            return@launch
+                            lastRep = true
+                            continue
                         }
                         rep++
                         pending = plan.announcementFor(rep, plannedReps)
+                    }
+                    if (lastRep) {
+                        speak(listOf(CadenceVoice.DONE), CadenceVoice.DONE)
+                        update("DONE", 0, 1)
+                        onFinished()
+                        return@launch
                     }
                 }
             }
