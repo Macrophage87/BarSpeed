@@ -3086,6 +3086,12 @@ data class RecordState(
  * detector's rule over a causal estimate rather than from the tracker's second
  * statement of that rule. `LiveRepCall`'s KDoc states what is and is not shared
  * between the two.
+ *
+ * THE SAMPLES IT SEES are whichever stream [LiveFeedPolicy.feedsTracker] has
+ * latched (#210), so on a dual-sensor set where the armed unit falls behind
+ * mid-set this count is made across a change of unit and [LiveRepCaller] is
+ * not reset at the switch; `sensors.analysedFellBack` on the exported row is
+ * the only thing that says so.
  */
 private class SensorRepCounter {
     private var caller: LiveRepCaller? = null

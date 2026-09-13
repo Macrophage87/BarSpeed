@@ -162,9 +162,11 @@ object CountingPolicy {
      * `"Done"` is the word `SetEnd.of` reads as the set having been called
      * over -- so a counter reaching the planned count BOUNDS the analysed rep
      * list at that instant and every drive begun after it is dropped from the
-     * analysis. Issue #285 measured the cost on a real capture:
-     * `field-ohp-3010-8rep-s38-set05` resolves 15 detections unbounded
-     * against 10 bounded.
+     * analysis. Issue #285 measured the size of that bound, relayed rather
+     * than re-run: `field-ohp-3010-8rep-s38-set05` resolves 15 detections
+     * unbounded against 10 bounded. Which is nearer the truth is not readable
+     * there -- the hand count is 8, below both -- so the bound's cost is
+     * deciding the rep list silently.
      *
      * A sensor-counted set is exactly the set where the counter can reach the
      * planned count without the lifter having finished, and a max-intent
