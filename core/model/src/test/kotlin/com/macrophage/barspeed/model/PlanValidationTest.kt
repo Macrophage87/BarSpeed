@@ -294,6 +294,92 @@ class PlanValidationTest {
         )
     }
 
+    /**
+     * The omission warning for a DRIVE direction, on the same two conditions
+     * the start one uses: the default must be wrong for this id, and some set
+     * must actually consume the direction.
+     *
+     * Field-39's four lat_pulldown sets are the case. The plan declared
+     * sensorOnStack and sensorInverted and no `concentric`, so the drive
+     * resolved UP, the long stroke of a 1120 went to the return, and three
+     * further sets delivered a cue track identical to the press sets beside
+     * them (#263).
+     */
+    @Test
+    fun `an undeclared concentric warns on a known drive-down lift, and nowhere else`() {
+        val guessed = planWith("lat_pulldown", "")
+        val warning = guessed.warnings().singleOrNull { "concentric" in it && "pulls DOWN" in it }
+        assertTrue(warning != null, "expected a drive-down omission warning: ${guessed.warnings()}")
+        assertTrue(warning.contains("lat_pulldown"), warning)
+        assertTrue(warning.contains("sessions[0].exercises[0]"), warning)
+        // The two halves the lifter needs: what the app will do, and the exact
+        // line to add.
+        assertTrue(warning.contains("cue the return as the drive"), warning)
+        assertTrue(warning.contains(""""concentric": "down""""), warning)
+
+        // A leg extension rides the same stack and drives UP, so the default
+        // is right for it and a warning would be noise.
+        assertTrue(
+            planWith("leg_extension", "").warnings().none { "pulls DOWN" in it },
+            "leg_extension drives up: ${planWith("leg_extension", "").warnings()}",
+        )
+        // Nothing the app has no drive-down knowledge of warns either.
+        assertTrue(planWith("back_squat", "").warnings().none { "pulls DOWN" in it })
+
+        // A declaration silences it either way -- including a declared "up",
+        // which is an author who decided rather than one who forgot.
+        assertTrue(
+            planWith("lat_pulldown", ""","concentric": "down"""").warnings().none { "pulls DOWN" in it },
+        )
+        assertTrue(
+            planWith("lat_pulldown", ""","concentric": "up"""").warnings().none { "pulls DOWN" in it },
+            "a declared up is a decision, not an omission",
+        )
+
+        // An invalid value was WRITTEN, not omitted -- validate() refuses it
+        // and the omission warning must not pile on.
+        val invalid = planWith("lat_pulldown", ""","concentric": "sideways"""")
+        assertTrue(invalid.validate().any { it.contains("concentric") })
+        assertTrue(
+            invalid.warnings().none { "pulls DOWN" in it },
+            "an invalid value is an error, not also an omission warning: ${invalid.warnings()}",
+        )
+    }
+
+    /**
+     * The consumption gate, apart so it cannot be lost in the case above. A
+     * timed set is graded by the clock and never reaches segmentation or a
+     * stroke cue, so a drive direction it never uses is not worth flagging --
+     * and one untimed set among them is enough to reach both.
+     */
+    @Test
+    fun `a drive-down exercise whose sets are all timed does not warn`() {
+        val timed = json.decodeFromString(
+            PlanFile.serializer(),
+            """
+            {"schemaVersion": "1.3", "planName": "t", "sessions": [{"name": "s",
+              "exercises": [{"exercise": "lat_pulldown", "sets": [{"duration_s": 30, "load_kg": 40}]}]}]}
+            """.trimIndent(),
+        )
+        assertTrue(
+            timed.warnings().none { "pulls DOWN" in it },
+            "a timed set consumes no drive direction: ${timed.warnings()}",
+        )
+
+        val mixed = json.decodeFromString(
+            PlanFile.serializer(),
+            """
+            {"schemaVersion": "1.3", "planName": "t", "sessions": [{"name": "s",
+              "exercises": [{"exercise": "lat_pulldown", "sets": [
+                {"duration_s": 30, "load_kg": 40}, {"reps": 8, "load_kg": 40}]}]}]}
+            """.trimIndent(),
+        )
+        assertTrue(
+            mixed.warnings().any { "pulls DOWN" in it },
+            "one untimed set is enough to reach the stroke cues: ${mixed.warnings()}",
+        )
+    }
+
     @Test
     fun `concentric direction is independent of where the lift starts`() {
         // A seated leg curl starts at the top (legs extended) and its DRIVE goes

@@ -48,7 +48,18 @@ import kotlin.test.assertTrue
  * Nothing here executes Room, SQLite or Android. The DAOs are interfaces and
  * the fake stands in for them, so what is verified is the exporter's own
  * output and nothing about what the database did with it.
+ *
+ * `LargeClass` is suppressed rather than obeyed, and that is a decision about
+ * THIS document rather than a general dispensation. `meta.json` has no
+ * published schema, so the exact-key-set pins above are its only definition,
+ * and a definition split across files is one that can disagree with itself --
+ * the drift class this suite exists to catch. The fakes and fixtures are
+ * shared by every case, so a split would duplicate them too, and two copies of
+ * a fixture is two documents. Adding the #263 provenance case is what crossed
+ * the threshold; the alternative was a second file re-declaring 150 lines of
+ * DAO fake.
  */
+@Suppress("LargeClass")
 class RawExporterTest {
     // ---- fakes -------------------------------------------------------------
 
@@ -943,6 +954,44 @@ class RawExporterTest {
     }
 
     /**
+     * WHOSE WORD the direction above is (#263).
+     *
+     * `session.json` has published `geometry.source.concentric` since the
+     * geometry block landed; this manifest published the resolved word alone,
+     * so a reader with the CSVs and this file could not tell a plan that said
+     * "up" from a plan that said nothing. Field-39's four lat_pulldown sets
+     * are exactly that reader's problem: `"concentric": "up"` on all four,
+     * every one of them a default the plan never wrote.
+     *
+     * Both states in one test so it cannot pass by the key being absent from
+     * both, and the pair is chosen to be indistinguishable without it: the
+     * declared case is a real drive-down declaration, the defaulted case is
+     * the same lift with the key left out, and only this key separates them.
+     */
+    @Test
+    fun `the manifest says whether the drive direction was declared or defaulted`() = runTest {
+        val declared = meta(listOf(row(id = 5L, geometry = legCurl)), emptyMap()).set(0)
+        assertEquals("down", declared.text("concentric"))
+        assertEquals("declared", declared.text("concentricSource"))
+
+        val defaulted =
+            meta(
+                listOf(
+                    row(
+                        id = 5L,
+                        geometry = legCurl.copy(
+                            concentricUp = true,
+                            sources = legCurl.sources.copy(concentric = GeometrySource.DEFAULT),
+                        ),
+                    ),
+                ),
+                emptyMap(),
+            ).set(0)
+        assertEquals("up", defaulted.text("concentric"))
+        assertEquals("default", defaulted.text("concentricSource"))
+    }
+
+    /**
      * A stated false is written; an unstated geometry writes nothing.
      *
      * `flag()` omits a false, which is right for `warmup` and `failed` where
@@ -959,7 +1008,15 @@ class RawExporterTest {
         assertEquals(true, stated["sensorOnStack"]?.jsonPrimitive?.content?.toBoolean())
 
         val unstated = meta(listOf(row(id = 5L, geometry = null)), emptyMap()).set(0)
-        for (key in listOf("startsWith", "concentric", "plane", "sensorOnStack", "sensorInverted", "travelRatio")) {
+        for (key in listOf(
+            "startsWith",
+            "concentric",
+            "concentricSource",
+            "plane",
+            "sensorOnStack",
+            "sensorInverted",
+            "travelRatio",
+        )) {
             assertNull(unstated[key], "an unstated geometry wrote $key")
         }
     }

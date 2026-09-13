@@ -76,4 +76,31 @@ class RealPlanFixtureTest {
             "the two seeded lifts have a real start from ExerciseDef.SEED, not a guess: $startWarnings",
         )
     }
+
+    /**
+     * The same real plan against the DRIVE direction (#263).
+     *
+     * It carries a `seated_leg_curl` and a `leg_extension` -- two ids off the
+     * same rack, one of which drives down and one of which does not -- and
+     * declares `concentric` on neither. Exactly one of them should warn, and
+     * a fixture holding both is what makes that assertion mean something: a
+     * table that swept in everything stack-mounted passes the pulldown case
+     * and fails here.
+     */
+    @Test
+    fun `omitting concentric warns on the leg curl and not on the leg extension`() {
+        val text =
+            checkNotNull(javaClass.getResourceAsStream("/real-plan-lower-body.json")) {
+                "fixture missing"
+            }.bufferedReader().readText()
+        val plan = Json { ignoreUnknownKeys = true }.decodeFromString(PlanFile.serializer(), text)
+
+        val driveWarnings = plan.warnings().filter { "pulls DOWN" in it }
+        assertEquals(1, driveWarnings.size, driveWarnings.toString())
+        assertTrue(driveWarnings.single().contains("seated_leg_curl"), driveWarnings.single())
+        assertTrue(
+            driveWarnings.none { "leg_extension" in it },
+            "a leg extension drives up: $driveWarnings",
+        )
+    }
 }
