@@ -13,7 +13,7 @@ room = "2.7.1"
 datastore = "1.1.1"
 junit = "4.13.2"
 kotlinTest = "2.1.0"
-ktlintPlugin = "12.1.2"
+ktlintPlugin = "14.2.0"
 detekt = "1.23.8"
 
 [libraries]
