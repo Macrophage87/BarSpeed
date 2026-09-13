@@ -60,11 +60,31 @@ class GuideVoiceCopyContractTest {
     private val rendered: String =
         guide.lineSequence().joinToString(" ") { it.trim() }.replace("\" + \"", "")
 
+    /** field-42 set 5's geometry: bench press, ECCENTRIC-first, drive up. */
+    private val benchPress = LiftDirection(startsWith = StartPhase.ECCENTRIC, concentricUp = true)
+
     /** field-41 set 1's geometry: seated overhead press, CONCENTRIC-first, drive up. */
     private val seatedOhp = LiftDirection(startsWith = StartPhase.CONCENTRIC, concentricUp = true)
 
     private fun plan(tempo: String, direction: LiftDirection) =
         CadencePlan.of(TempoSchedule.of(Tempo.parse(tempo), direction))
+
+    /**
+     * What a set of [reps] reps says, one string per rep, in the guide's own
+     * comma-separated form.
+     *
+     * `Done` is dropped: it follows the last rep and belongs to no rep's
+     * cycle. The grouping is by whole cycles of the plan, which is what makes
+     * one entry one rep.
+     */
+    private fun spokenByRep(p: CadencePlan, reps: Int): List<String> {
+        val spoken = CadenceVoice.script(p, reps).filter { it.utterance != CadenceVoice.DONE }
+        return spoken
+            .groupBy { it.atSecond / p.deliveredCycleS }
+            .toSortedMap()
+            .values
+            .map { cycle -> cycle.joinToString(", ") { it.utterance } }
+    }
 
     /**
      * The guide tells a lifter on a bottom-start lift which word the set opens
@@ -82,6 +102,37 @@ class GuideVoiceCopyContractTest {
             rendered.contains("starting on '$opener'"),
             "the guide does not say a bottom-start lift starts on '$opener', which is the first word " +
                 "CadenceVoice.script speaks on a concentric-first 3010",
+        )
+    }
+
+    /**
+     * The guide's worked example is what the script actually says.
+     *
+     * The example exists so a lifter can hear the first two reps and know
+     * the guide is describing their set. Reading it against
+     * [CadenceVoice.script] is the whole point: a substring assertion
+     * against a copy of the sentence would have passed at every SHA the
+     * sentence was false at, which is every SHA from #293's fix until this
+     * one.
+     *
+     * Reps 1 and 2 of an eccentric-first 3010 -- field-42 set 5's geometry,
+     * and the geometry the owner's own sentence uses. Rep 1 keeps its stroke
+     * word and counts from one; rep 2's word is replaced by the number and
+     * its counts continue from it. The two together are the only pair that
+     * shows both halves of the rule.
+     *
+     * The ellipsis between reps is the guide's own, written here as the
+     * escape `\u2026` rather than the character, so this assertion does not
+     * depend on the encoding this file is compiled with.
+     */
+    @Test
+    fun `the guide's bench 3010 example is what the script says on those reps`() {
+        val reps = spokenByRep(plan("3010", benchPress), 3)
+        val example = reps[0] + "\u2026 " + reps[1] + "\u2026"
+        assertTrue(
+            rendered.contains(example),
+            "the guide's Voice section does not contain \"" + example + "\", which is what " +
+                "CadenceVoice.script says on reps 1 and 2 of an eccentric-first 3010",
         )
     }
 }
