@@ -171,6 +171,17 @@ class SchemaRepsSourceContractTest {
      * corpus, so nothing mechanical compares these figures with the table that
      * produced them. What is enforced is that the schema and the prompt the
      * coach receives say the same thing.
+     *
+     * SIX CAPTURES AND NOT FIVE. #286's gate comment asks for the live count
+     * over the six committed concentric-first captures the batch detector
+     * over-counts. `field-seated-ohp-2rep` is the sixth and both copies said
+     * nothing about it, which left the key quoting five rows against an ask for
+     * six. It carries no rep-mark track, so its calls can be counted and not
+     * scored, and the key has to say that too -- a coach handed "1 call for 2
+     * hand reps" beside five scored rows would otherwise read it as a sixth
+     * scored row. `LiveRepCallCorpusTest`'s `the seated overhead press has no
+     * marks, so its calls are counted and not scored` is what computes the one
+     * call.
      */
     @Test
     fun `the reading key states what the live detector has been scored on`() {
@@ -181,7 +192,9 @@ class SchemaRepsSourceContractTest {
                 "11 of them in the right window",
                 "four of the thirteen say nothing",
                 "0 calls for 6 hand reps on session 37 set 2, 3 for 7 on set 3, 1 for 5 on set 4, " +
-                    "0 for 8 on session 38 set 4 and 2 for 8 on set 5",
+                    "0 for 8 on session 38 set 4, 2 for 8 on set 5",
+                "2 hand reps on the seated-overhead-press 2-rep capture, where the live caller makes 1 call",
+                "no rep-mark track, so its calls can be counted but not scored",
                 "every one of the thirteen is a tempo'd set",
             )
         documents.forEach { (name, text) ->
@@ -210,6 +223,40 @@ class SchemaRepsSourceContractTest {
                 "$name does not name the lift a tempo does not pace",
             )
             assertTrue("no stored geometry" in text.lowercase(), "$name does not name the collapse that is left")
+        }
+    }
+
+    /**
+     * A GEOMETRY-LESS TEMPO'D ROW READS AS THE GUIDE, in both copies.
+     *
+     * `RepsSourcePolicy.guideCounted` falls back to the tempo when `kind` is
+     * null, so such a row publishes `metronome`. The published schema says
+     * exactly that. `PLAN_PROMPT`, the copy the coach actually receives, said
+     * the opposite -- that "metronome" on such a row can be the lifter's own
+     * tap and should be read as "manual" -- which is a reinterpretation of
+     * almost every geometry-less tempo'd row in the archive, and almost all of
+     * those really were guided. The collapse is wrong for ONE shape, the
+     * explosive lift carrying a tempo, and the prompt generalised that one
+     * shape over the whole class.
+     *
+     * Pinned as a positive statement rather than as the absence of the wrong
+     * one, so a future rewording cannot satisfy it by deleting the sentence:
+     * both copies must SAY the tempo is read as the guide. The negative is
+     * kept beside it because the specific instruction that shipped is the one
+     * a coach would have followed.
+     */
+    @Test
+    fun `the reading key says a geometry-less tempo reads as the guide and not as a tap`() {
+        val documents = mapOf("the published schema" to description("repsSource"), "the plan prompt" to prompt)
+        documents.forEach { (name, text) ->
+            assertTrue(
+                "read as the guide" in text.lowercase(),
+                "$name does not say a geometry-less tempo'd row is read as the guide",
+            )
+            assertFalse(
+                "read it as \"manual\"" in text.lowercase(),
+                "$name tells a coach to read a geometry-less tempo'd row as a tap",
+            )
         }
     }
 
