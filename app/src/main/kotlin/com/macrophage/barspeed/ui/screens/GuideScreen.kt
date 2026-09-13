@@ -151,6 +151,9 @@ private val SECTIONS =
                 "that rep's first stroke word, with that stroke's counts continuing from the " +
                 "number: on a bench 3010 that's 'Down, 1, 2, Up… Rep 2, 2, 3, Up…'. Rep 1 " +
                 "keeps its word, so the first word of the set is the stroke, not 'Rep 1'. " +
+                "A two-second stroke is counted on every rep the same way: an accessory " +
+                "2011 goes 'Up, Hold, Down, 1… Rep 2, Hold, Down, 1…', so the count never " +
+                "goes quiet in the middle of a set. " +
                 "A cadence with no pause at the end and no stroke longer than a second — 1010, " +
                 "and 1110 on some lifts — has no second to spare, so it calls the strokes " +
                 "only: no rep number and no 'last rep', with the count on screen. " +
