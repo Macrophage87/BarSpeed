@@ -56,11 +56,13 @@ class GuidedCadenceRunner(
      * Two arguments, and the split is load-bearing. The first is the CUE ROWS —
      * the words that go on the set's cue track, which is a persisted format
      * every cue-track consumer parses. The second is the UTTERANCE actually
-     * spoken. One utterance can carry two words the record wants kept apart:
-     * a merged rep call is spoken as `"Down, Rep 2"` and recorded as `Down`
-     * and `Rep 2`, because renaming the `Down` row would break every consumer
-     * that matches it while dropping the call would lose what the app said.
-     * All rows of one call share one instant, so the caller stamps them once.
+     * spoken. The two came apart because one utterance used to carry two words
+     * the record wanted kept apart: a rep call merged into a stroke's own word
+     * was spoken as `"Down, Rep 2"` and recorded as `Down` and `Rep 2`. Since
+     * #293 the call REPLACES the stroke word, so a cadence call is one word and
+     * one row — and the split still earns its keep, because the lead-in speaks
+     * words it deliberately does not record. All rows of one call share one
+     * instant, so the caller stamps them once.
      *
      * An EMPTY list means speak it and write nothing down. The lead-in needs
      * that third state — its countdown digits and its `"N seconds"` opener are
@@ -192,9 +194,12 @@ class GuidedCadenceRunner(
      *
      * What is said and what is written down are [CadenceVoice]'s decisions, in
      * `:core:dsp` where a test can reach them; this walks the seconds. The
-     * announcement is merged into the beat's own utterance rather than spoken
-     * separately, because TTS runs with QUEUE_FLUSH and a second utterance a
-     * moment later would cancel the first.
+     * announcement REPLACES the beat's own word rather than being spoken beside
+     * it (#293), so no second is asked to carry two utterances — TTS runs with
+     * QUEUE_FLUSH and the second would cancel the first. This class does not
+     * know that: it hands the beat and the pending announcement to
+     * [CadenceVoice] and speaks whatever comes back, which is why the placement
+     * could change without a line of this file moving.
      */
     private suspend fun play(beat: CadenceBeat, announcement: String?) {
         CadenceVoice.beatCall(beat, announcement)?.let { speak(it.recorded, it.utterance) }

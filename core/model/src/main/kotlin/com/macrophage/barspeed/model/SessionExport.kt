@@ -165,8 +165,9 @@ data class SessionExport(
          * 1.13 carries a FIFTH change (#176, #173) and a SIXTH (#157, #174),
          * both under the same number because 1.13 was unreleased when they
          * landed, and NEITHER of them additive: `voiceCues` gains the rep
-         * call the guide merges into a stroke's own word, so an existing
-         * array's contents change; and `plannedReps` / `plannedDuration_s`
+         * call the guide then merged into a stroke's own word, so an existing
+         * array's contents change (the guide stopped merging at 1.20, which
+         * that entry states; this one is 1.13's and is left as 1.13's); and `plannedReps` / `plannedDuration_s`
          * publish what the plan declared, frozen at import, rather than the
          * box the lifter left
          * behind. The published schema's `schemaVersion` description carries
@@ -1191,6 +1192,84 @@ data class SessionExport(
          * analysis, and nothing re-runs the segmenter at export time. No set
          * already on disk gains the word or loses its figures.
          * `DATABASE_VERSION` does not move -- no column changes.
+         *
+         * 1.20 carries a THIRD change, filed under the same number because
+         * 1.20 is unreleased: `git tag --sort=-creatordate | head -1` is
+         * v0.1.52 and `git show
+         * v0.1.52:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.19"`, both read this round rather than
+         * relayed from the entries above.
+         *
+         * THE CHANGE (#293): the guided metronome speaks its rep call at the
+         * START of the rep it names, IN PLACE OF THAT REP'S FIRST STROKE WORD.
+         * The owner asked for it in those terms, after a session on a 3010
+         * overhead press whose lowering was hard to follow: "Have the rep
+         * number be at the start of the rep, and replace the relevant up or
+         * down, etc." Three things change in `voiceCues` and no key moves.
+         *
+         * WHEN A CALL IS HEARD IS NOW UNIFORM. Every `Rep N` and `Last rep`
+         * row from a guided set lands on the first second of the rep it names.
+         * From 1.13 through 1.19 it was not uniform and the published
+         * description says so: on the two schedules that merged the call into a
+         * stroke it was spoken during the rep it named, and on the schedule
+         * whose prescription ends in a pause it was spoken in the previous
+         * rep's closing pause, before that rep had begun. That rule is the
+         * reading rule for every set recorded under those versions and is kept
+         * as theirs, on the precedent the 1.13 entries set.
+         *
+         * THE FIRST STROKE'S WORD IS WRITTEN ONCE PER SET, NOT ONCE PER REP,
+         * and this is the half a reader must act on. The call replaces it, and
+         * a cue row is what the app SAID, so the word is not written on the reps
+         * that carry a call. Rep 1 carries none -- it keeps its word, its place
+         * and its own tempo counts -- so a newly recorded eccentric-first press
+         * publishes ONE `Down` row for a set of six where every earlier archive
+         * publishes six. WHICH word thins out is the (tempo, lift) pair's: the
+         * `Down` on an eccentric-first press, the `Up` on a concentric-first
+         * overhead press, from the same `3010`. A consumer counting stroke rows
+         * to count reps must count the call rows instead -- one per rep after
+         * the first, on the rep's own first second -- plus rep 1's stroke word.
+         * The OTHER stroke's word is still written on every rep, so a guided
+         * track still carries a stroke word in every rep and both of them in
+         * rep 1, which is what the published discriminator between this
+         * counter and the unguided one now rests on.
+         *
+         * NO TWO ROWS SHARE AN INSTANT ANY MORE. 1.13's fifth change published
+         * a merged call as two rows at one `t_ms`, the stroke word and the
+         * call; a replacing call is one row. The sentence that told a consumer
+         * matching stroke rows it was unaffected is DELETED from the published
+         * description rather than qualified, because from this version such a
+         * consumer is affected in the way stated above.
+         *
+         * THE TEMPO COUNTS OF THAT STROKE ARE RENUMBERED, not dropped. The
+         * number stands where the word stood, so it is that stroke's first
+         * count and the rest continue from it: a three-second opener publishes
+         * `2` then `3` where it published a single `2`, and rep 1 publishes `1`
+         * then `2`. A bare digit still means a tempo count and never a rep
+         * number, which does not move. The count a merged call used to give up
+         * is spoken again, so the missing-`1`-per-rep fingerprint that dated the
+         * unwritten calls of a 0.1.43 archive does not appear in a 1.20 one.
+         *
+         * WHAT STAYS TRUE, quoted so it is not re-litigated: the 1.19 EIGHTH
+         * entry's subject is WHICH rep a call names -- "what changes is WHICH
+         * rep a `Rep N` row names, so a consumer aligning cue rows to reps is
+         * off by one across the boundary" -- and #293 does not touch it. A call
+         * still names the rep now due: a set of twelve says `Rep 2` through
+         * `Rep 11`, then `Last rep`, then `Done`.
+         *
+         * NOT ADDITIVE, and not retroactive. No key is added, removed or
+         * retyped; the CONTENTS of an existing array change, which is the shape
+         * 1.4, 1.8, 1.9, 1.12, 1.13 and the 1.19 EIGHTH each carry. Cue rows
+         * are stored as they are spoken, so no archive already on disk moves,
+         * and a reader of one should apply the version's own rule.
+         * `DATABASE_VERSION` does not move and the plan schema is untouched --
+         * nothing about the prescription changes, only what is said over it.
+         *
+         * WHAT IT IS PINNED AGAINST. `CadenceVoice.script` in `:core:dsp`
+         * writes these rows, and the new script is asserted row for row against
+         * cue tracks from three sessions: field-41 set 1 and field-42 sets 5 and
+         * 13 (app 0.1.52), field-39 sets 3, 5 and 7 (0.1.50) and session 33 sets
+         * 1, 5 and 13 (0.1.43). No beat moves on any of them, and no set
+         * changes length.
          */
         const val SCHEMA_VERSION = "1.20"
 

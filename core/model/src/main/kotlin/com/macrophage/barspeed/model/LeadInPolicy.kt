@@ -96,9 +96,13 @@ object LeadInPolicy {
      * launch phrase -- and is deliberately NOT written as it, which this module
      * could not do in any case. Three constants in this codebase are 2 and all
      * three mean different things: how long the launch phrase is, the shortest
-     * stroke that can carry a merged rep announcement, and the shortest stroke
-     * counted out loud. `LeadInPlan.PHRASE_S` and `CadencePlan.MERGE_MIN_STROKE_S`
-     * each already carry this warning; this is the same warning for the fourth.
+     * stroke whose presence leaves a prescription able to speak a rep call, and
+     * the shortest stroke counted out loud. `LeadInPlan.PHRASE_S` and
+     * `CadencePlan.CALL_MIN_STROKE_S` each already carry this warning; this is
+     * the same warning for the fourth. (That second one was
+     * `CadencePlan.MERGE_MIN_STROKE_S`, "the shortest stroke that can carry a
+     * merged rep announcement", until #293 stopped merging a call into a stroke
+     * word and replaced the word instead.)
      *
      * Not a bound. A prep below it is legal and is warned about rather than
      * refused: a two-second cable set is exactly what this feature was asked for,
