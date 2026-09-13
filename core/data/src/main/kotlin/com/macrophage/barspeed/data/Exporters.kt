@@ -1043,16 +1043,18 @@ class RawExporter(
         // direction was DECLARED by a plan, SEEDED, or is the app's default
         // standing because nothing said (#263). `seeded` here means only
         // that the id has an ExerciseDef.SEED entry -- SetGeometryPolicy
-        // reads one flag for all seven values -- and NOT that a seed
-        // supplied a drive direction; no seed carries one, which is what
-        // DriveDownFamilyTest pins. `inferred` is the fourth word of that
-        // enum and is unreachable here: this value is resolved with
+        // computes one `seeded` flag from `seedById` and passes it to five
+        // of the seven geometry values, this one among them -- and NOT that
+        // a seed supplied a drive direction; no seed carries one, which is
+        // what DriveDownFamilyTest pins. `inferred` is the fourth word of
+        // that enum and is unreachable here: this value is resolved with
         // inference switched off, because guessing the drive from words in
         // an id is deliberately refused. session.json has published it as
         // geometry.source.concentric since the geometry block landed; this
         // manifest published the resolved value alone, so a reader with the
-        // CSVs and this file could not tell field-39's four "concentric": "up"
-        // pulldowns -- every one of them a default -- from four the plan meant.
+        // CSVs and this file could not tell field-39 (#263)'s four
+        // "concentric": "up" pulldowns -- every one of them a default --
+        // from four the plan meant.
         // Flat here and nested there, which is what these two documents
         // already do with geometry.
         geometry?.let { g ->

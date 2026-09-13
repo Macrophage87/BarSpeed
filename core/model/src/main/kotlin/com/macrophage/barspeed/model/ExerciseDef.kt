@@ -281,7 +281,11 @@ data class ExerciseDef(
          * "drives up".
          *
          * DERIVED FROM TWO STATEMENTS THE APP ALREADY MAKES, and from
-         * nothing else. The families are [concentricUp]'s own KDoc -- lifts
+         * nothing else. A third statement agrees and is the canonical
+         * user-facing copy: GuideScreen.PLAN_PROMPT already tells the model
+         * "ALWAYS DECLARE "down" ON A LEG CURL, LAT PULLDOWN OR TRICEPS
+         * PUSHDOWN". This table warns about the plans that ignored it.
+         * The families are [concentricUp]'s own KDoc -- lifts
          * whose drive goes down, "leg curl, lat pulldown, triceps pushdown"
          * -- which the published plan schema states in the same words at
          * `$defs.exercise.concentric`: "Use 'down' for leg curls, lat

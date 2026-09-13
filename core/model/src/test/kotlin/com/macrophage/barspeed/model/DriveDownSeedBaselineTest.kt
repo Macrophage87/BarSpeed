@@ -69,11 +69,11 @@ class DriveDownSeedBaselineTest {
     }
 
     /**
-     * The resolved value and its published provenance, on field-39's exact
-     * declaration: stack and inversion declared, `concentric` omitted.
+     * The resolved value and its published provenance, on field-39 (#263)'s
+     * exact declaration: stack and inversion declared, `concentric` omitted.
      */
     @Test
-    fun `field-39's pulldown declaration resolves drive-up and publishes it as a default`() {
+    fun `field-39 (#263)'s pulldown declaration resolves drive-up and publishes it as a default`() {
         val declared = planExercise("lat_pulldown", ""","sensorOnStack": true, "sensorInverted": true""")
         val used = SetGeometryPolicy.resolve(ExerciseDef("lat_pulldown", "Lat Pulldown"), declared)
         assertTrue(used.concentricUp, "the omitted key leaves the Kotlin default standing")

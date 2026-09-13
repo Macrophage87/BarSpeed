@@ -370,7 +370,7 @@ data class PlanFile(
      * every stroke of it is read backwards with nothing at the gate saying so
      * (#263).
      *
-     * Field-39 is the case. Four `lat_pulldown` sets ran from a plan that
+     * Field-39 (#263) is the case. Four `lat_pulldown` sets ran from a plan that
      * declared `sensorOnStack` and `sensorInverted` and wrote the direction
      * only in free text -- "Concentric DOWN (the pull)" -- which the app
      * correctly ignores. All four resolved drive-UP: the two-second stroke of
@@ -415,8 +415,8 @@ data class PlanFile(
         if (exercise.sets.all { it.isTimed }) return null
         return "sessions[$si].exercises[$ei]: ${exercise.exercise} pulls DOWN, and the plan did not say " +
             "so - with no \"concentric\" key the app defaults the drive to UP, so it will cue the return " +
-            "as the drive and grade every tempo digit against the wrong stroke. Add " +
-            "\"concentric\": \"down\" to replace the default."
+            "as the drive - the long stroke of a 1120 is played first, on the return - and pair every " +
+            "rep off the wrong stroke. Add \"concentric\": \"down\" to replace the default."
     }
 
     private fun startVsSeed(si: Int, ei: Int, exercise: PlanExerciseDef): String? {

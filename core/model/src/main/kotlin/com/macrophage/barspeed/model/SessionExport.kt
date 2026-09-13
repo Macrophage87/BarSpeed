@@ -1259,21 +1259,22 @@ data class SessionExport(
          * The manifest is the only file a reader who opens the archive's CSVs
          * has, and those samples are device-frame and carry no phase labels,
          * so the drive direction stated there decides which stroke every
-         * figure derived from them belongs to. Field-39 ran four
+         * figure derived from them belongs to. Field-39 (#263) ran four
          * `lat_pulldown` sets from a plan that declared the mount and not the
          * drive; all four published `"concentric": "up"`, every one of them
          * the app's default standing because nothing said, and the manifest
          * gave a reader no way to tell that from four the plan meant.
          *
-         * PURELY ADDITIVE, in both directions. No key in this document is
-         * added, removed or retyped, so a validator running the 1.19 schema
-         * accepts a 1.20 document exactly as it did before this entry: the
-         * closed `additionalProperties: false` on `$defs.geometrySource` is
-         * untouched, and it is what would have made an EIGHTH key there
-         * non-additive -- an older reader validating against 1.19 would refuse
-         * the whole document rather than ignore one key. That is the reason
-         * this provenance is published in the manifest, where it was actually
-         * missing, and not added to a closed object where it already exists.
+         * ADDS NO KEY HERE, so it changes nothing about what an older reader or
+         * validator does with this document: the 1.19 schema still REJECTS a 1.20
+         * document on the version string alone, exactly as the first 1.20 entry above
+         * states, and a 1.19 reader that does not validate still reads it correctly.
+         * The asymmetry is unchanged, not resolved. The closed `additionalProperties:
+         * false` on `$defs.geometrySource` is untouched, and it is what would have
+         * made an EIGHTH key there non-additive -- an older reader validating against
+         * 1.19 would refuse the whole document rather than ignore one key. That is
+         * the reason this provenance is published in the manifest, where it was
+         * actually missing, and not added to a closed object where it already exists.
          * `meta.json` has no published schema at all, so a reader of the
          * archive either reads the new key or ignores it; nothing validates it
          * and nothing can refuse it.
