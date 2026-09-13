@@ -1238,6 +1238,47 @@ data class SessionExport(
          * is recorded (`DATABASE_VERSION` 18) and nothing backfills it, so
          * every row already on disk publishes `manual`, `metronome`,
          * `analysis` or no word at all -- which is what those rows were.
+         *
+         * ALSO UNDER 1.20, a THIRD entry rather than a mint, and on a reading
+         * taken this round rather than a relayed one: `git tag
+         * --sort=-creatordate | head -1` is v0.1.52 and `git show
+         * v0.1.52:core/model/.../SessionExport.kt` reads
+         * `SCHEMA_VERSION = "1.19"`, so nothing has shipped 1.20 and the
+         * number still takes further entries. IT ADDS NO KEY TO THIS DOCUMENT
+         * (#263): what the RAW ARCHIVE's `meta.json` publishes gains
+         * `concentricSource` beside the `concentric` it already carried,
+         * naming which of `declared`, `seeded`, `inferred` or `default`
+         * supplied that direction -- the same word this document has published
+         * at `geometry.source.concentric` since the geometry block landed.
+         *
+         * The manifest is the only file a reader who opens the archive's CSVs
+         * has, and those samples are device-frame and carry no phase labels,
+         * so the drive direction stated there decides which stroke every
+         * figure derived from them belongs to. Field-39 ran four
+         * `lat_pulldown` sets from a plan that declared the mount and not the
+         * drive; all four published `"concentric": "up"`, every one of them
+         * the app's default standing because nothing said, and the manifest
+         * gave a reader no way to tell that from four the plan meant.
+         *
+         * PURELY ADDITIVE, in both directions. No key in this document is
+         * added, removed or retyped, so a validator running the 1.19 schema
+         * accepts a 1.20 document exactly as it did before this entry: the
+         * closed `additionalProperties: false` on `$defs.geometrySource` is
+         * untouched, and it is what would have made an EIGHTH key there
+         * non-additive -- an older reader validating against 1.19 would refuse
+         * the whole document rather than ignore one key. That is the reason
+         * this provenance is published in the manifest, where it was actually
+         * missing, and not added to a closed object where it already exists.
+         * `meta.json` has no published schema at all, so a reader of the
+         * archive either reads the new key or ignores it; nothing validates it
+         * and nothing can refuse it.
+         *
+         * NOT RETROACTIVE, for the reason every entry here gives, with one
+         * narrower limit worth stating: the provenance is frozen into the
+         * set's row when the set is RECORDED, so a row re-exports with
+         * whatever its stored `sources` object holds, and a row with no stored
+         * geometry publishes neither the direction nor its source, as it
+         * always has. `DATABASE_VERSION` does not move; no column changes.
          */
         const val SCHEMA_VERSION = "1.20"
 

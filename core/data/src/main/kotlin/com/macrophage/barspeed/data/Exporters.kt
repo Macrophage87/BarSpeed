@@ -1038,9 +1038,20 @@ class RawExporter(
         //
         // Omitted entirely for a set that carries no stored geometry, which is
         // every set recorded before the column existed.
+        //
+        // `concentricSource` is the word beside the word: whether that
+        // direction was DECLARED by a plan or is the app's default standing
+        // because nothing said (#263). session.json has published it as
+        // geometry.source.concentric since the geometry block landed; this
+        // manifest published the resolved value alone, so a reader with the
+        // CSVs and this file could not tell field-39's four "concentric": "up"
+        // pulldowns -- every one of them a default -- from four the plan meant.
+        // Flat here and nested there, which is what these two documents
+        // already do with geometry.
         geometry?.let { g ->
             str("startsWith", g.startsWith.name.lowercase())
             str("concentric", if (g.concentricUp) "up" else "down")
+            str("concentricSource", g.sources.concentric.name.lowercase())
             str("plane", if (g.horizontal) "horizontal" else "vertical")
             bool("sensorOnStack", g.sensorOnStack)
             bool("sensorInverted", g.sensorInverted)

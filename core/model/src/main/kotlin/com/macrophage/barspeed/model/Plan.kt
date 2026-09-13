@@ -164,9 +164,13 @@ data class PlanFile(
      * the plan, because each group prompts a different question back to
      * whoever wrote it. An undeclared start comes first among the direction
      * and kind warnings, because it is the one case here where the plan made
-     * no decision for the app to follow at all. Overriding a built-in comes
-     * next: that is the app being told to ignore something it ships with, and
-     * this is the only sign it happened.
+     * no decision for the app to follow at all. An undeclared DRIVE follows it
+     * immediately, on the same ground and about the other half of the same
+     * question: `start` says which phase opens a rep and `concentric` says
+     * which way the driving one moves, and a plan that omitted either left the
+     * app to decide. Overriding a built-in comes next: that is the app being
+     * told to ignore something it ships with, and this is the only sign it
+     * happened.
      *
      * The two coaching-text warnings come last, because nothing is lost in
      * either: every word the plan wrote is still reachable on screen. What they
@@ -176,6 +180,7 @@ data class PlanFile(
     fun warnings(): List<String> = eachExercise(::pairVsLoad) +
         eachExercise(::implementUndeclared) +
         eachExercise(::startUndeclared) +
+        eachExercise(::concentricUndeclared) +
         eachExercise(::startVsSeed) +
         eachExercise(::kindVsSeed) +
         eachExercise(::kindVsShape) +
@@ -358,6 +363,60 @@ data class PlanFile(
             "begins at from the id alone - the guess decides which direction opens a rep and, on a set " +
             "carrying a tempo, the voice guide's first call. Declare \"start\": \"top\" or \"bottom\" " +
             "to replace it."
+    }
+
+    /**
+     * `concentric` left undeclared on a lift the app knows drives DOWNWARD, so
+     * every stroke of it is read backwards with nothing at the gate saying so
+     * (#263).
+     *
+     * Field-39 is the case. Four `lat_pulldown` sets ran from a plan that
+     * declared `sensorOnStack` and `sensorInverted` and wrote the direction
+     * only in free text -- "Concentric DOWN (the pull)" -- which the app
+     * correctly ignores. All four resolved drive-UP: the two-second stroke of
+     * a 1120 went to the RETURN, and the other three delivered a cue track
+     * identical to the press sets beside them. Four of that session's ten sets
+     * taught nothing, and the reps cannot be re-run from a file.
+     *
+     * Fires only where the default is both WRONG and CONSUMED, which is
+     * [startUndeclared]'s pair of conditions applied to the other half of the
+     * direction question.
+     *
+     * Wrong: the id is in [ExerciseDef.DRIVE_DOWN_IDS], the five stack
+     * machines whose drive goes down. That table is checked rather than the
+     * resolved [PlanExerciseDef.concentricUp], which reads `true` for every
+     * exercise in the world and so cannot distinguish a bench press from a
+     * pulldown. No seed entry supplies a drive direction for any of the five
+     * -- `DriveDownFamilyTest` pins that -- so the value really is the Kotlin
+     * default rather than a built-in fact, and no equivalent of
+     * [startUndeclared]'s `seedById` gate is needed or would fire.
+     *
+     * Consumed: `RepSegmenter` and the voice guide both read the drive
+     * direction on any set that is not timed, and `RecordViewModel` grades a
+     * timed set on the clock without segmenting it -- so an exercise warns
+     * only when at least one of its sets is not timed, exactly as
+     * [startUndeclared] does.
+     *
+     * Reads [PlanExerciseDef.concentric] directly, for [startUndeclared]'s
+     * reason: a declared `"up"` is an author who decided and must not be
+     * nagged, and an unrecognised word such as `"sideways"` was WRITTEN and is
+     * already an error from `validate()`, which must not also be reported here
+     * as nothing having been written.
+     *
+     * This warns and changes nothing else. Guessing the drive from words in an
+     * id stays refused ([ExerciseDef.concentricUp]), the set still resolves
+     * drive-up, and the export still publishes that as
+     * [GeometrySource.DEFAULT]. What was missing is that nobody was told while
+     * the plan could still be fixed.
+     */
+    private fun concentricUndeclared(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        if (exercise.concentric != null) return null
+        if (!ExerciseDef.drivesDown(exercise.exercise)) return null
+        if (exercise.sets.all { it.isTimed }) return null
+        return "sessions[$si].exercises[$ei]: ${exercise.exercise} pulls DOWN, and the plan did not say " +
+            "so - with no \"concentric\" key the app defaults the drive to UP, so it will cue the return " +
+            "as the drive and grade every tempo digit against the wrong stroke. Add " +
+            "\"concentric\": \"down\" to replace the default."
     }
 
     private fun startVsSeed(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
