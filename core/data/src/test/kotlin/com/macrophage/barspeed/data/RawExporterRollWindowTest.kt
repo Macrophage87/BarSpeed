@@ -117,7 +117,7 @@ class RawExporterRollWindowTest {
 
     private val json = Json { encodeDefaults = true }
 
-    private fun row() = SetRecordEntity(
+    private fun row(tempo: String? = "3010") = SetRecordEntity(
         id = 5L,
         sessionId = 1L,
         orderIdx = 0,
@@ -133,7 +133,7 @@ class RawExporterRollWindowTest {
         // derives which from this frozen tempo and the row's geometry (#285).
         // `Set ended` bounds either way, which is why the early-stop case
         // below needs no tempo to hold.
-        tempo = "3010",
+        tempo = tempo,
         analysisJson =
         json.encodeToString(SetAnalysis.serializer(), SetAnalysis(emptyList(), 0.0, null, null, emptyList())),
     )
@@ -174,8 +174,8 @@ class RawExporterRollWindowTest {
         csvGzip = Gzip.compress(PrepWindowCsv.encode(PrepWindow(startedAtMs, workStartedAtMs))),
     )
 
-    private suspend fun meta(streams: List<RawStreamEntity>): JsonObject {
-        val dao = FakeSessionDao(listOf(row()), mapOf(5L to streams))
+    private suspend fun meta(streams: List<RawStreamEntity>, tempo: String? = "3010"): JsonObject {
+        val dao = FakeSessionDao(listOf(row(tempo)), mapOf(5L to streams))
         val repo = SessionRepository(dao, FakeExerciseDao())
         val bytes = RawExporter(repo, SessionExporter(repo), appVersion = "0.1.50").buildZip(1L)!!
         var metaText: String? = null
@@ -251,6 +251,39 @@ class RawExporterRollWindowTest {
                 ),
             )
         assertEquals(12.0, set.num("rollExcursion_deg"), "the re-rack was counted as the set")
+    }
+
+    /**
+     * A `Done` on a set NO CADENCE RAN ON does not close this window. Issue
+     * #285.
+     *
+     * The word is the same string either way -- on a set the lifter counts by
+     * tapping it is the rep-count milestone the app speaks at the planned
+     * count, not a call to stop lifting -- so the prescription is what
+     * separates them. `RepsSourcePolicy.guideCounted` over the row's frozen
+     * tempo and geometry is the rule, and this row carries no tempo.
+     *
+     * The same streams as the case above, so the difference between the two is
+     * one nullable column: 12.0 degrees bounded at the milestone against 140.0
+     * over the whole capture. `rollExcursionBasis` says which was used, so the
+     * change is readable on the row rather than silent.
+     *
+     * This is the ONLY pin on the raw exporter's own boundary. `SetAnalyzer`'s
+     * is `ManualDoneBoundTest` in `:core:dsp`, and the two are separate
+     * decisions in separate modules reading one rule.
+     */
+    @Test
+    fun `a Done on a set no cadence ran on does not close the window`() = runTest {
+        val set =
+            meta(
+                listOf(
+                    imuStream(samples(1_000L, sweep(0.0, 12.0, 20) + sweep(0.0, 140.0, 20))),
+                    cueStream(1_190L to "Done"),
+                ),
+                tempo = null,
+            )
+        assertEquals(140.0, set.num("rollExcursion_deg"), "the milestone closed a window it does not end")
+        assertEquals("wholeCapture", set.text("rollExcursionBasis"), "and the document did not say so")
     }
 
     /** `Set ended` bounds a set the lifter stopped early, exactly as `Done` does. */
