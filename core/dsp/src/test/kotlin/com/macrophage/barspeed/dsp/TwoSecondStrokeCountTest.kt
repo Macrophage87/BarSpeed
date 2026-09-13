@@ -81,8 +81,8 @@ import kotlin.test.assertTrue
  * `field-bicepscurl-2010-12rep-s38-set10-cues.csv`, copied byte for byte.
  *
  * `field-39/f7ad0cb9-BarSpeedv0.1.5020260905_080515raw.zip`, `"epoch":
- * "2026-09-05T12:05:15.479Z"`, ten sets. Five of its cue tracks are committed
- * here, likewise byte for byte:
+ * "2026-09-05T12:05:15.479Z"`, ten sets. Five of its cue tracks are added by
+ * this file, byte for byte:
  *
  * | source | committed as |
  * |---|---|
@@ -91,6 +91,11 @@ import kotlin.test.assertTrue
  * | `set06_seated_overhead_press_cues.csv` | `field-ohp-20x0-6rep-s39-set06` |
  * | `set08_lat_pulldown_cues.csv` | `field-latpulldown-2011-6rep-s39-set08` |
  * | `set10_lat_pulldown_cues.csv` | `field-latpulldown-20x0-6rep-s39-set10` |
+ *
+ * A sixth of that session's tracks, `field-ohp-1110-6rep-s39-set05-cues.csv`,
+ * is present in this source set and unread by this file, on the same footing
+ * as `1010`: `1110`'s digit-2 pause is inside the rep and no stroke of it
+ * reaches [CadencePlan.CALL_MIN_STROKE_S].
  *
  * Sets 6, 8 and 10 arrived in round 1 of review, which found the list below
  * claiming to be "the sets #248 names" while holding six of them. They carry
@@ -349,7 +354,7 @@ class TwoSecondStrokeCountTest {
     }
 
     @Test
-    fun `what the three sets round 1 added sound like, before and after`() {
+    fun `what the three sets round 1 added sound like now, and set 6 as 0150 recorded it`() {
         // 20X0 is the shape the corpus was missing, and the archive is what it
         // sounded like: a three-second cycle, `1` on rep 1 and rep 6, four
         // silent reps between. The explosive stroke is delivered as a
@@ -437,13 +442,18 @@ class TwoSecondStrokeCountTest {
         // The guard, as a rule over the corpus rather than a row list per set:
         // over the tracks [affected] and [unaffected] name, each first checked
         // to carry a stroke of at least CALL_MIN_STROKE_S seconds, every rep
-        // window holds at least one bare digit. This is the assertion that reds
-        // if a call ever eats a count again.
+        // window holds at least one bare digit. This is the assertion that
+        // reds if a call ever eats the only count a two-second stroke has. On
+        // the 3010 tracks the stroke has two interior counts, so it would
+        // survive losing one and this rule would stay green.
         //
         // It is a rule over THOSE tracks and not over every plan a lifter could
         // write. What it covers is five tempos -- 2011, 2010, 20X0, 1120, 3010
         // -- on three geometries, and what it says about any other prescription
-        // is nothing.
+        // is nothing. All eleven tracks are concentric-first, so the call
+        // never lands on the counted stroke here; the shape where the call and
+        // the counted stroke are one beat is pinned on the 3 s eccentric bench
+        // press in RepCallPlacementTest (Rep 2, 2, 3, Up), not here.
         (affected + unaffected).forEach { track ->
             val p = plan(track)
             assertTrue(
