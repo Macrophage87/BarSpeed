@@ -135,4 +135,31 @@ class GuideVoiceCopyContractTest {
                 "CadenceVoice.script says on reps 1 and 2 of an eccentric-first 3010",
         )
     }
+
+    /**
+     * The guide's second worked example, and the one #248 is about.
+     *
+     * A `2011` is the tempo the owner runs on the accessory sessions they train
+     * most weeks, and it is where the count used to disappear: a two-second
+     * stroke has exactly one interior second, so the merged call took the set's
+     * only interior count and left `1` spoken on rep 1 and the last rep alone.
+     * `TwoSecondStrokeCountTest` measures that on field-38 and field-39 and
+     * carries the numbers.
+     *
+     * The 3010 example above cannot show it. Its three-second stroke has two
+     * interior counts, so it kept one either way and reads the same to a lifter
+     * scanning for whether their own tempo is counted. This example is
+     * field-39 set 1's own geometry -- seated overhead press, concentric-first,
+     * drive up -- which is the set the owner heard go quiet.
+     */
+    @Test
+    fun `the guide's 2011 example is what the script says on those reps`() {
+        val reps = spokenByRep(plan("2011", seatedOhp), 3)
+        val example = reps[0] + "… " + reps[1] + "…"
+        assertTrue(
+            rendered.contains(example),
+            "the guide's Voice section does not contain \"" + example + "\", which is what " +
+                "CadenceVoice.script says on reps 1 and 2 of a concentric-first 2011",
+        )
+    }
 }
