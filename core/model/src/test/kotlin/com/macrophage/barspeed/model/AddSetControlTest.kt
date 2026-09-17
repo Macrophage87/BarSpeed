@@ -384,4 +384,59 @@ class AddSetControlTest {
             AddSetControl.label("Overhead press", "Lat pulldown"),
         )
     }
+
+    /**
+     * A prescribed block one of whose sets is GONE, which is the shape #300's
+     * skip leaves behind: set 2 of four squats has been dropped from the queue
+     * and the sets that remain keep the PLAN's own numbers, so the indices run
+     * 0, 2, 3 with a hole where the skipped set was.
+     *
+     * Characterization, added by #300 before anything can produce it. The
+     * forward and backward scans both continue on `setIndexInExercise > 0`
+     * and on the exercise id, and neither tests that the indices are
+     * CONSECUTIVE -- so the block is still found whole. That is the property
+     * the skip depends on and it is nowhere asserted today: renumbering the
+     * remaining sets instead would make the card disagree with the plan a
+     * coach reads.
+     */
+    private fun blockWithASkippedSet() = listOf(
+        AddSetSlotKey("back_squat", 0, isAddedSet = false),
+        AddSetSlotKey("back_squat", 2, isAddedSet = false),
+        AddSetSlotKey("back_squat", 3, isAddedSet = false),
+        AddSetSlotKey("seated_row", 0, isAddedSet = false),
+    )
+
+    /**
+     * The block survives a hole in its set numbering, from either end of it.
+     *
+     * Asked at every slot of the block rather than at one, because the
+     * backward walk starts where it is asked: anchored on the slot AFTER the
+     * hole it has to step over the hole to reach the opener, and anchored on
+     * the opener the forward walk has to step over it the other way.
+     */
+    @Test
+    fun `a block whose skipped set left a hole in the numbering is still one block`() {
+        val blocks = blockWithASkippedSet()
+        assertEquals(0..2, AddSetControl.blockRange(blocks, 0))
+        assertEquals(0..2, AddSetControl.blockRange(blocks, 1))
+        assertEquals(0..2, AddSetControl.blockRange(blocks, 2))
+        assertEquals(3..3, AddSetControl.blockRange(blocks, 3))
+    }
+
+    /**
+     * A set added to a block that has lost one still lands inside that block,
+     * and the numbering it carries is the caller's to choose rather than this
+     * rule's.
+     *
+     * The insertion point is what matters here: `blocks.size` would mean the
+     * end of the QUEUE, past the row block, and a hole in the numbering is
+     * exactly the input that could produce it if either scan counted instead
+     * of naming.
+     */
+    @Test
+    fun `a set added to a block that has lost one lands inside that block`() {
+        val p = assertNotNull(AddSetControl.placement(blockWithASkippedSet(), queueIndex = 2, upcomingIndex = 3))
+        assertEquals(2, p.anchorIndex)
+        assertEquals(3, p.insertAt)
+    }
 }

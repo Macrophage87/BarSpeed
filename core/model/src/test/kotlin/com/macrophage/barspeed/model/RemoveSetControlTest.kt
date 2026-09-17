@@ -225,4 +225,30 @@ class RemoveSetControlTest {
             RemoveSetControl.label("Back squat", setNumber = 5, several = true),
         )
     }
+
+    /**
+     * An appended set is still removable from a block one of whose prescribed
+     * sets is GONE -- the shape #300's skip leaves behind.
+     *
+     * Characterization, added by #300 before anything can produce that shape.
+     * The two controls have to keep working on each other's output: a lifter
+     * who skips set 2 and then appends a set must still be able to take the
+     * appended one back, and the eligibility scan reads
+     * [AddSetControl.blockRange], which walks the block by `setIndexInExercise`
+     * and does not require those numbers to be consecutive.
+     */
+    @Test
+    fun `an appended set survives a hole left in its block's numbering`() {
+        val blocks = listOf(
+            key("back_squat", 0),
+            key("back_squat", 2),
+            key("back_squat", 3, added = true),
+            key("seated_row", 0),
+        )
+
+        val t = assertNotNull(RemoveSetControl.target(blocks, queueIndex = 1, upcomingIndex = 2))
+        assertEquals(2, t.removeAt)
+        assertTrue(t.wasUpcoming)
+        assertEquals(1, t.removableCount)
+    }
 }
