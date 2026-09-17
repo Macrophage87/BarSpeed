@@ -9,6 +9,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -106,7 +107,22 @@ class SchemaVelocityLossRegimeContractTest {
      */
     @Test
     fun `the key rides under 1_19, which v0_1_51 shipped, and the exporter is past it`() {
-        assertEquals("1.20", SessionExport.SCHEMA_VERSION)
+        // CORRECTED FORWARD, and this comment is the one copy of the reasoning
+        // that seven files share. This line read
+        // `assertEquals("<the tip>", SessionExport.SCHEMA_VERSION)`: it asserted
+        // the version THIS KEY IS FILED UNDER by reading the version the
+        // exporter currently WRITES. Those are the same number only while the
+        // mint is the newest one, so the line goes false at the next mint --
+        // twice here already, each time "corrected" by re-pointing it at the new
+        // tip, which is the same defect again. #300 mints 1.21, so it is DELETED
+        // rather than re-pointed. What replaces it cannot go stale: the filed
+        // version is still ACCEPTED, and the exporter has moved PAST it. That
+        // the tip constant, the accepted set, the published enum and the example
+        // all agree is SchemaContractTest's `session export schema allows the
+        // version the exporter writes` and `the published example declares the
+        // version the exporter writes`, both of which read the constant instead
+        // of a literal.
+        assertNotEquals("1.19", SessionExport.SCHEMA_VERSION)
         assertContains(SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.19")
         assertContains(SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.20")
     }

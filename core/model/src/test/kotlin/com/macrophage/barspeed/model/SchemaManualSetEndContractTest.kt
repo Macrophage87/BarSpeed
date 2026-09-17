@@ -4,7 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
-import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -69,15 +69,33 @@ class SchemaManualSetEndContractTest {
         get() = versionLog.substringAfter(MARKER, "")
 
     /**
-     * The number the entry rides under, and that it is still the declared one.
+     * The number the entry rides under, and that a reader can still read it.
      *
-     * A pin on the digit rather than on "unreleased", because unreleased is a
-     * fact about a tag and goes stale the moment one is cut, while the entry
-     * having moved off 1.20 would mean this file is describing another version.
+     * A pin on the digit, because the entry having moved off 1.20 would mean
+     * this file is describing another version. The words "and that it is still
+     * the declared one" stood in this heading and are DELETED: v0.1.53 shipped
+     * 1.20 and #300 mints 1.21, so this entry's number is no longer the declared
+     * one, and it never had to be.
      */
     @Test
-    fun `the entry rides under the version this build declares`() {
-        assertEquals("1.20", SessionExport.SCHEMA_VERSION, "the declared export version")
+    fun `the entry rides under 1_20, which v0_1_53 shipped, and 1_20 is still accepted`() {
+        // CORRECTED FORWARD, and this comment is the one copy of the reasoning
+        // that seven files share. This line read
+        // `assertEquals("<the tip>", SessionExport.SCHEMA_VERSION)`: it asserted
+        // the version THIS KEY IS FILED UNDER by reading the version the
+        // exporter currently WRITES. Those are the same number only while the
+        // mint is the newest one, so the line goes false at the next mint --
+        // twice here already, each time "corrected" by re-pointing it at the new
+        // tip, which is the same defect again. #300 mints 1.21, so it is DELETED
+        // rather than re-pointed. What replaces it cannot go stale: the filed
+        // version is still ACCEPTED, and the exporter has moved PAST it. That
+        // the tip constant, the accepted set, the published enum and the example
+        // all agree is SchemaContractTest's `session export schema allows the
+        // version the exporter writes` and `the published example declares the
+        // version the exporter writes`, both of which read the constant instead
+        // of a literal.
+        assertTrue("1.20" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.20 left the accepted set")
+        assertNotEquals("1.20", SessionExport.SCHEMA_VERSION, "the exporter is still writing 1.20")
         assertTrue(
             entry.isNotEmpty(),
             "the published log carries no entry opening \"$MARKER\"",

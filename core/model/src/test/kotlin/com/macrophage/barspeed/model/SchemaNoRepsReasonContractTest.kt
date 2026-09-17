@@ -6,6 +6,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -63,7 +64,23 @@ class SchemaNoRepsReasonContractTest {
         // v0.1.51 has since shipped 1.19 too, so the constant moved again,
         // for the same reason and by the same rule. Read the shipped number
         // at the tag, never from a definition.
-        assertEquals("1.20", SessionExport.SCHEMA_VERSION, "1.19 is released, so the exporter must be past it")
+        // CORRECTED FORWARD, and this comment is the one copy of the reasoning
+        // that seven files share. This line read
+        // `assertEquals("<the tip>", SessionExport.SCHEMA_VERSION)`: it asserted
+        // the version THIS KEY IS FILED UNDER by reading the version the
+        // exporter currently WRITES. Those are the same number only while the
+        // mint is the newest one, so the line goes false at the next mint --
+        // twice here already, each time "corrected" by re-pointing it at the new
+        // tip, which is the same defect again. #300 mints 1.21, so it is DELETED
+        // rather than re-pointed. What replaces it cannot go stale: the filed
+        // version is still ACCEPTED, and the exporter has moved PAST it. That
+        // the tip constant, the accepted set, the published enum and the example
+        // all agree is SchemaContractTest's `session export schema allows the
+        // version the exporter writes` and `the published example declares the
+        // version the exporter writes`, both of which read the constant instead
+        // of a literal.
+        assertTrue("1.18" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.18 left the accepted set")
+        assertNotEquals("1.18", SessionExport.SCHEMA_VERSION, "the exporter is still writing 1.18")
         assertTrue("1.18" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the number this key rides under is refused")
         assertTrue("1.18" in exportVersionEnum(), "the published enum dropped the number this key rides under")
         assertTrue("1.17" in exportVersionEnum(), "1.17 stopped being readable, so this is not additive")

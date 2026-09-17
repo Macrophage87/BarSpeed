@@ -15,6 +15,7 @@ import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SecondaryCapture
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SessionRpe
+import com.macrophage.barspeed.model.SkippedSet
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.VoidSetPolicy
@@ -516,8 +517,23 @@ class SessionRepository(
      * but the thing that went wrong. Clamping an 11 to 10 would record the
      * hardest session the lifter ever had; throwing would take [hrvRmssdMs]
      * down with the close.
+     *
+     * [skippedSets] is the prescribed sets the lifter dropped during the session
+     * (#300), and it joins [sessionRpe] and [hrvRmssdMs] in the population the
+     * guard above protects: the list is held only in `:app`'s heap while the
+     * session runs, so a second close writing an empty one would erase every
+     * skip the lifter made. DECLARED AND NOT YET WRITTEN -- the write arrives in
+     * the commit after the red that asks for it, and the suppression goes with
+     * the body.
      */
-    suspend fun endSession(sessionId: Long, endedAtMs: Long, hrvRmssdMs: Double? = null, sessionRpe: Int? = null) {
+    @Suppress("UnusedParameter")
+    suspend fun endSession(
+        sessionId: Long,
+        endedAtMs: Long,
+        hrvRmssdMs: Double? = null,
+        sessionRpe: Int? = null,
+        skippedSets: List<SkippedSet> = emptyList(),
+    ) {
         val session = sessionDao.sessionById(sessionId) ?: return
         if (session.endedAtMs != null) return
         val sets = sessionDao.setsForSession(sessionId)

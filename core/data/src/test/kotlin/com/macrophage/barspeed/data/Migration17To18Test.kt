@@ -116,17 +116,23 @@ class Migration17To18Test {
     }
 
     /**
-     * The compiled version, the committed baseline and the migration's own
-     * endpoints are one number.
+     * The committed baselines and the migration's own endpoints are one number,
+     * inside a chain that does not overshoot the compiled version.
      *
-     * The assertion the NEWEST hop owes the constant, moved here from
-     * [Migration16To17Test] the way that file took it from its predecessor: a
-     * constant left behind at 17 ships a build whose schema the chain cannot
-     * reach, and Room throws on the lifter's phone.
+     * THE FIRST ASSERTION USED TO READ `assertEquals(18, DATABASE_VERSION)`. It
+     * moved to [Migration18To19Test] with the newest hop, exactly as this file
+     * took it from [Migration16To17Test]: only the newest hop can assert the
+     * constant, and what every earlier hop can still say is that it does not end
+     * BEYOND it -- a chain overshooting the schema this build compiles is a build
+     * Room throws on. RENAMED with it, because the name claimed the compiled
+     * version was this hop's.
      */
     @Test
-    fun `the compiled version, the committed baseline and the migration agree on eighteen`() {
-        assertEquals(18, DATABASE_VERSION, "DATABASE_VERSION is not the version this migration ends at")
+    fun `the baseline and the migration agree on eighteen, inside a chain reaching the compiled version`() {
+        assertTrue(
+            AppDatabase.MIGRATION_17_18.endVersion <= DATABASE_VERSION,
+            "this migration ends beyond DATABASE_VERSION, so the chain overshoots the schema this build compiles",
+        )
         assertEquals(18, declaredVersion(18), "18.json does not describe version 18")
         assertEquals(17, declaredVersion(17), "17.json does not describe version 17")
         assertEquals(17, AppDatabase.MIGRATION_17_18.startVersion)
@@ -236,17 +242,22 @@ class Migration17To18Test {
     /**
      * The hop is REGISTERED, which the statements above cannot say.
      *
-     * A migration declared and not passed to `addMigrations` is a migration
-     * Room never runs, and the failure lands on the lifter's phone as an
-     * `IllegalStateException` on open. Read off the declared list rather than
-     * off `build`, which needs a `Context`.
+     * A migration declared and not passed to `addMigrations` is a migration Room
+     * never runs, and the failure lands on the lifter's phone as an
+     * `IllegalStateException` on open. Read off the declared list rather than off
+     * `build`, which needs a `Context`.
+     *
+     * THIS ASSERTION USED TO READ `(1..17).map { it to it + 1 }`, the WHOLE
+     * chain, and #300's nineteenth hop made it false. The whole-chain equality
+     * moved to [Migration18To19Test] with the newest hop, for the reason the
+     * constant did; what this file asserts is that ITS OWN hop is in the list,
+     * which is the half it actually owns and which no later hop can falsify.
      */
     @Test
     fun `the hop is in the chain the database is built with`() {
-        assertEquals(
-            (1..17).map { it to it + 1 },
-            AppDatabase.MIGRATIONS.map { it.startVersion to it.endVersion },
-            "the migration chain is not an unbroken 1 -> 18",
+        assertTrue(
+            (17 to 18) in AppDatabase.MIGRATIONS.map { it.startVersion to it.endVersion },
+            "the 17 -> 18 hop is declared and not registered, so Room never runs it",
         )
     }
 }

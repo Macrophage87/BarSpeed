@@ -87,8 +87,21 @@ import java.io.File
  * deleted rather than refreshed: it was a pin on a collision that no longer
  * exists, and every value it ever held went stale before the next round read
  * it.
+ *
+ * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read at THIS commit and
+ * superseding the reading above rather than standing beside it:
+ * `git tag --sort=-creatordate | head -1` is v0.1.53 and
+ * `git show v0.1.53:core/data/src/main/kotlin/com/macrophage/barspeed/data/AppDatabase.kt`
+ * reads `DATABASE_VERSION = 18`, so 17 -> 18 HAS now shipped and only
+ * 18 -> 19 has not. The sentence above saying v0.1.52 is the newest tag and
+ * that 17 -> 18 is unshipped is DELETED by this paragraph rather than reworded
+ * in place: both halves were true when written and neither is now. That is
+ * also why #300's column mints 19 instead of riding on 18 -- extending a hop
+ * an installed build has already run leaves that phone without the column. A
+ * stock v0.1.53 install runs 18 -> 19 alone; an install still on v0.1.52 runs
+ * 17 -> 18 -> 19 in one open.
  */
-const val DATABASE_VERSION = 18
+const val DATABASE_VERSION = 19
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -590,6 +603,50 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
+         * `skippedSetsJson` on sessions: the prescribed sets the lifter
+         * deliberately did not do (#300).
+         *
+         * A NEW HOP RATHER THAN AN EXTENSION OF 18, and the test is which
+         * versions have shipped. v0.1.53 carries `DATABASE_VERSION = 18`, read
+         * by `git show v0.1.53:core/data/.../AppDatabase.kt` rather than
+         * assumed, so an installed build has already run 17 -> 18 and extending
+         * that hop would leave a phone that already migrated without the column.
+         *
+         * ON THE SESSION AND NOT ON A SET, because there is no set. The slot
+         * skipped never ran: no `set_records` row exists for it, no raw stream,
+         * no export entry. A row written to carry the skip would be a set that
+         * did not happen sitting in the lifter's history, which is the mistake
+         * `VoidedSet` exists to undo -- and every count over `set_records` would
+         * then have to learn to exclude it. The session is the only place a fact
+         * about a set that does not exist can live.
+         *
+         * TEXT, NULLABLE, NO DEFAULT. A JSON array of `{exercise, setNumber}`,
+         * the `:core:model` `SkippedSet` type on both sides, so the column and
+         * the export publish the same names and no second shape exists to drift.
+         * `SetRecordEntity.geometryJson` is the precedent for a JSON blob in
+         * this schema. Nullable with no default because no build before this one
+         * could record a skip: an empty array as a default would say every
+         * session in the archive was checked and had none, which is the one
+         * claim that cannot be made about them.
+         *
+         * NO BACKFILL, and nothing to backfill FROM. A session that ended early
+         * dropped its remaining sets silently and wrote nothing anywhere -- not
+         * in the journal, not in the export -- so there is no artifact from which
+         * a past skip could be recovered, and inventing one would publish a
+         * decision nobody made.
+         *
+         * [Migration18To19Test] pins the shape, the single statement, the
+         * refusal to write into any existing row, and that the hop is in
+         * [MIGRATIONS] at all. None of it executes SQLite; a bench run is owed.
+         */
+        internal val MIGRATION_18_19 =
+            object : Migration(18, 19) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE sessions ADD COLUMN skippedSetsJson TEXT")
+                }
+            }
+
+        /**
          * Every hop, in order, as one list.
          *
          * Extracted from the `addMigrations` call below, which named all
@@ -617,6 +674,7 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_15_16,
                 MIGRATION_16_17,
                 MIGRATION_17_18,
+                MIGRATION_18_19,
             )
 
         /**

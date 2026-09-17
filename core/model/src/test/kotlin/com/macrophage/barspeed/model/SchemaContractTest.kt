@@ -968,7 +968,7 @@ class SchemaContractTest {
         assertEquals(
             setOf(
                 "schemaVersion", "startedAt", "endedAt", "timeZone", "planRef", "notes",
-                "sessionRpe", "heartRate", "exercises",
+                "sessionRpe", "heartRate", "skippedSets", "exercises",
             ),
             keys,
             "a session-level key was added or removed without moving this pin",

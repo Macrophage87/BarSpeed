@@ -68,6 +68,43 @@ data class SessionExport(
      */
     val sessionRpe: Int? = null,
     val heartRate: HrSessionSummary? = null,
+    /**
+     * The prescribed sets the lifter deliberately did not do, in the order they
+     * were dropped (#300). Empty means none was, and the key is omitted.
+     *
+     * WHY THE DOCUMENT NEEDS IT, and the sentences that were false without it.
+     * [SetExport.added]'s KDoc says adherence is read *"from how many sets an
+     * exercise carries against how many the plan asked for"*, and
+     * [SetExport.rpeScale]'s says *"the plan is not in the export"* and that a
+     * plan *"can be edited or deleted after the session it drove"*. Both stay
+     * true. What follows from them is that a session carrying three squat sets
+     * where the plan asked for four is, to this document, indistinguishable
+     * from a plan that asked for three, from a set the app lost, and from a
+     * session that stopped early. Until #300 no control could drop one set, so
+     * the hole was always the whole remainder of a session; now it can be one
+     * set in the middle, and an archive that cannot say so publishes a
+     * deliberate decision as data loss.
+     *
+     * ADHERENCE, AS A READER SHOULD COUNT IT: recorded-and-not-voided sets over
+     * prescribed sets. A set in this list was prescribed and not performed, and
+     * it is not in [exercises] at all -- there is no row for it, so nothing here
+     * reads as a set of zero reps. A set that WAS performed and marked not-done
+     * afterwards is [SetExport.voided] instead, published with its row.
+     *
+     * WHAT IT DOES NOT SAY. Nothing distinguishes a skip from a set the lifter
+     * never reached, because a session that simply ends still drops its
+     * remainder and writes no entry here. So an entry is evidence of a
+     * decision; an absent entry is not evidence that everything prescribed was
+     * done.
+     *
+     * CAPTURED AT THE SESSION CLOSE and nowhere else. The list is held in the
+     * app's own memory while the session runs and is written with the end time,
+     * so a session the process does not survive publishes no skips even where
+     * the lifter made some -- the same limit [sessionRpe] and the session's HRV
+     * carry, and for the same reason: no row exists to attach them to until the
+     * close.
+     */
+    val skippedSets: List<SkippedSet> = emptyList(),
     val exercises: List<ExerciseExport>,
 ) {
     companion object {
@@ -1494,8 +1531,66 @@ data class SessionExport(
          * `1110` geometry is synthetic and pinned beside it. No beat moves and no
          * set changes length, which `CadencePlanTest` holds across every tempo
          * any plan can express.
+         *
+         * 1.21 MINTS A KEY, and 1.20 is why it is a mint rather than an eighth
+         * entry under 1.20: `git tag --sort=-creatordate | head -1` is v0.1.53
+         * and `git show
+         * v0.1.53:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.20"`, both read this round rather than
+         * relayed from the entries above. 1.20 has SHIPPED, so extending it
+         * would change what a version already in the field means.
+         *
+         * THE CHANGE (#300): a new session-level [skippedSets], an array of
+         * `{exercise, setNumber}` naming the PRESCRIBED sets the lifter
+         * deliberately did not do. The owner asked for the control it records:
+         * *"I'd also like a mechanism to remove an upcoming set."* Before it,
+         * the only way to be rid of an unwanted prescribed set was to finish
+         * the session, which drops every remaining exercise rather than one
+         * set.
+         *
+         * WHY A KEY WAS NEEDED AT ALL, since the preference is always to derive.
+         * Nothing in this document publishes how many sets the plan prescribed:
+         * the root carries `planRef`, a NAME, and `$defs.exercise` carries
+         * exactly `exercise` and `sets`. [SetExport.rpeScale]'s entry already
+         * says why that cannot be worked around -- *"the plan is not in the
+         * export"* and a plan *"can be edited or deleted after the session it
+         * drove"* -- so a reader cannot recover the prescribed count later, and
+         * deriving it at export time from a plan row would attribute today's
+         * plan to a session recorded months ago. With one set droppable
+         * mid-session, an exercise carrying three sets where four were
+         * prescribed became indistinguishable from a plan that asked for three
+         * and from a set the app lost. The key is what separates a decision
+         * from a loss.
+         *
+         * ADHERENCE IS RECORDED-AND-NOT-VOIDED OVER PRESCRIBED, which is the
+         * reading rule this key exists to keep readable. A skipped set has NO
+         * entry in `exercises`: no row was written, nothing was measured, and
+         * no set of zero reps appears. A set that was performed and afterwards
+         * marked not-done is [SetExport.voided] instead and stays published with
+         * its row. An entry here is evidence of a decision; the ABSENCE of
+         * entries is not evidence that everything prescribed was done, because
+         * a session that simply ends still drops its remainder silently.
+         *
+         * ADDITIVE, and not retroactive. One key is added and nothing is
+         * removed or retyped, so a 1.20 reader is unaffected except that it
+         * cannot see skips. No archive already on disk moves: the column
+         * carrying this is new, so every session recorded before it publishes
+         * nothing here, and absence on those is "the app could not record a
+         * skip" rather than "none was made". `DATABASE_VERSION` DOES move, to
+         * 19, because the list is stored on the session row -- `MIGRATION_18_19`
+         * appends `skippedSetsJson` and backfills nothing. The plan schema is
+         * untouched: what the plan prescribes has not changed, only what the
+         * session says it did with it.
+         *
+         * PINNED IN BOTH DIRECTIONS. `SchemaSkippedSetContractTest` asserts the
+         * published `$defs.skippedSet` properties and
+         * `serialKeysOf(SkippedSet.serializer())` are the same set, so neither
+         * the Kotlin type nor the document can gain a key alone; the block is
+         * `additionalProperties: false` with both keys required, and the
+         * published example carries an entry so the ajv step in `ci.yml`
+         * actually validates it.
          */
-        const val SCHEMA_VERSION = "1.20"
+        const val SCHEMA_VERSION = "1.21"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -1505,7 +1600,7 @@ data class SessionExport(
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
-                "1.16", "1.17", "1.18", "1.19", "1.20",
+                "1.16", "1.17", "1.18", "1.19", "1.20", "1.21",
             )
 
         /**

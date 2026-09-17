@@ -1,11 +1,14 @@
 {
-  "schemaVersion": "1.20",
+  "schemaVersion": "1.21",
   "startedAt": "2026-07-18T17:04:00Z",
   "endedAt": "2026-07-18T18:11:00Z",
   "timeZone": { "id": "America/New_York", "utcOffsetMinutes": -240 },
   "planRef": "Hypertrophy Block W3 / Lower A",
   "sessionRpe": 8,
   "heartRate": { "avgBpm": 112, "maxBpm": 156 },
+  "skippedSets": [
+    { "exercise": "seated_leg_curl", "setNumber": 4 }
+  ],
   "exercises": [
     {
       "exercise": "back_squat",

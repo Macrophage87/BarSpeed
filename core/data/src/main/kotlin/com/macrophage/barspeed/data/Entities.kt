@@ -76,6 +76,37 @@ data class SessionEntity(
      * anywhere records how a past workout felt.
      */
     val sessionRpe: Int? = null,
+    /**
+     * The prescribed sets the lifter deliberately did not do, as a JSON array of
+     * [com.macrophage.barspeed.model.SkippedSet] (v19, #300).
+     *
+     * ONE TYPE, TWO WRITERS. The same `:core:model` type the export publishes,
+     * encoded here and decoded straight back out at export time, so the column
+     * and `session.json` cannot disagree about the names or the meaning of a
+     * skip. [SetRecordEntity.geometryJson] is the precedent for a JSON blob in
+     * this schema; two scalars would not do, because the list is a list.
+     *
+     * ON THE SESSION BECAUSE THERE IS NO SET. A skipped slot never ran: no
+     * `set_records` row, no raw stream, no export entry. Writing a row to carry
+     * the skip would put a set that did not happen into the lifter's history,
+     * which is exactly what `VoidedSet` exists to undo, and every count over
+     * `set_records` would then have to learn to exclude it.
+     *
+     * NULL means no skip was recorded, and it covers two cases the row cannot
+     * separate: a session where the lifter skipped nothing, and any session
+     * recorded before v19, where the app had no control to skip with. Both mean
+     * the same thing to a reader -- this row asserts no skip -- and neither may
+     * be read as proof that every prescribed set was performed, because a
+     * session that simply ends drops its remainder without writing anything
+     * here. An empty array is not written for the same reason no default is
+     * declared: it would be a claim that the question was asked and answered.
+     *
+     * WRITTEN AT THE SESSION CLOSE, with the end time, from a list the app holds
+     * in memory while the session runs -- [sessionRpe] and [hrvRmssdMs]'s
+     * arrangement, and the same limit: a session the process does not survive
+     * records no skips.
+     */
+    val skippedSetsJson: String? = null,
 )
 
 @Entity(

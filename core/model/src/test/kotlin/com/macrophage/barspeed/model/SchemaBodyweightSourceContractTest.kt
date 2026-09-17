@@ -8,6 +8,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -114,15 +115,30 @@ class SchemaBodyweightSourceContractTest {
      * reading the constant is the mistake `SchemaNoRepsReasonContractTest`
      * already deleted once for 1.18.
      */
+    /**
+     * RENAMED from `the exporter writes 1_20 and 1_19 and 1_18 are both still
+     * readable`, which named the tip in its own title.
+     */
     @Test
-    fun `the exporter writes 1_20 and 1_19 and 1_18 are both still readable`() {
-        assertEquals(
-            "1.20",
-            SessionExport.SCHEMA_VERSION,
-            "v0.1.51 shipped 1.19, so the exporter must be past it",
-        )
-        assertTrue("1.20" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
-        assertTrue("1.20" in versionEnum(), "the published enum does not accept the version written")
+    fun `1_19 and 1_18 are both still readable, and the exporter is past them`() {
+        // CORRECTED FORWARD, and this comment is the one copy of the reasoning
+        // that seven files share. This line read
+        // `assertEquals("<the tip>", SessionExport.SCHEMA_VERSION)`: it asserted
+        // the version THIS KEY IS FILED UNDER by reading the version the
+        // exporter currently WRITES. Those are the same number only while the
+        // mint is the newest one, so the line goes false at the next mint --
+        // twice here already, each time "corrected" by re-pointing it at the new
+        // tip, which is the same defect again. #300 mints 1.21, so it is DELETED
+        // rather than re-pointed. What replaces it cannot go stale: the filed
+        // version is still ACCEPTED, and the exporter has moved PAST it. That
+        // the tip constant, the accepted set, the published enum and the example
+        // all agree is SchemaContractTest's `session export schema allows the
+        // version the exporter writes` and `the published example declares the
+        // version the exporter writes`, both of which read the constant instead
+        // of a literal.
+        assertNotEquals("1.19", SessionExport.SCHEMA_VERSION, "the exporter is still writing 1.19")
+        assertTrue("1.20" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.20 left the accepted set")
+        assertTrue("1.20" in versionEnum(), "1.20 left the published enum")
         assertTrue("1.19" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.19 left the accepted set")
         assertTrue("1.19" in versionEnum(), "1.19 left the published enum, so this is a break beyond the key")
         assertTrue("1.18" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.18 left the accepted set")
