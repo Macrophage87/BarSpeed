@@ -127,14 +127,33 @@ object SkipSetControl {
      * and a second parameter it never read would be a claim that the anchor
      * mattered.
      *
-     * DECLARED AND NOT YET DECIDED. The eligibility rule arrives red-first:
-     * `SkipSetControlTest` states every case of it against this body, which
-     * fails with `NotImplementedError` rather than with a wrong answer, so the
-     * suite says the rule is ABSENT rather than saying it is broken. The
-     * suppression goes with the body.
+     * THE BLOCK IS [AddSetControl.blockRange]'s, not a scan of its own, for
+     * [RemoveSetControl.target]'s reason: the set this drops has to belong to
+     * the block the add extends, and "what is a block" written in two places is
+     * two rules that can disagree about a session running one movement in two
+     * consecutive blocks. It is read for one fact only, whether anything of
+     * that block still follows.
+     *
+     * `getOrNull` RATHER THAN AN INDEX, and it is load-bearing rather than
+     * defensive: `upcomingIndex` is `queueIndex + 1` throughout rest, so after
+     * the session's final set it is legitimately one past the end.
+     *
+     * THE SET NUMBER IS `setIndexInExercise + 1` AND NEVER `upcomingIndex + 1`.
+     * The two agree until something has been skipped or appended, and then they
+     * do not: the remaining sets keep the numbers the plan gave them, so the
+     * slot at queue index 2 can be the plan's set 4, and recording the position
+     * would name a set that was performed.
      */
-    @Suppress("UnusedParameter")
-    fun target(blocks: List<AddSetSlotKey>, upcomingIndex: Int): SkipSetTarget? = TODO("#300 c3")
+    fun target(blocks: List<AddSetSlotKey>, upcomingIndex: Int): SkipSetTarget? {
+        val upcoming = blocks.getOrNull(upcomingIndex) ?: return null
+        if (upcoming.isAddedSet || upcoming.setIndexInExercise == 0) return null
+        val block = AddSetControl.blockRange(blocks, upcomingIndex) ?: return null
+        return SkipSetTarget(
+            skipAt = upcomingIndex,
+            setNumber = upcoming.setIndexInExercise + 1,
+            lastOfBlock = block.last == upcomingIndex,
+        )
+    }
 
     /**
      * What the control says.
