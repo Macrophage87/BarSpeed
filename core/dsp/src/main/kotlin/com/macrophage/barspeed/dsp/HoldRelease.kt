@@ -72,7 +72,7 @@ import kotlin.math.sqrt
  * units for one 45 s rope dead hang; before the set, write down which physical
  * unit is role a and which is role b, and where each is mounted (rope handle or
  * trouser pocket). Nothing is timed by hand and no second device is used. Then
- * read that set's exported `duration_s` and `duration_ended_by`. The figure to
+ * read that set's exported `duration_s` and `durationEndedBy`. The figure to
  * check is whether the mount the app analysed was the one on the implement:
  * set 18's two units answer 26 s and 23 s for the same hold, and nothing in the
  * capture records which mount produced which.
