@@ -46,13 +46,15 @@ class AppContainer(app: Application) {
             // An unreadable pairing store publishes NO unit identity rather
             // than failing the export (#260). `SettingsStore.sensorRoles` maps
             // a DataStore flow, whose read errors surface to the collector, and
-            // `SessionDetailViewModel`'s six export paths wrap their calls in
-            // try/finally with NO catch -- so an exception here would turn a
-            // share tap into a crash, over a key that is an identity and no
-            // part of the capture. Absence is the honest answer and is what the
-            // published description already covers. IOException and not
-            // Throwable: DataStore's documented failure, and a runCatching here
-            // would swallow the cancellation of the export itself.
+            // `SessionDetailViewModel`'s four export paths -- `shareJson`,
+            // `shareRawZip`, `prepareJsonSave` and `prepareRawZipSave` -- each
+            // wrap their exporter call in try/finally with NO catch, so an
+            // exception here would turn a share tap into a crash, over a key
+            // that is an identity and no part of the capture. Absence is the
+            // honest answer and is what the published description already
+            // covers. IOException and not Throwable: DataStore's documented
+            // failure, and a runCatching here would swallow the cancellation
+            // of the export itself.
             sensorRoleByAddress = {
                 try {
                     settings.sensorRoles.first()
