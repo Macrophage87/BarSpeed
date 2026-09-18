@@ -107,12 +107,20 @@ class RemoveSetControlTest {
     }
 
     /**
-     * #206 requirement 1. A set the PLAN prescribed is never removable. The
-     * squat block here has two of its three sets still to run and the control
-     * still answers nothing, because none of them is a set the lifter added.
+     * #206 requirement 1. A set the PLAN prescribed is never removable BY THIS
+     * CONTROL. The squat block here has two of its three sets still to run and
+     * the control still answers nothing, because none of them is a set the
+     * lifter added.
+     *
+     * The unqualified sentence -- "a set the PLAN prescribed is never
+     * removable" -- stood here and in the name, and #300 made it false as a
+     * statement about the app: `SkipSetControl` drops an upcoming prescribed
+     * set and RECORDS the deviation, which is how the adherence reading this
+     * refusal protected is kept. What this control does is unchanged, and that
+     * is what these two assertions are for; the scope is now in the words.
      */
     @Test
-    fun `a prescribed set is never removable`() {
+    fun `a prescribed set is never removable by this control`() {
         assertNull(RemoveSetControl.target(prescribedOnly(), queueIndex = 0, upcomingIndex = 1))
         assertNull(RemoveSetControl.target(oneAppendedSquat(), queueIndex = 4, upcomingIndex = 5))
     }
