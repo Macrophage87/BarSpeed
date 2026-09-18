@@ -208,11 +208,15 @@ class GyroGateTest {
             // The three field-43 deadlift captures, committed for issue #301 --
             // the corpus's first loaded barbell hinge at 61-102 kg, and the gate
             // HOLDS on all three: gyro medians 5.250, 5.430 and 3.943 deg/s with
-            // tenth percentiles of 0.000, so the distribution sits entirely under
-            // the gate. #284's hazard H8 predicted a bar-mounted magnet on a hinge
-            // would straddle "very likely"; on this session it does not, and the
-            // prediction is wrong rather than merely unconfirmed. What rotates on
-            // these sets rotates in bursts at the floor, not throughout.
+            // tenth percentiles of 0.000, so the MEDIAN sits under the 10 deg/s
+            // band and the capture does not straddle it; 26-32 percent of samples
+            // are at or above the band and the peaks reach 900-1280 deg/s.
+            // #284's hazard H8 predicted a bar-mounted magnet on a hinge would
+            // straddle "very likely"; on this session's mount it does not -- three
+            // captures, both units on the collars -- so the prediction is refuted
+            // there rather than merely unconfirmed, and a centre mount has never
+            // been measured. What rotates on these sets rotates in bursts at the
+            // floor, not throughout.
             "field-deadlift-straight-5rep-s43-set04",
             "field-deadlift-straight-5rep-s43-set05",
             "field-deadlift-straight-5rep-s43-set06",

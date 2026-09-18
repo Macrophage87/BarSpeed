@@ -429,9 +429,11 @@ class AnchorSupplyByMountTest {
         // 31, not the 28 that stood here: the three field-43 deadlift
         // captures landed with issue #301 and the gate HOLDS on all three.
         // Their gyro medians are 5.250, 5.430 and 3.943 deg/s with tenth
-        // percentiles of 0.000, so the distribution sits entirely under the
-        // 10 deg/s gate -- a loaded barbell hinge that does not straddle,
-        // which #284's hazard H8 predicted it would.
+        // percentiles of 0.000, so the MEDIAN sits under the 10 deg/s band
+        // and the capture does not straddle it; 26-32 percent of samples are
+        // at or above the band and the peaks reach 900-1280 deg/s. A loaded
+        // barbell hinge that does not straddle, which #284's hazard H8
+        // predicted it would.
         assertEquals(31, holding.size, "captures the gate still applies to")
         holding.forEach { fixture ->
             assertContentEquals(
