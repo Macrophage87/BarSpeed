@@ -66,10 +66,18 @@ object HoldRelease {
      *
      * One gravity, because that is the arithmetic of a fall: the free-fall
      * bound is 0 g of measured acceleration, which is 1.0 of deviation, and an
-     * impact reaches it from above at 2 g. A hand-held implement stays well
-     * inside it -- the largest deviation measured anywhere in the working
-     * window of the four committed holds is 0.54 g, at the pick-up of a 90 lb
-     * rope carry.
+     * impact reaches it from above at 2 g.
+     *
+     * THE MARGIN, and it is not the same on every mount. This sentence read
+     * "a hand-held implement stays well inside it -- the largest deviation
+     * measured anywhere in the working window of the four committed holds is
+     * 0.54 g, at the pick-up of a 90 lb rope carry", and that is false: 0.54 g
+     * is the largest on the three ANALYSED streams (set 17 reads 0.57 g, set 18
+     * 0.51 g, the carry 0.54 g), while field-38 set 18's PARTNER unit reaches
+     * 0.98 g without crossing. The false half is deleted rather than reworded.
+     * So the band clears a still or carried implement by a factor of about two
+     * on the streams the decision actually reads, and by 2% on the one it does
+     * not. `HoldReleaseFieldTest` asserts all four figures.
      */
     const val BAND_G = 1.0
 

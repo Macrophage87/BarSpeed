@@ -282,6 +282,11 @@ class HoldReleaseFieldTest {
             round3(inWindow(set17).filter { deviationG(it) <= 1.0 }.maxOf { deviationG(it) }),
             "set 17's largest deviation under the band",
         )
+        assertEquals(
+            0.505,
+            round3(inWindow(set18).filter { deviationG(it) <= 1.0 }.maxOf { deviationG(it) }),
+            "set 18's largest deviation under the band",
+        )
 
         // The carry crosses NOTHING. Thirty seconds of walking with 90 lb on a
         // rope handle peaks at 0.542 g, so the band a release crosses is not a
