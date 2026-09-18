@@ -272,6 +272,32 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * the archive back as a ByteArray here would put a full-size copy in the
      * heap on the way to a file the share sheet reads from anyway.
      *
+     * NO REENTRANCY GUARD HERE, AND THE BUTTON IS NEVER DISABLED, which the
+     * streaming above makes matter more rather than less. [shareRescued]
+     * refuses a second call while the first is in flight and its card draws
+     * SEND with `enabled = !isBusy`; this function has neither, and
+     * `InterruptedSetNotice` is passed no busy set to draw one from.
+     * [interruptedName] is stable across taps, so a second SEND reopens the
+     * same share-cache path and `FileOutputStream` truncates it. The window
+     * that truncation can land in is what changed: the whole-ByteArray write
+     * this replaced held it open for one `writeBytes`, and a streamed copy
+     * holds it open for the length of the copy -- for the capture behind
+     * #271, 314.6 MB of it -- so a short archive can reach the share sheet
+     * looking complete. Widened here, not created here. The same missing
+     * guard leaves DISCARD live during a send, where a stream not yet
+     * reached disappears and the per-file `runCatching` in
+     * `SetJournalStore.zipTo` skips it without a word; POSIX keeps an
+     * already-open stream readable, so which entries survive depends on how
+     * far the copy had got, and none of that has been run on a device.
+     *
+     * UNGUARDED `viewModelScope.launch`, which [shareRescued] is not. The
+     * per-file `runCatching` does not cover the central directory that
+     * `zip.close()` writes, so a disk full at that moment throws out of this
+     * coroutine with nothing to catch it, from the first screen of a cold
+     * launch. Both of these want their own issue and a busy key plumbed
+     * through `InterruptedSetNotice`, not a rider on a heap fix; reasoned
+     * from the source and unobserved, so they are [Field] until pressed.
+     *
      * Deliberately does NOT discard afterwards. Sharing can fail at the share
      * sheet, silently as far as this code can tell, and a capture deleted on
      * the assumption that it arrived somewhere is the defect this whole branch
