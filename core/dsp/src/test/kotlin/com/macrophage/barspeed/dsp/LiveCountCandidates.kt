@@ -82,7 +82,7 @@ internal object LiveCountCandidates {
  *
  * **The clone's licence is measured, not assumed.** With both switches off it
  * must reproduce the shipped count on every committed capture;
- * [LeakyIntegratorCandidateTest] asserts exactly that over all 45, and every
+ * [LeakyIntegratorCandidateTest] asserts exactly that over all 51, and every
  * switched-on figure is worthless without it.
  *
  * ## The leak, stated as an equation
@@ -99,7 +99,7 @@ internal object LiveCountCandidates {
  * accumulators. Those feed `LiveSetState.repMeanVelocities` and
  * `repPeakVelocities`, which no candidate reads and no table below scores, and
  * they take no part in the count -- the licence test proves the omission costs
- * nothing that matters here by reproducing the shipped count on all 45.
+ * nothing that matters here by reproducing the shipped count on all 54.
  *
  * @param anchorAtEveryRunBoundary the "per-run reset instead of a leak"
  *   variant. Its rule was not written down in round 1, so it is stated here:
@@ -369,7 +369,7 @@ internal object DriveImpulseCandidate {
  *
  * ## The geometry table is a fourth copy and says so
  *
- * The 45 `(fixture, geometry)` pairs are `RepRefusalCorpusTest`'s list with the
+ * The 54 `(fixture, geometry)` pairs are `RepRefusalCorpusTest`'s list with the
  * loads dropped -- a count needs no load. That file's own KDoc records where it
  * took them from: `BatchCueCoverageTest`, `StackMountGeometryTest`,
  * `FieldDataRegressionTest` and each session's `meta.json`. A fifth copy would
@@ -413,6 +413,24 @@ internal object CandidateCorpus {
         sensorOnStack = true,
     )
 
+    /**
+     * The two stack-mounted geometries issues #290 and #255 committed, declared
+     * here with the SAME values `ArtefactCorpus` declares for the same
+     * captures, so the two lanes' corpora cannot disagree about one capture's
+     * geometry.
+     */
+    private val ROW_ON_STACK = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = true,
+        plane = MovementPlane.HORIZONTAL,
+        sensorOnStack = true,
+    )
+    private val PULL_ON_STACK = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = true,
+        sensorOnStack = true,
+    )
+
     /** Where a capture's truth came from, published beside the number. */
     enum class Basis { STATED, MARKS, CUES, NONE }
 
@@ -447,6 +465,23 @@ internal object CandidateCorpus {
         "field-deadlift-straight-5rep-s43-set06" to 5,
         "field-seated-ohp-2rep" to 2,
         "field-ohp-3010-6rep-s37-set02" to 6,
+        // The six field-42 captures issues #290 and #255 committed. Each
+        // number is the lifter's OWN count for that set, read this round from
+        // `BarSpeed-field-captures/field-42/extracted/session.json`, where
+        // every one of the six carries `repsManual: true` -- the strongest
+        // basis this enum has, and the reason they are stated rather than left
+        // to their cue tracks. Two of the six the sidecar would get wrong:
+        // set 2 is a FAILED set whose metronome called eight Downs against
+        // seven performed, and set 9 is a cable row whose track speaks
+        // Drive/Return, so `CueTrack.calledReps` -- which counts "Down" --
+        // reads 0 on an eight-rep set. That vocabulary gap in `calledReps` is
+        // named rather than fixed here; it is not this lane's to change.
+        "field-ohp-3010-7rep-s42-set02" to 7,
+        "field-bench-3010-6rep-s42-set05" to 6,
+        "field-bench-3010-6rep-s42-set07" to 6,
+        "field-cablerow-3010-8rep-s42-set09" to 8,
+        "field-pullup-3010-8rep-s42-set11" to 8,
+        "field-pullup-4010-8rep-s42-set13" to 8,
     )
 
     val ALL = listOf(
@@ -460,8 +495,11 @@ internal object CandidateCorpus {
         Capture("field-backsquat-wrapping-s36-set01", ECC),
         Capture("field-bench-3010-6rep-s37-set05", ECC),
         Capture("field-bench-3010-6rep-s37-set06", ECC),
+        Capture("field-bench-3010-6rep-s42-set05", ECC),
+        Capture("field-bench-3010-6rep-s42-set07", ECC),
         Capture("field-bench-rotating-6rep", ECC),
         Capture("field-bench-rotating-6rep-ok", ECC),
+        Capture("field-cablerow-3010-8rep-s42-set09", ROW_ON_STACK),
         Capture("field-cablerow-static-8rep", CON),
         Capture("field-deadlift-straight-5rep-s43-set04", CON),
         Capture("field-deadlift-straight-5rep-s43-set05", CON),
@@ -478,6 +516,7 @@ internal object CandidateCorpus {
         Capture("field-legpress-single-2011-8rep-s36-set07", CON),
         Capture("field-ohp-100hz-bursty", ECC),
         Capture("field-ohp-3010-6rep-s37-set02", CON),
+        Capture("field-ohp-3010-7rep-s42-set02", CON),
         Capture("field-ohp-3010-8rep-s37-set01", CON),
         Capture("field-ohp-3010-8rep-s38-set04", CON),
         Capture("field-ohp-3010-8rep-s38-set05", CON),
@@ -487,6 +526,8 @@ internal object CandidateCorpus {
         Capture("field-ohp-rotating-8rep-b", ECC),
         Capture("field-pallof-static-12rep", CON),
         Capture("field-pullup-3010-8rep-s37-set09", CON),
+        Capture("field-pullup-3010-8rep-s42-set11", PULL_ON_STACK),
+        Capture("field-pullup-4010-8rep-s42-set13", PULL_ON_STACK),
         Capture("field-rdl-3010-10rep", ECC),
         Capture("field-rdl-3010-10rep-s36-set04", ECC),
         Capture("field-rdl-3010-10rep-s36-set05", ECC),

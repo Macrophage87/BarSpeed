@@ -29,14 +29,20 @@ import kotlin.test.assertEquals
  * Its corpus row read **272 with an over-count of 36** against **248 and 24**
  * here, and the rear delt fly 26 against 23. (247 and 23 until issue #259's
  * three holds joined the corpus: the leak calls one rep on the second rope
- * dead hang, where nothing was lifted at all.)
+ * dead hang, where nothing was lifted at all. Both figures are over the corpus
+ * as it stood before issues #290 and #255 added six captures; over all 54 the
+ * same row reads 279 and 26, pinned below.)
  *
  * **That correction changes an argument, not just a digit.** Counting reps
  * WITHIN each capture's truth -- `min(count, truth)` summed, pinned below -- the
- * leak matches **224 of 253** at an over-count of 24, against candidate (c)'s
- * **161 at 20** and the shipped path's **107 at 1**. The three holds added
- * with issue #259 carry a truth of 0 each, so they move the two over-counts
- * and neither matched figure. So on the committed corpus
+ * leak matches **224 of 253** at an over-count of 23, against candidate (c)'s
+ * **161 at 19** and the shipped path's **107 at 1**. (Those four rows were
+ * measured over the 33 scored captures the corpus then held. Over the 42 it
+ * holds since issue #259 committed three holds, each with a truth of 0, and
+ * issues #290 and #255 six field-42 captures, the same quantities read: truth
+ * **296**, leak **279** matching **253** at an over-count of **26**, candidate
+ * (c) **183 at 23**, shipped **123 at 1** -- the ORDER is unchanged, which is
+ * what the argument below rests on.) So on the committed corpus
  * the leak is the better recoverer, which is the opposite of what the proposal's
  * numbers implied, and the rejection cannot rest on the corpus total. What it
  * rests on is measured here too: the leak changes EVERY set including the ones
@@ -65,7 +71,7 @@ class LeakyIntegratorCandidateTest {
 
     /**
      * THE LICENCE FOR EVERY OTHER FIGURE IN THIS FILE. With the leak off and the
-     * per-run reset off, the clone is the shipped tracker on all 48 committed
+     * per-run reset off, the clone is the shipped tracker on all 54 committed
      * captures.
      *
      * Without this the tables below would be a model of a model. It is asserted
@@ -171,10 +177,15 @@ class LeakyIntegratorCandidateTest {
             leakMatched += minOf(leak, reps)
         }
         println("truth $truthTotal leak $leakTotal over $leakOver matched $leakMatched")
-        assertEquals(253, truthTotal, "reps the corpus truth set holds")
-        assertEquals(248, leakTotal, "reps the leak reports over them")
-        assertEquals(24, leakOver, "reps the leak reports beyond a capture's truth")
-        assertEquals(224, leakMatched, "reps the leak reports within a capture's truth")
+        // Re-measured over the 42 scored captures the corpus holds since issue
+        // #259 committed three holds and issues #290 and #255 six more: truth
+        // 253 -> 296, leak 247 -> 279, its over-count 23 -> 26, matched 224 ->
+        // 253. The matched figure landing on the old truth total is a
+        // coincidence of the arithmetic and nothing else.
+        assertEquals(296, truthTotal, "reps the corpus truth set holds")
+        assertEquals(279, leakTotal, "reps the leak reports over them")
+        assertEquals(26, leakOver, "reps the leak reports beyond a capture's truth")
+        assertEquals(253, leakMatched, "reps the leak reports within a capture's truth")
         val fly = "field-reardeltfly-s32-set06"
         assertEquals(
             listOf(12, 0, 23),

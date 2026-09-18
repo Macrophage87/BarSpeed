@@ -29,6 +29,22 @@ import kotlin.test.assertEquals
  * **108**. Round 1's harness is gone, so what caused each difference cannot be
  * established -- these are the figures with code behind them.
  *
+ * ## THE CORPUS ROW ABOVE WAS MEASURED OVER 33 SCORED CAPTURES AND IS NOW 42
+ *
+ * The figures in the paragraph above are what this file measured when the
+ * corpus held 45 captures. Issue #259 committed three holds and issues #290 and
+ * #255 six more captures, and the corpus row re-measured over the 42 scored
+ * captures reads truth **296**, shipped **124** at an over-count of **1**,
+ * candidate (c) **206** at an over-count of **23**. The comparison with the proposal's round-1 numbers is
+ * left standing as the record of that measurement rather than rewritten
+ * against a corpus round 1 never saw.
+ *
+ * What the six add is not neutral for candidate (c): it reports 10 against a
+ * truth of 7 on field-42 set 2, and 1 against 8 on the cable row and both
+ * assisted pull-ups -- three of the four captures it collapses on are now
+ * stack-mounted machines. That is a finding about (c) on stack lifts, raised
+ * here and not acted on; #301 chose (c) on the corpus it had.
+ *
  * ## These tables now measure the PRODUCTION class
  *
  * Two sentences stood here and are DELETED rather than reworded, because the
@@ -54,12 +70,16 @@ class DriveImpulseCandidateTest {
         LiveCountCandidates.shippedCount(fixture, CandidateCorpus.capture(fixture).direction)
 
     /**
-     * The corpus list is every committed capture, and 36 of the 48 carry a
+     * The corpus list is every committed capture, and 42 of the 54 carry a
      * truth.
      *
-     * 45 and 33 until issue #259's three holds landed: a hold's cue track is
-     * committed and calls no rep, so each takes a truth of 0 on the CUES
-     * basis, exactly as the hold already in the list does.
+     * It read 33 of 45 before two landings grew it. Issue #259's three holds
+     * landed first: a hold's cue track is committed and calls no rep, so each
+     * takes a truth of 0 on the CUES basis, exactly as the hold already in the
+     * list does. Issues #290 and #255 then committed six field-42 captures,
+     * all six carrying a STATED truth -- the lifter's own count, from that
+     * session's `session.json` -- so the stated basis grew from five captures
+     * to eleven.
      *
      * Asserted against the resource directory rather than a hand-kept number,
      * for the reason `RepRefusalCorpusTest` gives for its own list: a capture
@@ -67,13 +87,13 @@ class DriveImpulseCandidateTest {
      * nothing would say so.
      */
     @Test
-    fun `the candidate corpus is every committed capture, 36 of them with a truth`() {
+    fun `the candidate corpus is every committed capture, 42 of them with a truth`() {
         assertEquals(FieldCorpus.onClasspath(), CandidateCorpus.ALL.map { it.fixture }.sorted())
-        assertEquals(48, CandidateCorpus.ALL.size, "captures on the classpath")
+        assertEquals(54, CandidateCorpus.ALL.size, "captures on the classpath")
         val scored = CandidateCorpus.scored()
-        assertEquals(36, scored.size, "captures with a truth")
+        assertEquals(42, scored.size, "captures with a truth")
         assertEquals(
-            listOf(5, 12, 19),
+            listOf(11, 12, 19),
             listOf(
                 scored.count { it.second.basis == CandidateCorpus.Basis.STATED },
                 scored.count { it.second.basis == CandidateCorpus.Basis.MARKS },
@@ -175,7 +195,7 @@ class DriveImpulseCandidateTest {
     }
 
     /**
-     * The whole corpus, 36 captures with a truth. This is the row that decides
+     * The whole corpus, 42 captures with a truth. This is the row that decides
      * the candidate cannot simply become the counter everywhere: it recovers a
      * great deal on barbell work and collapses on stack and machine work, where
      * its sensor-frame thresholds are applied through a pulley ratio.
@@ -205,13 +225,19 @@ class DriveImpulseCandidateTest {
         }
         println("truth $truthTotal shipped $shippedTotal/$shippedOver candidate $candidateTotal/$candidateOver")
         println("matched: shipped $shippedMatched candidate $candidateMatched of $truthTotal")
-        assertEquals(253, truthTotal, "reps the corpus truth set holds")
-        assertEquals(108, shippedTotal, "reps the shipped live counter reports over them")
+        // Every figure here moved when issue #259's three holds and issues
+        // #290 and #255's six field-42 captures entered the corpus, and each is
+        // from the run that rebased this file onto both: truth 253 -> 296,
+        // shipped 108 -> 124, candidate 180 -> 206, its over-count 19 -> 23,
+        // matched 107 -> 123 and 161 -> 183. The shipped counter's over-count is
+        // unchanged at 1, so none of the nine makes it report beyond a truth.
+        assertEquals(296, truthTotal, "reps the corpus truth set holds")
+        assertEquals(124, shippedTotal, "reps the shipped live counter reports over them")
         assertEquals(1, shippedOver, "reps the shipped counter reports beyond a capture's truth")
-        assertEquals(181, candidateTotal, "reps candidate (c) reports")
-        assertEquals(20, candidateOver, "reps candidate (c) reports beyond a capture's truth")
-        assertEquals(107, shippedMatched, "reps the shipped counter reports within a capture's truth")
-        assertEquals(161, candidateMatched, "reps candidate (c) reports within a capture's truth")
+        assertEquals(206, candidateTotal, "reps candidate (c) reports")
+        assertEquals(23, candidateOver, "reps candidate (c) reports beyond a capture's truth")
+        assertEquals(123, shippedMatched, "reps the shipped counter reports within a capture's truth")
+        assertEquals(183, candidateMatched, "reps candidate (c) reports within a capture's truth")
         val collapse = listOf(
             "field-legcurl-1030-10rep",
             "field-legcurl-1030-12rep",

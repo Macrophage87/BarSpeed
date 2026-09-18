@@ -187,8 +187,9 @@ class LiveCountDifferentialTest {
      * A set counted by the metronome, by the lifter, or by nobody arms no live
      * counter, so no tempo-guided capture in this corpus can be reached by the
      * change at all. `LiveRepCountersTest` measures the other half of that
-     * claim: `LiveCounter.SEGMENTER` still makes exactly the 166 calls over all
-     * 45 committed captures that a directly constructed `LiveRepCaller` makes.
+     * claim: `LiveCounter.SEGMENTER` still makes exactly the same calls over
+     * all 54 committed captures that a directly constructed `LiveRepCaller`
+     * makes; `LiveRepCountersTest` carries the total.
      */
     @Test
     fun `no other counter arms a live detector, and the segmenter still exists`() {
