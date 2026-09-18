@@ -20,7 +20,10 @@ class RestClockPolicyTest {
     /** The cue that called the set over is when the lifter stopped lifting. */
     @Test
     fun `the set-over cue is the instant the rest runs from`() {
-        assertEquals(13_517L, RestClockPolicy.startedAtMs(setOverCueAtMs = 13_517L, endedAtMs = 27_004L))
+        assertEquals(
+            13_517L,
+            RestClockPolicy.startedAtMs(setOverCueAtMs = 13_517L, sensorEndAtMs = null, endedAtMs = 27_004L),
+        )
     }
 
     /**
@@ -33,7 +36,10 @@ class RestClockPolicyTest {
      */
     @Test
     fun `a set nothing called over runs from the instant the write froze`() {
-        assertEquals(27_004L, RestClockPolicy.startedAtMs(setOverCueAtMs = null, endedAtMs = 27_004L))
+        assertEquals(
+            27_004L,
+            RestClockPolicy.startedAtMs(setOverCueAtMs = null, sensorEndAtMs = null, endedAtMs = 27_004L),
+        )
     }
 
     /**
@@ -48,7 +54,10 @@ class RestClockPolicyTest {
      */
     @Test
     fun `a cue stamped after the write is still the instant taken`() {
-        assertEquals(99_000L, RestClockPolicy.startedAtMs(setOverCueAtMs = 99_000L, endedAtMs = 27_004L))
+        assertEquals(
+            99_000L,
+            RestClockPolicy.startedAtMs(setOverCueAtMs = 99_000L, sensorEndAtMs = null, endedAtMs = 27_004L),
+        )
     }
 
     // ------------------------------------------------------------------

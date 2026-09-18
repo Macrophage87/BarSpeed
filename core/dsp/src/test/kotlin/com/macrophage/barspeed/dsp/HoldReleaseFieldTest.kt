@@ -6,11 +6,10 @@ import com.macrophage.barspeed.model.RestClockPolicy
 import com.macrophage.barspeed.model.SetClockPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.VoiceCue
-import kotlin.math.abs
-import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -95,8 +94,16 @@ class HoldReleaseFieldTest {
     private fun cues(fixture: String): List<VoiceCue> =
         CueTrack.read(fixture).map { VoiceCue(timestampMs = it.timestampMs, cue = it.label) }
 
-    /** The deviation from one gravity this file measures a release by, in g. */
-    private fun deviationG(s: ImuSample): Double = abs(sqrt(s.axG * s.axG + s.ayG * s.ayG + s.azG * s.azG) - 1.0)
+    /**
+     * The deviation from one gravity this file measures a release by, in g.
+     *
+     * [HoldRelease.deviationG]'s own arithmetic, not a copy of it: a second
+     * expression here would let the pins measure one quantity while the
+     * decision measured another, and they would agree for exactly as long as
+     * nobody touched either. It was a local `abs(sqrt(...) - 1.0)` for one
+     * commit, before the detector existed to ask.
+     */
+    private fun deviationG(s: ImuSample): Double = HoldRelease.deviationG(s)
 
     private fun inWindow(hold: Hold, fixture: String = hold.fixture): List<ImuSample> =
         load(fixture).filter { it.timestampMs >= hold.clockStartedAtMs }
@@ -210,6 +217,7 @@ class HoldReleaseFieldTest {
             set17.endedAtMs,
             RestClockPolicy.startedAtMs(
                 setOverCueAtMs = (SetEnd.calledOver(cues(set17.fixture)) as? SetEnd.Cued)?.atMs,
+                sensorEndAtMs = null,
                 endedAtMs = set17.endedAtMs,
             ),
             "set 17's rest runs from the tap",
@@ -237,6 +245,7 @@ class HoldReleaseFieldTest {
             carry.endedAtMs,
             RestClockPolicy.startedAtMs(
                 setOverCueAtMs = (SetEnd.calledOver(cues(carry.fixture)) as? SetEnd.Cued)?.atMs,
+                sensorEndAtMs = null,
                 endedAtMs = carry.endedAtMs,
             ),
             "the carry's rest runs from the write, 1 ms after Time",
@@ -302,6 +311,62 @@ class HoldReleaseFieldTest {
             "role b's largest deviation under the band",
         )
     }
+
+    @Test
+    fun `the release instant each hold's own armed unit saw`() {
+        // What `HoldRelease` answers over the four committed streams. Nothing
+        // consumes it yet; this is the measurement the decision will be made
+        // against.
+        assertEquals(
+            1788517913103,
+            HoldRelease.atMs(load(set17.fixture), set17.clockStartedAtMs),
+            "set 17's release",
+        )
+        assertEquals(
+            1788518020443,
+            HoldRelease.atMs(load(set18.fixture), set18.clockStartedAtMs),
+            "set 18's release",
+        )
+        // The carry ran to `Time` with the handles still in the lifter's
+        // hands, so there is no release inside the capture at all. Null, and
+        // not a low number: a hold with nothing to say must not be able to
+        // shorten itself.
+        assertNull(
+            HoldRelease.atMs(load(carry.fixture), carry.clockStartedAtMs),
+            "the carry has no release in its capture",
+        )
+        // The partner: the SETTLED_MS guard is what makes this 23.313 s
+        // instead of the 1.025 s step-off pinned above.
+        assertEquals(
+            1788518017698,
+            HoldRelease.atMs(load("${set18.fixture}-imu-b"), set18.clockStartedAtMs),
+            "set 18's partner unit",
+        )
+    }
+
+    @Test
+    fun `the release sits where a reach would put it, seconds before the tap`() {
+        // The arithmetic the recorded seconds will be made of, in the same
+        // function the measured span comes from -- so a sensor end and a tap
+        // end are the same kind of number, floored the same way.
+        val release17 = HoldRelease.atMs(load(set17.fixture), set17.clockStartedAtMs)!!
+        val release18 = HoldRelease.atMs(load(set18.fixture), set18.clockStartedAtMs)!!
+        assertEquals(29, secondsTo(set17, release17), "set 17's seconds to the release")
+        assertEquals(26, secondsTo(set18, release18), "set 18's seconds to the release")
+        // Against 36 and 32 to the tap: 7 s and 6 s of reach, inside the
+        // owner's own "5-10 sec" and inside #172's measured 4.3-13.7 s.
+        assertEquals(7, secondsTo(set17, set17.endedAtMs) - secondsTo(set17, release17), "set 17's reach")
+        assertEquals(6, secondsTo(set18, set18.endedAtMs) - secondsTo(set18, release18), "set 18's reach")
+        assertEquals(7039L, set17.endedAtMs - release17, "set 17's reach in milliseconds")
+        assertEquals(6130L, set18.endedAtMs - release18, "set 18's reach in milliseconds")
+    }
+
+    private fun secondsTo(hold: Hold, instantMs: Long): Int = SetClockPolicy.heldSeconds(
+        case = PrepCase.TIMED,
+        tappedAtMs = hold.tappedAtMs,
+        clockStartedAtMs = hold.clockStartedAtMs,
+        endedAtMs = instantMs,
+    )
 
     private fun round3(v: Double): Double = Math.round(v * 1000.0) / 1000.0
 }

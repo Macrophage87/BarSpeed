@@ -4466,6 +4466,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // against a 60 s target reads as a hold carried past target on every
         // set, for a reason that is nothing to do with the lifter. A set the
         // lifter ended is never touched: it records what it lasted.
+        // Which buffer the DSP is pointed at, and what the row says about the
+        // choice (#207). Frozen here with everything else, from the buffers as
+        // they stand at the end of the set.
+        //
+        // ABOVE the duration rather than below it, which is where it sat until
+        // #259: the analysed stream is what a hold's own end instant is read
+        // off, so the duration cannot be worked out before the capture has
+        // been chosen. Nothing else about the move changes -- the buffers and
+        // both instants are the same ones it was called with.
+        val capture = s.captureAt(armedSensors, armedSecondaryRole, imuBuffer, imuBufferB, setStartedAtMs, endedAtMs)
         val actualDurationS =
             recordedTimedSeconds(
                 isTimed = isTimed,
@@ -4493,11 +4503,6 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val recordedReps =
             RepCountPolicy.recorded(setCounter, s.manualReps, sensorCounter.called, sensorCounter.correctionDelta)
         val manualReps = recordedReps.stated
-        // Which buffer the DSP is pointed at, and what the row says about the
-        // choice (#207). Frozen here with everything else, from the buffers as
-        // they stand at the end of the set.
-        // Frozen here with everything else -- see captureAt (#207, #213).
-        val capture = s.captureAt(armedSensors, armedSecondaryRole, imuBuffer, imuBufferB, setStartedAtMs, endedAtMs)
         // Where the rest after this set runs from. Asked here, once, and
         // carried on the frozen write: the countdown reads it below and the
         // rest-HR window is seeded from it a few lines down, so the two
@@ -4506,6 +4511,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val restStartedAtMs =
             RestClockPolicy.startedAtMs(
                 setOverCueAtMs = (SetEnd.calledOver(cueBuffer.toList()) as? SetEnd.Cued)?.atMs,
+                // No sensor end is offered yet. Stated at the call site rather
+                // than defaulted in the policy, so the commit that computes one
+                // cannot leave this reader behind (#259).
+                sensorEndAtMs = null,
                 endedAtMs = endedAtMs,
             )
         pendingWrite =

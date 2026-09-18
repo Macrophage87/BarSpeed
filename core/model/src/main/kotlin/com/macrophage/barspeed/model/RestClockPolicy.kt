@@ -74,7 +74,11 @@ object RestClockPolicy {
      * neither figure is more trustworthy than the other. [remainingS] floors
      * the result either way, so the worst it can produce is a full period.
      */
-    fun startedAtMs(setOverCueAtMs: Long?, endedAtMs: Long): Long = setOverCueAtMs ?: endedAtMs
+    // The suppression IS the statement: [sensorEndAtMs] is accepted and not
+    // read, so `RestFromSensorEndDifferentialTest` can be written against this
+    // signature and fail. The commit that reads it deletes this line.
+    @Suppress("UnusedParameter")
+    fun startedAtMs(setOverCueAtMs: Long?, sensorEndAtMs: Long?, endedAtMs: Long): Long = setOverCueAtMs ?: endedAtMs
 
     /**
      * Seconds of rest left at [nowMs], for a period of [restS] that started at
