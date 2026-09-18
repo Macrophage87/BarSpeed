@@ -189,6 +189,45 @@ class ArtefactPeakWithholdingTest {
     }
 
     /**
+     * THE SECOND FIGURE ON THE POST-SET CHART, over the whole corpus, as
+     * `RecordScreen.PeakVelocityChart` computes it TODAY.
+     *
+     * A CHARACTERIZATION and labelled as one. The expression is
+     * `AccelArtefact.terminalPeakLossPct`, lifted out of `:app` unchanged this
+     * round because nothing on the CI path reaches a Composable: the chart's
+     * *"last rep -%.0f%% off best"* is measured against the maximum over EVERY
+     * rep, artefact or not, which is the same population the shipped rule
+     * already refuses for `summary.peakConVel_mps`.
+     *
+     * Two entries say why that is worth a pin. field-42 set 7's 0.0 is the
+     * screen telling the lifter their LAST rep was their fastest, on the
+     * strength of the one out-of-range sample inside it. field-42 set 5's 43.377
+     * is a 43% velocity loss reported against a best the rule already withholds.
+     */
+    @Test
+    fun `the chart's terminal-loss figure, per capture`() {
+        assertEquals(
+            mapOf<String, Double?>(
+                "field-ohp-3010-7rep-s42-set02" to 69.277,
+                "field-bench-3010-6rep-s42-set05" to 43.377,
+                "field-bench-3010-6rep-s42-set07" to 0.0,
+                "field-cablerow-3010-8rep-s42-set09" to 77.797,
+                "field-pullup-3010-8rep-s42-set11" to 59.843,
+                "field-pullup-4010-8rep-s42-set13" to 65.497,
+                "field-deadlift-straight-5rep-s43-set04" to 79.183,
+                "field-deadlift-straight-5rep-s43-set05" to 10.273,
+                "field-deadlift-straight-5rep-s43-set06" to 75.683,
+                "field-assistedpullup-3010-s37-set08" to 0.0,
+                "field-ohp-prepinflated-s37-set03" to 19.628,
+            ),
+            ArtefactCorpus.cases.associate {
+                it.fixture to AccelArtefact.terminalPeakLossPct(analyse(it.fixture).reps)?.let(ArtefactCorpus::round3)
+            },
+            "the percentage the chart prints beside the set's best peak velocity",
+        )
+    }
+
+    /**
      * A set every one of whose reps carries an artefact publishes NO peak pair
      * rather than a low one, and nothing else about it changes.
      *

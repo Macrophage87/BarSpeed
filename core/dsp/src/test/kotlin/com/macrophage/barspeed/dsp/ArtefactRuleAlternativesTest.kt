@@ -37,6 +37,13 @@ import kotlin.test.assertEquals
  * these captures accept few anchors and the interval is then most of the
  * stream. Publishing no peak pair on most of the corpus is a product decision;
  * it is raised, and the measurement is here rather than in a sentence.
+ *
+ * ## Alternative 3: count over the DRIVE WINDOW alone
+ *
+ * The narrowest rule available -- count only inside the window the peak is
+ * actually taken over, `span.conStartIdx..span.conEndIdx`, rather than the whole
+ * rep span. The published schema claimed a measurement for this that nothing in
+ * the tree took; the claim is deleted and the measurement is taken here instead.
  */
 class ArtefactRuleAlternativesTest {
     /** Every sample above the bound replaced by the last in-range reading; gyro and timestamps untouched. */
@@ -108,6 +115,21 @@ class ArtefactRuleAlternativesTest {
         }
         val containment = spans.count { AccelArtefact.countIn(artefacts, AccelArtefact.spanOf(it)) > 0 }
         return listOf(spans.size, exact, containment)
+    }
+
+    /**
+     * Detections the DRIVE WINDOW alone withholds, against the whole span, over
+     * the same span population `withheldPerRule` uses and for its reasons.
+     */
+    private fun driveWindowPerRule(case: ArtefactCorpus.Case): List<Int> {
+        val samples = ArtefactCorpus.load(case.fixture)
+        val series = VelocityEstimator.estimate(samples, DspConfig(), case.direction.measuredPlane)
+            .mappedToLifter(case.direction.sensorToLifter)
+        val artefacts = AccelArtefact.indices(samples)
+        val spans = RepSegmenter.segmentDetailed(series, case.direction, DspConfig()).spans
+        val driveWindow = spans.count { AccelArtefact.countIn(artefacts, it.conStartIdx..it.conEndIdx) > 0 }
+        val containment = spans.count { AccelArtefact.countIn(artefacts, AccelArtefact.spanOf(it)) > 0 }
+        return listOf(spans.size, driveWindow, containment)
     }
 
     /**
@@ -208,6 +230,62 @@ class ArtefactRuleAlternativesTest {
             ),
             exact,
             "spans resolved, then spans the exact interval withholds, then spans containment withholds",
+        )
+    }
+
+    /**
+     * THE DRIVE WINDOW ALONE, AND WHAT IT WOULD COST.
+     *
+     * The window the peak is taken over is narrower than the window that decided
+     * the velocity the peak is read off: the integrator carries an artefact
+     * before the drive forward into it, and the drift correction interpolates
+     * between anchors on either side, so one after the drive moves the drive too.
+     * That is the mechanism. This is the price.
+     *
+     * Counting inside `conStartIdx..conEndIdx` withholds FEWER detections than
+     * the whole span on EIGHT of the eleven and more on none. On FIVE it
+     * withholds NONE at all where the whole span withholds between one and four
+     * -- field-42 set 5, field-42 set 11, field-43 set 4, field-43 set 6 and
+     * field-37 set 8 -- and on those five no published rep can be withheld
+     * either, because a published rep's drive window is a sub-range of its span.
+     *
+     * One of the five is a capture the shipped rule MOVES: field-42 set 5, whose
+     * peak pair falls from 1135.7 W and 0.989 m/s to 271.4 W and 0.56 m/s in
+     * `ArtefactPeakWithholdingTest`. Under the drive window alone it would
+     * publish 1135.7 W and 0.989 m/s again.
+     */
+    @Test
+    fun `counting over the drive window alone withholds less on eight captures and nothing on five`() {
+        val counts = ArtefactCorpus.cases.associate { it.fixture to driveWindowPerRule(it) }
+        assertEquals(
+            mapOf(
+                "field-ohp-3010-7rep-s42-set02" to listOf(9, 2, 2),
+                "field-bench-3010-6rep-s42-set05" to listOf(6, 0, 3),
+                "field-bench-3010-6rep-s42-set07" to listOf(7, 1, 2),
+                "field-cablerow-3010-8rep-s42-set09" to listOf(5, 0, 0),
+                "field-pullup-3010-8rep-s42-set11" to listOf(12, 0, 1),
+                "field-pullup-4010-8rep-s42-set13" to listOf(12, 0, 0),
+                "field-deadlift-straight-5rep-s43-set04" to listOf(9, 0, 4),
+                "field-deadlift-straight-5rep-s43-set05" to listOf(7, 2, 6),
+                "field-deadlift-straight-5rep-s43-set06" to listOf(7, 0, 4),
+                "field-assistedpullup-3010-s37-set08" to listOf(7, 0, 1),
+                "field-ohp-prepinflated-s37-set03" to listOf(11, 3, 5),
+            ),
+            counts,
+            "spans resolved, then spans the drive window withholds, then spans containment withholds",
+        )
+        assertEquals(8, counts.count { it.value[1] < it.value[2] }, "captures the drive window withholds less on")
+        assertEquals(0, counts.count { it.value[1] > it.value[2] }, "captures it withholds more on")
+        assertEquals(
+            listOf(
+                "field-bench-3010-6rep-s42-set05",
+                "field-pullup-3010-8rep-s42-set11",
+                "field-deadlift-straight-5rep-s43-set04",
+                "field-deadlift-straight-5rep-s43-set06",
+                "field-assistedpullup-3010-s37-set08",
+            ),
+            counts.filter { it.value[1] == 0 && it.value[2] > 0 }.keys.toList(),
+            "captures the drive window would withhold nothing on",
         )
     }
 }

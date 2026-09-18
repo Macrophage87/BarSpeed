@@ -157,6 +157,37 @@ class ArtefactBoundTest {
     }
 
     /**
+     * THE TERMINAL-LOSS FIGURE, as `RecordScreen.PeakVelocityChart` computes it
+     * TODAY: the best over EVERY rep, including one whose span carries a reading
+     * the sensor cannot have measured.
+     *
+     * A CHARACTERIZATION and labelled as one. It is pinned before it is changed
+     * because the expression lives in `:app`, where no test on the CI path
+     * reaches it, so the only way to show what the change moves is to lift it
+     * out first.
+     */
+    @Test
+    fun `terminalPeakLossPct characterizes the chart's own expression`() {
+        val reps = listOf(
+            rep(0, artefactSamples = 0, peakPowerW = 100.0, peakConVelMps = 0.5),
+            rep(1, artefactSamples = 2, peakPowerW = 3606.3, peakConVelMps = 2.5),
+            rep(2, artefactSamples = 0, peakPowerW = 120.0, peakConVelMps = 0.4),
+        )
+        assertEquals(84.0, AccelArtefact.terminalPeakLossPct(reps)!!, 1e-9, "0.4 against the artefact rep's 2.5")
+        assertNull(AccelArtefact.terminalPeakLossPct(emptyList()), "no rep, so no percentage")
+        assertNull(
+            AccelArtefact.terminalPeakLossPct(listOf(rep(0, 0, 100.0, 0.0))),
+            "a best of zero is not something a loss can be a percentage of",
+        )
+        assertEquals(
+            0.0,
+            AccelArtefact.terminalPeakLossPct(listOf(rep(0, 0, 100.0, 0.7)))!!,
+            1e-9,
+            "a one-rep set's last rep IS its best",
+        )
+    }
+
+    /**
      * THE RESIDUE INTERVAL, case by case. Derived from what `applyZupt` does --
      * see `AccelArtefact.corruptedSpan` -- and not shipped as the withholding
      * rule; `ArtefactRuleAlternativesTest` measures what shipping it would cost.

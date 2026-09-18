@@ -243,4 +243,26 @@ object AccelArtefact {
      */
     fun peakEligible(reps: List<RepAnalysis>): List<RepAnalysis> =
         reps.filterNot { peaksWithheld(it.artefactSamples ?: 0) }
+
+    /**
+     * How far the set's LAST rep fell short of the best peak drive velocity the
+     * set publishes, as a percentage of it: the second figure on the post-set
+     * peak-velocity chart's summary line, `RecordScreen.PeakVelocityChart`'s
+     * *"Best %.2f m/s - last rep -%.0f%% off best."*
+     *
+     * A CHARACTERIZATION OF WHAT THAT LINE COMPUTES TODAY, not a rule. The
+     * expression is lifted out of `:app` unchanged -- the maximum over EVERY
+     * rep, the last rep's own peak, no question asked about artefacts -- so that
+     * it can be measured on the committed corpus at all. Nothing in `:app` is
+     * reachable by a test on the CI path, which is why this figure was argued in
+     * prose and not pinned. Issues #290 and #255.
+     *
+     * Null where the chart already draws nothing: no rep, or a best that is not
+     * positive, because a loss measured against zero is not a percentage.
+     */
+    fun terminalPeakLossPct(reps: List<RepAnalysis>): Double? {
+        val best = reps.maxOfOrNull { it.peakConVelMps } ?: return null
+        if (best <= 0) return null
+        return (1.0 - reps.last().peakConVelMps / best) * 100.0
+    }
 }
