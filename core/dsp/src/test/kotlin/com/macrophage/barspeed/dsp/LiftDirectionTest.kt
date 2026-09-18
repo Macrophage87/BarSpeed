@@ -115,6 +115,70 @@ class LiftDirectionTest {
         assertFalse(press.liftDirection().mountSpecific)
     }
 
+    /**
+     * Every COMBINATION of the three, not just each alone (#280 c0).
+     *
+     * The test above asserts each term on its own, which a rule reading one
+     * term would also pass; this asserts the eight-row truth table, which one
+     * reading the wrong pair of them would not. It is a characterization pin:
+     * the expression is about to be split so a caller can ask about the stack
+     * term separately from the other two, and the table is what that split
+     * must leave alone.
+     */
+    @Test
+    fun `the three mount terms combine as an or`() {
+        val rows =
+            listOf(
+                Triple(false, false, 1.0) to false,
+                Triple(true, false, 1.0) to true,
+                Triple(false, true, 1.0) to true,
+                Triple(false, false, 2.0) to true,
+                Triple(true, true, 1.0) to true,
+                Triple(true, false, 2.0) to true,
+                Triple(false, true, 2.0) to true,
+                Triple(true, true, 2.0) to true,
+            )
+        for ((terms, expected) in rows) {
+            val (onStack, inverted, ratio) = terms
+            val direction =
+                LiftDirection(sensorOnStack = onStack, sensorInverted = inverted, travelRatio = ratio)
+            assertEquals(expected, direction.mountSpecific, "onStack=$onStack inverted=$inverted ratio=$ratio")
+        }
+    }
+
+    /**
+     * What is left of a BUILT-IN stack declaration once the stack term goes
+     * (#280 c0).
+     *
+     * The live readout's repair depends on this and on nothing else: where a
+     * unit measurably did NOT ride the stack, the remaining declaration has to
+     * be a statement about the LIFT before it can be applied to that unit's
+     * stream. It is here for the twelve seed ids `ExerciseDef.ridesStack`
+     * carries, none of which declares `sensorInverted` or a travel ratio, so
+     * dropping the stack term leaves them mount-free. A PLAN that declares
+     * either of the other two does not, which is the second row.
+     */
+    @Test
+    fun `dropping the stack term leaves a built-in cable declaration mount-free`() {
+        val pulldown = ExerciseDef(id = "lat_pulldown", displayName = "Lat pulldown", sensorOnStack = true)
+        assertTrue(pulldown.liftDirection().mountSpecific, "as declared")
+        assertFalse(
+            pulldown.liftDirection().copy(sensorOnStack = false).mountSpecific,
+            "the stack term was the only mount term it had",
+        )
+        val inverted =
+            ExerciseDef(
+                id = "lat_pulldown",
+                displayName = "Lat pulldown",
+                sensorOnStack = true,
+                sensorInverted = true,
+            )
+        assertTrue(
+            inverted.liftDirection().copy(sensorOnStack = false).mountSpecific,
+            "a declared inversion is still a mount nothing measured",
+        )
+    }
+
     /** A lat pulldown as field-38 declared it: stack-mounted and inverted, so both terms fire. */
     @Test
     fun `a stack-declared pulldown is mount-specific`() {
