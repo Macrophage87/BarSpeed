@@ -157,23 +157,35 @@ class ArtefactBoundTest {
     }
 
     /**
-     * THE TERMINAL-LOSS FIGURE, as `RecordScreen.PeakVelocityChart` computes it
-     * TODAY: the best over EVERY rep, including one whose span carries a reading
-     * the sensor cannot have measured.
+     * THE TERMINAL-LOSS FIGURE IS MEASURED AGAINST THE SAME POPULATION the set's
+     * published peak is, and is WITHHELD where the set's LAST rep is itself
+     * withheld.
      *
-     * A CHARACTERIZATION and labelled as one. It is pinned before it is changed
-     * because the expression lives in `:app`, where no test on the CI path
-     * reaches it, so the only way to show what the change moves is to lift it
-     * out first.
+     * The second half is not decoration. Narrowing the best to the eligible reps
+     * while leaving the last rep's own peak in the numerator puts the numerator
+     * ABOVE the denominator whenever the last rep is the marked one: field-42
+     * set 7's last rep peaks at 1.084 m/s against an eligible best of 0.948, so
+     * the screen would print a NEGATIVE loss. That is the wrong-pair class in
+     * one line, and it is why narrowing `best` alone is not the whole fix.
      */
     @Test
-    fun `terminalPeakLossPct characterizes the chart's own expression`() {
+    fun `terminalPeakLossPct measures against the eligible best and withholds on a marked last rep`() {
         val reps = listOf(
             rep(0, artefactSamples = 0, peakPowerW = 100.0, peakConVelMps = 0.5),
             rep(1, artefactSamples = 2, peakPowerW = 3606.3, peakConVelMps = 2.5),
             rep(2, artefactSamples = 0, peakPowerW = 120.0, peakConVelMps = 0.4),
         )
-        assertEquals(84.0, AccelArtefact.terminalPeakLossPct(reps)!!, 1e-9, "0.4 against the artefact rep's 2.5")
+        assertEquals(20.0, AccelArtefact.terminalPeakLossPct(reps)!!, 1e-9, "0.4 against the eligible best 0.5")
+        assertNull(
+            AccelArtefact.terminalPeakLossPct(reps.dropLast(1)),
+            "a set whose LAST rep is withheld has no terminal peak to measure a loss off",
+        )
+        assertEquals(
+            0.0,
+            AccelArtefact.terminalPeakLossPct(listOf(reps[0], reps[2].copy(peakConVelMps = 0.5)))!!,
+            1e-9,
+            "a last rep tying the eligible best is a zero loss, not an absent one",
+        )
         assertNull(AccelArtefact.terminalPeakLossPct(emptyList()), "no rep, so no percentage")
         assertNull(
             AccelArtefact.terminalPeakLossPct(listOf(rep(0, 0, 100.0, 0.0))),
@@ -181,9 +193,9 @@ class ArtefactBoundTest {
         )
         assertEquals(
             0.0,
-            AccelArtefact.terminalPeakLossPct(listOf(rep(0, 0, 100.0, 0.7)))!!,
+            AccelArtefact.terminalPeakLossPct(listOf(rep(0, null, 100.0, 0.7)))!!,
             1e-9,
-            "a one-rep set's last rep IS its best",
+            "a rep with no count is KEPT, so an archived set still gets its figure",
         )
     }
 

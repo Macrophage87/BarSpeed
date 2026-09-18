@@ -189,36 +189,45 @@ class ArtefactPeakWithholdingTest {
     }
 
     /**
-     * THE SECOND FIGURE ON THE POST-SET CHART, over the whole corpus, as
-     * `RecordScreen.PeakVelocityChart` computes it TODAY.
+     * THE SECOND FIGURE ON THE POST-SET CHART, over the whole corpus, measured
+     * against the reps the set's published peak is measured over.
      *
-     * A CHARACTERIZATION and labelled as one. The expression is
-     * `AccelArtefact.terminalPeakLossPct`, lifted out of `:app` unchanged this
-     * round because nothing on the CI path reaches a Composable: the chart's
-     * *"last rep -%.0f%% off best"* is measured against the maximum over EVERY
-     * rep, artefact or not, which is the same population the shipped rule
-     * already refuses for `summary.peakConVel_mps`.
+     * The characterization this replaces read 69.277, 43.377, 0.0, 77.797,
+     * 59.843, 65.497, 79.183, 10.273, 75.683, 0.0 and 19.628 -- the chart's own
+     * expression, the maximum over EVERY rep. Five captures move and each says
+     * something different to the lifter:
      *
-     * Two entries say why that is worth a pin. field-42 set 7's 0.0 is the
-     * screen telling the lifter their LAST rep was their fastest, on the
-     * strength of the one out-of-range sample inside it. field-42 set 5's 43.377
-     * is a 43% velocity loss reported against a best the rule already withholds.
+     * - field-42 set 2: 69.277 to 33.074. The largest drawdown in the corpus
+     *   halves once its best is a peak the sensor can have measured.
+     * - field-42 set 5: 43.377 to 0.0. The screen reported a 43% velocity loss
+     *   against a best the rule already withholds; the last rep IS the fastest
+     *   of the reps that are bounded.
+     * - field-42 set 7: 0.0 to absent. This is the inversion. The screen told
+     *   the lifter their last rep was the set's fastest, on the strength of the
+     *   one out-of-range sample inside that very rep.
+     * - field-43 set 5: 10.273 to absent, and field-37 set 3: 19.628 to absent.
+     *   Both sets end on a marked rep.
+     *
+     * Absent, not zero, on the three whose LAST rep is withheld: a rep whose
+     * peak the set refuses to publish is not a rep a loss can be measured off.
+     * The six unmoved figures are the six captures whose last rep is clean and
+     * whose best was never an artefact.
      */
     @Test
     fun `the chart's terminal-loss figure, per capture`() {
         assertEquals(
             mapOf<String, Double?>(
-                "field-ohp-3010-7rep-s42-set02" to 69.277,
-                "field-bench-3010-6rep-s42-set05" to 43.377,
-                "field-bench-3010-6rep-s42-set07" to 0.0,
+                "field-ohp-3010-7rep-s42-set02" to 33.074,
+                "field-bench-3010-6rep-s42-set05" to 0.0,
+                "field-bench-3010-6rep-s42-set07" to null,
                 "field-cablerow-3010-8rep-s42-set09" to 77.797,
                 "field-pullup-3010-8rep-s42-set11" to 59.843,
                 "field-pullup-4010-8rep-s42-set13" to 65.497,
                 "field-deadlift-straight-5rep-s43-set04" to 79.183,
-                "field-deadlift-straight-5rep-s43-set05" to 10.273,
+                "field-deadlift-straight-5rep-s43-set05" to null,
                 "field-deadlift-straight-5rep-s43-set06" to 75.683,
                 "field-assistedpullup-3010-s37-set08" to 0.0,
-                "field-ohp-prepinflated-s37-set03" to 19.628,
+                "field-ohp-prepinflated-s37-set03" to null,
             ),
             ArtefactCorpus.cases.associate {
                 it.fixture to AccelArtefact.terminalPeakLossPct(analyse(it.fixture).reps)?.let(ArtefactCorpus::round3)
