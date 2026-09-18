@@ -1863,9 +1863,11 @@ internal fun skippedState(s: RecordState): RecordState? {
         )
     // The FROZEN declarations on both sides, never loadKg/reps/durationS/tempo:
     // startNextSet's bake writes a statement into those, and comparing them
-    // would compare a value against itself. Neither slot has been through that
-    // bake here -- both are still ahead of the next START -- so the frozen pair
-    // is also the only pair that stays right if one of them ever has been.
+    // would compare a value against itself. The frozen pair is the only pair
+    // that stays right whether or not a bake has run: on the body-weight
+    // refusal door the SKIPPED slot HAS been baked (startNextSet ran
+    // advancedState before beginSet refused), and plannedLoadKg /
+    // plannedReps / plannedDurationS / plannedTempo are never written back.
     val standingKg =
         SetLoadPolicy.standingStatedAddedKg(
             statedAddedKg = s.statedLoadKg,
