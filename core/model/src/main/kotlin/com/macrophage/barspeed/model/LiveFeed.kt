@@ -132,32 +132,41 @@ object LiveFeedPolicy {
      * WHICH OF THOSE TWO POPULATIONS A REAL DUAL SESSION PRODUCES IS MEASURED
      * NOW, and the sentence that stood here -- *"no capture in this repository
      * holds a dual set with both units streaming"* -- is DELETED rather than
-     * reworded. It was true when it was written and #278 made it false by
-     * committing seven more two-stream captures. FOURTEEN captures on this tree
-     * carry two streams: twelve with a committed partner file and two whose
-     * second stream is committed under its own name
-     * (`field-legcurl-1030-12rep` and `field-ohp-rotating-8rep`). One of the
-     * twelve, `field-ropedeadhang-hold45-s38-set18`, came from `origin/main`
-     * with issue #259 rather than from #278, which is why the count is not
-     * #278's own. Over all fourteen, replaying each pair's own host arrival
-     * stamps in merged order and asking this rule's two conditions frame by
-     * frame, the readout MOVES on four:
+     * reworded. It was true when it was written and this repository now holds
+     * TWELVE two-stream captures -- the twelve `field-*-imu-b.csv` pairs,
+     * seven committed with #278, four already present before it and one,
+     * `field-ropedeadhang-hold45-s38-set18`, landed on `main` for issue #259
+     * while this branch was in review. A pair is ONE SET recorded by two
+     * units; `field-legcurl-1030-12rep` and its `-b` sibling are two
+     * different sets and are not one. Over all twelve, replaying each pair's
+     * own host arrival stamps in merged order and asking this rule's two
+     * conditions frame by frame, the readout MOVES on four:
      * `field-cablerow-3010-8rep-s42-set08` at 89 ms with 4 frames against 12,
      * `…-set09` at 89 ms with 4 against 12, `field-pullup-3010-8rep-s42-set11`
      * at 29 ms with 0 against 8, and `field-pullup-4010-8rep-s42-set13` at
      * 27 ms with 0 against 8. All four are field-42, whose two units stream at
      * roughly 2:1 -- 1944 frames against 4348 on set 08 -- so this is a rate
-     * asymmetry and not a dropout. It does not move on the other ten.
+     * asymmetry and not a dropout. It does not move on the other eight.
      *
-     * WHAT SEPARATES THE FOUR IS THE FIRST FEW FRAMES AND NOT THE TOTALS, and
-     * the sentence that stood here -- that the pairs it does not move on are
-     * *"within four frames of each other"* -- is deleted because two of them
-     * are not: `field-legcurl-1030-12rep` ends 76 frames apart and
-     * `field-ohp-rotating-8rep` 60, and neither switches. Once the armed unit
-     * is analysable at all the candidate list is every analysable role and the
-     * armed one is kept, so a total measured over a whole set cannot decide
-     * this; only the interleaving before the armed unit reaches
-     * `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES` can.
+     * WHAT DECIDES IT IS THE FIRST FEW FRAMES AND NOT THE TOTALS. Seven of
+     * those eight have pairs within four frames of each other -- all three
+     * field-43 deadlifts, both field-41 stack sets, the field-38 lat pulldown
+     * and the field-38 rope dead hang. The eighth is
+     * `field-cablerow-3010-8rep-s42-set10`, whose pair is as asymmetric as
+     * its two siblings' -- 1864 frames against 4168 -- and which still does
+     * not switch. So a total taken over a whole set cannot decide this: once
+     * the armed unit is analysable the candidate list is every analysable
+     * role and the armed one is kept, and only the interleaving before the
+     * armed unit reaches [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] matters.
+     *
+     * TWO ROWS ARE RETRACTED, not reworded. This paragraph said THIRTEEN, and
+     * the two extra rows came from pairing `field-legcurl-1030-12rep` with
+     * `-12rep-b` and `field-ohp-rotating-8rep` with `-8rep-b`, reading each
+     * `-b` file as a second unit of one set. They are SEPARATE SETS, each
+     * recorded by one unit: the legcurl `-b` stream's first frame is 95338 ms
+     * after its supposed partner's LAST frame, and the ohp `-b` stream's is
+     * 539371 ms after, so neither "pair" overlaps in time at all. Both rows
+     * are gone, and nothing is inferred from them.
      *
      * TWO THINGS THAT MEASUREMENT DOES NOT SAY. It does not say the readout
      * DID move on those four sets: which role was armed is not recorded in the

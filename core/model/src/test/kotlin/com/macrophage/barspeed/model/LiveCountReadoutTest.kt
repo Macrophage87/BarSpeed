@@ -38,6 +38,30 @@ class LiveCountReadoutTest {
         assertEquals("—", LiveCountReadout.NO_COUNT)
     }
 
+    /**
+     * Unchanged from the expression it replaces:
+     * `String.format(Locale.US, "%+.2f", velocityMps)`. The sign is always
+     * drawn -- a lowering reads negative on screen -- and the locale is pinned
+     * so a decimal comma cannot appear beside an `m/s` label.
+     */
+    @Test
+    fun `a live velocity is drawn signed to two decimals`() {
+        assertEquals("+0.00", LiveCountReadout.velocityLabel(0.0))
+        assertEquals("+1.23", LiveCountReadout.velocityLabel(1.234))
+        assertEquals("-0.45", LiveCountReadout.velocityLabel(-0.451))
+        assertEquals("+10.00", LiveCountReadout.velocityLabel(10.0))
+    }
+
+    /**
+     * CHARACTERIZATION of the defect, not the answer. A withheld set draws
+     * `+0.00` today: `RecordScreen` formats the line unguarded and the frozen
+     * `LiveSetState` supplies the zero. The differential replaces this pin.
+     */
+    @Test
+    fun `a withheld set draws plus zero velocity today`() {
+        assertEquals("+0.00", LiveCountReadout.velocityLabel(0.0, withheld = true))
+    }
+
     /** Unchanged: the fraction of the prescription, and 0 where nothing was prescribed. */
     @Test
     fun `the arc fills to the fraction of the prescription`() {

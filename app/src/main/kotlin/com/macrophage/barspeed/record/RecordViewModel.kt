@@ -3005,8 +3005,10 @@ data class RecordState(
      * on a set whose declaration describes a MOUNT rather than the lift, and the
      * geometry of the unit now feeding is not one anything measured.
      * `LiveFallbackPolicy` is the rule. Cleared at the start of every set, and
-     * never cleared within one: the decision is taken on the frame of the
-     * switch and stands.
+     * cleared within one only by [saySensorCount] -- which after a withhold can
+     * be reached by nothing but the lifter's own `+1 REP` tap, because the
+     * tracker is gone. The ring then redraws a number the LIFTER stated, never
+     * one the detector resolved.
      *
      * IT SAYS NOTHING ABOUT WHAT WAS RECORDED. Both buffers, both journals and
      * both archived raw streams are exactly what they would have been, and the

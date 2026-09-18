@@ -1,5 +1,7 @@
 package com.macrophage.barspeed.model
 
+import java.util.Locale
+
 /**
  * What the LIVE readout does when [LiveFeedPolicy] moves the feed off the
  * armed unit mid-set. Issue #280.
@@ -108,9 +110,11 @@ sealed interface LiveFallback {
  *
  * IN PRACTICE THE UNMEASURED ROW IS THE COMMON ONE, and that is stated rather
  * than discovered later. [LiveFeedPolicy]'s switch fires very early -- replayed
- * over the fourteen two-stream captures on this tree it moves the readout on
- * four of them, all field-42, between 27 and 89 ms into the capture;
- * [LiveFeedPolicy] holds the figures. A working window has not opened by then,
+ * over the TWELVE committed two-stream pairs -- seven of them with #278,
+ * five already present -- it moves the readout on four, all field-42,
+ * between 27 and 89 ms into the capture; [LiveFeedPolicy] holds the
+ * figures, and both the THIRTEEN and the FOURTEEN this sentence has said
+ * are retracted there. A working window has not opened by then,
  * and `RecordViewModel.liveFallbackAt` reports
  * [StackMountSignal.UNMEASURED] wherever the set has no work start rather than
  * taking a roll range over a set that has not begun. So the answer at a real
@@ -232,6 +236,24 @@ object LiveCountReadout {
 
     /** The count as the ring draws it, or [NO_COUNT] where it has been given up. */
     fun countLabel(reps: Int, withheld: Boolean = false): String = if (withheld) NO_COUNT else "$reps"
+
+    /**
+     * The live velocity as the in-set screen draws it: signed, two decimals,
+     * and `Locale.US` so a decimal comma cannot appear beside an `m/s` label.
+     *
+     * A SEAM CARRYING TODAY'S ANSWER, characterized and not endorsed.
+     * `RecordScreen` formats this line unguarded, and a withheld set drops the
+     * tracker and resets `LiveSetState`, so the figure is frozen at 0.0 and the
+     * line reads `+0.00 m/s` for the rest of the set -- a measurement where
+     * there is no longer an integrator. That is the repo's *absence rendered as
+     * a value* class and it is what #280's red differential and its fix, each
+     * in its own commit, replace. This commit changes nothing on screen.
+     */
+    fun velocityLabel(velocityMps: Double, withheld: Boolean = false): String = if (withheld) {
+        String.format(Locale.US, "%+.2f", 0.0)
+    } else {
+        String.format(Locale.US, "%+.2f", velocityMps)
+    }
 
     /**
      * The explosive ring's fill, 0 where nothing was prescribed and 0 where the

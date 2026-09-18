@@ -2329,7 +2329,7 @@ private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                String.format(Locale.US, "%+.2f", state.live.velocityMps),
+                LiveCountReadout.velocityLabel(state.live.velocityMps, state.liveCountWithheld),
                 style = MaterialTheme.typography.displayMedium,
                 color = velocityColor(state.live.phase),
             )
