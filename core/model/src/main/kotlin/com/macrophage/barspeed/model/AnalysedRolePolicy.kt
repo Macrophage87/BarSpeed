@@ -136,9 +136,16 @@ data class AnalysedRoleChoice(
  *    make, and with a partner below [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]
  *    the alternative is a buffer the analysis would refuse: basis
  *    [AnalysedRoleBasis.DECLARED].
- * 4. EXACTLY ONE UNIT'S SIGNATURE SAYS STACK: that unit is analysed, basis
+ * 4. EVERY ANALYSABLE UNIT MUST HAVE BEEN READ. A role whose signal is
+ *    [StackMountSignal.UNMEASURED], or which has no entry at all, is one
+ *    nothing measured -- absence, not a failed candidate -- so there is no
+ *    pair to tell apart and no verdict to publish: basis
+ *    [AnalysedRoleBasis.DECLARED]. Reading it as "not on the stack" would
+ *    leave the unit that WAS read as the only candidate and move the analysis
+ *    on one of the two streams.
+ * 5. EXACTLY ONE UNIT'S SIGNATURE SAYS STACK: that unit is analysed, basis
  *    [AnalysedRoleBasis.STACK_SIGNATURE].
- * 5. NEITHER OR BOTH: the armed unit stands, basis
+ * 6. NEITHER OR BOTH: the armed unit stands, basis
  *    [AnalysedRoleBasis.DECLARED]. Both is the ordinary shape of a machine
  *    whose two units are both on the stack -- field-43's seated leg curls
  *    measure 1.6 and 0.3 degrees -- and neither happens on a set where both
@@ -191,6 +198,8 @@ object AnalysedRolePolicy {
         if (!declaresStackMount || armed == null) return declared
         val analysable = SensorCapturePolicy.analysable(expected, framesByRole)
         if (analysable.size < 2) return declared
+        val read = analysable.map { signalByRole[it] ?: StackMountSignal.UNMEASURED }
+        if (read.any { it == StackMountSignal.UNMEASURED }) return declared
         val onStack = analysable.filter { signalByRole[it] == StackMountSignal.ON_STACK }
         val single = onStack.singleOrNull() ?: return declared
         return AnalysedRoleChoice(single, fellBack = false, basis = AnalysedRoleBasis.STACK_SIGNATURE)
