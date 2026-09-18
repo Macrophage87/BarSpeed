@@ -183,6 +183,73 @@ class AnalysedRolePolicyTest {
         assertEquals(AnalysedRoleBasis.DECLARED, choice.basis)
     }
 
+    /**
+     * DIFFERENTIAL, round 1 of review. ONE-SIDED EVIDENCE IS NOT A VERDICT.
+     *
+     * The armed unit's roll says it rode the stack and its partner's working
+     * window held too few samples to say anything at all, so the two units
+     * were NOT told apart: one was read and the other was not. The basis
+     * published on this set claims a rule chose between two rolls, which a
+     * reader cannot tell from a set where both were measured and one won.
+     * [AnalysedRoleBasis.DECLARED]'s own KDoc already names this case -- "both
+     * still, or neither still, or one of them unmeasured" -- and the filter
+     * that treats [StackMountSignal.UNMEASURED] as a failed candidate rather
+     * than as a missing reading contradicts it.
+     */
+    @Test
+    fun `an armed unit reading on stack beside an unmeasured partner is not told apart`() {
+        val choice =
+            choose(
+                signals = mapOf(
+                    SensorRole.A to StackMountSignal.ON_STACK,
+                    SensorRole.B to StackMountSignal.UNMEASURED,
+                ),
+            )
+
+        assertEquals(SensorRole.A, choice.role)
+        assertEquals(AnalysedRoleBasis.DECLARED, choice.basis, "a signature verdict on one measured unit")
+        assertFalse(choice.fellBack)
+    }
+
+    /**
+     * THE SAME DEFECT WITH THE CONSEQUENCE ON IT, and the reason this pair is
+     * not one test twice: here the unmeasured unit is the ARMED one, so the
+     * analysis MOVES onto the partner -- every velocity, ROM, tempo and power
+     * figure the set publishes comes off a different unit -- on evidence that
+     * read one of the two streams. The declaration still describes the armed
+     * unit; nothing has been measured that says it does not.
+     */
+    @Test
+    fun `an unmeasured armed unit does not lose the analysis to its partner`() {
+        val choice =
+            choose(
+                signals = mapOf(
+                    SensorRole.A to StackMountSignal.UNMEASURED,
+                    SensorRole.B to StackMountSignal.ON_STACK,
+                ),
+            )
+
+        assertEquals(SensorRole.A, choice.role, "the analysis moved on one stream's roll")
+        assertEquals(AnalysedRoleBasis.DECLARED, choice.basis)
+        assertFalse(choice.fellBack)
+    }
+
+    /**
+     * A ROLE WITH NO ENTRY IS THE SAME ABSENCE, and it is pinned separately
+     * because a guard written as `signal == UNMEASURED` is false for a missing
+     * key and would leave this half of the defect standing. `choose`'s own
+     * `@param` says a missing key is [StackMountSignal.UNMEASURED]; this is
+     * what holds the two spellings to one behaviour.
+     */
+    @Test
+    fun `a role with no signal at all does not lose the analysis to its partner`() {
+        val choice = choose(signals = mapOf(SensorRole.B to StackMountSignal.ON_STACK))
+
+        assertEquals(SensorRole.A, choice.role, "the analysis moved with one role unread")
+        assertEquals(AnalysedRoleBasis.DECLARED, choice.basis)
+        assertFalse(choice.fellBack)
+    }
+
     /** A role with no entry at all reads the same way, rather than defaulting to a verdict. */
     @Test
     fun `a set nothing measured is analysed as declared`() {
