@@ -64,12 +64,12 @@
               "artefactSamples": 0 },
             { "ecc_s": 4.1, "bottomPause_s": 0.2, "con_s": 1.0, "meanConVel_mps": 0.48, "peakConVel_mps": 0.8, "meanEccVel_mps": -0.15, "rom_m": 0.6, "peakPower_w": 933.4,
               "artefactSamples": 0 },
-            { "ecc_s": 3.7, "bottomPause_s": 0.2, "con_s": 1.1, "meanConVel_mps": 0.46, "peakConVel_mps": 0.78, "meanEccVel_mps": -0.15, "rom_m": 0.59, "peakPower_w": 921.0,
+            { "ecc_s": 3.7, "bottomPause_s": 0.2, "con_s": 1.1, "meanConVel_mps": 0.46, "peakConVel_mps": 0.92, "meanEccVel_mps": -0.15, "rom_m": 0.59, "peakPower_w": 1102.4,
               "artefactSamples": 1 },
             { "ecc_s": 3.2, "bottomPause_s": 0.1, "con_s": 1.3, "meanConVel_mps": 0.45, "peakConVel_mps": 0.74, "meanEccVel_mps": -0.17, "rom_m": 0.6, "peakPower_w": 905.6,
               "artefactSamples": 0 }
           ],
-          "summary": { "meanConVel_mps": 0.48, "peakConVel_mps": 0.85, "meanEcc_s": 3.74, "meanCon_s": 1.02, "meanRom_m": 0.6, "romSpread_pct": 4.2 }
+          "summary": { "meanConVel_mps": 0.48, "peakConVel_mps": 0.85, "meanEcc_s": 3.74, "meanCon_s": 1.02, "meanRom_m": 0.6, "romSpread_pct": 4.2, "peakPower_w": 980.2 }
         },
         {
           "load_kg": 110,

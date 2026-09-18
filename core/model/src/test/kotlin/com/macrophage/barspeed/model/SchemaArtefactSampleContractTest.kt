@@ -128,6 +128,13 @@ class SchemaArtefactSampleContractTest {
      * The published example carries both keys, including a set-level count on a
      * set whose reps carry one, so the ajv step in `ci.yml` actually validates
      * the blocks rather than passing a document that never exercises them.
+     *
+     * And it exercises their EFFECT, not only their shape: the marked rep is
+     * the set's fastest and most powerful row, so the summary's peak pair is
+     * the maximum over the reps carrying no count and a consumer taking the
+     * naive maximum over every row reads a different number. Round 2 finding 7
+     * -- the marked rep used to be the set's FOURTH fastest, which left the
+     * document demonstrating nothing about either key's narrowing.
      */
     @Test
     fun `the example publishes both counts, including a zero`() {
@@ -137,6 +144,22 @@ class SchemaArtefactSampleContractTest {
             .flatMap { it["repMetrics"]?.jsonArray.orEmpty() }
             .mapNotNull { it.jsonObject["artefactSamples"]?.jsonPrimitive?.content?.toInt() }
         assertEquals(listOf(0, 0, 0, 0, 1), repCounts.sorted(), "per-rep artefactSamples in the published example")
+
+        val marked = exampleSets().single { it["artefactSamples"]?.jsonPrimitive?.content?.toInt() == 3 }
+        val rows = marked["repMetrics"]!!.jsonArray.map { it.jsonObject }
+        val summary = marked["summary"]!!.jsonObject
+        listOf("peakConVel_mps", "peakPower_w").forEach { key ->
+            val naive = rows.maxOf { it[key]!!.jsonPrimitive.content.toDouble() }
+            val eligible = rows
+                .filter { it["artefactSamples"]!!.jsonPrimitive.content.toInt() == 0 }
+                .maxOf { it[key]!!.jsonPrimitive.content.toDouble() }
+            assertTrue(naive > eligible, "the marked rep is not the set's largest $key, so the example shows nothing")
+            assertEquals(
+                eligible,
+                summary[key]!!.jsonPrimitive.content.toDouble(),
+                "summary.$key is not the maximum over the reps carrying no count",
+            )
+        }
     }
 
     /**

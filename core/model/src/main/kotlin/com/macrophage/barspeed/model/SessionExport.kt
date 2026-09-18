@@ -1672,9 +1672,10 @@ data class SessionExport(
          * rule, from the same NINE detections. field-43 set 5 is an 83.9 kg
          * deadlift that publishes 4347.4 W, from samples where the
          * accelerometer RAILS at its own 16 g full scale, and publishes 722.3 W.
-         * field-42 sets 5 and 7 and field-37 set 3 move too; five published
-         * figures in the committed corpus do NOT, and
-         * `ArtefactPeakWithholdingTest` names each of them.
+         * field-42 sets 5 and 7 and field-37 set 3 move too; six published
+         * figures in the committed corpus do NOT, five of them still
+         * implausible and one -- field-42 set 13 at 244.3 W -- needing no
+         * movement, and `ArtefactPeakWithholdingTest` names each of them.
          *
          * WHY A COUNT AND NOT A REPAIR, which is the design decision a reader
          * should know was taken deliberately. Substituting an out-of-range
@@ -2949,6 +2950,13 @@ data class GeometrySourceExport(
 @Serializable
 data class SetSummaryExport(
     @SerialName("meanConVel_mps") val meanConVelMps: Double? = null,
+    /**
+     * Best instantaneous concentric (drive) velocity across the set, m/s. Over
+     * the reps whose own span carries no sample above the physical bound, from
+     * schema 1.21 -- see `artefactSamples`; a consumer taking the max over
+     * `repMetrics[].peakConVel_mps` will not reproduce this figure on a set
+     * whose `artefactSamples` is positive.
+     */
     @SerialName("peakConVel_mps") val peakConVelMps: Double? = null,
     @SerialName("meanEcc_s") val meanEccS: Double? = null,
     @SerialName("meanCon_s") val meanConS: Double? = null,
@@ -2960,7 +2968,13 @@ data class SetSummaryExport(
      * dispersion is undefined there. See SetAnalyzer.romSpreadPct.
      */
     @SerialName("romSpread_pct") val romSpreadPct: Double? = null,
-    /** Best instantaneous concentric power across the set, watts. */
+    /**
+     * Best instantaneous concentric power across the set, watts. Over the reps
+     * whose own span carries no sample above the physical bound, from schema
+     * 1.21 -- see `artefactSamples`; a consumer taking the max over
+     * `repMetrics[].peakPower_w` will not reproduce this figure on a set whose
+     * `artefactSamples` is positive.
+     */
     @SerialName("peakPower_w") val peakPowerW: Double? = null,
     /** Mean of per-rep average concentric power, watts. */
     @SerialName("meanConPower_w") val meanConPowerW: Double? = null,

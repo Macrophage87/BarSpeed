@@ -459,6 +459,13 @@ private fun SetVelocityBars(record: SetRecordEntity, analysis: SetAnalysis) {
     // Olympic-lift style movements are judged on peak velocity, not mean.
     val explosive = ExerciseDef.seedById(record.exerciseId)?.kind == ExerciseKind.EXPLOSIVE
     SectionCaption(if (explosive) "Peak velocity (m/s)" else "Mean concentric velocity (m/s)")
+    // EVERY REP, and the shading reference is the UNFILTERED maximum of this
+    // list -- a rep whose span carries a sample above the physical bound is
+    // shaded against it like any other. Narrowing the list while still drawing
+    // that rep's bar would shade the tallest bar on screen as a large loss
+    // against a smaller best; `AccelArtefact.peakEligible`'s KDoc carries the
+    // reasoning, and the SET-level claim it narrows is `powerSummary`'s, not
+    // this chart's (#290).
     val velocities = analysis.reps.map { if (explosive) it.peakConVelMps else it.meanConVelMps }
     RepBars(
         values = velocities,

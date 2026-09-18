@@ -4008,7 +4008,8 @@ internal fun PeakVelocityChart(analysis: SetAnalysis, verdicts: List<String>) {
     // the maximum of the values it is handed, so narrowing this list while still
     // drawing that rep's bar would shade the tallest bar on screen as a large
     // loss against a smaller best. AccelArtefact.peakEligible's KDoc carries the
-    // reasoning. The inflated per-rep rom_m still visible here is #291.
+    // reasoning. The per-rep bars a withheld rep contributes are still that
+    // rep's own inflated peak; the residue behind them is #291.
     val peaks = analysis.reps.map { it.peakConVelMps }
     RepBars(
         values = peaks,

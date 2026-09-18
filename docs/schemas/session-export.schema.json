@@ -346,7 +346,8 @@
               "type": "number"
             },
             "peakConVel_mps": {
-              "type": "number"
+              "type": "number",
+              "description": "Best instantaneous concentric (drive) velocity across the set, metres per second. Over the reps whose own span carries no sample above the physical bound, from schema 1.21 -- see artefactSamples; a consumer taking the max over repMetrics[].peakConVel_mps will not reproduce this figure on a set whose artefactSamples is positive."
             },
             "meanEcc_s": {
               "type": "number"
@@ -365,7 +366,7 @@
             "peakPower_w": {
               "type": "number",
               "minimum": 0,
-              "description": "Best instantaneous concentric (drive) power across the set, watts."
+              "description": "Best instantaneous concentric (drive) power across the set, watts. Over the reps whose own span carries no sample above the physical bound, from schema 1.21 -- see artefactSamples; a consumer taking the max over repMetrics[].peakPower_w will not reproduce this figure on a set whose artefactSamples is positive."
             },
             "meanConPower_w": {
               "type": "number",

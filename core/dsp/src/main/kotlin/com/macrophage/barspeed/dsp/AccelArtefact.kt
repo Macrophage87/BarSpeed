@@ -120,6 +120,14 @@ import com.macrophage.barspeed.model.ImuSample
  *
  * The other visible residue on these captures is the inflated per-rep `rom_m`,
  * which is issue #291 and is not this rule's to fix.
+ *
+ * ONE MORE REMAINDER, on a published key rather than a chip alone:
+ * `velocityLoss_pct` takes its reference as a maximum over every rep's MEAN
+ * drive velocity (`VelocityLoss.of`, and `SetAnalyzer`'s velocity-loss-stop
+ * verdict does the same), over the UNFILTERED rep list -- so a marked rep can
+ * still set it. A mean is not diluted by the integrator's step the way it is by
+ * one acceleration sample, and nothing here measures how far it moves. It is
+ * NOT narrowed by this change.
  */
 object AccelArtefact {
     /**
