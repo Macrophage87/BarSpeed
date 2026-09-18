@@ -68,6 +68,25 @@ data class RepAnalysis(
      * a reader of the per-rep row why.
      */
     val artefactSamples: Int? = null,
+    /**
+     * Whether the analysis can BOUND this rep's displacement: whether the ZUPT
+     * pass pinned the velocity integral to zero at both ends of this rep's own
+     * span with no other rep sharing the interval. [RomBound] holds the rule and
+     * its derivation; issue #291.
+     *
+     * FALSE DOES NOT MEAN [romM] IS WRONG and true does not mean it is right.
+     * The bound is on what the drift correction was licensed to remove, never on
+     * the residual an uncorrected bias leaves. What false says is that one
+     * interval's whole drift budget was spent across several reps, so this rep's
+     * travel rests on nothing the analysis can state a limit for.
+     *
+     * Null and false are different facts, the doctrine [artefactSamples]
+     * already carries: null means this rep was analysed before the question was
+     * asked, and a stored analysis cannot recover the answer from anything else
+     * it holds. [RomBound.boundedReps] KEEPS a null rep, so no archived set
+     * loses a figure it has always published.
+     */
+    val romBounded: Boolean? = null,
 )
 
 @Serializable
@@ -429,7 +448,7 @@ object SetAnalyzer {
         val artefacts = AccelArtefact.indices(samples)
         val detected =
             within.mapIndexed { idx, span ->
-                repMetrics(idx, span, series, direction, loadKg, config, artefacts)
+                repMetrics(idx, span, series, direction, loadKg, config, artefacts, spans)
             }
         // Refused HERE, for the reason the cue bound is applied where it is:
         // everything below reads one list, so a rule applied at any consumer
@@ -546,6 +565,7 @@ object SetAnalyzer {
         loadKg: Double?,
         config: DspConfig,
         artefacts: List<Int>,
+        allSpans: List<RepSpan>,
     ): RepAnalysis {
         // Sign so that the drive always reads positive, whichever way it moves:
         // a leg curl's concentric goes down, and reporting it as -0.4 m/s would
@@ -631,6 +651,12 @@ object SetAnalyzer {
             // and `ArtefactPeakWithholdingTest` names the five published
             // figures containment leaves standing.
             artefactSamples = AccelArtefact.countIn(artefacts, AccelArtefact.spanOf(span)),
+            // Whether the ZUPT pass bounded this rep's displacement (#291).
+            // Read against EVERY segmented span, not the bounded list this
+            // detection came from: a detection some later bound excluded still
+            // sat inside the inter-anchor interval and still spent its drift
+            // budget. [RomBound] is the one statement of the rule.
+            romBounded = RomBound.bounded(span, allSpans, series.anchorIndices),
         )
     }
 
