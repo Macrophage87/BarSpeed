@@ -16,25 +16,29 @@ import kotlin.test.assertTrue
  *
  * ## The column
  *
- * At most ONE rep per set is bounded, and on nine of the eleven captures none
- * is. That is the finding rather than a side effect of it: an anchor is accepted
- * only in a genuinely quiet window, and on a working set the bar never goes
- * quiet, so the whole working window is one uncorrected integration interval
- * shared by every rep in it.
+ * NOT ONE REP OF THE ELEVEN IS BOUNDED. That is the finding rather than a side
+ * effect of it, and it has two halves. An anchor is accepted only in a genuinely
+ * quiet window, and on a working set the bar never goes quiet, so the whole
+ * working window is one uncorrected integration interval shared by every rep in
+ * it. And where a rep does sit alone in an interval, the anchor that closed the
+ * interval was taken by ANCHOR STARVATION, which caps nothing -- `AnchorRouteTest`
+ * measures the three spans a route-blind rule admitted and the 1.0180 m, 5.0198 m
+ * and 2.3153 m the correction erased across their intervals, against the 0.10 m
+ * cap the rule cites.
  *
  * The consequence for the lifter, which is what issue #291 is about: a
- * dispersion figure needs [RomBound.MIN_BOUNDED_REPS] bounded reps, so
- * `romSpread_pct` is withheld on every capture in this corpus instead of reading
- * 98.1 %, 96.9 % or 87.4 %. The commit that narrows it is separate from the one
- * this test arrives in.
+ * dispersion figure needs [RomBound.MIN_BOUNDED_REPS] bounded reps and a mean
+ * needs one, so `romSpread_pct` is withheld on every capture in this corpus
+ * instead of reading 98.1 %, 96.9 % or 87.4 %, and `meanRom_m` is withheld on
+ * every one of them too.
  *
  * ## What is NOT claimed
  *
- * That the two bounded reps are correct. `RomBound`'s own KDoc states the
- * limit: the cap bounds the travel the drift correction was licensed to REMOVE,
- * never the residual an uncorrected non-linear bias leaves, and no machine in
- * this corpus but the leg-curl rail has an independently known travel to check a
- * figure against.
+ * That an unbounded rep's `rom_m` is wrong. `RomBound`'s own KDoc states the
+ * limit in both directions: the cap bounds the travel the drift correction was
+ * licensed to REMOVE, never the residual an uncorrected non-linear bias leaves,
+ * and no machine in this corpus but the leg-curl rail has an independently known
+ * travel to check a figure against.
  */
 class RomBoundCorpusTest {
     private data class Expected(val fixture: String, val reps: Int, val bounded: Int)
@@ -46,15 +50,15 @@ class RomBoundCorpusTest {
         Expected("field-cablerow-3010-8rep-s42-set09", 4, 0),
         Expected("field-pullup-3010-8rep-s42-set11", 9, 0),
         Expected("field-pullup-4010-8rep-s42-set13", 9, 0),
-        Expected("field-deadlift-straight-5rep-s43-set04", 9, 1),
+        Expected("field-deadlift-straight-5rep-s43-set04", 9, 0),
         Expected("field-deadlift-straight-5rep-s43-set05", 7, 0),
         Expected("field-deadlift-straight-5rep-s43-set06", 7, 0),
-        Expected("field-assistedpullup-3010-s37-set08", 7, 1),
+        Expected("field-assistedpullup-3010-s37-set08", 7, 0),
         Expected("field-ohp-prepinflated-s37-set03", 11, 0),
     )
 
     @Test
-    fun `at most one rep per capture is bounded, and on nine of eleven none is`() {
+    fun `no capture in the corpus publishes a bounded rep`() {
         column.forEach { e ->
             val a = ArtefactCorpus.analyse(ArtefactCorpus.cases.first { it.fixture == e.fixture })
             assertEquals(e.reps, a.reps.size, "${e.fixture} detections")
@@ -67,8 +71,8 @@ class RomBoundCorpusTest {
             // for every detection, so null can only mean a stored analysis.
             assertEquals(0, a.reps.count { it.romBounded == null }, "${e.fixture} reps with no answer")
         }
-        assertEquals(9, column.count { it.bounded == 0 }, "captures with no bounded rep at all")
-        assertEquals(2, column.count { it.bounded == 1 }, "captures with exactly one")
+        assertEquals(11, column.count { it.bounded == 0 }, "captures with no bounded rep at all")
+        assertTrue(column.none { it.bounded >= 1 }, "no capture can state a mean")
         assertTrue(column.none { it.bounded >= RomBound.MIN_BOUNDED_REPS }, "no capture can state a dispersion")
     }
 
@@ -87,30 +91,39 @@ class RomBoundCorpusTest {
     }
 
     @Test
-    fun `the two bounded reps in the corpus are named, not left as a count`() {
-        // So a reader can check the rule did what its derivation says: each of
-        // these detections is the only one between two accepted anchors.
+    fun `the two reps a route-blind rule called bounded are named, and neither is`() {
+        // RED AT THE COMMIT THAT ADDS THIS. These are the only two reps the rule
+        // ever admitted, and each sits in an interval a starvation anchor closed
+        // after erasing 1.0180 m and 5.0198 m -- ten and fifty times the 0.10 m
+        // the rule's own derivation cites, on reps publishing 0.351 m and
+        // 0.200 m. AnchorRouteTest is the measurement.
+        //
+        // Each rep's own rom_m is asserted unchanged beside its flag, because
+        // that is the whole terms of the trade: the SET-LEVEL claim narrows and
+        // no per-rep figure moves.
         val four = ArtefactCorpus.analyse(
             ArtefactCorpus.cases.first { it.fixture == "field-deadlift-straight-5rep-s43-set04" },
         )
-        assertEquals(listOf(7), four.reps.filter { it.romBounded == true }.map { it.index }, "field-43 set 4")
-        assertEquals(0.351, four.reps[7].romM, "and its rom_m, on a 61.2 kg deadlift")
+        assertEquals(emptyList(), four.reps.filter { it.romBounded == true }.map { it.index }, "field-43 set 4")
+        assertEquals(false, four.reps[7].romBounded, "field-43 set 4 rep 7")
+        assertEquals(0.351, four.reps[7].romM, "and its rom_m, on a 61.2 kg deadlift, unchanged")
 
         val eight = ArtefactCorpus.analyse(
             ArtefactCorpus.cases.first { it.fixture == "field-assistedpullup-3010-s37-set08" },
         )
-        assertEquals(listOf(5), eight.reps.filter { it.romBounded == true }.map { it.index }, "field-37 set 8")
-        assertEquals(0.2, eight.reps[5].romM, "and its rom_m, on an assisted pull-up")
+        assertEquals(emptyList(), eight.reps.filter { it.romBounded == true }.map { it.index }, "field-37 set 8")
+        assertEquals(false, eight.reps[5].romBounded, "field-37 set 8 rep 5")
+        assertEquals(0.2, eight.reps[5].romM, "and its rom_m, on an assisted pull-up, unchanged")
     }
 
     @Test
-    fun `field-42 set 11 has a bounded SPAN and no bounded REP, because its own Done cue excluded it`() {
+    fun `field-42 set 11 is where the span population and the published reps differ`() {
         // The one place the two populations differ, stated rather than left to be
         // discovered. RomBound judges spans and is handed EVERY segmented span;
         // SetAnalyzer publishes the spans its cue and work-start bounds kept. On
-        // this capture the only span alone in an inter-anchor interval is one of
-        // the two that began after the set was called over, so the set publishes
-        // no bounded rep.
+        // this capture the only span a route-blind rule left alone in an
+        // inter-anchor interval is one of the two that began after the set was
+        // called over, so even that rule published no bounded rep here.
         val case = ArtefactCorpus.cases.first { it.fixture == "field-pullup-3010-8rep-s42-set11" }
         val samples = ArtefactCorpus.load(case.fixture)
         val anchored = VelocityEstimator.estimate(samples, DspConfig(), case.direction.measuredPlane)

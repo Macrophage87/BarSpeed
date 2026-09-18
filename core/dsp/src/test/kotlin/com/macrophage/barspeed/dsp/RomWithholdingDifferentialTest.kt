@@ -105,6 +105,25 @@ class RomWithholdingDifferentialTest {
     }
 
     @Test
+    fun `no capture publishes a mean range either, because none has a bounded rep`() {
+        // RED AT THE COMMIT THAT ADDS THIS, on two of the eleven. `meanRom_m` is
+        // Exporters' figure over RomBound.boundedReps and needs only ONE bounded
+        // rep, so withholding it needs an empty population rather than a small
+        // one -- and today field-43 set 4 publishes 0.351 m and field-37 set 8
+        // publishes 0.200 m, each from the single rep the route-blind rule
+        // admitted. AnchorRouteTest measures the 1.0180 m and 5.0198 m the
+        // correction erased across those reps' own intervals.
+        ArtefactCorpus.cases.forEach { case ->
+            val a = ArtefactCorpus.analyse(case)
+            assertEquals(
+                emptyList(),
+                RomBound.boundedReps(a.reps).map { it.index },
+                "${case.fixture} reps a range claim may be taken over",
+            )
+        }
+    }
+
+    @Test
     fun `the rep count and every per-rep figure are untouched by the withholding`() {
         // Green in both states, and asserted because it is the whole terms of the
         // trade: the SET-LEVEL claim narrows and nothing else moves. The bars on
