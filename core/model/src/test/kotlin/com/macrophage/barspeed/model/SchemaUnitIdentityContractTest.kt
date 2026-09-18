@@ -4,11 +4,13 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalSerializationApi::class)
 private fun serialKeysOf(serializer: KSerializer<*>): Set<String> =
@@ -18,15 +20,21 @@ private fun serialKeysOf(serializer: KSerializer<*>): Set<String> =
  * What the published export says about WHICH PHYSICAL UNIT carried each sensor
  * role, issue #260.
  *
- * CHARACTERIZATION, at this commit: it says nothing. The block names roles `a`
- * and `b` and the lifter, holding two identical WT901 units, cannot tell which
- * one either name refers to -- *"I'm not really sure. Will check each time,
- * they're likely to get mixed up a lot."* (owner, 2026-09-05, on which unit is
- * role a). Every dual-unit mount inference in the corpus therefore rests on
- * the owner's memory of which unit went where.
+ * DIFFERENTIALS. Every assertion here fails at the commit that writes it: the
+ * document declares no such key, the Kotlin twin carries none, the version log
+ * files no such change, and the published example names no unit. The commit
+ * after this one is what makes them pass. The commit BEFORE it pinned the same
+ * four facts the other way round, which is what makes these four a change
+ * rather than four new claims.
  *
- * These assertions are the BEFORE side. The commit that flips them is the
- * differential, and the one after that is what makes them pass.
+ * WHY THE LIFTER NEEDS IT, in the owner's own words, asked which physical unit
+ * was role a on field-38: *"I'm not really sure. Will check each time, they're
+ * likely to get mixed up a lot."* (2026-09-05). Roles are not positional --
+ * `SensorCapturePolicy.roster` reads `roleByAddress`, the label the lifter gave
+ * each paired unit -- so role a IS one fixed unit for as long as the pairing
+ * stands, and the lifter holding two identical magnet-mounted WT901 units
+ * cannot tell which. Every dual-unit mount inference in the corpus rests on
+ * that memory.
  *
  * A separate file rather than cases in [SchemaContractTest], which sits on
  * detekt's LargeClass limit, and rather than in [SchemaSensorContractTest],
@@ -45,50 +53,139 @@ class SchemaUnitIdentityContractTest {
     private fun exportVersionLog() = schema("session-export.schema.json")["properties"]!!
         .jsonObject["schemaVersion"]!!.jsonObject["description"]!!.jsonPrimitive.content
 
+    /** Everything the version log says from its LAST `1.21:` marker onward. */
+    private fun entry121() = exportVersionLog().substringAfterLast("1.21:")
+
     /**
-     * The published sensors block declares no key naming a unit.
+     * The published sensors block names the unit behind each role, keyed by the
+     * role, with the addresses as free-form strings.
      *
-     * `$defs.setSensors` is `additionalProperties: false`, so this is not a
-     * gap a writer could fill unilaterally: until the document declares the
-     * key, an export carrying it is INVALID against the contract its consumer
-     * was pointed at.
+     * ROLE-KEYED and not an array of objects, which is `silent`'s shape in this
+     * same block and is what makes "role a is this unit" one lookup rather than
+     * a scan with a match. `propertyNames` closes the key set to the two roles
+     * the app can label, so a third key cannot appear without this pin moving.
+     *
+     * The VALUE is an unconstrained string on purpose. A MAC pattern here would
+     * be a claim about what a Bluetooth stack hands the app -- these addresses
+     * come from `BluetoothDevice.getAddress()` and nothing in this repository
+     * has ever validated one -- and a document rejected for a shape a real
+     * phone produced would lose the whole export over a regex.
      */
     @Test
-    fun `the published sensors block names no physical unit`() {
-        assertNull(
+    fun `the published sensors block names the unit behind each role`() {
+        val units = assertNotNull(
             sensorProperties()["unitAddresses"],
-            "the published sensors block already names the units, so this pin is not the before side",
+            "the published sensors block still names no physical unit",
+        ).jsonObject
+
+        assertEquals("object", units["type"]!!.jsonPrimitive.content, "a role-keyed object, as silent is")
+        assertEquals(
+            setOf("a", "b"),
+            units["propertyNames"]!!.jsonObject["enum"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet(),
+            "the key set is not closed to the roles the app can label",
+        )
+        assertEquals(
+            "string",
+            units["additionalProperties"]!!.jsonObject["type"]!!.jsonPrimitive.content,
+            "an address is published as a string",
+        )
+        assertTrue(
+            units["description"]!!.jsonPrimitive.content.isNotBlank(),
+            "the published unitAddresses carries no description, which is the shape of issue #76",
+        )
+        assertTrue(
+            "unitAddresses" !in setSensors()["required"]!!.jsonArray.map { it.jsonPrimitive.content },
+            "a key no one-sensor set can publish must not be required",
         )
     }
 
     /**
-     * The Kotlin twin carries no such key either, which is why the export
-     * cannot publish one.
+     * The Kotlin twin carries the same key, because nothing can publish what it
+     * cannot hold.
      *
      * [SchemaContractTest] asserts these two key sets are EQUAL, so neither
-     * side can move alone: that is what makes adding a field here a contract
-     * change rather than an addition.
+     * side can move alone: that assertion is what turns "add a field to
+     * `SetSensorsExport`" into a contract change that has to move the document
+     * in the same commit, and this is where the reason is written down.
      */
     @Test
-    fun `the export twin carries no unit key`() {
-        assertFalse(
+    fun `the export twin carries the unit key too`() {
+        assertTrue(
             "unitAddresses" in serialKeysOf(SetSensorsExport.serializer()),
-            "SetSensorsExport already carries a unit key, so this pin is not the before side",
+            "SetSensorsExport cannot publish which unit carried a role",
+        )
+        assertEquals(
+            serialKeysOf(SetSensorsExport.serializer()),
+            sensorProperties().keys,
+            "SetSensorsExport and the published sensors block disagree on keys",
         )
     }
 
     /**
-     * And the version log records no such change.
+     * The version log files the change as a FURTHER 1.21 entry, states it is
+     * additive, and states the one thing a reader must not assume: the
+     * addresses are the pairing read AT EXPORT TIME, not a fact recorded with
+     * the set.
      *
-     * The log is the only place a reader learns what a version number means,
-     * and a key published without an entry is a key nobody downstream can
-     * date.
+     * A further entry rather than a mint, because 1.21 is UNRELEASED on `main`:
+     * `git tag --sort=-creatordate | head -1` is v0.1.53 and `git show
+     * v0.1.53:core/model/.../SessionExport.kt` reads `SCHEMA_VERSION = "1.20"`,
+     * both read this round rather than relayed from the entries above.
+     *
+     * The export-time caveat is asserted and not merely written because it is
+     * the whole difference between this key and a column: nothing in
+     * `RawStreamEntity` or `SetRecordEntity` stores the address a capture came
+     * from, so a reader who takes this for a recorded fact would attribute a
+     * capture to whichever unit happens to hold the label today.
      */
     @Test
-    fun `the version log records no unit identity yet`() {
-        assertFalse(
-            "unitAddresses" in exportVersionLog(),
-            "the version log already files a unit-identity change, so this pin is not the before side",
+    fun `the version log files the unit identity as a further additive 1_21 entry`() {
+        val entry = entry121()
+        assertTrue("unitAddresses" in entry, "the version log does not file the unit-identity change")
+        assertTrue(
+            "ADDITIVE" in entry.uppercase(),
+            "the log does not say whether a 1.21 reader written before this key is affected",
         )
+        assertTrue(
+            "export time" in entry,
+            "the log does not say the addresses are the pairing as it stands at export time",
+        )
+    }
+
+    /**
+     * The published example carries the key, so `ci.yml`'s ajv step actually
+     * validates it.
+     *
+     * A declared key no example exercises is a key ajv never sees: the schema
+     * step would pass on a document shape nothing has ever been checked
+     * against. Asserted over the example's own dual set -- the one whose
+     * `sensors` block declares two roles -- because that is the only set an
+     * `unitAddresses` may appear on.
+     */
+    @Test
+    fun `the published example names both units on its dual set`() {
+        val sets =
+            schema("examples/session-export.example.json")["exercises"]!!.jsonArray
+                .flatMap { it.jsonObject["sets"]!!.jsonArray }
+        val dual =
+            assertNotNull(
+                sets.map { it.jsonObject }.firstOrNull { set ->
+                    set["sensors"]?.jsonObject?.get("expected")?.jsonArray?.size == 2
+                },
+                "the published example has no dual set, so nothing validates this key",
+            )
+        val units =
+            assertNotNull(
+                dual.getValue("sensors").jsonObject["unitAddresses"],
+                "the example's dual set names no unit, so ajv never sees this key",
+            ).jsonObject
+
+        assertEquals(setOf("a", "b"), units.keys, "the example names one unit, not the pair")
+        units.forEach { (role, address) ->
+            assertTrue(
+                address.jsonPrimitive.content.isNotBlank(),
+                "the example publishes a blank address for role $role",
+            )
+        }
     }
 }
