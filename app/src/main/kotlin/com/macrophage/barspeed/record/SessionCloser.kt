@@ -6,6 +6,7 @@ import com.macrophage.barspeed.hrm.Hrv
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.SessionCloseState
+import com.macrophage.barspeed.model.SkippedSet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +49,17 @@ private data class PendingSessionClose(
      * happened rather than to when the lifter tapped Finish.
      */
     val restHrSamples: List<HrSample>,
+    /**
+     * The prescribed sets the lifter skipped during this session (#300).
+     *
+     * Frozen for [sessionRpe]'s reason exactly: the list lives only in
+     * `RecordViewModel`'s heap, a retry cannot ask again, and `endSession`
+     * writes the column once with no correction surface anywhere. A retry that
+     * re-read the state would find whatever the state holds NOW, which after a
+     * failed close is the same list -- but nothing guarantees that, and the
+     * freeze is what makes the retry a retry.
+     */
+    val skippedSets: List<SkippedSet>,
 )
 
 /**
@@ -122,12 +134,21 @@ class SessionCloser(
         rrMs: List<Double>,
         sessionRpe: Int?,
         restHrSamples: List<HrSample>,
+        skippedSets: List<SkippedSet>,
         onState: (SessionCloseState) -> Unit,
         onClosed: () -> Unit,
     ): Boolean {
         if (asked) return false
         asked = true
-        pending = PendingSessionClose(sessionId, endedAtMs, Hrv.rmssdMs(rrMs), sessionRpe, restHrSamples)
+        pending =
+            PendingSessionClose(
+                sessionId,
+                endedAtMs,
+                Hrv.rmssdMs(rrMs),
+                sessionRpe,
+                restHrSamples,
+                skippedSets,
+            )
         run(onState, onClosed)
         return true
     }
@@ -148,7 +169,7 @@ class SessionCloser(
         scope.launch(Dispatchers.Main.immediate) {
             try {
                 p.sessionId?.let {
-                    repository.endSession(it, p.endedAtMs, p.hrvRmssdMs, p.sessionRpe)
+                    repository.endSession(it, p.endedAtMs, p.hrvRmssdMs, p.sessionRpe, p.skippedSets)
                     // AFTER the close and never before it, and the ordering is
                     // the whole of the reasoning (#109). This is a second,
                     // non-atomic write onto a row that is already durable --

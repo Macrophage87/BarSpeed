@@ -20,6 +20,7 @@ import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.VoidSetPolicy
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 /** Everything the record flow needs to persist about a finished set. */
@@ -522,11 +523,8 @@ class SessionRepository(
      * (#300), and it joins [sessionRpe] and [hrvRmssdMs] in the population the
      * guard above protects: the list is held only in `:app`'s heap while the
      * session runs, so a second close writing an empty one would erase every
-     * skip the lifter made. DECLARED AND NOT YET WRITTEN -- the write arrives in
-     * the commit after the red that asks for it, and the suppression goes with
-     * the body.
+     * skip the lifter made.
      */
-    @Suppress("UnusedParameter")
     suspend fun endSession(
         sessionId: Long,
         endedAtMs: Long,
@@ -545,6 +543,7 @@ class SessionRepository(
                 hrMaxBpm = sets.mapNotNull { it.hrMaxBpm }.maxOrNull(),
                 hrvRmssdMs = hrvRmssdMs,
                 sessionRpe = SessionRpe.accepted(sessionRpe),
+                skippedSetsJson = encodeSkippedSets(skippedSets),
             ),
         )
     }
@@ -756,6 +755,41 @@ class SessionRepository(
     } catch (e: Exception) {
         null
     }
+
+    /**
+     * The prescribed sets this session's lifter deliberately did not do (#300).
+     *
+     * EMPTY RATHER THAN NULL, because the export publishes a list and an empty
+     * one is dropped by `encodeDefaults = false`. The two states the COLUMN
+     * keeps apart -- a session that skipped nothing and a session recorded
+     * before v19 -- are deliberately not separated here:
+     * [SessionEntity.skippedSetsJson] says both mean "this row asserts no skip",
+     * and neither may be read as proof that everything prescribed was done.
+     *
+     * A column that will not decode answers empty, [decodeGeometry]'s rule and
+     * for a sharper reason than tidiness. The alternative is an export that
+     * throws, which loses the session's sets, its rest windows and its gzipped
+     * streams -- everything that cannot be recomputed -- to recover a list of
+     * set numbers that can be re-read off the plan.
+     */
+    fun decodeSkippedSets(session: SessionEntity): List<SkippedSet> = try {
+        session.skippedSetsJson?.let { json.decodeFromString(ListSerializer(SkippedSet.serializer()), it) }.orEmpty()
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    /**
+     * The skip list as the column stores it, or null where nothing was skipped.
+     *
+     * NULL AND NEVER `"[]"`. An empty array stored on every session would say
+     * each of them was checked and had none, which is the one claim that cannot
+     * be made about the archive: no build before v19 could record a skip, and a
+     * session that simply ends still drops its remainder without writing
+     * anything here.
+     */
+    private fun encodeSkippedSets(skippedSets: List<SkippedSet>): String? = skippedSets
+        .takeIf { it.isNotEmpty() }
+        ?.let { json.encodeToString(ListSerializer(SkippedSet.serializer()), it) }
 
     /**
      * The geometry this set was analysed against, or null when the row does not

@@ -36,13 +36,23 @@ data class RemoveSetTarget(
  * here, and the rule that separates them is `>= upcomingIndex`: every slot
  * before the upcoming one has already run.
  *
- * ELIGIBILITY IS `isAddedSet` AND NOTHING ELSE BESIDES THAT BOUNDARY. A slot
- * the PLAN prescribed is never removable, however unwanted -- a plan's set
- * count is how a coach reads adherence, and dropping prescribed sets would
- * corrupt exactly the reading `isAddedSet` was introduced to protect. A
- * prescribed set the lifter does not want is disposed of the way every
- * unwanted queued set always has been: by finishing the session, which drops
- * the remainder.
+ * ELIGIBILITY IS `isAddedSet` AND NOTHING ELSE BESIDES THAT BOUNDARY, and what
+ * changed in #300 is what happens to the sets this refuses. A slot the PLAN
+ * prescribed is still never removable HERE, because removing it would record
+ * nothing: a plan's set count is how a coach reads adherence, and a prescribed
+ * set that simply vanished from the queue would corrupt exactly the reading
+ * `isAddedSet` was introduced to protect.
+ *
+ * A PRESCRIBED SET IS NOW DROPPABLE, by [SkipSetControl], which is the third
+ * control of this cluster. The owner asked for it -- *"I'd also like a mechanism
+ * to remove an upcoming set"* -- and the adherence reading is kept by RECORDING
+ * the drop rather than by refusing it: a skip writes a [SkippedSet] into the
+ * session, which the export publishes under 1.21, so the document says the plan
+ * asked for four sets and three were recorded BECAUSE one was deliberately
+ * dropped. The sentence that stood here -- that a prescribed set the lifter does
+ * not want is disposed of "by finishing the session, which drops the remainder"
+ * -- is DELETED rather than reworded: finishing the session drops every
+ * remaining exercise, not one set, and it is no longer the only way.
  *
  * WHICH ONE, WHEN THERE ARE SEVERAL: the LAST appended set of the anchor's
  * block, and this object offers no way to say otherwise. Stated rather than

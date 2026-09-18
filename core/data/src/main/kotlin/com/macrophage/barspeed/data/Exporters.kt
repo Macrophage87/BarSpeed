@@ -122,6 +122,20 @@ class SessionExporter(
             // and `explicitNulls = false` drops the key rather than writing a
             // number nobody said.
             sessionRpe = session.sessionRpe,
+            // The prescribed sets the lifter dropped on purpose (#300, export
+            // 1.21). Copied off the row and gated by nothing, for the reason
+            // the rating above is: it is the lifter's own decision, not a figure
+            // aggregated from the set rows, so no gate over those rows may
+            // withhold it. `encodeDefaults = false` drops the empty list, so a
+            // session that skipped nothing publishes no key -- which is what
+            // keeps "omitted when none" true rather than aspirational.
+            //
+            // NOT written into any set, and there is no set to write it into:
+            // the skipped slot never ran. A reader counts adherence as
+            // recorded-and-not-voided over prescribed, and a skipped set
+            // published as a set of zero reps would be counted as performed by
+            // everything that counts sets.
+            skippedSets = sessionRepository.decodeSkippedSets(session),
             // The session block is aggregated from the set rows, so it must not
             // outlive them. When a session HAS sets and not one of them can
             // still say anything about heart rate, its frozen columns were

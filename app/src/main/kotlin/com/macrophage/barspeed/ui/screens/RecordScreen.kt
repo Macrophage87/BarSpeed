@@ -116,6 +116,7 @@ import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetRepsPolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.SideChoicePolicy
+import com.macrophage.barspeed.model.SkipSetControl
 import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.StartCue
 import com.macrophage.barspeed.model.StartCuePolicy
@@ -1486,6 +1487,7 @@ private fun NextSetControlsRow(state: RecordState, viewModel: RecordViewModel, s
     }
     AddSetCaption(state)
     RemoveSetSection(state, viewModel)
+    SkipSetSection(state, viewModel)
 }
 
 /**
@@ -1776,6 +1778,89 @@ private fun RemoveSetSection(state: RecordState, viewModel: RecordViewModel) {
                 several = target.removableCount > 1,
             ),
             color = BarColors.Blue,
+        )
+    }
+}
+
+/**
+ * "Not doing it? Skip Set 4 of Back squat" -- dropping an upcoming PRESCRIBED
+ * set without ending the session (#300).
+ *
+ * THE OWNER'S ASK, in their words: *"I'd also like a mechanism to remove an
+ * upcoming set."* Before this the only way to be rid of an unwanted prescribed
+ * set was FINISH SESSION, which drops every remaining exercise. A lifter who
+ * wanted to leave the last squat set and go on to the deadlifts had no control
+ * for it.
+ *
+ * THE THIRD OF THE CLUSTER, drawn directly under [RemoveSetSection] and under
+ * the same caption, so the three read as one decision about the queue rather
+ * than as three unrelated controls. Not IN the [NextSetControlsRow] FlowRow, for
+ * the reason [RemoveSetSection] gives for staying out of it: it is drawn only
+ * when there is something to skip, so in the row it would change the row's arity
+ * between renders and move the other buttons under a finger already reaching for
+ * one -- #137's stacked-target hazard.
+ *
+ * DRAWN ONLY WHERE A SET IS SKIPPABLE, which is what makes the eligibility
+ * visible rather than merely enforced. [SkipSetControl] refuses an APPENDED
+ * upcoming slot, which [RemoveSetSection] above takes back instead, and refuses
+ * a block OPENER, because dropping the first set of a block is dropping the
+ * exercise rather than a set of it. On READY the coming set is always the
+ * session's first, so nothing is drawn there at all; on the last-set branch
+ * there is no upcoming slot. The lifter never taps a control that refuses.
+ *
+ * CONFIRMED, WHERE ITS PAIR IS NOT, and the difference is what a mis-tap costs.
+ * Removing an appended set can be undone exactly -- ADD SET rebuilds it from the
+ * same standing values -- while a prescribed set's own prescription goes with
+ * it: ADD SET can queue another set of the exercise, but as an APPENDED set,
+ * carrying no `plannedReps` and publishing `added: true`. That is what
+ * [SkipSetControl.confirmBody] says, in the one place the lifter can read it,
+ * and it is the only thing they cannot work out from the screen. One tap to ask
+ * and one to confirm.
+ *
+ * WHAT IT NAMES is the slot the tap will take, out of the same
+ * [RecordState.skipSetTarget] the ViewModel acts on, so the words and the act
+ * cannot name different sets -- [RemoveSetSection]'s arrangement and #45's
+ * class of defect.
+ *
+ * NOT DESTRUCTIVE OF ANYTHING RECORDED, and this is where it differs from the
+ * void mark one screen over. The slot has not run: no row, no raw stream, no
+ * export entry. What the skip DOES write, at the session close, is the deviation
+ * itself, so a coach reading the export sees that the plan asked for four sets
+ * and three were recorded BECAUSE one was dropped on purpose.
+ */
+@Composable
+private fun SkipSetSection(state: RecordState, viewModel: RecordViewModel) {
+    val target = state.skipSetTarget ?: return
+    val slot = state.queue.getOrNull(target.skipAt) ?: return
+    var confirming by remember(state.queueIndex, state.stage) { mutableStateOf(false) }
+    TextButton(onClick = { confirming = true }) {
+        Text(
+            SkipSetControl.label(slot.exercise.displayName, target.setNumber, target.lastOfBlock),
+            color = BarColors.Blue,
+        )
+    }
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text(SkipSetControl.confirmTitle(slot.exercise.displayName, target.setNumber)) },
+            text = {
+                Text(
+                    SkipSetControl.confirmBody(slot.exercise.displayName),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BarColors.Sub,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirming = false
+                        viewModel.skipUpcomingSet()
+                    },
+                ) {
+                    Text("SKIP IT")
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirming = false }) { Text("KEEP IT") } },
         )
     }
 }

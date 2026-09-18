@@ -83,6 +83,9 @@ import com.macrophage.barspeed.model.SetRepsPolicy
 import com.macrophage.barspeed.model.SetVoicePolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.SideChoicePolicy
+import com.macrophage.barspeed.model.SkipSetControl
+import com.macrophage.barspeed.model.SkipSetTarget
+import com.macrophage.barspeed.model.SkippedSet
 import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
@@ -1792,6 +1795,70 @@ internal fun removedState(s: RecordState): RecordState? {
 }
 
 /**
+ * The state dropping an upcoming PRESCRIBED set leaves behind, or null when
+ * there is none to drop (#300).
+ *
+ * The third of the trio, and the same division of labour as the other two:
+ * [SkipSetControl.target] decides WHICH slot goes, on a projection of the queue
+ * a `:core:model` test can build; this function does the removal, the re-seed
+ * and the record, on types that live in `:app`.
+ *
+ * `internal` for [appendedState]'s reason, and called from one place,
+ * [RecordViewModel.skipUpcomingSet].
+ *
+ * THE RE-SEED ALWAYS RUNS, unlike [removedState]'s. The slot that goes IS the
+ * slot the next START would have run, by definition of the eligibility, so
+ * every editable box on the rest screen was seeded from it and the set that
+ * comes up in its place is a different set. They are re-seeded from the new
+ * upcoming slot and the stated values cleared, exactly as [jumpedState],
+ * [appendedState] and [removedState] do for the same event. Nothing is
+ * reverted; the boxes follow the set that is now coming.
+ *
+ * WHAT THE REMAINING SETS KEEP is the numbering the PLAN gave them. Nothing
+ * here renumbers a slot: a four-set block whose set 2 goes still shows
+ * "Set 3 of 4" on the set after it, which is what a coach reading the export
+ * against the plan needs. Renumbering would make the card agree with the queue
+ * and disagree with the prescription.
+ *
+ * NOTHING IS WRITTEN TO ROOM HERE, and nothing about the removed slot ever will
+ * be: it has not run, so no `set_records` row, no raw stream and no export entry
+ * exists for it. What IS written, at the session close and in one column, is the
+ * [SkippedSet] appended here -- the deviation itself, so an archive can tell a
+ * decision from a lost set. A set that HAS run is unreachable from this control:
+ * `SkipSetControl.target` only ever names `upcomingIndex`.
+ */
+internal fun skippedState(s: RecordState): RecordState? {
+    if (s.adHoc) return null
+    val target = s.skipSetTarget ?: return null
+    val at = target.skipAt
+    val slot = s.queue.getOrNull(at) ?: return null
+    val skipped = s.skippedSets + SkipSetControl.recordOf(slot.exercise.id, target)
+    val queue = s.queue.toMutableList().apply { removeAt(at) }
+    val upcoming = queue.getOrNull(at) ?: return s.copy(queue = queue, skippedSets = skipped)
+    val seedKg =
+        SetLoadPolicy.seedAddedKg(
+            hasPlannedNext = true,
+            nextDeclaredAddedKg = upcoming.loadKg,
+            lastAddedKg = null,
+        )
+    return s.copy(
+        queue = queue,
+        skippedSets = skipped,
+        loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
+        statedLoadKg = null,
+        statedTempo = null,
+        statedReps = null,
+        statedDurationS = null,
+        // Cleared with the four above it, for [removedState]'s reason: a side
+        // stated for the set that has just been skipped is not a statement about
+        // the one that moved up.
+        statedSide = null,
+        repsInput = upcoming.reps?.toString() ?: s.repsInput,
+        durationInput = upcoming.durationS?.toString() ?: s.durationInput,
+    )
+}
+
+/**
  * The state SWITCH EXERCISE leaves behind.
  *
  * A free function taking what it needs, rather than a method, for the reason
@@ -2678,6 +2745,24 @@ data class RecordState(
     /** The dot and the SETUP advice both need the whole state, not just these booleans. */
     val imuState: ConnectionState = ConnectionState.Disconnected,
     val hrmState: ConnectionState = ConnectionState.Disconnected,
+    /**
+     * The prescribed sets the lifter has skipped in this session, in the order
+     * they were dropped (#300).
+     *
+     * ON THE STATE and not in a field on [RecordViewModel], for
+     * [removeSetTarget]'s reason one control over: the close reads it and
+     * `skippedState` writes it, and a second copy beside the state is a copy
+     * that survives exactly until the two disagree.
+     *
+     * HELD IN MEMORY UNTIL THE CLOSE, which is where the whole list is written
+     * as one column. No session row exists until the first set has been
+     * durably written, so a skip taken on the way to set one has nothing to
+     * attach to; the same limit [SessionRepository.endSession] already carries
+     * for `hrvRmssdMs` and the session rating. A session the process does not
+     * survive records no skips, and the export then reads exactly as it read
+     * before this existed.
+     */
+    val skippedSets: List<SkippedSet> = emptyList(),
     val sessionId: Long? = null,
     val setsCompleted: Int = 0,
     /**
@@ -2846,6 +2931,28 @@ data class RecordState(
             RemoveSetControl.target(
                 queue.map { AddSetSlotKey(it.exercise.id, it.setIndexInExercise, it.isAddedSet) },
                 queueIndex = queueIndex,
+                upcomingIndex = upcomingIndex,
+            )
+        }
+
+    /**
+     * The upcoming prescribed set "Skip Set N" would drop, or null when there
+     * is none (#300).
+     *
+     * On the state for [removeSetTarget]'s reason, and it is the same hazard:
+     * the control names the set it will take and the tap takes the set this
+     * names, so there is one lookup and not two.
+     *
+     * ADHOC IS REFUSED HERE, as it is there. An ad-hoc session has no plan, so
+     * it has no prescribed set to deviate from and nothing to skip -- the
+     * projection below would be over a queue that does not exist.
+     */
+    val skipSetTarget: SkipSetTarget?
+        get() = if (adHoc) {
+            null
+        } else {
+            SkipSetControl.target(
+                queue.map { AddSetSlotKey(it.exercise.id, it.setIndexInExercise, it.isAddedSet) },
                 upcomingIndex = upcomingIndex,
             )
         }
@@ -3579,6 +3686,20 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     fun removeAddedSetOfCurrentExercise() {
         stateFlow.value = removedState(stateFlow.value) ?: return
     }
+
+    /**
+     * Drop the upcoming PRESCRIBED set (#300); every decision is
+     * [skippedState]'s.
+     *
+     * ONE LINE, where its two neighbours take three, and it is not a style
+     * preference: this class sits exactly on detekt's `LargeClass` limit, which
+     * counts code and not comments, so the three-line form reds `:app:detekt`
+     * before a single test runs. Written down so it is not tidied back into
+     * shape by someone who reads the inconsistency as an oversight. The
+     * structural answer is to move behaviour out of this class, which is a task
+     * of its own and not this one.
+     */
+    fun skipUpcomingSet() = skippedState(stateFlow.value)?.let { stateFlow.value = it }
 
     fun startAdHocSession() {
         sessionStartedAtMs = openedSessionClocks(sessionRrMs, restHrBuffer)
@@ -4717,6 +4838,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             rrMs = sessionRrMs.toList(),
             sessionRpe = sessionRpe,
             restHrSamples = restHrBuffer.toList(),
+            // Snapshotted with everything else the close freezes (#300). The
+            // list is the lifter's own decisions and exists nowhere durable
+            // until this write lands.
+            skippedSets = stateFlow.value.skippedSets,
             onState = ::onSessionCloseState,
             onClosed = ::onSessionClosed,
         )

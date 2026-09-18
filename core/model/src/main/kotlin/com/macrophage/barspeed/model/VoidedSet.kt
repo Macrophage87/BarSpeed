@@ -119,6 +119,12 @@ data class VoidedSetEffects(
  * removal at all: nothing is deleted, and that is what makes it available on a
  * row.
  *
+ * [SkipSetControl] IS THE THIRD CONTROL AND IS NOT THIS ONE EITHER (#300): it
+ * drops an upcoming PRESCRIBED set from the queue, which is again a set that has
+ * not run, and records the deviation on the session; this one marks a set that
+ * DID get recorded as one the lifter did not perform. The place decides which
+ * control applies, and [SetPlace] is where that is written down.
+ *
  * WHICH SETS ARE VOIDABLE: every RECORDED set, INCLUDING a prescribed one.
  * [RemoveSetControl] refuses a prescribed set deliberately, because a plan's
  * set count is how a coach reads adherence and dropping prescribed sets would
