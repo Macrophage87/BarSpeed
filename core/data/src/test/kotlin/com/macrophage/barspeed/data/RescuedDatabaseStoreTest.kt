@@ -396,7 +396,7 @@ class RescuedDatabaseStoreTest {
      * THE FIX FOR THIS ISSUE'S OWN WORST FINDING. `putNextEntry` writes the
      * zip entry's header before a single byte of the file is read, so an
      * earlier version that caught a read failure per file and moved on --
-     * matching SetJournalStore.zip's own shape -- left a STRUCTURALLY VALID
+     * matching SetJournalStore.zipTo's own shape -- left a STRUCTURALLY VALID
      * zip whose entry for the unreadable file was truncated or zero bytes:
      * an archive that opens cleanly and looks complete while the lifter's
      * actual backup is gone. Now the whole call throws, and the partial

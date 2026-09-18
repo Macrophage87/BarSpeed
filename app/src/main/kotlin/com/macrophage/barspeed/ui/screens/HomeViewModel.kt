@@ -282,8 +282,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * that truncation can land in is what changed: the whole-ByteArray write
      * this replaced held it open for one `writeBytes`, and a streamed copy
      * holds it open for the length of the copy -- for the capture behind
-     * #271, 314.6 MB of it -- so a short archive can reach the share sheet
-     * looking complete. Widened here, not created here. The same missing
+     * #271, 314.6 MB of it -- so the chooser can be handed the file while
+     * the second copy is still rewriting it from zero, which is a zip cut
+     * off before its central directory. A reader reports that as corrupt,
+     * not as complete; the outcome that DOES look complete is a missing or
+     * short ENTRY, which `SetJournalStore.zipTo`'s own per-file
+     * `runCatching` produces and which is a different mechanism. Widened
+     * here, not created here. The same missing
      * guard leaves DISCARD live during a send, where a stream not yet
      * reached disappears and the per-file `runCatching` in
      * `SetJournalStore.zipTo` skips it without a word; POSIX keeps an
