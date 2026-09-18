@@ -238,19 +238,22 @@ object LiveCountReadout {
     fun countLabel(reps: Int, withheld: Boolean = false): String = if (withheld) NO_COUNT else "$reps"
 
     /**
-     * The live velocity as the in-set screen draws it: signed, two decimals,
-     * and `Locale.US` so a decimal comma cannot appear beside an `m/s` label.
+     * The live velocity as the in-set screen draws it -- signed, two decimals,
+     * and `Locale.US` so a decimal comma cannot appear beside an `m/s` label --
+     * or [NO_COUNT] where the count has been given up.
      *
-     * A SEAM CARRYING TODAY'S ANSWER, characterized and not endorsed.
-     * `RecordScreen` formats this line unguarded, and a withheld set drops the
-     * tracker and resets `LiveSetState`, so the figure is frozen at 0.0 and the
-     * line reads `+0.00 m/s` for the rest of the set -- a measurement where
-     * there is no longer an integrator. That is the repo's *absence rendered as
-     * a value* class and it is what #280's red differential and its fix, each
-     * in its own commit, replace. This commit changes nothing on screen.
+     * The em dash and not `+0.00`. The withhold drops the tracker, so no sample
+     * reaches an integrator afterwards and `live` stays the reset
+     * `LiveSetState` for the rest of the set: the figure was frozen at 0.0 and
+     * the line drew `+0.00 m/s`, a velocity measurement on a set the app had
+     * just stopped counting. *Absence rendered as a value*, one line away from
+     * the count, the arc and the cadence line that already say nothing.
+     *
+     * It reads the same `withheld` flag as the other three, so the four figures
+     * on that screen cannot disagree about whether a measurement exists.
      */
     fun velocityLabel(velocityMps: Double, withheld: Boolean = false): String = if (withheld) {
-        String.format(Locale.US, "%+.2f", 0.0)
+        NO_COUNT
     } else {
         String.format(Locale.US, "%+.2f", velocityMps)
     }
