@@ -203,26 +203,33 @@ object LiveFallbackPolicy {
 }
 
 /**
- * What the in-set ring draws for the sensor's count, and the two figures
- * derived from it. Issue #280.
+ * What the in-set ring draws for the sensor's count, and the figures drawn
+ * beside it. Issue #280.
  *
- * ## Why these three lines are here
+ * ## Why these five lines are here
  *
- * They were three expressions inside `RecordScreen` -- the headline count, the
- * progress arc on the explosive ring and the reps/min line beside it -- in a
- * module no test on the CI path reaches. Issue #280 needs each of them to draw
- * NOTHING on a set whose live count has been given up, and "absence rendered as
- * a value" is the class that gets shipped when a withheld count is drawn as the
- * number zero: a lifter glancing at the ring reads a detector that has missed
- * every rep, which is a claim, rather than a count the app has stopped making.
+ * They were five expressions inside `RecordScreen` -- the headline count, the
+ * live velocity, the progress arc on the explosive ring, the reps/min line
+ * beside it and the caption naming the next rep -- in a module no test on the
+ * CI path reaches. Issue #280 needs each of them to draw NOTHING on a set whose
+ * live count has been given up, and "absence rendered as a value" is the class
+ * that gets shipped when a withheld count is drawn as the number zero: a lifter
+ * glancing at the ring reads a detector that has missed every rep, which is a
+ * claim, rather than a count the app has stopped making.
  *
- * ## One flag, read by all three
+ * This paragraph said THREE and named three; it was already one short of the
+ * functions below when it was written, and the velocity line makes it two. The
+ * count is stated rather than left implicit for exactly that reason: a
+ * function added here without this number moving is a function nobody checked
+ * the flag on.
  *
- * A single `withheld` argument, so the arc, the number and the cadence line
- * cannot disagree about whether there is a count. `RepCountPolicy.displayedCount`
- * stays the one place the NUMBER comes from -- these functions format it and
- * never re-derive it -- which is #252's rule: the ring and the voice read one
- * figure.
+ * ## One flag, read by all five
+ *
+ * A single `withheld` argument, so the number, the velocity, the arc and the
+ * cadence line cannot disagree about whether there is a count.
+ * `RepCountPolicy.displayedCount` stays the one place the NUMBER comes from --
+ * these functions format it and never re-derive it -- which is #252's rule: the
+ * ring and the voice read one figure.
  */
 object LiveCountReadout {
     /**
