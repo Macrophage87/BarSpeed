@@ -1926,11 +1926,13 @@ data class SetExport(
      * its target publishes [plannedDurationS] only when the lifter did not
      * change it; one the lifter ended by hand publishes what it lasted, and one
      * corrected afterwards on the rest screen publishes the corrected
-     * seconds. The three are not distinguishable from each other here --
-     * [repsManual] has no counterpart for duration -- so a reader comparing
-     * holds across 1.12 and 1.13 is comparing figures whose upper end moved:
-     * under 1.12 every timed set carried the walk back to the phone inside
-     * it.
+     * seconds. WHICH of them produced this figure is [durationEndedBy] from
+     * 1.21; the sentence that stood here -- that the three are not
+     * distinguishable and that [repsManual] has no counterpart for duration --
+     * is deleted rather than reworded. A reader comparing holds across 1.12 and
+     * 1.13 is still comparing figures whose upper end moved: under 1.12 every
+     * timed set carried the walk back to the phone inside it, and from 1.21 a
+     * hold whose armed unit saw the release does not.
      *
      * ABSENT FROM 1.18 on a set that ended before its work phase began, which
      * carries [abandonedInPrep] instead. Such a set stores 0 here and that 0

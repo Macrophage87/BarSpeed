@@ -41,6 +41,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
 import com.macrophage.barspeed.model.CoachingVerdictPolicy
 import com.macrophage.barspeed.model.EffortCorrectionPolicy
+import com.macrophage.barspeed.model.HoldEndPolicy
+import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.LastSetRecordPolicy
 import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLimiterGroup
@@ -270,7 +272,7 @@ private fun CorrectionDialog(
                 DraftLoadRow(state, feedback, addedKg) { addedKg = it }
                 val held = seconds
                 if (timed && held != null) {
-                    DraftHoldRow(held) { seconds = it }
+                    DraftHoldRow(held, feedback.durationEndedBy) { seconds = it }
                 } else if (!timed) {
                     DraftRepsRow(reps) { reps = it }
                 }
@@ -415,21 +417,33 @@ private fun DraftRepsRow(reps: Int, onDraft: (Int) -> Unit) {
 }
 
 /**
- * Held it longer than the app stopped you at? State it here (#168).
+ * Held it longer, or let go earlier, than the figure says? State it here
+ * (#168, and the second step is #259).
  *
- * The step is [TimedSetEndPolicy.CORRECTION_STEP_S] rather than one second,
- * because what is being added is a walk back to the phone, and the floor is
+ * The fine step is [TimedSetEndPolicy.CORRECTION_STEP_S] rather than one second,
+ * because what is being corrected is a walk back to the phone, and the floor is
  * [TimedSetEndPolicy.adjustedSeconds]'s so the draft cannot show a figure the
  * write would clamp.
+ *
+ * WHICH STEPS ARE OFFERED IS NOT DECIDED HERE. [HoldEndPolicy.downStepsS] takes
+ * the word saying what ended the hold and answers; a second, larger DOWN step
+ * appears wherever the reach is still inside the figure, and is absent on a hold
+ * whose own unit already timed the release. This composable draws the answer and
+ * decides nothing -- nothing in this file is reachable from a test.
  */
 @Composable
-private fun DraftHoldRow(seconds: Int, onDraft: (Int) -> Unit) {
+private fun DraftHoldRow(seconds: Int, endedBy: HoldEndSource?, onDraft: (Int) -> Unit) {
+    val steps = HoldEndPolicy.downStepsS(endedBy)
+    val fineS = steps.first()
+    val bigS = steps.drop(1).lastOrNull()
     Stepper(
         label = "Held",
         figure = "${seconds}s",
         corrected = false,
-        onDown = { onDraft(TimedSetEndPolicy.adjustedSeconds(seconds, -TimedSetEndPolicy.CORRECTION_STEP_S)) },
-        onUp = { onDraft(TimedSetEndPolicy.adjustedSeconds(seconds, TimedSetEndPolicy.CORRECTION_STEP_S)) },
+        onDown = { onDraft(TimedSetEndPolicy.adjustedSeconds(seconds, -fineS)) },
+        onUp = { onDraft(TimedSetEndPolicy.adjustedSeconds(seconds, fineS)) },
+        bigDownLabel = bigS?.let { "−${it}s" },
+        onBigDown = bigS?.let { { onDraft(TimedSetEndPolicy.adjustedSeconds(seconds, -it)) } },
     )
     Spacer(Modifier.height(6.dp))
 }
@@ -645,12 +659,27 @@ private fun DraftLimiterSection(
 
 /** One label, one figure, and a minus and a plus either side of it. */
 @Composable
-private fun Stepper(label: String, figure: String, corrected: Boolean, onDown: () -> Unit, onUp: () -> Unit) {
+private fun Stepper(
+    label: String,
+    figure: String,
+    corrected: Boolean,
+    onDown: () -> Unit,
+    onUp: () -> Unit,
+    // A SECOND, larger DOWN step, drawn only where one is offered (#259). Both
+    // down controls sit together, left of the figure, so the pair reads as one
+    // direction rather than as two unrelated buttons; the fine step keeps the
+    // bare glyph and this one says how much it moves.
+    bigDownLabel: String? = null,
+    onBigDown: (() -> Unit)? = null,
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+        if (bigDownLabel != null && onBigDown != null) {
+            TextButton(onClick = onBigDown) { Text(bigDownLabel, style = MaterialTheme.typography.bodySmall) }
+        }
         TextButton(onClick = onDown) { Text("−", style = MaterialTheme.typography.titleMedium) }
         Text(
             figure,

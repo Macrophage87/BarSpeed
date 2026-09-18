@@ -68,17 +68,24 @@ object RestClockPolicy {
      * the failure #168 arranged [TimedSetEndPolicy.remainingS] to make
      * impossible one screen over.
      *
+     * [sensorEndAtMs] FIRST, and it is offered only where a release DECIDED the
+     * set's recorded seconds -- `HoldEndPolicy`'s answer, never a release that
+     * was found and not believed. That ordering is the whole point of the
+     * parameter: once a hold's duration is measured to the release, a rest
+     * counted from anything else means the app holds two answers to when the set
+     * ended, which is #178's defect in a new place. On a hold there is nothing
+     * for it to outrank in practice -- `Time` is not in `SetEnd.TERMINAL_CUES`,
+     * so a hold is `NotCued` whether it ran to target or was broken early -- and
+     * the ordering is pinned anyway rather than left to a future cue to settle.
+     *
      * A cue instant AFTER the write instant is still taken. It cannot arise
      * from the app -- the cue is written before the set ends, on the same
      * clock -- so if it ever does, the wall clock moved between the two and
      * neither figure is more trustworthy than the other. [remainingS] floors
      * the result either way, so the worst it can produce is a full period.
      */
-    // The suppression IS the statement: [sensorEndAtMs] is accepted and not
-    // read, so `RestFromSensorEndDifferentialTest` can be written against this
-    // signature and fail. The commit that reads it deletes this line.
-    @Suppress("UnusedParameter")
-    fun startedAtMs(setOverCueAtMs: Long?, sensorEndAtMs: Long?, endedAtMs: Long): Long = setOverCueAtMs ?: endedAtMs
+    fun startedAtMs(setOverCueAtMs: Long?, sensorEndAtMs: Long?, endedAtMs: Long): Long =
+        sensorEndAtMs ?: setOverCueAtMs ?: endedAtMs
 
     /**
      * Seconds of rest left at [nowMs], for a period of [restS] that started at

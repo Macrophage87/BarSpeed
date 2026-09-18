@@ -6,6 +6,7 @@ import com.macrophage.barspeed.hrm.HrTrust
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.FinalRestWindowDecision
 import com.macrophage.barspeed.model.FinalRestWindowPolicy
+import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PrepWindow
@@ -75,6 +76,17 @@ data class CompletedSet(
      * row is in.
      */
     val actualDurationS: Int? = null,
+    /**
+     * Which of the four things that can end a hold produced [actualDurationS]:
+     * `HoldEndSource`'s published word, or null on a set that is not timed
+     * (#259).
+     *
+     * Decided in `:app` by `HoldEndPolicy` at the same moment the seconds are,
+     * and carried here rather than re-derived: the release instant the sensor
+     * case rests on is read off the frozen in-set stream, which this repository
+     * never sees as samples.
+     */
+    val durationEndedBy: String? = null,
     val plannedDurationS: Int? = null,
     /**
      * The side this set WORKED: "left", "right", or null on bilateral work.
@@ -434,6 +446,7 @@ class SessionRepository(
                 liveReps = set.liveReps,
                 plannedReps = set.plannedReps,
                 actualDurationS = set.actualDurationS,
+                durationEndedBy = set.durationEndedBy,
                 plannedDurationS = set.plannedDurationS,
                 side = set.side,
                 plannedSide = set.plannedSide,
@@ -730,33 +743,29 @@ class SessionRepository(
 
     /**
      * Lifter correction of a hold or carry's recorded seconds, from the rest
-     * screen.
+     * screen -- with the word that says the lifter is who restated them.
      *
      * The counterpart of [overrideReps] for the sets that have no reps. Its
      * one caller is the post-set addition #168 puts on the rest screen: a
      * timed set now ends when its clock reaches the seconds it was working
      * to, so a hold the lifter genuinely carried on past it is stated here
-     * afterwards
-     * rather than mid-set, where the owner would never see it.
+     * afterwards rather than mid-set, where the owner would never see it.
      *
-     * Unlike [overrideReps] this sets no "corrected by the lifter" flag,
-     * because `set_records` has no column for one on the duration -- reps have
-     * `repsManual`, seconds have nothing. Adding one is a migration and is
-     * deliberately not folded in here; the consequence, named rather than
-     * hidden, is that the export cannot distinguish a corrected hold from a
-     * measured one.
-     */
-    /**
-     * Restate a finished hold's seconds, with the word that says who restated
-     * them.
+     * The paragraph that stood here -- that this sets no "corrected by the
+     * lifter" flag because `set_records` has no column for one, so the export
+     * cannot distinguish a corrected hold from a measured one -- went false at
+     * database v19 and is deleted rather than reworded. `durationEndedBy` is
+     * that column and #249 is the ask it answers.
      *
      * The word is decided HERE and not at the call site: `:app` has one
-     * correction control and every tap of it is the lifter's, so a caller that
+     * duration control and every tap of it is the lifter's, so a caller that
      * could pass a different word would be a caller that could publish a
-     * correction as a measurement. It is still null at this commit -- #259's
-     * differential says what it must become.
+     * correction as a measurement. It travels in the SAME statement as the
+     * seconds, because two statements are two chances for a row to hold a
+     * figure and a word that disagree.
      */
-    suspend fun overrideDuration(setId: Long, seconds: Int) = sessionDao.overrideDuration(setId, seconds, null)
+    suspend fun overrideDuration(setId: Long, seconds: Int) =
+        sessionDao.overrideDuration(setId, seconds, HoldEndSource.CORRECTED.published)
 
     suspend fun deleteSession(id: Long) = sessionDao.deleteSession(id)
 

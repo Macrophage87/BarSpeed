@@ -11,6 +11,7 @@
 // that did.
 package com.macrophage.barspeed.record
 
+import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
@@ -64,7 +65,14 @@ internal fun ratedState(s: RecordState, rpe: Int?, tappedFailed: Boolean, effect
  * and `TimedSetEndPolicy.adjustedSeconds` floors the result at zero.
  */
 internal fun durationCorrectedState(s: RecordState, seconds: Int, effectiveFailed: Boolean): RecordState = s.copy(
-    lastFeedback = s.lastFeedback?.copy(durationOverrideS = seconds),
+    lastFeedback = s.lastFeedback?.copy(
+        durationOverrideS = seconds,
+        // The word the ROW now holds, published beside the figure it qualifies
+        // (#259, #249). Written here as well as in the update so the control the
+        // lifter is still looking at cannot go on offering steps chosen for what
+        // the figure used to be.
+        durationEndedBy = HoldEndSource.CORRECTED,
+    ),
     lastSetFailed = effectiveFailed,
 )
 

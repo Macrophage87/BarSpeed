@@ -15,6 +15,7 @@ import com.macrophage.barspeed.data.SetJournal
 import com.macrophage.barspeed.data.SetJournalHeader
 import com.macrophage.barspeed.data.SetJournalStore
 import com.macrophage.barspeed.dsp.CadencePlan
+import com.macrophage.barspeed.dsp.HoldRelease
 import com.macrophage.barspeed.dsp.LiftDirection
 import com.macrophage.barspeed.dsp.LiveRepCounter
 import com.macrophage.barspeed.dsp.LiveRepCounters
@@ -44,6 +45,8 @@ import com.macrophage.barspeed.model.EffortAsk
 import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.HoldEndPolicy
+import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.Implement
 import com.macrophage.barspeed.model.ImuSample
@@ -433,6 +436,18 @@ data class SetFeedback(
     val plannedReps: Int?,
     val tempo: String?,
     val actualDurationS: Int? = null,
+    /**
+     * Which of the four things that can end a hold decided [actualDurationS]
+     * (#259), or null on a set that is not timed and on a set recorded before
+     * database v19.
+     *
+     * The rest screen's duration correction reads it, and nothing else does:
+     * `HoldEndPolicy.downStepsS` offers a ten-second step wherever the walk
+     * back to the phone is still inside the figure. It becomes
+     * [HoldEndSource.CORRECTED] the moment the lifter restates the seconds,
+     * which is the same word the row then holds.
+     */
+    val durationEndedBy: HoldEndSource? = null,
     val plannedDurationS: Int? = null,
     val side: String? = null,
     /** Olympic-lift style set: peak velocity is the headline metric. */
@@ -603,6 +618,14 @@ private data class PendingSetWrite(
     /** The hold seconds the set was working to. Judges, as [targetReps] does. */
     val targetDurationS: Int?,
     val actualDurationS: Int?,
+    /**
+     * Which of the four things that can end a hold decided [actualDurationS]
+     * (#259), or null on a set that is not timed.
+     *
+     * Frozen with the seconds, from one `HoldEndPolicy` answer, so the row, the
+     * export and the rest screen's correction control all read the same word.
+     */
+    val durationEndedBy: HoldEndSource?,
     /** The prep prescribed and the prep that played, frozen too. */
     val plannedPrepS: Int?,
     val prepS: Int?,
@@ -888,6 +911,9 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
         // Both come off the frozen write, so a retry stores the same pair.
         liveReps = p.liveReps,
         actualDurationS = p.actualDurationS,
+        // The word, not the constant: `HoldEndSource` owns the four strings and
+        // the row stores one of them (#259).
+        durationEndedBy = p.durationEndedBy?.published,
         plannedDurationS = p.plannedDurationS,
         side = p.side,
         plannedSide = p.plannedSide,
@@ -2042,17 +2068,18 @@ private fun inSetState(
 )
 
 /**
- * The seconds a finished timed set records, or null for a set that is not
- * timed at all.
+ * What a finished timed set records, or null for a set that is not timed at
+ * all.
  *
- * Free function for [ratedState]'s reason, and it is the join of the two rules
- * rather than either of them: [SetClockPolicy] says which instant the set is
- * measured from, [TimedSetEndPolicy] says whether the measurement or the
- * prescription is what gets written down. Both are pinned in `:core:model`;
- * what lives here is only the wiring, which nothing in this repository can
- * execute.
+ * Free function for [ratedState]'s reason, and it is the join of three rules
+ * rather than any of them: [SetClockPolicy] says which instant the set is
+ * measured FROM, `HoldRelease` in `:core:dsp` says when the implement was let
+ * go, and `HoldEndPolicy` says which of the clock, that release and the tap the
+ * recorded figure comes from (#259). All three are pinned in `:core:model` and
+ * `:core:dsp`; what lives here is only the wiring, which nothing in this
+ * repository can execute.
  */
-private fun recordedTimedSeconds(
+private fun recordedTimedEnd(
     isTimed: Boolean,
     prepCase: PrepCase,
     tappedAtMs: Long,
@@ -2060,15 +2087,62 @@ private fun recordedTimedSeconds(
     endedAtMs: Long,
     targetS: Int?,
     autoEnded: Boolean,
-): Int? = if (!isTimed) {
-    null
-} else {
-    TimedSetEndPolicy.recordedSeconds(
-        measuredS = SetClockPolicy.heldSeconds(prepCase, tappedAtMs, clockStartedAtMs, endedAtMs),
+    analysedSamples: List<ImuSample>,
+): TimedEnd? {
+    if (!isTimed) return null
+    fun secondsTo(instantMs: Long) = SetClockPolicy.heldSeconds(prepCase, tappedAtMs, clockStartedAtMs, instantMs)
+    // Asked only where the lifter's tap is what ended the set. A hold the clock
+    // ended is not offered a release at all -- `HoldEndPolicy` would refuse it,
+    // and not reading the stream says so at the one place that could.
+    val releaseAtMs = if (autoEnded) null else HoldRelease.atMs(analysedSamples, clockStartedAtMs)
+    val decision = HoldEndPolicy.decide(
+        measuredS = secondsTo(endedAtMs),
         targetS = targetS,
         autoEnded = autoEnded,
+        sensorEndS = releaseAtMs?.let(::secondsTo),
+    )
+    return TimedEnd(
+        seconds = decision.seconds,
+        endedBy = decision.endedBy,
+        // The instant, offered to the rest clock ONLY where it decided the
+        // seconds. A release that was found and refused -- past the cap, or at
+        // or after the tap -- must not move the rest either, or the countdown
+        // and the recorded figure would again answer differently about when the
+        // set ended (#178).
+        restFromMs = releaseAtMs.takeIf { decision.endedBy == HoldEndSource.SENSOR },
     )
 }
+
+/**
+ * Which instant the rest after this set runs from.
+ *
+ * Free function for [openSession]'s reason, and asked ONCE at the freeze because
+ * two readers take it: the countdown the lifter watches and the heart-rate window
+ * the archive publishes as the next set's `rest_before_hrm`. Computing it twice
+ * is how those two come to disagree, which is the defect #178 measured at
+ * 53.06 s.
+ *
+ * [sensorEndAtMs] is the release, and only where one DECIDED the recorded
+ * seconds (#259) -- `TimedEnd.restFromMs`, never a release that was found and
+ * refused. The rule and the fallback for a set nothing called over are
+ * `RestClockPolicy`'s; what lives here is the wiring.
+ */
+private fun restStartedFrom(cues: List<VoiceCue>, sensorEndAtMs: Long?, endedAtMs: Long): Long =
+    RestClockPolicy.startedAtMs(
+        setOverCueAtMs = (SetEnd.calledOver(cues) as? SetEnd.Cued)?.atMs,
+        sensorEndAtMs = sensorEndAtMs,
+        endedAtMs = endedAtMs,
+    )
+
+/**
+ * What a finished timed set ended at: the seconds recorded, the word saying who
+ * decided them, and the instant the rest runs from where a release decided it.
+ *
+ * One carrier rather than three returns, because the three are one decision and
+ * a caller that could take the seconds without the word is a caller that can
+ * publish a sensor end as a measurement.
+ */
+private data class TimedEnd(val seconds: Int, val endedBy: HoldEndSource, val restFromMs: Long?)
 
 /**
  * The rest-screen state the set just written leaves behind. Free function for
@@ -2241,6 +2315,7 @@ private fun restingState(
             plannedReps = p.targetReps,
             tempo = p.tempoText,
             actualDurationS = p.actualDurationS,
+            durationEndedBy = p.durationEndedBy,
             plannedDurationS = p.targetDurationS,
             side = p.side,
             explosive = p.exercise.kind == ExerciseKind.EXPLOSIVE,
@@ -4476,8 +4551,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // been chosen. Nothing else about the move changes -- the buffers and
         // both instants are the same ones it was called with.
         val capture = s.captureAt(armedSensors, armedSecondaryRole, imuBuffer, imuBufferB, setStartedAtMs, endedAtMs)
-        val actualDurationS =
-            recordedTimedSeconds(
+        val timedEnd =
+            recordedTimedEnd(
                 isTimed = isTimed,
                 prepCase = prepCaseForSet,
                 tappedAtMs = setStartedAtMs,
@@ -4488,6 +4563,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 // counting down, and the countdown ran to what was on screen.
                 targetS = targetDurationS,
                 autoEnded = autoEndedSet,
+                // The stream the set's OWN figures come from -- on a two-unit
+                // set, whichever one `captureAt` chose. One stream, not both.
+                analysedSamples = capture.samples,
             )
         val tempoText = when {
             isTimed -> null
@@ -4503,20 +4581,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val recordedReps =
             RepCountPolicy.recorded(setCounter, s.manualReps, sensorCounter.called, sensorCounter.correctionDelta)
         val manualReps = recordedReps.stated
-        // Where the rest after this set runs from. Asked here, once, and
-        // carried on the frozen write: the countdown reads it below and the
-        // rest-HR window is seeded from it a few lines down, so the two
-        // readers cannot take different instants (#178). The rule and the
-        // fallback for a set nothing called over are RestClockPolicy's.
-        val restStartedAtMs =
-            RestClockPolicy.startedAtMs(
-                setOverCueAtMs = (SetEnd.calledOver(cueBuffer.toList()) as? SetEnd.Cued)?.atMs,
-                // No sensor end is offered yet. Stated at the call site rather
-                // than defaulted in the policy, so the commit that computes one
-                // cannot leave this reader behind (#259).
-                sensorEndAtMs = null,
-                endedAtMs = endedAtMs,
-            )
+        // Where the rest after this set runs from: once, here, carried on the
+        // frozen write, and read by both the countdown and the rest-HR window
+        // below (#178). [restStartedFrom] holds the argument and the wiring.
+        val restStartedAtMs = restStartedFrom(cueBuffer.toList(), timedEnd?.restFromMs, endedAtMs)
         pendingWrite =
             PendingSetWrite(
                 exercise = exercise,
@@ -4546,7 +4614,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 tempoText = tempoText,
                 plannedDurationS = plannedDurationS,
                 targetDurationS = targetDurationS,
-                actualDurationS = actualDurationS,
+                actualDurationS = timedEnd?.seconds,
+                durationEndedBy = timedEnd?.endedBy,
                 plannedPrepS = plannedPrepSForSet,
                 prepS = prepSForSet,
                 // The rule is PrepWindowPolicy's, in a module with tests; this

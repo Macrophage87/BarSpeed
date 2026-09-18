@@ -2,18 +2,21 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
- * [HoldEndPolicy] and [HoldEndSource] as they answer BEFORE #259's fix, and the
- * four words the export will carry.
+ * [HoldEndPolicy] and [HoldEndSource]: which of four things a finished hold's
+ * seconds came from, and the four words the export carries.
  *
- * The seconds half of this file is pinned so the fix is a differential against
- * a statement in the tree rather than against a memory of what the code used to
- * do: `HoldEndPolicyDifferentialTest` is written against these very cases, and
- * the ones the fix moves are deleted from here in the same commit that moves
- * them. `RestClockPolicy`'s KDoc records the same arrangement being used for
- * #172.
+ * The seconds half of this file was pinned so the fix could be a differential
+ * against a statement in the tree rather than against a memory of what the code
+ * used to do. Two of those pins -- that a sensor end changed nothing, and that
+ * the correction offered one step -- are DELETED rather than reworded now that
+ * `HoldEndPolicyDifferentialTest` has moved both; what is left here is the rule
+ * as it stands, plus the guards that could not be written red because the
+ * pre-fix code happened to answer the same thing.
  *
  * The WORDS half is not a differential and does not move: the four strings are
  * a published contract from the moment the schema carries them.
@@ -52,34 +55,97 @@ class HoldEndPolicyTest {
     }
 
     @Test
-    fun `a sensor end changes nothing yet`() {
-        // The state this branch starts from, pinned so the differential has
-        // something to be a differential against. Set 17 again, with the
-        // release its own unit saw at 29 s offered: the figure is still the
-        // one that ran to the tap and the word is still the lifter's.
+    fun `a release the clock beat is not consulted at all`() {
+        // The clock is not overruled: a hold that ran to `Time` records the
+        // target whatever its stream says afterwards. Letting a crossing shorten
+        // it would record less than the lifter was told they had completed.
         assertEquals(
-            HoldEndPolicy.Decision(36, HoldEndSource.LIFTER),
-            HoldEndPolicy.decide(measuredS = 36, targetS = 45, autoEnded = false, sensorEndS = 29),
+            HoldEndPolicy.Decision(30, HoldEndSource.CLOCK),
+            HoldEndPolicy.decide(measuredS = 31, targetS = 30, autoEnded = true, sensorEndS = 20),
+            "a clock-ended hold with a release ten seconds early",
         )
         assertEquals(
-            HoldEndPolicy.Decision(32, HoldEndSource.LIFTER),
-            HoldEndPolicy.decide(measuredS = 32, targetS = 45, autoEnded = false, sensorEndS = 26),
+            HoldEndPolicy.Decision(30, HoldEndSource.CLOCK),
+            HoldEndPolicy.decide(measuredS = 31, targetS = 30, autoEnded = true, sensorEndS = 29),
         )
     }
 
     @Test
-    fun `the correction offers one step, whatever ended the hold`() {
-        // What the rest screen ships: one down step of five seconds. #259 asks
-        // for a second, larger one where no unit spoke for the end.
-        HoldEndSource.entries.forEach { source ->
-            assertEquals(listOf(5), HoldEndPolicy.downStepsS(source), "$source")
-        }
-        assertEquals(listOf(5), HoldEndPolicy.downStepsS(null), "no provenance at all")
+    fun `a sensor end may not lengthen a hold, and may not take more than the cap off`() {
+        // GREEN at the commit that adds it, and said so rather than implied: the
+        // pre-fix code answered the tap's own seconds for both of these too, so
+        // neither could be written as a failing differential. The mutation table
+        // is what covers them.
+        //
+        // At or after the tap there is nothing to remove. A release stamped
+        // after the write cannot come from the app -- the stream is frozen at the
+        // write -- so if it ever arrives the wall clock moved, and the figure the
+        // lifter's tap produced is the one to keep.
+        assertEquals(
+            HoldEndPolicy.Decision(36, HoldEndSource.LIFTER),
+            HoldEndPolicy.decide(measuredS = 36, targetS = 45, autoEnded = false, sensorEndS = 36),
+            "a release at the tap",
+        )
+        assertEquals(
+            HoldEndPolicy.Decision(36, HoldEndSource.LIFTER),
+            HoldEndPolicy.decide(measuredS = 36, targetS = 45, autoEnded = false, sensorEndS = 40),
+            "a release after the tap",
+        )
+        // The cap, at its two edges, in LITERAL seconds. Written with
+        // MAX_TRIM_S on both sides of each case first, which moved the input and
+        // the expectation together and let a 20 -> 19 mutation pass -- measured,
+        // on a run. Twenty off is a reach; twenty-one is not, and the tap stands
+        // rather than a hold losing a third of itself to one crossing.
+        assertEquals(20, HoldEndPolicy.MAX_TRIM_S, "the cap the literals below are written against")
+        assertEquals(
+            HoldEndPolicy.Decision(40, HoldEndSource.SENSOR),
+            HoldEndPolicy.decide(measuredS = 60, targetS = 90, autoEnded = false, sensorEndS = 40),
+            "exactly twenty seconds off is believed",
+        )
+        assertEquals(
+            HoldEndPolicy.Decision(61, HoldEndSource.LIFTER),
+            HoldEndPolicy.decide(measuredS = 61, targetS = 90, autoEnded = false, sensorEndS = 40),
+            "twenty-one seconds off is not",
+        )
+    }
+
+    @Test
+    fun `a hold the sensor ended is offered the fine step and no other`() {
+        // GREEN, and unredable for the reason the file's KDoc gives: the pre-fix
+        // control offered one step on every hold, so this case answered the same
+        // thing before the fix. Its own test rather than a line inside the
+        // differential, because a `10 sensor gets both steps` mutation survived
+        // a run while the differential covered only the other four cases.
         assertEquals(
             listOf(TimedSetEndPolicy.CORRECTION_STEP_S),
-            HoldEndPolicy.downStepsS(HoldEndSource.LIFTER),
-            "the step is #168's constant and not a second copy of five",
+            HoldEndPolicy.downStepsS(HoldEndSource.SENSOR),
+            "the release already took the reach off, so the big step is noise",
         )
+        assertEquals(listOf(5), HoldEndPolicy.downStepsS(HoldEndSource.SENSOR), "five, in literal seconds")
+        assertEquals(
+            listOf(5, 10),
+            HoldEndPolicy.downStepsS(HoldEndSource.LIFTER),
+            "and the sets that still carry the reach get both, in literal seconds",
+        )
+    }
+
+    @Test
+    fun `a sensor end moves the seconds and never the verdict`() {
+        // The shortfall is DERIVED from the recorded seconds, so a sensor end
+        // can move it -- and that is the right answer rather than a side effect.
+        // Both field-38 hangs were short before and after: 36 and 29 against
+        // 90% of 45.
+        assertTrue(TimedSetEndPolicy.fellShort(36, 45), "the tap's figure fell short")
+        assertTrue(TimedSetEndPolicy.fellShort(29, 45), "so does the release's")
+        // And the case where it does change the answer, pinned so nobody is
+        // surprised by it: a hold ended by hand at 43 s of 45 counted as close
+        // enough, and its release at 36 does not.
+        assertFalse(TimedSetEndPolicy.fellShort(43, 45), "43 of 45 is within the tolerance")
+        assertEquals(
+            HoldEndPolicy.Decision(36, HoldEndSource.SENSOR),
+            HoldEndPolicy.decide(measuredS = 43, targetS = 45, autoEnded = false, sensorEndS = 36),
+        )
+        assertTrue(TimedSetEndPolicy.fellShort(36, 45), "and the hold it actually did was short")
     }
 
     @Test

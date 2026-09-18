@@ -115,6 +115,26 @@ class HoldReleaseTest {
             HoldRelease.atMs(stream, clockStartedAtMs),
             "the prep contributes nothing either way",
         )
+
+        // THE CASE THAT ACTUALLY KILLS THE MUTATION, and the first version of
+        // this test did not contain it: with the skip deleted, both assertions
+        // above still pass, because a prep crossing far enough back leaves the
+        // settle satisfied either way. Measured, not reasoned about -- the
+        // mutation survived a run.
+        //
+        // Here the prep crosses 2 s before the clock and the hold crosses 2 s
+        // after it. Counting from the clock, that is 2 s of settle and NOT a
+        // release. Counting from the prep's crossing it is 4 s and would be one,
+        // which would record a two-second hold.
+        val tightPrep = still(clockStartedAtMs - 6_000L, clockStartedAtMs - 2_000L) +
+            sample(clockStartedAtMs - 2_000L, 6.0) +
+            still(clockStartedAtMs - 1_990L, clockStartedAtMs + 2_000L) +
+            sample(clockStartedAtMs + 2_000L, 6.0) +
+            still(clockStartedAtMs + 2_010L, clockStartedAtMs + 25_000L)
+        assertNull(
+            HoldRelease.atMs(tightPrep, clockStartedAtMs),
+            "a prep crossing opened the settle for a crossing two seconds into the hold",
+        )
     }
 
     @Test
