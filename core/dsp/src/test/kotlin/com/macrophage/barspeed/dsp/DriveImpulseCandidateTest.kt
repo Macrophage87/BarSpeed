@@ -29,9 +29,20 @@ import kotlin.test.assertEquals
  * **108**. Round 1's harness is gone, so what caused each difference cannot be
  * established -- these are the figures with code behind them.
  *
- * NOTHING HERE IS WIRED TO ANYTHING. No production file on this branch changes;
- * these are models scored against committed captures so a design claim can be
- * checked rather than believed.
+ * ## These tables now measure the PRODUCTION class
+ *
+ * Two sentences stood here and are DELETED rather than reworded, because the
+ * owner chose candidate (c) and they are no longer true: *"NOTHING HERE IS WIRED
+ * TO ANYTHING. No production file on this branch changes."* The rule is
+ * [DriveImpulseCounter] in `:core:dsp`'s main source set and its four constants
+ * are [DspConfig] properties. Every assertion below is unchanged from the commit
+ * that measured the model, and that is the point: the extraction is licensed by
+ * these numbers re-deriving against the production class without one of them
+ * moving.
+ *
+ * What is still true is that WHICH SETS this counter counts is decided
+ * elsewhere -- `LiveCounterPolicy` in `:core:model` -- and nothing in this file
+ * asserts anything about that.
  */
 class DriveImpulseCandidateTest {
     private fun candidate(fixture: String): List<Double> {
@@ -133,16 +144,25 @@ class DriveImpulseCandidateTest {
     /**
      * The set-up pull on set 6 is excluded by the peak term and by nothing else.
      *
-     * Lowering [DriveImpulseCandidate.DRIVE_PEAK_ACCEL_MPS2] to 1.6 puts a call
-     * back on the set-up pull and recovers neither of the two reps set 6 misses,
-     * so the term is doing exactly one job and it is fitted to this session.
+     * Lowering [DspConfig.drivePeakAccelMps2] to 1.6 puts a call back on the
+     * set-up pull and recovers neither of the two reps set 6 misses, so the term
+     * is doing exactly one job and it is fitted to this session.
+     *
+     * The override is a [DspConfig] copy now that the constants live there, so
+     * this test drives the same production state machine as every other row in
+     * this file. It used to hold its own copy of the rule with the peak
+     * parameterised -- a second statement of the decision, which is exactly what
+     * moving the constants out of the harness removes.
      */
     @Test
     fun `dropping the peak term to 1_6 restores the phantom and recovers nothing`() {
         val fixture = "field-deadlift-straight-5rep-s43-set06"
         val capture = CandidateCorpus.capture(fixture)
-        val series = DriveImpulseCandidate.series(LiveCountCandidates.load(fixture), capture.direction)
-        val relaxed = callsWithPeak(series, peak = 1.6)
+        val relaxed = DriveImpulseCandidate.callsAtS(
+            LiveCountCandidates.load(fixture),
+            capture.direction,
+            DspConfig(drivePeakAccelMps2 = 1.6),
+        )
         println("$fixture at peak 1.6: ${relaxed.map { (it * 100).toInt() / 100.0 }}")
         val perRep = CandidateCorpus.perRep(fixture, relaxed)
         println("$fixture at peak 1.6 -> $perRep")
@@ -199,48 +219,5 @@ class DriveImpulseCandidateTest {
             collapse.map { CandidateCorpus.truth(it).reps to candidate(it).size },
             "truth against candidate (c) on the captures it collapses on",
         )
-    }
-
-    /** [DriveImpulseCandidate.callsFrom] with one term overridden, for the sensitivity check above. */
-    private fun callsWithPeak(series: List<Pair<Double, Double>>, peak: Double): List<Double> {
-        val calls = mutableListOf<Double>()
-        var driveStartS = Double.NaN
-        var drivePeak = 0.0
-        var lastDriveSampleS = Double.NaN
-        var awaitUntilS = Double.NaN
-        var brakeStartS = Double.NaN
-        val threshold = DriveImpulseCandidate.DRIVE_ACCEL_THRESHOLD_MPS2
-        for ((timeS, accel) in series) {
-            if (accel > threshold) {
-                if (driveStartS.isNaN()) {
-                    driveStartS = timeS
-                    drivePeak = accel
-                } else {
-                    drivePeak = max(drivePeak, accel)
-                }
-                lastDriveSampleS = timeS
-            } else if (!driveStartS.isNaN()) {
-                val longEnough = lastDriveSampleS - driveStartS >= DriveImpulseCandidate.DRIVE_MIN_PHASE_S
-                if (longEnough && drivePeak >= peak) {
-                    awaitUntilS = lastDriveSampleS + DriveImpulseCandidate.DRIVE_MAX_GAP_S
-                    brakeStartS = Double.NaN
-                }
-                driveStartS = Double.NaN
-                drivePeak = 0.0
-            }
-            if (awaitUntilS.isNaN()) continue
-            if (accel < -threshold) {
-                if (brakeStartS.isNaN()) brakeStartS = timeS
-                if (timeS - brakeStartS >= DriveImpulseCandidate.DRIVE_MIN_PHASE_S) {
-                    calls += timeS
-                    awaitUntilS = Double.NaN
-                    brakeStartS = Double.NaN
-                }
-            } else {
-                brakeStartS = Double.NaN
-                if (timeS > awaitUntilS) awaitUntilS = Double.NaN
-            }
-        }
-        return calls
     }
 }

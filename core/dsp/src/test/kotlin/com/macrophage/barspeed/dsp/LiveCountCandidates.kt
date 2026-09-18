@@ -13,9 +13,12 @@ import kotlin.math.max
  * threw it away, then wrote *"every candidate is modelled in the test source
  * set"* in the proposal. That sentence was false when it was written and is
  * retracted; this file and the two tests beside it are what makes it true.
- * Nothing here is production code and nothing here is wired to anything: these
- * are MODELS, run against committed captures so the proposal's tables can be
- * re-derived by
+ * THAT SENTENCE IS NOW HALF WRONG IN THE OTHER DIRECTION, and is corrected here
+ * rather than left standing: it read *"nothing here is production code and
+ * nothing here is wired to anything: these are MODELS"*. Candidate (c) WAS
+ * chosen, so its rule is [DriveImpulseCounter] in the main source set and
+ * [DriveImpulseCandidate] below is a wrapper that drives it. [LeakyTracker] is
+ * still a model and is still wired to nothing. Every table below re-derives by
  *
  * ```
  * ./gradlew -PjvmOnly :core:dsp:test --tests "com.macrophage.barspeed.dsp.DriveImpulseCandidateTest" \
@@ -24,7 +27,8 @@ import kotlin.math.max
  *
  * ## What is re-derivable here and what is not
  *
- * Candidate **(c)**, the drive-impulse counter ([DriveImpulseCandidate]), and
+ * Candidate **(c)**, the drive-impulse counter (now the production class
+ * [DriveImpulseCounter], driven here by [DriveImpulseCandidate]), and
  * candidate **(a)**, the leaky integrator ([LeakyTracker] with a `leakTauS`),
  * are both here, each scored over the nine captures the proposal tabled and
  * over the whole-corpus truth set ([CandidateCorpus.truth]).
@@ -316,123 +320,47 @@ internal class LeakyTracker(
 }
 
 /**
- * Candidate (c): a velocity-free drive-impulse counter.
+ * Candidate (c), the velocity-free drive-impulse counter -- now a THIN WRAPPER
+ * over the production class, [DriveImpulseCounter].
  *
- * It reads the ONE signal the shipped tracker already publishes and nothing in
- * the rep decision consumes -- `LiveSetState.accelMps2`, the bias-corrected,
- * low-passed vertical acceleration -- and never integrates it. No velocity, no
- * ZUPT anchor, no displacement cap, so none of the three mechanisms that lost
- * issue #301's reps can reach it.
+ * ## There is one copy of the rule, and it is not here any more
  *
- * A rep is an upward phase above [DRIVE_ACCEL_THRESHOLD_MPS2] lasting at least
- * [DRIVE_MIN_PHASE_S] whose peak reaches [DRIVE_PEAK_ACCEL_MPS2], followed by a
- * downward phase below the negated threshold that BEGINS within
- * [DRIVE_MAX_GAP_S] of the upward phase's end and lasts [DRIVE_MIN_PHASE_S].
- * The rep is called at the instant the downward phase reaches that duration,
- * which is the earliest instant both terms hold and therefore the earliest a
- * voice could speak.
+ * This object held the state machine and four test-local `const val`s while the
+ * candidate was being scored. The owner chose candidate (c) on issue #301, so
+ * the rule moved to `:core:dsp`'s main source set and the four constants moved
+ * to [DspConfig] with their provenance written on them. What is left here is the
+ * harness: it feeds a [StreamingSetTracker] and a [DriveImpulseCounter] the same
+ * stream the app would and collects the instants the counter speaks at, so every
+ * table in [DriveImpulseCandidateTest] now measures the PRODUCTION class rather
+ * than a model of it.
  *
- * **The four constants are test-local `const val`s and belong nowhere else
- * yet.** They are fitted to one session, `DRIVE_PEAK_ACCEL_MPS2` most of all:
- * on field-43 it is the only term separating set 6's set-up pull from its real
- * pulls, and nothing guarantees that gap stays open on a different load, mount
- * or lifter. Putting them in `DspConfig` would make them look surveyed. Issue
- * #301's design round is where that decision is argued; this file only
- * measures.
- *
- * ## Sign, and the one place this model is weaker than it looks
- *
- * The drive-frame acceleration is `accelMps2 * sensorToLifter * driveSign`,
- * matching the velocity path's own mapping, so a drive-down lift and a
- * stack-mounted sensor are handled the same way the shipped run classifier
- * handles them. The THRESHOLDS are not converted: they are sensor-frame
- * numbers fitted on `travelRatio` 1.0 barbell work, so on a machine with a
- * pulley ratio they are applied in the wrong frame. That is one reason this
- * candidate under-counts the stack and machine captures, measured in
- * [DriveImpulseCandidateTest] rather than argued here, and it is why the
- * proposal scopes the candidate to sensor-counted barbell sets instead of
- * making it the counter everywhere.
+ * Keeping the name is deliberate. Issue #301's design round published its tables
+ * against "candidate (c)", and those tables re-derive here unchanged -- which is
+ * the licence that the extraction changed nothing. A second copy of the rule to
+ * compare against would be the repo's *duplicate documentation drifts* class in
+ * code: two statements of one decision, free to diverge on a number.
  */
 internal object DriveImpulseCandidate {
-    const val DRIVE_ACCEL_THRESHOLD_MPS2 = 1.0
-    const val DRIVE_MIN_PHASE_S = 0.12
-    const val DRIVE_PEAK_ACCEL_MPS2 = 2.0
-    const val DRIVE_MAX_GAP_S = 1.0
-
     /**
-     * The drive-frame acceleration series this candidate reads, as
-     * (elapsed seconds, m/s^2) pairs on the tracker's reconstructed clock.
-     */
-    fun series(
-        samples: List<ImuSample>,
-        direction: LiftDirection,
-        config: DspConfig = DspConfig(),
-    ): List<Pair<Double, Double>> {
-        val tracker = StreamingSetTracker.forLift(direction, config)
-        val sign = direction.sensorToLifter * if (direction.driveIsPositive) 1.0 else -1.0
-        return samples.map { sample ->
-            val state = tracker.feed(sample)
-            state.elapsedS to state.accelMps2 * sign
-        }
-    }
-
-    /** The instants, in seconds on the tracker's clock, at which this candidate would speak. */
-    fun callsAtS(samples: List<ImuSample>, direction: LiftDirection, config: DspConfig = DspConfig()): List<Double> =
-        callsFrom(series(samples, direction, config))
-
-    fun count(samples: List<ImuSample>, direction: LiftDirection, config: DspConfig = DspConfig()): Int =
-        callsAtS(samples, direction, config).size
-
-    /**
-     * The state machine, over an already-signed series so a test can drive it
-     * with a synthetic one.
+     * The instants, in seconds on the tracker's reconstructed clock, at which
+     * the drive-impulse counter speaks.
      *
-     * A second qualified drive arriving before the brake replaces the first
-     * rather than adding a call: two drives with no braking between them are
-     * one rep with a stall in it, not two reps. That is a decision, it is
-     * reachable on a grinding pull, and it is stated here because nothing in
-     * the field data of issue #301 exercises it.
+     * [LiveSetState.elapsedS] rather than the arrival stamp, because every
+     * window and every published figure in this harness is on that clock.
      */
-    fun callsFrom(series: List<Pair<Double, Double>>): List<Double> {
+    fun callsAtS(samples: List<ImuSample>, direction: LiftDirection, config: DspConfig = DspConfig()): List<Double> {
+        val tracker = StreamingSetTracker.forLift(direction, config)
+        val counter = DriveImpulseCounter(direction, config)
         val calls = mutableListOf<Double>()
-        var driveStartS = Double.NaN
-        var drivePeak = 0.0
-        var lastDriveSampleS = Double.NaN
-        var awaitUntilS = Double.NaN
-        var brakeStartS = Double.NaN
-        for ((timeS, accel) in series) {
-            if (accel > DRIVE_ACCEL_THRESHOLD_MPS2) {
-                if (driveStartS.isNaN()) {
-                    driveStartS = timeS
-                    drivePeak = accel
-                } else {
-                    drivePeak = max(drivePeak, accel)
-                }
-                lastDriveSampleS = timeS
-            } else if (!driveStartS.isNaN()) {
-                val longEnough = lastDriveSampleS - driveStartS >= DRIVE_MIN_PHASE_S
-                if (longEnough && drivePeak >= DRIVE_PEAK_ACCEL_MPS2) {
-                    awaitUntilS = lastDriveSampleS + DRIVE_MAX_GAP_S
-                    brakeStartS = Double.NaN
-                }
-                driveStartS = Double.NaN
-                drivePeak = 0.0
-            }
-            if (awaitUntilS.isNaN()) continue
-            if (accel < -DRIVE_ACCEL_THRESHOLD_MPS2) {
-                if (brakeStartS.isNaN()) brakeStartS = timeS
-                if (timeS - brakeStartS >= DRIVE_MIN_PHASE_S) {
-                    calls += timeS
-                    awaitUntilS = Double.NaN
-                    brakeStartS = Double.NaN
-                }
-            } else {
-                brakeStartS = Double.NaN
-                if (timeS > awaitUntilS) awaitUntilS = Double.NaN
-            }
+        for (sample in samples) {
+            val live = tracker.feed(sample)
+            if (counter.feed(live, sample.timestampMs) is RepCall.Speak) calls += live.elapsedS
         }
         return calls
     }
+
+    fun count(samples: List<ImuSample>, direction: LiftDirection, config: DspConfig = DspConfig()): Int =
+        callsAtS(samples, direction, config).size
 }
 
 /**

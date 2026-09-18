@@ -16,7 +16,8 @@ import com.macrophage.barspeed.data.SetJournalHeader
 import com.macrophage.barspeed.data.SetJournalStore
 import com.macrophage.barspeed.dsp.CadencePlan
 import com.macrophage.barspeed.dsp.LiftDirection
-import com.macrophage.barspeed.dsp.LiveRepCaller
+import com.macrophage.barspeed.dsp.LiveRepCounter
+import com.macrophage.barspeed.dsp.LiveRepCounters
 import com.macrophage.barspeed.dsp.LiveSetState
 import com.macrophage.barspeed.dsp.RepCall
 import com.macrophage.barspeed.dsp.SetAnalysis
@@ -3280,20 +3281,27 @@ data class RecordState(
  * touches state, the journal or the voice -- the view model does that with the
  * number this returns.
  *
- * `LiveRepCaller` applies `RepSegmenter`'s own pairing rule to the velocity
- * `StreamingSetTracker` publishes, so the number spoken comes from the BATCH
- * detector's rule over a causal estimate rather than from the tracker's second
- * statement of that rule. `LiveRepCall`'s KDoc states what is and is not shared
- * between the two.
+ * WHICH DETECTOR IT HOLDS IS NOT DECIDED HERE. `LiveRepCounters.forCounted`
+ * builds it from `LiveCounterPolicy`'s answer for the set's `RepCounter`, so
+ * this class holds a `LiveRepCounter` and the choice between the two detectors
+ * in `:core:dsp` is one row of a `when` in `:core:model` with a test on it
+ * (#301). Before that seam existed this constructed a `LiveRepCaller` directly
+ * and an `if` in `beginSet` decided whether to construct one at all.
+ *
+ * `LiveRepCaller`, the counter a sensor-counted set used from #286, applies
+ * `RepSegmenter`'s own pairing rule to the velocity `StreamingSetTracker`
+ * publishes, so its number comes from the BATCH detector's rule over a causal
+ * estimate rather than from the tracker's second statement of that rule.
+ * `LiveRepCall`'s KDoc states what is and is not shared between the two.
  *
  * THE SAMPLES IT SEES are whichever stream [LiveFeedPolicy.feedsTracker] has
  * latched (#210), so on a dual-sensor set where the armed unit falls behind
- * mid-set this count is made across a change of unit and [LiveRepCaller] is
+ * mid-set this count is made across a change of unit and the counter is
  * not reset at the switch; `sensors.analysedFellBack` on the exported row is
  * the only thing that says so.
  */
 private class SensorRepCounter {
-    private var caller: LiveRepCaller? = null
+    private var counter: LiveRepCounter? = null
 
     /** What the detector has called, 0 before the first rep and after a reset. */
     var called = 0
@@ -3314,12 +3322,18 @@ private class SensorRepCounter {
     /**
      * Arm for a set the sensor counts, or DISARM for one it does not.
      *
-     * A null direction is a set with another counter, and it clears the figures
-     * as well as the caller: a count left over from the last set would be read
-     * by [endSet]'s frozen write as this one's.
+     * BOTH decisions come from `LiveRepCounters.forCounted`: whether a live
+     * counter runs on a set with this [RepCounter] at all, and which of the two
+     * it is. A null result is a set with another counter, and it clears the
+     * figures as well as the counter -- a count left over from the last set
+     * would be read by [endSet]'s frozen write as this one's.
+     *
+     * [direction] is passed on every set, counted or not. It is the geometry the
+     * tracker beside this was built from, so a counter that does get built reads
+     * the same lift; on a set nothing counts it is simply unused.
      */
-    fun begin(direction: LiftDirection?) {
-        caller = direction?.let { LiveRepCaller(it) }
+    fun begin(setCounter: RepCounter, direction: LiftDirection) {
+        counter = LiveRepCounters.forCounted(setCounter, direction)
         called = 0
         correctionDelta = 0
     }
@@ -3330,7 +3344,7 @@ private class SensorRepCounter {
      * and every sample of a set nothing is counting.
      */
     fun feed(live: LiveSetState, timestampMs: Long): Int? {
-        val call = caller?.feed(live, timestampMs) ?: return null
+        val call = counter?.feed(live, timestampMs) ?: return null
         if (call !is RepCall.Speak) return null
         called = call.count
         return shown()
@@ -3943,11 +3957,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         sensorVoiceRuns =
             SetVoicePolicy.sensorCounts(guidedTempo != null, s.currentIsTimed, exercise.kind, s.imuConnected)
         sensorSpeaksPhaseSeconds = sensorCounted && guidedTempo != null
-        // The live rep caller (#145), armed for the first time here. Handed the
-        // direction the tracker beside it was built from, so both read the same
-        // lift; a caller built with a different geometry would call reps off a
-        // stroke the tracker is not integrating.
-        sensorCounter.begin(if (sensorCounted) exercise.liftDirection() else null)
+        // The live rep counter (#145), armed for the first time here. Handed the
+        // set's counter and the direction the tracker beside it was built from,
+        // so both read the same lift; a counter built with a different geometry
+        // would call reps off a stroke the tracker is not integrating. WHETHER a
+        // counter is built and WHICH one are both `LiveCounterPolicy`'s answer
+        // now, not an `if` here: this line used to read
+        // `begin(if (sensorCounted) exercise.liftDirection() else null)` (#301).
+        sensorCounter.begin(counter, exercise.liftDirection())
         // The word the prep of a hold or a carry ends on, at the instant the
         // set's clock starts. Non-null on every TIMED prep and on nothing else:
         // LeadInPolicy pairs the case with the word, so this is one decision

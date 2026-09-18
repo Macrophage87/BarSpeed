@@ -158,4 +158,68 @@ data class DspConfig(
      * argument this constant used to rest on.
      */
     val maxRunDisplacementM: Double = 2.0,
+    /**
+     * The acceleration a drive must exceed for [DriveImpulseCounter] to be
+     * watching a rep, m/s^2, in the DRIVE frame.
+     *
+     * ## Provenance: one session, and the harness that measured it
+     *
+     * This and the three values below are the constants issue #301's design
+     * round fitted on **field-43**, the first deadlift session with the sensor
+     * counting straight reps (`field-deadlift-straight-5rep-s43-set04`, `-05`,
+     * `-06`). They were test-local `const val`s in `LiveCountCandidates.kt`
+     * while the candidate was being scored and moved here when the candidate
+     * became production code; `DriveImpulseCandidateTest` is where every figure
+     * behind them re-derives, over those three captures and over the 33
+     * committed captures that carry a truth.
+     *
+     * **They are fitted, not surveyed.** One session, one lifter, one lift, two
+     * mounts, both on the bar's collars. Nothing here is calibrated across
+     * loads, bar types or mount positions, and a value in [DspConfig] reads as
+     * surveyed unless its KDoc says otherwise -- so this one says otherwise.
+     *
+     * The same number is the BRAKE threshold negated: a brake is the drive
+     * frame below `-this`. One constant rather than two because nothing in
+     * field-43 distinguishes them and a second fitted number would be a second
+     * thing to get wrong.
+     */
+    val driveAccelThresholdMps2: Double = 1.0,
+    /**
+     * How long a drive and a brake must each hold past
+     * [driveAccelThresholdMps2] before they count, s.
+     *
+     * Applied to BOTH phases, and it is the brake's copy that decides WHEN the
+     * rep is called: [DriveImpulseCounter] speaks at the instant the brake
+     * reaches this duration, which is the earliest instant both terms of the
+     * rule hold. On field-43 that lands 0.2-0.3 s before the velocity path's
+     * own call instant would, because acceleration leads velocity.
+     *
+     * Deliberately NOT [minPhaseS], which is 0.20 s and is a bound on a
+     * VELOCITY run. A drive impulse is shorter than the stroke it starts.
+     */
+    val driveMinPhaseS: Double = 0.12,
+    /**
+     * The peak a drive must reach to be a rep at all, m/s^2, drive frame.
+     *
+     * **This term does exactly one job on the evidence there is, and it is an
+     * accident of one session that it does it.** On field-43 set 6 the set-up
+     * pull -- the lifter taking the slack out of the bar before the rep -- sits
+     * below this value and every real pull above it, so it is the only thing
+     * excluding a call the voice actually made and the lifter did not earn.
+     * Relaxing it to 1.6 puts that call back and recovers neither of the two
+     * reps set 6 misses (`DriveImpulseCandidateTest`). Nothing guarantees the
+     * gap stays open on a different load, bar or lifter, which is the same
+     * thing [minRomM]'s KDoc records about its own accidental job.
+     */
+    val drivePeakAccelMps2: Double = 2.0,
+    /**
+     * How long after a qualified drive its brake may begin and still belong to
+     * the same rep, s.
+     *
+     * Measured from the drive's LAST sample above [driveAccelThresholdMps2]. A
+     * lockout longer than this leaves the rep uncalled rather than calling it
+     * late: an unpaired impulse is not a rep, because a lifter setting a bar
+     * down produces an impulse too.
+     */
+    val driveMaxGapS: Double = 1.0,
 )

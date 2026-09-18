@@ -151,7 +151,7 @@ sealed interface RepCall {
 class LiveRepCaller(
     private val direction: LiftDirection = LiftDirection(),
     private val config: DspConfig = DspConfig(),
-) {
+) : LiveRepCounter {
     private var timeS = DoubleArray(INITIAL_CAPACITY)
     private var accelMps2 = DoubleArray(INITIAL_CAPACITY)
     private var velocityMps = DoubleArray(INITIAL_CAPACITY)
@@ -203,7 +203,7 @@ class LiveRepCaller(
      * the reconstructed clock and not the arrival one, and the instant a cue
      * is written at has to be comparable with the other recorded streams.
      */
-    fun feed(live: LiveSetState, timestampMs: Long): RepCall {
+    override fun feed(live: LiveSetState, timestampMs: Long): RepCall {
         append(live)
         if (size < MIN_SAMPLES) return RepCall.Hold
         // MIXED FRAMES, deliberately, and stated because nothing in the type
@@ -218,7 +218,8 @@ class LiveRepCaller(
         //
         // It is safe only because RepSegmenter reads velocityMps and timeS and
         // nothing else. Any future consumer of accelMps2 from here must map it
-        // through sensorToLifter first.
+        // through sensorToLifter first. There is one now:
+        // DriveImpulseCounter reads accelMps2 and does exactly that.
         val series = VelocitySeries(
             timeS = timeS.copyOf(size),
             accelMps2 = accelMps2.copyOf(size),
