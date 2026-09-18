@@ -104,7 +104,10 @@ data class SessionEntity(
      * WRITTEN AT THE SESSION CLOSE, with the end time, from a list the app holds
      * in memory while the session runs -- [sessionRpe] and [hrvRmssdMs]'s
      * arrangement, and the same limit: a session the process does not survive
-     * records no skips.
+     * records no skips. The row is not what makes that necessary. It exists at
+     * every skip, because the control refuses the opening set of a block and a
+     * set of that block has therefore been recorded first; the write could
+     * happen at the tap and does not.
      */
     val skippedSetsJson: String? = null,
 )

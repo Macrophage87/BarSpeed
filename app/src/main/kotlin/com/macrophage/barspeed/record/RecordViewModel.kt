@@ -2826,12 +2826,13 @@ data class RecordState(
      * that survives exactly until the two disagree.
      *
      * HELD IN MEMORY UNTIL THE CLOSE, which is where the whole list is written
-     * as one column. No session row exists until the first set has been
-     * durably written, so a skip taken on the way to set one has nothing to
-     * attach to; the same limit [SessionRepository.endSession] already carries
-     * for `hrvRmssdMs` and the session rating. A session the process does not
-     * survive records no skips, and the export then reads exactly as it read
-     * before this existed.
+     * as one column -- and the exposure that buys, stated rather than excused.
+     * A `sessions` row already exists at every skip: `SkipSetControl.target`
+     * refuses `setIndexInExercise == 0`, so a set of the block has been
+     * recorded before any skip is offered, and the list could be written at the
+     * tap. It is not. It rides with `hrvRmssdMs` and the session rating, so a
+     * session the process does not survive publishes no skips -- and those
+     * holes read as the data loss this key was minted to rule out.
      */
     val skippedSets: List<SkippedSet> = emptyList(),
     val sessionId: Long? = null,

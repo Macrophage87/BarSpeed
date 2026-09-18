@@ -20,13 +20,13 @@ import kotlin.test.assertNull
  * not write it. The commit after this one is what makes them pass. The two that
  * do NOT fail here are named at the tests themselves.
  *
- * WHY THE WRITE IS HERE AT ALL, and not one write per tap. No session row exists
- * until the first set has been durably written -- `RecordViewModel`'s
- * `openSession` is called from the set-write path -- so a skip taken before the
- * first recorded set has nothing to attach to. The list therefore rides with the
- * close, beside `sessionRpe` and `hrvRmssdMs`, and carries their limit: a session
- * the process does not survive records no skips. That is stated in the commit
- * body and in [SessionEntity.skippedSetsJson] rather than hidden here.
+ * WHERE THE WRITE IS, and what that costs. The list rides to the close beside
+ * `sessionRpe` and `hrvRmssdMs` and carries their limit: a session the process
+ * does not survive records no skips. It is not a row that is missing at the tap
+ * -- `SkipSetControl.target` refuses the opening set of a block, so a set has
+ * been recorded and a `sessions` row exists before any skip is offered. Nothing
+ * in this file executes that path either way; the exposure is stated in the
+ * commit body and at [SessionEntity.skippedSetsJson].
  *
  * A separate file from [SessionRepositoryEndSessionTest], whose subject is the
  * four columns that function has always written and whose fake is shaped for

@@ -100,9 +100,11 @@ data class SessionExport(
      * CAPTURED AT THE SESSION CLOSE and nowhere else. The list is held in the
      * app's own memory while the session runs and is written with the end time,
      * so a session the process does not survive publishes no skips even where
-     * the lifter made some -- the same limit [sessionRpe] and the session's HRV
-     * carry, and for the same reason: no row exists to attach them to until the
-     * close.
+     * the lifter made some, and those holes read as the data loss this key was
+     * minted to rule out. The session row exists at every skip -- a set of the
+     * block has been recorded before a skip is offered -- so the write could
+     * happen at the tap; it rides to the close with [sessionRpe] and the
+     * session's HRV instead.
      */
     val skippedSets: List<SkippedSet> = emptyList(),
     val exercises: List<ExerciseExport>,

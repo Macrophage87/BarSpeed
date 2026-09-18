@@ -1804,9 +1804,19 @@ private fun RemoveSetSection(state: RecordState, viewModel: RecordViewModel) {
  * visible rather than merely enforced. [SkipSetControl] refuses an APPENDED
  * upcoming slot, which [RemoveSetSection] above takes back instead, and refuses
  * a block OPENER, because dropping the first set of a block is dropping the
- * exercise rather than a set of it. On READY the coming set is always the
- * session's first, so nothing is drawn there at all; on the last-set branch
- * there is no upcoming slot. The lifter never taps a control that refuses.
+ * exercise rather than a set of it. The lifter never taps a control that
+ * refuses.
+ *
+ * WHICH SET IT NAMES ON READY, and it is not always the session's first.
+ * `upcomingIndex` is `queueIndex + 1` only while the stage is RESTING and is
+ * `queueIndex` otherwise. On the session's own READY the coming set IS the
+ * first, a block opener, so nothing is drawn. READY also renders after a
+ * body-weight refusal taken from the rest screen -- [BodyWeightRequiredDialog]'s
+ * KDoc states that door: `startNextSet` has already advanced the queue, so
+ * CANCEL leaves the lifter on READY with `upcomingIndex` naming the set that
+ * did not start. The control draws there, and skipping it drops that set. The
+ * rest screen's own last-set branch draws no [NextSetControlsRow] at all, so
+ * this section is not reached from it.
  *
  * CONFIRMED, WHERE ITS PAIR IS NOT, and the difference is what a mis-tap costs.
  * Removing an appended set can be undone exactly -- ADD SET rebuilds it from the
