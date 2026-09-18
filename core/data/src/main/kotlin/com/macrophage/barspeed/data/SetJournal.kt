@@ -524,29 +524,63 @@ class SetJournalStore(
      * the directory a person reads first, and the recorded key naming a role
      * says which unit was ARMED while its name said which was analysed.
      *
-     * A stream that will not read is skipped rather than failing the export.
+     * A stream that will not OPEN is skipped rather than failing the export.
      * Some of the capture is worth more than none of it, and the whole reason
-     * this file exists is that the process was killed partway.
+     * this file exists is that the process was killed partway. A stream that
+     * opens and then fails partway through the copy leaves a SHORT entry
+     * instead, because the entry's header is written before its bytes are --
+     * the window [RescuedDatabaseStore.zipTo] refuses to accept for a
+     * database file and this one can, for the reason that function states:
+     * a partial CSV capture is still independently useful, a partial
+     * database is not.
      *
-     * WRITTEN INTO A FILE RATHER THAN RETURNED AS BYTES (#273). A journal
-     * directory has no size bound -- the capture behind #271 was a 314.6 MB
-     * `imu.csv` -- and the listing is bounded now, so the recovery card
-     * draws for a capture that large and SEND IT TO ME is live on it. An
-     * archive accumulated in a `ByteArrayOutputStream` and handed back as a
-     * ByteArray is one full-size copy in the heap, and `ShareUtil.shareFile`
-     * writing it out is a second. This writes through
-     * `ShareUtil.shareStreamed` into the share cache instead, the shape
-     * [RescuedDatabaseStore.zipTo] already uses for the same reason.
+     * NOTHING IS READ WHOLE EXCEPT `header.json` (#273). Each stream is
+     * copied through one [JournalScanPolicy.BUFFER_BYTES] buffer, so peak
+     * heap here is that buffer whatever the file turns out to be. A journal
+     * directory has no size bound -- the capture behind #271 was 314.6 MB --
+     * and the listing is bounded now, so the recovery card draws for one
+     * that large and SEND IT TO ME is live on it. `file.readBytes()` per
+     * entry was what stood here, and inside this `runCatching` an
+     * OutOfMemoryError from it was SWALLOWED: the archive went to the share
+     * sheet without the capture's largest stream, looking complete. Silent
+     * data loss on the one path this data has off the phone, which is worse
+     * than the crash issue #273 predicted.
+     *
+     * `header.json` is the exception in both directions -- it is published
+     * rather than copied, so it has to be parsed, so it is read whole. It is
+     * bounded UPSTREAM rather than here: [read] refuses a directory whose
+     * header is larger than [JournalScanPolicy.HEADER_MAX_BYTES], so an
+     * [OrphanedSet] this function can be handed cannot carry a large one.
+     * That is where the bound lives; there is no second check here.
+     *
+     * WRITTEN INTO A FILE RATHER THAN RETURNED AS BYTES, which is the other
+     * half of the same defect. An archive accumulated in a
+     * `ByteArrayOutputStream` and handed back as a ByteArray is one
+     * full-size copy in the heap, and `ShareUtil.shareFile` writing it out
+     * is a second -- so streaming the input while returning the output as
+     * bytes would have fixed nothing on an incompressible capture. This
+     * writes through `ShareUtil.shareStreamed` into the share cache
+     * instead, the shape [RescuedDatabaseStore.zipTo] already uses.
      */
     fun zipTo(orphan: OrphanedSet, destination: File) {
         FileOutputStream(destination).use { fileOut ->
             ZipOutputStream(fileOut).use { zip ->
                 orphan.directory.listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }.forEach { file ->
                     runCatching {
-                        val bytes =
-                            if (file.name == HEADER_FILE) publishedHeader(orphan, file) else file.readBytes()
-                        zip.putNextEntry(ZipEntry(file.name))
-                        zip.write(bytes)
+                        if (file.name == HEADER_FILE) {
+                            val bytes = publishedHeader(orphan, file)
+                            zip.putNextEntry(ZipEntry(file.name))
+                            zip.write(bytes)
+                        } else {
+                            // Opened BEFORE the entry is begun, so a file that
+                            // cannot be opened at all is skipped with no entry
+                            // written for it -- the behaviour the whole-file read
+                            // had, kept.
+                            file.inputStream().use { source ->
+                                zip.putNextEntry(ZipEntry(file.name))
+                                source.copyTo(zip, JournalScanPolicy.BUFFER_BYTES)
+                            }
+                        }
                         zip.closeEntry()
                     }
                 }

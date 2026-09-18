@@ -265,12 +265,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      *
      * Streamed through [ShareUtil.shareStreamed] rather than
      * [ShareUtil.shareFile], with `SetJournalStore.zipTo` writing the archive
-     * into the share cache itself (#273). A journal directory has no size
-     * bound: the capture behind #271 was a 314.6 MB `imu.csv`, and now that
-     * the listing is bounded the card draws for one and this button is live
-     * on it. Taking the archive back as a ByteArray here would put a
-     * full-size copy in the heap on the way to a file the share sheet reads
-     * from anyway.
+     * into the share cache itself and copying each stream through a fixed
+     * buffer (#273). A journal directory has no size bound: the capture
+     * behind #271 was a 314.6 MB `imu.csv`, and now that the listing is
+     * bounded the card draws for one and this button is live on it. Taking
+     * the archive back as a ByteArray here would put a full-size copy in the
+     * heap on the way to a file the share sheet reads from anyway.
      *
      * Deliberately does NOT discard afterwards. Sharing can fail at the share
      * sheet, silently as far as this code can tell, and a capture deleted on
@@ -413,9 +413,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      *
      * Streamed through `ShareUtil.shareStreamed` rather than read into a
      * ByteArray. A crash file is bounded by construction and this is
-     * belt-and-braces, but #273 is the same shape one step along --
-     * `SetJournalStore.zipTo` reads every stream whole and is expected to run
-     * out of heap on an oversize journal -- and the trust is cheap to remove.
+     * belt-and-braces, but #273 was the same shape one step along --
+     * `SetJournalStore.zipTo` read every stream whole, and on an oversize
+     * journal the archive was shared without it -- and the trust is cheap to
+     * remove.
      *
      * Deliberately does NOT delete afterwards, the rule [shareInterrupted]
      * and [shareRescued] already follow: a share can fail at the sheet,
