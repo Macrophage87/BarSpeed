@@ -107,18 +107,21 @@ sealed interface LiveFallback {
  * channel.
  *
  * IN PRACTICE THE UNMEASURED ROW IS THE COMMON ONE, and that is stated rather
- * than discovered later. [LiveFeedPolicy]'s switch condition requires the armed
- * unit to be under [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] frames while the
- * partner is that many ahead, so it fires within roughly the first tenth of a
- * second of the set at the WT901's configured 100 Hz output -- before the
- * partner's own working window holds
- * [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES] samples in most shapes. The usual
- * answer at a real switch is therefore [LiveFallback.Withhold], and
- * [LiveFallback.Rebuild] is the narrower case where the partner had already
- * been streaming through a started working window. WHICH OF THE TWO A REAL
- * DUAL SESSION PRODUCES HAS NOT BEEN MEASURED: no capture in this repository
- * holds a dual set with both units streaming, and the fallback has never been
- * observed firing on a device. It is a field question and is raised as one.
+ * than discovered later. [LiveFeedPolicy]'s switch fires very early -- replayed
+ * over the fourteen two-stream captures on this tree it moves the readout on
+ * four of them, all field-42, between 27 and 89 ms into the capture;
+ * [LiveFeedPolicy] holds the figures. A working window has not opened by then,
+ * and `RecordViewModel.liveFallbackAt` reports
+ * [StackMountSignal.UNMEASURED] wherever the set has no work start rather than
+ * taking a roll range over a set that has not begun. So the answer at a real
+ * switch on a sensor-COUNTED set is always [LiveFallback.Withhold], and
+ * [LiveFallback.Rebuild] is reachable only where a prep ran. That call and what
+ * it costs are argued at `liveFallbackAt`; a live signature with a window and a
+ * provenance of its own is a narrower repair and is not attempted here.
+ *
+ * THE FALLBACK HAS NEVER BEEN OBSERVED FIRING ON A DEVICE. The replay above is
+ * over archived streams, and which role each of those sets armed is not
+ * recorded. It is a field question and is raised as one.
  *
  * ## What it decides nothing about
  *
@@ -172,12 +175,11 @@ object LiveFallbackPolicy {
      * @param signal what the stream now feeding the tracker says about riding
      *   the load, from `StackRollSignature` over its working window so far.
      *
-     * THIS BODY IS TODAY'S RULE AND NOT THE RULE THE KDOC ABOVE DESCRIBES.
-     * Every input returns [LiveFallback.Continue], which is exactly what the
-     * live readout does now: it goes on counting across the switch whatever the
-     * declaration says. The seam is landed first, with its two unchanged rows
-     * pinned, so that the rows that CHANGE can be pushed as failing tests at
-     * their own SHA before any of them passes. Rules 3 and 4 arrive there.
+     * THE FAILURE DIRECTION OF EVERY BRANCH IS "STOP COUNTING", never "count
+     * under the declaration anyway". A withheld count costs the lifter the
+     * in-set readout on a set whose raw capture is untouched and whose summary
+     * arrives on the rest screen; the other direction costs them a number they
+     * lift to and correct by hand, and a hand correction is captured once.
      */
     fun atSwitch(
         switched: Boolean,
@@ -186,12 +188,12 @@ object LiveFallbackPolicy {
         signal: StackMountSignal,
     ): LiveFallback {
         if (!switched) return LiveFallback.Continue
-        if (!declaresStackMount && !declaresOtherMount) return LiveFallback.Continue
+        if (declaresOtherMount) return LiveFallback.Withhold
+        if (!declaresStackMount) return LiveFallback.Continue
         return when (signal) {
-            StackMountSignal.ON_STACK,
-            StackMountSignal.NOT_ON_STACK,
-            StackMountSignal.UNMEASURED,
-            -> LiveFallback.Continue
+            StackMountSignal.ON_STACK -> LiveFallback.Rebuild(sensorOnStack = true)
+            StackMountSignal.NOT_ON_STACK -> LiveFallback.Rebuild(sensorOnStack = false)
+            StackMountSignal.UNMEASURED -> LiveFallback.Withhold
         }
     }
 }

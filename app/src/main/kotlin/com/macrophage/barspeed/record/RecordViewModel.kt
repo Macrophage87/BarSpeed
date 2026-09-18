@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.LiftingApp
+import com.macrophage.barspeed.RecordingHolds
 import com.macrophage.barspeed.SettingsStore
 import com.macrophage.barspeed.VoiceCounter
 import com.macrophage.barspeed.ble.AutoConnectManager
@@ -52,6 +53,9 @@ import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.Implement
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.LeadInPolicy
+import com.macrophage.barspeed.model.LiveCountReadout
+import com.macrophage.barspeed.model.LiveFallback
+import com.macrophage.barspeed.model.LiveFallbackPolicy
 import com.macrophage.barspeed.model.LiveFeed
 import com.macrophage.barspeed.model.LiveFeedPolicy
 import com.macrophage.barspeed.model.Phase
@@ -91,6 +95,7 @@ import com.macrophage.barspeed.model.SideChoicePolicy
 import com.macrophage.barspeed.model.SkipSetControl
 import com.macrophage.barspeed.model.SkipSetTarget
 import com.macrophage.barspeed.model.SkippedSet
+import com.macrophage.barspeed.model.StackMountSignal
 import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
@@ -758,6 +763,92 @@ internal fun liveFeedOf(
 }
 
 /**
+ * What the live readout does at the switch [liveFeedOf] just reported (#280).
+ *
+ * `RecordViewModel` built the live tracker once, at `beginSet`, from the
+ * geometry declared for the ARMED unit, and [LiveFeedPolicy] could then move
+ * the feed to the partner's stream with nothing re-deriving that geometry and
+ * nothing refusing. So the lifter read reps counted off one unit's stream under
+ * the other unit's mounting -- the live twin of the analysis `SetAnalyzer`
+ * refuses after the fact (#247), and the reason the in-set screen counted while
+ * the rest screen published nothing.
+ *
+ * A free function for [liveFeedOf]'s reason, and pinned by `LiveFallbackTest`.
+ * The DECISION is [LiveFallbackPolicy.atSwitch]'s, in `:core:model` where a
+ * test runs on it, and the measurement is `StackRollSignature`'s, in `:core:dsp`
+ * with the rest of the signal processing. What is left here is the two things
+ * only this module knows: which of the two buffers belongs to the role now
+ * feeding, and that the working window is still OPEN.
+ *
+ * WHICH BUFFER IS THE WHOLE RISK IN THIS FUNCTION. Measuring one unit's roll
+ * and handing the verdict to the other reverses the repair silently -- it would
+ * rebuild the tracker under the mounting of the unit that stopped feeding,
+ * which is the defect. [feed]'s role is compared against [secondaryRole], the
+ * only role that is not the armed one, so the armed buffer is what a null or an
+ * armed role selects.
+ *
+ * THE WINDOW IS OPEN, which is why [SetEnd.NotCued] is passed rather than
+ * `SetEnd.of` over the cue track: the set has not been called over -- it is
+ * still running -- so there is no terminal instant and none may be invented.
+ *
+ * NO WORK START, NO VERDICT, and this is the sharpest decision in the function.
+ * `StackRollSignature`'s bound was fitted over thirty-six streams' WORKING
+ * windows, whole ones -- cue-bounded on thirty-two of them and from the work
+ * start on the other two. That type does say a capture with neither bound is
+ * judged over "its whole capture", and that the looser window can only refuse a
+ * stack candidate and never invent one; BOTH of those sentences are about a
+ * COMPLETE capture and neither transfers to a partial one. Live, the capture so
+ * far at a switch is tens of milliseconds:
+ * [com.macrophage.barspeed.model.LiveFeedPolicy] moves the feed as soon as one
+ * unit is [com.macrophage.barspeed.model.SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]
+ * frames ahead of an armed unit that is under it. A roll range taken over that
+ * is a measurement of a set that has not started, every unit is still, and it
+ * reads ON_STACK -- which would re-apply the very declaration this change
+ * exists to stop re-applying. Applying a bound fitted on one interval to a
+ * different one is the repo's *wrong pair* class, so the verdict is taken as
+ * [StackMountSignal.UNMEASURED] wherever the set has no work start at all.
+ *
+ * WHAT THAT COSTS, stated rather than left to be discovered.
+ * [workStartedAtMs] is written only on a TIMED prep and at a cadence's first
+ * stroke, so it is null on every straight-reps set -- which is every set the
+ * sensor COUNTS. So on the population issue #280 is about, the answer at a
+ * switch is always `Withhold`, and `Rebuild` is reachable only on a set whose
+ * prep ran and whose live tracker is feeding velocity rather than a count. That
+ * is the conservative direction and it is the direction #247 already chose at
+ * set end; a live signature with a window and a provenance of its own is a
+ * narrower repair and is not attempted here.
+ *
+ * IT DECIDES NOTHING ABOUT WHAT IS RECORDED and reads no buffer it can write.
+ * Both lists are handed over read-only and the answer changes neither.
+ */
+internal fun liveFallbackAt(
+    feed: LiveFeed,
+    declared: LiftDirection,
+    secondaryRole: SensorRole?,
+    analysedBuffer: List<ImuSample>,
+    secondaryBuffer: List<ImuSample>,
+    workStartedAtMs: Long?,
+): LiveFallback {
+    val feeding =
+        if (secondaryRole != null && feed.role == secondaryRole) secondaryBuffer else analysedBuffer
+    return LiveFallbackPolicy.atSwitch(
+        switched = feed.switched,
+        declaresStackMount = declared.sensorOnStack,
+        declaresOtherMount = declared.mountSpecificBesidesStack,
+        signal = liveStackSignal(feeding, workStartedAtMs),
+    )
+}
+
+/**
+ * The roll verdict for a stream mid-set, or [StackMountSignal.UNMEASURED] where
+ * the set has no working window to take one over. See [liveFallbackAt].
+ */
+private fun liveStackSignal(feeding: List<ImuSample>, workStartedAtMs: Long?): StackMountSignal = when {
+    workStartedAtMs == null -> StackMountSignal.UNMEASURED
+    else -> StackRollSignature.of(feeding, workStartedAtMs, SetEnd.NotCued)
+}
+
+/**
  * Everything frozen onto a set that is ending: which buffer the DSP is pointed
  * at, what the row says about that choice (#207), and which armed links were
  * silent across the whole set with what the app could see of each (#213).
@@ -1193,6 +1284,77 @@ private fun CoroutineScope.openSecondaryCollector(
         onLive(sample)
     }
 }
+
+/**
+ * Run the frozen set-write, and keep the recording service up for exactly as
+ * long as it is in flight.
+ *
+ * Lifted out of [RecordViewModel] for [liveFeedOf]'s reason -- that class is
+ * what detekt's `LargeClass` counts against a default of 600 -- and moved with
+ * nothing changed: the same order, the same two catch clauses, the same
+ * `finally`.
+ *
+ * THE CANCELLATION CLAUSE IS FIRST AND RETHROWS, because a cancelled write is
+ * not a failed one and must not paint SAVE THIS SET AGAIN over a set that was
+ * stored. The broad clause below it is deliberate: whatever failed, the set is
+ * still only in memory, and the one thing that must not happen is the screen
+ * moving on as though it had been stored.
+ *
+ * THE HOLD IS RELEASED ON BOTH TERMINAL BRANCHES. A write that failed is still
+ * a write that is over: if the lifter is still here their own hold keeps the
+ * service up behind SAVE THIS SET AGAIN, and if they have gone the buffers went
+ * with the ViewModel and there is nothing left for the service to protect.
+ */
+private fun launchSetWrite(
+    pending: PendingSetWrite,
+    stateFlow: MutableStateFlow<RecordState>,
+    holds: RecordingHolds,
+    scope: CoroutineScope,
+    write: suspend (PendingSetWrite) -> Unit,
+) {
+    stateFlow.value = stateFlow.value.copy(setWrite = SetWriteState.IN_FLIGHT)
+    holds.acquire(RecordingHold.SET_WRITE)
+    scope.launch(Dispatchers.Main.immediate) {
+        try {
+            write(pending)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            stateFlow.value = stateFlow.value.copy(setWrite = SetWriteState.FAILED)
+        } finally {
+            holds.release(RecordingHold.SET_WRITE)
+        }
+    }
+}
+
+/**
+ * The rest countdown: one tick a second down to zero, with the last three
+ * seconds and the end spoken.
+ *
+ * Lifted out of [RecordViewModel] for [liveFeedOf]'s reason -- that class is
+ * what detekt's `LargeClass` counts against a default of 600. Behaviour is
+ * unchanged: the same loop, the same constant, the same two utterances.
+ *
+ * [speak] is passed rather than the `VoiceCounter` field, for
+ * [openSecondaryCollector]'s reason: the field is cleared at `onCleared` and a
+ * captured reference would outlive it. Nothing is written to the cue track
+ * here, which is what it was before -- a rest countdown is not part of any
+ * set's record.
+ */
+private fun CoroutineScope.restCountdown(stateFlow: MutableStateFlow<RecordState>, speak: (String) -> Unit): Job =
+    launch {
+        while (stateFlow.value.restRemainingS > 0) {
+            delay(1_000)
+            val remaining = stateFlow.value.restRemainingS - 1
+            stateFlow.value = stateFlow.value.copy(restRemainingS = remaining)
+            if (stateFlow.value.audioCues) {
+                when (remaining) {
+                    in 1..RecordViewModel.REST_COUNTDOWN_FROM_S -> speak(remaining.toString())
+                    0 -> speak("Rest over")
+                }
+            }
+        }
+    }
 
 /**
  * The four instants [mirrorLinkStates] mirrors in one write (#213).
@@ -2093,6 +2255,9 @@ private fun inSetState(
     // would be drawn as this one's until the detector resolves a drive.
     sensorCounted = sensorCounted,
     sensorReps = 0,
+    // Cleared with the count it qualifies. A set that gave up its count must
+    // not start the NEXT one with a blank ring (#280).
+    liveCountWithheld = false,
     guidedSet = guidedSet,
     guidedLabel = "",
     guidedCountdown = 0,
@@ -2826,6 +2991,29 @@ data class RecordState(
      * been resolved yet.
      */
     val sensorReps: Int = 0,
+    /**
+     * True once the live count has been GIVEN UP for the rest of this set
+     * (#280).
+     *
+     * A distinct state and not a [sensorReps] of 0: zero is a count, and a
+     * lifter glancing at the ring reads it as a detector that has missed every
+     * rep. [LiveCountReadout] is what the screen asks for every figure derived
+     * from the count, so the number, the arc and the cadence line cannot
+     * disagree about whether there is one.
+     *
+     * Set when [LiveFeedPolicy] moves the readout to the partner unit's stream
+     * on a set whose declaration describes a MOUNT rather than the lift, and the
+     * geometry of the unit now feeding is not one anything measured.
+     * `LiveFallbackPolicy` is the rule. Cleared at the start of every set, and
+     * never cleared within one: the decision is taken on the frame of the
+     * switch and stands.
+     *
+     * IT SAYS NOTHING ABOUT WHAT WAS RECORDED. Both buffers, both journals and
+     * both archived raw streams are exactly what they would have been, and the
+     * set's own figures still come from `AnalysedRolePolicy` and `SetAnalyzer`
+     * over the whole set -- which the rest screen shows as it always did.
+     */
+    val liveCountWithheld: Boolean = false,
     /** Active guided-cadence set: the app calls the tempo and counts the reps. */
     val guidedSet: Boolean = false,
     val guidedLabel: String = "",
@@ -3451,6 +3639,32 @@ private class SensorRepCounter {
     }
 
     /**
+     * Rebuild the detector for a new geometry mid-set, and report the count the
+     * set now stands at (#280).
+     *
+     * WHAT IS DISCARDED is the detector and its own count; what is KEPT is
+     * [correctionDelta], because that is the lifter's statement and nothing
+     * about the sensor's mounting makes it wrong. Wiping it would delete a `+1
+     * REP` tap the lifter had already made and heard.
+     *
+     * The discarded count is whatever the detector had called off the unit that
+     * stopped feeding, which the switch's own condition bounds at fewer than
+     * `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES` frames. It is written as a
+     * reset rather than relied on as a no-op: nothing here measures what a live
+     * detector calls in seven frames, and the honest form is to not depend on
+     * it.
+     *
+     * A null [setCounter] cannot reach here -- the caller only rebuilds where a
+     * tracker was running -- but [begin]'s own rule is reused rather than
+     * restated, so a set with no live counter rebuilds to no live counter.
+     */
+    fun rebuild(setCounter: RepCounter, direction: LiftDirection): Int {
+        counter = LiveRepCounters.forCounted(setCounter, direction)
+        called = 0
+        return shown()
+    }
+
+    /**
      * One published sample. The count to SAY where the detector called a rep,
      * and null where it said nothing -- which is every sample but one per rep,
      * and every sample of a set nothing is counting.
@@ -3589,6 +3803,21 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Which role's samples are reaching the tracker, this set: [liveFeedOf] (#210). */
     private var liveFedBy: SensorRole? = null
+
+    /**
+     * The geometry this set's live tracker was built from, frozen at [beginSet]
+     * (#280).
+     *
+     * Frozen for [armedSensors]' reason and for one more: it is the declaration
+     * a fallback has to be judged against, and re-reading
+     * `currentExercise.liftDirection()` at the switch would read whatever the
+     * screen's selection says at that instant rather than what this set was
+     * armed as.
+     *
+     * Null between sets, and null is what makes [applyLiveFallback] a no-op on
+     * a frame that somehow arrives outside a set.
+     */
+    private var liveDirection: LiftDirection? = null
     private var hrJob: Job? = null
     private var tickJob: Job? = null
     private var restJob: Job? = null
@@ -3994,8 +4223,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = startedFromReadyState(stateFlow.value).copy(askingSessionRpe = false)
         val s = stateFlow.value
         val exercise = s.currentExercise
-        val tracker = StreamingSetTracker.forLift(exercise.liftDirection())
+        // ONE statement of this set's geometry, read here and frozen below. The
+        // tracker, the live counter and the fallback rule at a feed switch all
+        // have to be judged against the same declaration; three reads of
+        // `exercise.liftDirection()` are three facts that can disagree (#280).
+        val direction = exercise.liftDirection()
+        val tracker = StreamingSetTracker.forLift(direction)
         this.tracker = tracker
+        liveDirection = direction
         imuBuffer.clear()
         imuBufferB.clear()
         hrBuffer.clear()
@@ -4076,7 +4311,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // counter is built and WHICH one are both `LiveCounterPolicy`'s answer
         // now, not an `if` here: this line used to read
         // `begin(if (sensorCounted) exercise.liftDirection() else null)` (#301).
-        sensorCounter.begin(counter, exercise.liftDirection())
+        sensorCounter.begin(counter, direction)
         // The word the prep of a hold or a carry ends on, at the instant the
         // set's clock starts. Non-null on every TIMED prep and on nothing else:
         // LeadInPolicy pairs the case with the word, so this is one decision
@@ -4175,10 +4410,73 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         if (LiveFeedPolicy.feedsTracker(liveFeedNow(), armedSecondaryRole ?: return)) feedTracker(sample)
     }
 
-    /** Which stream feeds the readout, and the latch with it: [liveFeedOf]. */
+    /**
+     * Which stream feeds the readout, the latch with it, and -- on the one frame
+     * that MOVES it -- what the live count does about the change of unit.
+     *
+     * [liveFeedOf] is the stream decision and [applyLiveFallback] the count's
+     * (#280). Both are asked here rather than at the two call sites so that the
+     * fallback is asked exactly once per switch: [LiveFeed.switched] is true on
+     * one call only, and a second asking after the latch has moved would read it
+     * false and decide nothing.
+     */
     private fun liveFeedNow(): LiveFeed =
         liveFeedOf(armedSensors, armedSecondaryRole, liveFedBy, imuBuffer.size, imuBufferB.size)
-            .also { liveFedBy = it.role }
+            .also {
+                liveFedBy = it.role
+                if (it.switched) applyLiveFallback(it)
+            }
+
+    /**
+     * The live count's answer to a feed switch: carry on, rebuild under a
+     * measured geometry, or give the count up for the rest of the set (#280).
+     *
+     * The DECISION is [liveFallbackAt]'s and through it
+     * `LiveFallbackPolicy.atSwitch`'s, which is also where every reason is
+     * written down. What is here is what has to happen to this object, and the
+     * three branches are inline rather than three functions because
+     * `RecordViewModel` is what detekt's `LargeClass` counts.
+     *
+     * REBUILD REPLACES THE TRACKER rather than carrying it over, which is what
+     * #210 deliberately did not do: its integrator state was built from the
+     * armed unit's frames, and folding one unit's motion into the other's
+     * integral is the thing this change exists to stop. The switch's own
+     * condition bounds what is thrown away at fewer than
+     * `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES` frames, and the lifter's
+     * `+1 REP` taps survive it -- `SensorRepCounter.rebuild` keeps the
+     * correction offset. Nothing is said out loud: the count continues, and a
+     * word at a switch the lifter cannot feel is noise on the channel the count
+     * itself comes down.
+     *
+     * WITHHOLD DROPS THE TRACKER, so [feedTracker] returns on its first line
+     * for every remaining frame: no velocity published, no phase second spoken,
+     * no rep called. NOTHING THAT RECORDS IS TOUCHED -- [onSample] appends to
+     * [imuBuffer] and the journal before it asks whether the tracker is fed,
+     * the secondary collector appends before it asks at all, and both raw
+     * streams reach the archive whole. One word is said once, through
+     * [speakCue] so the instant is on the set's cue track, and only where the
+     * sensor's voice was the thing counting and cues are on -- the gate every
+     * other in-set word is under. On a set recorded with the voice off nothing
+     * is said and no cue row is written; the ring still stops.
+     */
+    private fun applyLiveFallback(feed: LiveFeed) {
+        val declared = liveDirection ?: return
+        val answer = liveFallbackAt(feed, declared, armedSecondaryRole, imuBuffer, imuBufferB, workStartedAtMs)
+        when (answer) {
+            LiveFallback.Continue -> Unit
+            is LiveFallback.Rebuild -> {
+                val measured = declared.forMeasuredMount(answer.sensorOnStack)
+                tracker = StreamingSetTracker.forLift(measured)
+                stateFlow.value = stateFlow.value
+                    .copy(live = LiveSetState(), sensorReps = sensorCounter.rebuild(setCounter, measured))
+            }
+            LiveFallback.Withhold -> {
+                tracker = null
+                stateFlow.value = stateFlow.value.copy(liveCountWithheld = true, live = LiveSetState())
+                if (sensorVoiceRuns && stateFlow.value.audioCues) speakCue(LiveFallbackPolicy.WITHHELD_CUE)
+            }
+        }
+    }
 
     /** The body [onSample] carried until #210, now reachable from either collector. */
     private fun feedTracker(sample: ImuSample) {
@@ -4211,7 +4509,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * `StreamingSetTracker.repCount` while the row stored the segmenter's.
      */
     private fun saySensorCount(shown: Int) {
-        stateFlow.value = stateFlow.value.copy(sensorReps = shown)
+        // The withhold goes with it. After [withholdLiveCount] the tracker is
+        // gone, so the SENSOR cannot reach this function again for the rest of
+        // the set; a number arriving here after a withhold can only be the
+        // lifter's own `+1 REP` tap, and the ring may draw a figure the lifter
+        // stated (#280).
+        stateFlow.value = stateFlow.value.copy(sensorReps = shown, liveCountWithheld = false)
         if (stateFlow.value.audioCues) milestones.announceRep(shown)
     }
 
@@ -4785,29 +5088,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * the rating, the wall times — exists in this process and nowhere else
      * until the insert lands.
      */
+    /**
+     * A free function since #280, for [liveFeedOf]'s reason: `RecordViewModel`
+     * is what detekt's `LargeClass` counts, and lifting this block out is what
+     * makes room for the fallback branches this issue adds. Nothing about the
+     * write moved -- the same order, the same two catch clauses and the same
+     * `finally`.
+     */
     private fun launchSetWrite() {
         val pending = pendingWrite ?: return
-        stateFlow.value = stateFlow.value.copy(setWrite = SetWriteState.IN_FLIGHT)
-        holds.acquire(RecordingHold.SET_WRITE)
-        container.appScope.launch(Dispatchers.Main.immediate) {
-            try {
-                runSetWrite(pending)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                // Deliberately broad. Whatever failed, the set is still only in
-                // memory, and the one thing that must not happen is the screen
-                // moving on as though it had been stored.
-                stateFlow.value = stateFlow.value.copy(setWrite = SetWriteState.FAILED)
-            } finally {
-                // Both terminal branches. A write that failed is still a write
-                // that is over: if the lifter is still here their own hold keeps
-                // the service up behind SAVE THIS SET AGAIN, and if they have
-                // gone the buffers went with the ViewModel and there is nothing
-                // left for the service to protect.
-                holds.release(RecordingHold.SET_WRITE)
-            }
-        }
+        launchSetWrite(pending, stateFlow, holds, container.appScope) { runSetWrite(it) }
     }
 
     private suspend fun runSetWrite(p: PendingSetWrite) {
@@ -4960,22 +5250,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         startRestCountdown()
     }
 
+    /**
+     * A free function since #280, for [liveFeedOf]'s reason: `RecordViewModel`
+     * is what detekt's `LargeClass` counts, and lifting this loop out of the
+     * class is what makes room for the fallback branches above.
+     * Behaviour-preserving -- the same loop over the same flow, with the voice
+     * passed in rather than read from the field.
+     */
     private fun startRestCountdown() {
         restJob?.cancel()
-        restJob =
-            viewModelScope.launch {
-                while (stateFlow.value.restRemainingS > 0) {
-                    delay(1_000)
-                    val remaining = stateFlow.value.restRemainingS - 1
-                    stateFlow.value = stateFlow.value.copy(restRemainingS = remaining)
-                    if (stateFlow.value.audioCues) {
-                        when (remaining) {
-                            in 1..REST_COUNTDOWN_FROM_S -> voice?.speak(remaining.toString())
-                            0 -> voice?.speak("Rest over")
-                        }
-                    }
-                }
-            }
+        restJob = viewModelScope.restCountdown(stateFlow) { voice?.speak(it) }
     }
 
     /**

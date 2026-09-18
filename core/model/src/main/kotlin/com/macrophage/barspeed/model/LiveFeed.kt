@@ -127,12 +127,45 @@ object LiveFeedPolicy {
      * opening burst -- still loses the readout and still latches. What the
      * margin buys is that a link merely interleaving unluckily with its
      * partner keeps the readout, and that once the armed unit is analysable at
-     * all the readout cannot move for the rest of the set. WHICH OF THOSE TWO
-     * POPULATIONS A REAL DUAL SESSION PRODUCES HAS NOT BEEN MEASURED: no
-     * capture in this repository holds a dual set with both units streaming,
-     * so the frame this rule is tuned against is reasoned from the configured
-     * output rate and not observed. It is a field question and is raised as
-     * one.
+     * all the readout cannot move for the rest of the set.
+     *
+     * WHICH OF THOSE TWO POPULATIONS A REAL DUAL SESSION PRODUCES IS MEASURED
+     * NOW, and the sentence that stood here -- *"no capture in this repository
+     * holds a dual set with both units streaming"* -- is DELETED rather than
+     * reworded. It was true when it was written and #278 made it false by
+     * committing seven more two-stream captures. FOURTEEN captures on this tree
+     * carry two streams: twelve with a committed partner file and two whose
+     * second stream is committed under its own name
+     * (`field-legcurl-1030-12rep` and `field-ohp-rotating-8rep`). One of the
+     * twelve, `field-ropedeadhang-hold45-s38-set18`, came from `origin/main`
+     * with issue #259 rather than from #278, which is why the count is not
+     * #278's own. Over all fourteen, replaying each pair's own host arrival
+     * stamps in merged order and asking this rule's two conditions frame by
+     * frame, the readout MOVES on four:
+     * `field-cablerow-3010-8rep-s42-set08` at 89 ms with 4 frames against 12,
+     * `…-set09` at 89 ms with 4 against 12, `field-pullup-3010-8rep-s42-set11`
+     * at 29 ms with 0 against 8, and `field-pullup-4010-8rep-s42-set13` at
+     * 27 ms with 0 against 8. All four are field-42, whose two units stream at
+     * roughly 2:1 -- 1944 frames against 4348 on set 08 -- so this is a rate
+     * asymmetry and not a dropout. It does not move on the other ten.
+     *
+     * WHAT SEPARATES THE FOUR IS THE FIRST FEW FRAMES AND NOT THE TOTALS, and
+     * the sentence that stood here -- that the pairs it does not move on are
+     * *"within four frames of each other"* -- is deleted because two of them
+     * are not: `field-legcurl-1030-12rep` ends 76 frames apart and
+     * `field-ohp-rotating-8rep` 60, and neither switches. Once the armed unit
+     * is analysable at all the candidate list is every analysable role and the
+     * armed one is kept, so a total measured over a whole set cannot decide
+     * this; only the interleaving before the armed unit reaches
+     * `SensorCapturePolicy.MIN_ANALYSABLE_FRAMES` can.
+     *
+     * TWO THINGS THAT MEASUREMENT DOES NOT SAY. It does not say the readout
+     * DID move on those four sets: which role was armed is not recorded in the
+     * fixtures, and the switch fires only if the slower unit was the armed one.
+     * And it is taken over the ARCHIVED streams, not over a replay of the live
+     * collectors, so any frame that arrived before `beginSet` or was lost
+     * between the collector and the archive is not in it. Both remain field
+     * questions.
      */
     fun liveFeed(
         armed: SensorRole?,

@@ -85,6 +85,7 @@ import com.macrophage.barspeed.model.ExitPrompt
 import com.macrophage.barspeed.model.GuidedRepCaption
 import com.macrophage.barspeed.model.ImplementLoad
 import com.macrophage.barspeed.model.LeadInPolicy
+import com.macrophage.barspeed.model.LiveCountReadout
 import com.macrophage.barspeed.model.Phase
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.PlanValueCaption
@@ -2314,7 +2315,10 @@ private fun SensorCountedSetStage(state: RecordState, viewModel: RecordViewModel
             letterSpacing = 2.sp,
         )
         Row(verticalAlignment = Alignment.Bottom) {
-            Text("${state.sensorReps}", style = MaterialTheme.typography.displayLarge)
+            Text(
+                LiveCountReadout.countLabel(state.sensorReps, state.liveCountWithheld),
+                style = MaterialTheme.typography.displayLarge,
+            )
             Text(
                 plannedReps?.let { " of $it" } ?: " reps",
                 style = MaterialTheme.typography.titleMedium,
@@ -2573,8 +2577,7 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
         // is a second statement of the pairing rule and the voice no longer says
         // it; drawing it here would put a different number on screen from the
         // one the lifter just heard, and the row stores the spoken one.
-        val repProgress =
-            plannedReps?.takeIf { it > 0 }?.let { state.sensorReps / it.toFloat() } ?: 0f
+        val repProgress = LiveCountReadout.repProgress(state.sensorReps, plannedReps, state.liveCountWithheld)
         ProgressRing(progress = repProgress) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
@@ -2597,7 +2600,8 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
                     )
                 }
                 Text(
-                    "rep ${state.sensorReps}" + (plannedReps?.let { " of $it" } ?: ""),
+                    "rep " + LiveCountReadout.countLabel(state.sensorReps, state.liveCountWithheld) +
+                        (plannedReps?.let { " of $it" } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = BarColors.Sub,
                 )
@@ -2606,11 +2610,7 @@ private fun ExplosiveSetStage(state: RecordState, viewModel: RecordViewModel, sl
         Spacer(Modifier.height(8.dp))
         // Cadence matters for cyclical ballistic work (kettlebell swings).
         val cadence =
-            if (state.sensorReps >= 2 && state.setElapsedS > 0) {
-                state.sensorReps * 60 / state.setElapsedS
-            } else {
-                null
-            }
+            LiveCountReadout.repsPerMin(state.sensorReps, state.setElapsedS, state.liveCountWithheld)
         Text(
             listOfNotNull(
                 "Elapsed ${formatMmSs(state.setElapsedS)}",
@@ -2855,7 +2855,11 @@ private fun TempoRing(state: RecordState, slot: PlannedSlot?) {
             )
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    if (moving) String.format(Locale.US, "%.1f", elapsed) else "${state.sensorReps}",
+                    if (moving) {
+                        String.format(Locale.US, "%.1f", elapsed)
+                    } else {
+                        LiveCountReadout.countLabel(state.sensorReps, state.liveCountWithheld)
+                    },
                     style = MaterialTheme.typography.displayLarge,
                 )
                 Text(
@@ -2872,11 +2876,9 @@ private fun TempoRing(state: RecordState, slot: PlannedSlot?) {
                     color = BarColors.Sub,
                 )
             } else if (!moving) {
-                Text(
-                    "rep ${state.sensorReps + 1} ready",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = BarColors.Sub,
-                )
+                LiveCountReadout.nextRepCaption(state.sensorReps, state.liveCountWithheld)?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+                }
             }
         }
     }
