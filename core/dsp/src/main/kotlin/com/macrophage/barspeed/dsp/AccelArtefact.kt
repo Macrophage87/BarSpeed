@@ -30,20 +30,21 @@ import com.macrophage.barspeed.model.ImuSample
  * The raw stream is never altered -- that is the owner's rule, *"capture
  * faithfully, denoise offline"* -- and a repair in the ANALYSIS would be
  * allowed by it. The reason there is none is measured rather than argued, and
- * the measurement is in `ArtefactSubstitutionTest`: substituting an
+ * the measurement is in `ArtefactRuleAlternativesTest`: substituting an
  * out-of-range sample BEFORE the integration, by either of the two methods
  * (hold the last in-range reading, or interpolate between the neighbours),
- * moves the rep COUNT on eight of eleven committed captures that carry one,
+ * moves the rep COUNT on nine of eleven committed captures that carry one,
  * and does not fix the deadlifts at all.
  *
  * Both halves of that matter:
  *
  * - The count moves because the substitution feeds the integrator, the
  *   integrator feeds the segmenter, and the segmenter decides what a rep is.
- *   field-42 set 2 goes from 9 detections to 10 under one variant; field-42
- *   set 5 from 6 to 4; field-43 set 4 from 9 to 5. A rule that repairs a peak
- *   by moving the rep count has traded a wrong number for a wrong count, and
- *   the count is what the lifter checks.
+ *   field-43 set 4 goes from 9 detections to 5 under EITHER variant; field-42
+ *   set 7 from 6 to 3 under hold-last; field-42 set 11 from 9 to 7. The two it
+ *   does not move are field-42 set 2 and field-42 set 13. A rule that repairs
+ *   a peak by moving the rep count has traded a wrong number for a wrong
+ *   count, and the count is what the lifter checks.
  * - It does not fix the railed case. On field-43 set 5 the accelerometer is at
  *   its own full scale, so the sample carries no information about how large
  *   the real acceleration was; holding the last in-range reading over the
@@ -102,8 +103,10 @@ import com.macrophage.barspeed.model.ImuSample
  * WHAT IT DOES NOT GUARANTEE, and this is the half a reader must act on. The
  * rule withholds the peaks of the reps whose own span CONTAINS an artefact. An
  * artefact's residue reaches further than that -- [corruptedSpan] derives how
- * far, exactly, and `ArtefactWindowTest` measures it -- so a peak this rule
- * keeps is not a peak it certifies. Five published figures in the committed
+ * far, exactly, `ArtefactBoundTest` pins the interval it returns at both ends
+ * of a stream, and `ArtefactRuleAlternativesTest`'s *"withholding over the
+ * exact residue interval takes every peak on eight captures"* is the cost
+ * table -- so a peak this rule keeps is not a peak it certifies. Five published figures in the committed
  * corpus survive it and are named rather than glossed:
  * `field-assistedpullup-3010-s37-set08`'s 407.4 W (#255's own headline: its one
  * 14.982 g sample is at index 4079, inside rep 5's eccentric, and the inflated
@@ -159,7 +162,9 @@ object AccelArtefact {
      * inter-anchor interval it sits in, given [anchorIndices] ascending.
      *
      * **THE ALTERNATIVE RULE, MEASURED AND NOT SHIPPED.** `internal` because
-     * `ArtefactWindowTest` is its only reader and no production path calls it.
+     * its only readers are `ArtefactBoundTest`, which pins the interval case by
+     * case, and `ArtefactRuleAlternativesTest`, which prices it; no production
+     * path calls it.
      * It is kept because it is the evidence for a decision that would otherwise
      * be a bare assertion: this is the EXACT extent of an artefact's residue
      * under the ZUPT stage, and [peakEligible] deliberately uses the narrower
@@ -168,7 +173,7 @@ object AccelArtefact {
      * captures accept few anchors, so the interval is often the whole stream --
      * which trades a wrong number for no number at all across most of the
      * corpus. That is a product decision and it is raised rather than taken;
-     * `ArtefactWindowTest` carries the per-capture measurement.
+     * `ArtefactRuleAlternativesTest` carries the per-capture measurement.
      *
      * DERIVED FROM WHAT `applyZupt` DOES, not fitted to the corpus. Raw velocity
      * is a CUMULATIVE integral, so an out-of-range acceleration adds a step to

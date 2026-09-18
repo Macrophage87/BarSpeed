@@ -46,9 +46,13 @@ data class RepAnalysis(
     /** Average power over the concentric (drive) phase, watts. Null for bodyweight. */
     val meanConPowerW: Double? = null,
     /**
-     * Samples inside this rep's DRIVE WINDOW whose acceleration magnitude is
-     * above [AccelArtefact.BOUND_G] -- readings a lifted implement cannot
-     * produce. Issues #290 and #255.
+     * Samples inside THIS REP'S OWN SPAN whose acceleration magnitude is above
+     * [AccelArtefact.BOUND_G] -- readings a lifted implement cannot produce.
+     * Both phases and the turnaround between them, in whichever order the lift
+     * takes them: the SPAN and NOT the drive window, because the drive window is
+     * where a peak is TAKEN and not where the velocity it is read off was
+     * DECIDED. The field is [AccelArtefact.countIn] over
+     * [AccelArtefact.spanOf]. Issues #290 and #255.
      *
      * Null and 0 are different facts, the doctrine
      * [SetAnalysis.refusedDetections] already carries: 0 means the window was
@@ -623,7 +627,8 @@ object SetAnalyzer {
             // CONTAINMENT, which is narrower than the extent an artefact's
             // residue actually reaches. [AccelArtefact.corruptedSpan] derives
             // that extent and its KDoc says why it is not what ships;
-            // `ArtefactWindowTest` measures both and names the five published
+            // `ArtefactRuleAlternativesTest` prices withholding on it instead,
+            // and `ArtefactPeakWithholdingTest` names the five published
             // figures containment leaves standing.
             artefactSamples = AccelArtefact.countIn(artefacts, AccelArtefact.spanOf(span)),
         )

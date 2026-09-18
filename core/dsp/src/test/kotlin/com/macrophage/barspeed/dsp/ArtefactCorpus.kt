@@ -8,11 +8,13 @@ import com.macrophage.barspeed.model.VoiceCue
  * The eleven captures issues #290 and #255 are argued over, each with the
  * geometry, load and bounding instants its own session archive declares.
  *
- * Stated once here because four files walk the same eleven --
- * `ArtefactCorpusBaselineTest`, `ArtefactPeakWithholdingTest`,
- * `ArtefactRuleAlternativesTest` and `ArtefactWindowTest` -- and a second copy
- * of a load or a work-start instant is the *duplicate documentation drifts*
- * class with a numeric trigger. `ArtefactCorpusBaselineTest`'s KDoc carries the
+ * Stated once here because THREE files walk the same eleven --
+ * `ArtefactCorpusBaselineTest`, `ArtefactPeakWithholdingTest` and
+ * `ArtefactRuleAlternativesTest` -- and a second copy of a load or a
+ * work-start instant is the *duplicate documentation drifts* class with a
+ * numeric trigger. `ArtefactBoundTest` is a fourth reader but walks nothing: it
+ * loads field-37 set 8 alone, for the anchor property
+ * `AccelArtefact.corruptedSpan` rests on. `ArtefactCorpusBaselineTest`'s KDoc carries the
  * provenance of every figure below and the licence for each capture; this file
  * carries no claims, only the inputs.
  */
