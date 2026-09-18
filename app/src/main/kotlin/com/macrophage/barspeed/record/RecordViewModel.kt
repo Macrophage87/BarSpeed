@@ -1806,13 +1806,29 @@ internal fun removedState(s: RecordState): RecordState? {
  * `internal` for [appendedState]'s reason, and called from one place,
  * [RecordViewModel.skipUpcomingSet].
  *
- * THE RE-SEED ALWAYS RUNS, unlike [removedState]'s. The slot that goes IS the
- * slot the next START would have run, by definition of the eligibility, so
- * every editable box on the rest screen was seeded from it and the set that
- * comes up in its place is a different set. They are re-seeded from the new
- * upcoming slot and the stated values cleared, exactly as [jumpedState],
- * [appendedState] and [removedState] do for the same event. Nothing is
- * reverted; the boxes follow the set that is now coming.
+ * WHAT THE LIFTER SAID IS RE-DECIDED AND NOT CLEARED, which is the rule
+ * [restingState] applies at the same four fields: a load, a tempo, a rep count
+ * or a hold the lifter stated holds for the rest of the exercise BLOCK, and
+ * `SetLoadPolicy.standingStatedAddedKg`,
+ * `TempoAdjustPolicy.standingAdjustedTempo`,
+ * `SetRepsPolicy.standingStatedReps` and `standingStatedDurationS` are what
+ * say whether it still holds. The pair they are asked about is the SKIPPED
+ * slot's frozen declarations against the slot that moves up: the boxes on the
+ * rest screen were showing the statement for the set now being dropped, so
+ * that is the declaration the statement is a correction to. Where the block
+ * ends at the skip the four answer null and the boxes fall back to the new
+ * slot's own declarations. `SkippedSlotTest` pins both directions.
+ *
+ * WHERE THE BLOCK ENDS IS ASKED ONCE, of `SetLoadPolicy.sameExerciseBlock`,
+ * rather than read off [SkipSetTarget.lastOfBlock]: the policies take that
+ * answer as a parameter, and two statements of what a block is can disagree
+ * about a session running one movement in two consecutive blocks --
+ * [SkipSetControl]'s own KDoc names that hazard for the block scan.
+ *
+ * THE STATED SIDE IS THE ONE FIELD THAT DOES NOT CARRY. It is cleared for the
+ * reason [restingState] gives at its own `statedSide = null`: the plan writes
+ * unilateral work one set per side, so its order is the alternation, and a
+ * choice that stood would put every remaining set of the block on one arm.
  *
  * WHAT THE REMAINING SETS KEEP is the numbering the PLAN gave them. Nothing
  * here renumbers a slot: a four-set block whose set 2 goes still shows
@@ -1835,6 +1851,58 @@ internal fun skippedState(s: RecordState): RecordState? {
     val skipped = s.skippedSets + SkipSetControl.recordOf(slot.exercise.id, target)
     val queue = s.queue.toMutableList().apply { removeAt(at) }
     val upcoming = queue.getOrNull(at) ?: return s.copy(queue = queue, skippedSets = skipped)
+    // Where the block ends, hoisted for [restingState]'s reason: all four
+    // statements below are bounded by the SAME block, and asking four times
+    // would be four statements of one rule. The skipped slot is one side of the
+    // pair and the slot that moves up is the other.
+    val sameBlock =
+        SetLoadPolicy.sameExerciseBlock(
+            lastExerciseId = slot.exercise.id,
+            nextExerciseId = upcoming.exercise.id,
+            nextSetIndexInExercise = upcoming.setIndexInExercise,
+        )
+    // The FROZEN declarations on both sides, never loadKg/reps/durationS/tempo:
+    // startNextSet's bake writes a statement into those, and comparing them
+    // would compare a value against itself. Neither slot has been through that
+    // bake here -- both are still ahead of the next START -- so the frozen pair
+    // is also the only pair that stays right if one of them ever has been.
+    val standingKg =
+        SetLoadPolicy.standingStatedAddedKg(
+            statedAddedKg = s.statedLoadKg,
+            sameExerciseBlock = sameBlock,
+            lastDeclaredAddedKg = slot.plannedLoadKg,
+            nextDeclaredAddedKg = upcoming.plannedLoadKg,
+            // The COMING slot's movement, for [restingState]'s reason: inside a
+            // block the two are the same exercise by construction.
+            bodyweight = upcoming.exercise.bodyweight,
+            // The plan's own warm-up declaration on each side, never
+            // s.lastSetWarmup or lastSetWarmupMark: one describes the set
+            // BEFORE the skipped slot and the other is the lifter's live
+            // statement about it.
+            finishedWarmup = slot.warmup,
+            nextWarmup = upcoming.warmup,
+        )
+    val standingTempo =
+        TempoAdjustPolicy.standingAdjustedTempo(
+            adjustedTempo = s.statedTempo,
+            sameExerciseBlock = sameBlock,
+            lastDeclaredTempo = slot.plannedTempo,
+            nextDeclaredTempo = upcoming.plannedTempo,
+        )
+    val standingReps =
+        SetRepsPolicy.standingStatedReps(
+            statedReps = s.statedReps,
+            sameExerciseBlock = sameBlock,
+            lastDeclaredReps = slot.plannedReps,
+            nextDeclaredReps = upcoming.plannedReps,
+        )
+    val standingDurationS =
+        SetRepsPolicy.standingStatedDurationS(
+            statedDurationS = s.statedDurationS,
+            sameExerciseBlock = sameBlock,
+            lastDeclaredDurationS = slot.plannedDurationS,
+            nextDeclaredDurationS = upcoming.plannedDurationS,
+        )
     val seedKg =
         SetLoadPolicy.seedAddedKg(
             hasPlannedNext = true,
@@ -1844,17 +1912,20 @@ internal fun skippedState(s: RecordState): RecordState? {
     return s.copy(
         queue = queue,
         skippedSets = skipped,
-        loadInput = seedKg?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
-        statedLoadKg = null,
-        statedTempo = null,
-        statedReps = null,
-        statedDurationS = null,
-        // Cleared with the four above it, for [removedState]'s reason: a side
-        // stated for the set that has just been skipped is not a statement about
-        // the one that moved up.
+        // A statement that still stands is shown ahead of the plan's number, so
+        // the box and what the set would record cannot disagree --
+        // [restingState]'s arrangement at the same three boxes.
+        loadInput = (standingKg ?: seedKg)?.let { s.weightUnit.inputValue(it) } ?: s.loadInput,
+        statedLoadKg = standingKg,
+        statedTempo = standingTempo,
+        statedReps = standingReps,
+        statedDurationS = standingDurationS,
+        // NOT carried, and this is the field that differs from the four above
+        // it -- see the KDoc's last paragraph. Written explicitly rather than
+        // left to the copy: a field omitted here keeps the skipped set's answer.
         statedSide = null,
-        repsInput = upcoming.reps?.toString() ?: s.repsInput,
-        durationInput = upcoming.durationS?.toString() ?: s.durationInput,
+        repsInput = (standingReps ?: upcoming.reps)?.toString() ?: s.repsInput,
+        durationInput = (standingDurationS ?: upcoming.durationS)?.toString() ?: s.durationInput,
     )
 }
 
