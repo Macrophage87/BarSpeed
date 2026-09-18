@@ -110,19 +110,19 @@ class SessionExportUnitAddressTest {
         ImuSample(1_000L + i * 10L, 0.01, -0.02, 0.98, 1.5, -2.5, 0.25, 10.0 + i, -20.0, 30.0)
     }
 
-    private fun imuStream(id: Long, role: String) = RawStreamEntity(
+    private fun imuStream(id: Long, role: String, setId: Long = 5L) = RawStreamEntity(
         id = id,
-        setId = 5L,
+        setId = setId,
         kind = RawStreamEntity.KIND_IMU,
         csvGzip = Gzip.compress(ImuCsv.encode(samples(100))),
         sampleRateHz = 98.5,
         role = role,
     )
 
-    private fun row(sensors: RecordedSensors) = SetRecordEntity(
-        id = 5L,
+    private fun row(sensors: RecordedSensors, id: Long = 5L, orderIdx: Int = 0) = SetRecordEntity(
+        id = id,
         sessionId = 1L,
-        orderIdx = 0,
+        orderIdx = orderIdx,
         exerciseId = "lat_pulldown",
         exerciseName = "Lat Pulldown",
         loadKg = 50.0,
@@ -246,6 +246,64 @@ class SessionExportUnitAddressTest {
         assertEquals(
             mapOf("b" to unitB),
             sensors.getValue("unitAddresses").jsonObject.mapValues { it.value.jsonPrimitive.content },
+        )
+    }
+
+    /**
+     * ONE READING OF THE PAIRING PER DOCUMENT, whatever the store answers next.
+     *
+     * Round 1 of #260's review found this to be the round's one mechanical gap:
+     * `SessionExporter.buildExport` reads `sensorRoleByAddress` once and threads
+     * the map down, and nothing failed if that read moved into `setExport`. The
+     * supplier below answers a DIFFERENT labelling on its second call -- the two
+     * units swapped, which is what a re-label during an export looks like from
+     * inside the exporter -- so a per-set read publishes two sets of one session
+     * under two identities and this fails. The lifter's exposure is a mount
+     * table in which set 1 says role a is the unit ending 1D:3F and set 2 says
+     * it is 0C:7A, with no key saying either changed.
+     *
+     * The counter is asserted as well as the addresses, because the addresses
+     * alone would pass a second read that happened to return the same map.
+     */
+    @Test
+    fun `the pairing is read once for the whole document`() = runTest {
+        var reads = 0
+        val swapped = mapOf(unitA to SensorRole.B, unitB to SensorRole.A)
+        val dao =
+            FakeSessionDao(
+                listOf(row(dual, id = 5L, orderIdx = 0), row(dual, id = 6L, orderIdx = 1)),
+                mapOf(
+                    5L to listOf(imuStream(1L, "a"), imuStream(2L, "b")),
+                    6L to listOf(imuStream(3L, "a", setId = 6L), imuStream(4L, "b", setId = 6L)),
+                ),
+            )
+        val exporter =
+            SessionExporter(
+                SessionRepository(dao, FakeExerciseDao()),
+                dispatcher = Dispatchers.Default,
+                sensorRoleByAddress = {
+                    reads += 1
+                    if (reads == 1) bothLabelled else swapped
+                },
+            )
+
+        val sets =
+            Json.parseToJsonElement(exporter.exportJson(1L, includeRepDetail = true)!!)
+                .jsonObject.getValue("exercises").jsonArray.single()
+                .jsonObject.getValue("sets").jsonArray
+        val addresses =
+            sets.map { set ->
+                set.jsonObject.getValue("sensors").jsonObject
+                    .getValue("unitAddresses").jsonObject
+                    .mapValues { it.value.jsonPrimitive.content }
+            }
+
+        assertEquals(2, sets.size, "the fake did not deliver two sets")
+        assertEquals(1, reads, "the pairing store was read more than once for one document")
+        assertEquals(
+            listOf(mapOf("a" to unitA, "b" to unitB), mapOf("a" to unitA, "b" to unitB)),
+            addresses,
+            "two sets of one session were labelled by two readings of the pairing",
         )
     }
 }

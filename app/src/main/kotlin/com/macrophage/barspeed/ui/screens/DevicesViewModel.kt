@@ -217,9 +217,11 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      * there is nothing that can be said (#260).
      *
      * The SAME two inputs [dualSetupStep] is read from, and the phrase reads
-     * that step itself, so the line and the sentence above it cannot disagree
-     * about one setup. Null until two paired units carry different labels, which
-     * is every state that sentence is already explaining.
+     * that step itself, so the line and the sentence above it answer one setup
+     * by one rule; they are two StateFlows over those inputs, so a frame during
+     * a re-label can still show one updated before the other. Null until two
+     * paired units carry different labels, which is every state that sentence
+     * is already explaining.
      */
     val dualRolesLine =
         combine(knownDevices, sensorRoles) { known, roles ->

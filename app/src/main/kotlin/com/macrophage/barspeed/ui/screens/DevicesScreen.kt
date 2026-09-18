@@ -127,7 +127,10 @@ private fun DualSetupCard(step: DualSetupStep, rolesLine: String?) {
             // name, which pairs a unit with a label a few lines further down
             // the same card; this states the pair together, which is what goes
             // on the stickers. Computed by the caller from the same two inputs
-            // [step] is read from, so the two readings cannot disagree.
+            // [step] is read from, so the two readings answer one setup by one
+            // rule -- they arrive as two separate collectAsState values, so a
+            // frame during a re-label can still show one updated before the
+            // other.
             rolesLine?.let {
                 Spacer(Modifier.height(4.dp))
                 Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)

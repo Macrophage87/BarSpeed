@@ -54,7 +54,10 @@ class AppContainer(app: Application) {
             // honest answer and is what the published description already
             // covers. IOException and not Throwable: DataStore's documented
             // failure, and a runCatching here would swallow the cancellation
-            // of the export itself.
+            // of the export itself. Reasoned from DataStore's documented
+            // behaviour and from the source of the four call sites, never
+            // observed -- no corrupt preferences file has been induced on a
+            // device.
             sensorRoleByAddress = {
                 try {
                     settings.sensorRoles.first()
