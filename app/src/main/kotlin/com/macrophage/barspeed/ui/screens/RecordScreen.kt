@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.macrophage.barspeed.dsp.AccelArtefact
 import com.macrophage.barspeed.dsp.CoachingRules
 import com.macrophage.barspeed.dsp.PhaseTempoTarget
 import com.macrophage.barspeed.dsp.SetAnalysis
@@ -4094,7 +4095,11 @@ private fun PowerLine(analysis: SetAnalysis) {
 }
 
 private fun powerSummary(analysis: SetAnalysis): String? {
-    val peak = analysis.reps.mapNotNull { it.peakPowerW }.maxOrNull() ?: return null
+    // Over the reps whose own span carries no sample above the physical bound
+    // (#290). This line printed "peak 3606 W" on a 55 lb press, which is the
+    // reading the owner ignores these screens for.
+    val peak = AccelArtefact.peakEligible(analysis.reps).mapNotNull { it.peakPowerW }.maxOrNull()
+        ?: return null
     val avg = analysis.reps.mapNotNull { it.meanConPowerW }.takeIf { it.isNotEmpty() }?.average()
     return "Drive power: peak ${peak.toInt()} W" + (avg?.let { " · avg ${it.toInt()} W" } ?: "")
 }

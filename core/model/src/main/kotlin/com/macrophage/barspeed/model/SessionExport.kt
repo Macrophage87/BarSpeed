@@ -1636,6 +1636,76 @@ data class SessionExport(
          * four words are the same set, so neither can gain a word alone, and
          * the published example carries a hold with the key so the ajv step in
          * `ci.yml` validates it.
+         *
+         * THIRD 1.21 ENTRY, filed under the same number because 1.21 is
+         * UNRELEASED: `git tag --sort=-creatordate | head -1` is v0.1.53 and
+         * `git show
+         * v0.1.53:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.20"`, both read this round rather than
+         * relayed from the two entries above. So 1.21 is the open number and
+         * #300's mint above stands; this entry adds to it and mints nothing. It
+         * is the THIRD rather than the second because #259's entry landed on
+         * main first and this work was re-parented onto it.
+         *
+         * THE CHANGE (#290, #255): a set may say how many of its samples the
+         * sensor cannot have measured, each rep may say how many of them landed
+         * inside itself, and the set's published PEAK pair is taken over the
+         * reps that carry none. Two additive integer keys --
+         * [SetExport.artefactSamples] and `artefactSamples` on each
+         * `repMetrics` row -- plus a narrowing of the population two existing
+         * keys are computed over, `summary.peakConVel_mps` and
+         * `summary.peakPower_w`.
+         *
+         * THE RULE. A sample whose TOTAL support acceleration exceeds 4 g is not
+         * lift kinematics. An implement at rest reads 1 g and net drive on a
+         * tempo-prescribed set stays well under 1 g, so the exercise's own
+         * ceiling is near 2 g; 4 g admits three g of net drive, which nothing a
+         * lifter does to a loaded bar reaches. A rep whose own span -- both
+         * phases and the turnaround between them -- contains one is left out of
+         * the set's peak pair, because a peak is a MAXIMUM and one impossible
+         * reading is sufficient to be the answer.
+         *
+         * THE FIGURES IT MOVES, measured on the captures committed with it.
+         * field-42 set 2 is a 24.9476 kg seated overhead press that publishes
+         * `peakPower_w` 3606.3 and `peakConVel_mps` 2.516 -- 4.9 g of net drive
+         * on a tempo-`3010` press -- and publishes 329.4 and 1.155 under this
+         * rule, from the same NINE detections. field-43 set 5 is an 83.9 kg
+         * deadlift that publishes 4347.4 W, from samples where the
+         * accelerometer RAILS at its own 16 g full scale, and publishes 722.3 W.
+         * field-42 sets 5 and 7 and field-37 set 3 move too; five published
+         * figures in the committed corpus do NOT, and
+         * `ArtefactPeakWithholdingTest` names each of them.
+         *
+         * WHY A COUNT AND NOT A REPAIR, which is the design decision a reader
+         * should know was taken deliberately. Substituting an out-of-range
+         * sample before the velocity integration -- by holding the last
+         * in-range reading or by interpolating the neighbours -- MOVES THE REP
+         * COUNT on nine of the eleven committed captures that carry one, and
+         * does not fix the railed case at all: field-43 set 5 still publishes
+         * 974.5 W or 1336.6 W, and field-43 set 6 gets WORSE, 2386.5 W to
+         * 2869.1 W. So nothing is repaired; the raw stream is published
+         * unchanged as always, and every figure but the two summary peaks is
+         * bit-identical to what the same capture published at 1.20.
+         *
+         * ABSENT, 0 AND POSITIVE ARE THREE FACTS on both keys, the doctrine
+         * `refusedDetections` states. Absent is permanent on every set already
+         * on disk: the counts are frozen into the stored analysis when a set is
+         * analysed and nothing re-runs the estimator at export time. A rep
+         * carrying no count is KEPT in the peak population, so no archived set
+         * loses the peak it has always published.
+         *
+         * `DATABASE_VERSION` does not move for THIS entry -- the counts ride
+         * inside `analysisJson`, which is already a stored blob -- and the plan
+         * schema is untouched. (#300's entry above does move it, to 19, for its
+         * own reason.) `VALID_REFUSED_DETECTION_REASONS` is UNCHANGED and gains
+         * no word: no detection is refused by this rule, which is the correction
+         * written at that constant.
+         *
+         * PINNED IN BOTH DIRECTIONS. `SchemaArtefactSampleContractTest` asserts
+         * both published keys, their floors, that neither is required and that
+         * both objects are still closed; `ArtefactPeakWithholdingTest` and
+         * `ArtefactRuleAlternativesTest` in `:core:dsp` carry the corpus figures
+         * above and the substitution measurement that argued them.
          */
         const val SCHEMA_VERSION = "1.21"
 
@@ -1733,12 +1803,17 @@ data class SessionExport(
          * ones the export publishes" asserts the two lists are equal from
          * the side that can see both.
          *
-         * One word today, and the plural is deliberate rather than
-         * aspirational: the sample-level half of the same defect -- a corrupt
-         * accelerometer reading landing INSIDE a real rep's drive, which sets
-         * that rep's `peakConVel_mps` and `peakPower_w` while leaving its
-         * range and mean ordinary -- is not refused by anything yet and would
-         * need a second word if it ever is.
+         * One word today, and it stays one. The sample-level half of the same
+         * defect -- an accelerometer reading the sensor cannot have measured
+         * landing inside a real rep, which sets that rep's `peakConVel_mps`
+         * and `peakPower_w` while leaving its range and mean ordinary -- IS
+         * handled now, at 1.21, and it needed no word here. This sentence used
+         * to say it "would need a second word if it ever is"; that is DELETED
+         * rather than reworded, because the rule that landed refuses no
+         * detection at all. [SetExport.artefactSamples] and each rep's own
+         * count are what mark it, the detection is KEPT with every figure it
+         * measured, and only the SET's published peaks are taken over a
+         * narrower population. Issues #290 and #255.
          */
         val VALID_REFUSED_DETECTION_REASONS = setOf("unpairedRangeOutlier")
 

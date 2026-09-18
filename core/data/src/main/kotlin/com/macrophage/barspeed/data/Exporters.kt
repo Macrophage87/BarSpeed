@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.data
 
+import com.macrophage.barspeed.dsp.AccelArtefact
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.RollExcursion
 import com.macrophage.barspeed.dsp.SetAnalyzer
@@ -190,6 +191,14 @@ class SessionExporter(
     ): SetExport {
         val analysis = sessionRepository.decodeAnalysis(record)
         val reps = analysis?.reps.orEmpty()
+        // The reps a PEAK may be taken over: those whose own span carries no
+        // accelerometer sample above the physical bound (#290, #255). Derived
+        // from the stored per-rep counts, so it is answerable here for the
+        // reason velocityLoss below is -- it is a pure function of the rep list
+        // the row already holds. A rep stored before the count existed carries
+        // null and is KEPT, which is what stops an old set losing the peak it
+        // has always published; AccelArtefact.peakEligible owns that rule.
+        val peakEligible = AccelArtefact.peakEligible(reps)
         // Re-asked of the stored REPS, never read from the stored scalar.
         // analysis.velocityLossPct is frozen into analysisJson when the set is
         // recorded, so every set already on disk carries a figure computed
@@ -399,6 +408,14 @@ class SessionExporter(
             // a null here means the set has no work-start instant, which is a
             // different fact from 0.
             detectionsBeforeWorkStart = analysis?.detectionsBeforeWorkStart,
+            // How many of this set's samples the sensor cannot have measured
+            // (#290, #255, schema 1.21). Read off the stored analysis for the
+            // reason the three counts above are: the judgement needs the sample
+            // stream, and this class deliberately does not inflate one at export
+            // time. Absence is preserved through -- a null means the set was
+            // analysed before the count existed, which is a different fact
+            // from 0.
+            artefactSamples = analysis?.artefactSamples,
             // minBpm in this list is load-bearing, not defensive padding: it is
             // computed fresh, below, from this set's raw stream, while the
             // other three are read off columns frozen at record time. Those two
@@ -469,6 +486,13 @@ class SessionExporter(
                         romM = it.romM,
                         peakPowerW = it.peakPowerW,
                         meanConPowerW = it.meanConPowerW,
+                        // Samples in this rep's own span the sensor cannot have
+                        // measured (#290, #255, schema 1.21). Published on the
+                        // ROW whose peaks it qualifies, and read off the stored
+                        // analysis like every other count here -- the judgement
+                        // needs the sample stream, which this class does not
+                        // inflate.
+                        artefactSamples = it.artefactSamples,
                     )
                 }
             } else {
@@ -477,12 +501,20 @@ class SessionExporter(
             summary =
             SetSummaryExport(
                 meanConVelMps = reps.map { it.meanConVelMps }.averageOrNull()?.round3(),
-                peakConVelMps = reps.maxOfOrNull { it.peakConVelMps },
+                // Over the reps whose own span carries no sample above the
+                // physical bound, never over every rep (#290, #255, schema
+                // 1.21). One impossible reading is sufficient to be a MAXIMUM,
+                // so a set's published peak is otherwise whatever its worst
+                // artefact was: field-42 set 2 published 3606.3 W on a
+                // 24.9 kg press. AccelArtefact.peakEligible is the one
+                // statement of which reps qualify; this file does not hold a
+                // second copy of the rule.
+                peakConVelMps = peakEligible.maxOfOrNull { it.peakConVelMps },
                 meanEccS = reps.mapNotNull { it.eccS }.averageOrNull()?.round2(),
                 meanConS = reps.map { it.conS }.averageOrNull()?.round2(),
                 meanRomM = reps.map { it.romM }.averageOrNull()?.round3(),
                 romSpreadPct = SetAnalyzer.romSpreadPct(reps),
-                peakPowerW = reps.mapNotNull { it.peakPowerW }.maxOrNull(),
+                peakPowerW = peakEligible.mapNotNull { it.peakPowerW }.maxOrNull(),
                 meanConPowerW = reps.mapNotNull { it.meanConPowerW }.averageOrNull()?.round1(),
                 // Why every key above is absent, when they all are. Schema
                 // 1.18, issue #138: a healthy stream can segment to nothing,

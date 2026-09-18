@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.data.SetRecordEntity
+import com.macrophage.barspeed.dsp.AccelArtefact
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.model.CoachingVerdictPolicy
@@ -484,7 +485,11 @@ private fun trimNum(value: Double): String =
     if (value == Math.floor(value)) value.toInt().toString() else String.format(Locale.US, "%.1f", value)
 
 private fun powerSummary(analysis: SetAnalysis): String? {
-    val peak = analysis.reps.mapNotNull { it.peakPowerW }.maxOrNull() ?: return null
+    // Over the reps whose own span carries no sample above the physical bound
+    // (#290). This line printed "peak 3606 W" on a 55 lb press, which is the
+    // reading the owner ignores these screens for.
+    val peak = AccelArtefact.peakEligible(analysis.reps).mapNotNull { it.peakPowerW }.maxOrNull()
+        ?: return null
     val avg = analysis.reps.mapNotNull { it.meanConPowerW }.takeIf { it.isNotEmpty() }?.average()
     return "Drive power: peak ${peak.toInt()} W" + (avg?.let { " · avg ${it.toInt()} W" } ?: "")
 }
