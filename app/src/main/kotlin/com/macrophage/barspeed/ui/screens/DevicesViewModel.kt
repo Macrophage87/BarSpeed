@@ -213,6 +213,20 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DualSetupStep.NO_SENSOR)
 
     /**
+     * Which physical unit each label is on, for the card to draw, or null when
+     * there is nothing that can be said (#260).
+     *
+     * The SAME two inputs [dualSetupStep] is read from, and the phrase reads
+     * that step itself, so the line and the sentence above it cannot disagree
+     * about one setup. Null until two paired units carry different labels, which
+     * is every state that sentence is already explaining.
+     */
+    val dualRolesLine =
+        combine(knownDevices, sensorRoles) { known, roles ->
+            DualSensorSetup.rolesLine(known.filter { it.role == DeviceRole.IMU }.map { it.address }, roles)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
      * Makes a paired device the one its role is read from, deliberately --
      * the analysed bar sensor, or the strap the heart rate comes from.
      *

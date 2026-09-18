@@ -16,6 +16,7 @@ import com.macrophage.barspeed.model.CrashLogPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import java.io.File
 
 /** Manual dependency container; one instance per process. */
@@ -25,7 +26,20 @@ class AppContainer(app: Application) {
     private val database = AppDatabase.build(app)
     val planRepository = PlanRepository(database.planDao())
     val sessionRepository = SessionRepository(database.sessionDao(), database.exerciseDao())
-    val sessionExporter = SessionExporter(sessionRepository)
+
+    /**
+     * Above the exporters, deliberately: [sessionExporter] reads the A/B labels
+     * out of it (#260) and a property initialised later would still be null when
+     * the first export ran.
+     */
+    val settings = SettingsStore(app)
+
+    /**
+     * The pairing is read PER EXPORT, not captured here: the lifter can
+     * re-label a unit at any time, and a map taken at process start would go
+     * stale silently. One read per document, inside `buildExport`.
+     */
+    val sessionExporter = SessionExporter(sessionRepository, sensorRoleByAddress = { settings.sensorRoles.first() })
     val rawExporter = RawExporter(sessionRepository, sessionExporter, appVersion = BuildConfig.VERSION_NAME)
 
     /**
@@ -72,7 +86,6 @@ class AppContainer(app: Application) {
     val deviceRegistry = DeviceRegistry(app)
     val bleScanner = BleScanner()
     val autoConnect = AutoConnectManager(app, deviceRegistry, appScope)
-    val settings = SettingsStore(app)
 
     /**
      * Process-scoped, and holding enums only. See [BlePermissionGate] for why

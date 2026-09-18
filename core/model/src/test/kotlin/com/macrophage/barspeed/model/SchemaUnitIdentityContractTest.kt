@@ -53,8 +53,8 @@ class SchemaUnitIdentityContractTest {
     private fun exportVersionLog() = schema("session-export.schema.json")["properties"]!!
         .jsonObject["schemaVersion"]!!.jsonObject["description"]!!.jsonPrimitive.content
 
-    /** Everything the version log says from its LAST `1.21:` marker onward. */
-    private fun entry121() = exportVersionLog().substringAfterLast("1.21:")
+    /** Everything the version log says from its LAST `1.22:` marker onward. */
+    private fun entry122() = exportVersionLog().substringAfterLast("1.22:")
 
     /**
      * The published sensors block names the unit behind each role, keyed by the
@@ -122,15 +122,27 @@ class SchemaUnitIdentityContractTest {
     }
 
     /**
-     * The version log files the change as a FURTHER 1.21 entry, states it is
-     * additive, and states the one thing a reader must not assume: the
-     * addresses are the pairing read AT EXPORT TIME, not a fact recorded with
-     * the set.
+     * The version log files the change as the 1.22 MINT, states it is additive,
+     * states which direction a validator breaks in, and states the one thing a
+     * reader must not assume: the addresses are the pairing read AT EXPORT
+     * TIME, not a fact recorded with the set.
      *
-     * A further entry rather than a mint, because 1.21 is UNRELEASED on `main`:
-     * `git tag --sort=-creatordate | head -1` is v0.1.53 and `git show
-     * v0.1.53:core/model/.../SessionExport.kt` reads `SCHEMA_VERSION = "1.20"`,
-     * both read this round rather than relayed from the entries above.
+     * A MINT and not a further 1.21 entry, which reverses what this test
+     * asserted while it was drafted: `git tag --sort=-creatordate | head -1` is
+     * v0.1.54 and `git show v0.1.54:core/model/.../SessionExport.kt` reads
+     * `SCHEMA_VERSION = "1.21"`, both read at the tag this round rather than
+     * relayed. 1.21 has SHIPPED, so it takes no further entries, and the
+     * marker this file reads moved with it.
+     *
+     * The REJECTION is asserted because it is what a mint costs and a further
+     * entry does not: `schemaVersion` is a closed enum, so the 1.21 schema
+     * already in the field refuses a 1.22 document on the version string before
+     * it reaches a key.
+     *
+     * THE TIP LITERAL LIVES HERE NOW, on the rule
+     * `SchemaSkippedSetContractTest` wrote when it minted 1.21: the literal the
+     * exporter writes is asserted in the file that MINTS it and nowhere else,
+     * so that file now pins its own filed version and this one pins the tip.
      *
      * The export-time caveat is asserted and not merely written because it is
      * the whole difference between this key and a column: nothing in
@@ -139,13 +151,20 @@ class SchemaUnitIdentityContractTest {
      * capture to whichever unit happens to hold the label today.
      */
     @Test
-    fun `the version log files the unit identity as a further additive 1_21 entry`() {
-        val entry = entry121()
+    fun `the version log files the unit identity as the additive 1_22 mint`() {
+        val entry = entry122()
         assertTrue("unitAddresses" in entry, "the version log does not file the unit-identity change")
         assertTrue(
             "ADDITIVE" in entry.uppercase(),
             "the log does not say whether a 1.21 reader written before this key is affected",
         )
+        assertTrue(
+            "REJECTS" in entry.uppercase(),
+            "the log does not say the 1.21 schema in the field refuses a 1.22 document",
+        )
+        assertEquals("1.22", SessionExport.SCHEMA_VERSION, "the version the exporter writes")
+        assertTrue("1.22" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
+        assertTrue("1.21" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.21 left the accepted set")
         assertTrue(
             "export time" in entry,
             "the log does not say the addresses are the pairing as it stands at export time",

@@ -28,6 +28,7 @@ import com.macrophage.barspeed.model.RepMetricsExport
 import com.macrophage.barspeed.model.RepsSourcePolicy
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SensorCapturePolicy
+import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.SetExport
 import com.macrophage.barspeed.model.SetLimiter
@@ -74,6 +75,27 @@ class SessionExporter(
             explicitNulls = false
         },
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /**
+     * Which physical unit carries each A/B label, read ONCE per export (#260).
+     *
+     * A supplier and not a map, because the pairing outlives this object: the
+     * exporter is built at process start and the lifter can re-label a unit at
+     * any time afterwards, so a map captured here would go stale silently. It
+     * is read once in [buildExport] and threaded down, so every set in one
+     * document is labelled by ONE reading -- two reads could straddle a
+     * re-label and attribute two sets of one session to different units.
+     *
+     * WHAT THIS CANNOT BE. The pairing is not recorded with the set: nothing in
+     * `RawStreamEntity` or `SetRecordEntity` stores the address a capture came
+     * from, so this is the pairing AS IT STANDS NOW and the published
+     * description says so. A column would be the durable answer and is not what
+     * this is.
+     *
+     * Defaulted to no pairing, which publishes nothing, so every construction
+     * that has no pairing store to read -- the tests in this module included --
+     * writes exactly the document it wrote before this parameter existed.
+     */
+    private val sensorRoleByAddress: suspend () -> Map<String, SensorRole> = { emptyMap() },
 ) {
     /**
      * [minBpmOverride] is the fold for issue #29's double decompression, not
@@ -96,12 +118,18 @@ class SessionExporter(
         val session = sessionRepository.session(sessionId) ?: return@withContext null
         val sets = sessionRepository.sets(sessionId)
 
+        // ONE reading of the pairing for the whole document (#260). Two
+        // readings could straddle a re-label and attribute two sets of one
+        // session to different units.
+        val roleByAddress = sensorRoleByAddress()
         val byExercise = sets.groupBy { it.exerciseId }
         val exercises =
             byExercise.map { (exerciseId, records) ->
                 ExerciseExport(
                     exercise = exerciseId,
-                    sets = records.map { record -> setExport(record, includeRepDetail, minBpmOverride) },
+                    sets = records.map { record ->
+                        setExport(record, includeRepDetail, minBpmOverride, roleByAddress)
+                    },
                 )
             }
         SessionExport(
@@ -189,6 +217,7 @@ class SessionExporter(
         record: SetRecordEntity,
         includeRepDetail: Boolean,
         minBpmOverride: Map<Long, Int?>,
+        roleByAddress: Map<String, SensorRole>,
     ): SetExport {
         val analysis = sessionRepository.decodeAnalysis(record)
         val reps = analysis?.reps.orEmpty()
@@ -479,7 +508,7 @@ class SessionExporter(
             // qualifies every figure the summary publishes, and a caveat that
             // appears only in the detailed export leaves the summary-only
             // reader holding the numbers with the warning removed.
-            sensors = sensorsExport(record, streams),
+            sensors = sensorsExport(record, streams, roleByAddress),
             repMetrics =
             if (includeRepDetail && reps.isNotEmpty()) {
                 reps.map {
@@ -611,7 +640,11 @@ class SessionExporter(
      * does know, so a document written by a later version cannot relabel
      * somebody's capture on the way through.
      */
-    private fun sensorsExport(record: SetRecordEntity, streams: List<RawStreamEntity>): SetSensorsExport? {
+    private fun sensorsExport(
+        record: SetRecordEntity,
+        streams: List<RawStreamEntity>,
+        roleByAddress: Map<String, SensorRole>,
+    ): SetSensorsExport? {
         val declared = sessionRepository.decodeSensors(record) ?: return null
         val captured =
             streams.filter { it.kind == RawStreamEntity.KIND_IMU }
@@ -647,6 +680,23 @@ class SessionExporter(
             // this. Absent on every set an earlier build wrote, which is
             // correct: no build before this one could observe an unroled link.
             soleSilent = declared.soleSilent?.let(ArmedSilencePolicy::wireOf),
+            // Which physical unit carried each armed role (#260). The rule is
+            // [SensorCapturePolicy.unitAddresses]' -- roles the set armed only,
+            // and no entry for a role two addresses claim -- rather than a
+            // second reading of the pairing here, for `present`'s reason: a
+            // copy of that decision would be free to disagree with the one the
+            // screens draw.
+            //
+            // DERIVED, and the only key in this object that is not read off the
+            // row. It is the pairing as it stands now, so a lifter who
+            // re-labels the units between recording a session and exporting it
+            // publishes the new labelling over the old capture; the published
+            // description says exactly that. Nothing stores the address a
+            // capture came from, so the alternative is not a better derivation
+            // -- it is a column.
+            unitAddresses = SensorCapturePolicy.unitAddresses(declared.expected, roleByAddress)
+                .map { (role, address) -> SensorCapturePolicy.wireOf(role) to address }
+                .toMap(),
         )
     }
 

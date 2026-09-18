@@ -1786,8 +1786,66 @@ data class SessionExport(
          * closed and that the example demonstrates the narrowing;
          * `RomWithholdingDifferentialTest` in `:core:dsp` and
          * `SessionExportRomBoundTest` in `:core:data` are the differentials.
+         *
+         * 1.22 MINTS A KEY (#260): a set's [SetSensorsExport] may carry
+         * `unitAddresses`, which names the PHYSICAL UNIT behind each role it
+         * armed, keyed by role, valued with the device address.
+         *
+         * A MINT AND NOT A FURTHER ENTRY UNDER 1.21, which reverses what this
+         * entry said while it was drafted: `git tag --sort=-creatordate |
+         * head -1` is v0.1.54 and `git show
+         * v0.1.54:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.21"`, both read at the tag this round
+         * rather than relayed. 1.21 has SHIPPED, so extending it would change
+         * what a version already in the field means, and the four 1.21 entries
+         * above are closed.
+         *
+         * WHAT AN OLDER READER DOES, and it is not symmetric. `schemaVersion` is
+         * a CLOSED enum and the published schema sets
+         * `"additionalProperties": false` at its root, so the 1.21 schema
+         * v0.1.54 shipped REJECTS a 1.22 document on the version string alone,
+         * before looking at a single key. The 1.22 schema still lists every
+         * version from 1.0 through 1.21, so it ACCEPTS a 1.21 document
+         * unchanged. And because this entry adds one OPTIONAL key and removes
+         * or retypes none, a 1.21 READER that does not validate reads a 1.22
+         * document correctly -- the rejection is the validator's, not the
+         * reader's.
+         *
+         * WHAT WAS UNSAYABLE. Roles are not positional --
+         * [SensorCapturePolicy.roster] reads the label the lifter gave each
+         * paired unit -- so role `a` is one fixed unit for as long as the
+         * pairing stands, and the owner, asked which unit that was on field-38,
+         * said *"I'm not really sure. Will check each time, they're likely to
+         * get mixed up a lot."* Both units are magnet-mounted and identical to
+         * look at. Every dual-unit mount inference in the corpus therefore
+         * rested on that memory, with nothing in either document to check it
+         * against: the `sensors` block named roles and the raw manifest's
+         * `sensors` array carried role, file, samples and rate.
+         *
+         * DERIVED AT EXPORT TIME. The addresses are the pairing store read
+         * while the document is written, not a fact recorded with the set --
+         * nothing stores the address a capture came from -- so re-labelling the
+         * units between a session and its export publishes the new labelling
+         * over the old capture. That limit is in the published description
+         * rather than left for a reader to discover, and it is why no
+         * `DATABASE_VERSION` moves: this adds no column and stores nothing.
+         *
+         * ADDITIVE. One optional key is added; none is removed or retyped, so a
+         * 1.21 reader is unaffected except that it cannot see unit
+         * identities. Every archive already on disk is
+         * unchanged, and a session recorded before this key re-exports WITH it
+         * wherever the pairing still names both units -- which is correct and
+         * is the point, since the labels are the same labels those sets were
+         * recorded under.
+         *
+         * PINNED IN BOTH DIRECTIONS. `SchemaContractTest` asserts
+         * `serialKeysOf(SetSensorsExport.serializer())` equals the published
+         * `$defs.setSensors` property set, so neither side can move alone;
+         * `SchemaUnitIdentityContractTest` asserts the key's shape, this entry's
+         * own wording and that the published example carries it, so `ci.yml`'s
+         * ajv step validates a document that actually has one.
          */
-        const val SCHEMA_VERSION = "1.21"
+        const val SCHEMA_VERSION = "1.22"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -1797,7 +1855,7 @@ data class SessionExport(
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
-                "1.16", "1.17", "1.18", "1.19", "1.20", "1.21",
+                "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22",
             )
 
         /**
@@ -2938,6 +2996,54 @@ data class SetSensorsExport(
      * rule.
      */
     val soleSilent: String? = null,
+    /**
+     * Which physical unit carried each role this set armed, by device address,
+     * keyed by role (#260).
+     *
+     * WHY IT EXISTS. A role is not positional: `SensorCapturePolicy.roster`
+     * reads the label the lifter gave each paired unit, so role `a` is one
+     * fixed unit for as long as the pairing stands. The lifter holding two
+     * identical magnet-mounted WT901 units cannot tell which one that is, and
+     * said so when asked which unit was role a: *"I'm not really sure. Will
+     * check each time, they're likely to get mixed up a lot."* Until this key,
+     * every dual-unit mount inference in the corpus rested on that memory. An
+     * address is the only thing about a WT901 that survives a power cycle, so
+     * it is the only durable answer, and it lets an analysis say "role a = the
+     * unit ending 1D:3F" once the lifter has put those characters on a sticker.
+     *
+     * DERIVED AT EXPORT TIME, NOT RECORDED WITH THE SET, and no reader may take
+     * it for the second thing. Nothing in `RawStreamEntity`, `SetRecordEntity`
+     * or the raw archive stores the address a capture came from; this is the
+     * pairing store read while the document is being written. Re-labelling the
+     * two units between recording a session and exporting it therefore
+     * publishes the NEW labelling over the OLD capture, and nothing here dates
+     * it. Labels move only by a deliberate tap on the Devices screen -- not by
+     * pairing, not by forgetting, not by which unit connects first -- so the
+     * ordinary session is labelled correctly; the exposure is why the published
+     * description says derived rather than recorded.
+     *
+     * ONLY THE ROLES THE SET ARMED, which is [expected], and never more. A
+     * pairing store holds labels for units a given set never used, so an entry
+     * for a role absent from [expected] would attach an address to a capture
+     * that carries no role at all.
+     *
+     * A ROLE TWO ADDRESSES CLAIM HAS NO ENTRY. Forgetting a labelled unit does
+     * not clear its label, so pairing a replacement and giving it the same
+     * label leaves two addresses claiming one role permanently; one of them
+     * recorded the set and nothing can tell which, so the role is omitted while
+     * its partner is still named. Absence, never a coin flip published as an
+     * identity. [SensorCapturePolicy.unitAddresses] is the rule and the only
+     * copy of it.
+     *
+     * Absent rather than empty wherever there is nothing to say -- a one-sensor
+     * set, a set whose stream carries no role, a build or an install with no
+     * pairing labelled, and every set exported by a build that predates this
+     * key. `encodeDefaults = false` drops the empty map, which is
+     * [silent]'s rule and for [silent]'s reason: there is no informative empty
+     * here, and an empty object would read as "the app looked and found no
+     * units".
+     */
+    val unitAddresses: Map<String, String> = emptyMap(),
 )
 
 /**

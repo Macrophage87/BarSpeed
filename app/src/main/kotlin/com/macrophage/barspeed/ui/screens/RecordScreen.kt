@@ -1038,6 +1038,17 @@ private fun SensorCaptureLine(state: RecordState) {
                 style = MaterialTheme.typography.bodySmall,
                 color = if (roster.shortfall == null) BarColors.Sub else BarColors.Amber,
             )
+            // WHICH UNIT each label is on, before the set (#260). The lifter
+            // holding two identical magnet-mounted units cannot tell them apart
+            // -- "I'm not really sure. Will check each time, they're likely to
+            // get mixed up a lot." -- and the four characters here are what goes
+            // on the sticker. The phrase is `DualSensorSetup.rolesLine`'s, in
+            // `:core:model` where a test runs on it and where the Devices screen
+            // reads the same copy; null wherever the pair cannot be named, which
+            // is every state the sentence above is already explaining.
+            DualSensorSetup.rolesLine(state.pairedImuAddresses, state.sensorRoles)?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+            }
         }
     }
 }

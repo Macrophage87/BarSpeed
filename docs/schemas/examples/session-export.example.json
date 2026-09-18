@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.21",
+  "schemaVersion": "1.22",
   "startedAt": "2026-07-18T17:04:00Z",
   "endedAt": "2026-07-18T18:11:00Z",
   "timeZone": { "id": "America/New_York", "utcOffsetMinutes": -240 },
@@ -54,7 +54,8 @@
             "count": 2,
             "expected": ["a", "b"],
             "present": ["a", "b"],
-            "analysedRole": "a"
+            "analysedRole": "a",
+            "unitAddresses": { "a": "C0:82:2D:8A:1D:3F", "b": "C0:82:2D:8A:0C:7A" }
           },
           "hr": { "endOfSetBpm": 148, "avgBpm": 131, "maxBpm": 152, "minBpm": 118 },
           "repMetrics": [

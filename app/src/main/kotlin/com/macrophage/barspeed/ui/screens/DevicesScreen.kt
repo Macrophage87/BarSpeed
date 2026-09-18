@@ -108,7 +108,7 @@ private fun SensorRoleRow(assigned: SensorRole?, onAssign: (SensorRole?) -> Unit
  * ordinary setup and a line that is always there is a line nobody reads.
  */
 @Composable
-private fun DualSetupCard(step: DualSetupStep) {
+private fun DualSetupCard(step: DualSetupStep, rolesLine: String?) {
     val line = DualSensorSetup.devicesLine(step) ?: return
     Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Column(Modifier.padding(12.dp)) {
@@ -118,6 +118,17 @@ private fun DualSetupCard(step: DualSetupStep) {
                 color = if (step == DualSetupStep.READY) BarColors.Sub else BarColors.Amber,
             )
             DualSensorSetup.identifyHint(step)?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+            }
+            // WHICH UNIT each label is on, in one line, so the pairing is
+            // readable without comparing two cards (#260). Each paired row
+            // already carries its own `DevicePairingPolicy.unitTag` beside its
+            // name, which pairs a unit with a label a few lines further down
+            // the same card; this states the pair together, which is what goes
+            // on the stickers. Computed by the caller from the same two inputs
+            // [step] is read from, so the two readings cannot disagree.
+            rolesLine?.let {
                 Spacer(Modifier.height(4.dp))
                 Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
             }
@@ -167,6 +178,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
     val imuArmedAtMsB by viewModel.imuArmedAtMsB.collectAsState()
     val links by viewModel.linkAddresses.collectAsState()
     val roles by viewModel.sensorRoles.collectAsState()
+    val rolesLine by viewModel.dualRolesLine.collectAsState()
 
     Scaffold(
         topBar = {
@@ -196,7 +208,7 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                         "the app auto-connects from then on.",
                 )
             }
-            DualSetupCard(setupStep)
+            DualSetupCard(setupStep, rolesLine)
             known.forEach { device ->
                 // Keyed on ADDRESS, not on role. Keyed on role, two saved
                 // devices of one role showed the same link on both rows --

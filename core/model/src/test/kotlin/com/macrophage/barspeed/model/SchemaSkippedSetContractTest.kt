@@ -87,8 +87,8 @@ class SchemaSkippedSetContractTest {
     // ---- the version the key is filed under ---------------------------------
 
     /**
-     * The key rides under 1.21, which is the version this build writes, and
-     * 1.20 -- shipped in v0.1.53 -- is still readable.
+     * The key rides under 1.21, still an accepted version, and 1.20 -- shipped
+     * in v0.1.53 -- is still readable.
      *
      * A mint rather than an eighth entry under 1.20 BECAUSE 1.20 has shipped:
      * `git tag --sort=-creatordate | head -1` is v0.1.53 and `git show
@@ -97,14 +97,17 @@ class SchemaSkippedSetContractTest {
      * Extending a shipped version changes what a document already in the field
      * means.
      *
-     * The literal 1.21 is asserted HERE, in the file that mints it, and nowhere
-     * else. Seven other files asserted the tip constant beside a key filed under
-     * an older number, and every one of them went false at this mint; they are
-     * corrected in the same commit to pin their own filed version instead.
+     * THE TIP CONSTANT IS NO LONGER ASSERTED HERE. This test read
+     * `assertEquals("1.21", SessionExport.SCHEMA_VERSION)` on the rule that the
+     * literal belongs in the file that MINTS it -- and that rule is why the
+     * assertion is gone rather than re-pointed at 1.22: 1.21 is not the tip any
+     * more, #260 minted 1.22, and `SchemaUnitIdentityContractTest` is where the
+     * tip literal lives now. What this file pins is its own filed version, 1.21,
+     * being ACCEPTED, which is the claim #300's key depends on and which no
+     * later mint can make false.
      */
     @Test
     fun `the key rides under 1_21 and 1_20 is still readable`() {
-        assertEquals("1.21", SessionExport.SCHEMA_VERSION, "the version the exporter writes")
         assertTrue("1.21" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
         assertTrue("1.20" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.20 left the accepted set")
         assertTrue(entry.isNotEmpty(), "the published log carries no entry opening \"$MARKER\"")
