@@ -179,6 +179,64 @@ class LiftDirectionTest {
         )
     }
 
+    /**
+     * The two halves of [LiftDirection.mountSpecific], split so a caller
+     * holding a MEASUREMENT for one of them can ask about the other (#280).
+     *
+     * `StackRollSignature` reads a stream's roll and answers for the stack term
+     * alone; nothing anywhere reads whether a unit moved opposite to the load
+     * or through a pulley. So the split is not cosmetic -- it is the line
+     * between what can be measured and what can only be declared -- and this
+     * asserts the identity the refactor must hold to.
+     */
+    @Test
+    fun `the stack term and the other two make up mount-specific between them`() {
+        for (onStack in listOf(false, true)) {
+            for (inverted in listOf(false, true)) {
+                for (ratio in listOf(1.0, 2.0)) {
+                    val d = LiftDirection(sensorOnStack = onStack, sensorInverted = inverted, travelRatio = ratio)
+                    assertEquals(inverted || ratio != 1.0, d.mountSpecificBesidesStack, "$onStack/$inverted/$ratio")
+                    assertEquals(onStack || d.mountSpecificBesidesStack, d.mountSpecific, "$onStack/$inverted/$ratio")
+                }
+            }
+        }
+    }
+
+    /**
+     * Replacing the stack term with what a stream MEASURED, and nothing else
+     * (#280).
+     *
+     * `true` on a stack-declared lift returns the declaration itself -- the
+     * measurement confirmed it -- and `false` returns it with that one term
+     * dropped, which on a built-in cable id leaves a mount-free geometry. The
+     * five fields that describe the LIFT are untouched in both directions,
+     * which is asserted rather than assumed: a repair that quietly reset the
+     * start phase or the drive direction would swap a pulldown's concentric and
+     * eccentric while looking like it had only touched a mount.
+     */
+    @Test
+    fun `a measured mount replaces the stack term and nothing else`() {
+        val declared =
+            LiftDirection(
+                startsWith = StartPhase.CONCENTRIC,
+                concentricUp = false,
+                plane = MovementPlane.VERTICAL,
+                sensorOnStack = true,
+            )
+        assertEquals(declared, declared.forMeasuredMount(onStack = true), "the measurement confirmed it")
+        val measuredOff = declared.forMeasuredMount(onStack = false)
+        assertFalse(measuredOff.sensorOnStack)
+        assertFalse(measuredOff.mountSpecific, "the stack term was the only mount term")
+        assertEquals(declared.startsWith, measuredOff.startsWith)
+        assertEquals(declared.concentricUp, measuredOff.concentricUp)
+        assertEquals(declared.plane, measuredOff.plane)
+        assertEquals(declared.sensorInverted, measuredOff.sensorInverted)
+        assertEquals(declared.travelRatio, measuredOff.travelRatio)
+        val free = LiftDirection()
+        assertEquals(free, free.forMeasuredMount(onStack = false), "nothing to replace")
+        assertTrue(free.forMeasuredMount(onStack = true).sensorOnStack, "and it works the other way")
+    }
+
     /** A lat pulldown as field-38 declared it: stack-mounted and inverted, so both terms fire. */
     @Test
     fun `a stack-declared pulldown is mount-specific`() {

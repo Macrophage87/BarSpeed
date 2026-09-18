@@ -103,7 +103,51 @@ data class LiftDirection(
      * purpose. The value is whatever a plan declared or the app seeded, never
      * a measurement, so there is no tolerance to carry.
      */
-    val mountSpecific: Boolean get() = sensorOnStack || sensorInverted || travelRatio != 1.0
+    val mountSpecific: Boolean get() = sensorOnStack || mountSpecificBesidesStack
+
+    /**
+     * The mount terms OTHER than the stack: [sensorInverted] and
+     * [travelRatio]. Issue #280.
+     *
+     * Split out of [mountSpecific] -- which is now `sensorOnStack ||` this, the
+     * same expression -- because exactly one of the three terms can be
+     * MEASURED. `StackRollSignature` reads a stream's roll and answers "this
+     * unit rode the load" or "it did not"; nothing anywhere reads whether a
+     * unit moved opposite to the load or through a pulley that does not travel
+     * 1:1. So a caller holding a measurement for the stack term and none for
+     * the other two has to ask about them separately, and this is the half a
+     * measurement CANNOT settle.
+     *
+     * False on every seed id `ExerciseDef.ridesStack` carries: none of the
+     * twelve declares an inversion or a ratio, and no built-in exercise
+     * carries `sensorInverted` at all. True only where a PLAN declared one of
+     * them, which is also the only way either can become true.
+     *
+     * `travelRatio != 1.0` is an exact comparison against the type default,
+     * for [mountSpecific]'s reason: the value is declared or seeded, never
+     * measured, so there is no tolerance to carry.
+     */
+    val mountSpecificBesidesStack: Boolean get() = sensorInverted || travelRatio != 1.0
+
+    /**
+     * This declaration as it applies to a unit MEASURED to be [onStack] or not
+     * (#280).
+     *
+     * The stack term is replaced by what was measured and nothing else moves.
+     * A named function rather than a `copy` at the call site because the call
+     * site is `RecordViewModel`, where no test on the CI path can reach it, and
+     * because the result is only usable under a condition this function cannot
+     * check: [mountSpecificBesidesStack] must be false, or what comes back
+     * still carries a mount term nothing measured.
+     * `LiveFallbackPolicy` is what checks it, and `LiftDirectionTest` pins both
+     * halves.
+     *
+     * IT IS NOT A MEASUREMENT AND MAKES NONE. `onStack` is the caller's, from
+     * `StackRollSignature`, which reads a STREAM's roll and observes no magnet,
+     * no stack and no lifter.
+     */
+    fun forMeasuredMount(onStack: Boolean): LiftDirection =
+        if (onStack == sensorOnStack) this else copy(sensorOnStack = onStack)
 
     /** True when every rep opens with a downward movement. */
     val startsAtTop: Boolean get() = (startsWith == StartPhase.ECCENTRIC) == concentricUp

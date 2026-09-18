@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.LiveFallbackPolicy
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import kotlin.test.Test
@@ -664,5 +665,25 @@ class SetEndWindowTest {
             spans.map { samples[it.conEndIdx].timestampMs - doneMs },
             "drive end relative to Done, ms",
         )
+    }
+
+    /**
+     * The word said when a live count is given up does NOT bound a rep list
+     * (#280).
+     *
+     * `LiveFallbackPolicy.WITHHELD_CUE` is written to the set's cue track at the
+     * instant the count stops, so the archive carries when it happened. A cue
+     * row is read by this rule, and a new word that happened to land in
+     * [SetEnd.TERMINAL_CUES] would silently truncate every rep performed after
+     * the switch out of the set's figures -- on exactly the population whose
+     * figures were already the least trustworthy. Pinned here rather than
+     * reasoned about, because the vocabulary lives here.
+     */
+    @Test
+    fun `the withheld-count word is not a terminal cue`() {
+        val cue = VoiceCue(1_000L, LiveFallbackPolicy.WITHHELD_CUE)
+        assertEquals(SetEnd.NotCued, SetEnd.of(listOf(cue), cadenceGuided = true))
+        assertEquals(SetEnd.NotCued, SetEnd.of(listOf(cue), cadenceGuided = false))
+        assertTrue(LiveFallbackPolicy.WITHHELD_CUE !in SetEnd.TERMINAL_CUES)
     }
 }
