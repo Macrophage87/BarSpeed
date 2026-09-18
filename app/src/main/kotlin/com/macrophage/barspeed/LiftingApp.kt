@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import java.io.File
+import java.io.IOException
 
 /** Manual dependency container; one instance per process. */
 class AppContainer(app: Application) {
@@ -39,7 +40,27 @@ class AppContainer(app: Application) {
      * re-label a unit at any time, and a map taken at process start would go
      * stale silently. One read per document, inside `buildExport`.
      */
-    val sessionExporter = SessionExporter(sessionRepository, sensorRoleByAddress = { settings.sensorRoles.first() })
+    val sessionExporter =
+        SessionExporter(
+            sessionRepository,
+            // An unreadable pairing store publishes NO unit identity rather
+            // than failing the export (#260). `SettingsStore.sensorRoles` maps
+            // a DataStore flow, whose read errors surface to the collector, and
+            // `SessionDetailViewModel`'s six export paths wrap their calls in
+            // try/finally with NO catch -- so an exception here would turn a
+            // share tap into a crash, over a key that is an identity and no
+            // part of the capture. Absence is the honest answer and is what the
+            // published description already covers. IOException and not
+            // Throwable: DataStore's documented failure, and a runCatching here
+            // would swallow the cancellation of the export itself.
+            sensorRoleByAddress = {
+                try {
+                    settings.sensorRoles.first()
+                } catch (e: IOException) {
+                    emptyMap()
+                }
+            },
+        )
     val rawExporter = RawExporter(sessionRepository, sessionExporter, appVersion = BuildConfig.VERSION_NAME)
 
     /**
