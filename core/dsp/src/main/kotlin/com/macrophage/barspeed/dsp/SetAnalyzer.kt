@@ -656,7 +656,20 @@ object SetAnalyzer {
             // detection came from: a detection some later bound excluded still
             // sat inside the inter-anchor interval and still spent its drift
             // budget. [RomBound] is the one statement of the rule.
-            romBounded = RomBound.bounded(span, allSpans, series.anchorIndices),
+            //
+            // THE ROUTE RECORD IS NOT PASSED YET, deliberately. This commit
+            // records which anchors `VelocityEstimator.anchorAcceptable`
+            // accepted and which the starvation escape took, and changes no
+            // published figure: an all-capped record reproduces the rule
+            // exactly as it stood. The commit that passes
+            // `series.anchorCapped` is separate, and its red differentials are
+            // in `RomBoundCorpusTest` and `RomWithholdingDifferentialTest`.
+            romBounded = RomBound.bounded(
+                span,
+                allSpans,
+                series.anchorIndices,
+                BooleanArray(series.anchorIndices.size) { true },
+            ),
         )
     }
 

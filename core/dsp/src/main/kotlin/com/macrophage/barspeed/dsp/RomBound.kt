@@ -42,20 +42,39 @@ package com.macrophage.barspeed.dsp
  * ## The bound, and where it comes from
  *
  * The ZUPT pass is the only stage that pins the velocity integral to zero.
- * `VelocityEstimator.anchorAcceptable` decides which quiet windows become
- * anchors, and its ERASED-DISPLACEMENT cap is the only statement this pipeline
- * makes about how much of a reading may be drift: `0.5 * dv * dt`, the area of
- * the ramp the correction subtracts between two consecutive accepted anchors,
- * may not exceed `DspConfig.minRomM` -- the least distance the pipeline is
- * willing to call a rep, 0.10 m at the shipped defaults.
+ * `VelocityEstimator.anchorAcceptable` decides which quiet windows may become
+ * anchors, and its ERASED-DISPLACEMENT cap is this pipeline's one statement
+ * about how much of a reading may be drift: `0.5 * dv * dt`, the area of the
+ * ramp the correction subtracts between two consecutive accepted anchors, may
+ * not exceed `DspConfig.minRomM` -- the least distance the pipeline is willing
+ * to call a rep, 0.10 m at the shipped defaults.
  *
- * That cap is spent PER INTER-ANCHOR INTERVAL, not per rep. So a rep's
- * displacement is bounded only when the interval it sits in was spent on it
- * alone:
+ * THE CAP HOLDS ONLY FOR THE ANCHORS `anchorAcceptable` ACCEPTED, WHICH IS NOT
+ * ALL OF THEM. `applyZupt` takes a flat window on
+ * `stable && (nearPrev || starved)`, where `starved` means nothing has been
+ * acceptable for longer than its `ANCHOR_STARVATION_S`, 6.0 s: after a starved
+ * stretch the next flat window anchors with `nearPrev` FALSE, and the ramp back
+ * to it erases whatever it erases. `applyZupt`'s own note calls that escape the
+ * one route by which a slow phase can still be erased, 0 to 7 times per
+ * capture, and keeps it because gating it takes the corpus from 19 to 58 in
+ * absolute rep-count error. `VelocitySeries.anchorCapped` records which route
+ * each anchor took, and it is what lets this file tell the two apart -- the
+ * anchor indices alone cannot, so before that record existed this rule could
+ * not either.
+ *
+ * The cap is spent PER INTER-ANCHOR INTERVAL, not per rep. So a rep's
+ * displacement is bounded only when:
  *
  * - an accepted anchor lies at or before the rep's span start, AND
  * - an accepted anchor lies at or after its span end, AND
- * - no OTHER rep's span lies wholly between those two anchors.
+ * - no OTHER rep's span lies wholly between those two anchors, AND
+ * - every anchor from the first of those to the second was accepted with the
+ *   caps MET -- `anchorCapped` true -- so each interval the rep's span crosses
+ *   erased at most `minRomM`.
+ *
+ * The bound is therefore `minRomM` per interval crossed: 0.10 m for a rep
+ * sitting inside one interval, 0.10 m times k for a rep whose span crosses k of
+ * them. It is not a single 0.10 m for the rep, and this file does not claim one.
  *
  * Where several reps share one interval, 0.10 m of licensed drift removal is
  * all the analysis has applied across every one of them, and it bounds none of
@@ -63,33 +82,47 @@ package com.macrophage.barspeed.dsp
  * last anchor is a constant, which is the case `AccelArtefact.corruptedSpan`
  * describes as reaching to the end of the stream.
  *
+ * WHAT THE CAP DOES NOT COVER, and what is therefore not narrowed here:
+ * `applyZupt` also clamps every quiet sample under `DspConfig.pauseBandMps` to
+ * zero, and its own comment says `anchorAcceptable` does not guard that loop. A
+ * rep whose every interval is capped can still have had quiet samples inside
+ * its span zeroed by that clamp. This file makes no claim about it; it is a
+ * separate remainder of #291.
+ *
  * NOT A FITTED THRESHOLD AND NOT A NEW CONSTANT. Every term is read off
- * `anchorAcceptable` and `DspConfig`; nothing here was tuned against the corpus.
+ * `anchorAcceptable`, `applyZupt`'s own acceptance expression and `DspConfig`;
+ * nothing here was tuned against the corpus.
  *
  * ## What it withholds, measured on the eleven committed captures
  *
- * At most ONE rep per set is bounded, and on NINE of the eleven captures none
- * is: field-42 sets 2, 5, 7, 9, 11 and 13, field-43 sets 5 and 6 and field-37
- * set 3 publish no bounded rep, and field-43 set 4 and field-37 set 8 publish
- * exactly one, at `rom_m` 0.351 and 0.200. `RomBoundCorpusTest` carries the
- * per-capture column and the one case where a set has a bounded SPAN and no
- * bounded REP: field-42 set 11, whose only exclusive interval holds a detection
- * its own Done cue excluded.
+ * NO rep of any of the eleven is bounded. `RomBoundCorpusTest` carries the
+ * per-capture column, and `AnchorRouteTest` carries the measurement that made
+ * the fourth clause necessary: a ROUTE-BLIND version of this rule -- the first
+ * three clauses without the `anchorCapped` one -- admitted exactly three spans
+ * in the whole corpus, field-43 set 4's rep 7, field-37 set 8's rep 5 and
+ * field-42 set 11's twelfth span, and every one of the three sat in an interval
+ * a STARVATION-route anchor closed. Measured over those intervals, the
+ * displacement the correction erased was 1.0180 m, 5.0198 m and 2.3153 m
+ * against the 0.10 m the derivation above cites. The reps the route-blind rule
+ * admitted were exactly the ones whose erasure it could state no limit on, and
+ * it published them at `rom_m` 0.351 m and 0.200 m.
  *
  * That is the finding, not a side effect of it: on a real working set the bar
- * never goes quiet enough for an anchor to be accepted, so the whole working
- * window is one uncorrected interval. `romSpread_pct` therefore goes ABSENT on
- * every capture in this corpus rather than reading 98.1 %, which is the chip
- * going dark instead of lying.
+ * never goes quiet enough for an ACCEPTABLE anchor, so the whole working window
+ * is one uncorrected interval and the anchor that eventually closes it is taken
+ * by starvation. `romSpread_pct` therefore goes ABSENT on every capture in this
+ * corpus rather than reading 98.1 %, and under the fourth clause `meanRom_m`
+ * goes absent on all eleven as well, where the route-blind rule published it on
+ * two of them.
  *
  * ## What this does NOT claim
  *
  * A bounded rep is not a correct one. The cap bounds the travel the CORRECTION
  * removed, never the residual an uncorrected non-linear bias leaves, and nothing
  * in this repository has an independently known travel to check a figure
- * against except the leg-curl rail (`RomDispersionTest`). Bounded means the
- * pipeline spent its whole drift budget on this one rep; it does not mean the
- * distance is right.
+ * against except the leg-curl rail (`RomDispersionTest`). Bounded means every
+ * interval this rep's span crossed removed at most the licensed budget and
+ * removed it for this rep alone; it does not mean the distance is right.
  *
  * It also says nothing about power. #291 claims `rom_m` multiplies into
  * `meanConPower_w` and `peakPower_w`; it does not -- those are
@@ -127,7 +160,9 @@ object RomBound {
 
     /**
      * Whether [span]'s displacement is bounded, given every span the segmenter
-     * produced and the anchors the ZUPT pass accepted, both ascending.
+     * produced, the anchors the ZUPT pass accepted (ascending) and the route
+     * each of those anchors took -- [VelocitySeries.anchorCapped], one entry per
+     * anchor.
      *
      * [allSpans] is the WHOLE segmented list rather than the list a caller has
      * already bounded at the cue or the work start: a detection that was
@@ -135,11 +170,23 @@ object RomBound {
      * consumed its drift budget, so leaving it out would call a shared interval
      * exclusive.
      */
-    fun bounded(span: RepSpan, allSpans: List<RepSpan>, anchorIndices: IntArray): Boolean {
+    fun bounded(span: RepSpan, allSpans: List<RepSpan>, anchorIndices: IntArray, anchorCapped: BooleanArray): Boolean {
+        // A route record that does not describe this anchor list is an UNKNOWN
+        // route, and unknown withholds: `VelocitySeries.anchorCapped` defaults
+        // to empty, so a hand-built series bounds nothing rather than
+        // everything.
+        if (anchorCapped.size != anchorIndices.size) return false
         val lo = startOf(span)
         val hi = endOf(span)
-        val before = anchorIndices.filter { it <= lo }.maxOrNull() ?: return false
-        val after = anchorIndices.filter { it >= hi }.minOrNull() ?: return false
+        val firstAt = anchorIndices.indices.filter { anchorIndices[it] <= lo }.maxOrNull() ?: return false
+        val lastAt = anchorIndices.indices.filter { anchorIndices[it] >= hi }.minOrNull() ?: return false
+        // Every interval between those two anchors must have had its erasure
+        // capped, and an anchor's flag describes the interval ENDING at it, so
+        // the first anchor's own flag is not read here -- whatever closed the
+        // interval before the rep began removed nothing from inside it.
+        for (at in firstAt + 1..lastAt) if (!anchorCapped[at]) return false
+        val before = anchorIndices[firstAt]
+        val after = anchorIndices[lastAt]
         return allSpans.none { other ->
             val otherLo = startOf(other)
             val otherHi = endOf(other)
@@ -148,8 +195,8 @@ object RomBound {
     }
 
     /** [bounded] for every span of a set, in the order the spans arrived. */
-    fun boundedFlags(allSpans: List<RepSpan>, anchorIndices: IntArray): List<Boolean> =
-        allSpans.map { bounded(it, allSpans, anchorIndices) }
+    fun boundedFlags(allSpans: List<RepSpan>, anchorIndices: IntArray, anchorCapped: BooleanArray): List<Boolean> =
+        allSpans.map { bounded(it, allSpans, anchorIndices, anchorCapped) }
 
     private fun startOf(span: RepSpan) = minOf(span.eccStartIdx, span.conStartIdx)
 

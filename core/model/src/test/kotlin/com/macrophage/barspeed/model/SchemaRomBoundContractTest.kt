@@ -56,10 +56,13 @@ class SchemaRomBoundContractTest {
 
     @Test
     fun `the per-rep bound is published and is a boolean`() {
-        // A boolean rather than a reason word, and the choice is load-bearing:
-        // there is exactly ONE way a displacement goes unbounded here -- the
-        // inter-anchor interval was shared -- so an enum would publish a
-        // vocabulary with one member and invite a reader to expect others.
+        // A boolean rather than a reason word. There are two ways a displacement
+        // goes unbounded -- the inter-anchor interval was shared, or one of the
+        // intervals the rep crosses was closed by an anchor the starvation
+        // escape took, so nothing capped what the correction erased there -- and
+        // both are facts about the INTEGRATOR rather than about this rep, so
+        // neither is a reason a reader of one row could act on. RomBound states
+        // them; the row says only whether a limit exists.
         val flag = assertNotNull(
             repDef()["properties"]!!.jsonObject["romBounded"],
             "a rep declares no romBounded key",

@@ -119,8 +119,18 @@ class RomBoundCorpusTest {
         assertEquals(12, spans.size, "segmented spans")
         assertEquals(
             listOf(11),
-            RomBound.boundedFlags(spans, anchored.anchorIndices).withIndex().filter { it.value }.map { it.index },
-            "bounded span indices",
+            RomBound.boundedFlags(spans, anchored.anchorIndices, BooleanArray(anchored.anchorIndices.size) { true })
+                .withIndex().filter { it.value }.map { it.index },
+            "span indices a ROUTE-BLIND rule admits",
+        )
+        // And none once the route is read: the interval that span sits in was
+        // closed by a starvation anchor, which capped nothing. AnchorRouteTest
+        // measures the 2.3153 m it erased.
+        assertEquals(
+            emptyList(),
+            RomBound.boundedFlags(spans, anchored.anchorIndices, anchored.anchorCapped)
+                .withIndex().filter { it.value }.map { it.index },
+            "span indices the rule admits once the route is read",
         )
         val a = ArtefactCorpus.analyse(case, samples)
         assertEquals(9, a.reps.size, "published detections")

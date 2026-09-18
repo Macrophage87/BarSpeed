@@ -34,6 +34,33 @@ data class VelocitySeries(
      * hand-built series carries no samples for [AccelArtefact] to find anyway.
      */
     val anchorIndices: IntArray = IntArray(0),
+    /**
+     * Per entry of [anchorIndices], whether accepting that anchor passed
+     * [VelocityEstimator.anchorAcceptable] -- so whether the displacement the
+     * piecewise-linear offset erases over the interval ENDING at it is capped
+     * at [DspConfig.minRomM].
+     *
+     * FALSE IS NOT A MALFORMED ANCHOR. `applyZupt` accepts a flat window on
+     * `stable && (nearPrev || starved)`: after a stretch longer than the
+     * starvation limit with nothing acceptable, the next flat window anchors
+     * with the caps not met, and the ramp back to it can erase any amount. That
+     * escape is deliberate -- gating it takes the corpus from 19 to 58 in
+     * absolute rep-count error -- and this array is the only place its use is
+     * recorded. Element 0 is the series origin, which closes no interval and
+     * removes nothing, and reads true.
+     *
+     * Carried rather than re-derived because re-deriving it means a second copy
+     * of the acceptance rule, which is the arrangement [anchorIndices]' own note
+     * refuses for the same reason. [RomBound] is the reader, and issue #291 is
+     * why it needs one: a rep sitting in an interval this reads false for has no
+     * stated limit on how much of its travel the correction moved.
+     *
+     * EMPTY BY DEFAULT, like [anchorIndices], and for the same failure
+     * direction: a consumer that finds it shorter than the anchor list must read
+     * "the route is unknown" as "nothing is bounded" and withhold more rather
+     * than fewer figures.
+     */
+    val anchorCapped: BooleanArray = BooleanArray(0),
 ) {
     val size: Int get() = timeS.size
 
@@ -52,8 +79,11 @@ data class VelocitySeries(
             velocityMps = DoubleArray(size) { velocityMps[it] * factor },
             sampleRateHz = sampleRateHz,
             // Scaling the frame moves no sample, so the anchors are the same
-            // indices.
+            // indices. Scaling does not re-decide one either: acceptance was
+            // tested in the sensor frame, so the route each anchor took is the
+            // route it took.
             anchorIndices = anchorIndices,
+            anchorCapped = anchorCapped,
         )
     }
 }
@@ -164,7 +194,7 @@ object VelocityEstimator {
 
         val quiet = quietMask(samples, timeS, config)
         val zupt = applyZupt(rawV, timeS, quiet, config)
-        return VelocitySeries(timeS, accel, zupt.velocity, sampleRateHz, zupt.anchorIndices)
+        return VelocitySeries(timeS, accel, zupt.velocity, sampleRateHz, zupt.anchorIndices, zupt.anchorCapped)
     }
 
     private const val MIN_PLAUSIBLE_HZ = 4.0
@@ -439,19 +469,32 @@ object VelocityEstimator {
         return quiet
     }
 
-    private data class Anchor(val index: Int, val rawValue: Double)
+    /**
+     * One accepted zero-velocity anchor, and WHICH ROUTE accepted it.
+     *
+     * [capped] is [anchorAcceptable]'s answer for the step this anchor declares
+     * to be drift. False where the anchor was taken only because nothing had
+     * been acceptable for longer than [ANCHOR_STARVATION_S], which means no cap
+     * was applied to the displacement the offset erases over the interval
+     * ending here. The origin at index 0 closes no interval and reads true.
+     */
+    private data class Anchor(val index: Int, val rawValue: Double, val capped: Boolean)
 
     /**
-     * [applyZupt]'s two outputs. The anchor indices are returned rather than
-     * recomputed by a second caller because they are what [applyZupt] DECIDED
-     * -- a re-derivation would be a second copy of the acceptance rule, and the
-     * two would drift.
+     * [applyZupt]'s outputs. The anchor indices and the route each anchor took
+     * are returned rather than recomputed by a second caller because they are
+     * what [applyZupt] DECIDED -- a re-derivation would be a second copy of the
+     * acceptance rule, and the two would drift.
      */
-    private data class Zupt(val velocity: DoubleArray, val anchorIndices: IntArray)
+    private data class Zupt(
+        val velocity: DoubleArray,
+        val anchorIndices: IntArray,
+        val anchorCapped: BooleanArray,
+    )
 
     private fun applyZupt(rawV: DoubleArray, timeS: DoubleArray, quiet: BooleanArray, config: DspConfig): Zupt {
         val n = rawV.size
-        val anchors = mutableListOf(Anchor(0, rawV[0]))
+        val anchors = mutableListOf(Anchor(0, rawV[0], capped = true))
         // Walk quiet regions in windows of minStationaryS. A window anchors only if
         // (a) raw velocity is noise-flat across it and (b) [anchorAcceptable] will
         // have the velocity step it declares to be drift. Note (a) is satisfied
@@ -464,7 +507,10 @@ object VelocityEstimator {
         // escape is deliberately NOT gated by (b): gating it takes the corpus
         // from 19 to 58 in absolute rep-count error. It is also the one route by
         // which a slow phase can still be erased, 0 to 7 times per capture, and
-        // that is a separate defect from this one.
+        // that is a separate defect from this one. Such an anchor is RECORDED as
+        // uncapped, because (b) is the only cap on how much displacement the
+        // offset erases and a consumer of the corrected series has no other way
+        // to tell the two routes apart -- see Zupt.anchorCapped and RomBound.
         var i = 1
         while (i < n) {
             if (!quiet[i]) {
@@ -486,7 +532,12 @@ object VelocityEstimator {
                     val nearPrev = anchorAcceptable(abs(rawV[mid] - last.rawValue), elapsedS, config)
                     val starved = elapsedS > ANCHOR_STARVATION_S
                     if (stable && (nearPrev || starved)) {
-                        anchors += Anchor(mid, rawV[mid])
+                        // `nearPrev` IS the record of which route accepted this
+                        // anchor: true means the caps held, false means only the
+                        // starvation escape took it and no cap was applied to
+                        // what the offset erases over the interval ending here.
+                        // RomBound is the reader (#291).
+                        anchors += Anchor(mid, rawV[mid], capped = nearPrev)
                     }
                     windowStart = j + 1
                     if (windowStart < n) {
@@ -527,6 +578,10 @@ object VelocityEstimator {
         for (k in 0 until n) {
             if (quiet[k] && abs(corrected[k]) < config.pauseBandMps) corrected[k] = 0.0
         }
-        return Zupt(corrected, IntArray(anchors.size) { anchors[it].index })
+        return Zupt(
+            corrected,
+            IntArray(anchors.size) { anchors[it].index },
+            BooleanArray(anchors.size) { anchors[it].capped },
+        )
     }
 }

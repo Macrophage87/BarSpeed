@@ -6,14 +6,17 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * [RomBound] on its own, away from any capture: the three clauses of the rule
- * and the absence case, on spans and anchor lists built by hand.
+ * [RomBound] on its own, away from any capture: the four clauses of the rule and
+ * the absence case, on spans, anchor lists and route records built by hand.
  *
- * Green pins on a new symbol. Nothing reads [RepAnalysis.romBounded] yet --
- * `romSpread_pct`, the export and the post-set chip are untouched by the commit
- * that adds this -- so no published figure moves. The corpus column is in
- * [RomBoundCorpusTest], and the measurement that argued for withholding rather
- * than repairing is in [RomDriftBaselineTest].
+ * Every call passes a route record, [VelocitySeries.anchorCapped]'s per-anchor
+ * "did `anchorAcceptable` accept this one", because an anchor the starvation
+ * escape took applies no cap to the displacement the correction erases over the
+ * interval ending at it. [AnchorRouteTest] measures what that costs on the
+ * committed captures; this file is the rule in isolation.
+ *
+ * The corpus column is in [RomBoundCorpusTest], and the measurement that argued
+ * for withholding rather than repairing is in [RomDriftBaselineTest].
  */
 class RomBoundTest {
     /** An eccentric-first rep occupying [lo]..[hi], with the phases split down the middle. */
@@ -38,10 +41,61 @@ class RomBoundTest {
         hasEccentric = false,
     )
 
+    /** Every anchor of [anchorIndices] accepted with the caps met. */
+    private fun allCapped(count: Int) = BooleanArray(count) { true }
+
     @Test
-    fun `a rep alone between two accepted anchors is bounded`() {
+    fun `a rep alone between two capped anchors is bounded`() {
         val one = span(20, 40)
-        assertTrue(RomBound.bounded(one, listOf(one), intArrayOf(0, 10, 50)))
+        assertTrue(RomBound.bounded(one, listOf(one), intArrayOf(0, 10, 50), allCapped(3)))
+    }
+
+    @Test
+    fun `a rep whose interval was closed by a starvation anchor is unbounded`() {
+        // THE CLAUSE THE CORPUS TURNS ON. The anchor at 50 is the one that ends
+        // the interval this rep sits in, and it was taken through the starvation
+        // escape, so nothing capped what the offset erased across it -- on the
+        // committed captures that came to 1.0180 m, 2.3153 m and 5.0198 m against
+        // a 0.10 m cap (AnchorRouteTest). The first three clauses all hold here.
+        val one = span(20, 40)
+        assertFalse(RomBound.bounded(one, listOf(one), intArrayOf(0, 10, 50), booleanArrayOf(true, true, false)))
+    }
+
+    @Test
+    fun `an uncapped anchor before the rep does not make it unbounded`() {
+        // A flag describes the interval ENDING at its anchor. Whatever the ramp
+        // into the anchor at 10 erased, it erased it before this rep began, and
+        // the interval the rep occupies is the capped one after it.
+        val one = span(20, 40)
+        assertTrue(RomBound.bounded(one, listOf(one), intArrayOf(0, 10, 50), booleanArrayOf(true, false, true)))
+    }
+
+    @Test
+    fun `every interval a rep crosses must be capped, not just the last`() {
+        // A rep whose span holds an anchor of its own crosses two intervals, and
+        // the bound is minRomM per interval crossed. One uncapped interval
+        // inside the span is enough to lose the bound.
+        val one = span(20, 60)
+        val anchors = intArrayOf(0, 15, 40, 70)
+        assertTrue(RomBound.bounded(one, listOf(one), anchors, allCapped(4)))
+        assertFalse(
+            RomBound.bounded(one, listOf(one), anchors, booleanArrayOf(true, true, false, true)),
+            "the interval ending inside the span was uncapped",
+        )
+        assertFalse(
+            RomBound.bounded(one, listOf(one), anchors, booleanArrayOf(true, true, true, false)),
+            "the interval ending after the span was uncapped",
+        )
+    }
+
+    @Test
+    fun `a route record that does not match the anchor list bounds nothing`() {
+        // Unknown route withholds. VelocitySeries.anchorCapped defaults to
+        // EMPTY, so a hand-built series must read as "nothing is bounded"
+        // rather than as "every anchor was acceptable".
+        val one = span(20, 40)
+        assertFalse(RomBound.bounded(one, listOf(one), intArrayOf(0, 10, 50), BooleanArray(0)))
+        assertFalse(RomBound.bounded(one, listOf(one), intArrayOf(0, 10, 50), booleanArrayOf(true, true)))
     }
 
     @Test
@@ -50,7 +104,7 @@ class RomBoundTest {
         // the rep begins on may be the anchor itself. A strict comparison would
         // call the best-bounded rep in a set unbounded.
         val one = span(20, 40)
-        assertTrue(RomBound.bounded(one, listOf(one), intArrayOf(20, 40)))
+        assertTrue(RomBound.bounded(one, listOf(one), intArrayOf(20, 40), allCapped(2)))
     }
 
     @Test
@@ -62,8 +116,8 @@ class RomBoundTest {
         val second = span(50, 70)
         val spans = listOf(first, second)
         val anchors = intArrayOf(0, 10, 80)
-        assertFalse(RomBound.bounded(first, spans, anchors), "first rep")
-        assertFalse(RomBound.bounded(second, spans, anchors), "second rep")
+        assertFalse(RomBound.bounded(first, spans, anchors, allCapped(3)), "first rep")
+        assertFalse(RomBound.bounded(second, spans, anchors, allCapped(3)), "second rep")
     }
 
     @Test
@@ -72,13 +126,13 @@ class RomBoundTest {
         // error runs to the end of the stream -- the case
         // AccelArtefact.corruptedSpan describes from the same anchor structure.
         val one = span(20, 40)
-        assertFalse(RomBound.bounded(one, listOf(one), intArrayOf(0, 10)))
+        assertFalse(RomBound.bounded(one, listOf(one), intArrayOf(0, 10), allCapped(2)))
     }
 
     @Test
     fun `a rep with no accepted anchor before it is unbounded`() {
         val one = span(20, 40)
-        assertFalse(RomBound.bounded(one, listOf(one), intArrayOf(50, 60)))
+        assertFalse(RomBound.bounded(one, listOf(one), intArrayOf(50, 60), allCapped(2)))
     }
 
     @Test
@@ -87,8 +141,8 @@ class RomBoundTest {
         // chosen for its failure direction. A hand-built series gets it, and it
         // must read as "nothing is bounded" rather than "everything is".
         val one = span(20, 40)
-        assertFalse(RomBound.bounded(one, listOf(one), IntArray(0)))
-        assertEquals(listOf(false), RomBound.boundedFlags(listOf(one), IntArray(0)))
+        assertFalse(RomBound.bounded(one, listOf(one), IntArray(0), BooleanArray(0)))
+        assertEquals(listOf(false), RomBound.boundedFlags(listOf(one), IntArray(0), BooleanArray(0)))
     }
 
     @Test
@@ -96,9 +150,9 @@ class RomBoundTest {
         // Its eccentric span is a placeholder inside the drive's own range, so
         // taking the min and the max of the four indices must not widen it.
         val one = driveOnly(20, 40)
-        assertTrue(RomBound.bounded(one, listOf(one), intArrayOf(19, 41)))
+        assertTrue(RomBound.bounded(one, listOf(one), intArrayOf(19, 41), allCapped(2)))
         assertFalse(
-            RomBound.bounded(one, listOf(one), intArrayOf(21, 41)),
+            RomBound.bounded(one, listOf(one), intArrayOf(21, 41), allCapped(2)),
             "an anchor inside the drive is not before it",
         )
     }
@@ -113,12 +167,12 @@ class RomBoundTest {
         // so it is bounded too. The interval 50..100 holds b alone.
         assertEquals(
             listOf(true, true, true),
-            RomBound.boundedFlags(listOf(a, b, c), intArrayOf(0, 50, 100, 200)),
+            RomBound.boundedFlags(listOf(a, b, c), intArrayOf(0, 50, 100, 200), allCapped(4)),
         )
         // Remove the anchor at 50 and a and b share 0..100.
         assertEquals(
             listOf(false, false, true),
-            RomBound.boundedFlags(listOf(a, b, c), intArrayOf(0, 100, 200)),
+            RomBound.boundedFlags(listOf(a, b, c), intArrayOf(0, 100, 200), allCapped(3)),
         )
     }
 
