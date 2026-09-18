@@ -9,6 +9,7 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.zip.ZipInputStream
+import kotlin.random.Random
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,6 +50,17 @@ import kotlin.test.assertTrue
  * unreadable rather than counted. A capture nobody can parse is precisely the
  * one worth getting off the phone intact: the bytes are the only copy.
  *
+ * IT IS ALSO INCOMPRESSIBLE, AND THAT IS WHAT MAKES THIS COVER BOTH HALVES
+ * OF THE DEFECT. The filler is pseudorandom bytes with the newline value
+ * excluded, repeated from one 1 MiB block -- which deflate cannot collapse,
+ * because its window is 32 KB and the repeat period is thirty-two times
+ * that. So the ARCHIVE is also larger than the heap, and a `zipTo` that
+ * streamed each stream in but accumulated the archive in a
+ * `ByteArrayOutputStream` before writing it out fails this pin too. With
+ * filler of one repeated byte it did not: that mutation was run and it
+ * survived, because 300 MiB of `x` deflates to a few hundred kilobytes.
+ * Both mutations are in this branch's commit bodies.
+ *
  * WHAT THIS CANNOT SAY. Nothing here is Android. It does not establish that
  * the share sheet accepts the file, that a mail client uploads it, or that
  * the phone's own heap survives -- SEND IT TO ME has never been pressed on a
@@ -86,6 +98,22 @@ class JournalShareHeapTest {
             .writeText(Json.encodeToString(SetJournalHeader.serializer(), header))
     }
 
+    /**
+     * One 1 MiB block of pseudorandom bytes, never the newline value.
+     *
+     * Seeded, so a failure reproduces. Newline-free because the point of the
+     * fixture is #271's shape, and incompressible because the point of the
+     * pin is that neither the stream nor the archive fits in the heap -- see
+     * this class's own doc for the mutation that measured the difference.
+     */
+    private fun incompressibleChunk(): ByteArray {
+        val random = Random(SEED)
+        return ByteArray(CHUNK_BYTES) {
+            val byte = random.nextInt(0, BYTE_VALUES)
+            (if (byte == NEWLINE) byte + 1 else byte).toByte()
+        }
+    }
+
     /** A chunk at a time, so the fixture costs one buffer rather than the file. */
     private fun appendChunks(file: File, chunk: ByteArray, times: Int) {
         FileOutputStream(file, true).buffered(chunk.size).use { out ->
@@ -118,7 +146,7 @@ class JournalShareHeapTest {
     fun `an oversize capture reaches the zip whole on a heap that cannot hold it`() {
         val dir = directory()
         val stream = File(dir, SetJournal.IMU)
-        appendChunks(stream, ByteArray(CHUNK_BYTES) { FILLER }, RUNAWAY_CHUNKS)
+        appendChunks(stream, incompressibleChunk(), RUNAWAY_CHUNKS)
 
         val orphan = store().orphans().single()
         assertTrue(orphan.imu?.malformed == true, "the fixture is not the newline-free shape #271 measured")
@@ -157,7 +185,9 @@ class JournalShareHeapTest {
 
     private companion object {
         const val CHUNK_BYTES = 1024 * 1024
-        const val FILLER: Byte = 0x78 // 'x' -- anything that is not a newline
+        const val SEED = 0x5EEDL
+        const val BYTE_VALUES = 256
+        const val NEWLINE = 0x0A
         const val RUNAWAY_CHUNKS = 300
         const val RUNAWAY_BYTES = RUNAWAY_CHUNKS.toLong() * CHUNK_BYTES
     }
