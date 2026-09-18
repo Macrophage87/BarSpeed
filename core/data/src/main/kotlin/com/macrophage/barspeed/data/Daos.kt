@@ -185,11 +185,14 @@ interface SessionDao {
     @Query("UPDATE set_records SET loadKg = :loadKg WHERE id = :setId")
     suspend fun overrideLoad(setId: Long, loadKg: Double)
 
-    // No "corrected" flag beside it: reps have repsManual, seconds have no such
-    // column, and adding one is a migration this change does not make. A new
-    // @Query changes no table, so DATABASE_VERSION does not move for this.
-    @Query("UPDATE set_records SET actualDurationS = :seconds WHERE id = :setId")
-    suspend fun overrideDuration(setId: Long, seconds: Int)
+    // The provenance column moves WITH the seconds, in one statement, because
+    // two statements are two chances for a row to hold a figure and a word that
+    // disagree (#259, #249). The sentence that stood here -- that seconds have
+    // no such column and adding one is a migration this change does not make --
+    // went false when v19 added `durationEndedBy`, and is deleted rather than
+    // reworded. The word is the caller's: `SessionRepository` owns which one.
+    @Query("UPDATE set_records SET actualDurationS = :seconds, durationEndedBy = :endedBy WHERE id = :setId")
+    suspend fun overrideDuration(setId: Long, seconds: Int, endedBy: String?)
 
     @Query("SELECT * FROM sessions WHERE startedAtMs >= :fromMs AND startedAtMs <= :toMs ORDER BY startedAtMs")
     suspend fun sessionsInRange(fromMs: Long, toMs: Long): List<SessionEntity>

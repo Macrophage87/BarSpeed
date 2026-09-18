@@ -309,6 +309,21 @@
           "voided": true,
           "voidReason": "the app re-armed a slot I had already finished; I never hung on this one",
           "summary": {}
+        },
+        {
+          "load_kg": 0,
+          "load_lb": 0,
+          "reps": 0,
+          "duration_s": 29,
+          "durationEndedBy": "sensor",
+          "plannedDuration_s": 45,
+          "failed": true,
+          "failedByLifter": true,
+          "limiter": "grip",
+          "plannedPrep_s": 12,
+          "prep_s": 12,
+          "rest_s": 120,
+          "summary": {}
         }
       ]
     },

@@ -1591,6 +1591,51 @@ data class SessionExport(
          * `additionalProperties: false` with both keys required, and the
          * published example carries an entry so the ajv step in `ci.yml`
          * actually validates it.
+         *
+         * SECOND 1.21 ENTRY (#259, and #249's ask rides it): a timed set may
+         * carry [SetExport.durationEndedBy], one of `clock`, `sensor`,
+         * `lifter` or `corrected`, saying which of them decided the
+         * `duration_s` beside it.
+         *
+         * A FURTHER ENTRY UNDER 1.21 RATHER THAN A MINT, and the test is the
+         * same one the first entry applied: `git tag --sort=-creatordate | head
+         * -1` is v0.1.53 and `git show v0.1.53:core/model/.../SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.20"`, both read this round. 1.21 has NOT
+         * shipped, so it is still open and a key added to it changes nothing
+         * any reader has seen.
+         *
+         * WHY A KEY, since the preference is to derive. At export time the row
+         * offers `duration_s`, `plannedDuration_s`, its end instant and -- from
+         * the prep stream -- `workStartedAt_ms`, so the measured span IS
+         * recoverable and can be compared against what was recorded. What that
+         * comparison cannot do is separate a figure the SENSOR shortened from
+         * one the LIFTER corrected: both are a stored value that is neither the
+         * span nor the target, and telling those two apart is the whole of
+         * #249. A correction that happens to land on the target would read as
+         * the clock as well. So the word is stored, in `set_records` on the
+         * unreleased v19 hop, and published from there.
+         *
+         * WHAT THE `sensor` WORD CHANGES ABOUT `duration_s` ITSELF, stated
+         * because a reader comparing holds across versions needs it: on a hold
+         * the lifter ended by hand with an armed unit that saw a release, the
+         * figure now runs to the release rather than to the tap, and is
+         * therefore SHORTER than the same set would have published under 1.20
+         * by the length of the walk back to the phone -- 7 s and 6 s on the two
+         * field-38 dead hangs this was measured against. The published meaning
+         * of `duration_s` is unchanged: it is, as it was, the seconds the hold
+         * lasted. What changed is that the app can now tell where it ended. A
+         * set with no armed unit publishes exactly what it published before.
+         *
+         * ADDITIVE. One optional key is added, nothing is removed or retyped,
+         * and a 1.20 reader is unaffected except that it cannot see the word.
+         * No archive on disk moves: the column is new, so every session already
+         * recorded publishes nothing here.
+         *
+         * PINNED. `SchemaHoldEndContractTest` asserts the published enum in
+         * `docs/schemas/session-export.schema.json` and `HoldEndSource`'s own
+         * four words are the same set, so neither can gain a word alone, and
+         * the published example carries a hold with the key so the ajv step in
+         * `ci.yml` validates it.
          */
         const val SCHEMA_VERSION = "1.21"
 
@@ -1914,6 +1959,37 @@ data class SetExport(
      * or the app could not tell".
      */
     val abandonedInPrep: Boolean = false,
+    /**
+     * Which of four things decided [durationS]: `"clock"`, `"sensor"`,
+     * `"lifter"` or `"corrected"`. Schema 1.21, issues #259 and #249.
+     *
+     * The words are `HoldEndSource`'s and the enum is the only place they are
+     * spelled, so the column, this key and the archive manifest cannot drift
+     * apart over them. What each means:
+     *
+     * - `clock` -- the app's own clock reached the target and ended the set
+     *   (#168), so [durationS] is the target itself and the lifter heard `Time`
+     *   a beat before it.
+     * - `sensor` -- an armed unit's stream showed the implement being let go,
+     *   and [durationS] runs to THAT instant rather than to the tap that
+     *   followed it. On a hands-full hold the tap is 5-10 s late by the owner's
+     *   own account, and every one of those seconds used to be inside this
+     *   figure.
+     * - `lifter` -- the tap decided, and nothing else spoke: no unit was armed
+     *   for the set, or the armed unit's stream carried no release. The reach
+     *   is still inside [durationS] on these.
+     * - `corrected` -- the lifter restated the figure on the rest screen
+     *   afterwards. It REPLACES whichever of the other three stood before it,
+     *   so a corrected figure does not also publish what produced the figure
+     *   it replaced; the raw span is still recoverable from the archive's
+     *   `workStartedAt_ms` and the row's own end instant.
+     *
+     * ABSENT, not defaulted, on every set that is not timed and on every timed
+     * set recorded before database v19 -- where absence means "the build could
+     * not say", never "the lifter ended it". #249 asked for exactly this
+     * distinction and it is what the key is for.
+     */
+    val durationEndedBy: String? = null,
     @SerialName("plannedDuration_s") val plannedDurationS: Int? = null,
     /**
      * Unilateral sets: the arm the set WORKED -- "left" or "right".

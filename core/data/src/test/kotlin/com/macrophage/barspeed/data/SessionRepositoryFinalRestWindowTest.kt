@@ -113,7 +113,7 @@ class SessionRepositoryFinalRestWindowTest {
             setColumnWrites += "overrideLoad"
         }
 
-        override suspend fun overrideDuration(setId: Long, seconds: Int) {
+        override suspend fun overrideDuration(setId: Long, seconds: Int, endedBy: String?) {
             setColumnWrites += "overrideDuration"
         }
 

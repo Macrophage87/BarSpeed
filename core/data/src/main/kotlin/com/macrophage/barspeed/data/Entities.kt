@@ -224,12 +224,37 @@ data class SetRecordEntity(
      * ran to its planned end (#168) -- `plannedDurationS` unless the lifter
      * changed the hold in the change-set dialog, in which case theirs -- the
      * measurement on one the lifter stopped, and the stated
-     * figure on one corrected afterwards from the rest screen. No column
-     * says which: reps have `repsManual` and seconds have no counterpart,
-     * and adding one is a migration #168 deliberately did not make.
+     * figure on one corrected afterwards from the rest screen. WHICH of those
+     * produced it is [durationEndedBy] from v19; before it, no column said,
+     * and the sentence that stood here -- that reps have `repsManual` while
+     * seconds have no counterpart -- is deleted rather than reworded.
      */
     val actualDurationS: Int? = null,
     val plannedDurationS: Int? = null,
+    /**
+     * Which of the four things that can end a hold produced [actualDurationS]:
+     * `HoldEndSource`'s published word, or null. Issues #259 and #249.
+     *
+     * STORED RATHER THAN DERIVED, and the alternatives were enumerated before
+     * the column was added. At export time the row offers `actualDurationS`,
+     * `plannedDurationS`, `endedAtMs` and -- from the prep stream --
+     * `workStartedAtMs`, so the measured span is recoverable and can be
+     * compared with what was recorded. What that comparison cannot separate is
+     * a figure the SENSOR shortened from one the LIFTER corrected: both are a
+     * stored value that is neither the span nor the target, and those two are
+     * exactly what #249 needs told apart. A correction landing on the target
+     * would read as the clock as well.
+     *
+     * TEXT, NULLABLE, NO DEFAULT. Null on every set that is not timed at all,
+     * and on every row written before v19 -- where it means "this build could
+     * not say", never "the lifter ended it". The word is `HoldEndSource`'s in
+     * `:core:model`, one owner for the column, the export and the manifest.
+     *
+     * A CORRECTION OVERWRITES IT with `corrected`, so one row carries one
+     * answer to who decided the figure that is published. The pre-correction
+     * word is not kept; the raw span still is, in the archive.
+     */
+    val durationEndedBy: String? = null,
     /**
      * Unilateral sets: the arm the set WORKED -- "left" or "right".
      *

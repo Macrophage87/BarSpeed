@@ -15,9 +15,11 @@ import kotlin.test.assertTrue
 
 /**
  * The v18 -> v19 migration: `skippedSetsJson` on sessions, the prescribed sets
- * the lifter deliberately did not do (#300).
+ * the lifter deliberately did not do (#300), and `durationEndedBy` on
+ * `set_records`, which of the four things that can end a hold produced its
+ * recorded seconds (#259).
  *
- * ## A NEW HOP, not an extension of 18
+ * ## A NEW HOP, not an extension of 18 -- and TWO COLUMNS on it
  *
  * v0.1.53 SHIPS `DATABASE_VERSION = 18`, read by
  * `git show v0.1.53:core/data/src/main/kotlin/com/macrophage/barspeed/data/AppDatabase.kt`
@@ -25,6 +27,11 @@ import kotlin.test.assertTrue
  * hop would leave a device that already migrated without the new column.
  * [Migration16To17Test] states the opposite case and the same test: two columns
  * rode one hop there BECAUSE 17 had not shipped.
+ *
+ * The SAME test is why #259's column rides this hop instead of opening 19 -> 20:
+ * 19 itself has not shipped either, so nothing has migrated to it and no phone
+ * can be left behind. Re-read at the tag this round, not inherited from the
+ * paragraph above.
  *
  * ## Why a column at all
  *
@@ -142,16 +149,17 @@ class Migration18To19Test {
     }
 
     /**
-     * v19 differs from v18 by exactly one nullable TEXT column on sessions.
+     * v19 differs from v18 by exactly two nullable TEXT columns: the skip list
+     * on sessions and the hold-end provenance on set_records.
      *
      * The whole risk of a hand-written migration is that the entity moved
      * further than the SQL did. This reads the difference off Room's own
-     * generated descriptions, so a second column, a retyped column and a dropped
-     * one are all caught -- none of which the statement below would carry.
+     * generated descriptions, so a third column, a retyped column and a dropped
+     * one are all caught -- none of which the statements below would carry.
      */
     @Test
-    fun `the schema baselines differ by exactly the skipped-set list`() {
-        for (table in listOf("raw_streams", "set_records", "plans", "custom_exercises")) {
+    fun `the schema baselines differ by exactly the skip list and the hold-end word`() {
+        for (table in listOf("raw_streams", "plans", "custom_exercises")) {
             assertEquals(
                 emptySet(),
                 (columnsOf(19, table) - columnsOf(18, table).keys).keys,
@@ -164,6 +172,21 @@ class Migration18To19Test {
         assertEquals("TEXT", affinity, "skippedSetsJson is not TEXT, so it cannot hold the encoded list")
         assertTrue(!notNull, "skippedSetsJson is NOT NULL, so a session that skipped nothing cannot be stored")
         assertNull(default, "skippedSetsJson carries a default, which is an answer nobody gave")
+
+        // #259's column, riding the same unreleased hop. TEXT because the value
+        // is `HoldEndSource`'s published word; nullable and defaultless because
+        // no build before v19 could say what ended a hold, and a default word
+        // would answer for every hold already in the archive.
+        val gainedOnSets = columnsOf(19, "set_records") - columnsOf(18, "set_records").keys
+        assertEquals(
+            setOf("durationEndedBy"),
+            gainedOnSets.keys,
+            "set_records gained something other than the hold-end word",
+        )
+        val (setAffinity, setNotNull, setDefault) = gainedOnSets.getValue("durationEndedBy")
+        assertEquals("TEXT", setAffinity, "durationEndedBy is not TEXT, so it cannot hold the published word")
+        assertTrue(!setNotNull, "durationEndedBy is NOT NULL, so a set that is not timed cannot be stored")
+        assertNull(setDefault, "durationEndedBy carries a default, which answers for every hold ever recorded")
     }
 
     /**
@@ -193,10 +216,25 @@ class Migration18To19Test {
         assertEquals(Triple("REAL", false, null), v19.getValue("hrvRmssdMs"), "hrvRmssdMs changed shape")
     }
 
-    /** The migration executes exactly the one append the baselines call for. */
+    /**
+     * The migration executes exactly the two appends the baselines call for,
+     * and nothing else.
+     *
+     * TWO, not one, because 19 has not shipped: v0.1.53 carries
+     * `DATABASE_VERSION = 18`, read at the tag this round, so no phone has run
+     * 18 -> 19 and #259's column can ride the hop rather than needing 19 -> 20.
+     * The count is asserted as a whole list so a third statement cannot arrive
+     * unnoticed.
+     */
     @Test
-    fun `the migration runs one add-column statement and nothing else`() {
-        assertEquals(listOf("ALTER TABLE sessions ADD COLUMN skippedSetsJson TEXT"), executedSql())
+    fun `the migration runs the two add-column statements and nothing else`() {
+        assertEquals(
+            listOf(
+                "ALTER TABLE sessions ADD COLUMN skippedSetsJson TEXT",
+                "ALTER TABLE set_records ADD COLUMN durationEndedBy TEXT",
+            ),
+            executedSql(),
+        )
     }
 
     /**

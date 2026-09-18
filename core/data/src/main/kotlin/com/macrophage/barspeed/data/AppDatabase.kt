@@ -604,7 +604,18 @@ abstract class AppDatabase : RoomDatabase() {
 
         /**
          * `skippedSetsJson` on sessions: the prescribed sets the lifter
-         * deliberately did not do (#300).
+         * deliberately did not do (#300). AND `durationEndedBy` on
+         * `set_records`: which of the four things that can end a hold produced
+         * its recorded seconds (#259).
+         *
+         * TWO COLUMNS RIDE THIS ONE HOP because 19 has NOT shipped. Read this
+         * round rather than assumed: `git tag --sort=-creatordate | head -1` is
+         * v0.1.53 and `git show v0.1.53:core/data/.../AppDatabase.kt` reads
+         * `DATABASE_VERSION = 18`, so no installed build has run 18 -> 19 and
+         * extending it leaves no phone behind. [Migration16To17Test] states the
+         * same rule for the same reason and [Migration18To19Test] pins the
+         * count of statements here. Had 19 shipped, #259's column would need a
+         * 19 -> 20 hop of its own.
          *
          * A NEW HOP RATHER THAN AN EXTENSION OF 18, and the test is which
          * versions have shipped. v0.1.53 carries `DATABASE_VERSION = 18`, read
@@ -635,7 +646,13 @@ abstract class AppDatabase : RoomDatabase() {
          * a past skip could be recovered, and inventing one would publish a
          * decision nobody made.
          *
-         * [Migration18To19Test] pins the shape, the single statement, the
+         * `durationEndedBy` is TEXT, NULLABLE, NO DEFAULT for the same reasons
+         * and one of its own: a default word would claim every hold already in
+         * the archive was ended by whatever that word named.
+         * `SetRecordEntity.durationEndedBy` holds the argument for storing it
+         * rather than deriving it at export.
+         *
+         * [Migration18To19Test] pins the shape, the two statements, the
          * refusal to write into any existing row, and that the hop is in
          * [MIGRATIONS] at all. None of it executes SQLite; a bench run is owed.
          */
@@ -643,6 +660,7 @@ abstract class AppDatabase : RoomDatabase() {
             object : Migration(18, 19) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE sessions ADD COLUMN skippedSetsJson TEXT")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN durationEndedBy TEXT")
                 }
             }
 

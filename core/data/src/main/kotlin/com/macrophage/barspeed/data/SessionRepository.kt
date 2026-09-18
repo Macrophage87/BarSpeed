@@ -746,7 +746,17 @@ class SessionRepository(
      * hidden, is that the export cannot distinguish a corrected hold from a
      * measured one.
      */
-    suspend fun overrideDuration(setId: Long, seconds: Int) = sessionDao.overrideDuration(setId, seconds)
+    /**
+     * Restate a finished hold's seconds, with the word that says who restated
+     * them.
+     *
+     * The word is decided HERE and not at the call site: `:app` has one
+     * correction control and every tap of it is the lifter's, so a caller that
+     * could pass a different word would be a caller that could publish a
+     * correction as a measurement. It is still null at this commit -- #259's
+     * differential says what it must become.
+     */
+    suspend fun overrideDuration(setId: Long, seconds: Int) = sessionDao.overrideDuration(setId, seconds, null)
 
     suspend fun deleteSession(id: Long) = sessionDao.deleteSession(id)
 

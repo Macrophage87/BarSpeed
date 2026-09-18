@@ -7,6 +7,7 @@ import com.macrophage.barspeed.dsp.SetEnd
 import com.macrophage.barspeed.dsp.VelocityEstimator
 import com.macrophage.barspeed.dsp.VelocityLoss
 import com.macrophage.barspeed.hrm.HrTrust
+import com.macrophage.barspeed.model.AbandonedSetPhase
 import com.macrophage.barspeed.model.AbandonedSetPolicy
 import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.EffortScale
@@ -15,6 +16,7 @@ import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.FailureProvenancePolicy
 import com.macrophage.barspeed.model.GeometryExport
 import com.macrophage.barspeed.model.GeometrySourceExport
+import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.HrSessionSummary
 import com.macrophage.barspeed.model.HrSetSummary
 import com.macrophage.barspeed.model.ImuSample
@@ -295,6 +297,11 @@ class SessionExporter(
             liveReps = record.liveReps,
             plannedReps = record.plannedReps,
             durationS = phase.durationS,
+            // WHICH of the four things that can end a hold produced that figure
+            // (#259). Straight off the row, through the enum, and gated on the
+            // duration being published at all -- a set abandoned in its prep has
+            // no seconds and cannot have a word about them.
+            durationEndedBy = record.publishedHoldEnd(phase),
             abandonedInPrep = phase.abandonedInPrep,
             plannedDurationS = record.plannedDurationS,
             side = record.side,
@@ -666,6 +673,27 @@ private val SetRecordEntity.publishedLimiter: String?
  *   kind at all, and `ExerciseDef`'s kind for an id outside the seed list is its
  *   own admitted guess.
  */
+/**
+ * The word saying which of four things decided this row's recorded seconds, or
+ * null where there is nothing to say. Issue #259.
+ *
+ * READ BACK THROUGH THE ENUM rather than published as stored. The column is
+ * TEXT; a row written by a build this one does not know about, or by a hand
+ * editing the database, could hold anything, and the published key is
+ * schema-constrained to four words. An unknown word publishes nothing, which is
+ * the same absence a pre-v19 row gets.
+ *
+ * GATED ON THE DURATION being published. [AbandonedSetPhase.durationS] is null
+ * on a set that never entered its work phase (#216) and on every set that is
+ * not timed; a word about seconds that are not published would qualify nothing.
+ *
+ * @param phase the same phase decision the duration itself is published from,
+ *   passed rather than recomputed so the two cannot disagree about whether this
+ *   set has seconds.
+ */
+private fun SetRecordEntity.publishedHoldEnd(phase: AbandonedSetPhase): String? =
+    phase.durationS?.let { HoldEndSource.ofPublished(durationEndedBy)?.published }
+
 private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?): String? = RepsSourcePolicy.publishedWord(
     liveReps = liveReps,
     repsManual = repsManual,
@@ -981,6 +1009,9 @@ class RawExporter(
         num("reps", record.actualReps)
         num("plannedReps", record.plannedReps)
         num("duration_s", phase.durationS)
+        // Beside the figure it qualifies, in the manifest as well as in the
+        // session document (#259). Two writers, one fact, one extension.
+        str("durationEndedBy", record.publishedHoldEnd(phase))
         // The set never entered its work phase, so the zeros beside this are
         // absences rather than measurements (#216). In the manifest as well as
         // the session document: two writers, one fact.

@@ -151,9 +151,13 @@ class SessionRepositoryRecordSetTest {
 
         var durationOverrides = mutableListOf<Pair<Long, Int>>()
 
-        override suspend fun overrideDuration(setId: Long, seconds: Int) {
+        /** The provenance word the repository sends with the seconds (#259). */
+        var durationEndedByWrites = mutableListOf<String?>()
+
+        override suspend fun overrideDuration(setId: Long, seconds: Int, endedBy: String?) {
             calls += "overrideDuration"
             durationOverrides += setId to seconds
+            durationEndedByWrites += endedBy
         }
 
         override suspend fun sessionsInRange(fromMs: Long, toMs: Long): List<SessionEntity> = emptyList()

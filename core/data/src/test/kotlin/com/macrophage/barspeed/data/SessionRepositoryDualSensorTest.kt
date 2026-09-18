@@ -82,7 +82,7 @@ class SessionRepositoryDualSensorTest {
         // requires it. Nothing in this file calls it.
         override suspend fun overrideLoad(setId: Long, loadKg: Double) = Unit
 
-        override suspend fun overrideDuration(setId: Long, seconds: Int) = Unit
+        override suspend fun overrideDuration(setId: Long, seconds: Int, endedBy: String?) = Unit
 
         override suspend fun sessionsInRange(fromMs: Long, toMs: Long): List<SessionEntity> = emptyList()
 
