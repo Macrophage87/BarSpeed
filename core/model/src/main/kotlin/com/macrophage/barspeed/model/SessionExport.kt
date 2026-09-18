@@ -1844,6 +1844,65 @@ data class SessionExport(
          * `SchemaUnitIdentityContractTest` asserts the key's shape, this entry's
          * own wording and that the published example carries it, so `ci.yml`'s
          * ajv step validates a document that actually has one.
+         *
+         * 1.22 TAKES A SECOND ENTRY (#278): a set's [SetSensorsExport] may carry
+         * `analysedRoleBasis`, saying WHY [SetSensorsExport.analysedRole] is the
+         * role it is -- `declared`, `stackSignature` or `fallback`, which are
+         * [AnalysedRoleBasis]'s published spellings.
+         *
+         * A FURTHER ENTRY and not a mint, on evidence read at the tag this
+         * round rather than relayed from the entry above: `git tag
+         * --sort=-creatordate | head -1` is v0.1.54 and `git show
+         * v0.1.54:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.21"`, so 1.21 HAS SHIPPED and takes no
+         * further entries, and 1.22 -- minted by the entry above -- is the open
+         * number. This paragraph said 1.21 was unreleased and this was its
+         * THIRD entry; the tag shipped 1.21 while this branch was in review, so
+         * both halves are deleted rather than reworded.
+         *
+         * WHAT WAS UNSAYABLE. A set's mount declaration -- `sensorOnStack`,
+         * `sensorInverted`, `travelRatio` -- describes the ARMED unit, and
+         * there is no per-role mount field on [ExerciseDef], on the set row or
+         * in either published document, so on a two-unit set the second unit's
+         * mount was inferred from the exercise. Field-42's three seated cable
+         * rows armed the unit clipped to the rotating handle under a declared
+         * stack mount and published 3, 4 and 2 reps of the 8 the lifter
+         * performed. The app now measures each unit's own roll over the set's
+         * working window -- `StackRollSignature` in `:core:dsp` -- and analyses
+         * the one whose roll is consistent with riding the stack; this key says
+         * which of [AnalysedRolePolicy]'s three rules produced the answer.
+         *
+         * THE FACT THAT IS NOT DERIVABLE, which is why the key exists at all:
+         * `declared` on a stack-declared two-unit set means the rule RAN AND
+         * DECLINED -- neither unit's roll qualified, or both did -- and nothing
+         * else in this document separates that from nothing having looked. The
+         * mirror case is `stackSignature` on a set whose analysed role IS the
+         * armed one: a confirmation rather than a shrug.
+         *
+         * READ IT WITH [SetSensorsExport.analysedFellBack] AND NOT INSTEAD OF
+         * IT. That flag goes on meaning exactly one thing -- the armed unit
+         * delivered too few frames -- because `SetAnalyzer` blanks a set on it
+         * under a mount-specific declaration (#247). A `stackSignature` set can
+         * therefore name a role the set did not arm with no flag beside it, and
+         * that is deliberate: the analysis moved because the other unit is the
+         * one the declaration describes, not because anything went quiet.
+         *
+         * ADDITIVE, and not retroactive in either document. One optional key is
+         * added and none is removed or retyped, so a reader written against the
+         * first 1.22 entry is unaffected except that it cannot see the basis.
+         * No set already on disk moves: the basis is decided when a set
+         * is RECORDED and stored on its row, so every earlier set publishes
+         * nothing here and is not given a defaulted `declared`.
+         * `DATABASE_VERSION` does NOT move -- the declaration rides in the
+         * row's existing `sensorsJson` column.
+         *
+         * PINNED IN BOTH DIRECTIONS. `SchemaContractTest`'s key-set equality
+         * covers the Kotlin side; `SchemaAnalysedBasisContractTest` asserts the
+         * published property's shape, that the published enum is
+         * [AnalysedRoleBasis]'s own vocabulary in order, that this entry is
+         * filed once under the 1.22 marker the entry above minted, and that the
+         * published example carries the key so `ci.yml`'s ajv step validates a
+         * document that has one.
          */
         const val SCHEMA_VERSION = "1.22"
 
@@ -3044,6 +3103,32 @@ data class SetSensorsExport(
      * units".
      */
     val unitAddresses: Map<String, String> = emptyMap(),
+    /**
+     * Why [analysedRole] is the role it is: `declared`, `stackSignature` or
+     * `fallback`, [AnalysedRoleBasis]'s published spellings (#278).
+     *
+     * READ WITH [analysedFellBack] AND NOT INSTEAD OF IT. That flag says the
+     * armed unit delivered too few frames; this says which of three rules
+     * produced the answer, and a `stackSignature` set can name a role the set
+     * did not arm with no flag beside it -- the analysis moved because the
+     * OTHER unit is the one the set's mount declaration describes, not because
+     * anything went quiet.
+     *
+     * THE FACT A READER CANNOT DERIVE is `declared` on a two-unit set that
+     * declared a stack mount: it means the rule RAN AND DECLINED -- neither
+     * unit's roll qualified, or both did -- which is a different statement from
+     * nothing having looked, and nothing else in this document separates them.
+     * `stackSignature` on a set whose analysed role IS the armed one is the
+     * mirror case: a confirmation, and not a shrug.
+     *
+     * Absent on every set recorded by a build that could not decide this,
+     * whatever the document's `schemaVersion` says -- the basis is frozen into
+     * the row when the set is RECORDED and only copied out at export, so an
+     * earlier row has none and is not given a defaulted `declared`, which
+     * would claim a rule ran over a set nothing looked at. `encodeDefaults =
+     * false` drops the null.
+     */
+    val analysedRoleBasis: String? = null,
 )
 
 /**

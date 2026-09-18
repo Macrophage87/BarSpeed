@@ -236,6 +236,32 @@ class AnalysedRolePolicyTest {
         assertEquals(AnalysedRoleBasis.DECLARED, choice.basis)
     }
 
+    /**
+     * A SIGNATURE VERDICT NEEDS TWO STREAMS TO COMPARE, so a set where only the
+     * armed unit delivered reads `declared` even though that unit's own roll
+     * says it rode the stack.
+     *
+     * Found by mutation, not by design: relaxing the both-delivered guard to
+     * "at least one delivered" left every other case in this file green,
+     * because each of them has two analysable roles. What the relaxed rule
+     * would publish is `stackSignature` on a set where nothing was compared --
+     * a claim that a rule chose between two units when there was only one.
+     */
+    @Test
+    fun `a set where only the armed unit delivered is analysed as declared`() {
+        val choice =
+            choose(
+                frames = mapOf(SensorRole.A to 100, SensorRole.B to 3),
+                signals = mapOf(
+                    SensorRole.A to StackMountSignal.ON_STACK,
+                    SensorRole.B to StackMountSignal.NOT_ON_STACK,
+                ),
+            )
+
+        assertEquals(SensorRole.A, choice.role)
+        assertEquals(AnalysedRoleBasis.DECLARED, choice.basis, "a verdict was claimed with nothing to compare")
+    }
+
     /** The published vocabulary, 1:1 with the enum so neither can move alone. */
     @Test
     fun `the basis vocabulary is the three words the schema publishes`() {

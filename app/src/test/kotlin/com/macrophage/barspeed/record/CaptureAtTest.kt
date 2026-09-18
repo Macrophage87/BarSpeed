@@ -1,10 +1,15 @@
 package com.macrophage.barspeed.record
 
+import com.macrophage.barspeed.model.AnalysedRoleBasis
 import com.macrophage.barspeed.model.ArmedDelivery
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.RecordedSensors
+import com.macrophage.barspeed.model.SensorRole
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -53,6 +58,42 @@ class CaptureAtTest {
      * the wrong question and would pass for the wrong reason.
      */
     private fun stream(n: Int, firstMs: Long = 0L): List<ImuSample> = samples(*LongArray(n) { firstMs + it * 10L })
+
+    /**
+     * [n] frames at 10 ms whose ROLL advances [degreesPerSample] each frame,
+     * which is the only axis `StackRollSignature` reads.
+     *
+     * Two streams built from this differ in nothing else, so a verdict that
+     * separates them separated them on their roll.
+     */
+    /**
+     * An exercise that declares the sensor on a weight stack, which is the only
+     * field `captureAt` reads off it: field-42's seated cable row as its own
+     * meta.json declares it.
+     */
+    private val stackDeclared =
+        ExerciseDef(
+            id = "seated_cable_row",
+            displayName = "Seated Cable Row",
+            horizontal = true,
+            sensorOnStack = true,
+        )
+
+    private fun rollingStream(n: Int, degreesPerSample: Double, firstMs: Long = 0L): List<ImuSample> =
+        (0 until n).map { i ->
+            ImuSample(
+                timestampMs = firstMs + i * 10L,
+                axG = 0.0,
+                ayG = 0.0,
+                azG = 1.0,
+                wxDps = 0.0,
+                wyDps = 0.0,
+                wzDps = 0.0,
+                rollDeg = i * degreesPerSample,
+                pitchDeg = 0.0,
+                yawDeg = 0.0,
+            )
+        }
 
     /**
      * DIFFERENTIAL, issue #224. The set-end path ASKS about the one link, and
@@ -204,5 +245,107 @@ class CaptureAtTest {
             "a set whose one unit filled the buffer was recorded as having delivered nothing",
         )
         assertEquals(streamed, capture.samples, "the capture was dropped on a set that streamed")
+    }
+
+    /**
+     * DIFFERENTIAL, issue #278. The set-end path in `:app` hands the mount
+     * question down, and the answer reaches the row.
+     *
+     * A pin one level up from `ArmedCaptureTest`'s, for the reason the first
+     * test in this file states: deleting what `captureAt` passes down leaves
+     * every test that calls `armedCaptureOf` directly green, because nothing
+     * reaches the caller. That is the shape round 3 of #207 found, and this is
+     * the only place on the CI path that can catch it for the two arguments
+     * this issue adds.
+     *
+     * The fixture is field-42's seated cable row in miniature: two paired units
+     * labelled apart, the armed one rolling and the partner still, both
+     * delivering. The two streams differ ONLY in roll -- 40 degrees against a
+     * tenth of one -- so nothing but `StackRollSignature`'s own verdict can
+     * decide between them, and the analysis must come out on the partner with
+     * the row saying `stackSignature`.
+     *
+     * The window is left open at both ends: no work-start instant and
+     * `SetEnd.NotCued`, which is `RollExcursion.Basis.WHOLE_CAPTURE` and the
+     * looser reading. A looser window can only refuse a stack candidate, never
+     * invent one, so a pin that passes here would pass under a tighter one too.
+     */
+    @Test
+    fun `the set end path hands down the mount question and the row says why`() {
+        val handleUnit = "AA:BB:CC:DD:EE:01"
+        val stackUnit = "AA:BB:CC:DD:EE:02"
+        val rolling = rollingStream(12, degreesPerSample = 4.0)
+        val still = rollingStream(12, degreesPerSample = 0.01, firstMs = 1L)
+        val state =
+            RecordState(
+                pairedImuAddresses = listOf(handleUnit, stackUnit),
+                preferredImuAddress = handleUnit,
+                imuState = ConnectionState.Connected("WT901"),
+                imuFrameAtMs = 60_000L,
+                sensorRoles = mapOf(handleUnit to SensorRole.A, stackUnit to SensorRole.B),
+            )
+
+        val capture =
+            state.captureAt(
+                armed = RecordedSensors(
+                    count = 2,
+                    expected = listOf(SensorRole.A, SensorRole.B),
+                    analysed = SensorRole.A,
+                ),
+                secondaryRole = SensorRole.B,
+                analysedBuffer = rolling,
+                secondaryBuffer = still,
+                startedAtMs = 1_000L,
+                endedAtMs = 61_000L,
+                exercise = stackDeclared,
+            )
+
+        assertEquals(still, capture.samples, "the analysis stayed on the rolling unit")
+        val sensors = assertNotNull(capture.sensors, "a dual set must still record what it was armed with")
+        assertEquals(SensorRole.B, sensors.analysed, "the row names the armed role, so nothing was handed down")
+        assertEquals(AnalysedRoleBasis.STACK_SIGNATURE, sensors.analysedRoleBasis, "the row does not say why")
+        assertFalse(sensors.analysedFellBack, "a signature verdict set the flag #247's refusal keys off")
+    }
+
+    /**
+     * THE CONTROL AT THE SAME CALL: the same two streams with no stack
+     * declaration are analysed from the armed unit, and the row says
+     * `declared`.
+     *
+     * Every barbell set is this one. Without it, a pin that only ever asserts
+     * the move would pass on a wiring that moved every two-unit set.
+     */
+    @Test
+    fun `the set end path leaves a set that declares no stack mount alone`() {
+        val handleUnit = "AA:BB:CC:DD:EE:01"
+        val stackUnit = "AA:BB:CC:DD:EE:02"
+        val rolling = rollingStream(12, degreesPerSample = 4.0)
+        val still = rollingStream(12, degreesPerSample = 0.01, firstMs = 1L)
+        val state =
+            RecordState(
+                pairedImuAddresses = listOf(handleUnit, stackUnit),
+                preferredImuAddress = handleUnit,
+                imuState = ConnectionState.Connected("WT901"),
+                imuFrameAtMs = 60_000L,
+                sensorRoles = mapOf(handleUnit to SensorRole.A, stackUnit to SensorRole.B),
+            )
+
+        val capture =
+            state.captureAt(
+                armed = RecordedSensors(
+                    count = 2,
+                    expected = listOf(SensorRole.A, SensorRole.B),
+                    analysed = SensorRole.A,
+                ),
+                secondaryRole = SensorRole.B,
+                analysedBuffer = rolling,
+                secondaryBuffer = still,
+                startedAtMs = 1_000L,
+                endedAtMs = 61_000L,
+            )
+
+        assertEquals(rolling, capture.samples, "a set declaring no stack mount was moved onto its partner")
+        assertEquals(SensorRole.A, capture.sensors?.analysed)
+        assertEquals(AnalysedRoleBasis.DECLARED, capture.sensors?.analysedRoleBasis)
     }
 }

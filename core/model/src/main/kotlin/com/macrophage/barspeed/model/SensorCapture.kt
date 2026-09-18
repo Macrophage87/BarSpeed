@@ -93,6 +93,15 @@ data class RecordedSensors(
      * the app moved onto it because the armed one delivered too few frames to
      * analyse.
      *
+     * IT IS NO LONGER THE ONLY WAY [analysed] CAN DIFFER FROM THE ARMED ROLE,
+     * and the sentence above is narrowed rather than reworded: since #278 a set
+     * that declared `sensorOnStack` and recorded two streams is analysed from
+     * whichever unit's own roll says it rode the stack, which can be the
+     * partner while this flag stays FALSE. [analysedRoleBasis] is what
+     * separates the two, and this flag keeps meaning exactly one thing --
+     * the armed unit went quiet -- because `SetAnalyzer` blanks a set on it
+     * (#247) and a signature flip must not be blanked.
+     *
      * TOO FEW, not none, since #209. The armed unit may have put a handful of
      * frames in its buffer and a file in the raw archive; what it did not do
      * is reach [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES], which is the point
@@ -245,6 +254,27 @@ data class RecordedSensors(
      * [SensorCapturePolicy.withSoleSilence] cannot check it and says so.
      */
     val soleSilent: ArmedDelivery? = null,
+    /**
+     * Why [analysed] is the role it is, or null on a row written by a build
+     * that did not decide it (#278).
+     *
+     * STORED RATHER THAN DERIVED, for [analysedFellBack]'s reason and one of
+     * its own. The rule that chose the role ran over the two STREAMS as they
+     * stood when the set ended, and re-deciding at export time would attribute
+     * today's rule to figures produced by yesterday's. And two of the three
+     * answers are not recoverable from the other fields at all: a row whose
+     * [analysed] equals the armed role looks identical whether a roll
+     * signature confirmed it or nothing looked, and deriving the flip case
+     * from [expected]`.first()` would rest on list order, which nothing
+     * documents as the armed role.
+     *
+     * Null on every row an earlier build wrote, and absent from the encoded
+     * JSON when null, since the repository encodes with kotlinx's default
+     * `encodeDefaults = false`. Absence is the honest answer there rather than
+     * a defaulted [AnalysedRoleBasis.DECLARED], which would claim a rule ran
+     * over a set nothing looked at.
+     */
+    val analysedRoleBasis: AnalysedRoleBasis? = null,
 ) {
     /**
      * The role of the stream that is NOT analysed, or null when there is none.

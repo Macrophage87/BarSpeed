@@ -322,4 +322,159 @@ class ArmedCaptureTest {
         assertSame(only, capture.samples, "the capture was dropped on a set with no sensor declaration")
         assertNull(capture.sensors, "a declaration was invented for a set whose one unit delivered")
     }
+    // -----------------------------------------------------------------------
+    // Which of two units a stack-declared set is READ from (#278). The rule is
+    // AnalysedRolePolicy's and AnalysedRolePolicyTest pins it; what is pinned
+    // here is the step this file exists for -- turning that answer into the
+    // list of samples the analysis runs on, and the supplier being asked about
+    // the right BUFFER.
+    // -----------------------------------------------------------------------
+
+    /**
+     * A one-buffer supplier: [onStack] is the only buffer it answers ON_STACK
+     * for, by identity.
+     *
+     * By identity and not by value, because both buffers here are
+     * `List<ImuSample>` and a supplier matched by equality would pass on a
+     * function that had been handed the wrong one of two identical streams --
+     * which is exactly the pairing mistake this file exists to catch.
+     */
+    private fun onlyOnStack(onStack: List<ImuSample>): (List<ImuSample>) -> StackMountSignal = { samples ->
+        if (samples === onStack) StackMountSignal.ON_STACK else StackMountSignal.NOT_ON_STACK
+    }
+
+    /**
+     * THE SET #278 WAS FILED FOR. Both units delivered, the set declared a
+     * stack mount, and the PARTNER is the one whose roll says it rode the
+     * stack, so the analysis is pointed at the partner's buffer and the row
+     * says why.
+     *
+     * Field-42's three seated cable rows in miniature: they armed the unit on
+     * the rotating handle and published 3, 4 and 2 reps of 8.
+     */
+    @Test
+    fun `a stack-declared set is analysed from the unit whose roll says it rode the stack`() {
+        val handle = stream(12)
+        val stack = stream(9, firstMs = 1L)
+
+        val capture =
+            armedCaptureOf(
+                armed(SensorRole.A, SensorRole.B),
+                SensorRole.B,
+                handle,
+                stack,
+                declaresStackMount = true,
+                stackSignalOf = onlyOnStack(stack),
+            )
+
+        assertSame(stack, capture.samples, "the analysis stayed on the handle unit")
+        val sensors = assertNotNull(capture.sensors)
+        assertEquals(SensorRole.B, sensors.analysed, "the row still names the armed role")
+        assertEquals(AnalysedRoleBasis.STACK_SIGNATURE, sensors.analysedRoleBasis, "the row does not say why")
+        assertFalse(sensors.analysedFellBack, "a signature verdict set the flag #247's refusal keys off")
+        assertEquals(SensorRole.A, capture.secondary?.role, "the partner is now the handle unit")
+        assertSame(handle, capture.secondary?.samples, "the second capture carries the wrong unit's rows")
+    }
+
+    /**
+     * THE SAME INPUTS WITH NO STACK DECLARATION CHANGE NOTHING, which is the
+     * over-move guard: on a barbell set both units rotate alike and a rule that
+     * read the signature there would pick between them by noise.
+     */
+    @Test
+    fun `a set that declares no stack mount is unchanged by the signature`() {
+        val a = stream(12)
+        val b = stream(9, firstMs = 1L)
+
+        val capture =
+            armedCaptureOf(armed(SensorRole.A, SensorRole.B), SensorRole.B, a, b, stackSignalOf = onlyOnStack(b))
+
+        assertSame(a, capture.samples, "a set declaring no stack mount was moved onto its partner")
+        assertEquals(AnalysedRoleBasis.DECLARED, capture.sensors?.analysedRoleBasis)
+    }
+
+    /**
+     * AND THE SUPPLIER IS ASKED ABOUT THE ARMED UNIT'S OWN BUFFER: where it is
+     * the armed unit that rode the stack, nothing moves and the row says the
+     * signature confirmed it.
+     *
+     * Field-41's two triceps pushdowns are the real instance -- the armed unit
+     * was the one on the stack -- and this is the assertion that would fail if
+     * the two buffers were swapped on the way into the supplier, which is the
+     * failure a value-matched fake could not see.
+     */
+    @Test
+    fun `a set whose armed unit rode the stack keeps it and records the confirmation`() {
+        val stack = stream(12)
+        val handle = stream(9, firstMs = 1L)
+
+        val capture =
+            armedCaptureOf(
+                armed(SensorRole.A, SensorRole.B),
+                SensorRole.B,
+                stack,
+                handle,
+                declaresStackMount = true,
+                stackSignalOf = onlyOnStack(stack),
+            )
+
+        assertSame(stack, capture.samples, "the analysis moved off the unit that rode the stack")
+        assertEquals(SensorRole.A, capture.sensors?.analysed)
+        assertEquals(AnalysedRoleBasis.STACK_SIGNATURE, capture.sensors?.analysedRoleBasis)
+    }
+
+    /**
+     * A FRAME-COUNT FALLBACK STILL WINS, and its basis says so rather than
+     * claiming the roll chose the role.
+     *
+     * The armed unit's roll says stack and it delivered seven frames, which is
+     * below [SensorCapturePolicy.MIN_ANALYSABLE_FRAMES]; pointing the DSP at it
+     * would publish an empty summary over the partner's full capture, which is
+     * #209 exactly.
+     */
+    @Test
+    fun `a frame-count fallback outranks the roll and names itself`() {
+        val sevenFrames = stream(7)
+        val fullCapture = stream(40, firstMs = 1L)
+
+        val capture =
+            armedCaptureOf(
+                armed(SensorRole.A, SensorRole.B),
+                SensorRole.B,
+                sevenFrames,
+                fullCapture,
+                declaresStackMount = true,
+                stackSignalOf = onlyOnStack(sevenFrames),
+            )
+
+        assertSame(fullCapture, capture.samples, "the DSP was pointed at a seven-frame buffer")
+        val sensors = assertNotNull(capture.sensors)
+        assertEquals(SensorRole.B, sensors.analysed)
+        assertTrue(sensors.analysedFellBack, "a real fallback lost its flag")
+        assertEquals(AnalysedRoleBasis.FALLBACK, sensors.analysedRoleBasis)
+    }
+
+    /**
+     * AND A ONE-SENSOR SET IS UNTOUCHED BY ALL OF IT, declaration or no
+     * declaration: there is no second buffer to choose between, and the row of
+     * an ordinary single-sensor set stays byte-identical to what this app has
+     * always written.
+     */
+    @Test
+    fun `a one-sensor set records no basis at all`() {
+        val only = stream(12)
+
+        val capture =
+            armedCaptureOf(
+                null,
+                null,
+                only,
+                emptyList(),
+                declaresStackMount = true,
+                stackSignalOf = onlyOnStack(only),
+            )
+
+        assertSame(only, capture.samples)
+        assertNull(capture.sensors, "a declaration was invented for a set whose one unit delivered")
+    }
 }

@@ -70,6 +70,20 @@ data class ArmedCapture(
  * in play at all, which is the ordinary one-sensor set and the set that met
  * two paired units it could not tell apart. Both record one unroled stream and
  * neither has a second buffer to choose between.
+ *
+ * WHICH UNIT RODE THE STACK IS MEASURED HERE SINCE #278, and the decision is
+ * [AnalysedRolePolicy.choose]'s. Two things are needed from the caller and
+ * neither is a second reading of anything this function already holds:
+ * [declaresStackMount], the set's own `sensorOnStack` as resolved for the
+ * exercise it ran, and [stackSignalOf], which reads one buffer's roll --
+ * `StackRollSignature.of` in `:core:dsp`, which `:core:model` cannot see.
+ *
+ * THE SUPPLIER TAKES A BUFFER AND NOT A ROLE, deliberately. The role-to-buffer
+ * pairing stays inside this function, where it is one lookup over the map built
+ * below, so no caller can measure one unit's roll and attribute it to the
+ * other. That is the pairing mistake this function exists to make impossible,
+ * and `:app` -- where the only caller lives and where almost nothing is
+ * test-gated -- is exactly where it must not be repeated.
  */
 fun armedCaptureOf(
     armed: RecordedSensors?,
@@ -78,6 +92,8 @@ fun armedCaptureOf(
     secondaryBuffer: List<ImuSample>,
     deliveryByRole: Map<SensorRole, ArmedDelivery> = emptyMap(),
     soleDelivery: ArmedDelivery? = null,
+    declaresStackMount: Boolean = false,
+    stackSignalOf: (List<ImuSample>) -> StackMountSignal = { StackMountSignal.UNMEASURED },
 ): ArmedCapture {
     val byRole = buildMap {
         armed?.analysed?.let { put(it, analysedBuffer) }
@@ -89,13 +105,27 @@ fun armedCaptureOf(
     // publish another.
     val framesByRole = byRole.mapValues { it.value.size }
     val analysable = SensorCapturePolicy.analysable(armed?.expected.orEmpty(), framesByRole)
-    // `analysable` then `analysedStream`, composed once as `analysedFrom`
-    // (#211), because a second reader asks the same question: `SetJournalStore`
-    // answers it for a recovered capture. Two compositions of two functions are
-    // two places for the order to drift. `analysable` is still read here as
-    // well, because the silence words below key off the list rather than off
-    // the choice.
-    val decision = SensorCapturePolicy.analysedFrom(armed?.analysed, armed?.expected.orEmpty(), framesByRole)
+    // `analysable` is still read here as well, because the silence words below
+    // key off the list rather than off the choice. It is NOT read again to make
+    // the choice: `analysedFrom` composes it with `analysedStream` once (#211),
+    // because a second reader asks the same question -- `SetJournalStore`
+    // answers it for a recovered capture -- and two compositions of two
+    // functions are two places for the order to drift.
+    //
+    // The role, whether it moved, and WHY, from one decision (#278). It
+    // composes `analysedFrom` -- so the frame-count fallback of #207 and #209
+    // decides first, and a unit the DSP would refuse cannot be chosen however
+    // its roll reads -- and consults the roll signature only on a set that
+    // declared a stack mount with both units delivering. The signal is measured
+    // per BUFFER here, so a role cannot be paired with the other unit's roll.
+    val decision =
+        AnalysedRolePolicy.choose(
+            armed = armed?.analysed,
+            expected = armed?.expected.orEmpty(),
+            framesByRole = framesByRole,
+            declaresStackMount = declaresStackMount,
+            signalByRole = byRole.mapValues { stackSignalOf(it.value) },
+        )
     // Which armed roles delivered too few frames to analyse, and what the app
     // could see of each one's link when the set ended (#213, #209). The roles
     // come from `analysable` above and NOT from `present`, so since #209 a
@@ -139,7 +169,12 @@ fun armedCaptureOf(
     // reaches here, so `samples` below IS `analysedBuffer`.
     val sensors =
         SensorCapturePolicy.withSoleSilence(
-            armed?.copy(analysed = decision.role, analysedFellBack = decision.fellBack, silent = silent),
+            armed?.copy(
+                analysed = decision.role,
+                analysedFellBack = decision.fellBack,
+                silent = silent,
+                analysedRoleBasis = decision.basis,
+            ),
             soleDelivery.takeIf { analysedBuffer.size < SensorCapturePolicy.MIN_ANALYSABLE_FRAMES },
         )
     return ArmedCapture(

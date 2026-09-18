@@ -25,6 +25,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.SetEnd
 import com.macrophage.barspeed.dsp.SetTargets
+import com.macrophage.barspeed.dsp.StackRollSignature
 import com.macrophage.barspeed.dsp.StreamingSetTracker
 import com.macrophage.barspeed.dsp.TempoSchedule
 import com.macrophage.barspeed.dsp.TimedSetVoice
@@ -775,6 +776,25 @@ internal fun liveFeedOf(
  * driven by a frame from before the set began, which is where the
  * contradiction comes from and why the declining direction is silence -- see
  * [armedCaptureOf].
+ *
+ * SINCE #278 IT ALSO ASKS WHICH UNIT RODE THE STACK. The four last parameters
+ * are what that needs and all four are the SET's own, not a second reading of
+ * anything: [exercise] carries the `sensorOnStack` the analysis will be run
+ * under -- the same field `ExerciseDef.liftDirection()` reads, so the unit
+ * chosen and the geometry it is scored under come from one declaration -- and
+ * [prepWindow], [cues] and [cadenceGuided] are the two bounds of the working
+ * window, `PrepWindow.workStartedAtMs` and `SetEnd.of` over the frozen cue
+ * track. Composed HERE, outside the class, for the reason [liveFeedOf] states:
+ * `RecordViewModel` is what detekt's `LargeClass` counts.
+ *
+ * THE SUPPLIER READS A BUFFER AND NOT A ROLE. Which role a buffer belongs to
+ * is [armedCaptureOf]'s business and deliberately not this function's, so
+ * nothing in `:app` can measure one unit's roll and attribute it to the other.
+ *
+ * A NULL [exercise] OR [prepWindow] IS A SET THAT ASKS NOTHING AND A LOOSER
+ * WINDOW, in that order: no declaration means the verdict is never consulted,
+ * and no window means it is taken over the whole capture, which can only refuse
+ * a stack candidate and never invent one.
  */
 internal fun RecordState.captureAt(
     armed: RecordedSensors?,
@@ -783,6 +803,11 @@ internal fun RecordState.captureAt(
     secondaryBuffer: List<ImuSample>,
     startedAtMs: Long,
     endedAtMs: Long,
+    exercise: ExerciseDef? = null,
+    prepCase: PrepCase = PrepCase.NONE,
+    workStartedAtMs: Long? = null,
+    cues: List<VoiceCue> = emptyList(),
+    cadenceGuided: Boolean = false,
 ): ArmedCapture = armedCaptureOf(
     armed,
     secondaryRole,
@@ -802,6 +827,14 @@ internal fun RecordState.captureAt(
         setStartedAtMs = startedAtMs,
         setEndedAtMs = endedAtMs,
     ),
+    declaresStackMount = exercise?.sensorOnStack == true,
+    stackSignalOf = { samples ->
+        StackRollSignature.of(
+            samples,
+            PrepWindowPolicy.of(prepCase, startedAtMs, workStartedAtMs)?.workStartedAtMs,
+            SetEnd.of(cues, cadenceGuided),
+        )
+    },
 )
 
 /**
@@ -4550,7 +4583,18 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // off, so the duration cannot be worked out before the capture has
         // been chosen. Nothing else about the move changes -- the buffers and
         // both instants are the same ones it was called with.
-        val capture = s.captureAt(armedSensors, armedSecondaryRole, imuBuffer, imuBufferB, setStartedAtMs, endedAtMs)
+        //
+        // SINCE #278 IT IS ALSO ASKED WHICH UNIT RODE THE STACK, which is the
+        // last four arguments and the reason this call is no longer one line.
+        // They are the set's own declaration and the two bounds of its working
+        // window; `captureAt` defaults all four, and a call that leaves them
+        // out never consults the verdict, so passing them HERE is what wires
+        // the choice in. This call and the declaration `SetAnalyzer` is run
+        // under read the same `exercise`.
+        val capture = s.captureAt(
+            armedSensors, armedSecondaryRole, imuBuffer, imuBufferB, setStartedAtMs, endedAtMs,
+            exercise, prepCaseForSet, workStartedAtMs, cueBuffer.toList(), s.guidedSet,
+        )
         val timedEnd =
             recordedTimedEnd(
                 isTimed = isTimed,
@@ -4619,7 +4663,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 plannedPrepS = plannedPrepSForSet,
                 prepS = prepSForSet,
                 // The rule is PrepWindowPolicy's, in a module with tests; this
-                // hands it the case and both instants. It refuses rather than
+                // hands it the case and both instants, and captureAt asks it the
+                // same question with the same three. It refuses rather than
                 // inventing a window -- no prep, a prep the set was ended
                 // during, and an inverted pair each state nothing.
                 prepWindow = PrepWindowPolicy.of(prepCaseForSet, setStartedAtMs, workStartedAtMs),

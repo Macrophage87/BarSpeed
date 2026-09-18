@@ -697,6 +697,15 @@ class SessionExporter(
             unitAddresses = SensorCapturePolicy.unitAddresses(declared.expected, roleByAddress)
                 .map { (role, address) -> SensorCapturePolicy.wireOf(role) to address }
                 .toMap(),
+            // WHY the analysed role is the one it is (#278). Read off the row
+            // for `analysedFellBack`'s reason: the rule ran over the two
+            // streams as they stood when the set ended, so re-deciding here
+            // would attribute today's rule to figures produced by yesterday's.
+            // Null on every row written before the app could decide it, and the
+            // exporter drops a null, so such a set publishes no key -- absence,
+            // not a defaulted `declared` claiming a rule ran over a set nothing
+            // looked at.
+            analysedRoleBasis = declared.analysedRoleBasis?.published,
         )
     }
 
@@ -1293,6 +1302,15 @@ class RawExporter(
             // omission, which is also what every archive written before this
             // key existed says.
             flag("analysedFellBack", d.analysedFellBack)
+            // WHY that role, in the same three words session.json publishes
+            // (#278). Worth the key HERE in particular: this manifest already
+            // carries each role's own `rollExcursion_deg` and
+            // `rollExcursionBasis`, which are the inputs the `stackSignature`
+            // rule read, so an archive carrying both lets a reader re-derive
+            // the verdict rather than take it on trust. Absent on every row
+            // written before the app could decide it, and the manifest has no
+            // published schema, so no version entry attaches to this one.
+            str("analysedRoleBasis", d.analysedRoleBasis?.published)
             // Which armed units delivered too few frames to analyse across
             // the whole set (#209), and what the app could see
             // of each one's link when the set ended (#213). Written only when
