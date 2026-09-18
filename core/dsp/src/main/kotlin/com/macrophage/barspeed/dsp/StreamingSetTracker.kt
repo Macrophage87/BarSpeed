@@ -49,7 +49,10 @@ data class LiveSetState(
      *
      * Published for the same reason as [elapsedS]: a [VelocitySeries] carries
      * an acceleration and constructing one with zeros would state a
-     * measurement nothing made. Nothing in the rep decision reads it --
+     * measurement nothing made. Since issue #301 the LIVE rep decision on a
+     * sensor-counted set is made from this field and nothing else --
+     * [DriveImpulseCounter] maps it through `sensorToLifter * concentricSign`
+     * and reads no velocity at all. The BATCH decision is unchanged:
      * [RepSegmenter] reads velocity and time only.
      */
     val accelMps2: Double = 0.0,

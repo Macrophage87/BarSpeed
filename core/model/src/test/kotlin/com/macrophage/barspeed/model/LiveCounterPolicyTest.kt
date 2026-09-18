@@ -5,16 +5,17 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * Which live rep detector a set feeds, and the one row of it that is about to
- * move (#301).
+ * Which live rep detector a set feeds (#301).
  *
- * These were CHARACTERIZATION pins one commit ago and are the DIFFERENTIAL now.
- * Two rows below assert that a sensor-counted set runs
- * [LiveCounter.DRIVE_IMPULSE]; the policy still answers [LiveCounter.SEGMENTER],
- * so this file is RED at the commit that writes it and the failing run is the
- * evidence. The retired answer is kept in the words: SEGMENTER on a
- * sensor-counted set is what #286 shipped and what field-43 measured at three,
- * one and two calls for five performed reps a set.
+ * These were CHARACTERIZATION pins and then the DIFFERENTIAL: two rows below
+ * assert that a sensor-counted set runs [LiveCounter.DRIVE_IMPULSE], and at
+ * 72938caa0aae4095ac7eef6e71197283b00d8b43, where the policy still answered
+ * [LiveCounter.SEGMENTER], both FAILED -- CI run 35297021878 holds that red and
+ * is the only part of it CI ever reached, having aborted at `:core:model:test`
+ * before `:core:dsp`'s four differential files ran. The policy answers
+ * DRIVE_IMPULSE now and both rows are green. The retired answer is kept in the
+ * words: SEGMENTER on a sensor-counted set is what #286 shipped and what
+ * field-43 measured at three, one and two calls for five performed reps a set.
  */
 class LiveCounterPolicyTest {
     /**
@@ -52,10 +53,12 @@ class LiveCounterPolicyTest {
      *
      * A rep-based dynamic set, no prescribed tempo, not timed, an IMU
      * connected: `meta.json` for all three carries no `tempoPrescribed` key,
-     * `kind: "dynamic"` and two sensors armed. That shape is the ONLY one on the
-     * committed corpus that reaches [RepCounter.SENSOR] without a tempo, so it
-     * is the shape the counter choice is being made for, and pinning it through
-     * both policies is what stops the two from being changed apart.
+     * `kind: "dynamic"` and two sensors armed. Pinning that shape through both
+     * policies is what stops the two from being changed apart. It is NOT a claim
+     * that nothing else reaches [RepCounter.SENSOR] without a tempo: the gate
+     * reads the tempo, the clock and the kind and never the geometry, so a
+     * machine set prescribed in reps with no tempo reaches it too, and
+     * `LiveCounterPolicy`'s KDoc carries what that costs.
      */
     @Test
     fun `the shape field-43 recorded reaches the sensor, and the sensor drives on impulse`() {
