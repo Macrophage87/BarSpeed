@@ -92,12 +92,15 @@ class LiveRepCountersTest {
      * The three non-sensor counters get null, which is the disarm
      * `SensorRepCounter.begin` reads -- the `if (sensorCounted)` that used to
      * stand at the call site, now one decision in `:core:model`.
+     *
+     * The SENSOR row is a differential and is red at the commit that writes it:
+     * it asserted `is LiveRepCaller` one commit ago, which is what #286 armed.
      */
     @Test
-    fun `forCounted arms only a sensor-counted set, and arms it with the segmenter`() {
+    fun `forCounted arms only a sensor-counted set, and arms it with the drive counter`() {
         val direction = LiftDirection()
         assertTrue(
-            LiveRepCounters.forCounted(RepCounter.SENSOR, direction) is LiveRepCaller,
+            LiveRepCounters.forCounted(RepCounter.SENSOR, direction) is DriveImpulseCounter,
             "the counter a sensor-counted set is armed with",
         )
         listOf(RepCounter.MANUAL, RepCounter.METRONOME, RepCounter.NOBODY).forEach { counter ->

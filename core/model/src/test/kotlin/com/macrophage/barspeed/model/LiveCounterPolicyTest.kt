@@ -8,10 +8,13 @@ import kotlin.test.assertNull
  * Which live rep detector a set feeds, and the one row of it that is about to
  * move (#301).
  *
- * These are CHARACTERIZATION pins: every number and name below is what the
- * shipped app does at the commit that extracted this seam, and the commit that
- * moves a sensor-counted set onto the drive-impulse counter is EXPECTED to red
- * this file. Re-baseline it there with the evidence, not here.
+ * These were CHARACTERIZATION pins one commit ago and are the DIFFERENTIAL now.
+ * Two rows below assert that a sensor-counted set runs
+ * [LiveCounter.DRIVE_IMPULSE]; the policy still answers [LiveCounter.SEGMENTER],
+ * so this file is RED at the commit that writes it and the failing run is the
+ * evidence. The retired answer is kept in the words: SEGMENTER on a
+ * sensor-counted set is what #286 shipped and what field-43 measured at three,
+ * one and two calls for five performed reps a set.
  */
 class LiveCounterPolicyTest {
     /**
@@ -28,16 +31,17 @@ class LiveCounterPolicyTest {
     }
 
     /**
-     * Today's answer, counter by counter.
+     * The answer this issue requires, counter by counter.
      *
-     * The sensor runs [LiveCounter.SEGMENTER] -- `LiveRepCaller`, the velocity
-     * path #286 shipped. The other three run no live detector at all, and null
-     * is that absence rather than a fourth quiet counter.
+     * The sensor runs [LiveCounter.DRIVE_IMPULSE]. The other three run no live
+     * detector at all, and null is that absence rather than a fourth quiet
+     * counter -- unchanged by this issue, and asserted here so a change that
+     * reached them could not pass.
      */
     @Test
-    fun `a sensor-counted set runs the segmenter and no other set runs a live counter`() {
+    fun `a sensor-counted set runs the drive-impulse counter and no other set runs one`() {
         assertEquals(
-            listOf(LiveCounter.SEGMENTER, null, null, null),
+            listOf(LiveCounter.DRIVE_IMPULSE, null, null, null),
             RepCounter.entries.map { LiveCounterPolicy.counterFor(it) },
             "the live detector for SENSOR, MANUAL, METRONOME, NOBODY in that order",
         )
@@ -54,7 +58,7 @@ class LiveCounterPolicyTest {
      * both policies is what stops the two from being changed apart.
      */
     @Test
-    fun `the shape field-43 recorded reaches the sensor, and the sensor runs the segmenter`() {
+    fun `the shape field-43 recorded reaches the sensor, and the sensor drives on impulse`() {
         val counter = CountingPolicy.counterFor(
             hasTempo = false,
             isTimed = false,
@@ -63,7 +67,7 @@ class LiveCounterPolicyTest {
         )
         assertEquals(RepCounter.SENSOR, counter, "who counts a straight-reps set with a sensor on")
         assertEquals(
-            LiveCounter.SEGMENTER,
+            LiveCounter.DRIVE_IMPULSE,
             LiveCounterPolicy.counterFor(counter),
             "and which detector that counter runs",
         )
