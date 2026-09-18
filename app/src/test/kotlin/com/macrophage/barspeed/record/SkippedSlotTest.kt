@@ -29,6 +29,31 @@ import kotlin.test.assertNull
  * at itself. Everything else here passes at the commit that adds it and is
  * named where it sits, because a green tick inside a red commit is not
  * coverage.
+ *
+ * MUTATED, NOT ASSERTED TO WORK. Eight mutations, one build each, forward from
+ * the finished tree at `fdc602d1c85e2977d8ddc5dea8b44259c904664f` and reverted
+ * after, by `./gradlew :app:testDebugUnitTest --rerun-tasks --no-build-cache`,
+ * whose control is 83 tests and 0 failures. Counts read from this class's JUnit
+ * XML:
+ *
+ *  - the record names the exercise by display name       83/3
+ *  - the set number taken from the queue position        83/1
+ *  - the remaining sets renumbered to close the hole     83/2
+ *  - the list replaced instead of appended to            83/1
+ *  - the ad-hoc guard removed                            83/0, SURVIVED
+ *  - a skip with nothing after it records nothing        83/1
+ *  - the block boundary ignored, statements always carry 83/1
+ *  - the stated side carried                             83/1
+ *
+ * TWO OF THOSE ROWS SAY SOMETHING THE COUNTS ALONE DO NOT. The queue-position
+ * mutation is caught ONLY by `two skips leave two entries in the order they
+ * were dropped`: on a first skip the position and the plan's number are both 2,
+ * so every single-skip fixture here agrees with the wrong rule, and the second
+ * skip is what separates them. And the ad-hoc mutation SURVIVES, because
+ * [RecordState.skipSetTarget] already returns null on an ad-hoc session --
+ * `skippedState`'s own guard is a second gate on the same fact, so `an ad-hoc
+ * session has nothing to skip` pins the behaviour and cannot say which gate
+ * produced it.
  */
 class SkippedSlotTest {
     // ---- the queue and the record -------------------------------------------
@@ -210,6 +235,18 @@ class SkippedSlotTest {
      * block on one arm -- `restingState` states that rule at its own
      * `statedSide = null`, and `NextSetSideTest` pins the alternation it
      * protects.
+     *
+     * WHAT CARRYING IT WOULD PUBLISH, measured rather than argued. With
+     * `statedSide = s.statedSide` in `skippedState` and a throwaway probe over
+     * a plan declaring left / right / right: a "left" stated for the skipped
+     * set reaches the set that moves up, `advancedState` bakes it in, and the
+     * slot goes into the write with `side` left against `plannedSide` right --
+     * a one-armed set the lifter said nothing about, published as a deviation
+     * from a prescription they never contradicted. Round 1 of the review asked
+     * for the carry; that is the measurement it was refused on. The probe also
+     * shows what does NOT catch it: 41 tests over this class,
+     * `AppendedSlotTest` and `NextSetSideTest`, 1 failed, and the one was the
+     * test below.
      */
     @Test
     fun `the arm the lifter chose does not survive a skip`() {
