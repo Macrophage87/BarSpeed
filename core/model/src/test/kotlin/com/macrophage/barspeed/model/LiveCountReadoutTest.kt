@@ -53,13 +53,20 @@ class LiveCountReadoutTest {
     }
 
     /**
-     * CHARACTERIZATION of the defect, not the answer. A withheld set draws
-     * `+0.00` today: `RecordScreen` formats the line unguarded and the frozen
-     * `LiveSetState` supplies the zero. The differential replaces this pin.
+     * A withheld set draws no velocity either, at every figure the frozen
+     * `LiveSetState` could be holding.
+     *
+     * The em dash and not `+0.00`: the withhold drops the tracker, so nothing
+     * is integrating and a signed two-decimal figure beside an `m/s` label is a
+     * measurement the app no longer has. The same rule the count, the arc and
+     * the cadence line already follow. This REPLACES the characterization pin
+     * `a withheld set draws plus zero velocity today`, which stated the defect.
      */
     @Test
-    fun `a withheld set draws plus zero velocity today`() {
-        assertEquals("+0.00", LiveCountReadout.velocityLabel(0.0, withheld = true))
+    fun `a withheld set draws no velocity`() {
+        assertEquals(LiveCountReadout.NO_COUNT, LiveCountReadout.velocityLabel(0.0, withheld = true))
+        assertEquals(LiveCountReadout.NO_COUNT, LiveCountReadout.velocityLabel(1.23, withheld = true))
+        assertEquals(LiveCountReadout.NO_COUNT, LiveCountReadout.velocityLabel(-0.4, withheld = true))
     }
 
     /** Unchanged: the fraction of the prescription, and 0 where nothing was prescribed. */
