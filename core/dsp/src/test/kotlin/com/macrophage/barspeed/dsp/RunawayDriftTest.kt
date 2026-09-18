@@ -181,12 +181,14 @@ class RunawayDriftTest {
         // field-latpulldown-1120-12rep-s38-set14 and each needs one as well.
         // So the only bucket that has moved across all five is 1, and the
         // worst capture in the corpus is unchanged at four passes.
+        // #259 committed three holds: two of them carry no runaway at all and
+        // land in bucket 0, and the third needs one pass.
         assertEquals(
-            mapOf(0 to 13, 1 to 27, 2 to 3, 3 to 1, 4 to 1),
+            mapOf(0 to 15, 1 to 28, 2 to 3, 3 to 1, 4 to 1),
             passesNeeded.values.groupingBy { it }.eachCount().toSortedMap(),
             "captures by passes needed",
         )
-        assertEquals(45, passesNeeded.size, "committed captures walked")
+        assertEquals(48, passesNeeded.size, "committed captures walked")
         assertEquals(
             mapOf(
                 "field-deadlift-straight-5rep-s43-set05" to 2,
@@ -227,6 +229,12 @@ class RunawayDriftTest {
                 "field-pallof-static-12rep",
                 "field-rdl-3010-10rep",
                 "field-ropedeadhang-hold20-s37-set11",
+                // Two of the three holds #259 committed. The third, field-38
+                // set 18, DOES carry a runaway and is not here -- two hangs
+                // recorded minutes apart on the same rope differ on this,
+                // which is why the list is measured and not reasoned about.
+                "field-ropedeadhang-hold45-s38-set17",
+                "field-ropefarmershold-hold30-s42-set16",
                 "field-still-0rep",
             ),
             untouched,

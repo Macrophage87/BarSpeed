@@ -493,6 +493,13 @@ internal object CandidateCorpus {
         Capture("field-rdl-wrapping-s36-set05", ECC),
         Capture("field-reardeltfly-s32-set06", CON),
         Capture("field-ropedeadhang-hold20-s37-set11", ECC),
+        // #259's three holds, committed on the branch that landed after
+        // this file. Each carries a cue track that calls no rep, so [truth]
+        // scores them 0 on the CUES basis -- the same basis and the same
+        // number the hold already in this list takes.
+        Capture("field-ropedeadhang-hold45-s38-set17", ECC),
+        Capture("field-ropedeadhang-hold45-s38-set18", ECC),
+        Capture("field-ropefarmershold-hold30-s42-set16", ECC),
         Capture("field-seated-ohp-2rep", CON),
         Capture("field-still-0rep", ECC),
     )

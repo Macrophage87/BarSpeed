@@ -116,21 +116,27 @@ class RepMarkTrackTest {
      * the cue-only set move in opposite directions and still add up.
      */
     @Test
-    fun `thirteen captures carry marks and sixteen carry cues without them`() {
+    fun `thirteen captures carry marks and twenty-two carry cues without them`() {
         val captures = FieldCorpus.onClasspath()
         assertEquals(corpus.map { it.first }.sorted(), captures.filter { hasSidecar(it, "-reps.csv") })
         val cuedOnly = captures.filter { hasSidecar(it, "-cues.csv") && !hasSidecar(it, "-reps.csv") }
-        // 19, not 16: issue #301 committed the three field-43 deadlift
-        // captures, each with its cue track and none with a rep file. Their
-        // tracks are not a metronome's -- the rows are the sensor's own live
-        // calls and the lifter's catch-up taps, spoken through one path -- so
-        // there is nothing in them this file can read as a mark.
-        assertEquals(19, cuedOnly.size)
+        // 22, not 16: two landings added three cue-bearing captures each, and
+        // none of the six carries a rep file. Issue #301's three field-43
+        // deadlift tracks are not a metronome's -- the rows are the sensor's
+        // own live calls and the lifter's catch-up taps, spoken through one
+        // path -- so there is nothing in them this file can read as a mark.
+        // Issue #259's three holds call no rep at all, so there is nothing
+        // for a `-reps.csv` to hold. The test's own name carried the sixteen
+        // and is renamed with it rather than left saying a number it no
+        // longer means.
+        assertEquals(22, cuedOnly.size)
         assertEquals(
             listOf(
                 "field-backsquat-wrapping-s36-set01",
                 "field-rdl-wrapping-s36-set05",
                 "field-ropedeadhang-hold20-s37-set11",
+                "field-ropedeadhang-hold45-s38-set17",
+                "field-ropedeadhang-hold45-s38-set18",
             ),
             cuedOnly.filter { Regex("-s3[678]-set").containsMatchIn(it) },
         )

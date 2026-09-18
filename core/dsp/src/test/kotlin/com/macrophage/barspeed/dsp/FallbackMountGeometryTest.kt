@@ -221,6 +221,15 @@ class FallbackMountGeometryTest {
                 "field-deadlift-straight-5rep-s43-set05-imu-b",
                 "field-deadlift-straight-5rep-s43-set06-imu-b",
                 "field-latpulldown-1120-12rep-s38-set14-imu-b",
+                // #259's partner: field-38 set 18's SECOND unit, the one the
+                // owner says was in his pocket while the analysed unit sat on
+                // the assist stack. It is not scored in this file -- nothing
+                // here is about a hold -- and it is not unscored either:
+                // `HoldReleaseFieldTest` is what it was committed for, and
+                // that file names it and reads it. This list is the guard
+                // against a partner nobody reads, not against a partner this
+                // file does not read.
+                "field-ropedeadhang-hold45-s38-set18-imu-b",
             ),
             partners,
             "a partner stream reached the classpath without a pin in this file",

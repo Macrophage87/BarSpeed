@@ -98,6 +98,12 @@ class RepRefusalCorpusTest {
         Triple("field-rdl-wrapping-s36-set05", ecc, 43.09),
         Triple("field-reardeltfly-s32-set06", con, 9.07),
         Triple("field-ropedeadhang-hold20-s37-set11", ecc, 43.86),
+        // The three holds committed for #259, each with the load its own
+        // meta.json published: two rope dead hangs on the assist stack
+        // (body weight minus the assist) and a 90 lb rope farmers hold.
+        Triple("field-ropedeadhang-hold45-s38-set17", ecc, 29.369),
+        Triple("field-ropedeadhang-hold45-s38-set18", ecc, 22.582564147942733),
+        Triple("field-ropefarmershold-hold30-s42-set16", ecc, 40.82331330090319),
         Triple("field-seated-ohp-2rep", con, 20.4),
         Triple("field-still-0rep", ecc, 20.4),
     )
@@ -118,7 +124,7 @@ class RepRefusalCorpusTest {
     fun `the corpus list is every committed capture`() {
         val onDisk = FieldCorpus.onClasspath()
         assertEquals(onDisk, corpus.map { it.first }.sorted())
-        assertEquals(45, corpus.size, "captures this file walks")
+        assertEquals(48, corpus.size, "captures this file walks")
     }
 
     /**

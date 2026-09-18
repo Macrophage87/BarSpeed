@@ -72,6 +72,9 @@ class GyroGateTest {
         "field-rdl-wrapping-s36-set05",
         "field-reardeltfly-s32-set06",
         "field-ropedeadhang-hold20-s37-set11",
+        "field-ropedeadhang-hold45-s38-set17",
+        "field-ropedeadhang-hold45-s38-set18",
+        "field-ropefarmershold-hold30-s42-set16",
         "field-seated-ohp-2rep",
         "field-still-0rep",
     )
@@ -229,6 +232,13 @@ class GyroGateTest {
             "field-legpress-single-2011-8rep-s36-set07",
             "field-still-0rep",
             "field-ropedeadhang-hold20-s37-set11",
+            // The three holds committed for #259. The gate holds on all
+            // three, asserted below rather than predicted here: two of them
+            // are a body hanging from a rope with the unit on the assist
+            // stack, and the third is a carry whose handle unit turns slowly.
+            "field-ropedeadhang-hold45-s38-set17",
+            "field-ropedeadhang-hold45-s38-set18",
+            "field-ropefarmershold-hold30-s42-set16",
             // Committed on this branch for issue #133's rotation measure and
             // classified here rather than left to the corpus guard to catch:
             // median 6.42 deg/s with a tenth percentile of 0.0, so the

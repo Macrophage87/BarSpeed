@@ -26,13 +26,17 @@ import kotlin.test.assertEquals
  * row read 4, 5, 3, 5, 6, 7, 8, 5, 0 where this measures 4, 5, 4, 5, 6, 7, 10,
  * 6, 0; and its absolute-error column read 16, 13, 12, 20 against 17, 12, 12,
  * 20 here, so the best tau is 1.5 or 2.0 on a tie rather than 2.0 outright.
- * Its corpus row read **272 with an over-count of 36** against **247 and 23**
- * here, and the rear delt fly 26 against 23.
+ * Its corpus row read **272 with an over-count of 36** against **248 and 24**
+ * here, and the rear delt fly 26 against 23. (247 and 23 until issue #259's
+ * three holds joined the corpus: the leak calls one rep on the second rope
+ * dead hang, where nothing was lifted at all.)
  *
  * **That correction changes an argument, not just a digit.** Counting reps
  * WITHIN each capture's truth -- `min(count, truth)` summed, pinned below -- the
- * leak matches **224 of 253** at an over-count of 23, against candidate (c)'s
- * **161 at 19** and the shipped path's **107 at 1**. So on the committed corpus
+ * leak matches **224 of 253** at an over-count of 24, against candidate (c)'s
+ * **161 at 20** and the shipped path's **107 at 1**. The three holds added
+ * with issue #259 carry a truth of 0 each, so they move the two over-counts
+ * and neither matched figure. So on the committed corpus
  * the leak is the better recoverer, which is the opposite of what the proposal's
  * numbers implied, and the rejection cannot rest on the corpus total. What it
  * rests on is measured here too: the leak changes EVERY set including the ones
@@ -61,7 +65,7 @@ class LeakyIntegratorCandidateTest {
 
     /**
      * THE LICENCE FOR EVERY OTHER FIGURE IN THIS FILE. With the leak off and the
-     * per-run reset off, the clone is the shipped tracker on all 45 committed
+     * per-run reset off, the clone is the shipped tracker on all 48 committed
      * captures.
      *
      * Without this the tables below would be a model of a model. It is asserted
@@ -168,8 +172,8 @@ class LeakyIntegratorCandidateTest {
         }
         println("truth $truthTotal leak $leakTotal over $leakOver matched $leakMatched")
         assertEquals(253, truthTotal, "reps the corpus truth set holds")
-        assertEquals(247, leakTotal, "reps the leak reports over them")
-        assertEquals(23, leakOver, "reps the leak reports beyond a capture's truth")
+        assertEquals(248, leakTotal, "reps the leak reports over them")
+        assertEquals(24, leakOver, "reps the leak reports beyond a capture's truth")
         assertEquals(224, leakMatched, "reps the leak reports within a capture's truth")
         val fly = "field-reardeltfly-s32-set06"
         assertEquals(

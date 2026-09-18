@@ -14,8 +14,10 @@ import kotlin.test.assertTrue
  *
  * ## What the corpus says today
  *
- * Twenty-nine of the forty-two committed captures carry a cue track, and the
- * twenty-two in [cueTracked] are scored here. Across them the metronome called
+ * Thirty-two of the forty-five committed captures carry a cue track, and the
+ * twenty-two in [cueTracked] are scored here. It read twenty-nine of forty-two
+ * until #259 committed three holds, each with its track and none with a rep to
+ * score. Across them the metronome called
  * 190 reps; 79 produce a counted rep and 111 produce none. Eight counted reps
  * land outside every cued window. All four figures are pinned below.
  *
@@ -250,6 +252,13 @@ class CuedRepCoverageTest {
         // There is no window to open and nothing per-rep to score. Its
         // zero-rep guard is in `BatchCueCoverageTest`.
         "field-ropedeadhang-hold20-s37-set11",
+        // The three holds committed with their tracks for #259, here on the
+        // same terms as the hold above: two rope dead hangs whose tracks stop
+        // mid-countdown at the lifter's tap, and a rope farmers hold whose
+        // track ends on `Time`. No `Down` on any of them.
+        "field-ropedeadhang-hold45-s38-set17",
+        "field-ropedeadhang-hold45-s38-set18",
+        "field-ropefarmershold-hold30-s42-set16",
         "field-seated-ohp-2rep",
         "field-still-0rep",
     )
@@ -534,8 +543,10 @@ class CuedRepCoverageTest {
         }
         assertEquals(22, cueTracked.size, "captures with a cue track")
         // 13 until issue #125 committed field-ohp-3010-8rep-s37-set01,
-        // whose archived cue track is deliberately not committed beside it.
-        assertEquals(14, notCueTracked.size, "captures with no track that calls a rep")
+        // whose archived cue track is deliberately not committed beside it,
+        // and 14 until #259 committed three holds whose tracks ARE committed
+        // and call no rep.
+        assertEquals(17, notCueTracked.size, "captures with no track that calls a rep")
         // 9, not the 6 that stood here: issue #301 committed the three
         // field-43 deadlift captures, whose tracks carry the sensor's own
         // calls rather than a metronome's.

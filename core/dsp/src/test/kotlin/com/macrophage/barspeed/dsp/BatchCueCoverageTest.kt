@@ -243,12 +243,15 @@ class BatchCueCoverageTest {
      * stated reason. Nothing is here because it was inconvenient.
      *
      * - no `-cues.csv` is committed beside the capture at all: the first nine.
-     * - `field-ropedeadhang-hold20-s37-set11` HAS a committed track, and the
-     *   track calls no reps -- it is a twenty-second hold, `kind: "hold"`,
-     *   `reps: 0` in its own `meta.json`. There is no `Down`, so there is no
-     *   window to open. It is scored by `a hold and two no-rep controls, and
-     *   what each resolves on the phase it declares` below instead, which is
-     *   the assertion that matters for it.
+     * - FOUR HOLDS have a committed track whose track calls no reps --
+     *   `field-ropedeadhang-hold20-s37-set11`, the two field-38 dead hangs and
+     *   the field-42 rope farmers hold committed for #259. All four are
+     *   `kind: "hold"`, `reps: 0` in their own `meta.json`. There is no `Down`,
+     *   so there is no window to open. The first is scored by `a hold and two
+     *   no-rep controls, and what each resolves on the phase it declares`
+     *   below instead, which is the assertion that matters for it, and the
+     *   three new ones by `HoldReleaseFieldTest`, which is what they were
+     *   committed for.
      */
     private val notScored = listOf(
         "field-assistedpullup-3010-s37-set08",
@@ -264,6 +267,12 @@ class BatchCueCoverageTest {
         "field-seated-ohp-2rep",
         "field-still-0rep",
         "field-ropedeadhang-hold20-s37-set11",
+        // The three holds committed for #259: two rope dead hangs from
+        // field-38 and one rope farmers hold from field-42. Tracks committed,
+        // no rep called by any of them.
+        "field-ropedeadhang-hold45-s38-set17",
+        "field-ropedeadhang-hold45-s38-set18",
+        "field-ropefarmershold-hold30-s42-set16",
         // Committed for issue #125. Its cue track is deliberately not
         // committed, on the terms `CuedRepCoverageTest` states for it and
         // for field-rdl-3010-10rep-s36-set04.
@@ -976,12 +985,22 @@ class BatchCueCoverageTest {
             )
         }
         // And the reason the unscorable ones are unscorable, checked rather
-        // than asserted in a comment: nine have no committed track, and the
-        // tenth has a track that calls no rep.
+        // than asserted in a comment: ten have no committed track, and the
+        // other four have a track that calls no rep. It was one of ten until
+        // #259 committed three more holds, all with their tracks.
         val withTrack = notScored.filter {
             javaClass.getResource("/$it-cues.csv") != null
         }
-        assertEquals(listOf("field-ropedeadhang-hold20-s37-set11"), withTrack, "unscorable captures with a track")
-        assertEquals(0, CueTrack.calledReps(withTrack.single()), "a hold's track calls no rep")
+        assertEquals(
+            listOf(
+                "field-ropedeadhang-hold20-s37-set11",
+                "field-ropedeadhang-hold45-s38-set17",
+                "field-ropedeadhang-hold45-s38-set18",
+                "field-ropefarmershold-hold30-s42-set16",
+            ),
+            withTrack.sorted(),
+            "unscorable captures with a track",
+        )
+        withTrack.forEach { assertEquals(0, CueTrack.calledReps(it), "$it: a hold's track calls no rep") }
     }
 }

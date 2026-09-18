@@ -22,7 +22,7 @@ import kotlin.test.assertEquals
  * What moved is the cost side, in the direction that matters. Round 1 published
  * 7, 6, 5, 9, 9, 1 for the six non-deadlift captures of the nine and a corpus
  * row of 168 with an over-count of 13. Measured here: 8, 8, 7, 10, 11, 2, and a
- * corpus row of **180 with an over-count of 19**. Every moved cell moved UP, so
+ * corpus row of **181 with an over-count of 20**. Every moved cell moved UP, so
  * candidate (c) over-counts the committed corpus by half again as much as the
  * proposal claimed. The proposal's corpus shipped row, 112, does not re-derive
  * either; the shipped tracker's own `repCount` over this truth set totals
@@ -54,8 +54,12 @@ class DriveImpulseCandidateTest {
         LiveCountCandidates.shippedCount(fixture, CandidateCorpus.capture(fixture).direction)
 
     /**
-     * The corpus list is every committed capture, and 33 of the 45 carry a
+     * The corpus list is every committed capture, and 36 of the 48 carry a
      * truth.
+     *
+     * 45 and 33 until issue #259's three holds landed: a hold's cue track is
+     * committed and calls no rep, so each takes a truth of 0 on the CUES
+     * basis, exactly as the hold already in the list does.
      *
      * Asserted against the resource directory rather than a hand-kept number,
      * for the reason `RepRefusalCorpusTest` gives for its own list: a capture
@@ -63,13 +67,13 @@ class DriveImpulseCandidateTest {
      * nothing would say so.
      */
     @Test
-    fun `the candidate corpus is every committed capture, 33 of them with a truth`() {
+    fun `the candidate corpus is every committed capture, 36 of them with a truth`() {
         assertEquals(FieldCorpus.onClasspath(), CandidateCorpus.ALL.map { it.fixture }.sorted())
-        assertEquals(45, CandidateCorpus.ALL.size, "captures on the classpath")
+        assertEquals(48, CandidateCorpus.ALL.size, "captures on the classpath")
         val scored = CandidateCorpus.scored()
-        assertEquals(33, scored.size, "captures with a truth")
+        assertEquals(36, scored.size, "captures with a truth")
         assertEquals(
-            listOf(5, 12, 16),
+            listOf(5, 12, 19),
             listOf(
                 scored.count { it.second.basis == CandidateCorpus.Basis.STATED },
                 scored.count { it.second.basis == CandidateCorpus.Basis.MARKS },
@@ -171,7 +175,7 @@ class DriveImpulseCandidateTest {
     }
 
     /**
-     * The whole corpus, 33 captures with a truth. This is the row that decides
+     * The whole corpus, 36 captures with a truth. This is the row that decides
      * the candidate cannot simply become the counter everywhere: it recovers a
      * great deal on barbell work and collapses on stack and machine work, where
      * its sensor-frame thresholds are applied through a pulley ratio.
@@ -204,8 +208,8 @@ class DriveImpulseCandidateTest {
         assertEquals(253, truthTotal, "reps the corpus truth set holds")
         assertEquals(108, shippedTotal, "reps the shipped live counter reports over them")
         assertEquals(1, shippedOver, "reps the shipped counter reports beyond a capture's truth")
-        assertEquals(180, candidateTotal, "reps candidate (c) reports")
-        assertEquals(19, candidateOver, "reps candidate (c) reports beyond a capture's truth")
+        assertEquals(181, candidateTotal, "reps candidate (c) reports")
+        assertEquals(20, candidateOver, "reps candidate (c) reports beyond a capture's truth")
         assertEquals(107, shippedMatched, "reps the shipped counter reports within a capture's truth")
         assertEquals(161, candidateMatched, "reps candidate (c) reports within a capture's truth")
         val collapse = listOf(

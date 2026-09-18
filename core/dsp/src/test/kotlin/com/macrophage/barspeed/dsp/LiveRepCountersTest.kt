@@ -34,7 +34,7 @@ class LiveRepCountersTest {
     }
 
     /**
-     * ALL 45 committed captures, call for call and instant for instant.
+     * ALL 48 committed captures, call for call and instant for instant.
      *
      * The whole corpus rather than a sample, because the thing being licensed is
      * that a construction path changed nothing -- and "nothing" is a claim about
@@ -55,12 +55,14 @@ class LiveRepCountersTest {
             assertEquals(direct, throughFactory, "${capture.fixture}: calls through the factory")
             callsSeen += direct.size
         }
-        assertEquals(45, CandidateCorpus.ALL.size, "captures compared")
+        assertEquals(48, CandidateCorpus.ALL.size, "captures compared")
         // A floor under the comparison: an equality that compared two empty
-        // lists 45 times would pass and say nothing. 166 is over ALL 45
+        // lists 48 times would pass and say nothing. 166 is over ALL 48
         // captures and is NOT `DriveImpulseCandidateTest`'s 108, which is the
-        // total over the 33 that carry a truth.
-        assertEquals(166, callsSeen, "calls the segmenter makes across all 45 captures")
+        // total over the 36 that carry a truth. 166 is unchanged by issue
+        // #259's three holds: the shipped segmenter calls no rep on any of
+        // them, which is what a hold should draw from a rep counter.
+        assertEquals(166, callsSeen, "calls the segmenter makes across all 48 captures")
     }
 
     /**

@@ -24,9 +24,11 @@ import kotlin.test.assertTrue
  *
  * **The corpus** says which reasons real captures actually produce. Three, at
  * this commit, out of seven. The other four are pinned only by the synthetic
- * censuses, and saying otherwise would be a claim stronger than the evidence:
- * nothing here has seen a field capture emptied by the minimum-ROM floor or by
- * a set-end cue.
+ * censuses, and saying otherwise would be a claim stronger than the evidence.
+ * This paragraph said "nothing here has seen a field capture emptied by the
+ * minimum-ROM floor or by a set-end cue" -- the minimum-ROM half went false
+ * when #259 committed three holds, all three of which the floor empties, and
+ * it is deleted rather than reworded. No capture is emptied by a set-end cue.
  *
  * ## Where the census comes from
  *
@@ -298,11 +300,12 @@ class BlankAnalysisReasonTest {
 
     @Test
     fun `which reasons this corpus actually produces, and which it does not`() {
-        // TWO of seven, down from three. Stated as a measurement, not as a
-        // claim that the other five are unreachable: the corpus is 30 captures
-        // from seven sessions, and a set emptied by its own end cue or by the
-        // minimum-ROM floor is a thing the pipeline can produce and this
-        // corpus has not.
+        // THREE of seven. Stated as a measurement, not as a claim that the
+        // other four are unreachable. It read "two of seven, down from three,
+        // and a set emptied by its own end cue or by the minimum-ROM floor is
+        // a thing the pipeline can produce and this corpus has not" -- the
+        // minimum-ROM half of that went false when #259 committed three holds,
+        // and is deleted here rather than reworded.
         //
         // RUNS_EXCEED_DISPLACEMENT_CAP left this set with issue #94. It is not
         // dead code: RunawayDrift.corrected iterates to a fixed point under a
@@ -321,7 +324,7 @@ class BlankAnalysisReasonTest {
             }
         }.toSet()
         assertEquals(
-            setOf(NoRepsReason.PHASES_UNPAIRED, NoRepsReason.NO_MOVEMENT),
+            setOf(NoRepsReason.PHASES_UNPAIRED, NoRepsReason.DRIVE_BELOW_MIN_ROM, NoRepsReason.NO_MOVEMENT),
             produced,
             "the reasons this corpus produces",
         )
@@ -345,6 +348,28 @@ class BlankAnalysisReasonTest {
             reasonFor("field-ropedeadhang-hold20-s37-set11", StartPhase.ECCENTRIC),
             "a rope dead hang: four runs survive the bounds and none is a rep",
         )
+        // The three holds #259 committed, named individually for this test's
+        // own reason, and the payoff for naming them is right here: set 17 is
+        // the ONLY capture in this corpus the minimum-ROM floor empties, while
+        // set 18 -- the same rope, the same exercise, minutes later -- empties
+        // for unpaired phases like the carry does. Measured, not reasoned
+        // about: the set-equality assertion above says the reason exists
+        // somewhere and cannot say it is one hang of two.
+        assertEquals(
+            NoRepsReason.DRIVE_BELOW_MIN_ROM,
+            reasonFor("field-ropedeadhang-hold45-s38-set17", StartPhase.ECCENTRIC),
+            "field-38 set 17, a 45 s rope dead hang broken at 36 s",
+        )
+        assertEquals(
+            NoRepsReason.PHASES_UNPAIRED,
+            reasonFor("field-ropedeadhang-hold45-s38-set18", StartPhase.ECCENTRIC),
+            "field-38 set 18, a 45 s rope dead hang broken at 32 s",
+        )
+        assertEquals(
+            NoRepsReason.PHASES_UNPAIRED,
+            reasonFor("field-ropefarmershold-hold30-s42-set16", StartPhase.ECCENTRIC),
+            "field-42 set 16, a 90 lb rope farmers hold carried for its full 30 s",
+        )
         // The three sets #138 named that issue #87 moved off zero now resolve
         // reps, so they carry no reason -- the key's absence is the record
         // that #87 reached them.
@@ -361,14 +386,15 @@ class BlankAnalysisReasonTest {
     }
 
     @Test
-    fun `no capture with reps in it publishes a blank analysis, and the two that do performed none`() {
+    fun `no capture with reps in it publishes a blank analysis, and the five that do performed none`() {
         // #138's ask, as a contract: a healthy stream publishing nothing must
         // be the exception. Measured over every capture under its declared
         // start phase where one is known and under both where it is not, this
         // counts the (capture, phase) pairs that segment to zero. The list is
-        // three pairs over TWO captures, and both of them performed zero reps
-        // -- a twenty-second hold and a still-sensor control -- so no capture
-        // in this corpus with a rep in it publishes a blank analysis.
+        // six pairs over FIVE captures -- four holds and a still-sensor
+        // control, every one of them `reps: 0` -- so no capture in this corpus
+        // with a rep in it publishes a blank analysis. It was three pairs over
+        // two captures until #259 committed three more holds.
         val config = DspConfig()
         val blank = corpus.flatMap { fixture ->
             StartPhase.entries.mapNotNull { startsWith ->
@@ -385,6 +411,12 @@ class BlankAnalysisReasonTest {
                 // concentric-first it publishes two, which is why only the
                 // eccentric pair appears here -- see BatchCueCoverageTest.
                 "field-ropedeadhang-hold20-s37-set11/ECCENTRIC",
+                // The three holds #259 committed, all `reps: 0` in their own
+                // meta.json and all blank on the phase they declare, for the
+                // same reason as the hold above.
+                "field-ropedeadhang-hold45-s38-set17/ECCENTRIC",
+                "field-ropedeadhang-hold45-s38-set18/ECCENTRIC",
+                "field-ropefarmershold-hold30-s42-set16/ECCENTRIC",
                 "field-still-0rep/ECCENTRIC",
                 "field-still-0rep/CONCENTRIC",
             ),
