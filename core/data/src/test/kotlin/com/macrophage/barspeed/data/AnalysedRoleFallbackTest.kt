@@ -397,10 +397,24 @@ class AnalysedRoleFallbackTest {
         // before it -- so the figures are #94/#138's problem and pinning them
         // here would read as a claim that they are trustworthy.
         assertTrue(summary.isNotEmpty(), "the summary is still empty, which is what field-36 published")
-        listOf("meanConVel_mps", "peakConVel_mps", "meanRom_m", "peakPower_w").forEach { key ->
+        listOf("meanConVel_mps", "peakConVel_mps", "peakPower_w").forEach { key ->
             assertTrue(key in summary, "the restored summary has no $key: ${summary.keys}")
         }
-        assertEquals(8, set.getValue("repMetrics").jsonArray.size, "detections; the metronome called 6 (#94/#138)")
+        val rows = set.getValue("repMetrics").jsonArray
+        assertEquals(8, rows.size, "detections; the metronome called 6 (#94/#138)")
+        // AND NO meanRom_m, which this test asserted the presence of until
+        // #291's range bound reached this capture. Not one of the eight
+        // detections is bounded: every rep of this set shares its inter-anchor
+        // interval or sits in one an anchor taken on starvation closed, so there
+        // is no population for a mean to be taken over. The other summary keys
+        // above are untouched -- the narrowing is the RANGE claim alone.
+        assertTrue("meanRom_m" !in summary, "a mean range over reps nothing bounds: ${summary.keys}")
+        assertEquals(
+            0,
+            rows.count { it.jsonObject["romBounded"]?.jsonPrimitive?.content?.toBoolean() == true },
+            "rows whose displacement the analysis can bound",
+        )
+        assertEquals(8, rows.count { "romBounded" in it.jsonObject }, "rows carrying the flag at all")
     }
 
     @Test
