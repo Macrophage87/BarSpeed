@@ -143,17 +143,20 @@ class LiveCountDifferentialTest {
     /**
      * The six overhead-press captures, MEASURED AND NOT ENDORSED.
      *
-     * Every one of them is a TEMPO'D set, so none of them would be counted this
-     * way by the shipped app: a tempo'd set is counted by the metronome and arms
-     * no live counter at all (below). They are here because they are the only
-     * other captures with a truth on a barbell lift, and because the numbers are
-     * the honest cost of the rule if the selection ever widened: 8, 8, 7, 10, 11
+     * Every one of them is a tempo'd set whose kind is DYNAMIC, and such a set
+     * is counted by the metronome and arms no live counter. That is NOT true of
+     * every tempo'd set -- an EXPLOSIVE lift carrying a tempo is
+     * RepCounter.SENSOR and counts on impulse today (CountingPolicyTest > a
+     * tempo'd set is counted by the metronome unless nothing plays the tempo).
+     * So these six over-counts are the nearest measured analogue to a tempo'd
+     * power clean -- evidence about a shape the gate DOES reach: 8, 8, 7, 10, 11
      * and 2 against hand counts of 6, 7, 5, 8, 8 and 2. Five of the six are
      * OVER, one of them by three reps.
      *
-     * So this row is not evidence for the design. It is the boundary of the
-     * design written down where a later change that widens the gate has to walk
-     * past it.
+     * So this row is not evidence for the DYNAMIC design. It is the boundary of
+     * that design written down, and it is also the nearest measurement of what
+     * an EXPLOSIVE-with-tempo set costs, where a later change that widens the
+     * gate has to walk past it.
      */
     @Test
     fun `the overhead press captures over-count under this counter, which is why the gate is narrow`() {

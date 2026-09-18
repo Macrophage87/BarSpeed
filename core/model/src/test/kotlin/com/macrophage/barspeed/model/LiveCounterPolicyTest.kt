@@ -12,7 +12,9 @@ import kotlin.test.assertNull
  * 72938caa0aae4095ac7eef6e71197283b00d8b43, where the policy still answered
  * [LiveCounter.SEGMENTER], both FAILED -- CI run 35297021878 holds that red and
  * is the only part of it CI ever reached, having aborted at `:core:model:test`
- * before `:core:dsp`'s four differential files ran. The policy answers
+ * before `:core:dsp`'s two differential files and their six red rows ran --
+ * LiveCountDifferentialTest (5 of its 6) and LiveRepCountersTest (1 of its 3).
+ * The policy answers
  * DRIVE_IMPULSE now and both rows are green. The retired answer is kept in the
  * words: SEGMENTER on a sensor-counted set is what #286 shipped and what
  * field-43 measured at three, one and two calls for five performed reps a set.

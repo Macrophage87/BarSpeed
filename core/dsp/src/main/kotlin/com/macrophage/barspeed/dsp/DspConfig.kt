@@ -191,8 +191,9 @@ data class DspConfig(
      * Applied to BOTH phases, and it is the brake's copy that decides WHEN the
      * rep is called: [DriveImpulseCounter] speaks at the instant the brake
      * reaches this duration, which is the earliest instant both terms of the
-     * rule hold. On field-43 that lands 0.2-0.3 s before the velocity path's
-     * own call instant would, because acceleration leads velocity.
+     * rule hold. It lands the call at the brake rather than after a paired
+     * velocity run, so on field-43 it speaks earlier in the rep; by how much is
+     * not derived anywhere on this branch.
      *
      * Deliberately NOT [minPhaseS], which is 0.20 s and is a bound on a
      * VELOCITY run. A drive impulse is shorter than the stroke it starts.
