@@ -4003,6 +4003,12 @@ private fun FeedbackChips(feedback: SetFeedback, hrBpm: Int?, hrvMs: Int? = null
 internal fun PeakVelocityChart(analysis: SetAnalysis, verdicts: List<String>) {
     Text("Peak velocity per rep (m/s)", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     Spacer(Modifier.height(8.dp))
+    // EVERY REP, including one whose span carries a sample above the physical
+    // bound. One bar is drawn per rep and velocityLossColor shades each against
+    // the maximum of the values it is handed, so narrowing this list while still
+    // drawing that rep's bar would shade the tallest bar on screen as a large
+    // loss against a smaller best. AccelArtefact.peakEligible's KDoc carries the
+    // reasoning. The inflated per-rep rom_m still visible here is #291.
     val peaks = analysis.reps.map { it.peakConVelMps }
     RepBars(
         values = peaks,
@@ -4012,11 +4018,21 @@ internal fun PeakVelocityChart(analysis: SetAnalysis, verdicts: List<String>) {
     )
     Spacer(Modifier.height(6.dp))
     PowerLine(analysis)
-    val best = peaks.maxOrNull()
+    // The SET-LEVEL claim, over the reps whose own span carries no sample above
+    // the physical bound (#290). This line printed "Best 2.52 m/s" on a 55 lb
+    // press two lines above an already-corrected "Drive power: peak 329 W".
+    val best = AccelArtefact.peakEligible(analysis.reps).maxOfOrNull { it.peakConVelMps }
     if (best != null && best > 0) {
-        val lastLossPct = (1.0 - peaks.last() / best) * 100.0
+        // Absent rather than zero where the set's own last rep is withheld, and
+        // measured against the same reps as [best]. The decision is
+        // AccelArtefact.terminalPeakLossPct's, where a test reaches it.
+        val lastLossPct = AccelArtefact.terminalPeakLossPct(analysis.reps)
         Text(
-            String.format(Locale.US, "Best %.2f m/s · last rep −%.0f%% off best.", best, lastLossPct),
+            if (lastLossPct != null) {
+                String.format(Locale.US, "Best %.2f m/s · last rep −%.0f%% off best.", best, lastLossPct)
+            } else {
+                String.format(Locale.US, "Best %.2f m/s · last rep's peak withheld.", best)
+            },
             style = MaterialTheme.typography.bodySmall,
             color = BarColors.Sub,
         )

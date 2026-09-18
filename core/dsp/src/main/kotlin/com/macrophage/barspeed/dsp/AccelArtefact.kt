@@ -229,12 +229,33 @@ object AccelArtefact {
      * carries no artefact sample.
      *
      * THE ONE STATEMENT OF THE RULE, and the reason it is a function rather
-     * than a `filter` at each call site. Four places take a peak over a rep
-     * list -- `Exporters.setExport`'s `summary.peakConVel_mps` and
-     * `summary.peakPower_w`, and `:app`'s two drive-power lines -- and they
-     * would each have had to hold a copy. A set's published peak and the peak
-     * the screen prints disagreeing about which reps they cover is the
-     * *duplicate documentation drifts* class in arithmetic.
+     * than a `filter` at each call site. FIVE places take a SET-LEVEL peak over
+     * a rep list. This KDoc said FOUR and was wrong; the sentence naming four is
+     * deleted rather than adjusted, because the missing one is the site that
+     * kept printing "Best 2.52 m/s" two lines above a corrected "Drive power:
+     * peak 329 W":
+     *
+     * - `Exporters.setExport`'s `summary.peakConVel_mps`,
+     * - `Exporters.setExport`'s `summary.peakPower_w`,
+     * - `RecordScreen.powerSummary`'s drive-power line,
+     * - `SessionDetailScreen.powerSummary`'s drive-power line,
+     * - `RecordScreen.PeakVelocityChart`'s *"Best %.2f m/s"*, whose companion
+     *   drawdown is [terminalPeakLossPct].
+     *
+     * Each would otherwise have held a copy of the rule. A set's published peak
+     * and the peak the screen prints disagreeing about which reps they cover is
+     * the *duplicate documentation drifts* class in arithmetic, and it had
+     * already happened between the fourth site and the fifth.
+     *
+     * NOT A SET-LEVEL PEAK, and deliberately outside that list: the bar COLOURS
+     * on `RecordScreen.PeakVelocityChart` and on `SessionDetailScreen`'s
+     * explosive-lift chart. `velocityLossColor` shades each bar against the
+     * maximum of the values it is handed, and those values are EVERY rep,
+     * because one bar is drawn per rep. Narrowing that reference while still
+     * drawing the withheld rep's bar would shade the tallest bar on screen as a
+     * large loss against a smaller best, so the picture would contradict itself.
+     * The bars are the per-rep figures as measured; the line under them is the
+     * set-level claim, and the claim is what this narrows.
      *
      * A rep carrying `null` here -- an analysis stored before this rule existed
      * -- is KEPT. Absence is not zero: those reps were measured under a rule
@@ -246,23 +267,36 @@ object AccelArtefact {
 
     /**
      * How far the set's LAST rep fell short of the best peak drive velocity the
-     * set publishes, as a percentage of it: the second figure on the post-set
+     * set may publish, as a percentage of it: the second figure on the post-set
      * peak-velocity chart's summary line, `RecordScreen.PeakVelocityChart`'s
-     * *"Best %.2f m/s - last rep -%.0f%% off best."*
+     * *"Best %.2f m/s - last rep -%.0f%% off best."* Issues #290 and #255.
      *
-     * A CHARACTERIZATION OF WHAT THAT LINE COMPUTES TODAY, not a rule. The
-     * expression is lifted out of `:app` unchanged -- the maximum over EVERY
-     * rep, the last rep's own peak, no question asked about artefacts -- so that
-     * it can be measured on the committed corpus at all. Nothing in `:app` is
-     * reachable by a test on the CI path, which is why this figure was argued in
-     * prose and not pinned. Issues #290 and #255.
+     * BOTH FIGURES OVER THE SAME POPULATION, which is why this is a function
+     * and not two expressions on a Composable. The best is taken over
+     * [peakEligible], so it agrees with `summary.peakConVel_mps` and with the
+     * drive-power line drawn immediately above it.
      *
-     * Null where the chart already draws nothing: no rep, or a best that is not
-     * positive, because a loss measured against zero is not a percentage.
+     * NULL WHERE THE SET'S OWN LAST REP IS WITHHELD, which is a decision rather
+     * than a guard, and the one a reader should check. That rep's peak is a
+     * figure this rule refuses to publish, so it is not one a drawdown can be
+     * measured off -- and leaving it in the numerator against a narrowed
+     * denominator prints a NEGATIVE percentage, because a set that ends on a
+     * marked rep often ends on the largest peak in the set. field-42 set 7 is
+     * exactly that: 1.084 m/s against an eligible best of 0.948.
+     * `ArtefactBoundTest` pins both halves and `ArtefactPeakWithholdingTest`
+     * carries the per-capture column, on which three of the eleven captures are
+     * in this state.
+     *
+     * Also null where the chart already draws nothing: no rep at all, or a best
+     * that is not positive, because a loss measured against zero is not a
+     * percentage. A rep carrying `null` is KEPT, on [peakEligible]'s rule, so an
+     * archived set still gets its figure.
      */
     fun terminalPeakLossPct(reps: List<RepAnalysis>): Double? {
-        val best = reps.maxOfOrNull { it.peakConVelMps } ?: return null
+        val last = reps.lastOrNull() ?: return null
+        if (peaksWithheld(last.artefactSamples ?: 0)) return null
+        val best = peakEligible(reps).maxOfOrNull { it.peakConVelMps } ?: return null
         if (best <= 0) return null
-        return (1.0 - reps.last().peakConVelMps / best) * 100.0
+        return (1.0 - last.peakConVelMps / best) * 100.0
     }
 }
