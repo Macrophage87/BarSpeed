@@ -760,6 +760,51 @@ object SensorCapturePolicy {
         expected.filter { it in captured }
 
     /**
+     * Which physical unit carried each of the roles a set armed, by device
+     * address -- or no entry for a role whose unit cannot be named (#260).
+     *
+     * A role is one fixed unit for as long as the pairing stands, because
+     * [roster] reads `roleByAddress` and nothing positional. The lifter holding
+     * two identical WT901 units cannot tell which one that is, and said so when
+     * asked which unit was role a: *"I'm not really sure. Will check each time,
+     * they're likely to get mixed up a lot."* An address is the only thing
+     * about a WT901 that survives a power cycle, so it is the only durable
+     * answer, and publishing it lets the analysis say "role a = the unit
+     * ending 1D:3F" instead of resting on that memory.
+     *
+     * RESTRICTED TO [expected], WHICH IS WHAT A SET ARMED. A pairing store can
+     * hold labels for units this set never used -- a label is not cleared when
+     * a device is forgotten, since `DeviceRegistry.forget` and
+     * `SettingsStore.setSensorRole` are different documents -- and naming a
+     * role the set did not arm would attach an address to a capture that
+     * carries no role at all.
+     *
+     * A ROLE TWO ADDRESSES CLAIM IS OMITTED, never resolved by picking one.
+     * That state is reachable exactly the way the paragraph above describes:
+     * forget the unit labelled A, pair a replacement, label it A, and the
+     * store holds two A addresses for good. One of them is the unit that
+     * recorded the set and this function cannot tell which, so it says
+     * nothing -- absence, rather than a coin flip dressed as an identity.
+     *
+     * WHAT IT CANNOT SAY, and no caller may imply otherwise: this is the
+     * pairing AS IT STANDS WHEN IT IS ASKED, not a fact recorded with the set.
+     * Nothing in `RawStreamEntity`, `SetRecordEntity` or the archive stores the
+     * address a capture came from, so a lifter who re-labels the two units
+     * between recording a session and exporting it gets the NEW labelling
+     * published over the OLD capture, and no key dates it. Relabelling is a
+     * deliberate act on the Devices screen -- it is not moved by pairing, by
+     * forgetting, or by which unit happens to connect first -- so the ordinary
+     * session is labelled correctly; the exposure is real all the same and is
+     * why this is derived rather than claimed as recorded.
+     */
+    fun unitAddresses(expected: List<SensorRole>, roleByAddress: Map<String, SensorRole>): Map<SensorRole, String> {
+        val addressesByRole = roleByAddress.entries.groupBy({ it.value }, { it.key })
+        return expected.distinct()
+            .mapNotNull { role -> addressesByRole[role]?.singleOrNull()?.let { role to it } }
+            .toMap()
+    }
+
+    /**
      * Which of the armed roles delivered enough frames to be analysed, in the
      * order they were armed in (#209).
      *

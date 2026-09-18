@@ -557,4 +557,50 @@ object DualSensorSetup {
                 "the row whose signal reads strong is that unit."
         DualSetupStep.NO_SENSOR, DualSetupStep.ONE_SENSOR, DualSetupStep.READY -> null
     }
+
+    /**
+     * Which physical unit each label is on, for the screens to draw, or null
+     * when there is nothing that can be said (#260).
+     *
+     * `"A is 1D:3F, B is 0C:7A"`. The lifter puts those four characters on a
+     * sticker once and the pairing is readable in the gym for good -- which is
+     * the whole ask: both units are magnet-mounted, they are identical to look
+     * at, and when asked which one was role a the owner said *"I'm not really
+     * sure. Will check each time, they're likely to get mixed up a lot."*
+     * [identifyHint]'s ritual answers the same question with a live scan, and
+     * only while the lifter is standing on the Devices screen with a scan
+     * running; this answers it from what is already stored.
+     *
+     * NULL EVERYWHERE EXCEPT [DualSetupStep.READY], and read from [step] rather
+     * than re-tested here so the two cannot disagree. READY is the only state
+     * where both labels name exactly one unit each: with a label missing or two
+     * units sharing one, there is no pair to name and the card's own sentence
+     * says what to fix instead.
+     *
+     * IT TAKES THE PAIRED LIST FOR THE REASON [step] DOES. A label is not
+     * cleared when a unit is forgotten -- `DeviceRegistry.forget` and
+     * `SettingsStore.setSensorRole` are different documents -- so a stale entry
+     * would otherwise name a unit that is no longer there.
+     *
+     * THE TAG IS WIDENED WHEN IT COLLIDES. [DevicePairingPolicy.unitTag] is the
+     * last two octets, which is short enough for a sticker and is NOT unique in
+     * general; two units whose addresses end the same way would both be drawn
+     * as the same four characters, which is a discriminator that does not
+     * discriminate. Both full addresses are drawn in that case instead -- long,
+     * rare, and true.
+     */
+    fun rolesLine(pairedImuAddresses: List<String>, roleByAddress: Map<String, SensorRole>): String? {
+        if (step(pairedImuAddresses, roleByAddress) != DualSetupStep.READY) return null
+        // READY is exactly two paired units carrying different labels over a
+        // two-valued enum, so both roles are keys here and neither getValue
+        // below can miss. Nothing is defended against twice.
+        val addressByRole = pairedImuAddresses.distinct().associateBy { roleByAddress.getValue(it) }
+        val tags = SensorRole.entries.map { DevicePairingPolicy.unitTag(addressByRole.getValue(it)) }
+        val tagsTellThemApart = tags.distinct().size == tags.size
+        return SensorRole.entries.joinToString(", ") { role ->
+            val address = addressByRole.getValue(role)
+            val shown = if (tagsTellThemApart) DevicePairingPolicy.unitTag(address) else address.uppercase()
+            "${role.name} is $shown"
+        }
+    }
 }
