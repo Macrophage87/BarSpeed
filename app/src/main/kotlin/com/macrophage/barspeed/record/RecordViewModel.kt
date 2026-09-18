@@ -2704,11 +2704,15 @@ data class RecordState(
      * the voice has just said, which are one number by construction (#252's
      * rule applied to the sensor's counter).
      *
-     * `LiveRepCaller`'s spoken total plus whatever the lifter has corrected it
+     * The live counter's spoken total plus whatever the lifter has corrected it
      * by, through `RepCountPolicy.displayedCount`. NOT [live]'s `repCount`:
-     * that is `StreamingSetTracker`'s own second statement of the pairing rule,
-     * and what the app speaks and records comes from the batch detector's rule
-     * instead.
+     * that is `StreamingSetTracker`'s own pairing rule over its own velocity,
+     * and it is drawn nowhere.
+     *
+     * One sentence is DELETED rather than reworded -- *"what the app speaks and
+     * records comes from the batch detector's rule instead"* -- because since
+     * issue #301 a sensor-counted set is counted by `DriveImpulseCounter`, which
+     * shares no rule with the batch detector and reads no velocity at all.
      *
      * 0 before the first call, which is the honest figure there: no drive has
      * been resolved yet.

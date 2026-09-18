@@ -127,12 +127,19 @@ sealed interface RepCall {
  * the sensor at all, or what words are said. `SetVoicePolicy` owns the first
  * two and `VoiceMilestonePolicy` the third.
  *
- * `:app` CALLS THIS NOW, on the owner's rule of 2026-09-12 -- "The sensor
- * should count the reps" -- for every rep-based set with no prescribed tempo
- * and an IMU connected (#286). `RecordViewModel`'s `SensorRepCounter` holds one
- * per set and feeds it the samples `StreamingSetTracker` publishes; the count
- * it returns is what the voice says, what the ring draws and what the row
- * records.
+ * NOTHING SELECTS THIS ANY MORE, as of issue #301. From #286 it was the counter
+ * on every rep-based set with no prescribed tempo and an IMU connected -- the
+ * owner's rule of 2026-09-12, "The sensor should count the reps" -- and field-43
+ * measured what that cost on a deadlift: 3, 1 and 2 calls for five performed
+ * reps a set, one of the six on a set-up pull, because the live integrator never
+ * found a zero on a floor-based lift. `LiveCounterPolicy` now names
+ * [DriveImpulseCounter] for that set, and a set with any other counter never
+ * armed this one, so no production path builds it.
+ *
+ * It is KEPT rather than deleted, and `LiveCounterPolicy`'s KDoc gives the three
+ * reasons. What still runs against it is this module's own corpus:
+ * `LiveRepCallCorpusTest` over thirteen mark-carrying captures, and
+ * `LiveRepCountersTest` over all 45.
  *
  * TWO SENTENCES ARE DELETED HERE RATHER THAN REWORDED, both of them true when
  * written and false now: that **nothing in `:app` calls this yet**, and that

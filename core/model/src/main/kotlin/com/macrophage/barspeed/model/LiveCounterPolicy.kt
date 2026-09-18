@@ -21,7 +21,8 @@ enum class LiveCounter {
      * `LiveRepCaller`: `RepSegmenter`'s pairing rule, run over the causal
      * velocity `StreamingSetTracker` publishes.
      *
-     * The counter every sensor-counted set used from #286 until issue #301.
+     * The counter every sensor-counted set used from #286 until issue #301, and
+     * the counter nothing selects now.
      * It counts a rep from the VELOCITY, so it inherits everything the live
      * integrator does: the ZUPT anchor it may never find, and
      * `DspConfig.maxRunDisplacementM`, which refuses a run it cannot bound.
@@ -60,25 +61,40 @@ object LiveCounterPolicy {
     /**
      * The live detector for a set counted by [counter].
      *
-     * ## This row is TODAY'S answer and is about to move
+     * ## The owner's decision, 2026-09-17, issue #301
      *
-     * [LiveCounter.SEGMENTER] on a sensor-counted set is what #286 shipped and
-     * what field-43 measured at three, one and two calls for five performed
-     * reps a set. The owner's decision on issue #301 is that a sensor-counted
-     * set moves to [LiveCounter.DRIVE_IMPULSE]; this commit extracts the seam
-     * and changes NO behaviour, so the row still reads SEGMENTER and
-     * `LiveCounterPolicyTest` pins it as the shipped answer. The commit that
-     * flips it is the one that has to carry the evidence.
+     * *"Go with C."* A sensor-counted set counts on impulse. The evidence it was
+     * taken on: 13 of field-43's 15 deadlift reps called with no phantom,
+     * against 5 of 15 with one phantom from [LiveCounter.SEGMENTER], and the
+     * touch-and-go set going from one call to five where no re-tuned ZUPT band
+     * could reach it at all.
      *
-     * The scope is deliberately the SET and not the exercise or the geometry.
-     * `CountingPolicy.counterFor` returns [RepCounter.SENSOR] for a rep-based
-     * set with no prescribed tempo and an IMU connected, which on the committed
-     * corpus is the three field-43 deadlifts and nothing else, so scoping the
-     * choice here leaves every tempo-guided capture on the segmenter whatever
-     * this row becomes.
+     * ## The other three rows are the fix
+     *
+     * A counter that is not the sensor's arms no live detector, so this change
+     * cannot reach a tempo-guided set, a set the lifter counts or a timed one.
+     * That is not a side effect of the scoping -- it is the reason the
+     * recommendation was sound, because the drive-impulse rule costs a great
+     * deal outside a straight-reps barbell set: over the 33 committed captures
+     * that carry a truth it calls 180 against 253 performed with an over-count
+     * of 19, where the segmenter calls 108 with an over-count of 1, and on two
+     * captures of eight performed reps it calls ZERO.
+     * `LiveCountDifferentialTest` and `DriveImpulseCandidateTest` hold those
+     * figures. If this row ever widens past [RepCounter.SENSOR], that is the
+     * cost it takes on.
+     *
+     * ## What SEGMENTER is now
+     *
+     * Nothing selects it. `LiveRepCaller` ran on exactly the sets this row
+     * governs -- a tempo-guided set is counted by the metronome and never armed
+     * one -- so after this change no production path builds it. It is kept
+     * rather than deleted for three reasons, stated so it is not read as
+     * oversight: reverting this decision is one row, it is the only live counter
+     * with a thirteen-capture corpus pin behind it (`LiveRepCallCorpusTest`),
+     * and the design round's rejected hybrid composed the two.
      */
     fun counterFor(counter: RepCounter): LiveCounter? = when (counter) {
-        RepCounter.SENSOR -> LiveCounter.SEGMENTER
+        RepCounter.SENSOR -> LiveCounter.DRIVE_IMPULSE
         RepCounter.MANUAL, RepCounter.METRONOME, RepCounter.NOBODY -> null
     }
 }

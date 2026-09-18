@@ -17,17 +17,25 @@ package com.macrophage.barspeed.model
  */
 enum class RepCounter {
     /**
-     * The sensor, live: the drive detector run over the stream as it arrives
-     * (`LiveRepCaller`), on a rep-based lift with no prescribed tempo and an
-     * IMU connected.
+     * The sensor, live: a drive detector run over the stream as it arrives, on a
+     * rep-based lift with no prescribed tempo and an IMU connected.
+     *
+     * WHICH detector is [LiveCounterPolicy.counterFor]'s answer and not a fact
+     * about this member. It is `DriveImpulseCounter` since issue #301 and was
+     * `LiveRepCaller` from #286 until then; the naming here read `LiveRepCaller`
+     * as though the choice were fixed, and it is not.
      *
      * The count it produces can be wrong. Issue #284 measured the BATCH
      * detector over-counting every committed concentric-first capture that
-     * carries a hand count, six of six by +1 to +4, and the LIVE detector
-     * reading 6 for 5 performed on a synthetic hitch and 1 for 5 on a
-     * synthetic drop. That is why the lifter's tap on such a set is a
-     * correction ([RepTap.CORRECTION]) rather than being ignored, and why the
-     * export says whose count it published.
+     * carries a hand count, six of six by +1 to +4, and the segmenter-based LIVE
+     * detector reading 6 for 5 performed on a synthetic hitch and 1 for 5 on a
+     * synthetic drop. The counter that ships now was measured on field-43 at 13
+     * of 15 deadlift reps with no phantom and at over-counts of up to +3 on the
+     * tempo'd overhead-press captures it does not count
+     * (`LiveCountDifferentialTest`). Either way the count can be wrong, which is
+     * why the lifter's tap on such a set is a correction
+     * ([RepTap.CORRECTION]) rather than being ignored, and why the export says
+     * whose count it published.
      */
     SENSOR,
 

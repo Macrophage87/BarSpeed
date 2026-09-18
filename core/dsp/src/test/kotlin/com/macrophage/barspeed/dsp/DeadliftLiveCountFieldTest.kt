@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.RepCounter
 import com.macrophage.barspeed.model.StartPhase
 import kotlin.math.abs
 import kotlin.test.Test
@@ -56,13 +57,29 @@ import kotlin.test.assertTrue
  * is the replay licence pinned below: the first rows of each track are the
  * live calls, to the millisecond.
  *
- * ## These are CHARACTERIZATION pins
+ * ## RE-BASELINED, deliberately, in the commit that changed the count
  *
- * Nothing is fixed here. Every number below is what `v0.1.53`'s shipped
- * classes do on this capture, and a design that recovers the missed reps is
- * EXPECTED to red this file. Re-baseline it deliberately, in the commit that
- * changes the count, with the new numbers measured and the hand count
- * unchanged.
+ * This file said *"nothing is fixed here"* and that *"a design that recovers the
+ * missed reps is EXPECTED to red this file"*. The design landed, so the pins are
+ * split by WHICH counter they are about, and neither half is allowed to pass for
+ * the other:
+ *
+ * - [shippedCalls] is `v0.1.53`'s path, `LiveRepCaller` over the velocity
+ *   `StreamingSetTracker` publishes. Its figures -- 3, 1 and 2, six calls, the
+ *   set-up pull called "Rep 1" -- are the PROVENANCE of these fixtures: they are
+ *   what the archive's `liveReps` and cue track hold, and the replay licence
+ *   below is what proves the committed CSVs are the stream the app actually ran
+ *   on. They are kept for that reason and are no longer a claim about the app.
+ * - [liveCalls] is what the app counts NOW: whatever
+ *   `LiveRepCounters.forCounted` builds for a sensor-counted set, which since
+ *   issue #301 is `DriveImpulseCounter`. **5, 5 and 3 -- thirteen of fifteen,
+ *   no phantom.** The retired 3, 1 and 2 stay in the file rather than being
+ *   overwritten, because a re-baseline that deletes the number it replaced
+ *   deletes the evidence the change was worth making.
+ *
+ * `LiveCountDifferentialTest` holds the per-rep and per-instant version of the
+ * new figures; what is here is the count-level headline on the lift this file is
+ * named for.
  */
 class DeadliftLiveCountFieldTest {
     private fun load(n: String): List<ImuSample> = ImuCsv.decode(
@@ -80,14 +97,32 @@ class DeadliftLiveCountFieldTest {
         Fixture("field-deadlift-straight-5rep-s43-set06", 102.05828325225797, handCount = 5, liveReps = 2),
     )
 
-    /** Every [RepCall.Speak] the shipped live path makes over a whole stream. */
-    private fun calls(fixture: String): List<RepCall.Speak> {
+    /**
+     * Every [RepCall.Speak] `v0.1.53`'s live path makes over a whole stream.
+     *
+     * `LiveRepCaller` by name, not through `LiveCounterPolicy`: this is a
+     * reproduction of a shipped build, so it has to name the class that build
+     * ran and must not follow the policy when the policy moves.
+     */
+    private fun shippedCalls(fixture: String): List<RepCall.Speak> = spokenBy(LiveRepCaller(deadlift), fixture)
+
+    /**
+     * Every [RepCall.Speak] the app makes NOW on a set of this shape.
+     *
+     * Through `LiveRepCounters.forCounted`, which is `RecordViewModel`'s own
+     * call, so this follows the policy by construction rather than restating its
+     * answer.
+     */
+    private fun liveCalls(fixture: String): List<RepCall.Speak> = spokenBy(
+        LiveRepCounters.forCounted(RepCounter.SENSOR, deadlift) ?: error("a sensor-counted set must arm a counter"),
+        fixture,
+    )
+
+    private fun spokenBy(counter: LiveRepCounter, fixture: String): List<RepCall.Speak> {
         val tracker = StreamingSetTracker.forLift(deadlift)
-        val caller = LiveRepCaller(deadlift)
         val spoken = mutableListOf<RepCall.Speak>()
         for (sample in load(fixture)) {
-            val live = tracker.feed(sample)
-            val call = caller.feed(live, sample.timestampMs)
+            val call = counter.feed(tracker.feed(sample), sample.timestampMs)
             if (call is RepCall.Speak) spoken += call
         }
         return spoken
@@ -113,7 +148,7 @@ class DeadliftLiveCountFieldTest {
     @Test
     fun `replaying role a reproduces the exported liveReps and every call instant to the millisecond`() {
         sets.forEach { set ->
-            val spoken = calls(set.name)
+            val spoken = shippedCalls(set.name)
             assertEquals(set.liveReps, spoken.size, "${set.name}: calls against the exported liveReps")
             val cues = CueTrack.read(set.name)
             assertEquals(5, cues.size, "${set.name}: rows on the cue track")
@@ -129,9 +164,13 @@ class DeadliftLiveCountFieldTest {
     }
 
     /**
-     * SIX calls for fifteen performed reps, five of them on a rep, and the
-     * count the tracker itself held agrees with what the caller spoke on all
-     * three sets.
+     * SIX calls for fifteen performed reps on `v0.1.53`, and THIRTEEN now.
+     *
+     * The re-baseline, both halves in one method so neither can be read without
+     * the other. 5, 5 and 3 against 3, 1 and 2: the touch-and-go set goes from
+     * one call to five, and set 6's two slowest pulls at 102 kg are still
+     * uncounted -- an impulse detector under-counts a grind, and that is the
+     * cost the design was chosen with, not a defect discovered after.
      *
      * **Issue #301's headline arithmetic is wrong and is corrected here.** It
      * says *"5 calls for 15 real reps, and one of the 5 is a phantom -- 4 real
@@ -141,13 +180,29 @@ class DeadliftLiveCountFieldTest {
      * table wrongly.
      *
      * `countTrusted` is false on every stream of every set: the integrator
-     * carried a run past `maxRunDisplacementM` on all six. It is the one fact
-     * the lifter needed mid-set and nothing in `:app` reads it.
+     * carried a run past `maxRunDisplacementM` on all six. It is still latched
+     * the same way and nothing in `:app` reads it -- and WHAT IT MEANS HAS
+     * CHANGED. The count no longer comes from the integrator, so on a
+     * sensor-counted set this flag now describes the velocity, the ROM and the
+     * power and says nothing about the count. Wiring it to a "count by hand"
+     * warning would tell the lifter to count a set the sensor is counting
+     * correctly (#290, #291).
      */
     @Test
-    fun `the sensor called six times for fifteen reps, and stood behind none of them`() {
+    fun `v0_1_53 called six times for fifteen reps and the drive counter calls thirteen`() {
         assertEquals(15, sets.sumOf { it.handCount }, "reps performed by hand count")
-        assertEquals(6, sets.sumOf { calls(it.name).size }, "numbers the voice spoke")
+        assertEquals(6, sets.sumOf { shippedCalls(it.name).size }, "numbers v0.1.53's voice spoke")
+        assertEquals(
+            listOf(3, 1, 2),
+            sets.map { shippedCalls(it.name).size },
+            "v0.1.53's calls, set by set -- the retired figures, kept",
+        )
+        assertEquals(
+            listOf(5, 5, 3),
+            sets.map { liveCalls(it.name).size },
+            "the calls the app makes now, set by set",
+        )
+        assertEquals(13, sets.sumOf { liveCalls(it.name).size }, "numbers the voice speaks now")
         sets.forEach { set ->
             val state = finalState(set.name)
             assertEquals(set.liveReps, state.repCount, "${set.name}: the tracker's own count")
@@ -171,7 +226,7 @@ class DeadliftLiveCountFieldTest {
     fun `the partner unit counts differently on every set`() {
         assertEquals(
             listOf(0, 0, 3),
-            sets.map { calls("${it.name}-imu-b").size },
+            sets.map { shippedCalls("${it.name}-imu-b").size },
             "role b's live calls, set by set",
         )
     }
@@ -210,7 +265,7 @@ class DeadliftLiveCountFieldTest {
         expected.forEach { (fixture, callFollowsTransient) ->
             val samples = load(fixture)
             val firstTransient = samples.first { FrameTransform.accMagnitudeG(it) > 4.0 }.timestampMs
-            val firstCall = calls(fixture).first().atTimestampMs
+            val firstCall = shippedCalls(fixture).first().atTimestampMs
             assertEquals(
                 callFollowsTransient,
                 firstCall > firstTransient,
