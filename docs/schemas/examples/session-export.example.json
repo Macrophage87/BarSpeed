@@ -55,6 +55,7 @@
             "expected": ["a", "b"],
             "present": ["a", "b"],
             "analysedRole": "a",
+            "analysedRoleBasis": "declared",
             "unitAddresses": { "a": "C0:82:2D:8A:1D:3F", "b": "C0:82:2D:8A:0C:7A" }
           },
           "hr": { "endOfSetBpm": 148, "avgBpm": 131, "maxBpm": 152, "minBpm": 118 },
