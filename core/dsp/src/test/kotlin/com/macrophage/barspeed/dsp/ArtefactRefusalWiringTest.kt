@@ -55,10 +55,18 @@ class ArtefactRefusalWiringTest {
         assertEquals(101.6, reps.mapNotNull { it.peakPowerW }.maxOrNull(), "summary peakPower_w")
         assertEquals(0.404, round3(reps.map { it.romM }.average()), "summary meanRom_m")
         // #291 narrowed romSpread_pct onto the reps whose displacement the
-        // analysis can bound. THIS SET HAS AT LEAST TWO, so it still publishes a
-        // figure and the figure MOVES: 17.8 to 1.1. The mean above is computed in
-        // this file over every rep and is unaffected.
-        assertEquals(1.1, SetAnalyzer.romSpreadPct(reps), "summary romSpread_pct")
+        // analysis can bound, and this set has NONE. Route-blind it had two and
+        // published 1.1 % over the reps reading 0.471 m and 0.481 m, down from
+        // 17.8 over every rep -- but each of the three spans that rule admitted
+        // here sits in an inter-anchor interval closed by an anchor taken on
+        // STARVATION, after erasing 0.7726 m, 1.9223 m and 3.7822 m. A 1.1 %
+        // agreement between two displacements the correction moved by more than
+        // a metre each is drift agreeing with itself, which is the reading this
+        // set is the clearest case of in the whole committed corpus. The mean
+        // above is computed in this file over every rep and is unaffected; what
+        // the SET publishes is withheld.
+        assertNull(SetAnalyzer.romSpreadPct(reps), "summary romSpread_pct")
+        assertEquals(0, reps.count { it.romBounded == true }, "reps whose displacement the analysis can bound")
     }
 
     /**
