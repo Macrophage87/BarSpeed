@@ -83,19 +83,43 @@ package com.macrophage.barspeed.dsp
  * describes as reaching to the end of the stream.
  *
  * WHAT THE CAP DOES NOT COVER, and what is therefore not narrowed here:
+ *
  * `applyZupt` also clamps every quiet sample under `DspConfig.pauseBandMps` to
  * zero, and its own comment says `anchorAcceptable` does not guard that loop. A
  * rep whose every interval is capped can still have had quiet samples inside
  * its span zeroed by that clamp. This file makes no claim about it; it is a
  * separate remainder of #291.
  *
+ * `VelocityEstimator.estimate` is `RunawayDrift.corrected(estimateAnchored(...))`
+ * -- a second stage runs AFTER the anchors are decided, and this rule reads
+ * only the anchors. `RunawayDrift.corrected` subtracts the mean velocity of
+ * every same-sign run displacing beyond `DspConfig.maxRunDisplacementM`, 2.0 m,
+ * from `estimateAnchored`'s output, with no stated limit on how much that
+ * removes -- it is not spent from `minRomM`'s budget and this file's cap says
+ * nothing about it. Measured over the thirteen captures this rule is measured
+ * on (`ArtefactCorpus.cases` plus `field-ohp-3010-8rep-s37-set01` and
+ * `field-assistedpullup-3010-s37-set10`): eleven of the thirteen have at least
+ * one run `RunawayDrift` rewrites, all but `field-assistedpullup-3010-s37-set08`
+ * and `field-assistedpullup-3010-s37-set10`. So a rep whose every interval is
+ * capped can still have had metres removed by this second stage with nothing
+ * here bounding it -- a second remainder of #291, beside the pause-band clamp.
+ *
  * NOT A FITTED THRESHOLD AND NOT A NEW CONSTANT. Every term is read off
  * `anchorAcceptable`, `applyZupt`'s own acceptance expression and `DspConfig`;
  * nothing here was tuned against the corpus.
  *
- * ## What it withholds, measured on the eleven committed captures
+ * ## What it withholds, measured on the thirteen committed captures this rule
+ * has been checked against, and separately on three more
  *
- * NO rep of any of the eleven is bounded. `RomBoundCorpusTest` carries the
+ * NO rep of any of the eleven `ArtefactCorpus.cases` is bounded, and neither is
+ * any rep of `field-ohp-3010-8rep-s37-set01` (eleven detections, `ArtefactRepTest`)
+ * or `field-assistedpullup-3010-s37-set10` (`ArtefactRefusalWiringTest`) --
+ * thirteen captures measured, thirteen with no bounded rep. Nor is any rep of
+ * the three leg-curl fixtures `RomDispersionTest` reads: `field-legcurl-1030-
+ * 12rep`, `-b` and `-c` publish 12, 13 and 11 detections and every one comes
+ * back `false`, on the rail this file's own "What this does NOT claim" section
+ * names as the one machine with an independently known travel to check a
+ * figure against. `RomBoundCorpusTest` carries the
  * per-capture column, and `AnchorRouteTest` carries the measurement that made
  * the fourth clause necessary: a ROUTE-BLIND version of this rule -- the first
  * three clauses without the `anchorCapped` one -- admitted exactly three spans
