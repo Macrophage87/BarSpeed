@@ -294,6 +294,18 @@ class BatchCueCoverageTest {
      */
     private val notRepCorpus = listOf(
         "field-backsquat-wrapping-s36-set01",
+        // The three field-43 deadlift captures, committed for issue #301.
+        // They carry cue tracks, so `notScored`/`notCueTracked` would be a
+        // false statement about them, and their tracks are NOT a metronome's:
+        // every row is either the sensor's own live rep call or the lifter's
+        // catch-up tap, spoken through one voice path. Opening a rep window on
+        // one of those rows would score the counter against its own output.
+        // The hand count -- 5, 5, 5, the owner's, taken from chat -- is the
+        // only per-rep truth these three have, and it is pinned in
+        // `DeadliftLiveCountFieldTest` instead.
+        "field-deadlift-straight-5rep-s43-set04",
+        "field-deadlift-straight-5rep-s43-set05",
+        "field-deadlift-straight-5rep-s43-set06",
         "field-inclinepress-3010-12rep-s38-set02",
         "field-ohp-3010-8rep-s38-set05",
         "field-ohp-prepinflated-s37-set03",

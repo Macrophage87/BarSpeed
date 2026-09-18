@@ -68,6 +68,9 @@ class RepRefusalCorpusTest {
         Triple("field-bench-rotating-6rep", ecc, 43.091275150953365),
         Triple("field-bench-rotating-6rep-ok", ecc, 43.091275150953365),
         Triple("field-cablerow-static-8rep", con, 27.215542200602126),
+        Triple("field-deadlift-straight-5rep-s43-set04", con, 61.234969951354785),
+        Triple("field-deadlift-straight-5rep-s43-set05", con, 83.91458845185656),
+        Triple("field-deadlift-straight-5rep-s43-set06", con, 102.05828325225797),
         Triple("field-facepull-static-12rep", con, 9.97903214022078),
         Triple("field-inclinepress-3010-12rep-s38-set02", ecc, 27.215542200602126),
         Triple("field-latpulldown-1120-12rep-s38-set14", latPulldown, 34.019427750752655),
@@ -115,7 +118,7 @@ class RepRefusalCorpusTest {
     fun `the corpus list is every committed capture`() {
         val onDisk = FieldCorpus.onClasspath()
         assertEquals(onDisk, corpus.map { it.first }.sorted())
-        assertEquals(42, corpus.size, "captures this file walks")
+        assertEquals(45, corpus.size, "captures this file walks")
     }
 
     /**

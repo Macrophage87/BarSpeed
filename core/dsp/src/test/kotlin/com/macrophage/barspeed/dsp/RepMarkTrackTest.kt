@@ -120,7 +120,12 @@ class RepMarkTrackTest {
         val captures = FieldCorpus.onClasspath()
         assertEquals(corpus.map { it.first }.sorted(), captures.filter { hasSidecar(it, "-reps.csv") })
         val cuedOnly = captures.filter { hasSidecar(it, "-cues.csv") && !hasSidecar(it, "-reps.csv") }
-        assertEquals(16, cuedOnly.size)
+        // 19, not 16: issue #301 committed the three field-43 deadlift
+        // captures, each with its cue track and none with a rep file. Their
+        // tracks are not a metronome's -- the rows are the sensor's own live
+        // calls and the lifter's catch-up taps, spoken through one path -- so
+        // there is nothing in them this file can read as a mark.
+        assertEquals(19, cuedOnly.size)
         assertEquals(
             listOf(
                 "field-backsquat-wrapping-s36-set01",

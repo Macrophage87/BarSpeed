@@ -182,13 +182,14 @@ class RunawayDriftTest {
         // So the only bucket that has moved across all five is 1, and the
         // worst capture in the corpus is unchanged at four passes.
         assertEquals(
-            mapOf(0 to 13, 1 to 25, 2 to 2, 3 to 1, 4 to 1),
+            mapOf(0 to 13, 1 to 27, 2 to 3, 3 to 1, 4 to 1),
             passesNeeded.values.groupingBy { it }.eachCount().toSortedMap(),
             "captures by passes needed",
         )
-        assertEquals(42, passesNeeded.size, "committed captures walked")
+        assertEquals(45, passesNeeded.size, "committed captures walked")
         assertEquals(
             mapOf(
+                "field-deadlift-straight-5rep-s43-set05" to 2,
                 "field-ohp-prepinflated-s37-set03" to 3,
                 "field-rdl-3010-10rep-s36-set04" to 4,
                 "field-rdl-3010-10rep-s36-set05" to 2,

@@ -216,7 +216,12 @@ class FallbackMountGeometryTest {
         val partners = FieldCorpus.partnersOnClasspath()
 
         assertEquals(
-            listOf("field-latpulldown-1120-12rep-s38-set14-imu-b"),
+            listOf(
+                "field-deadlift-straight-5rep-s43-set04-imu-b",
+                "field-deadlift-straight-5rep-s43-set05-imu-b",
+                "field-deadlift-straight-5rep-s43-set06-imu-b",
+                "field-latpulldown-1120-12rep-s38-set14-imu-b",
+            ),
             partners,
             "a partner stream reached the classpath without a pin in this file",
         )

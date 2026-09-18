@@ -426,7 +426,13 @@ class AnchorSupplyByMountTest {
         // covers every strap, rope, stack and machine capture at once.
         val config = DspConfig()
         val holding = corpus.filter { VelocityEstimator.gyroGateApplies(load(it), config) }
-        assertEquals(28, holding.size, "captures the gate still applies to")
+        // 31, not the 28 that stood here: the three field-43 deadlift
+        // captures landed with issue #301 and the gate HOLDS on all three.
+        // Their gyro medians are 5.250, 5.430 and 3.943 deg/s with tenth
+        // percentiles of 0.000, so the distribution sits entirely under the
+        // 10 deg/s gate -- a loaded barbell hinge that does not straddle,
+        // which #284's hazard H8 predicted it would.
+        assertEquals(31, holding.size, "captures the gate still applies to")
         holding.forEach { fixture ->
             assertContentEquals(
                 maskWithGate(fixture, gyroGate = true),

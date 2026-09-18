@@ -42,6 +42,9 @@ class GyroGateTest {
         "field-bench-rotating-6rep",
         "field-bench-rotating-6rep-ok",
         "field-cablerow-static-8rep",
+        "field-deadlift-straight-5rep-s43-set04",
+        "field-deadlift-straight-5rep-s43-set05",
+        "field-deadlift-straight-5rep-s43-set06",
         "field-facepull-static-12rep",
         "field-inclinepress-3010-12rep-s38-set02",
         "field-latpulldown-1120-12rep-s38-set14",
@@ -202,6 +205,17 @@ class GyroGateTest {
             "field-cablerow-static-8rep",
             "field-facepull-static-12rep",
             "field-pallof-static-12rep",
+            // The three field-43 deadlift captures, committed for issue #301 --
+            // the corpus's first loaded barbell hinge at 61-102 kg, and the gate
+            // HOLDS on all three: gyro medians 5.250, 5.430 and 3.943 deg/s with
+            // tenth percentiles of 0.000, so the distribution sits entirely under
+            // the gate. #284's hazard H8 predicted a bar-mounted magnet on a hinge
+            // would straddle "very likely"; on this session it does not, and the
+            // prediction is wrong rather than merely unconfirmed. What rotates on
+            // these sets rotates in bursts at the floor, not throughout.
+            "field-deadlift-straight-5rep-s43-set04",
+            "field-deadlift-straight-5rep-s43-set05",
+            "field-deadlift-straight-5rep-s43-set06",
             "field-legcurl-1030-10rep",
             "field-legcurl-1030-12rep",
             "field-legcurl-1030-12rep-b",

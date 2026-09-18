@@ -275,6 +275,18 @@ class CuedRepCoverageTest {
      */
     private val notRepCorpus = listOf(
         "field-backsquat-wrapping-s36-set01",
+        // The three field-43 deadlift captures, committed for issue #301.
+        // They carry cue tracks, so `notScored`/`notCueTracked` would be a
+        // false statement about them, and their tracks are NOT a metronome's:
+        // every row is either the sensor's own live rep call or the lifter's
+        // catch-up tap, spoken through one voice path. Opening a rep window on
+        // one of those rows would score the counter against its own output.
+        // The hand count -- 5, 5, 5, the owner's, taken from chat -- is the
+        // only per-rep truth these three have, and it is pinned in
+        // `DeadliftLiveCountFieldTest` instead.
+        "field-deadlift-straight-5rep-s43-set04",
+        "field-deadlift-straight-5rep-s43-set05",
+        "field-deadlift-straight-5rep-s43-set06",
         "field-inclinepress-3010-12rep-s38-set02",
         "field-ohp-3010-8rep-s38-set05",
         "field-ohp-prepinflated-s37-set03",
@@ -524,7 +536,10 @@ class CuedRepCoverageTest {
         // 13 until issue #125 committed field-ohp-3010-8rep-s37-set01,
         // whose archived cue track is deliberately not committed beside it.
         assertEquals(14, notCueTracked.size, "captures with no track that calls a rep")
-        assertEquals(6, notRepCorpus.size, "captures committed for something other than rep coverage")
+        // 9, not the 6 that stood here: issue #301 committed the three
+        // field-43 deadlift captures, whose tracks carry the sensor's own
+        // calls rather than a metronome's.
+        assertEquals(9, notRepCorpus.size, "captures committed for something other than rep coverage")
         notRepCorpus.forEach { fixture ->
             assertTrue(
                 javaClass.getResourceAsStream("/$fixture-cues.csv") != null,
