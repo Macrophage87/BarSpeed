@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.dsp.AccelArtefact
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.RollExcursion
+import com.macrophage.barspeed.dsp.RomBound
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.SetEnd
 import com.macrophage.barspeed.dsp.VelocityEstimator
@@ -199,6 +200,13 @@ class SessionExporter(
         // null and is KEPT, which is what stops an old set losing the peak it
         // has always published; AccelArtefact.peakEligible owns that rule.
         val peakEligible = AccelArtefact.peakEligible(reps)
+        // The reps a RANGE claim may be taken over: those whose displacement the
+        // ZUPT pass bounded (#291). Derived from the stored per-rep flags for the
+        // same reason peakEligible above is -- a pure function of the rep list
+        // the row already holds -- and a rep stored before the flag existed
+        // carries null and is KEPT, so no archived set loses the mean and the
+        // spread it has always published. RomBound owns that rule.
+        val romBounded = RomBound.boundedReps(reps)
         // Re-asked of the stored REPS, never read from the stored scalar.
         // analysis.velocityLossPct is frozen into analysisJson when the set is
         // recorded, so every set already on disk carries a figure computed
@@ -484,6 +492,11 @@ class SessionExporter(
                         peakConVelMps = it.peakConVelMps,
                         meanEccVelMps = it.meanEccVelMps,
                         romM = it.romM,
+                        // Published UNCHANGED, with the bound beside it (#291).
+                        // The row is what its own drive window measured; the
+                        // summary line is the claim, and the claim is what
+                        // narrows -- AccelArtefact.peakEligible's own division.
+                        romBounded = it.romBounded,
                         peakPowerW = it.peakPowerW,
                         meanConPowerW = it.meanConPowerW,
                         // Samples in this rep's own span the sensor cannot have
@@ -512,7 +525,23 @@ class SessionExporter(
                 peakConVelMps = peakEligible.maxOfOrNull { it.peakConVelMps },
                 meanEccS = reps.mapNotNull { it.eccS }.averageOrNull()?.round2(),
                 meanConS = reps.map { it.conS }.averageOrNull()?.round2(),
-                meanRomM = reps.map { it.romM }.averageOrNull()?.round3(),
+                // Both range figures over the reps whose displacement the
+                // analysis can bound, never over every rep (#291), and both
+                // absent when no rep is bounded. A mean and a
+                // deviation taken over displacements nothing bounds are claims
+                // about the integrator: field-42 set 7 published a 98.1 % spread
+                // over six bench reps performed to a 3010 count, from a rep
+                // reading 1.592 m on a lift that travels about 0.45 m. RomBound
+                // is the one statement of which reps qualify; romSpreadPct
+                // applies it itself, so this file narrows only the mean.
+                // ONE bounded rep is enough for a MEAN and two are needed for a
+                // DISPERSION, which is why this is not
+                // RomBound.MIN_BOUNDED_REPS: a mean over one rep is a
+                // well-defined figure about that rep, where a deviation over one
+                // rep is zero by construction and would read as reps that agreed.
+                // averageOrNull returns null on an empty list, so a set with no
+                // bounded rep publishes no mean.
+                meanRomM = romBounded.map { it.romM }.averageOrNull()?.round3(),
                 romSpreadPct = SetAnalyzer.romSpreadPct(reps),
                 peakPowerW = peakEligible.mapNotNull { it.peakPowerW }.maxOrNull(),
                 meanConPowerW = reps.mapNotNull { it.meanConPowerW }.averageOrNull()?.round1(),

@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import kotlin.math.abs
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -118,6 +119,26 @@ class RomDriftBaselineTest {
 
     private fun case(fixture: String) = ArtefactCorpus.cases.first { it.fixture == fixture }
 
+    /**
+     * `romSpread_pct` AS IT WAS COMPUTED BEFORE THIS ISSUE WAS FIXED: the
+     * population deviation over EVERY rep, as a percentage of their mean.
+     *
+     * Computed here rather than read from `SetAnalyzer.romSpreadPct`, which now
+     * takes the same statistic over `RomBound.boundedReps` and returns null on
+     * every capture below. This file is the BEFORE side of the table and its
+     * figures have to survive the fix; calling the narrowed function would either
+     * make them go stale or make this file assert the fix rather than the defect.
+     * `RomWithholdingDifferentialTest` is where the narrowed function is pinned.
+     */
+    private fun spreadOverEveryRep(reps: List<RepAnalysis>): Double? {
+        if (reps.size < 2) return null
+        val roms = reps.map { it.romM }
+        val mean = roms.average()
+        if (mean <= 0.0) return null
+        val variance = roms.sumOf { (it - mean) * (it - mean) } / roms.size
+        return Math.round(sqrt(variance) / mean * 1000.0) / 10.0
+    }
+
     private data class Published(
         val fixture: String,
         val maxRomM: Double,
@@ -144,7 +165,7 @@ class RomDriftBaselineTest {
         expected.forEach { p ->
             val a = ArtefactCorpus.analyse(case(p.fixture))
             assertEquals(p.maxRomM, a.reps.maxOf { it.romM }, "${p.fixture} largest published rom_m")
-            assertEquals(p.spreadPct, SetAnalyzer.romSpreadPct(a.reps), "${p.fixture} romSpread_pct")
+            assertEquals(p.spreadPct, spreadOverEveryRep(a.reps), "${p.fixture} romSpread_pct")
             assertTrue(
                 p.maxRomM > 2.0 * p.travelM,
                 "${p.fixture} publishes ${p.maxRomM} m where the lift travels about ${p.travelM} m",
@@ -156,7 +177,7 @@ class RomDriftBaselineTest {
         // sets" and this as a clean one is the mistake the number invites.
         val four = ArtefactCorpus.analyse(case("field-deadlift-straight-5rep-s43-set04"))
         assertEquals(0.872, four.reps.maxOf { it.romM }, "set 4's largest rom_m")
-        assertEquals(50.9, SetAnalyzer.romSpreadPct(four.reps), "set 4 romSpread_pct")
+        assertEquals(50.9, spreadOverEveryRep(four.reps), "set 4 romSpread_pct")
     }
 
     @Test

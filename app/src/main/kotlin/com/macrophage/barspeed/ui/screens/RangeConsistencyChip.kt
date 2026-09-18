@@ -21,6 +21,17 @@ import com.macrophage.barspeed.ui.components.VerdictChip
  * undefined figure as a number is the defect this repository keeps
  * re-learning.
  *
+ * FROM #291 IT IS ALSO NULL WHERE THE ANALYSIS CANNOT BOUND THE DISPLACEMENTS,
+ * so on most real sets THIS CHIP DRAWS NOTHING. That is the fix rather than a
+ * regression: this chip read 98.1 % on six bench reps performed to a 3010 count,
+ * from a rep whose `rom_m` was 1.592 m on a lift travelling about 0.45 m, and the
+ * owner's comment on #291 is what it cost -- "It meant nothing to me. Those
+ * screens are so inaccurate that I ignore them." `RomBound` states the rule and
+ * `RomBoundCorpusTest` measures how often it holds: on the eleven committed field
+ * captures, never. The chip going dark is the analysis declining to publish a
+ * figure it cannot bound, which is the treatment `AccelArtefact` already gives a
+ * peak.
+ *
  * NEUTRAL, ALWAYS, and that is a decision rather than an oversight. A tone
  * needs a threshold, and no threshold for this figure has been measured on
  * this corpus: `romSpreadPct`'s own KDoc says a large value cannot separate a

@@ -4,6 +4,7 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.StartPhase
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 /**
@@ -53,7 +54,11 @@ class ArtefactRefusalWiringTest {
         assertEquals(0.435, reps.maxOf { it.peakConVelMps }, "summary peakConVel_mps")
         assertEquals(101.6, reps.mapNotNull { it.peakPowerW }.maxOrNull(), "summary peakPower_w")
         assertEquals(0.404, round3(reps.map { it.romM }.average()), "summary meanRom_m")
-        assertEquals(17.8, SetAnalyzer.romSpreadPct(reps), "summary romSpread_pct")
+        // #291 narrowed romSpread_pct onto the reps whose displacement the
+        // analysis can bound. THIS SET HAS AT LEAST TWO, so it still publishes a
+        // figure and the figure MOVES: 17.8 to 1.1. The mean above is computed in
+        // this file over every rep and is unaffected.
+        assertEquals(1.1, SetAnalyzer.romSpreadPct(reps), "summary romSpread_pct")
     }
 
     /**
@@ -88,7 +93,12 @@ class ArtefactRefusalWiringTest {
         assertEquals(1.363, a.reps.maxOf { it.peakConVelMps }, "summary peakConVel_mps")
         assertEquals(332.2, a.reps.mapNotNull { it.peakPowerW }.maxOrNull(), "summary peakPower_w")
         assertEquals(0.619, round3(a.reps.map { it.romM }.average()), "summary meanRom_m")
-        assertEquals(59.2, SetAnalyzer.romSpreadPct(a.reps), "summary romSpread_pct")
+        // #291 narrowed romSpread_pct onto the reps whose displacement the
+        // analysis can bound, and this set has fewer than two, so the figure is
+        // WITHHELD where it read 59.2. The mean above is computed in this file
+        // over every rep and is unaffected; RomBoundCorpusTest carries the
+        // per-capture column.
+        assertNull(SetAnalyzer.romSpreadPct(a.reps), "summary romSpread_pct")
         assertEquals(48.7, a.velocityLossPct, "velocityLoss_pct")
         assertEquals(0, RepRefusal.refusedCount(a.reps), "and the rule ran and refused nothing")
     }
@@ -100,7 +110,12 @@ class ArtefactRefusalWiringTest {
         assertEquals(1.396, a.reps.maxOf { it.peakConVelMps }, "summary peakConVel_mps")
         assertEquals(783.2, a.reps.mapNotNull { it.peakPowerW }.maxOrNull(), "summary peakPower_w")
         assertEquals(0.698, round3(a.reps.map { it.romM }.average()), "summary meanRom_m")
-        assertEquals(63.5, SetAnalyzer.romSpreadPct(a.reps), "summary romSpread_pct")
+        // #291 narrowed romSpread_pct onto the reps whose displacement the
+        // analysis can bound, and this set has fewer than two, so the figure is
+        // WITHHELD where it read 63.5. The mean above is computed in this file
+        // over every rep and is unaffected; RomBoundCorpusTest carries the
+        // per-capture column.
+        assertNull(SetAnalyzer.romSpreadPct(a.reps), "summary romSpread_pct")
         assertEquals(67.0, a.velocityLossPct, "velocityLoss_pct")
         assertEquals(0, RepRefusal.refusedCount(a.reps), "and the rule ran and refused nothing")
     }

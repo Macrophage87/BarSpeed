@@ -1707,6 +1707,76 @@ data class SessionExport(
          * both objects are still closed; `ArtefactPeakWithholdingTest` and
          * `ArtefactRuleAlternativesTest` in `:core:dsp` carry the corpus figures
          * above and the substitution measurement that argued them.
+         *
+         * FOURTH 1.21 ENTRY, filed under the same number because 1.21
+         * is UNRELEASED: `git tag --sort=-creatordate | head -1` is v0.1.53 and
+         * `git show
+         * v0.1.53:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.20"`, both read this round rather than
+         * relayed from the entries above. So 1.21 is still the open number and
+         * #300's mint stands; this entry adds to it and mints nothing.
+         *
+         * THE CHANGE (#291): each `repMetrics` row may say whether the analysis
+         * can BOUND its displacement, and the two set-level RANGE claims --
+         * `summary.meanRom_m` and `summary.romSpread_pct` -- are taken over the
+         * reps it holds for rather than over every rep, and are ABSENT below two
+         * of them. One additive boolean key, [RepMetricsExport.romBounded], plus
+         * a narrowing of the population two existing keys are computed over.
+         *
+         * THE FIGURES IT MOVES. field-42 set 7 is a 56.7 kg bench press
+         * performed to a 3010 count that publishes `romSpread_pct` 98.1 from a
+         * rep reading `rom_m` 1.592 m on a lift travelling about 0.45 m;
+         * field-42 set 9 is a seated cable row publishing 1.880 m on about
+         * 0.5 m; field-42 set 13 an assisted pull-up publishing 1.938 m on about
+         * 0.6 m. Under this rule all three publish NO range figures, because no
+         * capture in the committed corpus has two bounded reps.
+         * `RomBoundCorpusTest` carries that column and `RomDriftBaselineTest`
+         * the before side. The rep COUNTS, every velocity, every power figure
+         * and every per-rep `rom_m` are bit-identical to 1.20.
+         *
+         * THE BOUND, derived and not fitted. The ZUPT pass is the only stage
+         * that pins the velocity integral to zero, and
+         * `VelocityEstimator.anchorAcceptable` caps the displacement the drift
+         * correction may erase between two consecutive accepted anchors at
+         * `DspConfig.minRomM`, 0.10 m. That cap is spent per INTERVAL, so a
+         * rep's travel is bounded only when the interval it sits in was spent on
+         * it alone. `RomBound` states the rule once.
+         *
+         * WHY NO REPAIR, which is the decision a reader should know was taken
+         * deliberately. A rep begins and ends at rest, so a per-rep detrend
+         * looks like the fix. Two forms of it were measured and they DISAGREE by
+         * more than the defect: on the same bench rep that publishes 1.592 m a
+         * two-point detrend reads 1.544 m and a net-zero symmetrisation 1.780 m,
+         * and on the cable row's 1.880 m rep the same two read 0.666 m and
+         * 1.880 m. Both phases of the inflated reps are inflated together and no
+         * accepted anchor lies inside any rep span on either capture, so there
+         * is no offset to remove. The figure is withheld instead, which is the
+         * owner's rule and the treatment #290's entry above gives a peak.
+         *
+         * A RETRACTION OF #291's OWN CLAIM. The issue says `rom_m` "multiplies
+         * into `meanConPower_w` and `peakPower_w`". It does not: those are
+         * `load * (g + a/ratio) * (v/ratio)` over the drive window with no
+         * displacement term, recomputed and reproduced exactly in
+         * `RomDriftBaselineTest`. They are corrupted by the same VELOCITY, which
+         * is a separate remainder and is NOT narrowed here.
+         *
+         * ABSENT, FALSE AND TRUE ARE THREE FACTS, the doctrine
+         * `artefactSamples` states. Absent is permanent on every set already on
+         * disk -- the flag is frozen into the stored analysis and nothing re-runs
+         * the estimator at export time -- and a rep carrying no flag is KEPT in
+         * both populations, so no archived set loses the mean or the spread it
+         * has always published.
+         *
+         * `DATABASE_VERSION` does not move for this entry: the flag rides inside
+         * `analysisJson`, which is already a stored blob. The plan schema is
+         * untouched and `VALID_REFUSED_DETECTION_REASONS` gains no word -- no
+         * detection is refused by this rule.
+         *
+         * PINNED IN BOTH DIRECTIONS. `SchemaRomBoundContractTest` asserts the
+         * published key, that it is not required, that the object is still
+         * closed and that the example demonstrates the narrowing;
+         * `RomWithholdingDifferentialTest` in `:core:dsp` and
+         * `SessionExportRomBoundTest` in `:core:data` are the differentials.
          */
         const val SCHEMA_VERSION = "1.21"
 
@@ -2960,12 +3030,21 @@ data class SetSummaryExport(
     @SerialName("peakConVel_mps") val peakConVelMps: Double? = null,
     @SerialName("meanEcc_s") val meanEccS: Double? = null,
     @SerialName("meanCon_s") val meanConS: Double? = null,
+    /**
+     * Mean per-rep range of motion, metres. Over the reps whose displacement
+     * the analysis can bound, from schema 1.21 -- see `romBounded` on each
+     * `repMetrics` row; a consumer averaging `repMetrics[].rom_m` will not
+     * reproduce this figure on a set carrying an unbounded rep. Absent, never
+     * 0, when NO rep is bounded -- one is enough for a mean, where the
+     * dispersion below needs two.
+     */
     @SerialName("meanRom_m") val meanRomM: Double? = null,
     /**
      * How far the reps of this set disagree with each other about rom_m: the
-     * population standard deviation as a percentage of [meanRomM]. Absent,
-     * never 0, below two reps or when the reps average no displacement --
-     * dispersion is undefined there. See SetAnalyzer.romSpreadPct.
+     * population standard deviation as a percentage of [meanRomM]. Over the
+     * same bounded reps [meanRomM] is, from schema 1.21. Absent, never 0, below
+     * two bounded reps or when they average no displacement -- dispersion is
+     * undefined there. See SetAnalyzer.romSpreadPct.
      */
     @SerialName("romSpread_pct") val romSpreadPct: Double? = null,
     /**
@@ -3014,6 +3093,25 @@ data class RepMetricsExport(
     @SerialName("peakConVel_mps") val peakConVelMps: Double,
     @SerialName("meanEccVel_mps") val meanEccVelMps: Double? = null,
     @SerialName("rom_m") val romM: Double,
+    /**
+     * Whether the analysis can BOUND this rep's displacement -- schema 1.21,
+     * issue #291. See `RomBound` in `:core:dsp` for the rule and its
+     * derivation.
+     *
+     * [romM] is published unchanged whichever way this reads. False says the
+     * drift correction's whole licensed budget was spent across several reps at
+     * once, so this row's displacement rests on nothing the analysis can state a
+     * limit for, and that this rep was therefore left out of the set's
+     * `summary.meanRom_m` and `summary.romSpread_pct`. TRUE DOES NOT SAY THE
+     * DISTANCE IS RIGHT: the bound is on what the correction was licensed to
+     * remove, never on the residual an uncorrected bias leaves.
+     *
+     * Absent when the rep was analysed before the question was asked, which is
+     * permanent -- the answer is frozen into the stored analysis and nothing
+     * re-runs the estimator at export time. Absent and false are different
+     * facts, and an absent flag KEEPS the rep in both summary populations.
+     */
+    @SerialName("romBounded") val romBounded: Boolean? = null,
     @SerialName("peakPower_w") val peakPowerW: Double? = null,
     @SerialName("meanConPower_w") val meanConPowerW: Double? = null,
     /**

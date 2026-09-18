@@ -780,9 +780,17 @@ object SetAnalyzer {
      * the lifter. Published beside meanRom_m so a consumer can see how much the
      * mean is worth; see issue 74, of which it is the readable half.
      *
-     * NULL below two reps, never 0.0 and never 100.0. Dispersion over a single
-     * rep is undefined, and rendering an undefined figure as a number is the
-     * defect this repo keeps re-learning.
+     * OVER THE REPS THE ANALYSIS CAN BOUND, from issue #291 --
+     * [RomBound.boundedReps], which keeps a rep whose answer is null. A
+     * deviation taken over displacements nothing bounds is a claim about the
+     * integrator rather than about the lifter.
+     *
+     * NULL below [RomBound.MIN_BOUNDED_REPS] of them, never 0.0 and never
+     * 100.0. Dispersion over a single rep is undefined, and rendering an
+     * undefined figure as a number is the defect this repo keeps re-learning.
+     * On the committed field corpus NO capture has two bounded reps, so this
+     * returns null on every one of them; `RomBoundCorpusTest` carries that
+     * column and `RomWithholdingDifferentialTest` pins the eleven results.
      *
      * Population rather than sample deviation: the reps of the set ARE the
      * population, and there is no wider one being estimated.
@@ -792,11 +800,21 @@ object SetAnalyzer {
      * this corpus can settle that -- the only machine here with an
      * independently known travel is the leg curl rail. A large value says the
      * derived channels rest on displacements that disagree; it does not say
-     * which rep is wrong.
+     * which rep is wrong. Narrowing the population does not change that: a
+     * bounded rep is one whose travel the drift correction spent its whole
+     * licensed budget on, not one whose distance is right.
      */
     fun romSpreadPct(reps: List<RepAnalysis>): Double? {
-        if (reps.size < 2) return null
-        val roms = reps.map { it.romM }
+        // Over the reps whose displacement the analysis can BOUND, never over
+        // every rep (#291). A dispersion is a claim about the lifter's range, and
+        // a deviation taken over figures nothing bounds is a claim about the
+        // integrator: field-42 set 7 published 98.1 % over six bench reps
+        // performed to a 3010 count, from a rep reading 1.592 m on a lift that
+        // travels about 0.45 m. RomBound is the one statement of which reps
+        // qualify and of why; this function holds no second copy of the rule.
+        val bounded = RomBound.boundedReps(reps)
+        if (bounded.size < RomBound.MIN_BOUNDED_REPS) return null
+        val roms = bounded.map { it.romM }
         val mean = roms.average()
         if (mean <= 0.0) return null
         val variance = roms.sumOf { (it - mean) * (it - mean) } / roms.size

@@ -291,7 +291,12 @@ class ArtefactRepTest {
         assertEquals(1.396, a.reps.maxOf { it.peakConVelMps }, "summary peakConVel_mps")
         assertEquals(783.2, peakPower(a), "summary peakPower_w")
         assertEquals(0.698, meanRom(a), "summary meanRom_m")
-        assertEquals(63.5, SetAnalyzer.romSpreadPct(a.reps), "summary romSpread_pct")
+        // #291 narrowed romSpread_pct onto the reps whose displacement the
+        // analysis can bound, and this set has fewer than two, so the figure is
+        // WITHHELD where it read 63.5. The mean above is computed in this file
+        // over every rep and is unaffected; RomBoundCorpusTest carries the
+        // per-capture column.
+        assertNull(SetAnalyzer.romSpreadPct(a.reps), "summary romSpread_pct")
         assertEquals(67.0, a.velocityLossPct, "velocityLoss_pct")
     }
 

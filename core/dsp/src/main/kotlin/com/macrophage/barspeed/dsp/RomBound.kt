@@ -68,10 +68,13 @@ package com.macrophage.barspeed.dsp
  *
  * ## What it withholds, measured on the eleven committed captures
  *
- * At most ONE rep per set is bounded, and on eight of the eleven captures none
- * is: field-42 sets 2, 5, 7, 9 and 13, field-43 sets 5 and 6 and field-37
- * set 3 have no bounded rep, and field-42 set 11, field-43 set 4 and field-37
- * set 8 have exactly one. `RomBoundCorpusTest` carries the per-capture column.
+ * At most ONE rep per set is bounded, and on NINE of the eleven captures none
+ * is: field-42 sets 2, 5, 7, 9, 11 and 13, field-43 sets 5 and 6 and field-37
+ * set 3 publish no bounded rep, and field-43 set 4 and field-37 set 8 publish
+ * exactly one, at `rom_m` 0.351 and 0.200. `RomBoundCorpusTest` carries the
+ * per-capture column and the one case where a set has a bounded SPAN and no
+ * bounded REP: field-42 set 11, whose only exclusive interval holds a detection
+ * its own Done cue excluded.
  *
  * That is the finding, not a side effect of it: on a real working set the bar
  * never goes quiet enough for an anchor to be accepted, so the whole working
@@ -108,16 +111,19 @@ object RomBound {
     fun boundedReps(reps: List<RepAnalysis>): List<RepAnalysis> = reps.filter { it.romBounded ?: true }
 
     /**
-     * The least number of bounded reps a dispersion figure may be taken over.
+     * The least number of bounded reps a DISPERSION figure may be taken over.
      *
      * Two, which is `SetAnalyzer.romSpreadPct`'s own existing minimum and not a
      * second number: a deviation over one rep is zero by construction and would
      * read as reps that agreed perfectly.
+     *
+     * A MEAN is not gated on this and needs only one, which is why
+     * `Exporters`' `meanRom_m` does not read it: a mean over one rep is a
+     * well-defined figure about that rep. Publishing neither below two would
+     * delete `meanRom_m` from every one-rep set for no reason the evidence
+     * supports.
      */
     const val MIN_BOUNDED_REPS = 2
-
-    /** The word a withheld displacement claim publishes for why. */
-    const val ANCHOR_STARVED = "anchorStarved"
 
     /**
      * Whether [span]'s displacement is bounded, given every span the segmenter
