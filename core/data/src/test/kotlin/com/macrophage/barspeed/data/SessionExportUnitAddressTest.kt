@@ -2,6 +2,7 @@ package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.model.DualShortfall
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.SensorRole
@@ -13,6 +14,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -21,14 +23,18 @@ import kotlin.test.assertNull
  * What `session.json` says about WHICH PHYSICAL UNIT carried each role on a
  * set recorded with two accelerometers, issue #260.
  *
- * CHARACTERIZATION, at this commit: nothing. The block publishes `count`,
- * `expected`, `present` and `analysedRole`, and a reader holding the archive
- * cannot say which of two identical WT901 units role `a` was -- so the whole
- * mount table of a dual-unit session rests on the owner remembering, and the
- * owner says that memory will be wrong often.
+ * DIFFERENTIALS. Every assertion here fails at the commit that writes it, and
+ * the file does not even COMPILE at it: the `sensorRoleByAddress` snapshot the
+ * exporter is handed below is the parameter the fix adds. That is stated rather
+ * than hidden -- it is a weaker red than an AssertionError, and the four
+ * contract differentials in the commit before this one are the assertion-level
+ * half. The commit after this one is the fix.
  *
- * These are the BEFORE side of the differential. The commit that flips them is
- * the red; the one after it is the fix.
+ * WHY IT MATTERS TO THE LIFTER: a reader holding the archive cannot say which
+ * of two identical magnet-mounted WT901 units role `a` was, so the whole mount
+ * table of a dual-unit session rests on the owner remembering -- *"I'm not
+ * really sure. Will check each time, they're likely to get mixed up a lot."*
+ * (owner, 2026-09-05, asked which unit was role a).
  *
  * Nothing here executes Room, SQLite or Android. What is verified is the
  * exporter's own mapping and nothing about what the database did with it. The
@@ -136,14 +142,25 @@ class SessionExportUnitAddressTest {
             analysed = SensorRole.A,
         )
 
-    private suspend fun sensorsObject(sensors: RecordedSensors = dual): JsonObject {
+    private val unitA = "C0:82:2D:8A:1D:3F"
+    private val unitB = "C0:82:2D:8A:0C:7A"
+    private val bothLabelled = mapOf(unitA to SensorRole.A, unitB to SensorRole.B)
+
+    private suspend fun sensorsObject(
+        sensors: RecordedSensors = dual,
+        roleByAddress: Map<String, SensorRole> = bothLabelled,
+    ): JsonObject {
         val dao =
             FakeSessionDao(
                 listOf(row(sensors)),
                 mapOf(5L to listOf(imuStream(1L, "a"), imuStream(2L, "b"))),
             )
         val exporter =
-            SessionExporter(SessionRepository(dao, FakeExerciseDao()), dispatcher = Dispatchers.Default)
+            SessionExporter(
+                SessionRepository(dao, FakeExerciseDao()),
+                dispatcher = Dispatchers.Default,
+                sensorRoleByAddress = { roleByAddress },
+            )
         val text = exporter.exportJson(1L, includeRepDetail = true)!!
         return Json.parseToJsonElement(text)
             .jsonObject.getValue("exercises").jsonArray.single()
@@ -152,21 +169,83 @@ class SessionExportUnitAddressTest {
     }
 
     /**
-     * A dual set publishes four keys and none of them names a unit.
+     * A dual set names the unit behind each role it armed.
      *
-     * The key set is asserted whole rather than one absence at a time: an
-     * identity published under some other name would satisfy a single
-     * `assertNull` and still be a second place this fact could live.
+     * The reading key this whole change exists for: with it, an analysis can
+     * say "role a = the unit ending 1D:3F" and the owner labels that unit once
+     * with a sticker. Without it, the mount of every dual-unit set is whatever
+     * the owner remembers.
      */
     @Test
-    fun `a dual set publishes no physical unit for either role`() = runTest {
+    fun `a dual set names the unit behind each role`() = runTest {
         val sensors = sensorsObject()
+
+        assertEquals(
+            mapOf("a" to unitA, "b" to unitB),
+            sensors.getValue("unitAddresses").jsonObject.mapValues { it.value.jsonPrimitive.content },
+        )
+    }
+
+    /**
+     * Only the roles the SET armed are named, whatever the pairing store holds.
+     *
+     * A set that met two paired units it could not tell apart records one
+     * unroled stream -- `count` 1, both role lists empty -- while the store may
+     * still hold a label for each unit. Naming either here would attach an
+     * address to a capture that carries no role, which is the one thing the
+     * role column exists to refuse.
+     */
+    @Test
+    fun `a set that armed no role names no unit`() = runTest {
+        val sensors =
+            sensorsObject(
+                RecordedSensors(count = 1, shortfall = DualShortfall.ROLES_UNASSIGNED),
+            )
+
+        assertNull(
+            sensors["unitAddresses"],
+            "a set whose stream carries no role was given one anyway",
+        )
+    }
+
+    /**
+     * An exporter that knows no pairing publishes no key at all, rather than an
+     * empty object.
+     *
+     * The state of every session exported by a build that could not read the
+     * pairing store, and of a lifter who has labelled nothing. Absence is the
+     * honest answer and this document expresses every other unknown by
+     * omission; an empty object would read as "the app looked and there were no
+     * units".
+     */
+    @Test
+    fun `no pairing known publishes no unit key`() = runTest {
+        val sensors = sensorsObject(roleByAddress = emptyMap())
 
         assertEquals(
             setOf("count", "expected", "present", "analysedRole"),
             sensors.keys,
-            "the exported sensors block has changed shape, so this pin is not the before side",
+            "an empty pairing store still wrote something",
         )
-        assertNull(sensors["unitAddresses"], "the export already names the units")
+    }
+
+    /**
+     * A role two addresses claim is omitted and its partner survives.
+     *
+     * Reachable and permanent: forgetting the unit labelled A does not clear
+     * its label -- `DeviceRegistry.forget` and `SettingsStore.setSensorRole`
+     * are different documents -- so pairing a replacement and labelling it A
+     * leaves two A addresses in the store for good. The rule is
+     * `SensorCapturePolicy.unitAddresses`', pinned in `:core:model`; what is
+     * pinned here is that the exporter reads it rather than deciding again.
+     */
+    @Test
+    fun `a role two units claim is not named and the other role still is`() = runTest {
+        val sensors = sensorsObject(roleByAddress = bothLabelled + mapOf("C0:82:2D:8A:FF:01" to SensorRole.A))
+
+        assertEquals(
+            mapOf("b" to unitB),
+            sensors.getValue("unitAddresses").jsonObject.mapValues { it.value.jsonPrimitive.content },
+        )
     }
 }
