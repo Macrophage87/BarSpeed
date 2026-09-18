@@ -107,7 +107,7 @@ class CrashLogStore(private val root: File) {
      * A crash file is bounded by construction -- `CrashLogRing` bounds the log
      * and `CrashRecord.stackText` bounds the stack -- so this ceiling should
      * never be reached. It is here anyway because #273 is the same shape one
-     * step along: `SetJournalStore.zip` reads every stream whole and is
+     * step along: `SetJournalStore.zipTo` reads every stream whole and is
      * expected to run out of heap on an oversize journal. A share path that
      * trusts a file to be small is exactly that defect, and the trust is
      * cheap to remove.

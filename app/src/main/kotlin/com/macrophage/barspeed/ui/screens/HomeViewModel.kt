@@ -263,6 +263,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * browsable -- so without it the capture would be safe and permanently out
      * of reach of the person whose set it is.
      *
+     * Streamed through [ShareUtil.shareStreamed] rather than
+     * [ShareUtil.shareFile], with `SetJournalStore.zipTo` writing the archive
+     * into the share cache itself (#273). A journal directory has no size
+     * bound: the capture behind #271 was a 314.6 MB `imu.csv`, and now that
+     * the listing is bounded the card draws for one and this button is live
+     * on it. Taking the archive back as a ByteArray here would put a
+     * full-size copy in the heap on the way to a file the share sheet reads
+     * from anyway.
+     *
      * Deliberately does NOT discard afterwards. Sharing can fail at the share
      * sheet, silently as far as this code can tell, and a capture deleted on
      * the assumption that it arrived somewhere is the defect this whole branch
@@ -270,8 +279,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun shareInterrupted(orphan: OrphanedSet) {
         viewModelScope.launch {
-            val zip = withContext(Dispatchers.IO) { container.setJournals.zip(orphan) }
-            ShareUtil.shareFile(getApplication(), interruptedName(orphan), zip, "application/zip")
+            ShareUtil.shareStreamed(getApplication(), interruptedName(orphan), "application/zip") { destination ->
+                container.setJournals.zipTo(orphan, destination)
+            }
         }
     }
 
@@ -404,7 +414,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * Streamed through `ShareUtil.shareStreamed` rather than read into a
      * ByteArray. A crash file is bounded by construction and this is
      * belt-and-braces, but #273 is the same shape one step along --
-     * `SetJournalStore.zip` reads every stream whole and is expected to run
+     * `SetJournalStore.zipTo` reads every stream whole and is expected to run
      * out of heap on an oversize journal -- and the trust is cheap to remove.
      *
      * Deliberately does NOT delete afterwards, the rule [shareInterrupted]

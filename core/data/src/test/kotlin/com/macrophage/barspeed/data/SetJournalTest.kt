@@ -691,7 +691,7 @@ class SetJournalTest {
     fun `an interrupted capture zips to its files, byte for byte`() = runTest {
         val store = store()
         onDisk(imuText = ImuCsv.encode(imu), cueText = CueCsv.encode(cues))
-        val entries = unzip(store.zip(store.orphans().single()))
+        val entries = unzip(store, store.orphans().single())
         assertEquals(
             listOf(SetJournalStore.HEADER_FILE, SetJournal.CUES, SetJournal.IMU).sorted(),
             entries.keys.sorted(),
@@ -710,7 +710,7 @@ class SetJournalTest {
         val store = store()
         val ragged = ImuCsv.encode(imu) + "1020,0.03"
         onDisk(imuText = ragged, cueText = CueCsv.encode(cues))
-        val entries = unzip(store.zip(store.orphans().single()))
+        val entries = unzip(store, store.orphans().single())
         assertEquals(ragged, entries.getValue(SetJournal.IMU), "the zip repaired or truncated the raw capture")
         assertEquals(CueCsv.encode(cues), entries.getValue(SetJournal.CUES))
     }
@@ -738,7 +738,7 @@ class SetJournalTest {
             header = header().copy(sensorRoles = listOf(SensorRole.A, SensorRole.B), armedRole = SensorRole.A),
             imuText = ImuCsv.encode(imu),
         )
-        val entries = unzip(store.zip(store.orphans().single()))
+        val entries = unzip(store, store.orphans().single())
         assertEquals(
             "{\"exerciseId\":\"back_squat\",\"exerciseName\":\"Back Squat\",\"sessionId\":null," +
                 "\"sessionStartedAtMs\":900,\"startedAtMs\":1000,\"orderIdx\":0,\"imuConnected\":true," +
@@ -747,9 +747,19 @@ class SetJournalTest {
         )
     }
 
-    private fun unzip(bytes: ByteArray): Map<String, String> {
+    /**
+     * The archive as `zipTo` wrote it, read back off a real file.
+     *
+     * The destination is a file rather than a ByteArray because that is what
+     * `zipTo` takes (#273); `readBytes` per ENTRY here is a test reading
+     * back a capture of a few hundred bytes, which is not the read this
+     * issue is about.
+     */
+    private fun unzip(store: SetJournalStore, orphan: OrphanedSet): Map<String, String> {
+        val archive = File(root, "share.zip")
+        store.zipTo(orphan, archive)
         val out = mutableMapOf<String, String>()
-        ZipInputStream(bytes.inputStream()).use { zip ->
+        ZipInputStream(archive.inputStream()).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 out[entry.name] = zip.readBytes().toString(Charsets.UTF_8)

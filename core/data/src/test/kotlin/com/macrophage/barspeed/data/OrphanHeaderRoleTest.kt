@@ -12,7 +12,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.file.Files
 import java.util.zip.ZipInputStream
@@ -76,8 +75,8 @@ class OrphanHeaderRoleTest {
         ImuSample(1_000L + i * 10L, 0.01, -0.02, 0.98, 1.5, -2.5, 0.25, 10.0, -20.0, 30.0)
     }
 
-    private fun entries(bytes: ByteArray): Map<String, String> = buildMap {
-        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+    private fun entries(archive: File): Map<String, String> = buildMap {
+        ZipInputStream(archive.inputStream()).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 put(entry.name, zip.readBytes().toString(Charsets.UTF_8))
@@ -85,8 +84,11 @@ class OrphanHeaderRoleTest {
         }
     }
 
-    private fun publishedText(orphan: OrphanedSet, store: SetJournalStore): String =
-        entries(store.zip(orphan)).getValue(SetJournalStore.HEADER_FILE)
+    private fun publishedText(orphan: OrphanedSet, store: SetJournalStore): String {
+        val archive = File(root, "share.zip")
+        store.zipTo(orphan, archive)
+        return entries(archive).getValue(SetJournalStore.HEADER_FILE)
+    }
 
     private fun published(orphan: OrphanedSet, store: SetJournalStore): JsonObject =
         json.parseToJsonElement(publishedText(orphan, store)).jsonObject

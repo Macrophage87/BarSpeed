@@ -65,7 +65,7 @@ enum class RescueCompleteness(val riskOrder: Int) {
  * same defect one layer up. Every field below comes from a directory listing
  * and a file length, never a byte decoded from inside a database file. [zipTo]
  * is the one exception, and it is not one: it copies bytes through unread and
- * uninterpreted, the same way [SetJournalStore.zip] already copies a capture's
+ * uninterpreted, the same way [SetJournalStore.zipTo] already copies a capture's
  * raw CSVs -- the constraint this class exists to honour is against parsing
  * the file AS a database, not against moving its bytes.
  *
@@ -125,16 +125,14 @@ data class RescuedDatabase(
  * discard at the lifter's word and never on a timer.
  *
  * [zipTo] WRITES STRAIGHT TO A FILE RATHER THAN RETURNING BYTES, and this is
- * not a style choice. [SetJournalStore.zip] returns a ByteArray because a set
- * journal is on the order of hundreds of kilobytes; a rescued corpus is
- * explicitly unbounded by design (N downgrades, N corpora, [DatabaseRescue]'s
- * own KDoc), already stated there to reach "tens of megabytes" for a single
- * mature history. Measured on the JDK this project builds with, scanning
- * heap size against corpus size through the identical ByteArrayOutputStream
- * + toByteArray() code path [SetJournalStore.zip] and `ShareUtil.shareFile`
- * use: a 192 MB heap holds a 60 MB corpus but exhausts outright on an 80 MB
- * one, well inside what this design already expects a mature history to
- * reach. Streaming through [ZipOutputStream] over a [FileOutputStream] costs
+ * not a style choice. A rescued corpus is explicitly unbounded by design (N
+ * downgrades, N corpora, [DatabaseRescue]'s own KDoc), already stated there
+ * to reach "tens of megabytes" for a single mature history. Measured on the
+ * JDK this project builds with, scanning heap size against corpus size
+ * through a ByteArrayOutputStream + toByteArray() code path and
+ * `ShareUtil.shareFile`: a 192 MB heap holds a 60 MB corpus but exhausts
+ * outright on an 80 MB one, well inside what this design already expects a
+ * mature history to reach. Streaming through [ZipOutputStream] over a [FileOutputStream] costs
  * only its own internal buffers, a few tens of kilobytes, regardless of
  * corpus size: the same 80 MB corpus, and a 200 MB one beyond it, both
  * streamed clean on a 32 MB heap in the same measurement, with no observable
@@ -203,7 +201,7 @@ class RescuedDatabaseStore(
      * does not yet have. Streamed straight to disk; see this class's own
      * KDoc for why that is load-bearing rather than incidental. Uncompressed
      * intent, unconverted content: each file's bytes are copied through
-     * exactly as they lie, the same as [SetJournalStore.zip], because
+     * exactly as they lie, the same as [SetJournalStore.zipTo], because
      * nothing here can verify what it would be converting. BEST_SPEED,
      * matching [RawExporter.buildZip]'s own reasoning from issue #29 on the
      * only other zip this app streams at comparable scale -- this is the
@@ -213,13 +211,13 @@ class RescuedDatabaseStore(
      *
      * A FAILED READ FAILS THE WHOLE ARCHIVE, LOUDLY -- an earlier version of
      * this function caught a read failure per file and moved on, matching
-     * [SetJournalStore.zip]'s own shape, and that shape does not transfer
+     * [SetJournalStore.zipTo]'s own shape, and that shape does not transfer
      * here. `putNextEntry` writes the zip entry's header before a single
      * byte of the file is read, so catching a mid-copy failure and
      * continuing left a STRUCTURALLY VALID zip holding a truncated or
      * zero-byte database: an archive that opens cleanly and looks complete
      * while the lifter's actual backup is gone. A partial CSV capture is
-     * still independently useful, which is why [SetJournalStore.zip] can
+     * still independently useful, which is why [SetJournalStore.zipTo] can
      * afford to skip one and keep going; a partial database file is not, so
      * this throws instead.
      *

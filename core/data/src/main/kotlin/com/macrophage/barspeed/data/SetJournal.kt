@@ -19,8 +19,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import java.io.BufferedWriter
-import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -104,7 +104,7 @@ data class SetJournalHeader(
      * stream's role from it -- the same compatibility reasoning
      * [sensorRoles] gives for not bumping [SetJournalStore.JOURNAL_VERSION].
      * What a person READS is corrected where the correction can be made
-     * truthfully: [SetJournalStore.zip] publishes `armedRole` in its place,
+     * truthfully: [SetJournalStore.zipTo] publishes `armedRole` in its place,
      * beside an `analysedRole` derived from the streams that are actually in
      * the directory. Rewriting the recorded file was refused outright -- the
      * capture is not edited after the fact.
@@ -154,7 +154,7 @@ data class SetJournalHeader(
  * it is not counted in [bytes], and `InterruptedSetSummary` does not name it
  * among the unreadable files -- only a stream the scan measured and could not
  * count whole is named there. The bytes are still on disk and
- * [SetJournalStore.zip] still copies them into the recovered capture.
+ * [SetJournalStore.zipTo] still copies them into the recovered capture.
  *
  * [repMarks] counts the epoch-ms instants at which a rep was counted, by the
  * lifter thumbing the button or by the guided cadence runner. Marks rather
@@ -505,7 +505,8 @@ class SetJournalStore(
     }
 
     /**
-     * An interrupted capture as a zip the lifter can send themselves.
+     * An interrupted capture as a zip the lifter can send themselves,
+     * written straight to [destination].
      *
      * The only way this data leaves the phone. App-private storage is not
      * browsable, so without this the capture is safe and permanently out of
@@ -526,21 +527,31 @@ class SetJournalStore(
      * A stream that will not read is skipped rather than failing the export.
      * Some of the capture is worth more than none of it, and the whole reason
      * this file exists is that the process was killed partway.
+     *
+     * WRITTEN INTO A FILE RATHER THAN RETURNED AS BYTES (#273). A journal
+     * directory has no size bound -- the capture behind #271 was a 314.6 MB
+     * `imu.csv` -- and the listing is bounded now, so the recovery card
+     * draws for a capture that large and SEND IT TO ME is live on it. An
+     * archive accumulated in a `ByteArrayOutputStream` and handed back as a
+     * ByteArray is one full-size copy in the heap, and `ShareUtil.shareFile`
+     * writing it out is a second. This writes through
+     * `ShareUtil.shareStreamed` into the share cache instead, the shape
+     * [RescuedDatabaseStore.zipTo] already uses for the same reason.
      */
-    fun zip(orphan: OrphanedSet): ByteArray {
-        val out = ByteArrayOutputStream()
-        ZipOutputStream(out).use { zip ->
-            orphan.directory.listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }.forEach { file ->
-                runCatching {
-                    val bytes =
-                        if (file.name == HEADER_FILE) publishedHeader(orphan, file) else file.readBytes()
-                    zip.putNextEntry(ZipEntry(file.name))
-                    zip.write(bytes)
-                    zip.closeEntry()
+    fun zipTo(orphan: OrphanedSet, destination: File) {
+        FileOutputStream(destination).use { fileOut ->
+            ZipOutputStream(fileOut).use { zip ->
+                orphan.directory.listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }.forEach { file ->
+                    runCatching {
+                        val bytes =
+                            if (file.name == HEADER_FILE) publishedHeader(orphan, file) else file.readBytes()
+                        zip.putNextEntry(ZipEntry(file.name))
+                        zip.write(bytes)
+                        zip.closeEntry()
+                    }
                 }
             }
         }
-        return out.toByteArray()
     }
 
     /**
@@ -643,7 +654,7 @@ class SetJournalStore(
      *
      * A read that throws yields null rather than propagating: a directory the
      * scan cannot open must not be what stops the other interrupted sets being
-     * listed, and [SetJournalStore.zip] copies the bytes as they lie whatever
+     * listed, and [SetJournalStore.zipTo] copies the bytes as they lie whatever
      * this made of them.
      */
     private fun scan(dir: File, name: String): JournalStreamScan? {
