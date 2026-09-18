@@ -653,7 +653,7 @@ private val SetRecordEntity.publishedLimiter: String?
  * itself:
  *
  * - TIMED is `actualDurationS != null`. That column is written only by
- *   `recordedTimedSeconds`, which returns null on every set that is not a hold
+ *   `recordedTimedEnd`, which returns null on every set that is not a hold
  *   or a carry, so the column IS the timed marker. `AbandonedSetPolicy` reads
  *   it the same way one field up. The PUBLISHED duration is not used, because a
  *   set abandoned in its prep publishes no duration and is still a timed set.
@@ -673,6 +673,18 @@ private val SetRecordEntity.publishedLimiter: String?
  *   kind at all, and `ExerciseDef`'s kind for an id outside the seed list is its
  *   own admitted guess.
  */
+private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?): String? = RepsSourcePolicy.publishedWord(
+    liveReps = liveReps,
+    repsManual = repsManual,
+    timed = actualDurationS != null,
+    guideCounted =
+    RepsSourcePolicy.guideCounted(
+        hasTempo = tempo != null,
+        isTimed = actualDurationS != null,
+        kind = kind,
+    ),
+)
+
 /**
  * The word saying which of four things decided this row's recorded seconds, or
  * null where there is nothing to say. Issue #259.
@@ -693,18 +705,6 @@ private val SetRecordEntity.publishedLimiter: String?
  */
 private fun SetRecordEntity.publishedHoldEnd(phase: AbandonedSetPhase): String? =
     phase.durationS?.let { HoldEndSource.ofPublished(durationEndedBy)?.published }
-
-private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?): String? = RepsSourcePolicy.publishedWord(
-    liveReps = liveReps,
-    repsManual = repsManual,
-    timed = actualDurationS != null,
-    guideCounted =
-    RepsSourcePolicy.guideCounted(
-        hasTempo = tempo != null,
-        isTimed = actualDurationS != null,
-        kind = kind,
-    ),
-)
 
 /**
  * The free-text note as it may be PUBLISHED: only where an answer stands

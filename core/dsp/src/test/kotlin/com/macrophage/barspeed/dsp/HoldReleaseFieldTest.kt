@@ -364,6 +364,17 @@ class HoldReleaseFieldTest {
         assertEquals(6, secondsTo(set18, set18.endedAtMs) - secondsTo(set18, release18), "set 18's reach")
         assertEquals(7039L, set17.endedAtMs - release17, "set 17's reach in milliseconds")
         assertEquals(6130L, set18.endedAtMs - release18, "set 18's reach in milliseconds")
+
+        // The SAME hold read off the OTHER armed unit, which is what makes the
+        // choice of stream a figure rather than a detail: 23 s against role a's
+        // 26, from one hang. `HoldRelease`'s own KDoc states these four
+        // numbers, so they are pinned here rather than left to a reader to
+        // recompute.
+        val release18b = HoldRelease.atMs(load("${set18.fixture}-imu-b"), set18.clockStartedAtMs)!!
+        assertEquals(23, secondsTo(set18, release18b), "set 18's partner unit's seconds")
+        assertEquals(26058L, release18 - set18.clockStartedAtMs, "role a's release, into the hold")
+        assertEquals(23313L, release18b - set18.clockStartedAtMs, "role b's release, into the hold")
+        assertEquals(2745L, release18 - release18b, "how far apart the two units answer")
     }
 
     private fun secondsTo(hold: Hold, instantMs: Long): Int = SetClockPolicy.heldSeconds(

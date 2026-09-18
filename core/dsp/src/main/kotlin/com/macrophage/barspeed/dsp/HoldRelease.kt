@@ -58,6 +58,24 @@ import kotlin.math.sqrt
  * end quietly; no capture of one has been read. Whether a release the owner
  * would call obvious always crosses 1 g on a mount that is neither on the
  * stack nor in a pocket is a [Field] question, not a property of this file.
+ *
+ * WHICH UNIT IS READ MOVES THE ANSWER, and the corpus measures it. On field-38
+ * set 18 role a crosses at 1788518020443, 26.058 s into the hold, and role b at
+ * 1788518017698, 23.313 s in -- 2.745 s apart, so a set that analysed role b
+ * would record 23 s where one analysing role a records 26. `captureAt` in
+ * `:app` chooses the stream and this file reads whichever it chose; nothing
+ * here checks that the chosen unit was on the implement. Every figure in this
+ * paragraph is asserted in `HoldReleaseFieldTest`.
+ *
+ * [Field] On a two-unit rope hold, which unit is on the rope and which is on
+ * the lifter -- and is the role the app analyses the one on the rope? Arm both
+ * units for one 45 s rope dead hang; before the set, write down which physical
+ * unit is role a and which is role b, and where each is mounted (rope handle or
+ * trouser pocket). Nothing is timed by hand and no second device is used. Then
+ * read that set's exported `duration_s` and `duration_ended_by`. The figure to
+ * check is whether the mount the app analysed was the one on the implement:
+ * set 18's two units answer 26 s and 23 s for the same hold, and nothing in the
+ * capture records which mount produced which.
  */
 object HoldRelease {
     /**
