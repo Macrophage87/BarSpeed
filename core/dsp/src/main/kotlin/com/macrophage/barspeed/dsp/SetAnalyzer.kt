@@ -71,13 +71,16 @@ data class RepAnalysis(
     /**
      * Whether the analysis can BOUND this rep's displacement: whether the ZUPT
      * pass pinned the velocity integral to zero at both ends of this rep's own
-     * span with no other rep sharing the interval. [RomBound] holds the rule and
-     * its derivation; issue #291.
+     * span, with no other rep sharing the interval AND with every interval the
+     * span crosses closed by an anchor `VelocityEstimator.anchorAcceptable`
+     * approved. [RomBound] holds the rule and its derivation; issue #291.
      *
      * FALSE DOES NOT MEAN [romM] IS WRONG and true does not mean it is right.
      * The bound is on what the drift correction was licensed to remove, never on
-     * the residual an uncorrected bias leaves. What false says is that one
-     * interval's whole drift budget was spent across several reps, so this rep's
+     * the residual an uncorrected bias leaves. False says one of two things and
+     * does not distinguish them: one interval's whole drift budget was spent
+     * across several reps, or an interval this rep crosses was closed by an
+     * anchor taken on starvation, which caps nothing. Either way this rep's
      * travel rests on nothing the analysis can state a limit for.
      *
      * Null and false are different facts, the doctrine [artefactSamples]
@@ -657,19 +660,15 @@ object SetAnalyzer {
             // sat inside the inter-anchor interval and still spent its drift
             // budget. [RomBound] is the one statement of the rule.
             //
-            // THE ROUTE RECORD IS NOT PASSED YET, deliberately. This commit
-            // records which anchors `VelocityEstimator.anchorAcceptable`
-            // accepted and which the starvation escape took, and changes no
-            // published figure: an all-capped record reproduces the rule
-            // exactly as it stood. The commit that passes
-            // `series.anchorCapped` is separate, and its red differentials are
-            // in `RomBoundCorpusTest` and `RomWithholdingDifferentialTest`.
-            romBounded = RomBound.bounded(
-                span,
-                allSpans,
-                series.anchorIndices,
-                BooleanArray(series.anchorIndices.size) { true },
-            ),
+            // WITH THE ROUTE each anchor was accepted through. Only an anchor
+            // `VelocityEstimator.anchorAcceptable` approved caps what the drift
+            // correction erases over the interval ending at it; an anchor the
+            // starvation escape took caps nothing. Passing the anchor list
+            // without the record asks a question about a limit that may not
+            // exist -- on this corpus it admitted three spans and every one of
+            // them sat in an interval that erased between 1.0180 m and 5.0198 m
+            // against a 0.10 m cap (`AnchorRouteTest`).
+            romBounded = RomBound.bounded(span, allSpans, series.anchorIndices, series.anchorCapped),
         )
     }
 

@@ -1719,28 +1719,37 @@ data class SessionExport(
          * THE CHANGE (#291): each `repMetrics` row may say whether the analysis
          * can BOUND its displacement, and the two set-level RANGE claims --
          * `summary.meanRom_m` and `summary.romSpread_pct` -- are taken over the
-         * reps it holds for rather than over every rep, and are ABSENT below two
-         * of them. One additive boolean key, [RepMetricsExport.romBounded], plus
-         * a narrowing of the population two existing keys are computed over.
+         * reps it holds for rather than over every rep. The mean is ABSENT with
+         * no bounded rep and the spread below two of them. One additive boolean
+         * key, [RepMetricsExport.romBounded], plus a narrowing of the population
+         * two existing keys are computed over.
          *
          * THE FIGURES IT MOVES. field-42 set 7 is a 56.7 kg bench press
          * performed to a 3010 count that publishes `romSpread_pct` 98.1 from a
          * rep reading `rom_m` 1.592 m on a lift travelling about 0.45 m;
          * field-42 set 9 is a seated cable row publishing 1.880 m on about
          * 0.5 m; field-42 set 13 an assisted pull-up publishing 1.938 m on about
-         * 0.6 m. Under this rule all three publish NO range figures, because no
-         * capture in the committed corpus has two bounded reps.
-         * `RomBoundCorpusTest` carries that column and `RomDriftBaselineTest`
-         * the before side. The rep COUNTS, every velocity, every power figure
-         * and every per-rep `rom_m` are bit-identical to 1.20.
+         * 0.6 m. Under this rule all three publish NO range figures, and neither
+         * does any other capture in the committed corpus: not one rep of the
+         * eleven is bounded, so every one of them withholds both the mean and
+         * the spread. `RomBoundCorpusTest` carries that column and
+         * `RomDriftBaselineTest` the before side. The rep COUNTS, every
+         * velocity, every power figure and every per-rep `rom_m` are
+         * bit-identical to 1.20.
          *
          * THE BOUND, derived and not fitted. The ZUPT pass is the only stage
          * that pins the velocity integral to zero, and
          * `VelocityEstimator.anchorAcceptable` caps the displacement the drift
-         * correction may erase between two consecutive accepted anchors at
-         * `DspConfig.minRomM`, 0.10 m. That cap is spent per INTERVAL, so a
+         * correction may erase between two consecutive anchors IT ACCEPTED at
+         * `DspConfig.minRomM`, 0.10 m. It does not cap every anchor: after a
+         * stretch with nothing acceptable, `applyZupt` re-anchors on starvation
+         * alone and the ramp back to that anchor erases whatever it erases. So a
          * rep's travel is bounded only when the interval it sits in was spent on
-         * it alone. `RomBound` states the rule once.
+         * it alone AND every interval its span crosses was closed by an anchor
+         * the caps approved. `RomBound` states the rule once, and
+         * `AnchorRouteTest` measures what the uncapped intervals of this corpus
+         * erased: 1.0180 m, 5.0198 m and 2.3153 m on the three spans a
+         * route-blind form of the rule admitted.
          *
          * WHY NO REPAIR, which is the decision a reader should know was taken
          * deliberately. A rep begins and ends at rest, so a per-rep detrend
@@ -3098,13 +3107,16 @@ data class RepMetricsExport(
      * issue #291. See `RomBound` in `:core:dsp` for the rule and its
      * derivation.
      *
-     * [romM] is published unchanged whichever way this reads. False says the
-     * drift correction's whole licensed budget was spent across several reps at
-     * once, so this row's displacement rests on nothing the analysis can state a
-     * limit for, and that this rep was therefore left out of the set's
+     * [romM] is published unchanged whichever way this reads. FALSE has two
+     * causes and does not say which: the drift correction's whole licensed
+     * budget was spent across several reps at once, or one of the intervals this
+     * rep's span crosses was closed by an anchor taken on starvation, which caps
+     * nothing at all. Either way this row's displacement rests on nothing the
+     * analysis can state a limit for, and the rep was left out of the set's
      * `summary.meanRom_m` and `summary.romSpread_pct`. TRUE DOES NOT SAY THE
      * DISTANCE IS RIGHT: the bound is on what the correction was licensed to
-     * remove, never on the residual an uncorrected bias leaves.
+     * remove, never on the residual an uncorrected bias leaves, and it is that
+     * licence PER INTERVAL the rep's span crosses rather than 0.10 m per rep.
      *
      * Absent when the rep was analysed before the question was asked, which is
      * permanent -- the answer is frozen into the stored analysis and nothing
