@@ -32,6 +32,19 @@ import com.macrophage.barspeed.ui.components.VerdictChip
  * figure it cannot bound, which is the treatment `AccelArtefact` already gives a
  * peak.
  *
+ * ONLY ON A SET ANALYSED AFTER THIS SHIPS, and the qualifier is the whole of
+ * what a reader of the history screen will see. A rep stored before the flag
+ * existed carries null, `RomBound.boundedReps` KEEPS a null rep, and
+ * `SessionDetailScreen`'s `SetCard` draws this chip from the STORED analysis --
+ * `decodeAnalysis(record)` into `SetChips`, never a re-run of the estimator --
+ * so every set already on disk goes on printing exactly the figure it printed
+ * before, 98.1 % included. Nothing re-analyses an archived set, and that is
+ * deliberate: an archived figure is what its own session measured. The post-set
+ * rest screen is the other case and is immediate, because the analysis it draws
+ * was computed as the set ended. The corpus tables in `:core:dsp` are fresh
+ * `ArtefactCorpus.analyse` runs and are NOT what the app will show for the
+ * sessions those captures came from.
+ *
  * NEUTRAL, ALWAYS, and that is a decision rather than an oversight. A tone
  * needs a threshold, and no threshold for this figure has been measured on
  * this corpus: `romSpreadPct`'s own KDoc says a large value cannot separate a
