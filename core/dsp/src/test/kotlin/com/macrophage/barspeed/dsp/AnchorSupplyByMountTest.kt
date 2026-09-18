@@ -426,18 +426,23 @@ class AnchorSupplyByMountTest {
         // covers every strap, rope, stack and machine capture at once.
         val config = DspConfig()
         val holding = corpus.filter { VelocityEstimator.gyroGateApplies(load(it), config) }
-        // 34, not the 28 that stood here: two landings added three captures
-        // each and the gate HOLDS on all six. Issue #301's three field-43
-        // deadlift captures have gyro medians of 5.250, 5.430 and 3.943
-        // deg/s with tenth percentiles of 0.000, so the MEDIAN sits under
-        // the 10 deg/s band and the capture does not straddle it; 26-32
+        // 39, not the 28 that stood here: three landings enrolled captures
+        // and the gate HOLDS on eleven of the twelve. Issue #301's three
+        // field-43 deadlift captures have gyro medians of 5.250, 5.430 and
+        // 3.943 deg/s with tenth percentiles of 0.000, so the MEDIAN sits
+        // under the 10 deg/s band and the capture does not straddle it; 26-32
         // percent of samples are at or above the band and the peaks reach
         // 900-1280 deg/s. A loaded barbell hinge that does not straddle,
         // which #284's hazard H8 predicted it would. Issue #259's three
         // holds -- two rope dead hangs and a rope farmers hold -- take the
         // gate too, which is what a still or slowly carried implement
-        // should do to it.
-        assertEquals(34, holding.size, "captures the gate still applies to")
+        // should do to it. Issues #290 and #255 then added field-42's six
+        // sets, on five of which the gate holds; `GyroGateTest` carries their
+        // medians and tenth percentiles. The sixth, field-42 set 2, straddles
+        // (median 14.68 deg/s, tenth percentile 0.041) and is therefore not
+        // in this population; it is the only one of the twelve captures the
+        // three landings committed whose mask the gate decision can move.
+        assertEquals(39, holding.size, "captures the gate still applies to")
         holding.forEach { fixture ->
             assertContentEquals(
                 maskWithGate(fixture, gyroGate = true),

@@ -41,9 +41,11 @@ package com.macrophage.barspeed.dsp
  * so clause 2 alone already keeps it and the pair separates either way. Two
  * cases show clause 1 carrying weight on its own, both above the bound with
  * both phases resolved and kept by clause 1 and by nothing else:
- * `field-ohp-prepinflated-s37-set04` rep 4 at 4.82x, and
- * `field-bench-3010-6rep-s37-set05` rep 4 at 4.90x, which is the larger and
- * is recorded as [MAX_PAIRED_RANGE_RATIO_OBSERVED].
+ * `field-ohp-prepinflated-s37-set04` rep 4 at 4.82x and
+ * `field-bench-3010-6rep-s37-set05` rep 4 at 4.90x. The larger of those two
+ * was [MAX_PAIRED_RANGE_RATIO_OBSERVED] until issues #290 and #255 committed
+ * nine captures; it is not any more, and that constant's own KDoc carries the
+ * figure and what it does and does not license.
  *
  * **This rule is deliberately not the sample-level fix.** Refusing the SAMPLE
  * changes the velocity series and therefore re-partitions the whole set:
@@ -198,13 +200,37 @@ object RepRefusal {
      * across the committed corpus, under each capture's declared geometry.
      *
      * IT IS ABOVE [RANGE_RATIO_BOUND], on
-     * `field-bench-3010-6rep-s37-set05` rep 4 -- `rom_m` 1.363 against a
-     * median-of-others 0.278, with `ecc_s` 2.03. Clause 1 is the only thing
-     * that keeps it, which is why this figure is recorded and pinned.
+     * `field-bench-3010-6rep-s42-set07` rep 5 -- `rom_m` 1.592 on a 56.7 kg
+     * bench press. Clause 1 is the only thing that keeps it, which is why this
+     * figure is recorded and pinned.
      *
-     * IT READ 4.82, ON `field-ohp-prepinflated-s37-set04` rep 4, and that
-     * measurement was true of the tree it was taken on. It is not a figure
-     * about one detection: it is a figure about the corpus, and issue #72's
+     * IT READ 4.90, ON `field-bench-3010-6rep-s37-set05` rep 4 -- `rom_m`
+     * 1.363 against a median-of-others 0.278, with `ecc_s` 2.03 -- and that was
+     * true of the corpus it was measured on. Issues #290 and #255 committed
+     * nine captures and the figure moved to 8.47. What a reader must not take
+     * from that is that a real rep ranges 8.5x its siblings: the detection
+     * holding the new maximum carries one accelerometer sample above 4 g of
+     * total support acceleration inside its own span -- a reading the sensor
+     * cannot have measured on a lifted bar -- so its `rom_m` is a figure #290
+     * is about rather than a range the lifter travelled.
+     *
+     * NOT ALL OF THEM ARE, AND THAT IS THE PART THAT MATTERS FOR #255's SECOND
+     * HALF. Four more paired detections above the bound arrive with those nine
+     * captures -- `field-pullup-3010-8rep-s42-set11` rep 6 at 7.64 and rep 7 at
+     * 7.45, `field-cablerow-3010-8rep-s42-set09` rep 2 at 5.50 and
+     * `field-deadlift-straight-5rep-s43-set06` rep 1 at 4.86 -- and THREE of
+     * those four carry no artefact sample at all. Their ranges are inflated by
+     * something else, which is issue #291. So the corpus now holds several
+     * two-phase detections far above the bound whose inflation this rule's
+     * sibling does not explain, and [MAX_UNPAIRED_KEPT_RANGE_RATIO_OBSERVED] is
+     * UNCHANGED at 4.34, so the bound still clears the nearest drive-only
+     * detection below it. #255's question about whether 4.5 holds outside the
+     * 38 captures it was fitted on is given new evidence here and is NOT
+     * answered; it stays open.
+     *
+     * IT READ 4.82 BEFORE THAT, ON `field-ohp-prepinflated-s37-set04` rep 4,
+     * and that measurement was true of the tree it was taken on. It is not a
+     * figure about one detection: it is a figure about the corpus, and #72's
      * eccentric-first drive-alone fallback moved the corpus. On the bench set
      * the fallback publishes a fifth detection, a 0.278 m drive with no
      * eccentric partner. That detection becomes the lower median of the
@@ -224,7 +250,7 @@ object RepRefusal {
      * clause 1. Excluding drive-only detections from the median population is
      * a change to this rule and is not made here.
      */
-    const val MAX_PAIRED_RANGE_RATIO_OBSERVED = 4.90
+    const val MAX_PAIRED_RANGE_RATIO_OBSERVED = 8.47
 
     /**
      * The largest range ratio any DRIVE-ONLY detection reaches without being

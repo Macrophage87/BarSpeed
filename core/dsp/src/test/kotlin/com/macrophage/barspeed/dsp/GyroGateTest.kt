@@ -39,8 +39,11 @@ class GyroGateTest {
         "field-backsquat-wrapping-s36-set01",
         "field-bench-3010-6rep-s37-set05",
         "field-bench-3010-6rep-s37-set06",
+        "field-bench-3010-6rep-s42-set05",
+        "field-bench-3010-6rep-s42-set07",
         "field-bench-rotating-6rep",
         "field-bench-rotating-6rep-ok",
+        "field-cablerow-3010-8rep-s42-set09",
         "field-cablerow-static-8rep",
         "field-deadlift-straight-5rep-s43-set04",
         "field-deadlift-straight-5rep-s43-set05",
@@ -57,6 +60,7 @@ class GyroGateTest {
         "field-legpress-single-2011-8rep-s36-set07",
         "field-ohp-100hz-bursty",
         "field-ohp-3010-6rep-s37-set02",
+        "field-ohp-3010-7rep-s42-set02",
         "field-ohp-3010-8rep-s37-set01",
         "field-ohp-3010-8rep-s38-set04",
         "field-ohp-3010-8rep-s38-set05",
@@ -66,6 +70,8 @@ class GyroGateTest {
         "field-ohp-rotating-8rep-b",
         "field-pallof-static-12rep",
         "field-pullup-3010-8rep-s37-set09",
+        "field-pullup-3010-8rep-s42-set11",
+        "field-pullup-4010-8rep-s42-set13",
         "field-rdl-3010-10rep",
         "field-rdl-3010-10rep-s36-set04",
         "field-rdl-3010-10rep-s36-set05",
@@ -193,7 +199,7 @@ class GyroGateTest {
     }
 
     @Test
-    fun `the gate holds where the gyro distribution does not straddle it, and fails on the ten that do`() {
+    fun `the gate holds where the gyro distribution does not straddle it, and fails on the ones that do`() {
         val config = DspConfig()
         val holds = listOf(
             // Field-37 sets 8 to 10, committed on this branch for issue 96.
@@ -208,21 +214,35 @@ class GyroGateTest {
             "field-cablerow-static-8rep",
             "field-facepull-static-12rep",
             "field-pallof-static-12rep",
-            // The three field-43 deadlift captures, committed for issue #301 --
-            // the corpus's first loaded barbell hinge at 61-102 kg, and the gate
-            // HOLDS on all three: gyro medians 5.250, 5.430 and 3.943 deg/s with
-            // tenth percentiles of 0.000, so the MEDIAN sits under the 10 deg/s
-            // band and the capture does not straddle it; 26-32 percent of samples
-            // are at or above the band and the peaks reach 900-1280 deg/s.
-            // #284's hazard H8 predicted a bar-mounted magnet on a hinge would
-            // straddle "very likely"; on this session's mount it does not -- three
-            // captures, both units on the collars -- so the prediction is refuted
-            // there rather than merely unconfirmed, and a centre mount has never
-            // been measured. What rotates on these sets rotates in bursts at the
-            // floor, not throughout.
+            // The nine captures issues #290, #255 and #301 committed between
+            // them -- #301 landed the three field-43 deadlifts, this lane the
+            // six field-42 sets. The gate HOLDS on EIGHT and the ninth is
+            // named in the straddling list below, which is the whole reason
+            // they are classified here rather than left to the corpus guard.
+            // Measured medians and tenth percentiles, this round: field-42
+            // set 5 6.718 / 1.623, set 7 7.141 / 1.495, set 9 9.131 / 2.912,
+            // set 11 5.043 / 0.000, set 13 7.998 / 0.000; field-43 sets 4, 5
+            // and 6 5.250 / 0.000, 5.430 / 0.000 and 3.943 / 0.000. Every
+            // median sits UNDER the 10 deg/s band, so none straddles -- while
+            // 26 to 46 percent of each capture's samples are at or above the
+            // band (26-32 percent on the three deadlifts) and the peaks reach
+            // 48 to 1854 deg/s.
+            //
+            // The three deadlifts are the corpus's first loaded barbell hinge,
+            // at 61-102 kg. #284's hazard H8 predicted a bar-mounted magnet on
+            // a hinge would straddle "very likely"; on this session's mount it
+            // does not -- three captures, both units on the collars -- so the
+            // prediction is refuted there rather than merely unconfirmed, and a
+            // centre mount has never been measured. What rotates on these sets
+            // rotates in bursts at the floor, not throughout.
+            "field-bench-3010-6rep-s42-set05",
+            "field-bench-3010-6rep-s42-set07",
+            "field-cablerow-3010-8rep-s42-set09",
             "field-deadlift-straight-5rep-s43-set04",
             "field-deadlift-straight-5rep-s43-set05",
             "field-deadlift-straight-5rep-s43-set06",
+            "field-pullup-3010-8rep-s42-set11",
+            "field-pullup-4010-8rep-s42-set13",
             "field-legcurl-1030-10rep",
             "field-legcurl-1030-12rep",
             "field-legcurl-1030-12rep-b",
@@ -298,6 +318,12 @@ class GyroGateTest {
             // and 19.46 deg/s against tenth percentiles of 5.81 and 0.06.
             "field-ohp-3010-8rep-s38-set05",
             "field-inclinepress-3010-12rep-s38-set02",
+            // The ONE of the nine committed for issues #290 and #255 that
+            // straddles: median 14.68 deg/s against a tenth percentile of
+            // 0.041. The same seated overhead press as session 37's sets 1 and
+            // 2 above, one session later, and it straddles for the reason they
+            // do. Its eight siblings are in `holds`.
+            "field-ohp-3010-7rep-s42-set02",
         )
         holds.forEach { assertTrue(VelocityEstimator.gyroGateApplies(load(it), config), "$it: gate should hold") }
         fails.forEach { assertFalse(VelocityEstimator.gyroGateApplies(load(it), config), "$it: gate should fail") }

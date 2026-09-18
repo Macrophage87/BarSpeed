@@ -65,9 +65,21 @@ class RepRefusalCorpusTest {
         Triple("field-backsquat-wrapping-s36-set01", ecc, 60.0),
         Triple("field-bench-3010-6rep-s37-set05", ecc, 47.62719885105372),
         Triple("field-bench-3010-6rep-s37-set06", ecc, 49.8951607011039),
+        // field-42's sets 5 and 7, committed for #290. Loads from that
+        // session's own meta.json, not approximated.
+        Triple("field-bench-3010-6rep-s42-set05", ecc, 47.62719885105372),
+        Triple("field-bench-3010-6rep-s42-set07", ecc, 56.69904625125443),
         Triple("field-bench-rotating-6rep", ecc, 43.091275150953365),
         Triple("field-bench-rotating-6rep-ok", ecc, 43.091275150953365),
+        // field-42 set 9, a seated cable row. `con` and not a stack geometry,
+        // for the reason `field-cablerow-static-8rep` below is `con`: the set
+        // declares `sensorOnStack` with travelRatio 1.0 and no inversion, and
+        // a stack mount forces `measuredPlane` to VERTICAL, so every term the
+        // analyzer reads is identical to plain concentric-first.
+        Triple("field-cablerow-3010-8rep-s42-set09", con, 40.82331330090319),
         Triple("field-cablerow-static-8rep", con, 27.215542200602126),
+        // field-43's three deadlifts, landed on `origin/main` with #301 and
+        // read here for #290. Loads from that session's own meta.json.
         Triple("field-deadlift-straight-5rep-s43-set04", con, 61.234969951354785),
         Triple("field-deadlift-straight-5rep-s43-set05", con, 83.91458845185656),
         Triple("field-deadlift-straight-5rep-s43-set06", con, 102.05828325225797),
@@ -83,6 +95,7 @@ class RepRefusalCorpusTest {
         Triple("field-legpress-single-2011-8rep-s36-set07", con, 45.0),
         Triple("field-ohp-100hz-bursty", ecc, 20.4),
         Triple("field-ohp-3010-6rep-s37-set02", con, 24.94758035055195),
+        Triple("field-ohp-3010-7rep-s42-set02", con, 24.94758035055195),
         Triple("field-ohp-3010-8rep-s37-set01", con, 20.411656650451594),
         Triple("field-ohp-3010-8rep-s38-set04", con, 13.607771100301063),
         Triple("field-ohp-3010-8rep-s38-set05", con, 13.607771100301063),
@@ -92,6 +105,10 @@ class RepRefusalCorpusTest {
         Triple("field-ohp-rotating-8rep-b", ecc, 24.94758035055195),
         Triple("field-pallof-static-12rep", con, 11.79340234968141),
         Triple("field-pullup-3010-8rep-s37-set09", con, 23.443564147942737),
+        // field-42's two assisted pull-ups, `con` on the terms set 9 above
+        // states: stack-mounted, ratio 1.0, uninverted, vertical.
+        Triple("field-pullup-3010-8rep-s42-set11", con, 22.579000000000008),
+        Triple("field-pullup-4010-8rep-s42-set13", con, 22.579000000000008),
         Triple("field-rdl-3010-10rep", ecc, 43.09),
         Triple("field-rdl-3010-10rep-s36-set04", ecc, 43.09),
         Triple("field-rdl-3010-10rep-s36-set05", ecc, 43.09),
@@ -124,7 +141,9 @@ class RepRefusalCorpusTest {
     fun `the corpus list is every committed capture`() {
         val onDisk = FieldCorpus.onClasspath()
         assertEquals(onDisk, corpus.map { it.first }.sorted())
-        assertEquals(48, corpus.size, "captures this file walks")
+        // 54, not the 42 that stood before any of the three landings: #301
+        // committed three, #259 three, and issues #290 and #255 six more.
+        assertEquals(54, corpus.size, "captures this file walks")
     }
 
     /**

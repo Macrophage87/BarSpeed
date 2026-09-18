@@ -283,23 +283,39 @@ class CuedRepCoverageTest {
      * "checked".
      */
     private val notRepCorpus = listOf(
+        // The nine captures committed for issues #290, #255 and #301 --
+        // field-42's sets 2, 5, 7, 9, 11 and 13 and field-43's three
+        // deadlifts. They carry cue tracks, so `notScored`/`notCueTracked`
+        // would be a false statement about them; they are out of scope here
+        // for the terms `field-rdl-3010-10rep-s36-set04` states above.
+        // Enrolling them would re-baseline every aggregate in this file, and
+        // what the six field-42 sets were committed for is the PEAK pair,
+        // which `ArtefactPeakWithholdingTest` pins. The three deadlifts landed
+        // on `origin/main` with #301 while this lane was in review; this
+        // lane's copies were byte-identical and the rebase dropped them, so
+        // the comment beside those three entries is the one that lane wrote.
         "field-backsquat-wrapping-s36-set01",
-        // The three field-43 deadlift captures, committed for issue #301.
-        // They carry cue tracks, so `notScored`/`notCueTracked` would be a
-        // false statement about them, and their tracks are NOT a metronome's:
-        // every row is either the sensor's own live rep call or the lifter's
-        // catch-up tap, spoken through one voice path. Opening a rep window on
-        // one of those rows would score the counter against its own output.
-        // The hand count -- 5, 5, 5, the owner's, taken from chat -- is the
-        // only per-rep truth these three have, and it is pinned in
-        // `DeadliftLiveCountFieldTest` instead.
+        "field-bench-3010-6rep-s42-set05",
+        "field-bench-3010-6rep-s42-set07",
+        "field-cablerow-3010-8rep-s42-set09",
+        // The three field-43 deadlifts, landed on `origin/main` with issue
+        // #301. Their tracks are NOT a metronome's: every row is either the
+        // sensor's own live rep call or the lifter's catch-up tap, spoken
+        // through one voice path. Opening a rep window on one of those rows
+        // would score the counter against its own output. The hand count --
+        // 5, 5, 5, the owner's, taken from chat -- is the only per-rep truth
+        // these three have, and it is pinned in `DeadliftLiveCountFieldTest`
+        // instead.
         "field-deadlift-straight-5rep-s43-set04",
         "field-deadlift-straight-5rep-s43-set05",
         "field-deadlift-straight-5rep-s43-set06",
         "field-inclinepress-3010-12rep-s38-set02",
         "field-ohp-3010-8rep-s38-set05",
+        "field-ohp-3010-7rep-s42-set02",
         "field-ohp-prepinflated-s37-set03",
         "field-ohp-prepinflated-s37-set04",
+        "field-pullup-3010-8rep-s42-set11",
+        "field-pullup-4010-8rep-s42-set13",
         "field-rdl-wrapping-s36-set05",
     )
 
@@ -547,10 +563,12 @@ class CuedRepCoverageTest {
         // and 14 until #259 committed three holds whose tracks ARE committed
         // and call no rep.
         assertEquals(17, notCueTracked.size, "captures with no track that calls a rep")
-        // 9, not the 6 that stood here: issue #301 committed the three
-        // field-43 deadlift captures, whose tracks carry the sensor's own
-        // calls rather than a metronome's.
-        assertEquals(9, notRepCorpus.size, "captures committed for something other than rep coverage")
+        // 15, not the 6 that stood before any of the three landings: issue
+        // #301 committed the three field-43 deadlifts, whose tracks carry the
+        // sensor's own calls rather than a metronome's, and issues #290 and
+        // #255 six more -- all nine cue-tracked and none scored for rep
+        // coverage.
+        assertEquals(15, notRepCorpus.size, "captures committed for something other than rep coverage")
         notRepCorpus.forEach { fixture ->
             assertTrue(
                 javaClass.getResourceAsStream("/$fixture-cues.csv") != null,

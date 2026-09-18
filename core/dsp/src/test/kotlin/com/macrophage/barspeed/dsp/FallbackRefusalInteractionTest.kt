@@ -166,11 +166,21 @@ class FallbackRefusalInteractionTest {
      * [RepRefusal.RANGE_RATIO_BOUND], which it was nowhere near before.
      *
      * That rep resolved BOTH its phases, so clause 1 keeps it and nothing the
-     * lifter sees moves. What moves is
+     * lifter sees moves. What moved when this file was written was
      * [RepRefusal.MAX_PAIRED_RANGE_RATIO_OBSERVED], the corpus measurement
      * `RepRefusal`'s own KDoc offers as the evidence clause 1 is load-bearing:
-     * the largest two-phase ratio in the corpus is no longer the 4.82 main
-     * measured on a concentric-first capture, it is this one.
+     * the largest two-phase ratio in the corpus stopped being the 4.82 main
+     * measured on a concentric-first capture and became this one.
+     *
+     * IT IS NO LONGER THE CORPUS MAXIMUM. Issues #290 and #255 committed nine
+     * captures and `field-bench-3010-6rep-s42-set07` rep 5 reaches 8.47. This
+     * test used to close by asserting `4.9 == MAX_PAIRED_RANGE_RATIO_OBSERVED`,
+     * which read a claim about the WHOLE CORPUS off one capture's figure; that
+     * assertion is DELETED rather than re-pointed at 8.47, because re-pointing
+     * it would restate the same mistake against a different capture. What this
+     * file is about -- the fallback lifting a paired rep of the SAME SET past
+     * the bound -- is asserted by the two lines above it, and
+     * `RepRefusalCorpusTest` owns the corpus maximum by walking every capture.
      */
     @Test
     fun `the added detection lifts a paired rep of the same set past the bound`() {
@@ -187,10 +197,9 @@ class FallbackRefusalInteractionTest {
             RepRefusal.rangeRatio(reps, largest)!! > RepRefusal.RANGE_RATIO_BOUND,
             "and that is past the bound",
         )
-        assertEquals(
-            RepRefusal.MAX_PAIRED_RANGE_RATIO_OBSERVED,
-            r2(RepRefusal.rangeRatio(reps, largest)!!),
-            "the corpus's largest two-phase ratio is now this branch's, not main's 4.82",
+        assertTrue(
+            r2(RepRefusal.rangeRatio(reps, largest)!!) < RepRefusal.MAX_PAIRED_RANGE_RATIO_OBSERVED,
+            "this capture's 4.9 is no longer the corpus maximum; RepRefusalCorpusTest owns that figure",
         )
     }
 

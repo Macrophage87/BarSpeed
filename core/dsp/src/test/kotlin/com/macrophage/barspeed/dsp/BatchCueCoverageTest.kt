@@ -302,10 +302,23 @@ class BatchCueCoverageTest {
      * one of that pair.
      */
     private val notRepCorpus = listOf(
+        // The nine captures committed for issues #290 and #255 -- field-42's
+        // sets 2, 5, 7, 9, 11 and 13 and field-43's three deadlifts. They
+        // carry cue tracks, so `notScored`/`notCueTracked` would be a false
+        // statement about them; they are out of scope here for the terms
+        // `field-rdl-3010-10rep-s36-set04` states above. Enrolling them would
+        // re-baseline every aggregate in this file, and what they were
+        // committed for is the PEAK pair, which `ArtefactPeakWithholdingTest`
+        // pins. Three of the nine -- field-43's deadlifts -- landed on
+        // `origin/main` with issue #301 while this lane was in review. This
+        // lane's copies were byte-identical and the rebase dropped them, so
+        // those three entries are #301's files and the comment beside them is
+        // the one that lane wrote.
         "field-backsquat-wrapping-s36-set01",
-        // The three field-43 deadlift captures, committed for issue #301.
-        // They carry cue tracks, so `notScored`/`notCueTracked` would be a
-        // false statement about them, and their tracks are NOT a metronome's:
+        "field-bench-3010-6rep-s42-set05",
+        "field-bench-3010-6rep-s42-set07",
+        "field-cablerow-3010-8rep-s42-set09",
+        // The three field-43 deadlifts. Their tracks are NOT a metronome's:
         // every row is either the sensor's own live rep call or the lifter's
         // catch-up tap, spoken through one voice path. Opening a rep window on
         // one of those rows would score the counter against its own output.
@@ -316,9 +329,12 @@ class BatchCueCoverageTest {
         "field-deadlift-straight-5rep-s43-set05",
         "field-deadlift-straight-5rep-s43-set06",
         "field-inclinepress-3010-12rep-s38-set02",
+        "field-ohp-3010-7rep-s42-set02",
         "field-ohp-3010-8rep-s38-set05",
         "field-ohp-prepinflated-s37-set03",
         "field-ohp-prepinflated-s37-set04",
+        "field-pullup-3010-8rep-s42-set11",
+        "field-pullup-4010-8rep-s42-set13",
         "field-rdl-wrapping-s36-set05",
     )
 
@@ -499,7 +515,15 @@ class BatchCueCoverageTest {
 
     @Test
     fun `the notRepCorpus captures the fallback moves, and what each is`() {
-        // Issue #72 rounds 1 and 2. TWO of these six are moved by the
+        // TWO of the SIX this test was written over are moved by the fallback,
+        // and those six are the ones named below. The list itself now holds
+        // fifteen: issues #290, #255 and #301 added nine between them, and
+        // the figures those nine were committed for are pinned in
+        // `ArtefactPeakWithholdingTest` rather than here. The
+        // sentence below read "these six" and it is corrected rather than left
+        // to be read as a claim about the list.
+        //
+        // Issue #72 rounds 1 and 2. TWO of the six are moved by the
         // slow-eccentric fallback. The note here said ONE of four; that was
         // measured while this branch was 66 commits behind main, and the
         // rebase onto 2f7efa5f7cbcafec9c1ffcb34afda43ef01d09f9 brought in two

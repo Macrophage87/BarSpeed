@@ -217,6 +217,12 @@ class FallbackMountGeometryTest {
 
         assertEquals(
             listOf(
+                // field-43's three second units, landed on `origin/main` with
+                // issue #301 and read here for issues #290 and #255: both
+                // units sat on the collars, and the partner is what shows the
+                // railing is the SENSOR and not one unit's mount -- set 5
+                // reads 15.999 g on role a and 20.589 g peak on role b at the
+                // same instants.
                 "field-deadlift-straight-5rep-s43-set04-imu-b",
                 "field-deadlift-straight-5rep-s43-set05-imu-b",
                 "field-deadlift-straight-5rep-s43-set06-imu-b",
