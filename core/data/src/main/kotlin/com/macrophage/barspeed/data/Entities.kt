@@ -223,11 +223,13 @@ data class SetRecordEntity(
      * `actualDurationS` is the seconds the set was working to on a set that
      * ran to its planned end (#168) -- `plannedDurationS` unless the lifter
      * changed the hold in the change-set dialog, in which case theirs -- the
-     * measurement on one the lifter stopped, and the stated
-     * figure on one corrected afterwards from the rest screen. WHICH of those
-     * produced it is [durationEndedBy] from v19; before it, no column said,
-     * and the sentence that stood here -- that reps have `repsManual` while
-     * seconds have no counterpart -- is deleted rather than reworded.
+     * span to the release the sensor read on a hold let go of before the phone
+     * was reached (#259), the span to the tap where no release was found or the
+     * one found was refused, and the stated figure on one corrected afterwards
+     * from the rest screen. WHICH of those four produced it is
+     * [durationEndedBy] from v19; before it, no column said, and the sentence
+     * that stood here -- that reps have `repsManual` while seconds have no
+     * counterpart -- is deleted rather than reworded.
      */
     val actualDurationS: Int? = null,
     val plannedDurationS: Int? = null,

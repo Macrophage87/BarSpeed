@@ -69,12 +69,13 @@ data class CompletedSet(
      * `actualDurationS` is the seconds the set was working to on a set that
      * ran to its planned end (#168) -- `plannedDurationS` unless the lifter
      * changed the hold in the change-set dialog, in which case theirs -- the
-     * span to the release the sensor read on a hold the lifter let go of before
-     * reaching the phone (#259), the span to the tap on one with no such
-     * release, and the stated figure on one corrected afterwards from the rest
-     * screen. This is the object [SessionRepository.recordSet] fills
-     * [SetRecordEntity] from, so the two carry the same four cases -- and
-     * WHICH of them a given row is in is [durationEndedBy], from database v19.
+     * span to the release the sensor read on a hold let go of before the phone
+     * was reached (#259), the span to the tap where no release was found or the
+     * one found was refused, and the stated figure on one corrected afterwards
+     * from the rest screen. This is the object [SessionRepository.recordSet]
+     * fills [SetRecordEntity] from, so the two carry the same four cases --
+     * and WHICH of them a given row is in is [durationEndedBy], from database
+     * v19.
      */
     val actualDurationS: Int? = null,
     /**
