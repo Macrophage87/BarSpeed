@@ -262,10 +262,12 @@ class CaptureAtTest {
      *
      * The fixture is field-42's seated cable row in miniature: two paired units
      * labelled apart, the armed one rolling and the partner still, both
-     * delivering. The two streams differ ONLY in roll -- 40 degrees against a
-     * tenth of one -- so nothing but `StackRollSignature`'s own verdict can
-     * decide between them, and the analysis must come out on the partner with
-     * the row saying `stackSignature`.
+     * delivering. The two streams differ in roll -- 44 degrees against a tenth
+     * of one, eleven steps of 4.0 against eleven of 0.01 -- and in nothing the
+     * signature reads; their first timestamps are 1 ms apart so the two lists
+     * are not equal objects. Nothing but `StackRollSignature`'s own verdict can
+     * decide between the two roll ranges, and the analysis must come out on the
+     * partner with the row saying `stackSignature`.
      *
      * The window is left open at both ends: no work-start instant and
      * `SetEnd.NotCued`, which is `RollExcursion.Basis.WHOLE_CAPTURE` and the

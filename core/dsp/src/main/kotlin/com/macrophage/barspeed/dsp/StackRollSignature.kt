@@ -42,9 +42,11 @@ import kotlin.math.abs
  *
  * ## Provenance of the two numbers
  *
- * Measured over the cue-bounded working window on every two-unit set in
- * field-41, field-42 and field-43 that DECLARED `sensorOnStack` -- eighteen
- * sets, thirty-six streams -- by recomputing each stream's unwrapped roll range
+ * Measured over the window [RollExcursion] reports for each stream -- cue-bounded
+ * on thirty-two of the thirty-six, and `fromWorkStart` on field-41 sets 20 and
+ * 21, the two rope dead hangs, where no terminal cue bounded it -- on every
+ * two-unit set in field-41, field-42 and field-43 that DECLARED `sensorOnStack`
+ * -- eighteen sets, thirty-six streams -- by recomputing each stream's unwrapped roll range
  * and maximum |wx| from its CSV. Every figure agreed with the
  * `rollExcursion_deg` that session's own `meta.json` published for that role,
  * to the one decimal place the document carries.
