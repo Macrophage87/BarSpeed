@@ -55,15 +55,14 @@ class LiveRepCountersTest {
             assertEquals(direct, throughFactory, "${capture.fixture}: calls through the factory")
             callsSeen += direct.size
         }
-        assertEquals(54, CandidateCorpus.ALL.size, "captures compared")
+        assertEquals(58, CandidateCorpus.ALL.size, "captures compared")
         // A floor under the comparison: an equality that compared two empty
-        // lists 54 times would pass and say nothing. 184 is over ALL 54
-        // captures and is NOT `DriveImpulseCandidateTest`'s 124, which is the
-        // total over the 42 that carry a truth. It read 166 over the 45
-        // captures committed before issue #259 added three holds -- on none of
-        // which the shipped segmenter calls a rep, which is what a hold should
-        // draw from a rep counter -- and issues #290 and #255 six more.
-        assertEquals(184, callsSeen, "calls the segmenter makes across all 54 captures")
+        // lists 58 times would pass and say nothing. 198 is over ALL 58
+        // captures and is NOT `DriveImpulseCandidateTest`'s 138, which is the
+        // total over the 46 that carry a truth. It read 184 over the 54
+        // captures committed before issue #278 added four base captures this
+        // corpus did not already hold.
+        assertEquals(198, callsSeen, "calls the segmenter makes across all 58 captures")
     }
 
     /**

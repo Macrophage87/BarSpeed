@@ -404,20 +404,12 @@ internal object CandidateCorpus {
     private val ECC = LiftDirection(startsWith = StartPhase.ECCENTRIC)
     private val CON = LiftDirection(startsWith = StartPhase.CONCENTRIC)
 
-    /** A stack-mounted, drive-DOWN lift: leg curl and lat pulldown declare the same block. */
-    private val DOWN_ON_STACK = LiftDirection(
-        startsWith = StartPhase.CONCENTRIC,
-        concentricUp = false,
-        sensorInverted = true,
-        plane = MovementPlane.VERTICAL,
-        sensorOnStack = true,
-    )
-
     /**
-     * The two stack-mounted geometries issues #290 and #255 committed, declared
-     * here with the SAME values `ArtefactCorpus` declares for the same
-     * captures, so the two lanes' corpora cannot disagree about one capture's
-     * geometry.
+     * A stack-mounted seated cable row: drive UP in the app's terms, declared
+     * HORIZONTAL, `sensorInverted` false. Field-42's own `meta.json` for sets
+     * 8 to 10. Declared with the SAME values `ArtefactCorpus` declares for set
+     * 9, which both lanes read, so the two corpora cannot disagree about one
+     * capture's geometry.
      */
     private val ROW_ON_STACK = LiftDirection(
         startsWith = StartPhase.CONCENTRIC,
@@ -425,9 +417,40 @@ internal object CandidateCorpus {
         plane = MovementPlane.HORIZONTAL,
         sensorOnStack = true,
     )
-    private val PULL_ON_STACK = LiftDirection(
+
+    /**
+     * A stack-mounted assisted pull-up: drive UP, vertical. Field-42 sets 11
+     * and 13. `PULL_ON_STACK` was a second name for these same six values,
+     * added for issues #290 and #255; it is gone rather than kept beside this
+     * one, because two names for one geometry is how two corpora start
+     * disagreeing about a capture.
+     */
+    private val UP_ON_STACK = LiftDirection(
         startsWith = StartPhase.CONCENTRIC,
         concentricUp = true,
+        plane = MovementPlane.VERTICAL,
+        sensorOnStack = true,
+    )
+
+    /**
+     * A stack-mounted triceps pushdown: drive DOWN, vertical, and
+     * `sensorInverted` FALSE -- which is how field-41 declared it, one set
+     * after declaring the pulldown with inversion true on a structurally
+     * similar machine. The declaration is copied here rather than corrected.
+     */
+    private val PUSHDOWN_ON_STACK = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = false,
+        plane = MovementPlane.VERTICAL,
+        sensorOnStack = true,
+    )
+
+    /** A stack-mounted, drive-DOWN lift: leg curl and lat pulldown declare the same block. */
+    private val DOWN_ON_STACK = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = false,
+        sensorInverted = true,
+        plane = MovementPlane.VERTICAL,
         sensorOnStack = true,
     )
 
@@ -473,9 +496,12 @@ internal object CandidateCorpus {
         // to their cue tracks. Two of the six the sidecar would get wrong:
         // set 2 is a FAILED set whose metronome called eight Downs against
         // seven performed, and set 9 is a cable row whose track speaks
-        // Drive/Return, so `CueTrack.calledReps` -- which counts "Down" --
-        // reads 0 on an eight-rep set. That vocabulary gap in `calledReps` is
-        // named rather than fixed here; it is not this lane's to change.
+        // Drive/Return. The sentence that stood here -- that `calledReps`
+        // counts "Down" alone and so reads 0 on that eight-rep set -- is
+        // deleted: `CueTrack.calledReps` counts `Return` as well from issue
+        // #278, which committed sets 8 and 10 with the same vocabulary. Set 9
+        // stays STATED regardless, because the lifter's own count outranks a
+        // sidecar whatever the sidecar now reads.
         "field-ohp-3010-7rep-s42-set02" to 7,
         "field-bench-3010-6rep-s42-set05" to 6,
         "field-bench-3010-6rep-s42-set07" to 6,
@@ -499,7 +525,9 @@ internal object CandidateCorpus {
         Capture("field-bench-3010-6rep-s42-set07", ECC),
         Capture("field-bench-rotating-6rep", ECC),
         Capture("field-bench-rotating-6rep-ok", ECC),
+        Capture("field-cablerow-3010-8rep-s42-set08", ROW_ON_STACK),
         Capture("field-cablerow-3010-8rep-s42-set09", ROW_ON_STACK),
+        Capture("field-cablerow-3010-8rep-s42-set10", ROW_ON_STACK),
         Capture("field-cablerow-static-8rep", CON),
         Capture("field-deadlift-straight-5rep-s43-set04", CON),
         Capture("field-deadlift-straight-5rep-s43-set05", CON),
@@ -507,6 +535,7 @@ internal object CandidateCorpus {
         Capture("field-facepull-static-12rep", CON),
         Capture("field-inclinepress-3010-12rep-s38-set02", ECC),
         Capture("field-latpulldown-1120-12rep-s38-set14", DOWN_ON_STACK),
+        Capture("field-latpulldown-1120-12rep-s41-set18", DOWN_ON_STACK),
         Capture("field-legcurl-1030-10rep", DOWN_ON_STACK),
         Capture("field-legcurl-1030-12rep", DOWN_ON_STACK),
         Capture("field-legcurl-1030-12rep-b", DOWN_ON_STACK),
@@ -526,8 +555,9 @@ internal object CandidateCorpus {
         Capture("field-ohp-rotating-8rep-b", ECC),
         Capture("field-pallof-static-12rep", CON),
         Capture("field-pullup-3010-8rep-s37-set09", CON),
-        Capture("field-pullup-3010-8rep-s42-set11", PULL_ON_STACK),
-        Capture("field-pullup-4010-8rep-s42-set13", PULL_ON_STACK),
+        Capture("field-pullup-3010-8rep-s42-set11", UP_ON_STACK),
+        Capture("field-pullup-4010-8rep-s42-set13", UP_ON_STACK),
+        Capture("field-pushdown-1120-14rep-s41-set16", PUSHDOWN_ON_STACK),
         Capture("field-rdl-3010-10rep", ECC),
         Capture("field-rdl-3010-10rep-s36-set04", ECC),
         Capture("field-rdl-3010-10rep-s36-set05", ECC),

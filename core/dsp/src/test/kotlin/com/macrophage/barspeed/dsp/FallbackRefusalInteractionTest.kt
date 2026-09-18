@@ -181,6 +181,9 @@ class FallbackRefusalInteractionTest {
      * file is about -- the fallback lifting a paired rep of the SAME SET past
      * the bound -- is asserted by the two lines above it, and
      * `RepRefusalCorpusTest` owns the corpus maximum by walking every capture.
+     * Issue #278's seven pairs do not move that: re-measured at this tree,
+     * `RepRefusalCorpusTest` still finds the corpus maximum at
+     * `field-bench-3010-6rep-s42-set07` rep 5, 8.47.
      */
     @Test
     fun `the added detection lifts a paired rep of the same set past the bound`() {

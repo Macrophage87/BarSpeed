@@ -183,22 +183,34 @@ class RunawayDriftTest {
         // worst capture in the corpus is unchanged at four passes.
         // #259 committed three holds: two of them carry no runaway at all and
         // land in bucket 0, and the third needs one pass. Issue #301's three
-        // field-43 deadlifts need 1, 2 and 1 passes, and this lane's six
-        // field-42 sets need 3, 2, 3, 2, 2 and 1 -- sets 2, 5, 7, 9, 11 and
-        // 13 -- so the six add one to bucket 1, three to bucket 2 and two to
-        // bucket 3, and the worst capture in the corpus is still unchanged at
-        // four. The six are the corpus's first captures at a 43-44 Hz analysed
-        // rate (field-42 role a), and they do not push the bound either.
+        // field-43 deadlifts need 1, 2 and 1 passes, and issues #290 and #255'
+        // six field-42 sets need 3, 2, 3, 2, 2 and 1 -- sets 2, 5, 7, 9, 11
+        // and 13 -- so the six add one to bucket 1, three to bucket 2 and two
+        // to bucket 3, and the worst capture in the corpus is still unchanged
+        // at four. The six are the corpus's first captures at a 43-44 Hz
+        // analysed rate (field-42 role a), and they do not push the bound
+        // either.
+        // And issue #278 committed seven pairs, four of whose base captures
+        // were not already walked here. Re-measured at this tree, the buckets
+        // move from {0=15, 1=29, 2=6, 3=3, 4=1} to {0=16, 1=31, 2=7, 3=3,
+        // 4=1}: the triceps pushdown, whose armed unit sat on the stack,
+        // carries no runaway at all and lands in bucket 0, two of the four
+        // need one pass and one needs two. The worst capture in the corpus is
+        // still unchanged at four passes.
         assertEquals(
-            mapOf(0 to 15, 1 to 29, 2 to 6, 3 to 3, 4 to 1),
+            mapOf(0 to 16, 1 to 31, 2 to 7, 3 to 3, 4 to 1),
             passesNeeded.values.groupingBy { it }.eachCount().toSortedMap(),
             "captures by passes needed",
         )
-        assertEquals(54, passesNeeded.size, "committed captures walked")
+        assertEquals(58, passesNeeded.size, "committed captures walked")
         assertEquals(
             mapOf(
                 "field-bench-3010-6rep-s42-set05" to 2,
                 "field-bench-3010-6rep-s42-set07" to 3,
+                // The one of issue #278's four new captures needing a second
+                // pass: a seated cable row, handle-side under a stack
+                // declaration.
+                "field-cablerow-3010-8rep-s42-set08" to 2,
                 "field-cablerow-3010-8rep-s42-set09" to 2,
                 "field-deadlift-straight-5rep-s43-set05" to 2,
                 "field-ohp-3010-7rep-s42-set02" to 3,
@@ -238,6 +250,12 @@ class RunawayDriftTest {
                 "field-legcurl-1030-12rep-c",
                 "field-legpress-single-2011-8rep-s36-set07",
                 "field-pallof-static-12rep",
+                // The one capture of issue #278's seven whose series holds no
+                // runaway: the triceps pushdown, the corpus's first capture
+                // whose ARMED unit was the one on the stack. Its gyro median
+                // is 0.173 deg/s and its roll sweeps 0.28 deg over the working
+                // window -- a stream that barely moves in any axis.
+                "field-pushdown-1120-14rep-s41-set16",
                 "field-rdl-3010-10rep",
                 "field-ropedeadhang-hold20-s37-set11",
                 // Two of the three holds #259 committed. The third, field-38

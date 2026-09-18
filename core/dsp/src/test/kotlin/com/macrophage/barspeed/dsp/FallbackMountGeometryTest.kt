@@ -217,6 +217,14 @@ class FallbackMountGeometryTest {
 
         assertEquals(
             listOf(
+                // The seven pairs committed for issue #278, scored by
+                // `StackMountFieldTest` in this module rather than by the
+                // tests above: what is asked of them is which unit a
+                // stack-declared set should be READ from, and the answer
+                // needs both streams of one set side by side.
+                "field-cablerow-3010-8rep-s42-set08-imu-b",
+                "field-cablerow-3010-8rep-s42-set09-imu-b",
+                "field-cablerow-3010-8rep-s42-set10-imu-b",
                 // field-43's three second units, landed on `origin/main` with
                 // issue #301 and read here for issues #290 and #255: both
                 // units sat on the collars, and the partner is what shows the
@@ -227,6 +235,10 @@ class FallbackMountGeometryTest {
                 "field-deadlift-straight-5rep-s43-set05-imu-b",
                 "field-deadlift-straight-5rep-s43-set06-imu-b",
                 "field-latpulldown-1120-12rep-s38-set14-imu-b",
+                "field-latpulldown-1120-12rep-s41-set18-imu-b",
+                "field-pullup-3010-8rep-s42-set11-imu-b",
+                "field-pullup-4010-8rep-s42-set13-imu-b",
+                "field-pushdown-1120-14rep-s41-set16-imu-b",
                 // #259's partner: field-38 set 18's SECOND unit, the one the
                 // owner says was in his pocket while the analysed unit sat on
                 // the assist stack. It is not scored in this file -- nothing

@@ -90,6 +90,17 @@ internal object CueTrack {
      * A rule that works either side of both boundaries counts the rep calls plus
      * whichever stroke word the plan did not spend; nothing needs one yet, so it
      * is described here and not written.
+     *
+     * IT COUNTED `Down` ALONE AND READ 0 ON A HORIZONTAL SET, which is a wrong
+     * truth and not a missing one: the metronome speaks `Drive` and `Return`
+     * rather than `Up` and `Down` wherever the plane is HORIZONTAL, so
+     * field-42's three seated cable rows -- committed for issue #278, eight
+     * reps each, eight `Return` rows each -- entered the candidate corpus with
+     * a truth of 0 and made every counter's output on them read as pure
+     * over-count. Both words are counted now. A track speaks ONE of the two
+     * vocabularies and never both, verified across all committed `-cues.csv`:
+     * only those three carry `Return` and none of them carries `Down`, so the
+     * sum moves no other capture's truth.
      */
-    fun calledReps(fixture: String): Int = movement(fixture, "Down").size
+    fun calledReps(fixture: String): Int = movement(fixture, "Down").size + movement(fixture, "Return").size
 }

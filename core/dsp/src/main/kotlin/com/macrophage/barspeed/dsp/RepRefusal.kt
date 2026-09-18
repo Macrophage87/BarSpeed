@@ -45,7 +45,14 @@ package com.macrophage.barspeed.dsp
  * `field-bench-3010-6rep-s37-set05` rep 4 at 4.90x. The larger of those two
  * was [MAX_PAIRED_RANGE_RATIO_OBSERVED] until issues #290 and #255 committed
  * nine captures; it is not any more, and that constant's own KDoc carries the
- * figure and what it does and does not license.
+ * figure and what it does and does not license. Issue #278's seven pairs
+ * did NOT displace it: re-measured at this tree by `RepRefusalCorpusTest`,
+ * the largest two-phase ratio in the corpus is still
+ * `field-bench-3010-6rep-s42-set07` rep 5 at 8.47x. The sentence drafted
+ * here while this branch sat on an older base -- that the largest was
+ * `field-pullup-3010-8rep-s42-set11` rep 6 at 7.64x -- was measured against
+ * a corpus that did not hold field-42 set 7, and it is deleted rather than
+ * reworded.
  *
  * **This rule is deliberately not the sample-level fix.** Refusing the SAMPLE
  * changes the velocity series and therefore re-partitions the whole set:

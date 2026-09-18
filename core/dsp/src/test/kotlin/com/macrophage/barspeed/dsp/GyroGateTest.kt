@@ -43,7 +43,9 @@ class GyroGateTest {
         "field-bench-3010-6rep-s42-set07",
         "field-bench-rotating-6rep",
         "field-bench-rotating-6rep-ok",
+        "field-cablerow-3010-8rep-s42-set08",
         "field-cablerow-3010-8rep-s42-set09",
+        "field-cablerow-3010-8rep-s42-set10",
         "field-cablerow-static-8rep",
         "field-deadlift-straight-5rep-s43-set04",
         "field-deadlift-straight-5rep-s43-set05",
@@ -51,6 +53,7 @@ class GyroGateTest {
         "field-facepull-static-12rep",
         "field-inclinepress-3010-12rep-s38-set02",
         "field-latpulldown-1120-12rep-s38-set14",
+        "field-latpulldown-1120-12rep-s41-set18",
         "field-legcurl-1030-10rep",
         "field-legcurl-1030-12rep",
         "field-legcurl-1030-12rep-b",
@@ -72,6 +75,7 @@ class GyroGateTest {
         "field-pullup-3010-8rep-s37-set09",
         "field-pullup-3010-8rep-s42-set11",
         "field-pullup-4010-8rep-s42-set13",
+        "field-pushdown-1120-14rep-s41-set16",
         "field-rdl-3010-10rep",
         "field-rdl-3010-10rep-s36-set04",
         "field-rdl-3010-10rep-s36-set05",
@@ -241,8 +245,25 @@ class GyroGateTest {
             "field-deadlift-straight-5rep-s43-set04",
             "field-deadlift-straight-5rep-s43-set05",
             "field-deadlift-straight-5rep-s43-set06",
+            // The seven pairs issue #278 committed, base captures only --
+            // a partner is not in [FieldCorpus.onClasspath] and so not in
+            // this corpus. Three of the seven -- field-42 sets 9, 11 and 13
+            // -- were already here, committed for issues #290 and #255. The
+            // gate HOLDS on all seven. Gyro magnitude medians, re-measured at
+            // this tree through `VelocityEstimator.gyroQuantileDps`: 7.058,
+            // 9.131 and 7.684 deg/s on the three seated cable rows (sets 8, 9
+            // and 10), 5.043 and 7.998 on the two assisted pull-ups, 0.173 on
+            // the triceps pushdown -- whose ARMED unit sat on the stack, the
+            // lowest figure in the whole corpus bar the still control -- and
+            // 9.007 on the lat pulldown. Tenth percentiles in the same order:
+            // 2.610, 2.912, 2.592, 0.000, 0.000, 0.000 and 1.784. Every median
+            // is under the 10 deg/s band and no distribution straddles it.
+            "field-cablerow-3010-8rep-s42-set08",
+            "field-cablerow-3010-8rep-s42-set10",
+            "field-latpulldown-1120-12rep-s41-set18",
             "field-pullup-3010-8rep-s42-set11",
             "field-pullup-4010-8rep-s42-set13",
+            "field-pushdown-1120-14rep-s41-set16",
             "field-legcurl-1030-10rep",
             "field-legcurl-1030-12rep",
             "field-legcurl-1030-12rep-b",

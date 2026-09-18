@@ -171,15 +171,31 @@ object RollExcursion {
      * the same fact and gets the same answer.
      */
     fun of(samples: List<ImuSample>, workStartedAtMs: Long?, end: SetEnd): Measured? {
-        val endedAtMs = (end as? SetEnd.Cued)?.atMs
-        val windowed =
-            samples.filter { sample ->
-                (workStartedAtMs == null || sample.timestampMs >= workStartedAtMs) &&
-                    (endedAtMs == null || sample.timestampMs <= endedAtMs)
-            }
+        val windowed = inWindow(samples, workStartedAtMs, end)
         if (windowed.size < 2) return null
         val unwrapped = unwrap(windowed.map { it.rollDeg })
-        return Measured(unwrapped.max() - unwrapped.min(), basisOf(workStartedAtMs, endedAtMs))
+        return Measured(unwrapped.max() - unwrapped.min(), basisOf(workStartedAtMs, (end as? SetEnd.Cued)?.atMs))
+    }
+
+    /**
+     * [samples] restricted to the working window, both bounds inclusive.
+     *
+     * Extracted so [StackRollSignature] measures its roll range and its roll
+     * RATE over the interval this type already publishes a figure for, rather
+     * than over a second window that could drift from it. The archive's
+     * `rollExcursion_deg` and the mount verdict derived beside it then answer
+     * for the same seconds by construction, which is the only way a reader
+     * holding the published figure can re-apply the verdict's thresholds to it.
+     *
+     * A missing bound does not restrict: that is [basisOf]'s four cases, said
+     * once here as two null checks.
+     */
+    internal fun inWindow(samples: List<ImuSample>, workStartedAtMs: Long?, end: SetEnd): List<ImuSample> {
+        val endedAtMs = (end as? SetEnd.Cued)?.atMs
+        return samples.filter { sample ->
+            (workStartedAtMs == null || sample.timestampMs >= workStartedAtMs) &&
+                (endedAtMs == null || sample.timestampMs <= endedAtMs)
+        }
     }
 
     private fun basisOf(workStartedAtMs: Long?, endedAtMs: Long?): Basis = when {

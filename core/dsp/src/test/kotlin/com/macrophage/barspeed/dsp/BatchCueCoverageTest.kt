@@ -317,7 +317,18 @@ class BatchCueCoverageTest {
         "field-backsquat-wrapping-s36-set01",
         "field-bench-3010-6rep-s42-set05",
         "field-bench-3010-6rep-s42-set07",
+        // Four more of issue #278's seven pairs; the other three --
+        // field-42 sets 9, 11 and 13 -- are already in this list,
+        // committed for issues #290 and #255. All seven carry the
+        // metronome's cue track, so `notScored`/`notCueTracked` would be a
+        // false statement about them; scoring them here would move every
+        // figure this file pins for a reason that has nothing to do with
+        // cue coverage. `StackMountFieldTest` is what reads them, and it
+        // reads BOTH streams of each set -- the question they were
+        // committed for and one no rep-coverage figure asks.
+        "field-cablerow-3010-8rep-s42-set08",
         "field-cablerow-3010-8rep-s42-set09",
+        "field-cablerow-3010-8rep-s42-set10",
         // The three field-43 deadlifts. Their tracks are NOT a metronome's:
         // every row is either the sensor's own live rep call or the lifter's
         // catch-up tap, spoken through one voice path. Opening a rep window on
@@ -329,12 +340,14 @@ class BatchCueCoverageTest {
         "field-deadlift-straight-5rep-s43-set05",
         "field-deadlift-straight-5rep-s43-set06",
         "field-inclinepress-3010-12rep-s38-set02",
+        "field-latpulldown-1120-12rep-s41-set18",
         "field-ohp-3010-7rep-s42-set02",
         "field-ohp-3010-8rep-s38-set05",
         "field-ohp-prepinflated-s37-set03",
         "field-ohp-prepinflated-s37-set04",
         "field-pullup-3010-8rep-s42-set11",
         "field-pullup-4010-8rep-s42-set13",
+        "field-pushdown-1120-14rep-s41-set16",
         "field-rdl-wrapping-s36-set05",
     )
 

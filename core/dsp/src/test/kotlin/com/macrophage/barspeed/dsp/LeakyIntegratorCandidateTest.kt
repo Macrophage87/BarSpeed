@@ -37,12 +37,14 @@ import kotlin.test.assertEquals
  * WITHIN each capture's truth -- `min(count, truth)` summed, pinned below -- the
  * leak matches **224 of 253** at an over-count of 23, against candidate (c)'s
  * **161 at 19** and the shipped path's **107 at 1**. (Those four rows were
- * measured over the 33 scored captures the corpus then held. Over the 42 it
- * holds since issue #259 committed three holds, each with a truth of 0, and
- * issues #290 and #255 six field-42 captures, the same quantities read: truth
- * **296**, leak **279** matching **253** at an over-count of **26**, candidate
- * (c) **183 at 23**, shipped **123 at 1** -- the ORDER is unchanged, which is
- * what the argument below rests on.) So on the committed corpus
+ * measured over the 33 scored captures the corpus then held. Over the 46 it
+ * holds since issue #259 committed three holds, each with a truth of 0,
+ * issues #290 and #255 six field-42 captures and issue #278 four more base
+ * captures, the same quantities re-measured at this tree read: truth
+ * **338**, leak **296** matching **270** at an over-count of **26**,
+ * candidate (c) **184 at 23**, shipped **137 at 1** -- the ORDER is
+ * unchanged, which is what the argument below rests on.)
+ * So on the committed corpus
  * the leak is the better recoverer, which is the opposite of what the proposal's
  * numbers implied, and the rejection cannot rest on the corpus total. What it
  * rests on is measured here too: the leak changes EVERY set including the ones
@@ -177,15 +179,13 @@ class LeakyIntegratorCandidateTest {
             leakMatched += minOf(leak, reps)
         }
         println("truth $truthTotal leak $leakTotal over $leakOver matched $leakMatched")
-        // Re-measured over the 42 scored captures the corpus holds since issue
-        // #259 committed three holds and issues #290 and #255 six more: truth
-        // 253 -> 296, leak 247 -> 279, its over-count 23 -> 26, matched 224 ->
-        // 253. The matched figure landing on the old truth total is a
-        // coincidence of the arithmetic and nothing else.
-        assertEquals(296, truthTotal, "reps the corpus truth set holds")
-        assertEquals(279, leakTotal, "reps the leak reports over them")
+        // Re-measured over the 58 committed captures, 46 of them scored,
+        // after issue #278's four new base captures: truth 296 -> 338, leak
+        // 279 -> 296, its over-count unchanged at 26, matched 253 -> 270.
+        assertEquals(338, truthTotal, "reps the corpus truth set holds")
+        assertEquals(296, leakTotal, "reps the leak reports over them")
         assertEquals(26, leakOver, "reps the leak reports beyond a capture's truth")
-        assertEquals(253, leakMatched, "reps the leak reports within a capture's truth")
+        assertEquals(270, leakMatched, "reps the leak reports within a capture's truth")
         val fly = "field-reardeltfly-s32-set06"
         assertEquals(
             listOf(12, 0, 23),

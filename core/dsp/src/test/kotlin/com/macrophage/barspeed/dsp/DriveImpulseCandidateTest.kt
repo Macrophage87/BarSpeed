@@ -70,7 +70,7 @@ class DriveImpulseCandidateTest {
         LiveCountCandidates.shippedCount(fixture, CandidateCorpus.capture(fixture).direction)
 
     /**
-     * The corpus list is every committed capture, and 42 of the 54 carry a
+     * The corpus list is every committed capture, and 46 of the 58 carry a
      * truth.
      *
      * It read 33 of 45 before two landings grew it. Issue #259's three holds
@@ -78,8 +78,13 @@ class DriveImpulseCandidateTest {
      * takes a truth of 0 on the CUES basis, exactly as the hold already in the
      * list does. Issues #290 and #255 then committed six field-42 captures,
      * all six carrying a STATED truth -- the lifter's own count, from that
-     * session's `session.json` -- so the stated basis grew from five captures
-     * to eleven.
+     * session's `session.json` -- so the stated basis grew from five
+     * captures to eleven. Issue #278 then committed seven pairs, four of
+     * whose base captures were not already here -- field-42 sets 8 and 10,
+     * the field-41 triceps pushdown and the field-41 lat pulldown. Each of
+     * the four carries the metronome's own cue track and no rep file, so
+     * each takes a cue-called truth and the CUES basis alone moves, 19 to
+     * 23.
      *
      * Asserted against the resource directory rather than a hand-kept number,
      * for the reason `RepRefusalCorpusTest` gives for its own list: a capture
@@ -87,13 +92,15 @@ class DriveImpulseCandidateTest {
      * nothing would say so.
      */
     @Test
-    fun `the candidate corpus is every committed capture, 42 of them with a truth`() {
+    fun `the candidate corpus is every committed capture, 46 of them with a truth`() {
         assertEquals(FieldCorpus.onClasspath(), CandidateCorpus.ALL.map { it.fixture }.sorted())
-        assertEquals(54, CandidateCorpus.ALL.size, "captures on the classpath")
+        assertEquals(58, CandidateCorpus.ALL.size, "captures on the classpath")
         val scored = CandidateCorpus.scored()
-        assertEquals(42, scored.size, "captures with a truth")
+        // 46, not 42: the four #278 base captures new to this corpus each
+        // take a cue-called truth.
+        assertEquals(46, scored.size, "captures with a truth")
         assertEquals(
-            listOf(11, 12, 19),
+            listOf(11, 12, 23),
             listOf(
                 scored.count { it.second.basis == CandidateCorpus.Basis.STATED },
                 scored.count { it.second.basis == CandidateCorpus.Basis.MARKS },
@@ -225,19 +232,19 @@ class DriveImpulseCandidateTest {
         }
         println("truth $truthTotal shipped $shippedTotal/$shippedOver candidate $candidateTotal/$candidateOver")
         println("matched: shipped $shippedMatched candidate $candidateMatched of $truthTotal")
-        // Every figure here moved when issue #259's three holds and issues
-        // #290 and #255's six field-42 captures entered the corpus, and each is
-        // from the run that rebased this file onto both: truth 253 -> 296,
-        // shipped 108 -> 124, candidate 180 -> 206, its over-count 19 -> 23,
-        // matched 107 -> 123 and 161 -> 183. The shipped counter's over-count is
-        // unchanged at 1, so none of the nine makes it report beyond a truth.
-        assertEquals(296, truthTotal, "reps the corpus truth set holds")
-        assertEquals(124, shippedTotal, "reps the shipped live counter reports over them")
+        // Re-measured at this tree over the 58 captures the corpus holds
+        // since issue #278's four new base captures entered it: truth 296 ->
+        // 338, shipped 124 -> 138, its over-count unchanged at 1, matched 123
+        // -> 137; candidate (c) 206 -> 207, its over-count unchanged at 23,
+        // matched 183 -> 184. Neither counter's over-count moves, so nothing
+        // either path calls on the four lands beyond that capture's truth.
+        assertEquals(338, truthTotal, "reps the corpus truth set holds")
+        assertEquals(138, shippedTotal, "reps the shipped live counter reports over them")
         assertEquals(1, shippedOver, "reps the shipped counter reports beyond a capture's truth")
-        assertEquals(206, candidateTotal, "reps candidate (c) reports")
+        assertEquals(207, candidateTotal, "reps candidate (c) reports")
         assertEquals(23, candidateOver, "reps candidate (c) reports beyond a capture's truth")
-        assertEquals(123, shippedMatched, "reps the shipped counter reports within a capture's truth")
-        assertEquals(183, candidateMatched, "reps candidate (c) reports within a capture's truth")
+        assertEquals(137, shippedMatched, "reps the shipped counter reports within a capture's truth")
+        assertEquals(184, candidateMatched, "reps candidate (c) reports within a capture's truth")
         val collapse = listOf(
             "field-legcurl-1030-10rep",
             "field-legcurl-1030-12rep",

@@ -35,6 +35,30 @@ class RepRefusalCorpusTest {
         sensorOnStack = true,
     )
 
+    /** Field-42 sets 8 to 10: a seated cable row on the stack, declared HORIZONTAL. */
+    private val rowOnStack = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = true,
+        plane = MovementPlane.HORIZONTAL,
+        sensorOnStack = true,
+    )
+
+    /** Field-42 sets 11 and 13: an assisted pull-up on the stack, drive UP. */
+    private val upOnStack = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = true,
+        plane = MovementPlane.VERTICAL,
+        sensorOnStack = true,
+    )
+
+    /** Field-41 set 16: a triceps pushdown on the stack, drive DOWN, NOT inverted as declared. */
+    private val pushdownOnStack = LiftDirection(
+        startsWith = StartPhase.CONCENTRIC,
+        concentricUp = false,
+        plane = MovementPlane.VERTICAL,
+        sensorOnStack = true,
+    )
+
     /** Session 38 set 14's declared geometry: lat pulldown, drive DOWN, on the stack. */
     private val latPulldown = LiftDirection(
         startsWith = StartPhase.CONCENTRIC,
@@ -71,12 +95,17 @@ class RepRefusalCorpusTest {
         Triple("field-bench-3010-6rep-s42-set07", ecc, 56.69904625125443),
         Triple("field-bench-rotating-6rep", ecc, 43.091275150953365),
         Triple("field-bench-rotating-6rep-ok", ecc, 43.091275150953365),
-        // field-42 set 9, a seated cable row. `con` and not a stack geometry,
-        // for the reason `field-cablerow-static-8rep` below is `con`: the set
-        // declares `sensorOnStack` with travelRatio 1.0 and no inversion, and
-        // a stack mount forces `measuredPlane` to VERTICAL, so every term the
-        // analyzer reads is identical to plain concentric-first.
-        Triple("field-cablerow-3010-8rep-s42-set09", con, 40.82331330090319),
+        // The seven committed for issue #278, with the load from each
+        // session's own meta.json. Their directions are the mount each set
+        // DECLARED, which is the whole subject of that issue: the declaration
+        // describes one unit and these are the base captures, role a. Set 9
+        // stood here as `con` with a note that a stack mount forces
+        // `measuredPlane` VERTICAL and makes every term identical; the note
+        // was right and the geometry is declared anyway, so this file, the
+        // candidate corpus and the artefact corpus name one capture one way.
+        Triple("field-cablerow-3010-8rep-s42-set08", rowOnStack, 34.019427750752655),
+        Triple("field-cablerow-3010-8rep-s42-set09", rowOnStack, 40.82331330090319),
+        Triple("field-cablerow-3010-8rep-s42-set10", rowOnStack, 47.62719885105372),
         Triple("field-cablerow-static-8rep", con, 27.215542200602126),
         // field-43's three deadlifts, landed on `origin/main` with #301 and
         // read here for #290. Loads from that session's own meta.json.
@@ -86,6 +115,7 @@ class RepRefusalCorpusTest {
         Triple("field-facepull-static-12rep", con, 9.97903214022078),
         Triple("field-inclinepress-3010-12rep-s38-set02", ecc, 27.215542200602126),
         Triple("field-latpulldown-1120-12rep-s38-set14", latPulldown, 34.019427750752655),
+        Triple("field-latpulldown-1120-12rep-s41-set18", latPulldown, 34.019427750752655),
         Triple("field-legcurl-1030-10rep", legCurl, 40.8),
         Triple("field-legcurl-1030-12rep", legCurl, 40.8),
         Triple("field-legcurl-1030-12rep-b", legCurl, 40.8),
@@ -105,10 +135,9 @@ class RepRefusalCorpusTest {
         Triple("field-ohp-rotating-8rep-b", ecc, 24.94758035055195),
         Triple("field-pallof-static-12rep", con, 11.79340234968141),
         Triple("field-pullup-3010-8rep-s37-set09", con, 23.443564147942737),
-        // field-42's two assisted pull-ups, `con` on the terms set 9 above
-        // states: stack-mounted, ratio 1.0, uninverted, vertical.
-        Triple("field-pullup-3010-8rep-s42-set11", con, 22.579000000000008),
-        Triple("field-pullup-4010-8rep-s42-set13", con, 22.579000000000008),
+        Triple("field-pullup-3010-8rep-s42-set11", upOnStack, 22.579000000000008),
+        Triple("field-pullup-4010-8rep-s42-set13", upOnStack, 22.579000000000008),
+        Triple("field-pushdown-1120-14rep-s41-set16", pushdownOnStack, 13.607771100301063),
         Triple("field-rdl-3010-10rep", ecc, 43.09),
         Triple("field-rdl-3010-10rep-s36-set04", ecc, 43.09),
         Triple("field-rdl-3010-10rep-s36-set05", ecc, 43.09),
@@ -141,9 +170,10 @@ class RepRefusalCorpusTest {
     fun `the corpus list is every committed capture`() {
         val onDisk = FieldCorpus.onClasspath()
         assertEquals(onDisk, corpus.map { it.first }.sorted())
-        // 54, not the 42 that stood before any of the three landings: #301
-        // committed three, #259 three, and issues #290 and #255 six more.
-        assertEquals(54, corpus.size, "captures this file walks")
+        // 58, not the 42 that stood before any of the four landings: #301
+        // committed three, #259 three, issues #290 and #255 six, and issue
+        // #278 four base captures this file did not already walk.
+        assertEquals(58, corpus.size, "captures this file walks")
     }
 
     /**

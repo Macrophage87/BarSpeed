@@ -50,9 +50,12 @@ import java.io.File
  * SO IT IS EXCLUDED AND THE EXCLUSION IS NARROW. The guarantee those corpora
  * exist for -- no committed capture is silently unscored -- is kept by
  * [partnersOnClasspath] and the pins in `FallbackMountGeometryTest`, which
- * name every partner, score every partner, and refuse a partner whose base
- * capture is not itself in [onClasspath]. A partner cannot be smuggled onto
- * the classpath unscored, and it cannot be smuggled in without its own set.
+ * name every partner and refuse a partner whose base capture is not itself in
+ * [onClasspath]. The SCORING is split: that file scores the four partners
+ * issues #247 and #301 committed, and `StackMountFieldTest` scores the seven
+ * issue #278 committed, which is where both streams of one stack-declared set
+ * are read side by side. A partner cannot be smuggled onto the classpath
+ * unnamed, and it cannot be smuggled in without its own set.
  */
 internal object FieldCorpus {
     /** The sidecar suffixes a `field-*.csv` can carry; see the class KDoc. */

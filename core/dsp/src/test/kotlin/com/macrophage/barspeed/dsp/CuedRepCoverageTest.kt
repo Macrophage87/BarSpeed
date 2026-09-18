@@ -267,12 +267,13 @@ class CuedRepCoverageTest {
      * Captures committed for something other than rep coverage, named here so
      * the partition below stays total.
      *
-     * These six carry cue tracks and are deliberately NOT in [cueTracked].
+     * These carry cue tracks and are deliberately NOT in [cueTracked].
      * Four arrived with issue #133, which is about how far the sensor's ROLL
      * swept over a set -- `RollExcursionFieldTest` is what reads them -- and
      * two with issue #245, which is about where the analysed window OPENS;
-     * `PrepDetectionFieldTest` is what reads those. Nothing has counted any
-     * of their reps against their tracks. Folding them into
+     * `PrepDetectionFieldTest` is what reads those. Three arrived with #301 and
+     * seven with #278, each named below with what reads it instead. Nothing has
+     * counted any of their reps against their tracks. Folding them into
      * the corpus would move every figure this file pins for a reason that has
      * nothing to do with rep counting, and would state a coverage result
      * nobody measured.
@@ -297,7 +298,18 @@ class CuedRepCoverageTest {
         "field-backsquat-wrapping-s36-set01",
         "field-bench-3010-6rep-s42-set05",
         "field-bench-3010-6rep-s42-set07",
+        // Four more of issue #278's seven pairs; the other three --
+        // field-42 sets 9, 11 and 13 -- are already in this list,
+        // committed for issues #290 and #255. All seven carry the
+        // metronome's cue track, so `notScored`/`notCueTracked` would be a
+        // false statement about them; scoring them here would move every
+        // figure this file pins for a reason that has nothing to do with
+        // cue coverage. `StackMountFieldTest` is what reads them, and it
+        // reads BOTH streams of each set -- the question they were
+        // committed for and one no rep-coverage figure asks.
+        "field-cablerow-3010-8rep-s42-set08",
         "field-cablerow-3010-8rep-s42-set09",
+        "field-cablerow-3010-8rep-s42-set10",
         // The three field-43 deadlifts, landed on `origin/main` with issue
         // #301. Their tracks are NOT a metronome's: every row is either the
         // sensor's own live rep call or the lifter's catch-up tap, spoken
@@ -310,12 +322,14 @@ class CuedRepCoverageTest {
         "field-deadlift-straight-5rep-s43-set05",
         "field-deadlift-straight-5rep-s43-set06",
         "field-inclinepress-3010-12rep-s38-set02",
+        "field-latpulldown-1120-12rep-s41-set18",
         "field-ohp-3010-8rep-s38-set05",
         "field-ohp-3010-7rep-s42-set02",
         "field-ohp-prepinflated-s37-set03",
         "field-ohp-prepinflated-s37-set04",
         "field-pullup-3010-8rep-s42-set11",
         "field-pullup-4010-8rep-s42-set13",
+        "field-pushdown-1120-14rep-s41-set16",
         "field-rdl-wrapping-s36-set05",
     )
 
@@ -563,12 +577,14 @@ class CuedRepCoverageTest {
         // and 14 until #259 committed three holds whose tracks ARE committed
         // and call no rep.
         assertEquals(17, notCueTracked.size, "captures with no track that calls a rep")
-        // 15, not the 6 that stood before any of the three landings: issue
-        // #301 committed the three field-43 deadlifts, whose tracks carry the
-        // sensor's own calls rather than a metronome's, and issues #290 and
-        // #255 six more -- all nine cue-tracked and none scored for rep
+        // 19, not the 6 that stood before any of the landings: issue #301
+        // committed the three field-43 deadlifts, whose tracks carry the
+        // sensor's own calls rather than a metronome's, issues #290 and #255
+        // six more, and issue #278 four that were not already here -- field-42
+        // sets 8 and 10, the field-41 triceps pushdown and the field-41 lat
+        // pulldown. All thirteen are cue-tracked and none is scored for rep
         // coverage.
-        assertEquals(15, notRepCorpus.size, "captures committed for something other than rep coverage")
+        assertEquals(19, notRepCorpus.size, "captures committed for something other than rep coverage")
         notRepCorpus.forEach { fixture ->
             assertTrue(
                 javaClass.getResourceAsStream("/$fixture-cues.csv") != null,

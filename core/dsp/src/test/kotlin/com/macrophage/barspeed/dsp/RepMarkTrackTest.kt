@@ -116,23 +116,24 @@ class RepMarkTrackTest {
      * the cue-only set move in opposite directions and still add up.
      */
     @Test
-    fun `thirteen captures carry marks and twenty-eight carry cues without them`() {
+    fun `thirteen captures carry marks and thirty-two carry cues without them`() {
         val captures = FieldCorpus.onClasspath()
         assertEquals(corpus.map { it.first }.sorted(), captures.filter { hasSidecar(it, "-reps.csv") })
         val cuedOnly = captures.filter { hasSidecar(it, "-cues.csv") && !hasSidecar(it, "-reps.csv") }
-        // 28, not 16: three landings added twelve cue-bearing captures
-        // between them, and none of the twelve carries a rep file. Issue
+        // 32, not 16: four landings added sixteen cue-bearing captures
+        // between them and none of the sixteen carries a rep file. Issue
         // #301's three field-43 deadlift tracks are not a metronome's -- the
         // rows are the sensor's own live calls and the lifter's catch-up taps,
         // spoken through one path -- so there is nothing in them this file can
         // read as a mark. Issue #259's three holds call no rep at all, so
-        // there is nothing for a `-reps.csv` to hold. The six field-42 tracks,
-        // this lane's (#290, #255), ARE a metronome's and carry marks the guide
-        // spoke; they are not enrolled here because this file's per-capture
-        // mark counts are a claim about rep counting, which #290 is not about.
-        // The test's own name carried the sixteen and is renamed with it
-        // rather than left saying a number it no longer means.
-        assertEquals(28, cuedOnly.size)
+        // there is nothing for a `-reps.csv` to hold. The six field-42 tracks
+        // of issues #290 and #255 and the four issue #278 added ARE a
+        // metronome's and carry marks the guide spoke; they are not enrolled
+        // here because this file's per-capture mark counts are a claim about
+        // rep counting, which neither issue is about. The test's own name
+        // carried the sixteen and is renamed with it rather than left saying a
+        // number it no longer means.
+        assertEquals(32, cuedOnly.size)
         assertEquals(
             listOf(
                 "field-backsquat-wrapping-s36-set01",
