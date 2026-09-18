@@ -2427,6 +2427,31 @@ data class SetExport(
      * the summary-only export publishes.
      */
     val detectionsBeforeWorkStart: Int? = null,
+    /**
+     * Samples in this set's analysed IMU stream whose acceleration magnitude is
+     * above 4 g of total support acceleration -- readings a lifted implement
+     * cannot produce. Schema 1.21, issues #290 and #255. See the property's own
+     * description in `docs/schemas/session-export.schema.json` for the rule and
+     * the bound's derivation.
+     *
+     * ABSENT, 0 and a positive number are three different facts, the doctrine
+     * [refusedDetections] states. Absent: the set was analysed before the count
+     * existed, which is permanent -- it is frozen into the stored analysis and
+     * nothing re-runs the estimator at export time. 0: the stream was counted
+     * and carried none. Positive: that many samples could not have been
+     * measured.
+     *
+     * OVER THE STREAM, NOT OVER THE REPS, so it is NOT the sum of the per-rep
+     * counts under `repMetrics`: it includes samples between detections and
+     * samples the set-end and work-start bounds excluded. It answers "how much
+     * of this capture could the sensor not have measured"; the per-rep counts
+     * answer which reps it reached.
+     *
+     * Not gated on `includeRepDetail`, for [refusedDetections]' reason: it
+     * qualifies `summary.peakConVel_mps` and `summary.peakPower_w`, which the
+     * summary-only export publishes.
+     */
+    val artefactSamples: Int? = null,
     val hr: HrSetSummary? = null,
     /** Per-rep detail; included only when the user enables detailed export. */
     val repMetrics: List<RepMetricsExport>? = null,
@@ -2902,6 +2927,21 @@ data class RepMetricsExport(
     @SerialName("rom_m") val romM: Double,
     @SerialName("peakPower_w") val peakPowerW: Double? = null,
     @SerialName("meanConPower_w") val meanConPowerW: Double? = null,
+    /**
+     * Samples inside THIS rep's own span -- both phases and the turnaround
+     * between them -- above 4 g of total support acceleration. Schema 1.21,
+     * issues #290 and #255.
+     *
+     * A positive count says [peakConVelMps] and [peakPowerW] ON THIS ROW were
+     * taken across a reading the sensor cannot have measured, and that this rep
+     * was therefore left out of the set's `summary.peakConVel_mps` and
+     * `summary.peakPower_w`. The row still publishes what its own window
+     * measured; this is the key that says not to trust the pair.
+     *
+     * Absent when the rep was analysed before the count existed, which is
+     * permanent. Absent and 0 are different facts: 0 is a counted clean span.
+     */
+    @SerialName("artefactSamples") val artefactSamples: Int? = null,
 )
 
 @OptIn(ExperimentalSerializationApi::class)

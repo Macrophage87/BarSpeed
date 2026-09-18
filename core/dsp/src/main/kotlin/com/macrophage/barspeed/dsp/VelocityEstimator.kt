@@ -14,6 +14,26 @@ data class VelocitySeries(
     val velocityMps: DoubleArray,
     /** Measured (not configured) sample rate. */
     val sampleRateHz: Double,
+    /**
+     * Indices of the zero-velocity anchors the ZUPT pass accepted, ascending,
+     * always beginning at 0.
+     *
+     * Carried because the drift correction between two consecutive anchors is
+     * PIECEWISE-LINEAR, which makes the inter-anchor interval the exact extent
+     * over which an out-of-range accelerometer sample leaves a residue in
+     * [velocityMps]: before the anchor preceding it the raw integral does not
+     * carry its step and neither does the offset, and after the anchor
+     * following it both carry it and it cancels. [AccelArtefact.corruptedSpan]
+     * is the one reader, and issue #290 is why it needs one.
+     *
+     * EMPTY BY DEFAULT, and the default is chosen for its FAILURE DIRECTION
+     * rather than because absence is a value here: with no anchors the whole
+     * series is one interval, so a consumer asking which samples an artefact
+     * could have reached is told "all of them" and withholds more rather than
+     * fewer figures. A test that builds a series by hand gets that, and a
+     * hand-built series carries no samples for [AccelArtefact] to find anyway.
+     */
+    val anchorIndices: IntArray = IntArray(0),
 ) {
     val size: Int get() = timeS.size
 
@@ -31,6 +51,9 @@ data class VelocitySeries(
             accelMps2 = DoubleArray(size) { accelMps2[it] * factor },
             velocityMps = DoubleArray(size) { velocityMps[it] * factor },
             sampleRateHz = sampleRateHz,
+            // Scaling the frame moves no sample, so the anchors are the same
+            // indices.
+            anchorIndices = anchorIndices,
         )
     }
 }
@@ -140,8 +163,8 @@ object VelocityEstimator {
         }
 
         val quiet = quietMask(samples, timeS, config)
-        val velocity = applyZupt(rawV, timeS, quiet, config)
-        return VelocitySeries(timeS, accel, velocity, sampleRateHz)
+        val zupt = applyZupt(rawV, timeS, quiet, config)
+        return VelocitySeries(timeS, accel, zupt.velocity, sampleRateHz, zupt.anchorIndices)
     }
 
     private const val MIN_PLAUSIBLE_HZ = 4.0
@@ -418,7 +441,15 @@ object VelocityEstimator {
 
     private data class Anchor(val index: Int, val rawValue: Double)
 
-    private fun applyZupt(rawV: DoubleArray, timeS: DoubleArray, quiet: BooleanArray, config: DspConfig): DoubleArray {
+    /**
+     * [applyZupt]'s two outputs. The anchor indices are returned rather than
+     * recomputed by a second caller because they are what [applyZupt] DECIDED
+     * -- a re-derivation would be a second copy of the acceptance rule, and the
+     * two would drift.
+     */
+    private data class Zupt(val velocity: DoubleArray, val anchorIndices: IntArray)
+
+    private fun applyZupt(rawV: DoubleArray, timeS: DoubleArray, quiet: BooleanArray, config: DspConfig): Zupt {
         val n = rawV.size
         val anchors = mutableListOf(Anchor(0, rawV[0]))
         // Walk quiet regions in windows of minStationaryS. A window anchors only if
@@ -496,6 +527,6 @@ object VelocityEstimator {
         for (k in 0 until n) {
             if (quiet[k] && abs(corrected[k]) < config.pauseBandMps) corrected[k] = 0.0
         }
-        return corrected
+        return Zupt(corrected, IntArray(anchors.size) { anchors[it].index })
     }
 }

@@ -45,6 +45,25 @@ data class RepAnalysis(
     val peakPowerW: Double?,
     /** Average power over the concentric (drive) phase, watts. Null for bodyweight. */
     val meanConPowerW: Double? = null,
+    /**
+     * Samples inside this rep's DRIVE WINDOW whose acceleration magnitude is
+     * above [AccelArtefact.BOUND_G] -- readings a lifted implement cannot
+     * produce. Issues #290 and #255.
+     *
+     * Null and 0 are different facts, the doctrine
+     * [SetAnalysis.refusedDetections] already carries: 0 means the window was
+     * counted and carried none, null means this rep was analysed before the
+     * count existed and nothing ever asked. A stored analysis cannot recover
+     * the difference from anything else it holds, and a defaulted 0 would read
+     * as a clean window on every set ever recorded.
+     *
+     * A POSITIVE COUNT DISQUALIFIES THIS REP FROM THE SET'S PEAK FIGURES and
+     * changes nothing else about it. [peakConVelMps] and [peakPowerW] are still
+     * what this rep's window measured; [AccelArtefact.peakEligible] is what
+     * keeps them out of the set's published peaks, and this count is what tells
+     * a reader of the per-rep row why.
+     */
+    val artefactSamples: Int? = null,
 )
 
 @Serializable
@@ -248,6 +267,25 @@ data class SetAnalysis(
      * statement about what the number means rather than a correction to it.
      */
     val detectionsBeforeWorkStart: Int? = null,
+    /**
+     * Samples in the whole analysed stream whose acceleration magnitude is
+     * above [AccelArtefact.BOUND_G], or null when the set was analysed before
+     * the count existed. Issues #290 and #255.
+     *
+     * Null and 0 are different facts, on the doctrine [refusedDetections]
+     * states: 0 means the stream was counted and carried none, null means
+     * nothing counted it. Every set recorded before this shipped is
+     * permanently null -- the count is frozen into the stored analysis when the
+     * set is analysed and nothing re-runs the estimator at export time.
+     *
+     * OVER THE STREAM, NOT OVER THE REPS. It includes samples between
+     * detections and samples the set-end and work-start bounds excluded, so it
+     * is not the sum of the per-rep counts and must not be read as one: it
+     * answers "how much of this capture could the sensor not have measured",
+     * which is a question about the link. [RepAnalysis.artefactSamples] is what
+     * says which reps it reached.
+     */
+    val artefactSamples: Int? = null,
 )
 
 /** Full batch analysis of one recorded set. */
@@ -317,6 +355,11 @@ object SetAnalyzer {
                 tempoCompliance = null,
                 verdicts = listOf(MOUNT_NOT_DECLARED_VERDICT),
                 noRepsReason = NoRepsReason.MOUNT_NOT_DECLARED,
+                // The stream was still read, so the count is still a fact
+                // about it, and this return publishes it for the reason
+                // sampleRateHz above is published here: it is a property of
+                // the samples and owes nothing to the mount (#290).
+                artefactSamples = AccelArtefact.count(samples),
             )
         }
         val series = orient(raw, direction, config).mappedToLifter(direction.sensorToLifter)
@@ -374,7 +417,16 @@ object SetAnalyzer {
         // should be derived from, and a countdown phantom left in would raise
         // the median the real reps are judged against. Issue #245.
         val within = withinCue.filter { workStart.withinSet(samples[it.conEndIdx].timestampMs) }
-        val detected = within.mapIndexed { idx, span -> repMetrics(idx, span, series, direction, loadKg, config) }
+        // Found ONCE over the whole stream, before any figure is derived, and
+        // read per detection by [repMetrics]. These are indices into `samples`,
+        // and the series is index-parallel to `samples`, so a span's own
+        // indices address them exactly -- the same property `driveStartMs`
+        // above relies on. Issues #290 and #255.
+        val artefacts = AccelArtefact.indices(samples)
+        val detected =
+            within.mapIndexed { idx, span ->
+                repMetrics(idx, span, series, direction, loadKg, config, artefacts)
+            }
         // Refused HERE, for the reason the cue bound is applied where it is:
         // everything below reads one list, so a rule applied at any consumer
         // would have to be applied at all of them.
@@ -431,6 +483,12 @@ object SetAnalyzer {
             RepRefusal.refusedCount(detected),
             RepRefusal.reason(detected),
             detectionsBeforeWorkStart,
+            // Over the WHOLE analysed stream, not over the retained reps: a
+            // reader asking "how much of this capture could not have been
+            // measured" is asking about the stream, and an artefact between
+            // reps is still evidence about the link. The per-rep counts say
+            // which reps it reached. Issues #290 and #255.
+            artefactSamples = artefacts.size,
         )
     }
 
@@ -483,6 +541,7 @@ object SetAnalyzer {
         direction: LiftDirection,
         loadKg: Double?,
         config: DspConfig,
+        artefacts: List<Int>,
     ): RepAnalysis {
         // Sign so that the drive always reads positive, whichever way it moves:
         // a leg curl's concentric goes down, and reporting it as -0.4 m/s would
@@ -555,6 +614,18 @@ object SetAnalyzer {
             romM = round3(rom),
             peakPowerW = peakPower?.let { round1(it) },
             meanConPowerW = meanConPower?.let { round1(it) },
+            // Samples above [AccelArtefact.BOUND_G] inside THIS rep's own span
+            // -- both phases and the turnaround between them, in whichever
+            // order the lift takes them. A positive count is what
+            // [AccelArtefact.peakEligible] reads to keep this rep out of the
+            // SET's published peaks (#290, #255).
+            //
+            // CONTAINMENT, which is narrower than the extent an artefact's
+            // residue actually reaches. [AccelArtefact.corruptedSpan] derives
+            // that extent and its KDoc says why it is not what ships;
+            // `ArtefactWindowTest` measures both and names the five published
+            // figures containment leaves standing.
+            artefactSamples = AccelArtefact.countIn(artefacts, AccelArtefact.spanOf(span)),
         )
     }
 
