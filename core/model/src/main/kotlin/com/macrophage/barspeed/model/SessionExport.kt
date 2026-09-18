@@ -2909,7 +2909,9 @@ data class SetSensorsExport(
      * still put a file in the raw archive, so a set carrying this key can name
      * the unit it moved off in [present], and [expected] minus [present] is no
      * longer that unit. Nothing in this document publishes a frame count, so
-     * this key is the only statement that the move happened.
+     * this key is what says the move happened, beside
+     * [SetSensorsExport.analysedRoleBasis] reading `fallback`, which since #278
+     * carries the same fact.
      *
      * The fact a reader cannot derive. "Analysed the preferred unit" and
      * "analysed the only unit that turned up" are different statements about

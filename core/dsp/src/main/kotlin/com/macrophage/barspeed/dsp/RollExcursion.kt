@@ -184,8 +184,11 @@ object RollExcursion {
      * RATE over the interval this type already publishes a figure for, rather
      * than over a second window that could drift from it. The archive's
      * `rollExcursion_deg` and the mount verdict derived beside it then answer
-     * for the same seconds by construction, which is the only way a reader
-     * holding the published figure can re-apply the verdict's thresholds to it.
+     * for the same seconds by construction, without which a reader holding the
+     * published figure could not even CHECK it against the verdict's roll
+     * bound. Only that half is checkable: nothing publishes the peak |wx| the
+     * rate guard reads, and the roll figure is published rounded to 0.1 degrees
+     * against a strict bound.
      *
      * A missing bound does not restrict: that is [basisOf]'s four cases, said
      * once here as two null checks.

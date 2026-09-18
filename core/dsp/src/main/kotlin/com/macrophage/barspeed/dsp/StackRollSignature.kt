@@ -30,20 +30,24 @@ import kotlin.math.abs
  *
  * THE RANGE IS [RollExcursion]'s, unwrapped across the +-180 discontinuity and
  * taken over the same interval the archive's `rollExcursion_deg` covers. That
- * is deliberate and load-bearing: a reader holding the published figure and
- * these two constants can re-derive this verdict from the document, which a
- * second window could not offer. Both of that type's stated faults are
- * inherited with it -- the wrap assumption and roll's ill-conditioning as
- * pitch approaches +-90 degrees.
+ * is deliberate and load-bearing, and what it buys is a CHECK of the roll half
+ * rather than a re-derivation of the verdict: only ONE of this rule's two
+ * inputs is published anywhere -- no key in either document carries the peak
+ * |wx| [MAX_STACK_ROLL_RATE_DPS] is compared against -- and the roll figure
+ * that is published is rounded to 0.1 degrees against a STRICT
+ * [MAX_STACK_ROLL_DEG], so a published 3.0 can sit on either side of the
+ * bound. Re-deriving this verdict means decoding the archive's own imu CSV.
+ * Both of that type's stated faults are inherited with it -- the wrap
+ * assumption and roll's ill-conditioning as pitch approaches +-90 degrees.
  *
  * ## Provenance of the two numbers
  *
  * Measured over the cue-bounded working window on every two-unit set in
- * field-41, field-42 and field-43 that DECLARED `sensorOnStack` -- twenty sets,
- * forty streams -- by recomputing each stream's unwrapped roll range and
- * maximum |wx| from its CSV. Every figure agreed with the `rollExcursion_deg`
- * that session's own `meta.json` published for that role, to the one decimal
- * place the document carries.
+ * field-41, field-42 and field-43 that DECLARED `sensorOnStack` -- eighteen
+ * sets, thirty-six streams -- by recomputing each stream's unwrapped roll range
+ * and maximum |wx| from its CSV. Every figure agreed with the
+ * `rollExcursion_deg` that session's own `meta.json` published for that role,
+ * to the one decimal place the document carries.
  *
  * The two populations do not overlap and the gap is wide:
  *
@@ -64,8 +68,8 @@ import kotlin.math.abs
  * with no single stack candidate, and the analysed role does not move.
  *
  * [MAX_STACK_ROLL_RATE_DPS] DISQUALIFIES NOTHING IN THIS CORPUS and is stated
- * as a guard rather than as a discriminator. Across those forty streams the
- * highest |wx| on a stream this rule calls ON_STACK is 7.57 degrees/s
+ * as a guard rather than as a discriminator. Across those thirty-six streams
+ * the highest |wx| on a stream this rule calls ON_STACK is 7.57 degrees/s
  * (field-43 set 10 role `b`), while streams it calls NOT_ON_STACK run from 4.46
  * upward -- so the rate separates the two populations not at all, and the roll
  * range does all the work. What it is for is the case the range cannot see: the
@@ -94,8 +98,8 @@ import kotlin.math.abs
 object StackRollSignature {
     /**
      * The roll range, in degrees, a stack-mounted unit is expected to stay
-     * under over its working window. See the class KDoc for the forty streams
-     * this is drawn from.
+     * under over its working window. See the class KDoc for the thirty-six
+     * streams this is drawn from.
      */
     const val MAX_STACK_ROLL_DEG = 3.0
 

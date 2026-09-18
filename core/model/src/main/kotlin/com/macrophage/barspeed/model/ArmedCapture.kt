@@ -139,8 +139,7 @@ fun armedCaptureOf(
     // that delivered nothing. Since #209 the same holds for a role that
     // delivered a handful of frames and stopped: if the last of them landed
     // inside that window the reading is DELIVERING, the word is dropped, and
-    // `analysedFellBack` is left as the only statement that the analysis
-    // moved off it.
+    // `analysedFellBack` is what says the analysis moved off it.
     val silent =
         ArmedSilencePolicy.silent(armed?.expected.orEmpty().filterNot { it in analysable }, deliveryByRole)
     // And the same fact for the set whose single stream carries NO ROLE (#224),

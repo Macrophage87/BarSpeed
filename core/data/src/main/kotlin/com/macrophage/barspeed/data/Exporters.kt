@@ -1305,9 +1305,13 @@ class RawExporter(
             // WHY that role, in the same three words session.json publishes
             // (#278). Worth the key HERE in particular: this manifest already
             // carries each role's own `rollExcursion_deg` and
-            // `rollExcursionBasis`, which are the inputs the `stackSignature`
-            // rule read, so an archive carrying both lets a reader re-derive
-            // the verdict rather than take it on trust. Absent on every row
+            // `rollExcursionBasis`, which are ONE of the two inputs the
+            // `stackSignature` rule read. The peak |wx| its rate guard reads is
+            // published nowhere, and the roll figure here is rounded to 0.1
+            // degrees against a STRICT 3.0 bound, so a reader holding these two
+            // keys can CHECK the roll half of the verdict against the figure
+            // beside it -- not re-derive it, which means decoding the imu CSV
+            // in this same archive. Absent on every row
             // written before the app could decide it, and the manifest has no
             // published schema, so no version entry attaches to this one.
             str("analysedRoleBasis", d.analysedRoleBasis?.published)

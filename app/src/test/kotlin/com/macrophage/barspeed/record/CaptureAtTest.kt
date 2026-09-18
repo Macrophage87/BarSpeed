@@ -60,13 +60,6 @@ class CaptureAtTest {
     private fun stream(n: Int, firstMs: Long = 0L): List<ImuSample> = samples(*LongArray(n) { firstMs + it * 10L })
 
     /**
-     * [n] frames at 10 ms whose ROLL advances [degreesPerSample] each frame,
-     * which is the only axis `StackRollSignature` reads.
-     *
-     * Two streams built from this differ in nothing else, so a verdict that
-     * separates them separated them on their roll.
-     */
-    /**
      * An exercise that declares the sensor on a weight stack, which is the only
      * field `captureAt` reads off it: field-42's seated cable row as its own
      * meta.json declares it.
@@ -79,6 +72,15 @@ class CaptureAtTest {
             sensorOnStack = true,
         )
 
+    /**
+     * [n] frames at 10 ms whose ROLL advances [degreesPerSample] each frame.
+     *
+     * `wxDps` is 0.0 on every frame of this and of [stream], so
+     * `StackRollSignature`'s RATE guard is not exercised by anything in this
+     * file and the roll RANGE alone decides the verdict. Two streams built
+     * from this differ in nothing else, so a verdict that separates them
+     * separated them on their roll.
+     */
     private fun rollingStream(n: Int, degreesPerSample: Double, firstMs: Long = 0L): List<ImuSample> =
         (0 until n).map { i ->
             ImuSample(
