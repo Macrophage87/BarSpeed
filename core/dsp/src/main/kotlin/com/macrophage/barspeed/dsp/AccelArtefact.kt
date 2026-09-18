@@ -72,7 +72,13 @@ import com.macrophage.barspeed.model.ImuSample
  *   ceiling the exercise imposes, not one this file chose.
  * - 4 g is twice it, so the bound admits three g of net drive: three times
  *   gravity, on a bar being pressed to a metronome. Nothing a lifter does to a
- *   loaded bar reaches it.
+ *   loaded bar on a tempo-prescribed set reaches it. That is the whole
+ *   evidence: every capture this bound was derived on was prescribed `3010`
+ *   or `4010`, and the corpus holds no explosive lift. On a snatch, clean or
+ *   push press -- seeded EXPLOSIVE, judged on peak intent by
+ *   `VelocityLossRegime` -- a real second pull may exceed 4 g, and this rule
+ *   would withhold a peak the lifter did produce. A `[Field]` question;
+ *   narrowing by `ExerciseKind` is not taken here.
  * - [SENSOR_RANGE_G] is the other end. 16 g is the WT901BLECL's full scale,
  *   measured rather than read off a datasheet: field-43 set 5 carries samples
  *   at 15.999 g on both units, which is the reading saturating. A sample AT the
@@ -106,15 +112,18 @@ import com.macrophage.barspeed.model.ImuSample
  * far, exactly, `ArtefactBoundTest` pins the interval it returns at both ends
  * of a stream, and `ArtefactRuleAlternativesTest`'s *"withholding over the
  * exact residue interval takes every peak on eight captures"* is the cost
- * table -- so a peak this rule keeps is not a peak it certifies. Five published figures in the committed
- * corpus survive it and are named rather than glossed:
+ * table -- so a peak this rule keeps is not a peak it certifies. Six published
+ * figures in the committed corpus survive it. Five are still implausible and
+ * are named rather than glossed:
  * `field-assistedpullup-3010-s37-set08`'s 407.4 W (#255's own headline: its one
  * 14.982 g sample is at index 4079, inside rep 5's eccentric, and the inflated
  * rep is rep 6, whose drive opens at 4083),
  * `field-deadlift-straight-5rep-s43-set04`'s 1203.1 W,
  * `field-deadlift-straight-5rep-s43-set06`'s 2386.5 W,
  * `field-pullup-3010-8rep-s42-set11`'s 634.3 W and
- * `field-cablerow-3010-8rep-s42-set09`'s 651.7 W. Withholding on
+ * `field-cablerow-3010-8rep-s42-set09`'s 651.7 W. The sixth,
+ * `field-pullup-4010-8rep-s42-set13`'s 244.3 W, survives because it needs no
+ * movement. Withholding on
  * [corruptedSpan] instead reaches all five and withholds every peak on eight of
  * the eleven captures as well; that trade is raised, not taken.
  *
