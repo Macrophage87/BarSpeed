@@ -78,12 +78,19 @@ import com.macrophage.barspeed.model.VoiceCue
  *
  * [TERMINAL_CUES] is the whole of the vocabulary that means the set is over on
  * the RECORD -- [DONE] when the prescription was called through, [STOPPED]
- * when it was not -- see [STOPPED] for the two populations that covers. It is
- * NOT the whole of what may bound a rep list: [of] asks whether a cadence
- * ran, and [DONE] on a set with none is a rep-count milestone (#285). Every other
- * cue calls a stroke or counts one. `Time` ends a TIMED set, and a timed set
- * publishes no rep list at all, so widening the vocabulary to it would add a
- * case with nothing in it.
+ * when it was not -- see [STOPPED] for the two populations that covers -- and
+ * since #295 [TIME_UP], a timed set's clock reaching its target. It is NOT the
+ * whole of what may bound a rep list: [of] asks whether a cadence ran, and
+ * [DONE] on a set with none is a rep-count milestone (#285). Every other cue
+ * calls a stroke or counts one.
+ *
+ * `Time` was left out until #295 on the argument that a timed set publishes no
+ * rep list, so bounding one would add a case with nothing in it. That was the
+ * rep list's view only, and it is deleted rather than reworded: the same bound
+ * closes the raw archive's roll window (`RollExcursion`) and the stack-mount
+ * verdict's (`StackRollSignature`), and [calledOver] seeds the rest clock.
+ * field-42's six hold streams published `fromWorkStart` -- "nothing said when
+ * the set ended" -- beside a track ending on `Time`, spoken on the tick.
  *
  * The EARLIEST terminal cue by instant, not the last and not the first in list
  * order. The boundary is the moment the lifter was told to stop, and a second
@@ -193,10 +200,27 @@ sealed interface SetEnd {
         const val STOPPED = "Set ended"
 
         /**
+         * The cue a timed set's own clock speaks as it ends the set (#295).
+         *
+         * Read off [TimedSetVoice], which SPEAKS it, for [DONE]'s reason: a
+         * second literal here could drift from the word the app says, and
+         * every hold would go quietly unbounded.
+         *
+         * A timed set says it only when its clock ran to the target -- the
+         * tick loop speaks it on the tick that ends the set, and only where
+         * the timed voice is on -- so it carries both of [DONE]'s meanings at
+         * once: the prescription was delivered, and the set is over. It is NOT
+         * evidence the lifter held to the end: a hold let go before its target
+         * and never tapped still hears it, and `HoldEndPolicy` decides from the
+         * release what the set records (#311).
+         */
+        const val TIME_UP = TimedSetVoice.TIME_UP
+
+        /**
          * Every cue that means the set is over, in no particular order --
          * [of] takes the earliest by INSTANT, not by this list's order.
          */
-        val TERMINAL_CUES = setOf(DONE, STOPPED)
+        val TERMINAL_CUES = setOf(DONE, STOPPED, TIME_UP)
 
         /**
          * TWO QUESTIONS, TWO FUNCTIONS, and which one a caller wants is not a
@@ -243,7 +267,10 @@ sealed interface SetEnd {
          *
          * [STOPPED] bounds either way, cadence or no cadence.
          * `SetEnd.terminalCall` is its only writer and it writes it as the set
-         * ends, so it is never a milestone.
+         * ends, so it is never a milestone. [TIME_UP] bounds either way too
+         * (#295): no cadence runs on a timed set, so asking for one would leave
+         * every hold unbounded, and the tick that speaks it is the tick that
+         * ends the set, so it is never a milestone either.
          *
          * FALSE IS THE DEFAULT AND THAT IS THE SAFE DIRECTION. A caller that
          * does not say keeps every detection, which loses no figure; the
@@ -262,7 +289,7 @@ sealed interface SetEnd {
          * silently admit a third word added later.
          */
         private fun boundsTheRepList(cue: String, cadenceGuided: Boolean): Boolean =
-            cue == STOPPED || (cue == DONE && cadenceGuided)
+            cue == STOPPED || cue == TIME_UP || (cue == DONE && cadenceGuided)
 
         /**
          * What to say and write when a set ends, or null when nothing should
@@ -273,8 +300,8 @@ sealed interface SetEnd {
          * track as it stands at the moment the set is ending.
          *
          * Scoped to guided sets deliberately, and #141 argues why the other
-         * two cases are separate decisions. A timed set ends on `Time` and
-         * publishes no rep list, so there is nothing for a boundary to bound.
+         * two cases are separate decisions. A timed set whose clock ran out
+         * already carries [TIME_UP], which is terminal since #295.
          *
          * The question asked is "does the record already carry a terminal
          * word", through [calledOver], rather than "was `Done` spoken". Those

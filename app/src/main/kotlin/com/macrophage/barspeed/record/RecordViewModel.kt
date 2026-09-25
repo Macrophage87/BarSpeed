@@ -5299,13 +5299,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
         val restS = p.slot?.restS ?: DEFAULT_REST_S
         // How much of the rest is left now, against the instant frozen with
-        // the write. That instant comes off the set's own frozen cue track --
-        // the same terminal stamp SetEnd bounds the rep window at -- and a set
-        // nothing called over falls back to the instant the write froze, which
-        // is every hold and every set recorded with the voice off. #172. Since
-        // #141 a guided set the lifter ended early is no longer in that group:
-        // `endSet` speaks `SetEnd.STOPPED` before freezing the buffer, so the
-        // stamp exists. It is READ here rather than worked out again, because
+        // the write. That instant is a release that decided a hold's seconds
+        // (#259), else the set's own terminal cue -- the stamp SetEnd.calledOver
+        // reads -- and a set nothing called over falls back to the instant the
+        // write froze. #172. Since #141 a guided set the lifter ended early is
+        // not in that group (`endSet` speaks `SetEnd.STOPPED` before freezing
+        // the buffer), and since #295 neither is a timed set its clock ended,
+        // whose `Time` is terminal. It is READ here rather than worked out again, because
         // #178 gave it a second reader in the rest-HR window and two
         // computations of one instant is how they came to disagree.
         val restRemainingS = RestClockPolicy.remainingS(restS, p.restStartedAtMs, System.currentTimeMillis())

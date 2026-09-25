@@ -73,14 +73,13 @@ object RestClockPolicy {
      * was found and not believed. That ordering is the whole point of the
      * parameter: once a hold's duration is measured to the release, a rest
      * counted from anything else means the app holds two answers to when the set
-     * ended, which is #178's defect in a new place. On a hold there is nothing
-     * for it to outrank in practice -- `Time` is not in `SetEnd.TERMINAL_CUES`,
-     * so a hold is `NotCued` whether it ran to target or was broken early -- and
-     * the ordering is pinned anyway rather than left to a future cue to settle.
-     * What it does outrank is the write instant, and since #311 on a hold the
-     * CLOCK ended too: where a release before the target decided the seconds,
-     * the rest runs from the release rather than from the write at `Time`, so
-     * field-45 set 13's rest would start 4.284 s earlier than the write.
+     * ended, which is #178's defect in a new place. Since #295 `Time` is in
+     * `SetEnd.TERMINAL_CUES`, so a hold the clock ended carries a cue instant
+     * and the ordering is no longer only pinned in principle: a release that
+     * decided a clock-ended hold's seconds outranks the `Time` stamp, which
+     * would otherwise start the rest at the target the hold did not reach --
+     * field-45 set 13's would start 4.284 s earlier than its write, which came
+     * 1 ms after its `Time`. On a tapped hold it outranks the write instant.
      *
      * A cue instant AFTER the write instant is still taken. It cannot arise
      * from the app -- the cue is written before the set ends, on the same

@@ -2204,6 +2204,41 @@ data class SessionExport(
          * both descriptions' carry sentences, and `SchemaClockReleaseContractTest`
          * now asserts `duration_s` says HOLD; neither can see this KDoc.
          * `HoldEndCarryGuardTest` pins the rule.
+         *
+         * 1.22 TAKES AN ELEVENTH ENTRY (#295, a timed set's `Time` is a terminal
+         * cue), and it CHANGES NO KEY. A FURTHER ENTRY under the unreleased
+         * 1.22, on the tag reading the ninth entry states.
+         *
+         * WHAT WAS FALSE. A timed set's track ends on `Time` when its clock ends
+         * it, and `SetEnd` did not count that word as calling the set over, so
+         * the raw archive's `rollExcursionBasis` on every such hold read
+         * `fromWorkStart` beside a word spoken on the tick that ended it --
+         * field-42's six hold streams, `Time` 30.014 to 30.020 s after work
+         * start on a 30 s prescription. [SetExport.voiceCues]' published
+         * description sent a reader to `Done` or `Set ended` for that instant,
+         * and [SetExport.restS]'s said every hold rests from its end instant.
+         *
+         * THE CHANGE. `SetEnd.TIME_UP` joins `SetEnd.TERMINAL_CUES` and bounds
+         * `SetEnd.of`: the roll window, the stack-mount verdict's window and the
+         * rest seed where no release decided the seconds. Both descriptions say
+         * so, and `rest_s` now states the release case it never did.
+         *
+         * WHAT A READER DOES, IN BOTH DIRECTIONS. No key is added, removed or
+         * retyped and the schema accepts and rejects exactly the documents it
+         * did before this entry. RETROACTIVE IN THE RAW ARCHIVE: its roll figure
+         * is recomputed from the stored cue track at export time, so a hold
+         * recorded by any build whose track carries `Time` now reads
+         * `workingWindow` where it read `fromWorkStart` (`toTerminalCue` where it
+         * read `wholeCapture`), over the samples up to `Time` -- the same figure
+         * on field-42's six hold streams, which stop 1 to 65 ms before the word.
+         * NOT RETROACTIVE elsewhere: the rest instant and the stack-mount verdict
+         * are decided when the set is recorded. `DATABASE_VERSION` does NOT move
+         * and the plan schema is untouched.
+         *
+         * PINNED. `SchemaTimeTerminalContractTest` asserts this entry's marker and
+         * both descriptions; it cannot see this KDoc. `HoldTerminalCueFieldTest`
+         * and `FailedSetBoundaryTest` in `:core:dsp` and `RawExporterRollWindowTest`
+         * in `:core:data` pin the rule.
          */
         const val SCHEMA_VERSION = "1.22"
 
@@ -2984,9 +3019,10 @@ data class SetExport(
      * measurement of how long the lifter rested (#76).
      *
      * From 1.19 the published description states which instant it is counted
-     * FROM, and `RestClockPolicy` owns that instant: the terminal cue on the
-     * set's own cue track, or the set's end instant where nothing called it
-     * over. The countdown and the archive's `rest_before_hrm` window both
+     * FROM, and `RestClockPolicy` owns that instant: a release that decided a
+     * hold's seconds first (#259), then the terminal cue on the set's own cue
+     * track -- which from 1.22 (#295) includes a timed set's `Time` -- or the
+     * set's end instant where nothing called it over. The countdown and the archive's `rest_before_hrm` window both
      * begin there (#178); until 1.19 the window began when the set's capture
      * stopped instead, up to 53.06 s later on one measured set. `rest_after_hrm`
      * -- the window a session close writes onto the LAST set, when there is no
