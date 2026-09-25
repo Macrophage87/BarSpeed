@@ -169,9 +169,8 @@ fun restVerdicts(
     plannedDurationS: Int?,
     frozenVerdicts: List<String>,
     velocityLossRegime: VelocityLossRegime?,
-): List<String> =
-    if (isTimed) {
-        timedVerdicts(effectiveDurationS, plannedDurationS)
-    } else {
-        CoachingVerdictPolicy.forRegime(frozenVerdicts, velocityLossRegime)
-    }
+): List<String> = if (isTimed) {
+    timedVerdicts(effectiveDurationS, plannedDurationS)
+} else {
+    CoachingVerdictPolicy.forRegime(frozenVerdicts, velocityLossRegime)
+}
