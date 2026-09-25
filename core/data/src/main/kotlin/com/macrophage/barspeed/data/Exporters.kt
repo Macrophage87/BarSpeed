@@ -337,9 +337,9 @@ class SessionExporter(
             // disagree about who counted a set.
             repsSource = record.publishedRepsSource(geometry?.kind),
             // What the sensor counted, beside what the set is recorded as.
-            // Published straight off the row and never recomputed -- the live
-            // figure cannot be rebuilt from the stored stream, which yields the
-            // BATCH count over a different velocity estimate.
+            // Published straight off the row and never recomputed: the stored
+            // analysis holds the BATCH count, a different detector's answer
+            // (#302; the live one is a drive impulse since #301).
             liveReps = record.liveReps,
             plannedReps = record.plannedReps,
             durationS = phase.durationS,

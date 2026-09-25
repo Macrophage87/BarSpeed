@@ -1903,6 +1903,48 @@ data class SessionExport(
          * filed once under the 1.22 marker the entry above minted, and that the
          * published example carries the key so `ci.yml`'s ajv step validates a
          * document that has one.
+         *
+         * 1.22 TAKES A THIRD ENTRY (#302, the live count's descriptions), and it
+         * CHANGES NO KEY: three published descriptions said something false
+         * about where a sensor-counted set's live count comes from, and are
+         * corrected here and in the published schema in the same commit.
+         *
+         * A FURTHER ENTRY under the unreleased 1.22 and not a mint: `git tag
+         * --sort=-creatordate | head -1` is v0.1.54 and `git show
+         * v0.1.54:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.21"`, both read at the tag this round.
+         *
+         * WHAT WAS FALSE. From v0.1.54 (#301) a sensor-counted set is counted
+         * live by `DriveImpulseCounter`, which reads no velocity at all. The
+         * published [SetExport.liveReps] said the live detector ran the batch
+         * pairing rule over a causal velocity estimate;
+         * [SetExport.repMetricsComplete] called the live and batch counts one
+         * pairing rule over two velocity estimates; and [SetExport.repsSource]'s
+         * reading key said the live detector had never been scored against a
+         * real straight-reps set and quoted `LiveRepCaller`'s corpus figures as
+         * its score. All three were written for v0.1.53's detector and were
+         * false in every 1.21 document v0.1.54 wrote. They now name the detector
+         * that produces the count and its measured score on the only two
+         * sessions it has been scored on, field-43 and field-44, including that
+         * it called nothing at 111.1 and 120.2 kg (#305).
+         *
+         * WHAT A READER DOES, IN BOTH DIRECTIONS. Nothing about the data moves:
+         * `liveReps` is the same integer on the same sets, `repsSource` has the
+         * same five words derived the same way, and the schema accepts and
+         * rejects exactly the documents it did before this entry. An older
+         * reader and a newer one therefore read every value of a 1.21 or a
+         * 1.22 document identically; the asymmetry the 1.22 mint states -- a
+         * 1.21 validator refusing a 1.22 document on its version string -- is
+         * unchanged. Only the prose a reader weighs the count by changes. A
+         * `liveReps` on a set RECORDED by v0.1.53 still came from the retired
+         * detector and keeps it when re-exported, and nothing in the document
+         * records which build recorded a set. `DATABASE_VERSION` does NOT move
+         * and the plan schema is untouched.
+         *
+         * PINNED. `SchemaRepsSourceContractTest` asserts the new figures in the
+         * published reading key AND in `PLAN_PROMPT`, string for string, and
+         * that neither copy nor the two neighbouring descriptions still carries
+         * a deleted claim. It cannot see this KDoc.
          */
         const val SCHEMA_VERSION = "1.22"
 
@@ -2138,33 +2180,45 @@ data class SetExport(
      * means that and nothing else -- never a sixth word and never a stand-in
      * for `manual`.
      *
-     * READ `sensor` AS A MEASUREMENT AND NOT A VERIFIED COUNT. The live
-     * detector has never been scored against a real straight-reps set: the
-     * batch detector over-counts all six committed concentric-first captures
-     * that carry a hand count, by +1 to +4 (#284), and the thirteen
-     * mark-carrying captures are guided sets whose marks are the GUIDE's calls
-     * rather than a lifter's. On the first straight-reps captures the LIFTER'S
-     * HAND COUNT is the ground truth and this word says which counter to score
-     * against it (#286).
+     * READ `sensor` AS A MEASUREMENT AND NOT A VERIFIED COUNT. From v0.1.54
+     * (#301) it is `DriveImpulseCounter`'s count -- an upward acceleration
+     * impulse followed by braking, with no velocity in it -- and [liveReps]
+     * says what that means beside the batch count. On straight-reps work the
+     * LIFTER'S HAND COUNT is the ground truth and this word says which counter
+     * to score against it (#286). The batch detector, separately, over-counts
+     * all six committed concentric-first captures that carry a hand count, by
+     * +1 to +4 (#284).
      *
-     * WHAT IT HAS BEEN SCORED ON, in figures rather than in words, every one
-     * of them computed by `LiveRepCallCorpusTest`: over the thirteen committed
-     * captures that carry rep marks the live detector makes 35 calls against
-     * 103 marks, 11 of them in the right window, and four of the thirteen say
-     * nothing at all. Per capture on the six seated overhead presses, calls
-     * against the lifter's own hand count: 0 calls for 6 hand reps on session
-     * 37 set 2, 3 for 7 on set 3, 1 for 5 on set 4, 0 for 8 on session 38 set
-     * 4, 2 for 8 on set 5, and 2 hand reps on the seated-overhead-press 2-rep
-     * capture, where the live caller makes 1 call; that capture carries no
-     * rep-mark track, so its calls can be counted but not scored and it is not
-     * one of the thirteen. EVERY ONE OF THE THIRTEEN IS A TEMPO'D SET, so
-     * those figures score the detector on paced work and not on the straight
-     * reps this word is for; which way that moves on a faster set is UNTESTED
-     * and this KDoc does not guess. The measured bottleneck is the velocity
-     * estimate rather than the pairing rule -- the batch path resolves 5 to 15
-     * spans per set on these same captures where the live caller speaks 0 to 8
-     * -- and no committed capture is a no-tempo max-intent set of any
-     * exercise.
+     * WHAT IT HAS BEEN SCORED ON, against the hand count: straight-reps
+     * deadlifts from two sessions and nothing else. Field-43, replayed through
+     * the detector after the session (`LiveCountDifferentialTest`): 5, 5 and 3
+     * of 5, 5 and 5 at 61.2, 83.9 and 102.1 kg, no phantom call, the two
+     * misses the slowest pulls of the heaviest set. Field-44, as the app
+     * counted it during the session -- the exported `liveReps`, not a replay,
+     * and no committed test computes it: 5, 5, 5, 0 and 0 of 5, 5, 5, 4 and 2
+     * at 61.2, 83.9, 102.1, 111.1 and 120.2 kg. Every rep through 102.1 kg and
+     * NOTHING at 111.1 or 120.2 kg, where #305's analysis of the capture finds
+     * each dead-stop pull above the detector's acceleration threshold for too
+     * short a time to be called. So a low or zero count on a heavy set is more
+     * likely a miss than a short set, and a heavy set the lifter did not
+     * correct reads `sensor` while under-stating the work.
+     *
+     * No other lift has been scored as the app runs it. On the six committed
+     * seated overhead-press captures -- tempo'd sets the metronome counts, so
+     * the detector never runs on them in the app -- it would call 8, 8, 7, 10,
+     * 11 and 2 against hand counts of 6, 7, 5, 8, 8 and 2
+     * (`LiveCountDifferentialTest`), the nearest measurement of the one
+     * tempo'd shape it does count, an explosive lift carrying a tempo.
+     *
+     * A set RECORDED by v0.1.53 was counted by `LiveRepCaller`, the retired
+     * detector [liveReps] names, which called 3, 1 and 2 on the same three
+     * field-43 sets and keeps its figure when re-exported.
+     *
+     * The paragraph that stood here said the live detector "has never been
+     * scored against a real straight-reps set" and quoted `LiveRepCaller`'s
+     * corpus figures -- 35 calls against 103 marks over thirteen tempo'd
+     * captures -- as the live detector's. Both went false with #301 in
+     * v0.1.54, and both are DELETED rather than reworded (#302).
      */
     val repsSource: String? = null,
     /**
@@ -2178,9 +2232,23 @@ data class SetExport(
      *
      * NOT the batch segmenter's count, which is `repMetrics.length` where
      * per-rep detail was asked for and is the figure [repMetricsComplete]
-     * compares [reps] against. The live detector runs the same pairing rule
-     * over a CAUSAL velocity estimate, so the two disagree wherever the
-     * estimates do.
+     * compares [reps] against. THEY ARE DIFFERENT DETECTORS. A set recorded by
+     * v0.1.54 or later was counted live by `DriveImpulseCounter` (#301): an
+     * upward acceleration impulse followed by braking, read off the
+     * bias-corrected acceleration, with no velocity, no integrator and no
+     * displacement in it. The segmenter pairs phases of an integrated,
+     * drift-corrected velocity. So the two disagree wherever a drive impulse
+     * and a velocity phase do, and neither is a check on the other.
+     *
+     * A set recorded by v0.1.53, the only earlier release that stored this
+     * key, was counted by `LiveRepCaller` -- the segmenter's pairing rule over
+     * a causal velocity estimate -- and keeps that figure when re-exported.
+     * Nothing in the document records which build recorded a set; a session
+     * whose `startedAt` precedes v0.1.54's release on 2026-09-18 cannot have
+     * been counted by the impulse detector. The sentence that stood here said
+     * the live detector runs the same pairing rule over a causal velocity
+     * estimate; that was v0.1.53's detector, it was false for every set
+     * v0.1.54 recorded, and it is DELETED rather than reworded (#302).
      *
      * ABSENT where no live counter ran: a set the lifter counted, a set the
      * guide counted, a timed set, and every set recorded before database v18.
@@ -2768,11 +2836,13 @@ data class SetExport(
      * now says. On a `manual`, `metronome` or `corrected` set this compares the
      * segmenter with a count a person or the guide kept, and false is the two
      * disagreeing. On a `sensor` set it compares the segmenter with the LIVE
-     * detector -- the same pairing rule over a causal velocity estimate against
-     * a retroactively drift-corrected one -- so false there is the two
-     * ESTIMATES disagreeing, which is the figure #286's first field session is
-     * read for. On an `analysis` set the two agree by construction and this
-     * says nothing.
+     * detector, which since #301 (v0.1.54) is a different detector -- a drive
+     * impulse read off the acceleration, with no velocity in it -- so false
+     * there is two DETECTORS disagreeing, and either may be the one that is
+     * wrong. On an `analysis` set the two agree by construction and this says
+     * nothing. The clause that stood here called the live and batch counts one
+     * pairing rule over two velocity estimates; that was v0.1.53's live
+     * detector, and the clause is DELETED rather than reworded (#302).
      *
      * The sentence that stood here -- "when [repsManual] is false the stored
      * rep count IS the segmenter's count, so the two agree by construction" --

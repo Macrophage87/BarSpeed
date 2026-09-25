@@ -139,12 +139,15 @@ class SchemaRepsSourceContractTest {
      * The reading key states the hand count as the ground truth for the first
      * straight-reps captures.
      *
-     * Not a hedge for its own sake. The live detector has never been scored
-     * against a real straight-reps set: issue #145's F1 capture is still owed,
-     * every one of the thirteen mark-carrying captures is a guided set whose
-     * marks are the GUIDE's calls, and the batch detector over-counts all six
-     * committed concentric-first captures that carry a hand count. A coach must
-     * not read `sensor` as a verified count.
+     * Not a hedge for its own sake. The live detector has been scored on two
+     * deadlift sessions and on nothing else, it called nothing on the two
+     * heaviest sets of the second (#305), and the batch detector over-counts
+     * all six committed concentric-first captures that carry a hand count. A
+     * coach must not read `sensor` as a verified count.
+     *
+     * This KDoc said the live detector "has never been scored against a real
+     * straight-reps set". False since #301 in v0.1.54, and DELETED rather than
+     * reworded (#302).
      */
     @Test
     fun `the reading key says the hand count is the ground truth on the first captures`() {
@@ -159,48 +162,72 @@ class SchemaRepsSourceContractTest {
     /**
      * THE FIGURES, in both published copies of the reading key.
      *
-     * "The live detector has never been scored against a real straight-reps
-     * set" is true and is not the whole truth: it HAS been scored, on the
-     * thirteen committed captures that carry rep marks, and the numbers are
-     * poor. A coach told only that the evidence is missing reads `sensor` as
-     * untested; a coach told what it scored reads it as tested and bad on
-     * paced work, which is the state it is in. `LiveRepCallCorpusTest`
-     * computes every figure quoted here.
+     * WHAT CHANGED (#302). Since #301 in v0.1.54 a sensor-counted set is
+     * counted by `DriveImpulseCounter`, and every figure this test used to pin
+     * -- 35 calls against 103 marks over thirteen tempo'd captures, and the six
+     * per-capture overhead-press rows -- was `LiveRepCaller`'s, the retired
+     * detector. Quoting them under `sensor` attributed one detector's failures
+     * to another's word, so they are replaced rather than kept beside the new
+     * ones.
+     *
+     * WHERE EACH NEW FIGURE COMES FROM, because `:core:model` cannot see
+     * `:core:dsp`'s corpus and nothing mechanical compares them with the table
+     * that produced them. Field-43's 5, 5 and 3, and the overhead-press 8, 8,
+     * 7, 10, 11 and 2 against 6, 7, 5, 8, 8 and 2, are computed by
+     * `LiveCountDifferentialTest`, replaying the capture through the counter
+     * the app arms. Field-44's 5, 5, 5, 0 and 0 is what the app exported as
+     * `liveReps` on the day, the truth of 5, 5, 5, 4 and 2 is the owner's as
+     * settled on #305, and no committed test computes either: field-44 is not
+     * a fixture here. The retired detector's 3, 1 and 2 is
+     * `DeadliftLiveCountFieldTest`'s.
      *
      * BOTH COPIES, checked against the SAME strings, because that is the only
-     * drift this file can catch: `:core:model` cannot see `:core:dsp`'s
-     * corpus, so nothing mechanical compares these figures with the table that
-     * produced them. What is enforced is that the schema and the prompt the
-     * coach receives say the same thing.
-     *
-     * SIX CAPTURES AND NOT FIVE. #286's gate comment asks for the live count
-     * over the six committed concentric-first captures the batch detector
-     * over-counts. `field-seated-ohp-2rep` is the sixth and both copies said
-     * nothing about it, which left the key quoting five rows against an ask for
-     * six. It carries no rep-mark track, so its calls can be counted and not
-     * scored, and the key has to say that too -- a coach handed "1 call for 2
-     * hand reps" beside five scored rows would otherwise read it as a sixth
-     * scored row. `LiveRepCallCorpusTest`'s `the seated overhead press has no
-     * marks, so its calls are counted and not scored` is what computes the one
-     * call.
+     * drift this file can catch: what is enforced is that the schema and the
+     * prompt the coach receives say the same thing.
      */
     @Test
     fun `the reading key states what the live detector has been scored on`() {
         val documents = mapOf("the published schema" to description("repsSource"), "the plan prompt" to prompt)
         val figures =
             listOf(
-                "35 calls against 103 marks",
-                "11 of them in the right window",
-                "four of the thirteen say nothing",
-                "0 calls for 6 hand reps on session 37 set 2, 3 for 7 on set 3, 1 for 5 on set 4, " +
-                    "0 for 8 on session 38 set 4, 2 for 8 on set 5",
-                "2 hand reps on the seated-overhead-press 2-rep capture, where the live caller makes 1 call",
-                "no rep-mark track, so its calls can be counted but not scored",
-                "every one of the thirteen is a tempo'd set",
+                "an upward acceleration impulse followed by braking, with no velocity in it",
+                "5, 5 and 3 of 5, 5 and 5 at 61.2, 83.9 and 102.1 kg",
+                "5, 5, 5, 0 and 0 of 5, 5, 5, 4 and 2 at 61.2, 83.9, 102.1, 111.1 and 120.2 kg",
+                "nothing at 111.1 or 120.2 kg",
+                "#305",
+                "8, 8, 7, 10, 11 and 2 against hand counts of 6, 7, 5, 8, 8 and 2",
+                "recorded by v0.1.53",
+                "3, 1 and 2",
             )
         documents.forEach { (name, text) ->
             figures.forEach {
                 assertTrue(it.lowercase() in text.lowercase(), "$name does not state: $it")
+            }
+        }
+    }
+
+    /**
+     * NEITHER COPY STILL CARRIES A CLAIM #301 MADE FALSE (#302).
+     *
+     * Pinned as absences as well as presences, because the defect this issue
+     * found was a sentence left standing beside a correct one: a rewording that
+     * added the new figures and kept "has never been scored" would satisfy the
+     * test above and still tell a coach the opposite.
+     */
+    @Test
+    fun `neither copy of the reading key still carries a claim the impulse counter made false`() {
+        val documents = mapOf("the published schema" to description("repsSource"), "the plan prompt" to prompt)
+        val deleted =
+            listOf(
+                "never been scored against a real straight-reps set",
+                "35 calls against 103 marks",
+                "four of the thirteen say nothing",
+                "the live caller makes 1 call",
+                "the measured bottleneck is the velocity estimate rather than the pairing rule",
+            )
+        documents.forEach { (name, text) ->
+            deleted.forEach {
+                assertFalse(it.lowercase() in text.lowercase(), "$name still states: $it")
             }
         }
     }
@@ -271,6 +298,28 @@ class SchemaRepsSourceContractTest {
     }
 
     /**
+     * THE LIVE COUNT NAMES THE DETECTOR THAT PRODUCES IT (#302).
+     *
+     * The published description said "The live detector applies the same
+     * pairing rule over a CAUSAL velocity estimate". Since #301 in v0.1.54 a
+     * sensor-counted set -- the only set this key is published on -- is
+     * counted from a drive impulse with no velocity in it, so the sentence was
+     * false for every set v0.1.54 recorded. It is DELETED, and the retired
+     * detector is named only as what a v0.1.53 recording carries.
+     */
+    @Test
+    fun `the published live count names the impulse detector and not a velocity pairing rule`() {
+        val d = description("liveReps")
+        assertTrue("drive-impulse detector" in d, "the description does not name the detector that counts")
+        assertTrue("no velocity" in d, "the description does not say the live count reads no velocity")
+        assertTrue("v0.1.53" in d, "the description does not say which recordings carry the retired detector")
+        assertFalse(
+            "The live detector applies the same pairing rule over a CAUSAL velocity estimate" in d,
+            "the description still says the live count is a velocity pairing rule",
+        )
+    }
+
+    /**
      * The completeness caveat no longer claims the two counts agree by
      * construction.
      *
@@ -288,6 +337,26 @@ class SchemaRepsSourceContractTest {
             "the published caveat still says the recorded and segmented counts agree by construction",
         )
         assertTrue("repsSource" in d, "the caveat does not point at the key that now says whose count it is")
+    }
+
+    /**
+     * The completeness caveat no longer calls the live and batch counts one
+     * rule over two estimates (#302).
+     *
+     * On a `sensor` set `repMetricsComplete` compares the segmenter with the
+     * live count, and since #301 those are two different detectors. The clause
+     * "one pairing rule over two velocity estimates" read a false as two
+     * estimates of one thing disagreeing; it is DELETED, and the caveat says
+     * two detectors disagree and either may be wrong.
+     */
+    @Test
+    fun `the completeness caveat calls the live and batch counts two detectors`() {
+        val d = description("repMetricsComplete")
+        assertFalse(
+            "one pairing rule over two velocity estimates" in d,
+            "the caveat still calls the live and batch counts one rule over two estimates",
+        )
+        assertTrue("two different detectors" in d, "the caveat does not say the two counts are different detectors")
     }
 
     /**
