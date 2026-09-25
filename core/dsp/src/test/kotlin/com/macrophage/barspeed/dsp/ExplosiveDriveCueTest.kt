@@ -146,9 +146,12 @@ class ExplosiveDriveCueTest {
     fun `a 10X0 seated press names the rep at the drive's end, so Drive is said every rep`() {
         assertEquals(
             listOf(
-                0 to "Drive", 1 to "Rep 1",
-                2 to "Drive", 3 to "Rep 2",
-                4 to "Drive", 5 to "Last rep",
+                0 to "Drive",
+                1 to "Rep 1",
+                2 to "Drive",
+                3 to "Rep 2",
+                4 to "Drive",
+                5 to "Last rep",
                 6 to "Done",
             ),
             script("10X0", seatedOhp, 3),
