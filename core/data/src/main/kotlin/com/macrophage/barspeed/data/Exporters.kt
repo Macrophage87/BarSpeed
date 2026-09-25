@@ -26,8 +26,8 @@ import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RepMetricsExport
 import com.macrophage.barspeed.model.RepsSourcePolicy
-import com.macrophage.barspeed.model.RestMeasurePolicy
 import com.macrophage.barspeed.model.ResolvedGeometry
+import com.macrophage.barspeed.model.RestMeasurePolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SessionExport
