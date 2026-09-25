@@ -161,6 +161,19 @@ class StreamingSetTracker(
     var state: LiveSetState = LiveSetState()
         private set
 
+    /**
+     * [LiveSetState.countTrusted] as a finished set records it (#302), or null
+     * when this tracker has been fed no sample at all.
+     *
+     * Null rather than the latch's starting `true`, because a tracker that was
+     * fed nothing has integrated nothing and so has not held a zero: a set
+     * recorded with no sensor connected must not publish that its velocity was
+     * trusted. The latch itself is unchanged -- this reads it and never writes
+     * it, so every live figure the tracker publishes is what it was.
+     */
+    val publishedCountTrusted: Boolean?
+        get() = if (sampleCount == 0) null else countTrusted
+
     fun feed(sample: ImuSample): LiveSetState {
         val firstSample = sampleCount == 0
         updateClock(sample.timestampMs)

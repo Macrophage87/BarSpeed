@@ -64,6 +64,17 @@ data class CompletedSet(
      */
     val liveReps: Int? = null,
     /**
+     * Whether the live tracker still held its zero when the set ended, or null
+     * where no live tracker covered the set (#302). The caller reads it off
+     * `StreamingSetTracker.publishedCountTrusted`.
+     *
+     * Stored inside `analysisJson` as `SetAnalysis.liveCountTrusted` rather
+     * than in a column: [recordSet] copies it onto the analysis it encodes, so
+     * `DATABASE_VERSION` does not move. It overwrites whatever the analysis
+     * carried there, which is always null -- `SetAnalyzer` never sets it.
+     */
+    val liveCountTrusted: Boolean? = null,
+    /**
      * Timed sets (planks, carries): recorded and planned hold/carry seconds.
      *
      * `actualDurationS` is the seconds the set was working to on a set that
@@ -466,7 +477,13 @@ class SessionRepository(
                 workBegan = set.workBegan,
                 startedAtMs = set.startedAtMs,
                 endedAtMs = set.endedAtMs,
-                analysisJson = json.encodeToString(SetAnalysis.serializer(), set.analysis),
+                // The live tracker's latch rides in the analysis blob (#302):
+                // null encodes to nothing, so a set without one is stored
+                // byte for byte as it was before the field existed.
+                analysisJson = json.encodeToString(
+                    SetAnalysis.serializer(),
+                    set.analysis.copy(liveCountTrusted = set.liveCountTrusted),
+                ),
                 // Written only when the caller states one. There is no default
                 // to fall back on: an invented geometry reads exactly like a
                 // measured one and would be believed.

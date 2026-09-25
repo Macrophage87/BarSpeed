@@ -181,8 +181,9 @@ class DeadliftLiveCountFieldTest {
      *
      * `countTrusted` is false on every stream of every set: the integrator
      * carried a run past `maxRunDisplacementM` on all six. It is still latched
-     * the same way and nothing in `:app` reads it -- and WHAT IT MEANS HAS
-     * CHANGED. The count no longer comes from the integrator, so on a
+     * the same way -- and WHAT IT MEANS HAS CHANGED. (A clause here said
+     * nothing in `:app` reads it; #302 publishes it on the export, so the
+     * clause is deleted rather than left to go false.) The count no longer comes from the integrator, so on a
      * sensor-counted set this flag now describes the velocity, the ROM and the
      * power and says nothing about the count. Wiring it to a "count by hand"
      * warning would tell the lifter to count a set the sensor is counting
