@@ -21,8 +21,9 @@ enum class RepCounter {
      * rep-based lift with no prescribed tempo and an IMU connected.
      *
      * WHICH detector is [LiveCounterPolicy.counterFor]'s answer and not a fact
-     * about this member. It is `DriveImpulseCounter` since issue #301 and was
-     * `LiveRepCaller` from #286 until then; the naming here read `LiveRepCaller`
+     * about this member. It is `CycleRepCounter` since issue #305, was
+     * `DriveImpulseCounter` from #301 and `LiveRepCaller` from #286 until then;
+     * the naming here read `LiveRepCaller`
      * as though the choice were fixed, and it is not.
      *
      * The count it produces can be wrong. Issue #284 measured the BATCH

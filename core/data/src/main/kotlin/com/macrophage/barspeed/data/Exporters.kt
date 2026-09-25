@@ -339,7 +339,8 @@ class SessionExporter(
             // What the sensor counted, beside what the set is recorded as.
             // Published straight off the row and never recomputed: the stored
             // analysis holds the BATCH count, a different detector's answer
-            // (#302; the live one is a drive impulse since #301).
+            // (#302; the live one reads the acceleration, not a velocity --
+            // a drive impulse from #301, a full cycle since #305).
             liveReps = record.liveReps,
             // The live integrator's latch, frozen into the stored analysis when
             // the set was recorded (#302). Read off the blob and never

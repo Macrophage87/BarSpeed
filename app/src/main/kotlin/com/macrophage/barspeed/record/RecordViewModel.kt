@@ -3000,8 +3000,9 @@ data class RecordState(
      *
      * One sentence is DELETED rather than reworded -- *"what the app speaks and
      * records comes from the batch detector's rule instead"* -- because since
-     * issue #301 a sensor-counted set is counted by `DriveImpulseCounter`, which
-     * shares no rule with the batch detector and reads no velocity at all.
+     * issue #301 a sensor-counted set is counted by a detector that shares no
+     * rule with the batch detector and reads no velocity estimate:
+     * `DriveImpulseCounter` from #301, `CycleRepCounter` since #305.
      *
      * 0 before the first call, which is the honest figure there: no drive has
      * been resolved yet.
@@ -3614,7 +3615,7 @@ data class RecordState(
  *
  * WHICH DETECTOR IT HOLDS IS NOT DECIDED HERE. `LiveRepCounters.forCounted`
  * builds it from `LiveCounterPolicy`'s answer for the set's `RepCounter`, so
- * this class holds a `LiveRepCounter` and the choice between the two detectors
+ * this class holds a `LiveRepCounter` and the choice between the detectors
  * in `:core:dsp` is one row of a `when` in `:core:model` with a test on it
  * (#301). Before that seam existed this constructed a `LiveRepCaller` directly
  * and an `if` in `beginSet` decided whether to construct one at all.
@@ -3654,7 +3655,7 @@ private class SensorRepCounter {
      * Arm for a set the sensor counts, or DISARM for one it does not.
      *
      * BOTH decisions come from `LiveRepCounters.forCounted`: whether a live
-     * counter runs on a set with this [RepCounter] at all, and which of the two
+     * counter runs on a set with this [RepCounter] at all, and which detector
      * it is. A null result is a set with another counter, and it clears the
      * figures as well as the counter -- a count left over from the last set
      * would be read by [endSet]'s frozen write as this one's.

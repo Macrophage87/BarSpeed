@@ -5,7 +5,7 @@ package com.macrophage.barspeed.model
  *
  * [CountingPolicy] answers who counts -- the sensor, the lifter, the metronome
  * or nobody. This answers the question that only has an answer once the first
- * of those wins: which of the two rep detectors in `:core:dsp` the arriving
+ * of those wins: which of the rep detectors in `:core:dsp` the arriving
  * samples are fed to. They are different detectors, not two tunings of one, and
  * a set is fed to exactly one.
  *
@@ -41,6 +41,10 @@ enum class LiveCounter {
      * 102 kg set), and on stack and machine captures its sensor-frame
      * thresholds are applied through a pulley ratio and it collapses --
      * `DriveImpulseCandidateTest`'s corpus row is where both are pinned.
+     *
+     * The counter every sensor-counted set used from #301 until issue #305 --
+     * v0.1.54's -- and the counter nothing selects now. On field-44 it called
+     * nothing at 111 and 120 kg, which is what #305 replaced it for.
      */
     DRIVE_IMPULSE,
 
@@ -78,19 +82,40 @@ object LiveCounterPolicy {
     /**
      * The live detector for a set counted by [counter].
      *
-     * ## The owner's decision, 2026-09-17, issue #301
+     * ## The design round's recommendation, issue #305
      *
-     * *"Go with C."* A sensor-counted set counts on impulse. The evidence it was
-     * taken on: 13 of field-43's 15 deadlift reps called with no phantom,
-     * against 5 of 15 with one phantom from [LiveCounter.SEGMENTER], and the
-     * touch-and-go set going from one call to five where no re-tuned ZUPT band
-     * could reach it at all.
+     * A sensor-counted set counts FULL CYCLES. On 2026-09-25 the owner wrote
+     * *"Orchestrate the next design round and continue to release."*, was told
+     * the round's recommendation would be implemented unless redirected, and
+     * did not redirect; the round recommended (b), the full cycle. The owner's
+     * counting rules it was measured against: *"The sensor should count the
+     * reps."*, and a pull that fails is not a rep -- *"if you can't do it, it's
+     * failed."*
+     *
+     * The evidence, on the eight deadlift sets the corpus holds (field-43 sets
+     * 4-6, field-44 sets 1-5): [LiveCounter.CYCLE] counts 35 of 36 completed
+     * reps with one phantom -- field-43 set 6's set-up pull -- and does not
+     * call field-44 set 5's failed pull; [LiveCounter.DRIVE_IMPULSE] counted
+     * 28 with no phantom and nothing at 111 or 120 kg (`ClosingRuleCandidateTest`,
+     * `CycleLiveCountFieldTest`). What it costs: the number comes as the bar
+     * lands, median 1.16 s after the batch window ends against -0.27 s; on a
+     * light soft landing it can come a rep late; field-43 set 6's rep 4 is
+     * still missed; and a failed pull held and lowered past
+     * `DspConfig.cycleMinCycleS` may be called, which nothing measures.
+     *
+     * ## The owner's decision, 2026-09-17, issue #301 -- the row this replaced
+     *
+     * *"Go with C."* From then until #305 a sensor-counted set counted on
+     * impulse. The evidence it was taken on: 13 of field-43's 15 deadlift reps
+     * called with no phantom, against 5 of 15 with one phantom from
+     * [LiveCounter.SEGMENTER], and the touch-and-go set going from one call to
+     * five where no re-tuned ZUPT band could reach it at all.
      *
      * ## The other three rows are unchanged, and they are NOT a barbell gate
      *
-     * A counter that is not the sensor's arms no live detector, so this change
+     * A counter that is not the sensor's arms no live detector, so this row
      * cannot reach a tempo-guided set, a set the lifter counts or a timed one.
-     * What it does NOT do is hold the drive-impulse rule to barbell work.
+     * What it does NOT do is hold the full-cycle rule to barbell work.
      * [CountingPolicy.counterFor] gates on the prescribed tempo, on whether the
      * set is measured in seconds and on the exercise kind; it never reads
      * `travelRatio` or `sensorOnStack`, and a tempo is OPTIONAL on a
@@ -98,20 +123,18 @@ object LiveCounterPolicy {
      * `duration_s` on a set and forbids a tempo only on the timed one. So a leg
      * curl, a pulldown or a single-leg press whose sets say `reps: 10` with no
      * tempo, recorded with an IMU connected, is [RepCounter.SENSOR] and counts
-     * on impulse TODAY. This row does not have to widen for that to happen.
+     * on the full-cycle rule TODAY -- and so does an EXPLOSIVE lift, with a
+     * tempo or without one. This row does not have to widen for that to happen.
      *
      * What holds the corpus's machine captures away from this counter is their
      * TEMPO and nothing structural: every stack or machine capture the candidate
      * corpus scores carries a `-cues.csv` of metronome stroke words, so a
-     * cadence ran on it and [RepCounter.METRONOME] counted it. On that shape the
-     * cost is measured -- 2 calls against 10 performed on
-     * `field-legcurl-1030-10rep`, 0 against 12 on `field-legcurl-1030-12rep`, 0
-     * against 8 on `field-legpress-single-2011-8rep-s36-set07`, 0 against 8 on
-     * `field-pullup-3010-8rep-s37-set09`, and over the 33 committed captures
-     * that carry a truth 180 calls against 253 performed with an over-count of
-     * 19, where the segmenter calls 108 with an over-count of 1.
-     * `DriveImpulseCandidateTest` and `LiveCountDifferentialTest` hold those
-     * figures.
+     * cadence ran on it and [RepCounter.METRONOME] counted it. The only
+     * non-deadlift evidence for the full-cycle rule is those tempo'd captures
+     * replayed through it: 9, 11, 9 and 6 calls on four leg curls of 10, 12,
+     * 12 and 12, where the drive-impulse rule called 2, 0, 0 and 1, and one
+     * phantom call on each of two rope dead hangs where nothing is lifted
+     * (`ClosingRuleCandidateTest`).
      *
      * An UNTEMPO'D machine set is unmeasured rather than known-bad, which is the
      * exposure this row leaves open. The three committed cable captures with no
@@ -119,21 +142,20 @@ object LiveCounterPolicy {
      * `field-facepull-static-12rep`, `field-pallof-static-12rep` -- carry no cue
      * track and no rep marks, so nothing scores them and nothing here says what
      * this counter would call on one. Whether the gate should NARROW, counting
-     * on impulse only where the geometry is a barbell's, is an owner decision
+     * on the sensor only where the geometry is a barbell's, is an owner decision
      * and is tracked as issue #303 rather than settled in this KDoc.
      *
-     * ## What SEGMENTER is now
+     * ## What SEGMENTER and DRIVE_IMPULSE are now
      *
-     * Nothing selects it. `LiveRepCaller` ran on exactly the sets this row
-     * governs -- a tempo-guided set is counted by the metronome and never armed
-     * one -- so after this change no production path builds it. It is kept
-     * rather than deleted for three reasons, stated so it is not read as
-     * oversight: reverting this decision is one row, it is the only live counter
-     * with a thirteen-capture corpus pin behind it (`LiveRepCallCorpusTest`),
-     * and the design round's rejected hybrid composed the two.
+     * Nothing selects either. `LiveRepCaller` and `DriveImpulseCounter` ran on
+     * exactly the sets this row governs -- a tempo-guided set is counted by the
+     * metronome and never armed one -- so no production path builds them. Both
+     * are kept rather than deleted, stated so it is not read as oversight:
+     * reverting this decision is one row, and each carries a corpus pin that
+     * re-derives what it did (`LiveRepCallCorpusTest`, `LiveCountDifferentialTest`).
      */
     fun counterFor(counter: RepCounter): LiveCounter? = when (counter) {
-        RepCounter.SENSOR -> LiveCounter.DRIVE_IMPULSE
+        RepCounter.SENSOR -> LiveCounter.CYCLE
         RepCounter.MANUAL, RepCounter.METRONOME, RepCounter.NOBODY -> null
     }
 }

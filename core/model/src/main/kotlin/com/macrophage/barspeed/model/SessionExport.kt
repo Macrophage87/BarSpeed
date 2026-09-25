@@ -2025,6 +2025,44 @@ data class SessionExport(
          * `TempoScheduleTest`, `ExplosiveDriveCueTest` and
          * `TwoSecondStrokeCountTest` in `:core:dsp` pin the words the guide
          * says.
+         *
+         * 1.22 TAKES A SIXTH ENTRY (#305, the live count's descriptions), and it
+         * CHANGES NO KEY: from v0.1.55 a sensor-counted set is counted live by
+         * `CycleRepCounter`, the full-cycle detector, rather than the
+         * `DriveImpulseCounter` v0.1.54 armed, so the four descriptions the third
+         * and fourth entries wrote around that detector are corrected --
+         * [SetExport.repsSource]'s reading key, [SetExport.liveReps],
+         * [SetExport.countTrusted] and [SetExport.repMetricsComplete] -- here, in
+         * the published schema and in `PLAN_PROMPT`, in one commit.
+         *
+         * A FURTHER ENTRY under the unreleased 1.22 and not a mint: `git tag
+         * --sort=-creatordate | head -1` is v0.1.54 and `git show
+         * v0.1.54:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.21"`, both read at the tag this round.
+         *
+         * WHAT WENT FALSE. Each of the four named the drive-impulse detector as
+         * the one that counts, which is not true of any set a build carrying
+         * #305 records. They now name the full-cycle detector and its measured
+         * score -- 5, 5, 5, 4 and 2 of 5, 5, 5, 4 and 2 on field-44 with the
+         * failed pull not called (`CycleLiveCountFieldTest`) -- say it speaks as
+         * the bar lands and can speak a rep late, and keep the drive-impulse
+         * figures as what a v0.1.54 recording carries.
+         *
+         * WHAT A READER DOES, IN BOTH DIRECTIONS. Nothing about the data moves:
+         * `liveReps` is still the integer the live detector spoke, `repsSource`
+         * has the same five words derived the same way, and the schema accepts
+         * and rejects exactly the documents it did before this entry, so an
+         * older reader and a newer one read every value identically; the 1.22
+         * mint's asymmetry is unchanged. Only the prose moves. A `liveReps` on a
+         * set RECORDED by v0.1.54 still came from the drive-impulse detector and
+         * keeps it when re-exported, and nothing in the document records which
+         * build recorded a set. `DATABASE_VERSION` does NOT move and the plan
+         * schema is untouched.
+         *
+         * PINNED. `SchemaCycleCounterContractTest` asserts the new statements
+         * in the published schema AND in `PLAN_PROMPT`, the absence of each
+         * sentence that went false, and this entry's marker. It cannot see this
+         * KDoc.
          */
         const val SCHEMA_VERSION = "1.22"
 
@@ -2260,35 +2298,47 @@ data class SetExport(
      * means that and nothing else -- never a sixth word and never a stand-in
      * for `manual`.
      *
-     * READ `sensor` AS A MEASUREMENT AND NOT A VERIFIED COUNT. From v0.1.54
-     * (#301) it is `DriveImpulseCounter`'s count -- an upward acceleration
-     * impulse followed by braking, with no velocity in it -- and [liveReps]
-     * says what that means beside the batch count. On straight-reps work the
+     * READ `sensor` AS A MEASUREMENT AND NOT A VERIFIED COUNT. From v0.1.55
+     * (#305) it is `CycleRepCounter`'s count -- a drive, measured by the
+     * velocity it gains, met by its brake and called only once the bar is back
+     * at the floor -- and [liveReps] says what that means beside the batch
+     * count. It speaks as the bar lands, about 1.2 s after the pull ends
+     * (median 1.16 s on the eight deadlift sets), can speak a rep late after a
+     * light soft landing, and does not count an attempt that is back on the
+     * floor, or falls, within 1.2 s of its drive. On straight-reps work the
      * LIFTER'S HAND COUNT is the ground truth and this word says which counter
      * to score against it (#286). The batch detector, separately, over-counts
      * all six committed concentric-first captures that carry a hand count, by
      * +1 to +4 (#284).
      *
      * WHAT IT HAS BEEN SCORED ON, against the hand count: straight-reps
-     * deadlifts from two sessions and nothing else. Field-43, replayed through
-     * the detector after the session (`LiveCountDifferentialTest`): 5, 5 and 3
-     * of 5, 5 and 5 at 61.2, 83.9 and 102.1 kg, no phantom call, the two
-     * misses the slowest pulls of the heaviest set. Field-44, as the app
-     * counted it during the session -- the exported `liveReps`, not a replay,
-     * and no committed test computes it: 5, 5, 5, 0 and 0 of 5, 5, 5, 4 and 2
-     * at 61.2, 83.9, 102.1, 111.1 and 120.2 kg. Every rep through 102.1 kg and
-     * NOTHING at 111.1 or 120.2 kg, where #305's analysis of the capture finds
-     * each dead-stop pull above the detector's acceleration threshold for too
-     * short a time to be called. So a low or zero count on a heavy set is more
-     * likely a miss than a short set, and a heavy set the lifter did not
-     * correct reads `sensor` while under-stating the work.
+     * deadlifts from two sessions and nothing else, both replayed through it
+     * after the session (`CycleLiveCountFieldTest`). Field-43: 5, 5 and 5
+     * calls for 5, 5 and 5 at 61.2, 83.9 and 102.1 kg, one of the last set's
+     * the set-up pull and that set's rep 4 missed. Field-44: 5, 5, 5, 4 and 2
+     * of 5, 5, 5, 4 and 2 at 61.2 to 120.2 kg, the failed third pull of the
+     * last set not called. No other lift has been scored as the app runs it:
+     * on the six committed seated overhead-press captures -- tempo'd sets the
+     * metronome counts -- it would call 7, 8, 6, 10, 9 and 2 against hand
+     * counts of 6, 7, 5, 8, 8 and 2, the nearest measurement of the one tempo'd
+     * shape it does count, an explosive lift carrying a tempo.
      *
-     * No other lift has been scored as the app runs it. On the six committed
-     * seated overhead-press captures -- tempo'd sets the metronome counts, so
-     * the detector never runs on them in the app -- it would call 8, 8, 7, 10,
-     * 11 and 2 against hand counts of 6, 7, 5, 8, 8 and 2
-     * (`LiveCountDifferentialTest`), the nearest measurement of the one
-     * tempo'd shape it does count, an explosive lift carrying a tempo.
+     * A set RECORDED by v0.1.54 was counted by `DriveImpulseCounter` (#301),
+     * an upward acceleration impulse followed by braking, with no velocity in
+     * it, and keeps that figure when re-exported. On field-43, replayed
+     * (`LiveCountDifferentialTest`): 5, 5 and 3 of 5, 5 and 5, no phantom call,
+     * the two misses the slowest pulls of the heaviest set. On field-44, as the
+     * app counted it during the session: 5, 5, 5, 0 and 0 of 5, 5, 5, 4 and 2
+     * -- NOTHING at 111.1 or 120.2 kg, each dead-stop pull above its
+     * acceleration threshold for too short a time to be called. So on a set
+     * recorded by v0.1.54 a low or zero count on a heavy set is more likely a
+     * miss than a short set. The same six presses read 8, 8, 7, 10, 11 and 2
+     * under it.
+     *
+     * The sentence that stood here naming `DriveImpulseCounter` as the
+     * detector "from v0.1.54" went false for every set a build carrying #305
+     * records, and is DELETED rather than reworded; its figures are kept above,
+     * scoped to the v0.1.54 recordings they describe.
      *
      * A set RECORDED by v0.1.53 was counted by `LiveRepCaller`, the retired
      * detector [liveReps] names, which called 3, 1 and 2 on the same three
@@ -2313,12 +2363,18 @@ data class SetExport(
      * NOT the batch segmenter's count, which is `repMetrics.length` where
      * per-rep detail was asked for and is the figure [repMetricsComplete]
      * compares [reps] against. THEY ARE DIFFERENT DETECTORS. A set recorded by
-     * v0.1.54 or later was counted live by `DriveImpulseCounter` (#301): an
-     * upward acceleration impulse followed by braking, read off the
-     * bias-corrected acceleration, with no velocity, no integrator and no
-     * displacement in it. The segmenter pairs phases of an integrated,
-     * drift-corrected velocity. So the two disagree wherever a drive impulse
-     * and a velocity phase do, and neither is a check on the other.
+     * v0.1.55 or later was counted live by `CycleRepCounter` (#305): a drive,
+     * measured by the velocity it gains off the acceleration, met by its brake
+     * and called only once the bar is back at the floor, with no running
+     * velocity integrator and no displacement in it. A set recorded by v0.1.54
+     * was counted by `DriveImpulseCounter` (#301): an upward acceleration
+     * impulse followed by braking, read off the bias-corrected acceleration,
+     * with no velocity, no integrator and no displacement in it. The segmenter
+     * pairs phases of an integrated, drift-corrected velocity. So the live and
+     * batch counts disagree wherever the two rules do, and neither is a check
+     * on the other. The sentence that stood here said every set recorded by
+     * "v0.1.54 or later" was counted by the impulse detector; #305 made it
+     * false and it is DELETED rather than reworded.
      *
      * A set recorded by v0.1.53, the only earlier release that stored this
      * key, was counted by `LiveRepCaller` -- the segmenter's pairing rule over
@@ -2351,13 +2407,13 @@ data class SetExport(
      * stream, so false does not measure how wrong they are; TRUE CERTIFIES
      * NOTHING about them, only that the bound was never crossed.
      *
-     * NOT ABOUT THE COUNT. Since #301 a sensor-counted set is counted by
-     * `DriveImpulseCounter`, which reads no velocity, so this says nothing
-     * about [reps] or [liveReps], and #301's design round forbids wiring it to
-     * a "count this set by hand" warning: replayed over field-43's three
-     * deadlifts it was false on every stream while the impulse counter,
-     * replayed over the same captures, called 13 of 15 reps. No screen reads
-     * it.
+     * NOT ABOUT THE COUNT. Since #301 a sensor-counted set is counted by a
+     * detector that reads no velocity -- `DriveImpulseCounter` in v0.1.54,
+     * `CycleRepCounter` from v0.1.55 -- so this says nothing about [reps] or
+     * [liveReps], and #301's design round forbids wiring it to a "count this
+     * set by hand" warning: replayed over field-43's three deadlifts it was
+     * false on every stream while the impulse counter called 13 of 15 reps and
+     * the full-cycle counter counted 14 with one phantom. No screen reads it.
      *
      * WHICH TRACKER: the one running when the set ended. On a two-unit set
      * whose readout was rebuilt on the other unit mid-set, that tracker saw
@@ -2948,10 +3004,10 @@ data class SetExport(
      * now says. On a `manual`, `metronome` or `corrected` set this compares the
      * segmenter with a count a person or the guide kept, and false is the two
      * disagreeing. On a `sensor` set it compares the segmenter with the LIVE
-     * detector, which since #301 (v0.1.54) is a different detector -- a drive
-     * impulse read off the acceleration, with no velocity in it -- so false
-     * there is two DETECTORS disagreeing, and either may be the one that is
-     * wrong. On an `analysis` set the two agree by construction and this says
+     * detector, which since #301 is a different detector read off the
+     * acceleration, not a velocity -- a drive impulse in v0.1.54, a full cycle
+     * from v0.1.55 (#305) -- so false there is two DETECTORS disagreeing, and
+     * either may be the one that is wrong. On an `analysis` set the two agree by construction and this says
      * nothing. The clause that stood here called the live and batch counts one
      * pairing rule over two velocity estimates; that was v0.1.53's live
      * detector, and the clause is DELETED rather than reworded (#302).

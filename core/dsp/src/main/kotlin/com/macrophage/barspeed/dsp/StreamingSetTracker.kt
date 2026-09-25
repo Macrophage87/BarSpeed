@@ -26,10 +26,11 @@ data class LiveSetState(
      * *absence rendered as a value* class, and this is the same separation
      * `RepAnalysis.eccS` already makes by being nullable.
      *
-     * Since issue #301 the count a sensor-counted set speaks comes from
-     * [DriveImpulseCounter], which reads no velocity, so on such a set this
-     * flag describes the velocity, ROM and power path and NOT the count the
-     * lifter hears -- [repCount] here is drawn nowhere.
+     * Since issue #301 the count a sensor-counted set speaks comes from a
+     * detector that reads no velocity -- [DriveImpulseCounter] from #301,
+     * [CycleRepCounter] since #305 -- so on such a set this flag describes the
+     * velocity, ROM and power path and NOT the count the lifter hears --
+     * [repCount] here is drawn nowhere.
      *
      * ONE READER, and it is not a screen: since #302 the set end freezes
      * [StreamingSetTracker.publishedCountTrusted] onto the row, and the export
@@ -59,10 +60,11 @@ data class LiveSetState(
      * Published for the same reason as [elapsedS]: a [VelocitySeries] carries
      * an acceleration and constructing one with zeros would state a
      * measurement nothing made. Since issue #301 the LIVE rep decision on a
-     * sensor-counted set is made from this field and nothing else --
-     * [DriveImpulseCounter] maps it through `sensorToLifter * concentricSign`
-     * and reads no velocity at all. The BATCH decision is unchanged:
-     * [RepSegmenter] reads velocity and time only.
+     * sensor-counted set reads this field and no velocity: [CycleRepCounter],
+     * the counter since #305, maps it through `sensorToLifter * concentricSign`
+     * and also reads [accMagnitudeG] and [quiet]; [DriveImpulseCounter], the
+     * counter from #301, read this field alone. The BATCH decision is
+     * unchanged: [RepSegmenter] reads velocity and time only.
      */
     val accelMps2: Double = 0.0,
     /**

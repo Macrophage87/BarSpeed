@@ -132,9 +132,10 @@ sealed interface RepCall {
  * owner's rule of 2026-09-12, "The sensor should count the reps" -- and field-43
  * measured what that cost on a deadlift: 3, 1 and 2 calls for five performed
  * reps a set, one of the six on a set-up pull, because the live integrator never
- * found a zero on a floor-based lift. `LiveCounterPolicy` now names
- * [DriveImpulseCounter] for that set, and a set with any other counter never
- * armed this one, so no production path builds it.
+ * found a zero on a floor-based lift. `LiveCounterPolicy` named
+ * [DriveImpulseCounter] for that set from #301 and names [CycleRepCounter]
+ * since #305, and a set with any other counter never armed this one, so no
+ * production path builds it.
  *
  * It is KEPT rather than deleted, and `LiveCounterPolicy`'s KDoc gives the three
  * reasons. What still runs against it is this module's own corpus:
@@ -225,8 +226,9 @@ class LiveRepCaller(
         //
         // It is safe only because RepSegmenter reads velocityMps and timeS and
         // nothing else. Any future consumer of accelMps2 from here must map it
-        // through sensorToLifter first. There is one now:
-        // DriveImpulseCounter reads accelMps2 and does exactly that.
+        // through sensorToLifter first. There are two now:
+        // DriveImpulseCounter and CycleRepCounter read accelMps2 and both do
+        // exactly that.
         val series = VelocitySeries(
             timeS = timeS.copyOf(size),
             accelMps2 = accelMps2.copyOf(size),

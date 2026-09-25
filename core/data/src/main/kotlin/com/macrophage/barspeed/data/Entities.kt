@@ -201,9 +201,11 @@ data class SetRecordEntity(
      * NOT the batch segmenter's count. That one is re-derivable from the
      * archived stream at any time and is in `analysisJson`; this one exists
      * only while the set is being performed, from a live detector the batch
-     * path does not run. Since #301 (v0.1.54) that is `DriveImpulseCounter`,
-     * which reads a drive impulse off the acceleration and no velocity at all;
-     * a row v0.1.53 wrote holds `LiveRepCaller`'s count, the segmenter's rule
+     * path does not run. A row written by a build carrying #305 holds
+     * `CycleRepCounter`'s count, a full cycle read off the acceleration; a row
+     * v0.1.54 wrote holds `DriveImpulseCounter`'s (#301), a drive impulse read
+     * off the acceleration with no velocity at all; a row v0.1.53 wrote holds
+     * `LiveRepCaller`'s count, the segmenter's rule
      * over a causal velocity estimate. `LiveCounterPolicy` names which
      * detector a set arms. The sentence that stood here said this count was
      * made "over a causal velocity estimate", true of v0.1.53 only, and it is

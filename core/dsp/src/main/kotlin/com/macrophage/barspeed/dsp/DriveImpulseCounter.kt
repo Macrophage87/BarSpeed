@@ -44,10 +44,11 @@ import kotlin.math.max
  * - **It collapses on stack and machine work.** The thresholds are drive-frame
  *   numbers fitted at `travelRatio` 1.0 and are NOT converted through the
  *   ratio, so on a pulley they are applied in the wrong frame: 2 calls against
- *   10 performed on a leg curl, 0 against 8 on a single-leg press. Which sets
- *   reach this class is `LiveCounterPolicy.counterFor`'s answer, and that KDoc
- *   states what the answer leaves exposed: a machine set prescribed in reps with
- *   no tempo is counted by the sensor and is therefore counted here already.
+ *   10 performed on a leg curl, 0 against 8 on a single-leg press. From #301
+ *   until #305 every sensor-counted set reached this class, a machine set
+ *   prescribed in reps with no tempo included. None does since #305:
+ *   `LiveCounterPolicy.counterFor` arms [CycleRepCounter] on a sensor-counted
+ *   set, and this class is built only by name.
  *
  * There is also no ROM term of any kind, so a short sharp jolt with no travel
  * -- a bar bumped on the rack -- is a rep to this class and is not one to
