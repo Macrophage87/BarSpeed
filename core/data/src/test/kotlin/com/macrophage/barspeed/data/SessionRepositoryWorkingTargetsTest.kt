@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
@@ -25,6 +26,12 @@ import kotlin.test.assertNull
  * plan tempo ("3010") that differs from the working one ("2010"). The rest
  * instant is neither the set's start nor its end, so reading either of those
  * in its place fails too.
+ *
+ * `loadKg` is 97.5 here, apart from the working 102.5, only so that a mapping
+ * reading `loadKg` into `workingLoadKg` is caught. At a real write the two are
+ * equal -- `completedSetOf` passes the same frozen figure to both -- and they
+ * part only when a rest-screen correction later overwrites the row's
+ * `loadKg`.
  *
  * ## Absence first
  *
@@ -116,12 +123,12 @@ class SessionRepositoryWorkingTargetsTest {
     ) = CompletedSet(
         exerciseId = "back_squat",
         exerciseName = "Back Squat",
-        loadKg = 102.5,
+        loadKg = 97.5,
         plannedLoadKg = 100.0,
         workingLoadKg = 102.5,
         plannedReps = 6,
         workingReps = workingReps,
-        manualReps = 8,
+        manualReps = 7,
         plannedDurationS = 45,
         workingDurationS = workingDurationS,
         actualDurationS = 31,
@@ -144,6 +151,32 @@ class SessionRepositoryWorkingTargetsTest {
         val dao = FakeSessionDao()
         SessionRepository(dao, FakeExerciseDao()).recordSet(sessionId = 1L, orderIdx = 0, set = set)
         return dao.sets.single()
+    }
+
+    /**
+     * Each of the five reaches its own column, and no sibling stands in for it.
+     *
+     * A raised rep target that was met must read as met against 8, not as an
+     * over-performance against the plan's 6; a hold shortened to 30 must not
+     * read as a failed 45. The row can say that only if the working figure is
+     * on it.
+     */
+    @Test
+    fun `the working targets, the plan's tempo and the rest instant reach the row`() = runTest {
+        val row =
+            rowFor(
+                completedSet(
+                    workingReps = 8,
+                    workingDurationS = 30,
+                    plannedTempo = "3010",
+                    restStartedAtMs = 62_500L,
+                ),
+            )
+        assertEquals(8, row.workingReps, "the working rep target was dropped at the write")
+        assertEquals(30, row.workingDurationS, "the working hold was dropped at the write")
+        assertEquals(102.5, row.workingLoadKg, "the working load was dropped at the write")
+        assertEquals("3010", row.plannedTempo, "the plan's tempo was dropped at the write")
+        assertEquals(62_500L, row.restStartedAtMs, "the rest-start instant was dropped at the write")
     }
 
     /**
