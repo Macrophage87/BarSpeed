@@ -2,6 +2,7 @@ package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.model.CoachingVerdictPolicy
+import com.macrophage.barspeed.model.HistoryTarget
 import com.macrophage.barspeed.model.PlanNoteDisplay
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.ProgressionKind
@@ -173,4 +174,38 @@ fun restVerdicts(
     timedVerdicts(effectiveDurationS, plannedDurationS)
 } else {
     CoachingVerdictPolicy.forRegime(frozenVerdicts, velocityLossRegime)
+}
+
+/**
+ * Which verdict lines the history screen shows for a stored set (#308): the
+ * rest screen's own [restVerdicts], asked the question [verdict] names.
+ *
+ * [HistoryTarget.Verdict.Regrade] is a hold re-graded off its stored seconds,
+ * through the same [timedVerdicts] the rest screen re-grades with, so the two
+ * screens cannot word one hold two ways. [HistoryTarget.Verdict.Frozen] is the
+ * sentence frozen at set end, filtered through [CoachingVerdictPolicy] for the
+ * set's velocity-loss regime -- exactly what [restVerdicts] shows for a rep
+ * set. A Frozen caption is not a verdict line; the screen draws it above them.
+ */
+fun historyVerdicts(
+    verdict: HistoryTarget.Verdict,
+    frozenVerdicts: List<String>,
+    velocityLossRegime: VelocityLossRegime?,
+): List<String> = when (verdict) {
+    is HistoryTarget.Verdict.Regrade ->
+        restVerdicts(
+            isTimed = true,
+            effectiveDurationS = verdict.actualS,
+            plannedDurationS = verdict.targetS,
+            frozenVerdicts = frozenVerdicts,
+            velocityLossRegime = velocityLossRegime,
+        )
+    is HistoryTarget.Verdict.Frozen ->
+        restVerdicts(
+            isTimed = false,
+            effectiveDurationS = null,
+            plannedDurationS = null,
+            frozenVerdicts = frozenVerdicts,
+            velocityLossRegime = velocityLossRegime,
+        )
 }

@@ -38,13 +38,14 @@ import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.dsp.AccelArtefact
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
-import com.macrophage.barspeed.model.CoachingVerdictPolicy
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.HistoryTarget
 import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
+import com.macrophage.barspeed.record.historyVerdicts
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
 import com.macrophage.barspeed.ui.components.RepBars
@@ -216,9 +217,13 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
 @Composable
 private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, unit: WeightUnit) {
     val analysis = viewModel.decodeAnalysis(record)
+    // Every target this card draws, decided once in :core:model where a test
+    // reaches it (#308). The composables below read its fields and decide
+    // nothing about whose figure a target is.
+    val target = HistoryTarget.of(historyRowOf(record), unit)
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            SetCardHeader(record, unit)
+            SetCardHeader(record, unit, target)
             // OUTSIDE the analysis block below, deliberately. Every other chip
             // on this card is drawn only where a stored analysis decodes, and
             // a set that did not happen is exactly the set whose analysis is
@@ -227,13 +232,13 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
             VoidRow(record, viewModel)
             analysis?.let { a ->
                 val regime = viewModel.velocityLossRegime(record)
-                SetChips(record, a, regime)
+                SetChips(record, a, regime, target)
                 // What the ratio in the chip above does not cover. History
                 // carried no qualifier at all, so a set graded on the drive
                 // alone read as a fully compliant one. #56.
                 TempoCoverageNote(a)
                 if (a.reps.isNotEmpty()) {
-                    SetVelocityBars(record, a)
+                    SetVelocityBars(record, a, target.repSlots)
                     // The prescription this set's eccentric was GRADED
                     // against, not a second reading of record.tempo's digits:
                     // digit 1 is the eccentric only while the drive moves up.
@@ -254,18 +259,16 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
                 // reader shows, and CoachingVerdictPolicy in :core:model is
                 // where that decision is made and tested.
                 //
-                // NOT FIXED for a timed set (#270, part not yet closed): `a.verdicts`
-                // here is still the sentence frozen at set end from the
-                // pre-correction seconds, same as the rest screen's bug --
-                // but this is not the rest screen's one-line fix. The header
-                // above (SetCardHeader) prints `record.actualDurationS`, which
-                // Daos.kt's overrideDuration DOES rewrite on a correction, next
-                // to `record.plannedDurationS`, the PLAN's original target,
-                // which a duration correction never touches -- not the working
-                // target `restVerdicts` grades against on the rest screen. So
-                // fixing this call site needs its own read of what "corrected"
-                // means for history, not a copy of PlanQueue.kt's restVerdicts.
-                CoachingVerdictPolicy.forRegime(a.verdicts, regime).forEach {
+                // NOT FIXED for a timed set (#308): HistoryTarget still answers
+                // Frozen on every row, so `a.verdicts` here is the sentence
+                // frozen at set end from the pre-correction seconds. The row's
+                // `plannedDurationS` is the PLAN's original target, which a
+                // duration correction never touches -- not the working target
+                // `restVerdicts` grades against on the rest screen.
+                (target.verdict as? HistoryTarget.Verdict.Frozen)?.caption?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+                }
+                historyVerdicts(target.verdict, a.verdicts, regime).forEach {
                     Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                 }
             }
@@ -370,31 +373,56 @@ private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel) 
     ) { Text(VoidSetPolicy.label(record.voided), color = BarColors.Sub) }
 }
 
+/**
+ * The stored row's columns [HistoryTarget] reads, field for field. Which
+ * column lands in which slot is compile- and lint-gated only: no test reaches
+ * this function.
+ */
+private fun historyRowOf(record: SetRecordEntity) = HistoryTarget.Row(
+    actualReps = record.actualReps,
+    plannedReps = record.plannedReps,
+    workingReps = record.workingReps,
+    actualDurationS = record.actualDurationS,
+    plannedDurationS = record.plannedDurationS,
+    workingDurationS = record.workingDurationS,
+    loadKg = record.loadKg,
+    plannedLoadKg = record.plannedLoadKg,
+    workingLoadKg = record.workingLoadKg,
+    durationEndedBy = record.durationEndedBy,
+)
+
+private fun HistoryTarget.Tone.chipTone(): ChipTone = when (this) {
+    HistoryTarget.Tone.OK -> ChipTone.OK
+    HistoryTarget.Tone.WARN -> ChipTone.WARN
+    HistoryTarget.Tone.BAD -> ChipTone.BAD
+}
+
 @Composable
-private fun SetCardHeader(record: SetRecordEntity, unit: WeightUnit) {
+private fun SetCardHeader(record: SetRecordEntity, unit: WeightUnit, target: HistoryTarget) {
     val loadText = record.loadKg.takeIf { it > 0 }?.let { unit.format(it) } ?: "bodyweight"
     val name =
         record.exerciseName +
             (record.side?.let { " (${it.replaceFirstChar { c -> c.uppercase() }})" } ?: "")
-    val work =
-        record.actualDurationS?.let {
-            "${it}s" + (record.plannedDurationS?.let { p -> " (target ${p}s)" } ?: "")
-        } ?: "${record.actualReps} ×"
+    val work = target.holdHeader ?: "${record.actualReps} ×"
     Text(
         "$name — $work ${if (record.actualDurationS != null) "@ $loadText" else loadText}",
         style = MaterialTheme.typography.titleMedium,
     )
-    record.plannedLoadKg?.takeIf { it != record.loadKg }?.let {
-        Text(
-            "Deviation (planned ${unit.format(it)})",
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Amber,
-        )
+    target.note?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+    }
+    target.loadDeviation?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
     }
 }
 
 @Composable
-private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis, regime: VelocityLossRegime?) {
+private fun SetChips(
+    record: SetRecordEntity,
+    analysis: SetAnalysis,
+    regime: VelocityLossRegime?,
+    target: HistoryTarget,
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (record.failed) VerdictChip("FAILED", ChipTone.BAD)
         // The plan's declaration composed with the lifter's own mark (#194),
@@ -412,17 +440,7 @@ private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis, regime: Vel
         if (record.added) VerdictChip("ADDED", ChipTone.NEUTRAL)
         if (record.repsManual) VerdictChip("MANUAL COUNT", ChipTone.NEUTRAL)
         record.rpe?.let { VerdictChip("RPE $it", if (it >= 10) ChipTone.WARN else ChipTone.NEUTRAL) }
-        record.actualDurationS?.let { actual ->
-            val planned = record.plannedDurationS
-            VerdictChip(
-                if (planned != null) "Held $actual/${planned}s" else "Held ${actual}s",
-                when {
-                    planned == null || actual >= planned -> ChipTone.OK
-                    actual >= (planned * 0.9).toInt() -> ChipTone.WARN
-                    else -> ChipTone.BAD
-                },
-            )
-        }
+        target.heldChip?.let { VerdictChip(it.text, it.tone.chipTone()) }
         // One decision with the rest screen, in :core:model where a test
         // reaches it -- the two copies of it here and there could not be
         // tested and were free to drift. History reads stored analyses, so
@@ -467,7 +485,7 @@ private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis, regime: Vel
 }
 
 @Composable
-private fun SetVelocityBars(record: SetRecordEntity, analysis: SetAnalysis) {
+private fun SetVelocityBars(record: SetRecordEntity, analysis: SetAnalysis, plannedSlots: Int?) {
     // Olympic-lift style movements are judged on peak velocity, not mean.
     val explosive = ExerciseDef.seedById(record.exerciseId)?.kind == ExerciseKind.EXPLOSIVE
     SectionCaption(if (explosive) "Peak velocity (m/s)" else "Mean concentric velocity (m/s)")
@@ -481,7 +499,7 @@ private fun SetVelocityBars(record: SetRecordEntity, analysis: SetAnalysis) {
     val velocities = analysis.reps.map { if (explosive) it.peakConVelMps else it.meanConVelMps }
     RepBars(
         values = velocities,
-        plannedSlots = record.plannedReps,
+        plannedSlots = plannedSlots,
         colorFor = { _, v -> velocityLossColor(v, velocities, record.velocityLossStopPct) },
         barHeight = 56,
     )
