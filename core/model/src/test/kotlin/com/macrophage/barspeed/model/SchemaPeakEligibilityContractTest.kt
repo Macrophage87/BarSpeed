@@ -151,7 +151,7 @@ class SchemaPeakEligibilityContractTest {
     @Test
     fun `the version log carries the thirteenth 1_22 entry once`() {
         val log = versionLog()
-        assertEquals(1, Regex("1\\.22 TAKES A SEVENTH ENTRY \\(#306").findAll(log).count(), "the entry's marker")
+        assertEquals(1, Regex("1\\.22 TAKES A THIRTEENTH ENTRY \\(#306").findAll(log).count(), "the entry's marker")
         listOf("guardArtefactSamples", "noEligiblePair", "NOT PURELY ADDITIVE", "0.362 s", "RETROACTIVE").forEach {
             assertTrue(it in log, "the version log's #306 entry does not say $it")
         }
