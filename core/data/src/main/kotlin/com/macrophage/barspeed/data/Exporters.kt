@@ -26,6 +26,7 @@ import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RepMetricsExport
 import com.macrophage.barspeed.model.RepsSourcePolicy
+import com.macrophage.barspeed.model.RestMeasurePolicy
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRole
@@ -45,6 +46,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.util.zip.Deflater
@@ -123,13 +127,17 @@ class SessionExporter(
         // readings could straddle a re-label and attribute two sets of one
         // session to different units.
         val roleByAddress = sensorRoleByAddress()
+        // Each set's NEXT set's start, across the whole session rather than
+        // within an exercise: the measured rest runs to whichever set came
+        // next (#157). Taken before the grouping below, which loses the order.
+        val nextStart = nextStartsById(sets)
         val byExercise = sets.groupBy { it.exerciseId }
         val exercises =
             byExercise.map { (exerciseId, records) ->
                 ExerciseExport(
                     exercise = exerciseId,
                     sets = records.map { record ->
-                        setExport(record, includeRepDetail, minBpmOverride, roleByAddress)
+                        setExport(record, includeRepDetail, minBpmOverride, roleByAddress, nextStart[record.id])
                     },
                 )
             }
@@ -219,6 +227,7 @@ class SessionExporter(
         includeRepDetail: Boolean,
         minBpmOverride: Map<Long, Int?>,
         roleByAddress: Map<String, SensorRole>,
+        nextStartedAtMs: Long?,
     ): SetExport {
         val analysis = sessionRepository.decodeAnalysis(record)
         val reps = analysis?.reps.orEmpty()
@@ -320,9 +329,10 @@ class SessionExporter(
         return SetExport(
             loadKg = record.loadKg,
             loadLb = Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0,
-            // The set's targets and its rest, from ONE builder (#219):
-            // [prescriptionExport] states which columns each key reads.
-            prescription = record.prescriptionExport(),
+            // The set's targets and its rest, from ONE builder (#219), the same
+            // one the archive's manifest calls: [prescriptionExport] states
+            // which columns each key reads.
+            prescription = record.prescriptionExport(nextStartedAtMs),
             // How much of loadKg was the lifter (#220). Straight off the row,
             // never recomputed: it is the figure the arithmetic used, and the
             // one body weight the app holds has moved since. Absent where the
@@ -866,17 +876,46 @@ private val SetRecordEntity.publishedLimiterNote: String?
 /**
  * This row's targets and its rest as the export publishes them (#157, #219).
  *
- * The one builder of [SetPrescriptionExport] in this module. Each key reads
- * one column, straight off the row and never recomputed: the plan's frozen
- * load, count and hold, the plan's rest, and the tempo the set ran.
+ * The one builder of [SetPrescriptionExport] in this module, called by both
+ * writers. Every key but one reads one column, straight off the row and never
+ * recomputed: the plan's frozen load, count, hold and tempo; the working load,
+ * count and hold the set ran against; the plan's rest; and the tempo the set
+ * ran. No working key is backfilled from its planned sibling: a row written
+ * before database v20 holds null in each, and publishes nothing for them.
+ *
+ * `restMeasured_s` is the one computed key, [RestMeasurePolicy.measuredS]
+ * over the row's stored rest instant and [nextStartedAtMs], the next set's
+ * start. Null where either is absent -- a row written before v20, the last set
+ * of a session -- or where the two are inverted.
+ *
+ * @param nextStartedAtMs the start instant of the set that came next in the
+ *   session, in `orderIdx` order, or null on the last set.
  */
-private fun SetRecordEntity.prescriptionExport(): SetPrescriptionExport = SetPrescriptionExport(
+private fun SetRecordEntity.prescriptionExport(nextStartedAtMs: Long?): SetPrescriptionExport = SetPrescriptionExport(
     plannedLoadKg = plannedLoadKg,
+    workingLoadKg = workingLoadKg,
     plannedReps = plannedReps,
+    workingReps = workingReps,
     plannedDurationS = plannedDurationS,
+    workingDurationS = workingDurationS,
     restS = plannedRestS,
+    restMeasuredS = RestMeasurePolicy.measuredS(restStartedAtMs, nextStartedAtMs),
     tempoPrescribed = tempo,
+    plannedTempo = plannedTempo,
 )
+
+/**
+ * Each set's NEXT set's start instant, by set id, in `orderIdx` order across
+ * the whole session (#157). The last set has no entry.
+ *
+ * Across the session and not within an exercise, because the rest after a set
+ * ends at whichever START came next -- the owner's reading of where rest
+ * ends, 2026-09-25: "I consider rests a minimum. If it takes more time to
+ * setup I do." One function for both writers, so the manifest and the session
+ * document measure one rest from one pair of instants.
+ */
+private fun nextStartsById(sets: List<SetRecordEntity>): Map<Long, Long> =
+    sets.sortedBy { it.orderIdx }.zipWithNext { set, next -> set.id to next.startedAtMs }.toMap()
 
 /**
  * The void reason as it may be PUBLISHED: only where the mark stands beside
@@ -986,6 +1025,9 @@ class RawExporter(
             // minBpmOverride` check (rather than a value-nullity check) can tell
             // "computed here, nothing trusted" apart from "not computed here".
             val minBpmBySet = mutableMapOf<Long, Int?>()
+            // The same next-start reading session.json takes, so the two
+            // documents measure one rest from one pair of instants (#157).
+            val nextStart = nextStartsById(sets)
             for ((idx, record) in sets.withIndex()) {
                 val streams = sessionRepository.rawStreams(record.id)
                 val files = mutableListOf<String>()
@@ -1078,6 +1120,7 @@ class RawExporter(
                         imuFileByRole,
                         prepWindow,
                         setEnd,
+                        nextStart[record.id],
                     )
             }
             meta.append(setLines.joinToString(",\n")).append("\n  ]\n}\n")
@@ -1126,6 +1169,7 @@ class RawExporter(
         imuFileByRole: Map<String?, String>,
         prepWindow: PrepWindow?,
         setEnd: SetEnd,
+        nextStartedAtMs: Long?,
     ): String {
         // The same policy the session document asks, so the two cannot
         // disagree about one set (#216).
@@ -1151,7 +1195,21 @@ class RawExporter(
         // body-weight term publishes no key rather than a zero.
         num("bodyWeight_kg", record.bodyWeightKg)
         num("reps", record.actualReps)
-        num("plannedReps", record.plannedReps)
+        // The set's targets and its rest -- planned, working, and the rest two
+        // instants measured -- from the SAME object session.json publishes
+        // (#219, #157). Each writer listing these keys for itself is how
+        // `plannedLoad_kg`, `plannedDuration_s` and `rest_s` reached
+        // session.json and never this manifest; a key added to
+        // [SetPrescriptionExport] now reaches both or neither. [str] for a
+        // string and [num] for a number, so the manifest writes each value the
+        // way it writes every other, and a null -- absent from both documents
+        // -- is skipped rather than written as a literal.
+        Json.encodeToJsonElement(SetPrescriptionExport.serializer(), record.prescriptionExport(nextStartedAtMs))
+            .jsonObject.filterValues { it != JsonNull }
+            .forEach { (key, value) ->
+                val primitive = value.jsonPrimitive
+                if (primitive.isString) str(key, primitive.content) else num(key, primitive.content)
+            }
         num("duration_s", phase.durationS)
         // Beside the figure it qualifies, in the manifest as well as in the
         // session document (#259). Two writers, one fact, one extension.
@@ -1233,7 +1291,6 @@ class RawExporter(
         val geometry = sessionRepository.decodeGeometry(record)
         str("repsSource", record.publishedRepsSource(geometry?.kind))
         num("liveReps", record.liveReps)
-        str("tempoPrescribed", record.tempo)
         // The prep, both halves. [num] drops a null, which is right -- a set
         // that ran no voice guide has no prep -- and writes a real 0, which is
         // also right: 0 is the prep in which nothing is spoken before the first

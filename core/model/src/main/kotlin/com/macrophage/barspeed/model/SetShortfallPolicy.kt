@@ -31,11 +31,12 @@ package com.macrophage.barspeed.model
  * here. Noting it is a recording job, not a verdict. From database v20 the
  * set row stores the working target this function is handed
  * (`workingReps`, `workingDurationS`) beside the plan's figure and the
- * actual one. The export does not publish it yet, so a set met at a lowered
- * target still reads in the export as "planned 10, did 6, not failed"
- * (#157, field-45 set 8) until the export carries the working keys. The
- * sentence here said the row does NOT store the working target; v20 made it
- * false and it is deleted. #157 recovered the working count of a guided set
+ * actual one, and from export 1.23 both documents publish it
+ * (`workingReps`, `workingDuration_s`), so a set met at a lowered target
+ * reads as planned 10, working 6, did 6, not failed (#157, field-45 set 8).
+ * Two sentences here are deleted rather than reworded: one said the row does
+ * NOT store the working target, which v20 made false, and one said the
+ * export does not publish it, which 1.23 made false. #157 recovered the working count of a guided set
  * only from where `Last rep` falls in its cue track.
  *
  * ## Judged only where the count is trustworthy

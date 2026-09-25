@@ -1268,15 +1268,13 @@ private fun TempoAdjuster(state: RecordState, viewModel: RecordViewModel) {
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
     )
-    // NOT "your change is recorded in the export", which is what PrepAdjuster
-    // says one control down and is FALSE here. That line is true of the prep
-    // and of the load because both publish a planned/actual pair -- prep_s
-    // beside plannedPrep_s, load_kg beside plannedLoad_kg -- so a reader can
-    // see the deviation afterwards. Tempo has no such pair: session.json
-    // carries one field, tempoPrescribed, and it holds what RAN, so an
-    // adjusted set is indistinguishable from one the plan prescribed that way.
-    // #151. What is said instead is what the lifter can act on: how far this
-    // change reaches.
+    // What is said here is what the lifter can act on: how far this change
+    // reaches. From export 1.23 the change is also on the record --
+    // `plannedTempo` beside `tempoPrescribed`, which holds what RAN (#151,
+    // #157) -- on every set whose plan declared a tempo. The sentence that
+    // stood here said tempo had no such pair and an adjusted set was
+    // indistinguishable from a prescribed one; 1.23 made it false and it is
+    // deleted. The caption is unchanged.
     Text(
         when {
             planned == null || tempo == planned -> "Seconds per phase for the coming set"
@@ -1575,12 +1573,13 @@ private fun ChangeSetButton(
  *
  * The caption stays attached to the load and reps row rather than being
  * promoted to the dialog's subtitle, and that is the one thing here it would
- * be easy to get wrong. "deviations are recorded" is a claim about the export,
- * and it is TRUE of load, reps and prep -- each publishes a planned/actual
- * pair -- and FALSE of tempo, which publishes one field holding what ran
- * (#151). The tempo control carries its own caption saying something different
- * for that reason; a subtitle would silently extend the true claim over the
- * control it is false for.
+ * be easy to get wrong. "deviations are recorded" is a claim about the export.
+ * From export 1.23 it is true of load, reps, hold and tempo -- each publishes
+ * its planned figure beside the working one (#157) -- and of prep, which
+ * publishes a planned/actual pair. The tempo control carries its own caption,
+ * which names how far the change reaches. The sentence that stood here said
+ * the claim is FALSE of tempo because tempo published one field holding what
+ * ran (#151); `plannedTempo` made it false at 1.23 and it is deleted.
  *
  * Plan sets only. The ad-hoc rest and READY layouts keep their inline form:
  * `AdHocForm` carries an exercise grid, a unit toggle and side chips, which is

@@ -2568,9 +2568,9 @@ data class SetExport(
     @SerialName("load_lb") val loadLb: Double? = null,
     /**
      * The set's targets and its rest, published FLAT beside the keys below by
-     * [SetExportWireSerializer]: `plannedLoad_kg`, `plannedReps`,
-     * `plannedDuration_s`, `rest_s` and `tempoPrescribed`. Grouped so the raw
-     * archive's manifest publishes them from the same object (#219).
+     * [SetExportWireSerializer]: the planned, working and rest keys
+     * [SetPrescriptionExport] declares. Grouped so the raw archive's manifest
+     * publishes them from the same object (#219).
      *
      * No default: every set states its prescription, and a defaulted property
      * is one the exporter could silently stop passing.
@@ -2774,13 +2774,13 @@ data class SetExport(
     /**
      * Hold/carry seconds recorded for timed sets (planks, farmer's walks).
      *
-     * Since #168 a timed set ENDS when its clock reaches the seconds the set
-     * was working to -- [SetPrescriptionExport.plannedDurationS] unless the
-     * lifter changed the hold in the change-set dialog, in which case theirs
-     * -- so a set that ran to its target publishes
-     * [SetPrescriptionExport.plannedDurationS] only when the lifter did not
-     * change it; one the lifter ended by hand publishes what it lasted, and
-     * one corrected afterwards on the rest screen publishes the corrected
+     * The ACTUAL seconds, after any rest-screen correction. Since #168 a timed
+     * set ENDS when its clock reaches its working target, published from 1.23
+     * as [SetPrescriptionExport.workingDurationS] beside the plan's
+     * [SetPrescriptionExport.plannedDurationS], so a set that ran to its
+     * target publishes its working target here; one the lifter ended by hand
+     * publishes what it lasted, and one corrected afterwards on the rest
+     * screen publishes the corrected
      * seconds. WHICH of them produced this figure is [durationEndedBy] from
      * 1.21; the sentence that stood here -- that the three are not
      * distinguishable and that [repsManual] has no counterpart for duration

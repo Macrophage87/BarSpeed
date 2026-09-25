@@ -4,10 +4,11 @@ package com.macrophage.barspeed.model
  * The rest between two sets as two clock instants measure it, and whether
  * that is short of the rest the plan prescribed (#157).
  *
- * NOTHING CALLS THIS YET. It is the pure half of the measured rest the #157
- * design proposes to publish as `restMeasured_s`. From database v20 the set
- * row stores the instant its rest ran from (`restStartedAtMs`); nothing
- * exports that instant or this figure yet.
+ * [measuredS] is what the export publishes as `restMeasured_s` (1.23): both
+ * export writers build it from the row's stored `restStartedAtMs`, which
+ * database v20 added, and the next set's start, in `orderIdx` order. The
+ * sentence that stood here said nothing called this; export 1.23 made it
+ * false and it is deleted. [shortOfPrescribed] still has no caller.
  *
  * ## What the measurement is
  *

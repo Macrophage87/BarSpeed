@@ -13,6 +13,20 @@ import kotlinx.serialization.json.jsonObject
  * A set's targets and its rest as the export publishes them: the keys BOTH
  * export writers must carry, in one type (#157, #219).
  *
+ * THREE LAYERS PER TARGET (export 1.23). PLANNED is what the plan prescribed,
+ * frozen when the plan was flattened, and no in-app control moves it:
+ * [plannedLoadKg], [plannedReps], [plannedDurationS], [plannedTempo] and
+ * [restS]. WORKING is the target the set ran against, fixed at START:
+ * [workingLoadKg], [workingReps], [workingDurationS] and [tempoPrescribed].
+ * ACTUAL is on [SetExport] itself -- `load_kg`, `reps`, `duration_s`,
+ * `tempoCompliance` -- after any rest-screen correction. [restMeasuredS] is
+ * the rest two clock instants measured.
+ *
+ * A working figure below the planned one is a lowered target, and a set that
+ * met it is COMPLETED: the owner, 2026-09-25, "It's completed even if the
+ * target is lowered, just note the discrepancy." The two figures side by side
+ * are the note; nothing here judges it.
+ *
  * ONE TYPE, TWO WRITERS. `session.json` is serialised by kotlinx and the raw
  * archive's `meta.json` is assembled as text by a different function. Before
  * this type each writer listed these keys itself, and they drifted: #219 is
@@ -33,12 +47,58 @@ import kotlinx.serialization.json.jsonObject
  */
 @Serializable
 data class SetPrescriptionExport(
+    /**
+     * The load the PLAN prescribed, frozen when the plan was flattened, on
+     * `load_kg`'s scale. Null where the plan named no load for the set, and on
+     * an added or ad-hoc set, which no plan prescribed.
+     */
     @SerialName("plannedLoad_kg") val plannedLoadKg: Double?,
+    /**
+     * The load the set RAN AGAINST, resolved when it ended and before any
+     * rest-screen correction (1.23). Every set recorded from database v20
+     * carries it, because every set has a load, so its absence is what marks a
+     * set whose working targets the recording build could not state. Where
+     * `load_kg` differs from it, the load was corrected after the set: the
+     * rest-screen correction is the only write that moves `load_kg` on a
+     * stored row.
+     */
+    @SerialName("workingLoad_kg") val workingLoadKg: Double?,
+    /**
+     * The rep count the PLAN prescribed, frozen when the plan was flattened.
+     * Null on an added set and on a set the plan gave no count. On an ad-hoc
+     * set, which has no plan, the recorder writes the count the lifter typed.
+     */
     val plannedReps: Int?,
+    /**
+     * The rep count the set RAN AGAINST, fixed at START (1.23): the plan's
+     * unless the lifter changed it in the app. The short-set judgement reads
+     * this figure (`SetShortfallPolicy`), so a met lowered target is
+     * completed. Published even where it equals [plannedReps], so its absence
+     * never means "as planned": it means no rep target, or a set recorded
+     * before database v20.
+     */
+    val workingReps: Int?,
+    /**
+     * The hold or carry seconds the PLAN prescribed, frozen when the plan was
+     * flattened. A set RECORDED by v0.1.43 or earlier stored the working
+     * target here and still publishes it.
+     */
     @SerialName("plannedDuration_s") val plannedDurationS: Int?,
+    /**
+     * The hold or carry seconds the set RAN AGAINST (1.23): the countdown ran
+     * to this figure. Null on a set that is not timed and on every set
+     * recorded before database v20.
+     */
+    @SerialName("workingDuration_s") val workingDurationS: Int?,
     /**
      * The rest PRESCRIBED after this set, in whole seconds -- never a
      * measurement of how long the lifter rested (#76).
+     *
+     * A MINIMUM (1.23). The owner, 2026-09-25: "I consider rests a minimum. If
+     * it takes more time to setup I do." So only a [restMeasuredS] SHORTER
+     * than this is a discrepancy. Null where the plan declared no rest -- the
+     * countdown then ran the app's default -- and on an added set it is
+     * carried over from the block, prescribing nothing for that set.
      *
      * From 1.19 the published description states which instant it is counted
      * FROM, and `RestClockPolicy` owns that instant: a release that decided a
@@ -57,7 +117,30 @@ data class SetPrescriptionExport(
      * to 0.58 s on the one session measured.
      */
     @SerialName("rest_s") val restS: Int?,
+    /**
+     * The rest after this set as two clock instants measure it, seconds to the
+     * nearest tenth (1.23): from the instant [restS]'s countdown starts at --
+     * the stored `restStartedAtMs` -- to the START tap on the next set of the
+     * session, as [RestMeasurePolicy.measuredS] computes it. Walking and setup
+     * are inside it; the next set's prep, which runs after that tap, is not.
+     * Only a figure SHORTER than [restS] is a discrepancy. Null on the last
+     * set, on a set recorded before database v20, and where the two instants
+     * are inverted.
+     */
+    @SerialName("restMeasured_s") val restMeasuredS: Double?,
+    /**
+     * The WORKING tempo: the one the set ran against and `tempoCompliance`
+     * scores. The name is historical; [plannedTempo] is the plan's.
+     */
     val tempoPrescribed: String?,
+    /**
+     * The tempo the PLAN declared, frozen when the plan was flattened (1.23,
+     * #151). Where it differs from [tempoPrescribed] the lifter adjusted the
+     * tempo in the app. Null where no plan declared one -- an ad-hoc set, an
+     * added set, a timed set, a planned set with no tempo -- and on every set
+     * recorded before database v20.
+     */
+    val plannedTempo: String?,
 )
 
 /**
