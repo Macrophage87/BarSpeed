@@ -5287,9 +5287,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // for a change they made deliberately, and after #137 that reaches the
         // RPE record. From database v20 the row stores the working target it
         // was judged against (workingReps, workingDurationS, via
-        // completedSetOf) beside plannedReps and the actual count; the export
-        // does not publish it yet, so there a set met at a lowered target
-        // still reads "planned 10, did 6, not failed". Its seconds
+        // completedSetOf) beside plannedReps and the actual count; from export
+        // 1.23 both documents publish it as workingReps and workingDuration_s
+        // beside plannedReps and plannedDuration_s. Its seconds
         // rule is TimedSetEndPolicy.fellShort, the function setTargetMet's
         // timed branch asks, so the screen and the record draw one boundary
         // (#168).

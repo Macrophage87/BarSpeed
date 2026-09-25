@@ -32,8 +32,10 @@ package com.macrophage.barspeed.model
  * set row stores the working target this function is handed
  * (`workingReps`, `workingDurationS`) beside the plan's figure and the
  * actual one, and from export 1.23 both documents publish it
- * (`workingReps`, `workingDuration_s`), so a set met at a lowered target
- * reads as planned 10, working 6, did 6, not failed (#157, field-45 set 8).
+ * (`workingReps`, `workingDuration_s`), so a set recorded from database v20
+ * and met at a lowered target reads as planned, working and actual side by
+ * side, not failed. Set 8 of field-45 was recorded on v0.1.54, before v20,
+ * and still reads "planned 10, did 6, not failed": nothing backfills it.
  * Two sentences here are deleted rather than reworded: one said the row does
  * NOT store the working target, which v20 made false, and one said the
  * export does not publish it, which 1.23 made false. #157 recovered the working count of a guided set
