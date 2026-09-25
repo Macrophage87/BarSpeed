@@ -3,6 +3,7 @@ package com.macrophage.barspeed.model
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonTransformingSerializer
@@ -63,9 +64,9 @@ data class SetPrescriptionExport(
  * The published shape of a set: [SetExport] with its [SetExport.prescription]
  * lifted into the set object, so the grouping is invisible on the wire.
  *
- * Applied where [ExerciseExport] lists its sets, so every set the session
- * document publishes passes through it, and nothing else in the document is
- * touched. Decoding reverses it, so a document this writer produced reads back
+ * Applied where [ExerciseExport] lists its sets, through
+ * [SetExportListSerializer], so every set the session document publishes
+ * passes through it, and nothing else in the document is touched. Decoding reverses it, so a document this writer produced reads back
  * into the same objects.
  *
  * WHERE THE KEYS LAND. Where the grouping sits among [SetExport]'s own
@@ -106,3 +107,11 @@ object SetExportWireSerializer : JsonTransformingSerializer<SetExport>(SetExport
     private fun keysOf(serializer: KSerializer<*>): Set<String> =
         serializer.descriptor.let { d -> (0 until d.elementsCount).map(d::getElementName).toSet() }
 }
+
+/**
+ * [ExerciseExport.sets]' serializer: a list of [SetExportWireSerializer]
+ * sets. An object of its own because a property-level `@Serializable(with =)`
+ * names a serializer class, and ktlint refuses the type-use annotation that
+ * would otherwise sit inside `List<>`.
+ */
+object SetExportListSerializer : KSerializer<List<SetExport>> by ListSerializer(SetExportWireSerializer)

@@ -2488,7 +2488,7 @@ data class HrSessionSummary(
 @Serializable
 data class ExerciseExport(
     val exercise: String,
-    val sets: List<@Serializable(with = SetExportWireSerializer::class) SetExport>,
+    @Serializable(with = SetExportListSerializer::class) val sets: List<SetExport>,
 )
 
 @Serializable
