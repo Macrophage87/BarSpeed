@@ -355,10 +355,11 @@ private fun applyDraft(
     // TimedSetEndPolicy.adjustedSeconds, so the figure is already floored where
     // the write would floor it.
     val heldNow = feedback.effectiveDurationS
+    val heldChanged = seconds != null && heldNow != null && seconds != heldNow
     val draft =
         CountAndRatingDraft(
             reps = if (!timed && reps != feedback.effectiveReps) reps else null,
-            seconds = if (timed && seconds != null && heldNow != null && seconds != heldNow) seconds else null,
+            seconds = if (timed && heldChanged) seconds else null,
             rpe = rpe,
             tappedFailed = tappedFailed,
             ratingChanged = rpe != state.lastSetRpe || tappedFailed != state.lastSetTappedFailed,

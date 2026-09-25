@@ -52,12 +52,7 @@ object SetCorrectionPolicy {
      * short of a planned count. A draft that moves neither leaves [standing]
      * where it is, because nothing it says bears on the verdict.
      */
-    fun shortfall(
-        draft: CountAndRatingDraft,
-        plannedReps: Int?,
-        plannedDurationS: Int?,
-        standing: Boolean,
-    ): Boolean {
+    fun shortfall(draft: CountAndRatingDraft, plannedReps: Int?, plannedDurationS: Int?, standing: Boolean): Boolean {
         val seconds = draft.seconds
         val reps = draft.reps
         return when {
