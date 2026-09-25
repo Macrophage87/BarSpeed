@@ -64,9 +64,9 @@ data class CompletedSet(
      */
     val liveReps: Int? = null,
     /**
-     * Whether the live tracker still held its zero when the set ended, or null
-     * where no live tracker covered the set (#302). The caller reads it off
-     * `StreamingSetTracker.publishedCountTrusted`.
+     * Whether the live tracker stayed within its displacement bound for the
+     * whole set, or null where no live tracker covered the set (#302). The
+     * caller reads it off `StreamingSetTracker.publishedCountTrusted`.
      *
      * Stored inside `analysisJson` as `SetAnalysis.liveCountTrusted` rather
      * than in a column: [recordSet] copies it onto the analysis it encodes, so

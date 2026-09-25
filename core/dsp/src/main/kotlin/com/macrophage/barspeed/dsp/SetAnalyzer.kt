@@ -313,9 +313,10 @@ data class SetAnalysis(
      */
     val artefactSamples: Int? = null,
     /**
-     * Whether the LIVE tracker that ran on this set still held its zero when
-     * the set ended -- [StreamingSetTracker.publishedCountTrusted] -- or null
-     * where no live tracker covered the set (#302).
+     * Whether the LIVE tracker that ran on this set stayed within its
+     * displacement bound for the whole set --
+     * [StreamingSetTracker.publishedCountTrusted] -- or null where no live tracker
+     * covered the set (#302).
      *
      * NOT COMPUTED HERE. Nothing in [SetAnalyzer] sets it and nothing in it
      * reads it: this is a fact about the in-set integrator, which the batch

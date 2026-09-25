@@ -335,8 +335,7 @@ class StreamingSetTracker(
      * nothing here rests on the difference.
      *
      * Never cleared. A run that has travelled that far did so because the
-     * integrator has no zero, and nothing downstream re-establishes one within
-     * the set.
+     * integrator has no zero.
      */
     private fun noteRunaway() {
         if (runDisplacement > thresholds.maxRunDisplacementM) countTrusted = false

@@ -1947,9 +1947,10 @@ data class SessionExport(
          * a deleted claim. It cannot see this KDoc.
          *
          * 1.22 TAKES A FOURTH ENTRY (#302, countTrusted): a set may carry
-         * [SetExport.countTrusted], whether the LIVE velocity integrator held
-         * its zero through the set. A FURTHER ENTRY under the unreleased 1.22,
-         * on the tag reading the third entry states.
+         * [SetExport.countTrusted], whether the LIVE velocity integrator
+         * stayed within its displacement bound through the set. A FURTHER
+         * ENTRY under the unreleased 1.22, on the tag reading the third entry
+         * states.
          *
          * WHAT WAS UNSAYABLE. `StreamingSetTracker` latches this flag whenever
          * it refuses a run past its displacement cap, and nothing published
@@ -2293,7 +2294,8 @@ data class SetExport(
      */
     val liveReps: Int? = null,
     /**
-     * Whether the LIVE velocity integrator held its zero through this set
+     * Whether the LIVE velocity integrator stayed within its displacement
+     * bound through this set
      * (1.22, #302): `StreamingSetTracker.publishedCountTrusted`, frozen when
      * the set was recorded and read here out of the stored analysis.
      *
