@@ -1,7 +1,9 @@
 package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.data.SessionRepository
-import com.macrophage.barspeed.model.TimedSetEndPolicy
+import com.macrophage.barspeed.model.CorrectedRatingRow
+import com.macrophage.barspeed.model.CountAndRatingDraft
+import com.macrophage.barspeed.model.SetCorrectionPolicy
 
 /**
  * Every write [SetRatingTracker] issues against the finished set's row.
@@ -61,8 +63,9 @@ private class RepositoryRowWriter(private val repository: SessionRepository) : S
  * effort must not erase a real shortfall, and correcting a miscounted rep total
  * must clear a shortfall that never actually happened.
  *
- * Every method returns the effective failed flag to mirror into UI state, or
- * null when there is no recorded set to rate.
+ * Every method returns what to mirror into UI state -- the effective failed
+ * flag, or from [correct] the whole row it wrote -- or null when there is no
+ * recorded set to rate.
  */
 class SetRatingTracker(private val writer: SetRowWriter) {
     constructor(repository: SessionRepository) : this(RepositoryRowWriter(repository))
@@ -114,7 +117,7 @@ class SetRatingTracker(private val writer: SetRowWriter) {
      *
      * Separate from [onSetRecorded] because the id does not exist until the
      * insert returns, and because a set-end write that fails must not leave
-     * [rate] and [correctReps] aimed at a row that was never written.
+     * [rate] and [correct] aimed at a row that was never written.
      */
     fun attachTo(setId: Long) {
         this.setId = setId
@@ -169,18 +172,39 @@ class SetRatingTracker(private val writer: SetRowWriter) {
     }
 
     /**
-     * Correct a miscounted (or uncounted) rep total. The shortfall was derived
-     * from the count, so it is re-derived here — otherwise a set the sensor
-     * under-counted stays marked failed forever.
+     * One Correct-popup SAVE's count or hold and its rating, as ONE rating
+     * write (#310).
+     *
+     * The shortfall was derived from the count, so a corrected count or hold
+     * re-derives it -- otherwise a set the sensor under-counted stays marked
+     * failed forever, and a lifter who states they carried on past the target
+     * is left failed on a figure that has since moved (#168). Seconds are
+     * judged by `TimedSetEndPolicy.fellShort` through
+     * [SetCorrectionPolicy.shortfall], the same boundary the set write asked.
+     *
+     * The tapped half comes off the draft and nothing else. The popup seeds
+     * the draft from what stands, so a SAVE that only corrects the count
+     * carries the lifter's own tap through untouched and the two facts stay
+     * two facts.
+     *
+     * Both fields move BEFORE the first suspension and the statements are
+     * issued in sequence, each awaited: the count or hold first, then the
+     * one `rateSet` [SetCorrectionPolicy.row] folded. There is no second
+     * rating statement for Room's pool to reorder, and no rating read before a
+     * suspension to go stale across it -- the mechanism #310 names: the count's
+     * `rateSet` carried the rpe read before `overrideDuration` suspended, and
+     * could land after the lifter's new rating. Read from source; the order
+     * Room ran them in on a phone was never observed.
      */
-    suspend fun correctReps(reps: Int, rpe: Int?, warmup: Boolean): Boolean? {
+    suspend fun correct(draft: CountAndRatingDraft, warmup: Boolean): CorrectedRatingRow? {
         val id = setId ?: return null
-        val planned = plannedReps
-        autoFailed = planned != null && reps < planned
-        val effective = tappedFailed || autoFailed
-        writer.overrideReps(id, reps)
-        writer.rateSet(id, rpe = rpe, failed = effective, failedByLifter = tappedFailed, warmup = warmup)
-        return effective
+        autoFailed = SetCorrectionPolicy.shortfall(draft, plannedReps, plannedDurationS, standing = autoFailed)
+        val row = SetCorrectionPolicy.row(draft, autoFailed)
+        tappedFailed = row.failedByLifter
+        draft.seconds?.let { writer.overrideDuration(id, it) }
+        draft.reps?.let { writer.overrideReps(id, it) }
+        writer.rateSet(id, row.rpe, row.failed, failedByLifter = row.failedByLifter, warmup = warmup)
+        return row
     }
 
     /**
@@ -190,10 +214,9 @@ class SetRatingTracker(private val writer: SetRowWriter) {
      * computed; this only writes it. Returns null when there is no recorded
      * set to correct, the same as every other method here.
      *
-     * NEITHER FAILURE FACT IS READ OR WRITTEN, unlike [correctReps] and
-     * [correctDuration] which both re-derive the shortfall. The shortfall is a
-     * verdict on the rep count or the seconds against their targets, and no
-     * plan target anywhere is a load: a set done at the wrong weight is not
+     * NEITHER FAILURE FACT IS READ OR WRITTEN, unlike [correct], which
+     * re-derives the shortfall. The shortfall is a verdict on the rep count or
+     * the seconds against their targets, and no plan target anywhere is a load: a set done at the wrong weight is not
      * thereby a set that fell short. Re-deriving here would either be a no-op
      * or would quietly re-OR a verdict this correction says nothing about.
      */
@@ -201,30 +224,5 @@ class SetRatingTracker(private val writer: SetRowWriter) {
         val id = setId ?: return null
         writer.overrideLoad(id, loadKg)
         return true
-    }
-
-    /**
-     * Correct the seconds a hold or a carry is recorded at, from the rest
-     * screen (#168).
-     *
-     * The counterpart of [correctReps] for sets that have no reps, and it
-     * re-derives the shortfall for the same reason: the verdict came off the
-     * seconds, so a lifter who states they carried on past the target must not
-     * be left with a set marked failed on a figure that has since moved.
-     * [TimedSetEndPolicy.fellShort] is the same function the set write asked,
-     * so a correction cannot land on a different boundary from the original
-     * judgement.
-     *
-     * The lifter's own tapped failure is untouched here, exactly as in
-     * [correctReps]: correcting a duration says nothing about whether the
-     * lifter felt they failed, and the two facts stay two facts.
-     */
-    suspend fun correctDuration(seconds: Int, rpe: Int?, warmup: Boolean): Boolean? {
-        val id = setId ?: return null
-        autoFailed = TimedSetEndPolicy.fellShort(seconds, plannedDurationS)
-        val effective = tappedFailed || autoFailed
-        writer.overrideDuration(id, seconds)
-        writer.rateSet(id, rpe = rpe, failed = effective, failedByLifter = tappedFailed, warmup = warmup)
-        return effective
     }
 }

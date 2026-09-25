@@ -3106,8 +3106,9 @@ private fun FailSetButton(state: RecordState, viewModel: RecordViewModel) {
  * withholds the "failed the set" tile for the same reason. A shortfall is
  * DERIVED at the write, so it can be re-derived -- correcting a miscounted
  * rep total on the rest screen clears
- * it. A TAPPED failure is one no later REP CORRECTION can clear: `correctReps`
- * re-derives the derived half and leaves the tapped half standing. Re-rating
+ * it. A TAPPED failure is one no later REP CORRECTION can clear:
+ * `SetRatingTracker.correct` re-derives the derived half and leaves the tapped
+ * half standing. Re-rating
  * the set does overwrite it, so it is not permanent -- it is out of reach of
  * the one repair that fits the mistake. A lifter who did all five reps but only
  * tapped "+1 REP" three times reaches exactly this control, and a tapped

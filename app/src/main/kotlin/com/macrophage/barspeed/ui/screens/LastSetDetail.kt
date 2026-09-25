@@ -225,21 +225,14 @@ private fun LastSetCard(state: RecordState, feedback: SetFeedback) {
  * and a stray tap on the scrim throwing away corrections the lifter had just
  * dialled in would be the expensive direction to fail. Back still dismisses.
  *
- * CONFIRM CALLS THE SAME METHODS THE ROWS CALLED, in a named order: load, then
- * the warm-up mark, then the reason, then the count or the hold, then the
- * rating. The first three write columns nobody else here writes and cannot
- * collide with anything. THE LAST TWO BOTH WRITE THE RATING ROW, and that is a
- * real and unmeasured hazard when the lifter changes BOTH the count and the
- * rating in one confirm: the count's launch in `applyCountAndRating` reads
- * `lastSetRpe` out of the state at launch and the rating's launch publishes
- * its new rating only after Room returns, so the two `rateSet` writes carry different rpe values and Room's
- * default query executor is a pool that does not order them. The row may keep
- * the count correction's earlier rating while this screen shows the new one.
- * It is the same unordered window `applyLoadCorrection` and `applyWarmupMark`
- * already document for two fast taps -- what changes is that a confirm reaches
- * it in one frame rather than at human tapping speed. #310 is this hazard,
- * inferred from field-45's set 13; at this commit the count, hold and rating
- * writes are gathered into `applyCountAndRating` unchanged and still race.
+ * CONFIRM CALLS, in a named order: load, then the warm-up mark, then the
+ * reason, then the count or the hold TOGETHER WITH the rating. The first three
+ * write columns nobody else here writes and cannot collide with anything. The
+ * count or hold and the rating both end in the rating row, so they are ONE
+ * call, `correctLastSet`, which awaits the count and then writes one rating
+ * row folded from the draft (#310). They used to be two launches whose
+ * `rateSet` statements Room's pool did not order, and the row could keep the
+ * rating the lifter had just replaced; field-45's set 13 is inferred to have.
  *
  * A correction is issued ONLY where the draft differs from what stands, so a
  * confirm that changed nothing spends no Room write and a confirm that changed

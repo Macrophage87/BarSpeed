@@ -11,6 +11,7 @@
 // that did.
 package com.macrophage.barspeed.record
 
+import com.macrophage.barspeed.model.CorrectedRatingRow
 import com.macrophage.barspeed.model.CountAndRatingDraft
 import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.SetLimiter
@@ -169,9 +170,44 @@ internal fun applyLimiter(
 }
 
 /**
- * The writes behind one Correct-popup SAVE's count, hold and rating (#310),
- * gathered here out of `applyRepCorrection`, `applyDurationCorrection` and the
- * popup's own call to `rateLastSet`, whose bodies this carries unchanged.
+ * The state one Correct-popup SAVE's count or hold and rating leave behind
+ * (#310): the corrected figure, then the rating [row] the tracker wrote.
+ *
+ * Free function for [ratedState]'s reason. Every rating field comes off
+ * [row] -- what the database was just told -- rather than off the draft, so
+ * the screen cannot show a rating beside a failure the row does not pair it
+ * with.
+ */
+internal fun countAndRatingState(s: RecordState, draft: CountAndRatingDraft, row: CorrectedRatingRow): RecordState {
+    val seconds = draft.seconds
+    val counted =
+        when {
+            seconds != null -> durationCorrectedState(s, seconds, row.failed)
+            draft.reps != null -> s.copy(lastFeedback = s.lastFeedback?.copy(repsOverride = draft.reps))
+            else -> s
+        }
+    return ratedState(counted, row.rpe, tappedFailed = row.failedByLifter, effectiveFailed = row.failed)
+}
+
+/**
+ * The write behind one Correct-popup SAVE's count, hold and rating (#310),
+ * which replaced `applyRepCorrection`, `applyDurationCorrection` and the
+ * popup's own call to `rateLastSet`.
+ *
+ * ONE LAUNCH, ONE RATING STATEMENT. `SetRatingTracker.correct` writes the
+ * count or hold, awaits it, then writes the single rating row
+ * `SetCorrectionPolicy.row` folded out of the draft. Before this the three
+ * were three launches: the count's read `lastSetRpe` before it suspended in
+ * Room and wrote it back after, the rating's wrote the lifter's new rating in
+ * between, and the two `rateSet` statements were unordered on Room's pool, so
+ * the row could keep the rating the lifter had just replaced. Field-45's set
+ * 13 is inferred to have done that; `CountAndRatingOrderTest` pins the order
+ * against a writer that returns when told, not against Room.
+ *
+ * Why one write rather than three awaited in order: the rating the row gets
+ * is then a value computed from the draft in one place, never one read from
+ * the state before a suspension, and there is no intermediate row carrying
+ * the old rating for any reader to catch.
  *
  * appScope, for the reason `launchSetWrite` is: a correction saved on the
  * rest screen and then abandoned by Back is a correction the pop cancels, and
@@ -179,15 +215,9 @@ internal fun applyLimiter(
  * [context] is `Main.immediate` everywhere but a test, which keeps
  * `SetRatingTracker`'s fields on the thread that already reads them.
  *
- * AT THIS COMMIT THE THREE ARE STILL THREE LAUNCHES, and that is the defect
- * #310 names: the count or hold launch reads `lastSetRpe` before it suspends
- * in Room, the rating launch writes the lifter's new rating meanwhile, and the
- * count's `rateSet` then writes the rating it read. The two `rateSet`
- * statements are unordered on Room's pool, so the row may keep the rating the
- * lifter replaced. Moved here unfixed so the differential can drive it.
- *
- * A negative [CountAndRatingDraft.reps] writes no count, the bound
- * `applyRepCorrection` enforced on the way in.
+ * Published AFTER the write, as before. A negative [CountAndRatingDraft.reps]
+ * writes no count, the bound `applyRepCorrection` enforced on the way in, and
+ * the rating beside it still stands.
  */
 internal fun applyCountAndRating(
     stateFlow: MutableStateFlow<RecordState>,
@@ -196,39 +226,14 @@ internal fun applyCountAndRating(
     appScope: CoroutineScope,
     context: CoroutineContext = Dispatchers.Main.immediate,
 ) {
-    val seconds = draft.seconds
-    if (seconds != null) {
-        appScope.launch(context) {
-            val s = stateFlow.value
-            val failed =
-                ratings.correctDuration(seconds, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
-            stateFlow.value = durationCorrectedState(stateFlow.value, seconds, failed)
-        }
-    }
-    val reps = draft.reps
-    if (reps != null && reps >= 0) {
-        appScope.launch(context) {
-            val s = stateFlow.value
-            val failed = ratings.correctReps(reps, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
-            stateFlow.value =
-                stateFlow.value.copy(
-                    lastFeedback = stateFlow.value.lastFeedback?.copy(repsOverride = reps),
-                    lastSetFailed = failed,
-                    // lastSetTappedFailed is deliberately NOT written here.
-                    // correctReps re-derives only the shortfall; the lifter's
-                    // own tap is untouched by a rep correction, so carrying it
-                    // unchanged is what keeps the two facts two facts.
-                )
-        }
-    }
-    if (draft.ratingChanged) {
-        appScope.launch(context) {
-            // The stored warm-up flag is handed back unchanged, for the reason
-            // applyRating gives (#187).
-            val warmup = stateFlow.value.lastSetWarmup
-            val effectiveFailed = ratings.rate(draft.rpe, draft.tappedFailed, warmup) ?: return@launch
-            stateFlow.value = ratedState(stateFlow.value, draft.rpe, draft.tappedFailed, effectiveFailed)
-        }
+    val bounded = if ((draft.reps ?: 0) < 0) draft.copy(reps = null) else draft
+    if (!bounded.changesAnything) return
+    appScope.launch(context) {
+        // The stored warm-up flag is handed back unchanged, for the reason
+        // applyRating gives (#187).
+        val warmup = stateFlow.value.lastSetWarmup
+        val row = ratings.correct(bounded, warmup) ?: return@launch
+        stateFlow.value = countAndRatingState(stateFlow.value, bounded, row)
     }
 }
 
