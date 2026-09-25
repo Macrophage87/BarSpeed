@@ -83,6 +83,7 @@ import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
 import com.macrophage.barspeed.model.ExitPrompt
 import com.macrophage.barspeed.model.GuidedRepCaption
+import com.macrophage.barspeed.model.Implement
 import com.macrophage.barspeed.model.ImplementLoad
 import com.macrophage.barspeed.model.LeadInPolicy
 import com.macrophage.barspeed.model.LiveCountReadout
@@ -900,7 +901,7 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     val slot = state.currentSlot
     if (slot != null) {
         if (slot.isExerciseChange) {
-            MoveSensorCard(slot.exercise.displayName)
+            MoveSensorCard(slot.exercise.displayName, slot.implement)
         }
         SlotCard(
             slot,
@@ -1947,10 +1948,21 @@ private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel
 }
 
 @Composable
-private fun MoveSensorCard(exerciseName: String) {
+private fun MoveSensorCard(exerciseName: String, implement: Implement) {
+    // Worded off the plan's declared implement (#253's key), not "bar" for
+    // every movement (#269): a machine, a cable or a single dumbbell has
+    // nothing to move to a bar, and telling a lifter to find one that is not
+    // part of the exercise is a wrong instruction, not a cosmetic one.
+    // OTHER — the omitted-key default — falls back to naming the exercise
+    // alone, which is the neutral case #269 asked for.
+    val where = when (implement) {
+        Implement.BARBELL -> "$exerciseName bar"
+        Implement.DUMBBELL -> "$exerciseName dumbbells"
+        Implement.OTHER -> exerciseName
+    }
     Card(Modifier.fillMaxWidth()) {
         Text(
-            "New exercise — move the sensor to the $exerciseName bar",
+            "New exercise — move the sensor to the $where",
             Modifier.padding(12.dp),
             style = MaterialTheme.typography.titleSmall,
             color = BarColors.Amber,
@@ -3341,7 +3353,7 @@ private fun NextSetBlock(state: RecordState, viewModel: RecordViewModel) {
     val next = state.nextSlot
     if (!state.adHoc && next != null) {
         if (next.isExerciseChange) {
-            MoveSensorCard(next.exercise.displayName)
+            MoveSensorCard(next.exercise.displayName, next.implement)
         }
         SlotCard(
             next,
