@@ -3,7 +3,12 @@ package com.macrophage.barspeed.dsp
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 
-/** One movement stroke of a prescribed rep, with the word the voice guide says for it. */
+/**
+ * One movement stroke of a prescribed rep, with the word the voice guide says for it.
+ *
+ * [seconds] is null for a stroke the tempo writes as `X`, which has no
+ * prescribed duration.
+ */
 data class TempoStroke(val label: String, val seconds: Double?, val isConcentric: Boolean)
 
 /**
@@ -39,7 +44,9 @@ data class TempoSchedule(
      *
      * NOT what the metronome plays, and reading it as that is the mistake
      * #250's second comment made against this very paragraph. The voice guide
-     * gives an X stroke a ONE-SECOND beat and always has:
+     * gives an X stroke a ONE-SECOND beat and always has -- from #264 an X
+     * drive's beat carries the word `Drive` rather than `Up`, and its length
+     * is unchanged:
      * `CadencePlan.strokeSeconds` substitutes 1.0 for a null and floors every
      * stroke at a second, so `30X0` is delivered as a four-second cycle
      * against a prescription of three. The same floor lifts a written `0`
@@ -63,13 +70,18 @@ data class TempoSchedule(
             val digit1IsConcentric = if (horizontal) false else !direction.concentricUp
             val digit1 =
                 TempoStroke(
-                    label = strokeLabel(horizontal, down = true, isConcentric = digit1IsConcentric),
+                    label = strokeLabel(horizontal, down = true, isConcentric = digit1IsConcentric, explosive = false),
                     seconds = tempo.downS,
                     isConcentric = digit1IsConcentric,
                 )
             val digit3 =
                 TempoStroke(
-                    label = strokeLabel(horizontal, down = false, isConcentric = !digit1IsConcentric),
+                    label = strokeLabel(
+                        horizontal,
+                        down = false,
+                        isConcentric = !digit1IsConcentric,
+                        explosive = tempo.isExplosiveUpStroke,
+                    ),
                     seconds = tempo.upS,
                     isConcentric = !digit1IsConcentric,
                 )
@@ -81,10 +93,33 @@ data class TempoSchedule(
             }
         }
 
-        /** Vertical work is called by direction; horizontal work has no up, so it is called by phase. */
-        private fun strokeLabel(horizontal: Boolean, down: Boolean, isConcentric: Boolean): String = when {
+        /**
+         * Vertical work is called by direction; horizontal work has no up, so it
+         * is called by phase.
+         *
+         * One exception on vertical work, and it is a DRIVE the tempo writes as
+         * `X`: that stroke is called `DRIVE`, the word the horizontal guide and
+         * the prep countdown already use for the working stroke (#264). Until
+         * then it was called `UP`, so a `20X0` set was called exactly as a
+         * `2010` set was -- field-39 sets 2, 6 and 10, row for row -- and the
+         * one tempo whose job is to not pace the drive sounded like a paced
+         * one-second drive. An `X` that is the RETURN -- digit 3 of a drive-down
+         * lift -- keeps its direction word: a fast return is not a drive.
+         *
+         * [explosive] is `X` on THIS digit, so digit 1 always passes false:
+         * `Tempo.parse` refuses `X` there (#258). The stroke keeps its
+         * one-second beat either way -- `CadencePlan.strokeSeconds` decides the
+         * seconds and is untouched -- so only the word moves.
+         *
+         * Stated a second time in `:core:model` for the prep countdown, as
+         * `StartCuePolicy.firstMovementWord`, and pinned equal to this by
+         * `StartCueVoiceContractTest`. `TempoAdjustPolicy`'s wheels keep `UP`
+         * for an `X` on purpose; `TempoLabelContractTest` says why.
+         */
+        private fun strokeLabel(horizontal: Boolean, down: Boolean, isConcentric: Boolean, explosive: Boolean) = when {
             horizontal && isConcentric -> "DRIVE"
             horizontal -> "RETURN"
+            isConcentric && explosive -> "DRIVE"
             down -> "DOWN"
             else -> "UP"
         }

@@ -3068,6 +3068,20 @@ data class RecordState(
      */
     val repCallAtDriveEnd: Boolean = false,
 
+    /**
+     * True when THIS set's tempo writes `X` in digit 3, so the prep countdown
+     * can name an explosive first drive in the word the voice will open on
+     * (#264): `StartCuePolicy` shows `DRIVE` where it would show `UP`, on a
+     * vertical lift that starts at the bottom with its drive up.
+     *
+     * Read off the same parsed tempo the runner's [TempoSchedule] is built
+     * from, at the moment the set begins, for [repCallAtDriveEnd]'s reason:
+     * a second parse of the slot's tempo string is a second fact that can
+     * disagree with the voice. False on every set that is not a guided
+     * cadence, which has no tempo the voice plays.
+     */
+    val explosiveUpStroke: Boolean = false,
+
     /** True once the voice guide has called the prescription all the way through. */
     val guidedFinished: Boolean = false,
     val setElapsedS: Int = 0,
@@ -4412,6 +4426,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             // not use.
             stateFlow.value = stateFlow.value.copy(
                 repCallAtDriveEnd = CadencePlan.of(schedule).announcesAtConcentricEnd,
+                explosiveUpStroke = guidedTempo.isExplosiveUpStroke,
             )
             startGuidedCadence(schedule, plannedRepsForSet, prepS)
         }

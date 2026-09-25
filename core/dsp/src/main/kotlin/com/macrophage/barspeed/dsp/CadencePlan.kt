@@ -613,6 +613,24 @@ data class CadencePlan(
             isStroke = true,
         )
 
+        /**
+         * The whole seconds a stroke is played for: a null -- a stroke the
+         * tempo writes as `X` -- is a one-second beat, and every stroke is at
+         * least one.
+         *
+         * #264 gave an X drive its own word and deliberately kept this slot.
+         * The word has to be SPOKEN, and the runner can only place an utterance
+         * on a whole second: `GuidedCadenceRunner` sleeps `delay(1_000)` per
+         * second and speaks at each beat's start. A zero-second beat would put
+         * `Drive` and the next beat's word on one instant, and `VoiceCounter`'s
+         * `QUEUE_FLUSH` cancels the first utterance when the second arrives, so
+         * the X word would be cut off or never heard. One second is what the
+         * shipped app already delivered for the X stroke: on field-39 set 6 the
+         * X word's row is followed by the next word's row 1,000 to 1,002 ms
+         * later on all six reps. Keeping it also leaves every other beat where
+         * it was, the obligation `CadencePlanTest` pins over 1,380 pairs. How
+         * long `Drive` takes to SAY is not measured anywhere in this repo.
+         */
         private fun strokeSeconds(seconds: Double?): Int = (seconds ?: 1.0).toInt().coerceAtLeast(1)
     }
 }

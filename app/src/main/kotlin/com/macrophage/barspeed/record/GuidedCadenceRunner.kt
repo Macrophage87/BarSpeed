@@ -46,6 +46,10 @@ internal const val LEAD_IN_LABEL = "GET READY"
  * them all come from [TempoSchedule], which resolves the tempo digits against
  * the declared direction and plane — so a leg curl is called "Down" on its
  * drive and a seated row is called "Drive" and "Return", having no up or down.
+ * A drive the tempo writes as `X` is called "Drive" on vertical work too
+ * (#264), and this file did not change for it: it speaks whatever
+ * [CadenceVoice.beatCall] returns for the beat [CadencePlan] built, and pushes
+ * that beat's label to the ring.
  */
 class GuidedCadenceRunner(
     private val scope: CoroutineScope,

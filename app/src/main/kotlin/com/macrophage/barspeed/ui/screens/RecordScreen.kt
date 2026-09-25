@@ -2519,13 +2519,23 @@ private fun StartCueBlock(cue: StartCue, repCallNote: String?) {
  * plan, so its provenance is asked of [SetGeometryPolicy.describe] with no
  * declaration, which is the same call `RecordViewModel` makes when it freezes
  * an ad-hoc set's geometry into the pending write.
+ *
+ * Whether the tempo's digit 3 is `X` comes off [RecordState.explosiveUpStroke],
+ * which `RecordViewModel` sets from the tempo it hands the voice, so a set
+ * whose voice opens on an explosive `Drive` is shown `DRIVE` (#264).
  */
 private fun startCueFor(state: RecordState, slot: PlannedSlot?): StartCue {
     val exercise = state.currentExercise
     val source =
         slot?.geometry?.sources?.startsWith
             ?: SetGeometryPolicy.describe(exercise, declared = null).sources.startsWith
-    return StartCuePolicy.of(exercise.startsWith, exercise.concentricUp, exercise.horizontal, source)
+    return StartCuePolicy.of(
+        exercise.startsWith,
+        exercise.concentricUp,
+        exercise.horizontal,
+        source,
+        explosiveUpStroke = state.explosiveUpStroke,
+    )
 }
 
 /** Sensorless set: the lifter taps to count reps; the ring tracks planned progress. */

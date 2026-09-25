@@ -102,13 +102,15 @@ object StartCuePolicy {
      *   seated row moves vertically and the lifter still does not.
      * @param explosiveUpStroke the set's tempo writes `X` in digit 3 --
      *   [Tempo.isExplosiveUpStroke] of the tempo the guide is about to play.
+     *   No default: a caller that forgot it would show `UP` over a set whose
+     *   voice opens on `Drive`, the disagreement #241 exists to prevent.
      */
     fun of(
         startsWith: StartPhase,
         concentricUp: Boolean,
         horizontal: Boolean,
         source: GeometrySource,
-        explosiveUpStroke: Boolean = false,
+        explosiveUpStroke: Boolean,
     ): StartCue {
         val word = firstMovementWord(startsWith, concentricUp, horizontal, explosiveUpStroke)
         return StartCue(phrase = phrase(word, horizontal), word = word, marker = marker(source))
