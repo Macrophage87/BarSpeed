@@ -78,6 +78,23 @@ object TimedSetEndPolicy {
     const val CORRECTION_STEP_S = 5
 
     /**
+     * How often a hold's voice names the time left, in REMAINING seconds,
+     * until [FINAL_COUNTDOWN_FROM_S] are left.
+     *
+     * The canonical copy. `TimedSetVoice.MILESTONE_EVERY_S` in `:core:dsp` is
+     * declared from this one, so the spacing the voice speaks and the spacing
+     * [HoldEndPolicy]'s correction is built on are one number rather than two
+     * that agree today.
+     */
+    const val MARK_EVERY_S = 15
+
+    /**
+     * Longest remaining time a hold's voice counts digit by digit, from this
+     * number to 1. The canonical copy, for the reason [MARK_EVERY_S] gives.
+     */
+    const val FINAL_COUNTDOWN_FROM_S = 10
+
+    /**
      * Distance in seconds from where the set's clock is now to the planned
      * end, or null when no duration was prescribed.
      *

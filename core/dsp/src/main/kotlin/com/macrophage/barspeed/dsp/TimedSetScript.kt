@@ -63,6 +63,10 @@ object TimedSetScript {
      * BREAK restarts it, and this cannot express that. No capture of a timed
      * set has one, and rather than invent a rule for a shape nothing has
      * produced, the numbering is stated here as the assumption it is.
+     *
+     * [markEveryS] is the spacing the clock names the time left at, and is
+     * [TimedSetVoice.MILESTONE_EVERY_S] unless the caller is replaying an
+     * archive recorded under a different one.
      */
     fun script(
         prepS: Int,
@@ -71,6 +75,7 @@ object TimedSetScript {
         workStartedAtMs: Long,
         guides: Set<SetVoiceGuide>,
         sensorCountsAtMs: List<Long> = emptyList(),
+        markEveryS: Int = TimedSetVoice.MILESTONE_EVERY_S,
     ): List<TimedSetCue> {
         require(targetS >= 0) { "a timed set is not held for a negative number of seconds" }
         val cues = mutableListOf<TimedSetCue>()
@@ -82,7 +87,7 @@ object TimedSetScript {
         cues += TimedSetCue(workStartedAtMs, startWord)
         if (SetVoiceGuide.TIMED_CLOCK in guides) {
             for (second in 1..targetS) {
-                val said = TimedSetVoice.cueFor(targetS - second) ?: continue
+                val said = TimedSetVoice.cueFor(targetS - second, markEveryS) ?: continue
                 cues += TimedSetCue(workStartedAtMs + 1000L * second, said)
             }
         }

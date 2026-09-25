@@ -1,5 +1,7 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.TimedSetEndPolicy
+
 /**
  * What a hold or a carry says while its clock is running down.
  *
@@ -50,11 +52,18 @@ object TimedSetVoice {
      * and 15 and a 40 s hold at 30 and 15 as well -- the marks land the same
      * distance from the end whatever the target is, which is the half of the
      * set the lifter is deciding whether to hold on through.
+     *
+     * Declared from `TimedSetEndPolicy.MARK_EVERY_S` in `:core:model`, the
+     * canonical copy, because the hold correction steps on the same marks.
      */
-    const val MILESTONE_EVERY_S = 15
+    const val MILESTONE_EVERY_S = TimedSetEndPolicy.MARK_EVERY_S
 
-    /** Longest remaining time counted down digit by digit, from this number to 1. */
-    const val FINAL_COUNTDOWN_FROM_S = 10
+    /**
+     * Longest remaining time counted down digit by digit, from this number to
+     * 1. Declared from `TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S`, the
+     * canonical copy.
+     */
+    const val FINAL_COUNTDOWN_FROM_S = TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S
 
     /**
      * Spoken as the target is reached.
@@ -72,11 +81,15 @@ object TimedSetVoice {
      * Negative input -- a tick the loop was late for, past a target the set is
      * about to end at -- is silence, and so is every second between
      * milestones.
+     *
+     * [markEveryS] is [MILESTONE_EVERY_S] for everything the app says. It is a
+     * parameter so a replay of an archive can state the spacing that archive
+     * was RECORDED under, which does not change when this build's does.
      */
-    fun cueFor(remainingS: Int): String? = when {
+    fun cueFor(remainingS: Int, markEveryS: Int = MILESTONE_EVERY_S): String? = when {
         remainingS == 0 -> TIME_UP
         remainingS in 1..FINAL_COUNTDOWN_FROM_S -> remainingS.toString()
-        remainingS > 0 && remainingS % MILESTONE_EVERY_S == 0 -> "$remainingS seconds"
+        remainingS > 0 && remainingS % markEveryS == 0 -> "$remainingS seconds"
         else -> null
     }
 }

@@ -50,11 +50,19 @@ class TimedSetScriptTest {
      */
     private val guidesAsRecorded = setOf(SetVoiceGuide.TIMED_CLOCK, SetVoiceGuide.SENSOR_COUNT)
 
+    /**
+     * The spacing app 0.1.48 named a hold's time left at, written out for the
+     * reason [guidesAsRecorded] is: set 12's 30 s track carries `15 seconds`
+     * and no other mark, and #312 moves the build's spacing, not the archive.
+     */
+    private val markEveryAsRecordedS = 15
+
     private fun replay(
         targetS: Int,
         workStartedAtMs: Long,
         sensorCountsAtMs: List<Long>,
         guides: Set<SetVoiceGuide> = guidesAsRecorded,
+        markEveryS: Int = markEveryAsRecordedS,
     ) = TimedSetScript.script(
         prepS = PREP_S,
         targetS = targetS,
@@ -62,6 +70,7 @@ class TimedSetScriptTest {
         workStartedAtMs = workStartedAtMs,
         guides = guides,
         sensorCountsAtMs = sensorCountsAtMs,
+        markEveryS = markEveryS,
     )
 
     /**

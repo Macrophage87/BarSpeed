@@ -49,7 +49,6 @@ import com.macrophage.barspeed.model.SetLimiterGroup
 import com.macrophage.barspeed.model.SetLimiterPolicy
 import com.macrophage.barspeed.model.SetLimiterScale
 import com.macrophage.barspeed.model.SetLoadPolicy
-import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
@@ -265,7 +264,7 @@ private fun CorrectionDialog(
                 DraftLoadRow(state, feedback, addedKg) { addedKg = it }
                 val held = seconds
                 if (timed && held != null) {
-                    DraftHoldRow(held, feedback.durationEndedBy) { seconds = it }
+                    DraftHoldRow(held, feedback.plannedDurationS, feedback.durationEndedBy) { seconds = it }
                 } else if (!timed) {
                     DraftRepsRow(reps) { reps = it }
                 }
@@ -345,8 +344,8 @@ private fun applyDraft(
     // ONE call for the count or hold and the rating (#310), because both end
     // in the rating row. The seconds are the draft's figure itself rather than
     // a delta from what stands: DraftHoldRow steps through
-    // TimedSetEndPolicy.adjustedSeconds, so the figure is already floored where
-    // the write would floor it.
+    // HoldEndPolicy.correction, whose every landing is floored by
+    // TimedSetEndPolicy.adjustedSeconds where the write would floor it.
     val heldNow = feedback.effectiveDurationS
     val heldChanged = seconds != null && heldNow != null && seconds != heldNow
     val draft =
@@ -417,32 +416,33 @@ private fun DraftRepsRow(reps: Int, onDraft: (Int) -> Unit) {
 
 /**
  * Held it longer, or let go earlier, than the figure says? State it here
- * (#168, and the second step is #259).
+ * (#168, the second step is #259, and the steps and the figure are #312's).
  *
- * The fine step is [TimedSetEndPolicy.CORRECTION_STEP_S] rather than one second,
- * because what is being corrected is a walk back to the phone, and the floor is
- * [TimedSetEndPolicy.adjustedSeconds]'s so the draft cannot show a figure the
- * write would clamp.
+ * NOTHING IS DECIDED HERE. [HoldEndPolicy.correction] takes the draft, the
+ * seconds the set was working to and the word saying what ended the hold, and
+ * answers with the figure, where each control moves the draft, and whether a
+ * larger down step is offered and what it says. This composable draws that
+ * answer -- nothing in this file is reachable from a test.
  *
- * WHICH STEPS ARE OFFERED IS NOT DECIDED HERE. [HoldEndPolicy.downStepsS] takes
- * the word saying what ended the hold and answers; a second, larger DOWN step
- * appears wherever the reach is still inside the figure, and is absent on a hold
- * whose own unit already timed the release. This composable draws the answer and
- * decides nothing -- nothing in this file is reachable from a test.
+ * [targetS] is `SetFeedback.plannedDurationS`, which is the WORKING target the
+ * voice counted against (`restingState` fills it from the write's
+ * `targetDurationS`), not the plan's frozen prescription.
+ *
+ * The figure sits on its own line above the controls, because it carries two
+ * numbers and would crowd the row between the minus and the plus.
  */
 @Composable
-private fun DraftHoldRow(seconds: Int, endedBy: HoldEndSource?, onDraft: (Int) -> Unit) {
-    val steps = HoldEndPolicy.downStepsS(endedBy)
-    val fineS = steps.first()
-    val bigS = steps.drop(1).lastOrNull()
+private fun DraftHoldRow(seconds: Int, targetS: Int?, endedBy: HoldEndSource?, onDraft: (Int) -> Unit) {
+    val row = HoldEndPolicy.correction(seconds, targetS, endedBy)
+    Text(row.figure, style = MaterialTheme.typography.titleMedium, color = BarColors.Text)
     Stepper(
-        label = "Held",
-        figure = "${seconds}s",
+        label = null,
+        figure = null,
         corrected = false,
-        onDown = { onDraft(TimedSetEndPolicy.adjustedSeconds(seconds, -fineS)) },
-        onUp = { onDraft(TimedSetEndPolicy.adjustedSeconds(seconds, fineS)) },
-        bigDownLabel = bigS?.let { "−${it}s" },
-        onBigDown = bigS?.let { { onDraft(TimedSetEndPolicy.adjustedSeconds(seconds, -it)) } },
+        onDown = { onDraft(row.downS) },
+        onUp = { onDraft(row.upS) },
+        bigDownLabel = row.bigDownLabel,
+        onBigDown = row.bigDownS?.let { landing -> { onDraft(landing) } },
     )
     Spacer(Modifier.height(6.dp))
 }
@@ -656,11 +656,15 @@ private fun DraftLimiterSection(
     Spacer(Modifier.height(6.dp))
 }
 
-/** One label, one figure, and a minus and a plus either side of it. */
+/**
+ * One label, one figure, and a minus and a plus either side of it. A null
+ * label or figure is not drawn: the hold row draws its two-number figure on
+ * its own line above the controls.
+ */
 @Composable
 private fun Stepper(
-    label: String,
-    figure: String,
+    label: String?,
+    figure: String?,
     corrected: Boolean,
     onDown: () -> Unit,
     onUp: () -> Unit,
@@ -675,16 +679,18 @@ private fun Stepper(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+        if (label != null) Text(label, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
         if (bigDownLabel != null && onBigDown != null) {
             TextButton(onClick = onBigDown) { Text(bigDownLabel, style = MaterialTheme.typography.bodySmall) }
         }
         TextButton(onClick = onDown) { Text("−", style = MaterialTheme.typography.titleMedium) }
-        Text(
-            figure,
-            style = MaterialTheme.typography.titleMedium,
-            color = if (corrected) BarColors.Amber else BarColors.Text,
-        )
+        if (figure != null) {
+            Text(
+                figure,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (corrected) BarColors.Amber else BarColors.Text,
+            )
+        }
         TextButton(onClick = onUp) { Text("+", style = MaterialTheme.typography.titleMedium) }
     }
 }

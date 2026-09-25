@@ -220,4 +220,60 @@ object HoldEndPolicy {
         HoldEndSource.CORRECTED,
         -> listOf(TimedSetEndPolicy.CORRECTION_STEP_S, BIG_CORRECTION_STEP_S)
     }
+
+    /**
+     * Everything the Correct popup's hold row draws: the figure, where each
+     * control moves the draft to, and the larger down step's label, or null
+     * where [downStepsS] offers no larger step.
+     */
+    data class HoldCorrection(
+        val figure: String,
+        val downS: Int,
+        val upS: Int,
+        val bigDownS: Int?,
+        val bigDownLabel: String?,
+    )
+
+    /**
+     * The hold row for a draft of [seconds] against [targetS], the seconds the
+     * set was working to (null on an ad-hoc hold), ended by [endedBy].
+     *
+     * The composable reads every field of the answer and decides nothing.
+     */
+    fun correction(seconds: Int, targetS: Int?, endedBy: HoldEndSource?): HoldCorrection {
+        val big = downStepsS(endedBy).size > 1
+        return HoldCorrection(
+            figure = heldFigure(seconds, targetS),
+            downS = steppedSeconds(seconds, targetS, up = false),
+            upS = steppedSeconds(seconds, targetS, up = true),
+            bigDownS = if (big) bigStepDownSeconds(seconds, targetS) else null,
+            bigDownLabel = if (big) "−${BIG_CORRECTION_STEP_S}s" else null,
+        )
+    }
+
+    /**
+     * The draft after one tap of the fine step, [up] or down, floored where
+     * [TimedSetEndPolicy.adjustedSeconds] floors. [targetS] is not read yet:
+     * #312's fix reads it and deletes the suppression.
+     */
+    @Suppress("UnusedParameter")
+    fun steppedSeconds(currentS: Int, targetS: Int?, up: Boolean): Int {
+        val stepS = if (up) TimedSetEndPolicy.CORRECTION_STEP_S else -TimedSetEndPolicy.CORRECTION_STEP_S
+        return TimedSetEndPolicy.adjustedSeconds(currentS, stepS)
+    }
+
+    /**
+     * The draft after one tap of the larger down step, floored the same way.
+     * [targetS] is not read yet, as for [steppedSeconds].
+     */
+    @Suppress("UnusedParameter")
+    fun bigStepDownSeconds(currentS: Int, targetS: Int?): Int =
+        TimedSetEndPolicy.adjustedSeconds(currentS, -BIG_CORRECTION_STEP_S)
+
+    /**
+     * The hold row's figure for a draft of [seconds]. [targetS] is not read
+     * yet, as for [steppedSeconds].
+     */
+    @Suppress("UnusedParameter")
+    fun heldFigure(seconds: Int, targetS: Int?): String = "Held ${seconds}s"
 }
