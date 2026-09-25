@@ -120,7 +120,7 @@ class SchemaBodyweightSourceContractTest {
      * readable`, which named the tip in its own title.
      */
     @Test
-    fun `1_19 and 1_18 are both still readable, and the exporter is past them`() {
+    fun `1_19 and 1_18 are both still readable, and they are not the version the exporter writes`() {
         // CORRECTED FORWARD, and this comment is the one copy of the reasoning
         // that seven files share. This line read
         // `assertEquals("<the tip>", SessionExport.SCHEMA_VERSION)`: it asserted
@@ -130,7 +130,7 @@ class SchemaBodyweightSourceContractTest {
         // twice here already, each time "corrected" by re-pointing it at the new
         // tip, which is the same defect again. #300 mints 1.21, so it is DELETED
         // rather than re-pointed. What replaces it cannot go stale: the filed
-        // version is still ACCEPTED, and the exporter has moved PAST it. That
+        // version is still ACCEPTED, and it is not the version the exporter writes. That
         // the tip constant, the accepted set, the published enum and the example
         // all agree is SchemaContractTest's `session export schema allows the
         // version the exporter writes` and `the published example declares the

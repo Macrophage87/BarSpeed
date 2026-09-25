@@ -408,7 +408,7 @@ class SchemaRepsSourceContractTest {
         // twice here already, each time "corrected" by re-pointing it at the new
         // tip, which is the same defect again. #300 mints 1.21, so it is DELETED
         // rather than re-pointed. What replaces it cannot go stale: the filed
-        // version is still ACCEPTED, and the exporter has moved PAST it. That
+        // version is still ACCEPTED, and it is not the version the exporter writes. That
         // the tip constant, the accepted set, the published enum and the example
         // all agree is SchemaContractTest's `session export schema allows the
         // version the exporter writes` and `the published example declares the
