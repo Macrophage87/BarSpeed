@@ -885,9 +885,9 @@ private fun AudioCueChip(state: RecordState, viewModel: RecordViewModel) {
 @Composable
 private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
     // READY carries START SET, so it is the last screen before a set that would
-    // record nothing. It renders at most once per session -- startNextSet writes
-    // READY and calls beginSet in the same frame -- which is why RESTING carries
-    // this too.
+    // record nothing. It renders once per session on the way to set one, and
+    // again after a body-weight refusal taken from the rest screen -- see
+    // SkipSetSection -- which is why RESTING carries this too.
     //
     // The refusal is drawn HERE and only here, and it covers both doors:
     // `startNextSet` runs `advancedState` -- which writes Stage.READY on the
@@ -914,10 +914,11 @@ private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
         )
         // Everything the lifter can change about set one now lives behind one
         // button, and every change it makes is struck into the card above it.
-        // READY renders at most once per session -- startNextSet writes READY
-        // and calls beginSet in the same frame -- so this is set one's only
-        // chance to say anything, and until this button it could say only the
-        // load.
+        // READY renders once per session on the way to set one, and again
+        // after a body-weight refusal taken from the rest screen -- see
+        // SkipSetSection -- so this is not always the ONLY chance to say
+        // anything, but until this button it could say only the load either
+        // time.
         // Switch exercise is kept OUT of the dialog: it opens a chooser of
         // its own, and a dialog inside a dialog is a shape this app has never
         // used. It already reached READY, which is half of what the owner
@@ -1512,9 +1513,10 @@ private fun NextSetControlsRow(state: RecordState, viewModel: RecordViewModel, s
  * crowds the screen out of usefulness. They are all here now, behind one
  * outlined button.
  *
- * Drawn on the rest screen AND on READY. READY renders at most once per
- * session and used to offer only the load box, so set one was the one set of a
- * plan session whose reps, tempo and prep could not be touched. The owner's
+ * Drawn on the rest screen AND on READY. READY renders once per session on
+ * the way to set one, and again after a body-weight refusal taken from the
+ * rest screen -- see SkipSetSection -- and used to offer only the load box,
+ * so set one was the set whose reps, tempo and prep could not be touched. The owner's
  * case for closing that is the gym itself: "What if someone is using all the
  * squat racks when you walk in." Set one is exactly when rerouting matters,
  * and it is where the app was least flexible. `RecordViewModel.beginSet`'s
@@ -3276,11 +3278,13 @@ internal fun RestingStage(state: RecordState, viewModel: RecordViewModel) {
     // where the lifter has a rest period to spend fixing it.
     PermissionBanner()
     // Same reason as the banner above it, for the sensor rather than the
-    // permission: READY renders at most once per session, so a card drawn only
-    // there names a silent unit before set one and never again. Every set from
-    // the second onwards is armed from this screen, and the rest period is the
-    // window in which switching a unit on or re-seating it still costs the
-    // lifter nothing.
+    // permission: READY renders once per session on the way to set one, and
+    // again after a body-weight refusal taken from the rest screen -- see
+    // SkipSetSection -- so a card drawn only there can name a silent unit
+    // more than once, though almost always just before set one. Every set
+    // from the second onwards is armed from this screen, and the rest period
+    // is the window in which switching a unit on or re-seating it still costs
+    // the lifter nothing.
     ArmedSilenceCard(state)
     // ABOVE the card it changes, not below the whole block that carries it
     // (#236). It used to be drawn after NextSetBlock -- the Up next card plus
