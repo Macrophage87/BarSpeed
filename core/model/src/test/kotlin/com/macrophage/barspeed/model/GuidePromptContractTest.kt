@@ -144,8 +144,15 @@ class GuidePromptContractTest {
      * answer. A rule stated only where nobody is pointed is not stated.
      *
      * Narrow, and said so: this cannot check the prompt teaches the rule well,
-     * only that the rule and the empty `sensorInverted` table are both in the
-     * text a lifter's clipboard receives.
+     * only that the rule, and what an omitted `sensorInverted` resolves to, are
+     * both in the text a lifter's clipboard receives.
+     *
+     * The `sensorInverted` half moved with #317. It pinned "which no built-in
+     * exercise carries", the sentence that told the model an omitted key always
+     * meant false; an omitted key on a stack lift driving down now resolves
+     * true, so the pin is on the sentence that says so, and on the deleted
+     * "There is no such line" staying deleted -- the import gate names that
+     * inversion now.
      */
     @Test
     fun `the plan prompt states what omitting a geometry flag means`() {
@@ -154,8 +161,12 @@ class GuidePromptContractTest {
             "the plan prompt never tells the model that an omitted geometry flag is not a declared false",
         )
         assertTrue(
-            "which no built-in exercise carries" in prompt,
-            "the plan prompt never says sensorInverted has no built-in default behind an omitted key",
+            "an omitted key means true, because the stack rises as I drive the handle down" in prompt,
+            "the plan prompt never says an omitted sensorInverted resolves true on a stack lift driving down",
+        )
+        assertFalse(
+            "There is no such line for \"sensorInverted\"" in prompt,
+            "the plan prompt still says the import gate names no line for an omitted sensorInverted",
         )
     }
 

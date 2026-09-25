@@ -123,4 +123,43 @@ class StackInversionRuleTest {
         assertEquals(emptyList(), inversionLines("cable_face_pull", horizontalOnStack))
         assertEquals(emptyList(), inversionLines("leg_extension"))
     }
+
+    // ---- the case the rule exists for: red before it -------------------------
+
+    /**
+     * RED before #317's rule. A weight stack rises while the handle is driven
+     * down, so on a lift that resolves onto the stack with a downward drive in
+     * the vertical plane, the stack unit moves opposite to the lifter's drive.
+     * Three ways to get there: field-41's own shape (the stack mount from the
+     * app's table), a declared stack mount, and an id the app has never heard
+     * of -- the rule reads the resolved geometry, never the words in an id.
+     */
+    @Test
+    fun `an omitted key on a stack lift whose drive goes down resolves inverted`() {
+        assertEquals(true, resolved("triceps_pushdown", down).sensorInverted, "field-41's shape")
+        assertEquals(
+            true,
+            resolved("lat_pulldown", down + ""","sensorOnStack":true""").sensorInverted,
+            "a declared stack mount",
+        )
+        assertEquals(
+            true,
+            resolved("rope_pushdown", down + ""","sensorOnStack":true""").sensorInverted,
+            "an id no table carries",
+        )
+    }
+
+    /**
+     * RED before #317's rule. The import gate names each inference it makes, one
+     * line per exercise, as it does for a stack mount it applied (#223); an
+     * inversion the plan never wrote is not visible anywhere else before the
+     * set is recorded -- the export publishes no source for it (#289).
+     */
+    @Test
+    fun `the import gate names the inversion it applied`() {
+        val lines = inversionLines("triceps_pushdown", down)
+        assertEquals(1, lines.size, "one exercise, one line: $lines")
+        assertTrue(lines[0].startsWith("sessions[0].exercises[0]: triceps_pushdown"), lines[0])
+        assertTrue("does not declare \"sensorInverted\"" in lines[0], lines[0])
+    }
 }

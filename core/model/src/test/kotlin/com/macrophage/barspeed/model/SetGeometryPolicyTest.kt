@@ -377,16 +377,22 @@ class SetGeometryPolicyTest {
 
     /**
      * No exercise the app ships is inverted by construction, so there is no id
-     * table for `sensorInverted` and no inference for the import gate to name.
+     * table for `sensorInverted`.
      *
      * This is the premise the `sensorInverted` third of #64 rests on, and it is
      * pinned rather than asserted in prose because it is the thing that would
      * go false silently. `sensorOnStack` has [ExerciseDef.STACK_MOUNTED_IDS]
      * and `bodyweight` has [ExerciseDef.BODYWEIGHT_IDS], each with its own line
      * at the import gate saying which way an omitted key resolved. The third
-     * flag has neither, because nothing the app defines is wired backwards --
-     * inversion is a property of how a cable machine is ROUTED, which only
-     * whoever clipped the sensor on can know.
+     * flag has no table, because nothing the app defines is wired backwards --
+     * inversion is a property of how a cable machine is ROUTED.
+     *
+     * It has one RULE instead, since #317: a set that resolves onto the stack
+     * with its drive going down in the vertical plane resolves an omitted key
+     * true, because the stack rises as the handle is driven down, and the gate
+     * names that inference. The sentence that stood here -- "no inference for
+     * the import gate to name" -- is deleted. `StackInversionRuleTest` pins the
+     * rule; this pins only that no table has appeared beside it.
      *
      * The day a seed entry does set it, this reds, and what it is asking for is
      * a gate line beside `stackSeeded` and `bodyweightSeeded` naming that
