@@ -698,14 +698,16 @@ private fun RepQualityCard(feedback: SetFeedback) {
     //
     // On a hold or a carry `analysis.verdicts` is the sentence FROZEN at set
     // end from the pre-correction seconds -- `timedVerdicts(p.actualDurationS,
-    // p.targetDurationS)` in PlanQueue.kt. A duration correction on this same
-    // screen moves `feedback.effectiveDurationS` and the FAILED flag but never
-    // rewrites that frozen sentence, so a 20 s hold corrected to 15 s went on
-    // reading "Held 20s -- full 20s target. Nice." under "FAILED" (#270). The
-    // fix is to call the same pure function again here, at render time, off
-    // the CURRENT seconds rather than trust the frozen string: `timedVerdicts`
-    // is pinned by `PlanQueueTest`, so this is the one call site left free to
-    // go stale, not a new decision.
+    // p.targetDurationS)`, called from RecordViewModel's set write
+    // (RecordViewModel.kt), where `timedVerdicts` itself is DEFINED in
+    // PlanQueue.kt. A duration correction on this same screen moves
+    // `feedback.effectiveDurationS` and the FAILED flag but never rewrites
+    // that frozen sentence, so a 20 s hold corrected to 15 s went on reading
+    // "Held 20s -- full 20s target. Nice." under "FAILED" (#270). The fix is
+    // to call the same pure function again here, at render time, off the
+    // CURRENT seconds rather than trust the frozen string: `timedVerdicts` is
+    // pinned by `PlanQueueTest`'s five cases, so this is the one call site
+    // left free to go stale, not a new decision.
     //
     // A non-timed set has no correction to go stale against, so it keeps
     // reading the frozen `analysis.verdicts` through `CoachingVerdictPolicy`,
