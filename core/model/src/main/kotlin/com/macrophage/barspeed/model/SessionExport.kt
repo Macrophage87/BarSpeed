@@ -2084,8 +2084,7 @@ data class SessionExport(
          * decides `duration_s` where believing it takes 1 to 20 whole seconds
          * off the target -- the window a tapped hold already had,
          * `HoldEndPolicy.MAX_TRIM_S` -- and the key reads `sensor`; a release at
-         * or after the target, or none, leaves `clock` and the target, so a
-         * hold that ran to its target is never shortened.
+         * or after the target, or none, leaves `clock` and the target.
          *
          * THE VERDICT. The release writes neither failure fact. `failed` is
          * derived from `duration_s` at the write as before, so such a hold can
@@ -2097,11 +2096,12 @@ data class SessionExport(
          * did before this entry, so an older and a newer reader read every
          * value identically; the asymmetry the 1.22 mint states is unchanged.
          * What moves is what two words may mean: a `sensor` hold may never have
-         * been tapped, and a `clock` hold is one no armed unit saw let go
-         * before its target. NOT RETROACTIVE: the word and the seconds are
-         * decided when the set is recorded and stored with it, so every set
-         * already on disk keeps its `clock` and its target. `DATABASE_VERSION`
-         * does NOT move and the plan schema is untouched.
+         * been tapped, and a `clock` hold is one whose armed unit, if any, saw
+         * no release taking 1 to 20 whole seconds off its target. NOT
+         * RETROACTIVE: the word and the seconds are decided when the set is
+         * recorded and stored with it, so every set already on disk keeps its
+         * `clock` and its target. `DATABASE_VERSION` does NOT move and the
+         * plan schema is untouched.
          *
          * PINNED. `SchemaClockReleaseContractTest` asserts this entry's marker
          * and its reading rules in the published log, and the `durationEndedBy`

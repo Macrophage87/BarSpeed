@@ -101,9 +101,9 @@ enum class HoldEndSource(val published: String) {
  *
  * What survives of the old argument is the direction it guarded. A hold that
  * ran to `Time` must not record less than the voice told the lifter they had
- * completed, and it does not: a release at or after the target takes zero or
- * fewer seconds off and is refused, and a hold whose stream crosses nothing
- * keeps the target (field-42 set 16, pinned in `HoldReleaseFieldTest`). The
+ * completed. A release at or after the target takes zero or fewer seconds off
+ * and is refused, and a hold whose stream crosses nothing keeps the target
+ * (field-42 set 16, pinned in `HoldReleaseFieldTest`). The
  * risk left is a false crossing 1 to [MAX_TRIM_S] seconds before a target the
  * lifter did reach. `HoldRelease`'s settle is fitted to one measured onset and
  * its band's margins are measured on four committed hold streams, so that risk
@@ -175,8 +175,8 @@ object HoldEndPolicy {
         // The trim is what believing the sensor costs that figure, and both
         // ends of the range matter. Zero or less is a release at or after the
         // tap or the target -- nothing to remove, and a sensor end must never
-        // LENGTHEN a hold nor shorten one that ran to `Time`. Beyond the cap it
-        // is not a reach, so the standing figure stands.
+        // LENGTHEN a hold. Beyond the cap it is not a reach, so the standing
+        // figure stands.
         val trimS = sensorEndS?.let { standingS - it }
         if (sensorEndS != null && trimS != null && trimS in 1..MAX_TRIM_S) {
             return Decision(sensorEndS, HoldEndSource.SENSOR)
