@@ -74,8 +74,9 @@ sealed interface LiveFallback {
  * ## The rule, in order
  *
  * 1. NO SWITCH, NOTHING TO DECIDE: [LiveFallback.Continue]. This is every set
- *    with one unit and every dual set whose armed unit kept the readout, which
- *    is the whole committed corpus.
+ *    with one unit and every dual set whose armed unit kept the readout --
+ *    eight of the twelve committed two-stream pairs; the switch fires on the
+ *    other four, argued below.
  * 2. A DECLARATION THAT NAMES NO MOUNT transfers: [LiveFallback.Continue]. The
  *    same gate `LiftDirection.mountSpecific` is, asked live. A barbell
  *    declaration describes the lift, so the partner's stream is described by it
@@ -208,14 +209,15 @@ object LiveFallbackPolicy {
  *
  * ## Why these five lines are here
  *
- * They were five expressions inside `RecordScreen` -- the headline count, the
- * live velocity, the progress arc on the explosive ring, the reps/min line
- * beside it and the caption naming the next rep -- in a module no test on the
- * CI path reaches. Issue #280 needs each of them to draw NOTHING on a set whose
- * live count has been given up, and "absence rendered as a value" is the class
- * that gets shipped when a withheld count is drawn as the number zero: a lifter
- * glancing at the ring reads a detector that has missed every rep, which is a
- * claim, rather than a count the app has stopped making.
+ * They were seven expressions inside `RecordScreen`, of five kinds -- the
+ * headline count (drawn three times), the live velocity, the progress arc on
+ * the explosive ring, the reps/min line beside it and the caption naming the
+ * next rep -- in a module no test on the CI path reaches. Issue #280 needs
+ * each of them to draw NOTHING on a set whose live count has been given up,
+ * and "absence rendered as a value" is the class that gets shipped when a
+ * withheld count is drawn as the number zero: a lifter glancing at the ring
+ * reads a detector that has missed every rep, which is a claim, rather than a
+ * count the app has stopped making.
  *
  * This paragraph said THREE and named three; it was already one short of the
  * functions below when it was written, and the velocity line makes it two. The
@@ -225,8 +227,9 @@ object LiveFallbackPolicy {
  *
  * ## One flag, read by all five
  *
- * A single `withheld` argument, so the number, the velocity, the arc and the
- * cadence line cannot disagree about whether there is a count.
+ * A single `withheld` argument, so the number, the velocity, the arc, the
+ * cadence line and the next-rep caption cannot disagree about whether there
+ * is a count.
  * `RepCountPolicy.displayedCount` stays the one place the NUMBER comes from --
  * these functions format it and never re-derive it -- which is #252's rule: the
  * ring and the voice read one figure.
@@ -254,9 +257,10 @@ object LiveCountReadout {
      * `LiveSetState` for the rest of the set: the figure was frozen at 0.0 and
      * the line drew `+0.00 m/s`, a velocity measurement on a set the app had
      * just stopped counting. *Absence rendered as a value*, one line away from
-     * the count, the arc and the cadence line that already say nothing.
+     * the count, the arc, the cadence line and the next-rep caption that
+     * already say nothing.
      *
-     * It reads the same `withheld` flag as the other three, so the four figures
+     * It reads the same `withheld` flag as the other four, so the five figures
      * on that screen cannot disagree about whether a measurement exists.
      */
     fun velocityLabel(velocityMps: Double, withheld: Boolean = false): String = if (withheld) {

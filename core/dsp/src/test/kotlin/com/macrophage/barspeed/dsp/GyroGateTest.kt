@@ -258,6 +258,8 @@ class GyroGateTest {
             // 9.007 on the lat pulldown. Tenth percentiles in the same order:
             // 2.610, 2.912, 2.592, 0.000, 0.000, 0.000 and 1.784. Every median
             // is under the 10 deg/s band and no distribution straddles it.
+            // These fourteen figures are recorded, not asserted -- no test
+            // compares them, so a change that moves them reds nothing.
             "field-cablerow-3010-8rep-s42-set08",
             "field-cablerow-3010-8rep-s42-set10",
             "field-latpulldown-1120-12rep-s41-set18",
