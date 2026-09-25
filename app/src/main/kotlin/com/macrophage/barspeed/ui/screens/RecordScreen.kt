@@ -127,7 +127,6 @@ import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TempoDigit
 import com.macrophage.barspeed.model.TimedSetEndPolicy
-import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.record.PlannedSlot
 import com.macrophage.barspeed.record.RecordState
@@ -3992,7 +3991,14 @@ private fun FeedbackChips(feedback: SetFeedback, hrBpm: Int?, hrvMs: Int? = null
         // decision itself is VelocityLossRegime in :core:model, where a test
         // runs on every push -- nothing here decides anything, which is the
         // arrangement the tempo chip above already uses (#56).
-        if (feedback.velocityLossRegime == VelocityLossRegime.CONTROLLED) {
+        // Reads the accessor rather than comparing against a member (#277):
+        // VelocityLossRegime.readsVelocityLoss's own KDoc says the screens read
+        // it precisely so a third regime cannot come apart from this
+        // comparison silently, and comparing against CONTROLLED only agreed
+        // with it because the enum happens to have exactly two members today.
+        // Null stays the identity -- the same branch a null regime took before
+        // #250 existed.
+        if (feedback.velocityLossRegime?.readsVelocityLoss == false) {
             RangeConsistencyChip(analysis)
         } else {
             // Asked of the reps rather than read off analysis.velocityLossPct, so
