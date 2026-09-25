@@ -323,10 +323,11 @@ sealed interface SetEnd {
          * The question asked is "does the record already carry a terminal
          * word", through [calledOver], rather than "was `Done` spoken". Those
          * are the same question today and the first is the one that stays
-         * right: a second terminal word added to [TERMINAL_CUES] later would
-         * otherwise get a duplicate boundary written beside it, and the
-         * duplicate would be the earlier instant's neighbour rather than a
-         * visible defect. [calledOver] and not [of], because what must not be
+         * right: a word added to [TERMINAL_CUES], as `Time` was by #295, is
+         * counted here without a change, where a test for `Done` would write
+         * a duplicate boundary beside it, and the duplicate would be the
+         * earlier instant's neighbour rather than a visible defect.
+         * [calledOver] and not [of], because what must not be
          * written twice is a WORD on the record, and that is the record's
          * question.
          *

@@ -73,7 +73,7 @@ import kotlin.test.assertTrue
  */
 class RepPauseBoundaryTest {
     /**
-     * Every capture analysed here is a metronome-guided set -- all 34 cue
+     * Every capture analysed here is a metronome-guided set -- all 68 cue
      * tracks committed to this corpus carry cadence stroke words or a hold's
      * clock -- so the prescription they are analysed under declares that a
      * cadence RAN. `SetEnd.of` reads it, because `Done` on a set with no

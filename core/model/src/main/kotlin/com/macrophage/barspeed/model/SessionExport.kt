@@ -3050,8 +3050,9 @@ data class SetExport(
      * From 1.19 the published description states which instant it is counted
      * FROM, and `RestClockPolicy` owns that instant: a release that decided a
      * hold's seconds first (#259), then the terminal cue on the set's own cue
-     * track -- which from 1.22 includes a timed set's `Time` (#295) and the
-     * `Set ended` a timed set the lifter stopped says (#288) -- or the set's
+     * track -- which from 1.22 includes a timed set's `Time` where the timed
+     * voice is on (#295) and the `Set ended` a timed set the lifter stopped
+     * says (#288) -- or the set's
      * end instant where nothing called it over. The countdown and the archive's `rest_before_hrm` window both
      * begin there (#178); until 1.19 the window began when the set's capture
      * stopped instead, up to 53.06 s later on one measured set. `rest_after_hrm`

@@ -176,7 +176,7 @@ class ManualDoneBoundTest {
     }
 
     // ------------------------------------------------------------------
-    // What the analyzer does with each of the two words.
+    // What the analyzer does with `Done` and `Set ended`.
     // ------------------------------------------------------------------
 
     /**
@@ -243,9 +243,8 @@ class ManualDoneBoundTest {
      *
      * Nothing but the app's own set-end call speaks this word --
      * `SetEnd.terminalCall` is its only writer -- so it is never a milestone
-     * and bounds whoever counted the set. This is the cell of the two-by-two
-     * that makes the rule a rule about the WORD's author rather than about
-     * manual sets.
+     * and bounds whoever counted the set. This is the case that makes the
+     * rule a rule about the WORD's author rather than about manual sets.
      */
     @Test
     fun `Set ended bounds a set no cadence ran on`() {

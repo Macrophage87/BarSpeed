@@ -72,7 +72,7 @@ class FailedSetBoundaryTest {
         SetEnd.terminalCall(guided = guided, timed = false, clockEnded = false, voiceSpeaks = true, spoken = spoken)
 
     /**
-     * Every capture in this corpus is a metronome-guided set -- all 34 cue
+     * Every capture in this corpus is a metronome-guided set -- all 68 cue
      * tracks committed here carry cadence stroke words or a hold's clock -- so
      * a cadence RAN on the sets these pins bound. `SetEnd.of` asks, because
      * `Done` on a set with no cadence is the rep-count milestone a lifter's own
