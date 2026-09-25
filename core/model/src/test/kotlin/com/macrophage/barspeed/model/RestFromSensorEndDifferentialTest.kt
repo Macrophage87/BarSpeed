@@ -18,11 +18,12 @@ import kotlin.test.assertEquals
  *
  * ## What a hold actually has to offer
  *
- * Nothing, until now. `SetEnd.TERMINAL_CUES` is `Done` and `Set ended`; `Time`
- * is not in it, so a hold is `NotCued` whether it ran to target or was broken
- * early, and every hold falls back to the write instant. On an auto-ended hold
- * that costs 1 ms, measured on field-42 set 16: `Time` at 1788776841087 against
- * a write at 1788776841088. On a hold ended by hand it costs the whole reach.
+ * When this pin was written, nothing: `Time` was not a terminal cue, so every
+ * hold fell back to the write instant. Since #295 a hold that ran to its
+ * target rests from `Time` -- on field-42 set 16, 1788776841087 against a
+ * write at 1788776841088 -- and a hold broken before it has no `Time` to
+ * offer. On a hold ended by hand the fallback costs the whole reach, which is
+ * what the release instant below removes.
  *
  * The instants below are field-38 set 17's own: clock 1788517883914, release
  * 1788517913103, write 1788517920142.

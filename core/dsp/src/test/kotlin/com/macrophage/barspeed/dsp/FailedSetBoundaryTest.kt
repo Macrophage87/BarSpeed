@@ -6,6 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Session 32, set 9: a guided set the lifter abandoned, and the boundary its
@@ -164,7 +165,10 @@ class FailedSetBoundaryTest {
      */
     @Test
     fun `the terminal vocabulary names both endings and keeps them apart`() {
-        assertEquals(setOf("Done", "Set ended"), SetEnd.TERMINAL_CUES, "the words that end a set")
+        // `Time` joined at #295: it ends a timed set on the record, and the
+        // rest clock already treated it as the set's end instant.
+        assertEquals(setOf("Done", "Set ended", "Time"), SetEnd.TERMINAL_CUES, "the words that end a set")
+        assertTrue(TimedSetVoice.TIME_UP in SetEnd.TERMINAL_CUES, "the word the timed voice speaks is the one bounded")
         assertNotEquals(SetEnd.DONE, SetEnd.STOPPED, "a completed set and an abandoned one must not read alike")
     }
 

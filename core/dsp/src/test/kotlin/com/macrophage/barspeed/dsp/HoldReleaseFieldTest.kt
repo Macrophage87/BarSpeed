@@ -204,7 +204,7 @@ class HoldReleaseFieldTest {
     }
 
     @Test
-    fun `the rest after a broken hold runs from the tap, because nothing called it over`() {
+    fun `the rest after a broken hold runs from the tap, and after a completed one from Time`() {
         // #172 moved the rest clock's origin to the instant the set was called
         // over, read off the set's own frozen cue track. A hold broken before
         // its target has no such word, so the fallback -- the write instant,
@@ -224,19 +224,17 @@ class HoldReleaseFieldTest {
             ),
             "set 17's rest runs from the tap",
         )
-        // The carry, and the finding that took a run to establish: `Time` is
-        // NOT in SetEnd.TERMINAL_CUES -- the vocabulary is `Done` and `Set
-        // ended` -- so a hold that ran to its target is ALSO NotCued, and its
-        // rest also runs from the write instant. It costs nothing there,
-        // because the app ends the set on the same tick it speaks the word:
-        // `Time` at 1788776841087 against a write at 1788776841088, 1 ms
-        // apart. So for a hold the write instant is the only instant the rest
-        // clock has, which is precisely why a hold ended by hand carries the
-        // reach into the rest as well as into the duration.
+        // The hold that ran to its target. Until #295 `Time` was not in
+        // SetEnd.TERMINAL_CUES, so this set was NotCued too and its rest ran
+        // from the write instant. `Time` is a terminal word now, so the rest
+        // runs from `Time` -- 1788776841087, 1 ms before the write at
+        // 1788776841088, because the app ends the set on the tick it speaks
+        // the word. Set 17 above is unchanged: it was recorded before #288
+        // and its track carries no terminal word at all.
         assertEquals(
-            SetEnd.NotCued,
+            SetEnd.Cued(1788776841087),
             SetEnd.calledOver(cues(carry.fixture)),
-            "Time is not a terminal cue, so the carry is NotCued too",
+            "Time calls the hold over",
         )
         assertEquals(
             1L,
@@ -244,13 +242,13 @@ class HoldReleaseFieldTest {
             "the carry's write lands 1 ms after the word",
         )
         assertEquals(
-            carry.endedAtMs,
+            1788776841087,
             RestClockPolicy.startedAtMs(
                 setOverCueAtMs = (SetEnd.calledOver(cues(carry.fixture)) as? SetEnd.Cued)?.atMs,
                 sensorEndAtMs = null,
                 endedAtMs = carry.endedAtMs,
             ),
-            "the carry's rest runs from the write, 1 ms after Time",
+            "the hold's rest runs from Time, 1 ms before the write",
         )
     }
 

@@ -173,7 +173,9 @@ class SetEndWindowTest {
 
     /**
      * Every cue outside [SetEnd.TERMINAL_CUES] calls a stroke or counts one;
-     * none of those ends the set.
+     * none of those ends the set. `Time` stood in this list until #295 made it
+     * a terminal word; it is removed rather than asserted here, and the pin
+     * that it bounds is `a hold's Time bounds its window and seeds its rest`.
      */
     @Test
     fun `a cue track with no terminal cue leaves the set unbounded`() {
@@ -183,7 +185,6 @@ class SetEndWindowTest {
             VoiceCue(3_000L, "Hold"),
             VoiceCue(4_000L, "Down"),
             VoiceCue(5_000L, "1"),
-            VoiceCue(6_000L, "Time"),
         )
         assertEquals(SetEnd.NotCued, SetEnd.of(spoken, guided))
     }
@@ -203,15 +204,15 @@ class SetEndWindowTest {
      * arrival millisecond `speakCues` wrote. A rest clock seeded from a
      * shifted instant would be wrong by that shift on every set.
      *
-     * The second is the one that decides the fallback exists at all: a hold's
-     * track ends on `Time`, which this deliberately does not bound on, so a
-     * timed set is [SetEnd.NotCued] and its rest has no cue instant to start
-     * from. That is an absence and the caller has to treat it as one. It is
-     * also harmless there -- a hold ends on its own clock, so the instant the
-     * set write freezes IS the instant it ended.
+     * The second is a hold's. Until #295 a hold's track ending on `Time` was
+     * [SetEnd.NotCued], because `Time` was not a terminal word, and its rest
+     * fell back to the write instant. It is a terminal word now, so the seed
+     * is the `Time` stamp, unshifted, exactly as `Done`'s is. A track with no
+     * terminal word at all is still an absence, and the caller still treats it
+     * as one.
      */
     @Test
-    fun `the rest clock's seed instant is the Done stamp, and a hold has none`() {
+    fun `the rest clock's seed instant is the Done stamp, and a hold's is its Time stamp`() {
         val guidedTrack = listOf(
             VoiceCue(1_000L, "Ready"),
             VoiceCue(2_000L, "Brace"),
@@ -229,7 +230,8 @@ class SetEndWindowTest {
             VoiceCue(45_000L, "1"),
             VoiceCue(46_000L, "Time"),
         )
-        assertEquals(SetEnd.NotCued, SetEnd.calledOver(hold), "a hold names no set-over cue")
+        assertEquals(SetEnd.Cued(46_000L), SetEnd.calledOver(hold), "the Time stamp, unshifted")
+        assertEquals(SetEnd.NotCued, SetEnd.calledOver(hold.dropLast(1)), "a hold broken before Time names none")
     }
 
     /**

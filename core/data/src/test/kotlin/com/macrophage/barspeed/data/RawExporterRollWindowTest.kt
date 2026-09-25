@@ -254,6 +254,31 @@ class RawExporterRollWindowTest {
     }
 
     /**
+     * A hold's `Time` closes the window the way a cadence's `Done` does (#295).
+     *
+     * field-42's six hold streams published `fromWorkStart` -- "nothing said
+     * when the set ended" -- beside a track that ends on `Time`. No cadence
+     * runs on a hold (no tempo here), so the word bounds it by itself. The
+     * roll values are written down here, not measured: a 12-degree hold, then
+     * a 140-degree swing after `Time` that stands for a capture which kept
+     * recording while the implement was put down.
+     */
+    @Test
+    fun `a hold's Time closes the working window`() = runTest {
+        val set =
+            meta(
+                listOf(
+                    imuStream(samples(1_000L, sweep(0.0, 12.0, 20) + sweep(0.0, 140.0, 20))),
+                    prepStream(startedAtMs = 900L, workStartedAtMs = 1_000L),
+                    cueStream(1_000L to "Hold", 1_190L to "Time"),
+                ),
+                tempo = null,
+            )
+        assertEquals(12.0, set.num("rollExcursion_deg"), "the put-down after Time was counted as the hold")
+        assertEquals("workingWindow", set.text("rollExcursionBasis"))
+    }
+
+    /**
      * A `Done` on a set NO CADENCE RAN ON does not close this window. Issue
      * #285.
      *
