@@ -2303,17 +2303,20 @@ data class SetExport(
      * velocity it gains, met by its brake and called only once the bar is back
      * at the floor -- and [liveReps] says what that means beside the batch
      * count. It speaks as the bar lands, about 1.2 s after the pull ends
-     * (median 1.16 s on the eight deadlift sets), can speak a rep late after a
-     * light soft landing, and does not count an attempt that is back on the
-     * floor, or falls, within 1.2 s of its drive. On straight-reps work the
-     * LIFTER'S HAND COUNT is the ground truth and this word says which counter
-     * to score against it (#286). The batch detector, separately, over-counts
-     * all six committed concentric-first captures that carry a hand count, by
-     * +1 to +4 (#284).
+     * (a median 1.16 s after the batch detector's concentric window ends, on
+     * replayed captures), can speak a rep late after a light soft landing,
+     * and does not count an attempt that is back on the floor, or falls,
+     * within 1.2 s of its drive. On straight-reps work the LIFTER'S HAND
+     * COUNT is the ground truth and this word says which counter to score
+     * against it (#286). The batch detector, separately, over-counts all six
+     * committed concentric-first captures that carry a hand count, by +1 to
+     * +4 (#284).
      *
-     * WHAT IT HAS BEEN SCORED ON, against the hand count: straight-reps
-     * deadlifts from two sessions and nothing else, both replayed through it
-     * after the session (`CycleLiveCountFieldTest`). Field-43: 5, 5 and 5
+     * WHAT IT HAS BEEN SCORED ON, against the lifter's settled count -- the
+     * hand count, except field-44 set 4, where the capture's 4 replaced a
+     * hand count of 5 --: straight-reps deadlifts from two sessions and
+     * nothing else, both replayed through it after the session
+     * (`CycleLiveCountFieldTest`). Field-43: 5, 5 and 5
      * calls for 5, 5 and 5 at 61.2, 83.9 and 102.1 kg, one of the last set's
      * the set-up pull and that set's rep 4 missed. Field-44: 5, 5, 5, 4 and 2
      * of 5, 5, 5, 4 and 2 at 61.2 to 120.2 kg, the failed third pull of the
