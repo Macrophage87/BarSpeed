@@ -86,6 +86,18 @@ class TimedStopCallTest {
         assertNull(timedCall(clockEnded = true, voiceSpeaks = false, spoken = track()))
     }
 
+    /**
+     * The clock-end guard on its own. The app writes `Time` on every clock
+     * end where the voice is on, so this track -- a clock end with the voice
+     * on and no `Time` -- is not a shape it produces; the pin exists because
+     * the case above cannot fail without it: a mutation dropping the guard
+     * survived CI run 36170989820 (claude/tmp-hold-mut-8).
+     */
+    @Test
+    fun `a clock end never takes Set ended, even where no Time was written`() {
+        assertNull(timedCall(clockEnded = true, voiceSpeaks = true, spoken = track()))
+    }
+
     @Test
     fun `a timed set whose countdown was silent stays silent at its end`() {
         assertNull(timedCall(clockEnded = false, voiceSpeaks = false, spoken = track()))

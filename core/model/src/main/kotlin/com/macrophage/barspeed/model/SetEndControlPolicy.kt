@@ -102,11 +102,18 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
  * the sets that hit their target -- every failed set absent by construction,
  * and the set the lifter stopped is where the fatigue information is, so the
  * record read easier the harder the session got. This gates on COMPLETION, and
- * a set ended via Fail is still rateable: #140's correction grid sits on the
- * rest screen, where a Fail-ended set's row reads EFFORT -- FAILED and carries
- * a Change action that opens the same grid with the failure tile pre-lit. The
- * rating moves from the moment of ending to the rest period rather than
- * disappearing. (An auto-ended hold, which carries no verdict at all, is the
+ * a set ended via Fail still reaches the grid: #140's correction grid sits on
+ * the rest screen, where a Fail-ended set's row reads EFFORT -- FAILED and
+ * carries a Change action that opens the same grid with the failure tile
+ * pre-lit. What that grid can STORE is narrower than this paragraph once said.
+ * It said the rating "moves from the moment of ending to the rest period
+ * rather than disappearing"; the owner's rule -- "Don't ask for an RPE on
+ * failed sets, if you can't do it, it's failed" -- overrode that, and since
+ * #313 no write stores an rpe beside a failure of either kind
+ * (`FailedSetRatingPolicy.storedRpe`). A rung tapped there is kept only where
+ * it withdraws the lifter's tap AND no derived shortfall stands. #137's hazard
+ * is answered by the `failed` flag rather than by a rating: the plan prompt
+ * tells the coach to read a failed set as beyond RPE 10. (An auto-ended hold, which carries no verdict at all, is the
  * row that reads EFFORT -- NOT RATED with a Rate action instead -- unless,
  * since #311, the release its armed unit saw put its recorded seconds short of
  * the target, when the derived shortfall is a verdict; both routes
