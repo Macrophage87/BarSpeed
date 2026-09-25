@@ -301,8 +301,14 @@ class StackMountFieldTest {
      * Its rep count is 1 of the 14 performed and stays 1, which this change
      * does not repair and does not cause: the unit the declaration describes is
      * the unit already being read. Its partner, on the handle, resolves 15. That
-     * is a separate defect about a stack-mounted stream that barely travels, and
-     * it is raised rather than folded in here.
+     * is a separate defect, raised rather than folded in here.
+     *
+     * The stream is not one that "barely travels": that reading stood here and
+     * is deleted. Under `sensorInverted` true the same stream resolves 14 of the
+     * 14 performed -- the set's own geometry read the stack's rise as the
+     * return, because the recorded declaration carries `sensorInverted` false
+     * on a stack whose drive goes down. That is #317; the count asserted below
+     * is the geometry as recorded, which does not move.
      */
     @Test
     fun `the triceps pushdown confirms the unit it already armed and moves nothing`() {
