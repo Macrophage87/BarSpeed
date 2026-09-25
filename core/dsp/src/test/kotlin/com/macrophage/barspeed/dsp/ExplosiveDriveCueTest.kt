@@ -88,8 +88,12 @@ class ExplosiveDriveCueTest {
     @Test
     fun `on horizontal work 20X0 and 2010 are still the same audio`() {
         val expected = listOf(
-            0 to "Drive", 1 to "Return", 2 to "1",
-            3 to "Last rep", 4 to "Return", 5 to "1",
+            0 to "Drive",
+            1 to "Return",
+            2 to "1",
+            3 to "Last rep",
+            4 to "Return",
+            5 to "1",
             6 to "Done",
         )
         assertEquals(expected, script("20X0", seatedRow, 2), "a seated row's X drive")
