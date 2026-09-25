@@ -81,4 +81,38 @@ class PlanQueueTest {
             timedVerdicts(actualS = 8, plannedS = 10),
         )
     }
+
+    // #270 (round 2): a duration correction on the rest screen must re-grade
+    // a hold's verdict off the CORRECTED seconds, not keep reading the
+    // sentence frozen at set end. A 20 s target corrected down to 15 s used
+    // to go on reading "Held 20s -- full 20s target. Nice." under "FAILED".
+    // [restVerdicts] is the pure selection RepQualityCard now calls; this is
+    // the one case that reproduces the reported bench defect.
+    @Test
+    fun `a corrected timed duration re-grades the verdict rather than keeping the frozen one`() {
+        assertEquals(
+            listOf("Held 15s of 20s. Consider a shorter target or lighter load."),
+            restVerdicts(
+                isTimed = true,
+                effectiveDurationS = 15,
+                plannedDurationS = 20,
+                frozenVerdicts = listOf("Held 20s — full 20s target. Nice."),
+                velocityLossRegime = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `a non-timed set keeps the frozen verdicts, filtered by regime`() {
+        assertEquals(
+            emptyList(),
+            restVerdicts(
+                isTimed = false,
+                effectiveDurationS = null,
+                plannedDurationS = null,
+                frozenVerdicts = emptyList(),
+                velocityLossRegime = null,
+            ),
+        )
+    }
 }
