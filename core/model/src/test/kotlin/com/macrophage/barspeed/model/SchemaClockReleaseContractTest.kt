@@ -57,7 +57,8 @@ class SchemaClockReleaseContractTest {
     @Test
     fun `duration_s says a clock-ended set can be shorter than its target, and never by a late release`() {
         val duration = setDescription("duration_s")
-        val clockCase = "From 1.22 (#311) a set the CLOCK ended carries the same span to a release instead of"
+        // A HOLD, not a set, since #314: a carry the clock ended is never offered the release.
+        val clockCase = "From 1.22 (#311) a HOLD the CLOCK ended carries the same span to a release instead of"
         assertTrue(clockCase in duration, "duration_s does not state the clock-ended release case")
         assertTrue(
             "a release at or after the target, or none, leaves the target" in duration,
