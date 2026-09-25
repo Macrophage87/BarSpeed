@@ -22,7 +22,9 @@ import kotlin.math.sqrt
  * are the progression metric on a `time` exercise, so the error lands on the
  * number the next plan steps up from.
  *
- * Since #311 it is asked of a hold the CLOCK ended as well. A lifter who lets
+ * Since #311 it is asked of a hold the CLOCK ended as well -- a hold, and
+ * since #314 never a timed carry the clock ended, whose footstrikes no
+ * capture has measured (`HoldEndPolicy.releaseConsulted`). A lifter who lets
  * go inside that reach of the target never gets to the phone before the clock
  * ends the set, and until then the target was recorded whatever the stream
  * said; `HoldEndPolicy` now weighs the release against the target as it

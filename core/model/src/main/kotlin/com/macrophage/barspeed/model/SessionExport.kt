@@ -2175,6 +2175,35 @@ data class SessionExport(
          * and the `rpe` sentence; it cannot see this KDoc.
          * `FailedSetRatingPolicyTest` and, in `:app`, `DerivedFailureRatingTest`
          * pin the rule and the three writes.
+         *
+         * 1.22 TAKES A TENTH ENTRY (#314, a carry the clock ended keeps its
+         * target), and it CHANGES NO KEY. A FURTHER ENTRY under the unreleased
+         * 1.22, on the tag reading the ninth entry states.
+         *
+         * WHAT WENT FALSE. The seventh entry's check -- a release 1 to 20 whole
+         * seconds before the target decides a clock-ended set's `duration_s` --
+         * reached every timed kind, so a timed CARRY (`farmers_walk`,
+         * `suitcase_carry`) took it too, and [SetExport.durationEndedBy] and
+         * [SetExport.durationS] said so of any set the clock ended. No
+         * walking-carry stream exists in any capture, and a footstrike could
+         * read as a let-go.
+         *
+         * THE CHANGE. `HoldEndPolicy.releaseConsulted`: the check applies to a
+         * HOLD only, so a carry the clock ended records its target and reads
+         * `clock` whatever its stream shows. A carry the lifter tapped is
+         * unchanged. Both descriptions now say HOLD.
+         *
+         * WHAT A READER DOES, IN BOTH DIRECTIONS. No key is added, removed or
+         * retyped and the schema accepts and rejects exactly the documents it
+         * did before this entry. What moves is what `clock` may mean on a carry:
+         * the target, never a release. NOT RETROACTIVE: the word and the
+         * seconds are decided when the set is recorded and stored with it.
+         * `DATABASE_VERSION` does NOT move and the plan schema is untouched.
+         *
+         * PINNED. `SchemaCarryClockContractTest` asserts this entry's marker and
+         * both descriptions' carry sentences, and `SchemaClockReleaseContractTest`
+         * now asserts `duration_s` says HOLD; neither can see this KDoc.
+         * `HoldEndCarryGuardTest` pins the rule.
          */
         const val SCHEMA_VERSION = "1.22"
 
@@ -2562,11 +2591,14 @@ data class SetExport(
      * timed set carried the walk back to the phone inside it, and from 1.21 a
      * hold whose armed unit saw the release does not.
      *
-     * From 1.22 (#311) a set the CLOCK ended publishes the span to a release
+     * From 1.22 (#311) a HOLD the CLOCK ended publishes the span to a release
      * instead of the target where its armed unit saw the implement let go and
      * believing it takes 1 to 20 whole seconds off the target, so such a set
      * is SHORTER than its target though the clock ran to it. A release at or
-     * after the target, or none, leaves the target.
+     * after the target, or none, leaves the target. From 1.22 (#314) a CARRY
+     * the clock ended publishes the target whatever its stream shows: no
+     * walking-carry stream has been captured, and a footstrike could read as
+     * a release.
      *
      * ABSENT FROM 1.18 on a set that ended before its work phase began, which
      * carries [abandonedInPrep] instead. Such a set stores 0 here and that 0
@@ -2605,8 +2637,10 @@ data class SetExport(
      *
      * - `clock` -- the app's own clock reached the target and ended the set
      *   (#168), so [durationS] is the target itself and the lifter heard `Time`
-     *   a beat before it. From 1.22 (#311) only where its armed unit, if any,
-     *   reported no release taking 1 to 20 whole seconds off the target.
+     *   a beat before it. From 1.22 (#311), on a HOLD, only where its armed
+     *   unit, if any, reported no release taking 1 to 20 whole seconds off the
+     *   target; a timed CARRY the clock ended is never offered the release
+     *   (#314), so it reads `clock` and its target whatever its stream shows.
      * - `sensor` -- an armed unit's stream showed the implement being let go,
      *   and [durationS] runs to THAT instant rather than to the tap that
      *   followed it -- or, from 1.22 (#311), rather than to the target on a

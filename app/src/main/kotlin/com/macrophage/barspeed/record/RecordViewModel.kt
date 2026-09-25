@@ -2312,11 +2312,14 @@ private fun recordedTimedEnd(
 ): TimedEnd? {
     if (timedKind == null) return null
     fun secondsTo(instantMs: Long) = SetClockPolicy.heldSeconds(prepCase, tappedAtMs, clockStartedAtMs, instantMs)
-    // Asked whoever ended the set. Until #311 a hold the clock ended was not
-    // offered a release at all, so a hold let go before its target and never
-    // tapped recorded the target (field-45 set 13: 35 s against a release
-    // 30.742 s in). `HoldEndPolicy` now weighs it against the target the same
-    // way it weighs it against a tap, and refuses one at or after the target.
+    // Asked whoever ended the set, and weighed unless the clock ended a CARRY:
+    // `HoldEndPolicy.decideFor` withholds it there (#314), because no walking
+    // carry has been captured to say how a footstrike reads. Until #311 a hold
+    // the clock ended was not offered a release at all, so a hold let go
+    // before its target and never tapped recorded the target (field-45 set
+    // 13: 35 s against a release 30.742 s in). `HoldEndPolicy` now weighs it
+    // against the target the same way it weighs it against a tap, and refuses
+    // one at or after the target.
     val releaseAtMs = HoldRelease.atMs(analysedSamples, clockStartedAtMs)
     val decision = HoldEndPolicy.decideFor(
         kind = timedKind,

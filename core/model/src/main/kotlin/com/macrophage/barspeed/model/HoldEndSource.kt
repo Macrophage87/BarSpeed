@@ -19,10 +19,12 @@ package com.macrophage.barspeed.model
  */
 enum class HoldEndSource(val published: String) {
     /**
-     * The app's own clock reached the target and ended the set (#168), and no
-     * armed unit reported a release 1 to [HoldEndPolicy.MAX_TRIM_S] seconds
-     * before it (#311). The lifter heard `Time` a beat earlier and the
-     * recorded seconds are the target itself.
+     * The app's own clock reached the target and ended the set (#168), and,
+     * on a hold, no armed unit reported a release 1 to
+     * [HoldEndPolicy.MAX_TRIM_S] seconds before it (#311). A timed carry the
+     * clock ended is never offered the release (#314), so it reads this word
+     * whatever its stream shows. The lifter heard `Time` a beat earlier and
+     * the recorded seconds are the target itself.
      */
     CLOCK("clock"),
 
@@ -108,6 +110,10 @@ enum class HoldEndSource(val published: String) {
  * lifter did reach. `HoldRelease`'s settle is fitted to one measured onset and
  * its band's margins are measured on four committed hold streams, so that risk
  * is bounded by what was observed, not by design.
+ *
+ * A HOLD ONLY (#314). A timed carry the clock ended is not offered the
+ * release at all -- [releaseConsulted] -- because no walking carry has been
+ * captured and a footstrike could read as a let-go.
  *
  * WHAT IS STILL OPEN: a hold with no unit armed, or one whose unit saw no
  * release, still has the clock end it at the target and record the target
@@ -196,11 +202,25 @@ object HoldEndPolicy {
      * Whether a timed set of [kind] is offered the release an armed unit saw
      * at all, given whether the clock [autoEnded] it (#314).
      *
-     * SEAM ONLY at this commit: every timed kind is offered it on every
-     * ending, which is what `recordedTimedEnd` in `:app` has done since #311.
+     * A set the lifter ended is always offered it, as since #259. A set the
+     * CLOCK ended is offered it only when it is a [ExerciseKind.HOLD]. #311
+     * added the clock-end check for the hang field-45 measured, and it reached
+     * every timed kind, so a timed CARRY -- `farmers_walk`, `suitcase_carry`,
+     * or any id the kind inference reads as one -- took it too. No walking
+     * carry has been captured, in the corpus or in any field session:
+     * `HoldRelease`'s band and settle are fitted to static holds, and a
+     * footstrike's acceleration is exactly the kind of crossing that could
+     * read as a let-go and shorten a carry that ran to `Time`. So a carry the
+     * clock ended records its target under [HoldEndSource.CLOCK] until a
+     * walking-carry capture shows how footstrikes read. The owner was told
+     * this recommendation and did not object.
+     *
+     * NOT CLOSED BY THIS: a carry the lifter TAPPED is still offered the
+     * release (#259), and the same footstrike could shorten it by up to
+     * [MAX_TRIM_S] seconds. That is the tap-end path, older than #311, and it
+     * is raised rather than folded in here.
      */
-    @Suppress("UnusedParameter", "FunctionOnlyReturningConstant")
-    fun releaseConsulted(kind: ExerciseKind, autoEnded: Boolean): Boolean = true
+    fun releaseConsulted(kind: ExerciseKind, autoEnded: Boolean): Boolean = !autoEnded || kind == ExerciseKind.HOLD
 
     /**
      * [decide] for a timed set of [kind], with [sensorEndS] withheld where
