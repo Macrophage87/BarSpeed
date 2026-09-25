@@ -69,6 +69,24 @@ data class RepAnalysis(
      */
     val artefactSamples: Int? = null,
     /**
+     * Samples above [AccelArtefact.BOUND_G] in the GUARD BAND before this rep's
+     * span: the [AccelArtefact.GUARD_BAND_S] seconds that end where the span
+     * begins, the span itself excluded -- [AccelArtefact.guardBandBefore]. Issue
+     * #306.
+     *
+     * [artefactSamples] counts what lies INSIDE the span. This counts what lies
+     * just before it, because a floor contact rings for a measured interval
+     * after it, and ringing that reaches into the span can enter the velocity
+     * a peak is read off without putting a sample above the bound inside the
+     * span: field-44 set 4 rep 3's span opens 0.03 s after a 21.4 g sample
+     * and carries 0 artefact samples. The band may reach into the previous rep's span, so one
+     * sample can be counted here and in that rep's [artefactSamples].
+     *
+     * Null and 0 are different facts, on [artefactSamples]'s doctrine: null
+     * means the rep was analysed before the band existed.
+     */
+    val guardArtefactSamples: Int? = null,
+    /**
      * Whether the analysis can BOUND this rep's displacement: whether the ZUPT
      * pass pinned the velocity integral to zero at both ends of this rep's own
      * span, with no other rep sharing the interval AND with every interval the
@@ -671,6 +689,11 @@ object SetAnalyzer {
             // and `ArtefactPeakWithholdingTest` names the five published
             // figures containment leaves standing.
             artefactSamples = AccelArtefact.countIn(artefacts, AccelArtefact.spanOf(span)),
+            // The same count over the guard band that ENDS where this span
+            // begins (#306): a contact's ringing reaches into the span without
+            // a sample above the bound inside it. On the reconstructed clock,
+            // which is the one GUARD_BAND_S was measured on.
+            guardArtefactSamples = AccelArtefact.countIn(artefacts, AccelArtefact.guardBandBefore(span, series.timeS)),
             // Whether the ZUPT pass bounded this rep's displacement (#291).
             // Read against EVERY segmented span, not the bounded list this
             // detection came from: a detection some later bound excluded still

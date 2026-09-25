@@ -459,7 +459,7 @@ private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis, regime: Vel
                         },
                     )
                 VelocityLoss.TerminalRepIsFastest -> VerdictChip("Vel loss n/a", ChipTone.NEUTRAL)
-                VelocityLoss.NotEnoughReps, VelocityLoss.NoReference -> Unit
+                VelocityLoss.NotEnoughReps, VelocityLoss.NoReference, VelocityLoss.NoEligiblePair -> Unit
             }
         }
         record.hrAvgBpm?.let { VerdictChip("♥ $it", ChipTone.NEUTRAL) }
@@ -507,8 +507,7 @@ private fun powerSummary(analysis: SetAnalysis): String? {
     // Over the reps whose own span carries no sample above the physical bound
     // (#290). This line printed "peak 3606 W" on a 55 lb press, which is the
     // reading the owner ignores these screens for.
-    val peak = AccelArtefact.peakEligible(analysis.reps).mapNotNull { it.peakPowerW }.maxOrNull()
-        ?: return null
+    val peak = AccelArtefact.setPeakPowerW(analysis.reps) ?: return null
     val avg = analysis.reps.mapNotNull { it.meanConPowerW }.takeIf { it.isNotEmpty() }?.average()
     return "Drive power: peak ${peak.toInt()} W" + (avg?.let { " · avg ${it.toInt()} W" } ?: "")
 }

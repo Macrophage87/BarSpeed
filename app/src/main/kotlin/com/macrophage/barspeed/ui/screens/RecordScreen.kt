@@ -4031,7 +4031,7 @@ private fun FeedbackChips(feedback: SetFeedback, hrBpm: Int?, hrvMs: Int? = null
                 // is a set the sensor DID resolve reps for: the lifter is being
                 // told the figure is unavailable, not that nothing was measured.
                 VelocityLoss.TerminalRepIsFastest -> VerdictChip("Vel loss n/a", ChipTone.NEUTRAL)
-                VelocityLoss.NotEnoughReps, VelocityLoss.NoReference -> Unit
+                VelocityLoss.NotEnoughReps, VelocityLoss.NoReference, VelocityLoss.NoEligiblePair -> Unit
             }
         }
         hrBpm?.let { VerdictChip("♥ $it", ChipTone.NEUTRAL) }
@@ -4069,7 +4069,7 @@ internal fun PeakVelocityChart(analysis: SetAnalysis, verdicts: List<String>) {
     // The SET-LEVEL claim, over the reps whose own span carries no sample above
     // the physical bound (#290). This line printed "Best 2.52 m/s" on a 55 lb
     // press two lines above an already-corrected "Drive power: peak 329 W".
-    val best = AccelArtefact.peakEligible(analysis.reps).maxOfOrNull { it.peakConVelMps }
+    val best = AccelArtefact.setPeakConVelMps(analysis.reps)
     if (best != null && best > 0) {
         // Absent rather than zero where the set's own last rep is withheld, and
         // measured against the same reps as [best]. The decision is
@@ -4170,8 +4170,7 @@ private fun powerSummary(analysis: SetAnalysis): String? {
     // Over the reps whose own span carries no sample above the physical bound
     // (#290). This line printed "peak 3606 W" on a 55 lb press, which is the
     // reading the owner ignores these screens for.
-    val peak = AccelArtefact.peakEligible(analysis.reps).mapNotNull { it.peakPowerW }.maxOrNull()
-        ?: return null
+    val peak = AccelArtefact.setPeakPowerW(analysis.reps) ?: return null
     val avg = analysis.reps.mapNotNull { it.meanConPowerW }.takeIf { it.isNotEmpty() }?.average()
     return "Drive power: peak ${peak.toInt()} W" + (avg?.let { " · avg ${it.toInt()} W" } ?: "")
 }

@@ -41,11 +41,22 @@ sealed interface VelocityLoss {
      */
     data object TerminalRepIsFastest : VelocityLoss
 
+    /**
+     * At least two reps resolved, but the pair best-to-last needs is not one
+     * the analysis can stand behind: fewer than two reps are
+     * `AccelArtefact.isPeakEligible`, or the set's LAST rep is not. Issue #306.
+     *
+     * A distinct case rather than [NotEnoughReps], because a set of thirteen
+     * detections is not a set with too few reps, and saying which absence a set
+     * is in is the reason this type exists.
+     */
+    data object NoEligiblePair : VelocityLoss
+
     /** The figure to publish, or null in every case where there is not one. */
     val pctOrNull: Double? get() = (this as? Measured)?.pct
 
     /**
-     * The wire name of this case. These four strings are the vocabulary
+     * The wire name of this case. These strings are the vocabulary
      * `SessionExport.VALID_VELOCITY_LOSS_BASES` publishes; this is the side
      * that owns them.
      */
@@ -55,6 +66,7 @@ sealed interface VelocityLoss {
             NotEnoughReps -> NOT_ENOUGH_REPS
             NoReference -> NO_REFERENCE
             TerminalRepIsFastest -> TERMINAL_REP_IS_FASTEST
+            NoEligiblePair -> NO_ELIGIBLE_PAIR
         }
 
     companion object {
@@ -62,6 +74,7 @@ sealed interface VelocityLoss {
         const val NOT_ENOUGH_REPS = "notEnoughReps"
         const val NO_REFERENCE = "noReference"
         const val TERMINAL_REP_IS_FASTEST = "terminalRepIsFastest"
+        const val NO_ELIGIBLE_PAIR = "noEligiblePair"
 
         /**
          * A pure function of the rep list, so it can be asked of a stored

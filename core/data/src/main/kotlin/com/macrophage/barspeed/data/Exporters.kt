@@ -221,17 +221,16 @@ class SessionExporter(
     ): SetExport {
         val analysis = sessionRepository.decodeAnalysis(record)
         val reps = analysis?.reps.orEmpty()
-        // The reps a PEAK may be taken over: those whose own span carries no
-        // accelerometer sample above the physical bound (#290, #255). Derived
-        // from the stored per-rep counts, so it is answerable here for the
-        // reason velocityLoss below is -- it is a pure function of the rep list
-        // the row already holds. A rep stored before the count existed carries
-        // null and is KEPT, which is what stops an old set losing the peak it
-        // has always published; AccelArtefact.peakEligible owns that rule.
-        val peakEligible = AccelArtefact.peakEligible(reps)
+        // The set's two PEAK figures are AccelArtefact.setPeakConVelMps and
+        // setPeakPowerW, read in the summary below (#290, #255, #306). Both are
+        // pure functions of the stored per-rep figures, so they are answerable
+        // here for the reason velocityLoss below is, and a rep stored before a
+        // count or flag existed carries null and is KEPT, which is what stops
+        // an old set losing the peak it has always published.
+        //
         // The reps a RANGE claim may be taken over: those whose displacement the
-        // ZUPT pass bounded (#291). Derived from the stored per-rep flags for the
-        // same reason peakEligible above is -- a pure function of the rep list
+        // ZUPT pass bounded (#291). Derived from the stored per-rep flags -- a
+        // pure function of the rep list
         // the row already holds -- and a rep stored before the flag existed
         // carries null and is KEPT, so no archived set loses the mean and the
         // spread it has always published. RomBound owns that rule.
@@ -554,10 +553,10 @@ class SessionExporter(
                 // 1.21). One impossible reading is sufficient to be a MAXIMUM,
                 // so a set's published peak is otherwise whatever its worst
                 // artefact was: field-42 set 2 published 3606.3 W on a
-                // 24.9 kg press. AccelArtefact.peakEligible is the one
-                // statement of which reps qualify; this file does not hold a
-                // second copy of the rule.
-                peakConVelMps = peakEligible.maxOfOrNull { it.peakConVelMps },
+                // 24.9 kg press. AccelArtefact.setPeakConVelMps is the one
+                // statement of which figure a set publishes as its peak; this
+                // file does not hold a second copy of the rule (#306).
+                peakConVelMps = AccelArtefact.setPeakConVelMps(reps),
                 meanEccS = reps.mapNotNull { it.eccS }.averageOrNull()?.round2(),
                 meanConS = reps.map { it.conS }.averageOrNull()?.round2(),
                 // Both range figures over the reps whose displacement the
@@ -578,7 +577,7 @@ class SessionExporter(
                 // bounded rep publishes no mean.
                 meanRomM = romBounded.map { it.romM }.averageOrNull()?.round3(),
                 romSpreadPct = SetAnalyzer.romSpreadPct(reps),
-                peakPowerW = peakEligible.mapNotNull { it.peakPowerW }.maxOrNull(),
+                peakPowerW = AccelArtefact.setPeakPowerW(reps),
                 meanConPowerW = reps.mapNotNull { it.meanConPowerW }.averageOrNull()?.round1(),
                 // Why every key above is absent, when they all are. Schema
                 // 1.18, issue #138: a healthy stream can segment to nothing,

@@ -155,6 +155,35 @@ object AccelArtefact {
      */
     const val SENSOR_RANGE_G = 16.0
 
+    /**
+     * Seconds before a rep's span over which an artefact still disqualifies
+     * the rep's peaks, issue #306: the interval a floor contact is measured to
+     * ring for, rounded up to the next tenth of a second.
+     *
+     * MEASURED, not chosen. `GuardBandProvenanceTest` walks every deadlift
+     * stream on the classpath -- the only lift in the corpus that meets the
+     * floor between reps -- and measures, for each contact that is not the
+     * stream's last, the time from its first sample above [BOUND_G] to its last
+     * sample above 2 g, 2 g being the most a tempo-prescribed lift's total
+     * support acceleration reaches (the class KDoc's derivation). The longest
+     * is 0.362 s. The last contact of each stream is excluded because no rep
+     * follows it: it is the bar set down, and it rings for up to a second.
+     *
+     * What it is FOR: field-44 set 4 rep 3's span opens 0.03 s after a 21.4 g
+     * sample on the reconstructed clock, carries 0 artefact samples inside
+     * itself, and publishes 7762.4 W on 111.1 kg. It is not an outlier: 21
+     * of the 38 spans on the five field-44 deadlifts open within 0.06 s of a
+     * sample above [BOUND_G].
+     *
+     * What it does not say. 2 g bounds what a LIFT produces, not what ringing
+     * does to an integral; the band says where a contact's ringing was
+     * measured to reach, never how far it moved a velocity. And the corpus
+     * holds deadlifts only: a lift whose contact rings longer, or a mount that
+     * damps it differently, is a `[Field]` question this constant cannot
+     * answer.
+     */
+    const val GUARD_BAND_S = 0.4
+
     /** Whether this one sample is above [BOUND_G]. */
     fun exceedsBound(sample: ImuSample): Boolean = FrameTransform.accMagnitudeG(sample) > BOUND_G
 
@@ -242,6 +271,21 @@ object AccelArtefact {
         return lo..hi
     }
 
+    /**
+     * The GUARD BAND before a rep: the indices whose time on [timeS] lies in the
+     * [GUARD_BAND_S] seconds that end where the rep's [spanOf] begins, the span's
+     * own first sample excluded. Clamped at the head of the stream, so a rep
+     * that opens less than a band into the stream gets the shorter band there
+     * is. Empty when the span opens on the stream's first sample. Issue #306.
+     */
+    fun guardBandBefore(span: RepSpan, timeS: DoubleArray): IntRange {
+        val start = spanOf(span).first
+        val from = timeS[start] - GUARD_BAND_S
+        var first = start
+        while (first > 0 && timeS[first - 1] >= from) first--
+        return first until start
+    }
+
     /** How many of [artefactIndices] lie inside [range]. */
     fun countIn(artefactIndices: List<Int>, range: IntRange): Int = artefactIndices.count { it in range }
 
@@ -269,6 +313,8 @@ object AccelArtefact {
      * - `RecordScreen.PeakVelocityChart`'s *"Best %.2f m/s"*, whose companion
      *   drawdown is [terminalPeakLossPct].
      *
+     * Since #306 every one of them reads the SET's figure through
+     * [setPeakConVelMps] or [setPeakPowerW], never through this list directly.
      * Each would otherwise have held a copy of the rule. A set's published peak
      * and the peak the screen prints disagreeing about which reps they cover is
      * the *duplicate documentation drifts* class in arithmetic, and it had
@@ -289,8 +335,31 @@ object AccelArtefact {
      * that asked nothing about artefacts, and dropping them would make an old
      * set publish no peak at all rather than the peak it has always published.
      */
-    fun peakEligible(reps: List<RepAnalysis>): List<RepAnalysis> =
-        reps.filterNot { peaksWithheld(it.artefactSamples ?: 0) }
+    fun peakEligible(reps: List<RepAnalysis>): List<RepAnalysis> = reps.filter(::isPeakEligible)
+
+    /**
+     * Whether ONE rep may count toward its set's peak figures: [peakEligible]'s
+     * rule for a single rep, stated once so that the set's peaks,
+     * [terminalPeakLossPct]'s last-rep test and `VelocityLoss.of` cannot
+     * disagree about which reps qualify.
+     */
+    fun isPeakEligible(rep: RepAnalysis): Boolean = !peaksWithheld(rep.artefactSamples ?: 0)
+
+    /**
+     * The peak drive velocity a SET publishes: `summary.peakConVel_mps`, and
+     * the *"Best"* on the post-set peak-velocity chart. Null where no rep is
+     * [peakEligible]. Issue #306 makes this a function rather than a
+     * `maxOfOrNull` at each call site, so that every consumer takes the SET's
+     * figure from one statement.
+     */
+    fun setPeakConVelMps(reps: List<RepAnalysis>): Double? = peakEligible(reps).maxOfOrNull { it.peakConVelMps }
+
+    /**
+     * The peak drive power a SET publishes: `summary.peakPower_w` and the
+     * drive-power line on both post-set screens, on [setPeakConVelMps]'s terms.
+     * Null where no eligible rep carries a power figure.
+     */
+    fun setPeakPowerW(reps: List<RepAnalysis>): Double? = peakEligible(reps).mapNotNull { it.peakPowerW }.maxOrNull()
 
     /**
      * How far the set's LAST rep fell short of the best peak drive velocity the
@@ -321,8 +390,8 @@ object AccelArtefact {
      */
     fun terminalPeakLossPct(reps: List<RepAnalysis>): Double? {
         val last = reps.lastOrNull() ?: return null
-        if (peaksWithheld(last.artefactSamples ?: 0)) return null
-        val best = peakEligible(reps).maxOfOrNull { it.peakConVelMps } ?: return null
+        if (!isPeakEligible(last)) return null
+        val best = setPeakConVelMps(reps) ?: return null
         if (best <= 0) return null
         return (1.0 - last.peakConVelMps / best) * 100.0
     }
