@@ -338,8 +338,8 @@ object SetAnalyzer {
      * prescribing. Empty for a set that was not guided, and for every caller
      * that has no track to offer; [SetEnd] is where what that means is written
      * down. It is read together with [SetTargets.cadenceGuided], because one of
-     * the two terminal words is also the rep-count milestone a lifter counting
-     * their own set hears at the planned count (#285).
+     * the terminal words, `Done`, is also the rep-count milestone a lifter
+     * counting their own set hears at the planned count (#285).
      *
      * [workStartedAtMs] is `PrepWindow.workStartedAtMs`, the instant the set's
      * prep ended, or null for a set that has none. [WorkStart] is where what

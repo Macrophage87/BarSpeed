@@ -72,10 +72,9 @@ class RestFromSensorEndDifferentialTest {
     fun `a sensor end is preferred over the write instant and yields to nothing else on a hold`() {
         // The release is the instant the DURATION was measured to, so it is the
         // instant the rest must run from: one answer to when the set ended, for
-        // both readers, which is #178's rule. A hold carries no terminal cue at
-        // all -- `Time` is not terminal -- so on a hold there is nothing for the
-        // release to disagree with; the ordering below says what happens if one
-        // ever arrives, and it is deliberate rather than incidental.
+        // both readers, which is #178's rule. A hold its clock ended carries
+        // `Time`, terminal since #295, so a cue and a release can both be on
+        // offer; the ordering below is deliberate rather than incidental.
         assertEquals(
             RELEASE_AT_MS,
             RestClockPolicy.startedAtMs(

@@ -156,7 +156,7 @@ class FailedSetBoundaryTest {
     }
 
     /**
-     * Two terminal words, and they say different things.
+     * The terminal words say different things.
      *
      * `Done` is the prescription delivered; `Set ended` is the lifter stopping
      * before it was. A reader of an archive can tell those apart because the

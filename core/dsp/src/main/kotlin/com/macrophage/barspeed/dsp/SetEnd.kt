@@ -34,7 +34,7 @@ import com.macrophage.barspeed.model.VoiceCue
  * ## The three decisions this type makes, and why
  *
  * **A set with no end cue is [NotCued], and nothing is bounded.** An ad-hoc set
- * with the voice off says neither terminal word, and neither does any set
+ * with the voice off says no terminal word, and neither does any set
  * recorded before the app wrote cue tracks. Nor -- since #285 -- does a set
  * carrying `Done` on which no CADENCE ran, because on such a set that word is
  * the rep-count milestone the LIFTER's own tap spoke and not a call to stop
@@ -237,9 +237,9 @@ sealed interface SetEnd {
          * TWO QUESTIONS, TWO FUNCTIONS, and which one a caller wants is not a
          * detail. [calledOver] is what the RECORD says: a terminal word was
          * spoken on this set and here is when. [of] is what may BOUND THE
-         * ANALYSED REP LIST, which is a narrower thing, because one of the two
-         * terminal words is also the word the rep-count milestone speaks to a
-         * lifter counting their own set (#285).
+         * ANALYSED REP LIST, which is a narrower thing, because one of the
+         * terminal words, `Done`, is also the word the rep-count milestone
+         * speaks to a lifter counting their own set (#285).
          *
          * They were one function taking one argument. That function had two
          * jobs -- the rest clock's seed instant and the analyser's boundary --
@@ -295,9 +295,9 @@ sealed interface SetEnd {
         /**
          * Whether one cue may cut the rep list, given whether a cadence ran.
          *
-         * Written over the two words rather than over [TERMINAL_CUES] because
-         * the two now differ in what they may do, and a membership test would
-         * silently admit a third word added later.
+         * Written over each word rather than over [TERMINAL_CUES] because
+         * `Done` differs from the other two in what it may do, and a
+         * membership test would silently admit a word added later.
          */
         private fun boundsTheRepList(cue: String, cadenceGuided: Boolean): Boolean =
             cue == STOPPED || cue == TIME_UP || (cue == DONE && cadenceGuided)

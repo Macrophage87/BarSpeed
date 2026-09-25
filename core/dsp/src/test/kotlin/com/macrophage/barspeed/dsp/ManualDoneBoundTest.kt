@@ -131,8 +131,9 @@ class ManualDoneBoundTest {
     /**
      * `of` answers what may BOUND THE REP LIST, and takes whether a cadence ran.
      *
-     * Both branches over both words, because the rule is a two-by-two and only
-     * one of its four cells changes.
+     * Both branches over `Done` and `Set ended`, and only `Done`'s answer
+     * changes between them. `Time` bounds on both branches too (#295); its
+     * no-cadence case is pinned in `HoldTerminalCueFieldTest`.
      */
     @Test
     fun `the bound takes whether a cadence ran, and only Done depends on it`() {
