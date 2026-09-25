@@ -337,17 +337,22 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * timer. Nothing else deletes one: a capture the lifter has not ruled on
      * outlives any number of launches.
      *
-     * Reads [busyInterruptedFlow] too (#304), the same cross-guard
-     * [discardRescued] takes against [shareRescued]: without it, DISCARD
-     * stayed live while a SEND was streaming the same directory, and a stream
-     * not yet reached could disappear mid-copy with the archive silently
-     * missing it.
+     * HOLDS [busyInterruptedFlow] too (#304), the same cross-guard
+     * [discardRescued] takes against [shareRescued]: checking the key alone
+     * guarded a double-tap of this function but never disabled SEND while a
+     * discard was in flight, so a SEND could still reopen a directory this
+     * function was in the middle of removing.
      */
     fun discardInterrupted(orphan: OrphanedSet) {
         if (orphan.directory in busyInterruptedFlow.value) return
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { container.setJournals.discard(orphan) }
-            refreshInterrupted()
+            busyInterruptedFlow.update { it + orphan.directory }
+            try {
+                withContext(Dispatchers.IO) { container.setJournals.discard(orphan) }
+                refreshInterrupted()
+            } finally {
+                busyInterruptedFlow.update { it - orphan.directory }
+            }
         }
     }
 
