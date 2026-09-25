@@ -5,6 +5,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -71,8 +72,8 @@ class SchemaClockReleaseContractTest {
         val entry = versionLog.substringAfter(marker)
         assertTrue("CHANGES NO KEY" in entry, "the entry does not say no key moved")
         assertTrue(
-            "a hold that ran to its target is never shortened" in entry,
-            "the entry does not say a completed hold keeps its target",
+            "a release at or after the target, or none, leaves 'clock' and the target" in entry,
+            "the entry does not say which releases leave clock and the target",
         )
         assertTrue("failedByLifter never moves" in entry, "the entry does not say the lifter's verdict is untouched")
         assertTrue("can now derive short" in entry, "the entry hides that the derived failure can move")
@@ -81,5 +82,22 @@ class SchemaClockReleaseContractTest {
             "DATABASE_VERSION does NOT move" in entry,
             "the entry does not say the database is untouched",
         )
+    }
+
+    @Test
+    fun `the 1_22 entry bounds clock by the trim window and claims no completed hold is safe`() {
+        // Round 1 of #311's review. HoldRelease takes the FIRST crossing, so a
+        // bump 1 to 20 s before a target the lifter reached still shortens the
+        // hold, and a release past the cap or inside the settle still reads
+        // clock. Neither absolute the entry first published is true.
+        val entry = versionLog.substringAfter("1.22 TAKES A SEVENTH ENTRY (#311")
+        assertFalse("never shortened" in entry, "the entry still says a completed hold is never shortened")
+        assertFalse(
+            "no armed unit saw let go before its target" in entry,
+            "the entry still says clock means no release before the target at all",
+        )
+        val clockMeans = "a 'clock' hold is one whose armed unit, if any, saw no release taking 1 to 20 whole " +
+            "seconds off its target"
+        assertTrue(clockMeans in entry, "the entry does not bound clock by the trim window")
     }
 }
