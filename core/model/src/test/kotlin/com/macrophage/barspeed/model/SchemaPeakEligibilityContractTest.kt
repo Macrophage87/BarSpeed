@@ -128,6 +128,26 @@ class SchemaPeakEligibilityContractTest {
         assertTrue("velocityLoss_pct" !in detailed, "the example publishes a loss with no eligible pair")
     }
 
+    /**
+     * `noReference` is decided over the peak-eligible reps from 1.22, because
+     * `VelocityLoss.of` takes its best over them, so the word's description and
+     * the seventh entry must both say so. Round 1 finding 2, and RED at the
+     * commit that adds it. Narrow, and said so: this checks one sentence is
+     * present, one is gone and the entry names the word, never that the prose
+     * is right.
+     */
+    @Test
+    fun `noReference says it is decided over the peak-eligible reps`() {
+        val basis = description(setDef(), "velocityLossBasis")
+        assertTrue(
+            "\"noReference\": no peak-eligible rep carried a positive drive velocity to divide by" in basis,
+            "velocityLossBasis does not say noReference is decided over the eligible reps",
+        )
+        assertTrue("no rep carried a positive drive velocity" !in basis, "the pre-1.22 noReference sentence survives")
+        val entry = versionLog().substringAfter("1.22 TAKES A THIRTEENTH ENTRY (#306")
+        assertTrue("noReference" in entry, "the seventh 1.22 entry does not say noReference narrowed")
+    }
+
     @Test
     fun `the version log carries the thirteenth 1_22 entry once`() {
         val log = versionLog()
