@@ -23,12 +23,16 @@ import com.macrophage.barspeed.model.TimedSetEndPolicy
  *
  * ## The shape of it
  *
- * Sparse on purpose, and the opposite of [LeadInPlan], which fills every second
- * of a prep. A prep is at most two minutes and a hold has no ceiling: a plank
- * counted out loud from 60 would be a minute of talking. So the far half of a
- * timed set is marked rather than counted -- a milestone every
- * [MILESTONE_EVERY_S] seconds of what remains -- and only the last
- * [FINAL_COUNTDOWN_FROM_S] seconds get every digit.
+ * The owner's rule (#312, 2026-09-25): "for holds, count in 5 second
+ * increments until 10 seconds to go (then 1)". So the time left is named every
+ * [MILESTONE_EVERY_S] seconds of what remains, and the last
+ * [FINAL_COUNTDOWN_FROM_S] seconds get every digit. The reason is the let-go:
+ * a lifter who ends a hold early knows the last number heard, and the rest
+ * screen's correction (`HoldEndPolicy.steppedSeconds`) lands on these same
+ * marks, so the number heard is a number the correction can state. The
+ * spacing was fifteen seconds until #312, argued as keeping a long hold
+ * quiet; that argument is deleted rather than reworded -- the owner chose the
+ * denser count.
  *
  * Nothing is said past zero, and since #168 there is nothing there to say
  * anything about: the terminal word and the end of the set are the same
@@ -48,10 +52,10 @@ object TimedSetVoice {
      * How often the remaining time is named, in seconds, until the final
      * countdown takes over.
      *
-     * Counted in REMAINING seconds, not elapsed, so a 45 s hold is marked at 30
-     * and 15 and a 40 s hold at 30 and 15 as well -- the marks land the same
-     * distance from the end whatever the target is, which is the half of the
-     * set the lifter is deciding whether to hold on through.
+     * Counted in REMAINING seconds, not elapsed, so a 45 s hold is marked at
+     * 40, 35 ... 15 and a 42 s hold at 40, 35 ... 15 as well -- the marks land
+     * the same distance from the end whatever the target is, which is the part
+     * of the set the lifter is deciding whether to hold on through.
      *
      * Declared from `TimedSetEndPolicy.MARK_EVERY_S` in `:core:model`, the
      * canonical copy, because the hold correction steps on the same marks.

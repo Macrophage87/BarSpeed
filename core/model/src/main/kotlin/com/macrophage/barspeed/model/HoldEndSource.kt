@@ -146,15 +146,22 @@ object HoldEndPolicy {
     const val MAX_TRIM_S = 20
 
     /**
-     * Seconds the LARGER of the rest screen's two down steps moves the recorded
-     * hold by.
+     * The LEAST the larger of the rest screen's two down steps moves the
+     * recorded hold by, in seconds.
      *
-     * Ten rather than another five, because what it is for is the whole reach in
-     * one tap: the owner's estimate is "about 5-10 sec" and #172 measured the
-     * interval at 4.3 to 13.7 s, so two taps of five is what the fine step costs
-     * on a rest screen with a countdown running. Not a replacement for
-     * [TimedSetEndPolicy.CORRECTION_STEP_S] -- the fine step is what states a
-     * genuine overage, and both are offered together.
+     * It survives #312, and for a new reason. It was sized for the walk back
+     * to the phone -- the owner's "about 5-10 sec", #172's 4.3 to 13.7 s -- as
+     * two taps of a five-second fine step. Since #312 the fine step inside the
+     * last [TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S] seconds is ONE second, and
+     * that is exactly where a hold the clock ended at its target sits: 0 s to
+     * go. The owner's own case, "so I'd know if I let go around 10 sec to go",
+     * would be ten taps without it; with it, a 45 of 45 is one tap from
+     * "Held 35s · 10s to go".
+     *
+     * Where the figure is off the voice's marks it no longer moves exactly ten:
+     * [bigStepDownSeconds] carries it on to the next mark, and the label says
+     * how far it actually went. Offered where [downStepsS] offers it, beside
+     * the fine step and never instead of it.
      */
     const val BIG_CORRECTION_STEP_S = 10
 
@@ -189,10 +196,10 @@ object HoldEndPolicy {
      * step first.
      *
      * TWO STEPS WHEREVER THE REACH IS STILL IN THE FIGURE, one where it is not.
-     * [TimedSetEndPolicy.CORRECTION_STEP_S] is five, sized for the walk back to
-     * the phone, and the owner's own estimate of that walk is "about 5-10 sec" --
-     * so on the sets that still carry it one tap is not enough, and the second
-     * step is [BIG_CORRECTION_STEP_S].
+     * The values are the steps' nominal sizes, the flat pair a hold with no
+     * target steps by; with a target, where each step LANDS is
+     * [steppedSeconds]' and [bigStepDownSeconds]' decision (#312), and this
+     * answers only whether the second, larger step is offered.
      *
      * Enumerated rather than collapsed to an `else`, so a fifth
      * [HoldEndSource] cannot inherit an answer nobody chose for it.
@@ -224,7 +231,7 @@ object HoldEndPolicy {
     /**
      * Everything the Correct popup's hold row draws: the figure, where each
      * control moves the draft to, and the larger down step's label, or null
-     * where [downStepsS] offers no larger step.
+     * where no larger step is offered.
      */
     data class HoldCorrection(
         val figure: String,
@@ -241,39 +248,102 @@ object HoldEndPolicy {
      * The composable reads every field of the answer and decides nothing.
      */
     fun correction(seconds: Int, targetS: Int?, endedBy: HoldEndSource?): HoldCorrection {
-        val big = downStepsS(endedBy).size > 1
+        // Offered where downStepsS offers it AND it would move the draft: a
+        // control that does nothing is not drawn. The label is the distance
+        // it really moves, which off the marks is more than ten.
+        val bigDownS =
+            bigStepDownSeconds(seconds, targetS).takeIf { downStepsS(endedBy).size > 1 && it != seconds }
         return HoldCorrection(
             figure = heldFigure(seconds, targetS),
             downS = steppedSeconds(seconds, targetS, up = false),
             upS = steppedSeconds(seconds, targetS, up = true),
-            bigDownS = if (big) bigStepDownSeconds(seconds, targetS) else null,
-            bigDownLabel = if (big) "−${BIG_CORRECTION_STEP_S}s" else null,
+            bigDownS = bigDownS,
+            bigDownLabel = bigDownS?.let { "−${seconds - it}s" },
         )
     }
 
     /**
-     * The draft after one tap of the fine step, [up] or down, floored where
-     * [TimedSetEndPolicy.adjustedSeconds] floors. [targetS] is not read yet:
-     * #312's fix reads it and deletes the suppression.
+     * The draft after one tap of the fine step, [up] or down (#312).
+     *
+     * The owner's rule: "Allow adjustments for holds to be based with the same
+     * increment" the voice counts in. With a target, the step works on the
+     * time LEFT, as `TimedSetVoice` does:
+     *
+     * - more than [TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S] seconds left: the
+     *   next remaining time that is a multiple of [TimedSetEndPolicy.MARK_EVERY_S]
+     *   in the direction stepped -- a mark the voice named. A figure off the
+     *   marks (a sensor end at 33 of 45, 12 s left) snaps to the nearest one in
+     *   that direction, 15 left down and 10 left up.
+     * - inside the last [TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S] seconds: one
+     *   second, because the voice said every one of them.
+     * - at or past the target: [TimedSetEndPolicy.CORRECTION_STEP_S] up, as an
+     *   overage was always stated, and down by the same but never past the
+     *   target, the one mark on that side.
+     *
+     * The same rule for every [HoldEndSource]: what ended the hold decides
+     * whether a larger step is offered ([downStepsS]), not where the fine one
+     * lands. With no target, or a target of zero or less, there are no marks
+     * and the step is the flat [TimedSetEndPolicy.CORRECTION_STEP_S] it always
+     * was. Floored at zero by [TimedSetEndPolicy.adjustedSeconds], as the
+     * write floors.
      */
-    @Suppress("UnusedParameter")
     fun steppedSeconds(currentS: Int, targetS: Int?, up: Boolean): Int {
-        val stepS = if (up) TimedSetEndPolicy.CORRECTION_STEP_S else -TimedSetEndPolicy.CORRECTION_STEP_S
-        return TimedSetEndPolicy.adjustedSeconds(currentS, stepS)
+        val target = targetS?.takeIf { it > 0 }
+        if (target == null) {
+            val stepS = if (up) TimedSetEndPolicy.CORRECTION_STEP_S else -TimedSetEndPolicy.CORRECTION_STEP_S
+            return TimedSetEndPolicy.adjustedSeconds(currentS, stepS)
+        }
+        val leftS = target - currentS
+        val nextLeftS = if (up) leftAfterStepUp(leftS) else leftAfterStepDown(leftS)
+        return TimedSetEndPolicy.adjustedSeconds(target, -nextLeftS)
     }
 
     /**
-     * The draft after one tap of the larger down step, floored the same way.
-     * [targetS] is not read yet, as for [steppedSeconds].
+     * The draft after one tap of the larger down step.
+     *
+     * With a target: at least [BIG_CORRECTION_STEP_S] seconds more left, carried
+     * on to the next mark where that lands above the last
+     * [TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S] seconds and off the marks --
+     * 45 of 45 lands on 35 (10 left), 42 of 45 on 30 (15 left). With no target,
+     * the flat [BIG_CORRECTION_STEP_S]. Floored at zero.
      */
-    @Suppress("UnusedParameter")
-    fun bigStepDownSeconds(currentS: Int, targetS: Int?): Int =
-        TimedSetEndPolicy.adjustedSeconds(currentS, -BIG_CORRECTION_STEP_S)
+    fun bigStepDownSeconds(currentS: Int, targetS: Int?): Int {
+        val target = targetS?.takeIf { it > 0 }
+            ?: return TimedSetEndPolicy.adjustedSeconds(currentS, -BIG_CORRECTION_STEP_S)
+        val movedLeftS = target - currentS + BIG_CORRECTION_STEP_S
+        val nextLeftS =
+            if (movedLeftS > TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S) markAtOrAbove(movedLeftS) else movedLeftS
+        return TimedSetEndPolicy.adjustedSeconds(target, -nextLeftS)
+    }
 
     /**
-     * The hold row's figure for a draft of [seconds]. [targetS] is not read
-     * yet, as for [steppedSeconds].
+     * The hold row's figure: the held total, and the time left to [targetS]
+     * (#312), e.g. "Held 35s · 10s to go" -- so a lifter who let go around
+     * ten to go can see the correction land there.
+     *
+     * At or past the target it says "target reached" rather than a zero or a
+     * negative time to go. With no target, or a target of zero or less, the
+     * total alone: there is nothing to go to.
      */
-    @Suppress("UnusedParameter")
-    fun heldFigure(seconds: Int, targetS: Int?): String = "Held ${seconds}s"
+    fun heldFigure(seconds: Int, targetS: Int?): String {
+        val target = targetS?.takeIf { it > 0 } ?: return "Held ${seconds}s"
+        val leftS = target - seconds
+        return if (leftS > 0) "Held ${seconds}s · ${leftS}s to go" else "Held ${seconds}s · target reached"
+    }
+
+    private fun leftAfterStepUp(leftS: Int): Int = when {
+        leftS > TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S ->
+            (leftS - 1) / TimedSetEndPolicy.MARK_EVERY_S * TimedSetEndPolicy.MARK_EVERY_S
+        leftS > 0 -> leftS - 1
+        else -> leftS - TimedSetEndPolicy.CORRECTION_STEP_S
+    }
+
+    private fun leftAfterStepDown(leftS: Int): Int = when {
+        leftS < 0 -> minOf(leftS + TimedSetEndPolicy.CORRECTION_STEP_S, 0)
+        leftS < TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S -> leftS + 1
+        else -> (leftS / TimedSetEndPolicy.MARK_EVERY_S + 1) * TimedSetEndPolicy.MARK_EVERY_S
+    }
+
+    private fun markAtOrAbove(leftS: Int): Int =
+        (leftS + TimedSetEndPolicy.MARK_EVERY_S - 1) / TimedSetEndPolicy.MARK_EVERY_S * TimedSetEndPolicy.MARK_EVERY_S
 }

@@ -449,7 +449,7 @@ data class SetFeedback(
      * database v19.
      *
      * The rest screen's duration correction reads it, and nothing else does:
-     * `HoldEndPolicy.downStepsS` offers a ten-second step wherever the walk
+     * `HoldEndPolicy.downStepsS` offers a larger down step wherever the walk
      * back to the phone is still inside the figure. It becomes
      * [HoldEndSource.CORRECTED] the moment the lifter restates the seconds,
      * which is the same word the row then holds.

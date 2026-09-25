@@ -2109,6 +2109,41 @@ data class SessionExport(
          * see this KDoc. `HoldEndPolicyDifferentialTest` and `HoldEndPolicyTest`
          * pin the rule, and `HoldReleaseFieldTest` in `:core:dsp` pins it on the
          * committed hold streams.
+         *
+         * 1.22 TAKES AN EIGHTH ENTRY (#312, which build wrote the export), and it
+         * CHANGES NO KEY. A FURTHER ENTRY under the unreleased 1.22, on the tag
+         * reading the third entry states: the latest tag is v0.1.54 and it
+         * ships 1.21.
+         *
+         * WHAT MISLED. [SetExport.liveReps] said, truly of this document, that
+         * nothing in it records which build recorded a set, and `PLAN_PROMPT`
+         * said nothing in the export does -- which was false.
+         * `SessionDetailViewModel.exportName` names every export
+         * `BarSpeed-v<BuildConfig.VERSION_NAME>-<session start>-<suffix>` and
+         * `RawExporter` writes `appVersion` into the raw zip's `meta.json`; both
+         * name the build that WROTE the export, which is the recording build
+         * unless the session was exported after an update. `liveReps` now says
+         * so beside its unchanged sentence, and the prompt's false clause is
+         * deleted and replaced by the same pointer. The earlier entries that
+         * say nothing in this document records the build are left as written:
+         * they are true of this document.
+         *
+         * ALSO FROM #312, moving no sentence here because no description states
+         * the spacing: a hold's or carry's voice now names the time left every
+         * 5 s until 10 s are left, where it named it every 15 s
+         * (`TimedSetEndPolicy.MARK_EVERY_S`), so a timed set recorded by a build
+         * carrying #312 can have more `N seconds` rows on its cue track than
+         * one recorded before.
+         *
+         * WHAT A READER DOES, IN BOTH DIRECTIONS. No key is added, removed or
+         * retyped and the schema accepts and rejects exactly the documents it
+         * did before this entry, so an older and a newer reader read every
+         * value identically. `DATABASE_VERSION` does NOT move and the plan
+         * schema is untouched.
+         *
+         * PINNED. `SchemaExportBuildContractTest` asserts this entry's marker,
+         * the `liveReps` pointer and the prompt's replacement clause; it cannot
+         * see this KDoc.
          */
         const val SCHEMA_VERSION = "1.22"
 
@@ -2428,9 +2463,14 @@ data class SetExport(
      * A set recorded by v0.1.53, the only earlier release that stored this
      * key, was counted by `LiveRepCaller` -- the segmenter's pairing rule over
      * a causal velocity estimate -- and keeps that figure when re-exported.
-     * Nothing in the document records which build recorded a set; a session
-     * whose `startedAt` precedes v0.1.54's release on 2026-09-18 cannot have
-     * been counted by the impulse detector. The sentence that stood here said
+     * Nothing in the document records which build recorded a set; the
+     * export's filename as the app names it
+     * (`BarSpeed-v<version>-<session start>-<suffix>`, from
+     * `SessionDetailViewModel.exportName`) and the raw zip's `meta.json`
+     * `appVersion` (`RawExporter`) name the build that WROTE the export, which
+     * is the recording build unless the session was exported after an update
+     * (#312). A session whose `startedAt` precedes v0.1.54's release on
+     * 2026-09-18 cannot have been counted by the impulse detector. The sentence that stood here said
      * the live detector runs the same pairing rule over a causal velocity
      * estimate; that was v0.1.53's detector, it was false for every set
      * v0.1.54 recorded, and it is DELETED rather than reworded (#302).

@@ -74,6 +74,11 @@ object TimedSetEndPolicy {
      * takes to get the phone back out", which is seconds to tens of seconds,
      * not one second. A one-second step would need ten taps to say what one
      * tap says here, on a rest screen with a countdown running.
+     *
+     * Since #312 it is the whole step only on a hold with no target, and past
+     * the target. With a target, `HoldEndPolicy.steppedSeconds` lands the
+     * step on the voice's marks and steps one second inside the last
+     * [FINAL_COUNTDOWN_FROM_S].
      */
     const val CORRECTION_STEP_S = 5
 
@@ -81,12 +86,17 @@ object TimedSetEndPolicy {
      * How often a hold's voice names the time left, in REMAINING seconds,
      * until [FINAL_COUNTDOWN_FROM_S] are left.
      *
+     * Five because the owner asked for it (#312, 2026-09-25): "for holds, count
+     * in 5 second increments until 10 seconds to go (then 1)". A lifter who
+     * lets go early knows the last number heard, and the correction lands on
+     * these same marks, so that number can be stated as it was heard.
+     *
      * The canonical copy. `TimedSetVoice.MILESTONE_EVERY_S` in `:core:dsp` is
      * declared from this one, so the spacing the voice speaks and the spacing
-     * [HoldEndPolicy]'s correction is built on are one number rather than two
+     * [HoldEndPolicy.steppedSeconds] lands on are one number rather than two
      * that agree today.
      */
-    const val MARK_EVERY_S = 15
+    const val MARK_EVERY_S = 5
 
     /**
      * Longest remaining time a hold's voice counts digit by digit, from this
