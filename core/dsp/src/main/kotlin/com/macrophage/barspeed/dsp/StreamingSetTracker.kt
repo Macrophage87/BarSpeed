@@ -26,8 +26,17 @@ data class LiveSetState(
      * *absence rendered as a value* class, and this is the same separation
      * `RepAnalysis.eccS` already makes by being nullable.
      *
-     * NOTHING READS THIS. No rep count, no screen and no spoken cue behaves
-     * differently because of it; it is a capability, not a fix.
+     * Since issue #301 the count a sensor-counted set speaks comes from
+     * [DriveImpulseCounter], which reads no velocity, so on such a set this
+     * flag describes the velocity, ROM and power path and NOT the count the
+     * lifter hears -- [repCount] here is drawn nowhere.
+     *
+     * ONE READER, and it is not a screen: since #302 the set end freezes
+     * [StreamingSetTracker.publishedCountTrusted] onto the row, and the export
+     * publishes it as `countTrusted`. No rep count, no screen and no spoken cue
+     * behaves differently because of it. The sentence that stood here --
+     * "NOTHING READS THIS" -- went false with that and is DELETED rather than
+     * reworded.
      */
     val countTrusted: Boolean = true,
     /**

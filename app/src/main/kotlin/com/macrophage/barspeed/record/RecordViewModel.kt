@@ -611,6 +611,19 @@ private data class PendingSetWrite(
      * and what its null covers.
      */
     val liveReps: Int?,
+    /**
+     * The live tracker's latch as the set ended --
+     * `StreamingSetTracker.publishedCountTrusted` -- or null where no tracker
+     * covered the end (#302): none was fed a sample, or the readout was given
+     * up at a withhold and the tracker dropped.
+     *
+     * Frozen here, at [RecordViewModel.endSet], with everything else, because
+     * the next set's [RecordViewModel.beginSet] replaces the tracker and a
+     * retried write must store the same answer. It describes the VELOCITY path
+     * and not the count, and nothing on the lifter's screens reads it: it goes
+     * to the row and from there to the export, and no further.
+     */
+    val liveCountTrusted: Boolean?,
     val side: String?,
     /**
      * The arm the PLAN prescribed, frozen beside [side] the way [plannedReps]
@@ -1034,6 +1047,9 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
         // What the sensor counted, beside what the set is recorded as (#286).
         // Both come off the frozen write, so a retry stores the same pair.
         liveReps = p.liveReps,
+        // The live integrator's latch, frozen at endSet (#302); the repository
+        // stores it inside the analysis blob.
+        liveCountTrusted = p.liveCountTrusted,
         actualDurationS = p.actualDurationS,
         // The word, not the constant: `HoldEndSource` owns the four strings and
         // the row stores one of them (#259).
@@ -4137,9 +4153,10 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = adHocSessionState(stateFlow.value)
     }
 
-    fun selectExercise(id: String) {
-        stateFlow.value = stateFlow.value.copy(selectedExerciseId = id)
-    }
+    // One line, like skipUpcomingSet and selectSide, for skipUpcomingSet's
+    // reason: this class sits on detekt's `LargeClass` limit, and these two
+    // pay for the line #302's frozen live-trust flag adds to endSet.
+    fun selectExercise(id: String) = stateFlow.value.copy(selectedExerciseId = id).let { stateFlow.value = it }
 
     fun updateLoadInput(text: String) {
         val s = stateFlow.value
@@ -4159,9 +4176,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         stateFlow.value = stateFlow.value.copy(durationInput = text, statedDurationS = text.trim().toIntOrNull())
     }
 
-    fun selectSide(side: String?) {
-        stateFlow.value = stateFlow.value.copy(sideInput = side)
-    }
+    fun selectSide(side: String?) = stateFlow.value.copy(sideInput = side).let { stateFlow.value = it }
 
     /**
      * The lifter's statement that the NEXT set works this arm (#215).
@@ -4958,6 +4973,8 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
                 targetReps = targetReps,
                 manualReps = manualReps,
                 liveReps = recordedReps.live,
+                // Null where a withhold dropped the tracker or none was fed (#302).
+                liveCountTrusted = tracker?.publishedCountTrusted,
                 side = side,
                 plannedSide = plannedSide,
                 tempoText = tempoText,

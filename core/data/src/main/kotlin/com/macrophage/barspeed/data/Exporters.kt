@@ -341,6 +341,11 @@ class SessionExporter(
             // analysis holds the BATCH count, a different detector's answer
             // (#302; the live one is a drive impulse since #301).
             liveReps = record.liveReps,
+            // The live integrator's latch, frozen into the stored analysis when
+            // the set was recorded (#302). Read off the blob and never
+            // recomputed; null -- no tracker covered the set's end, or the set
+            // predates the key -- stays absent rather than becoming an answer.
+            countTrusted = analysis?.liveCountTrusted,
             plannedReps = record.plannedReps,
             durationS = phase.durationS,
             // WHICH of the four things that can end a hold produced that figure

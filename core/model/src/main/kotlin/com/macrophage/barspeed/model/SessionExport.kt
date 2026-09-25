@@ -1945,6 +1945,42 @@ data class SessionExport(
          * published reading key AND in `PLAN_PROMPT`, string for string, and
          * that neither copy nor the two neighbouring descriptions still carries
          * a deleted claim. It cannot see this KDoc.
+         *
+         * 1.22 TAKES A FOURTH ENTRY (#302, countTrusted): a set may carry
+         * [SetExport.countTrusted], whether the LIVE velocity integrator held
+         * its zero through the set. A FURTHER ENTRY under the unreleased 1.22,
+         * on the tag reading the third entry states.
+         *
+         * WHAT WAS UNSAYABLE. `StreamingSetTracker` latches this flag whenever
+         * it refuses a run past its displacement cap, and nothing published
+         * it, so a reader holding `velocityLoss_pct`, `rom_m` and power built
+         * from a stream the live integrator could not bound had nothing in the
+         * document to say so. On field-43's three deadlifts it latched false on
+         * every stream (`DeadliftLiveCountFieldTest`).
+         *
+         * WHAT IT DOES NOT SAY is anything about the count: since #301 the
+         * count comes from `DriveImpulseCounter`, which reads no velocity, and
+         * the published description forbids reading the flag as an instruction
+         * to count by hand.
+         *
+         * WHAT A READER DOES, IN BOTH DIRECTIONS. The key is optional and
+         * nothing is removed or retyped, so a reader written against the
+         * earlier 1.22 entries reads every other value unchanged and cannot see
+         * the flag, and the schema accepts every document those entries
+         * described; a 1.21 validator still refuses a 1.22 document on its
+         * version string, as the mint states. NOT RETROACTIVE: the value is
+         * taken from the tracker when the set is recorded and stored with it,
+         * so every set already on disk publishes nothing here. Absence is
+         * neither false nor true. `DATABASE_VERSION` does NOT move: the flag
+         * rides in the row's existing `analysisJson` as
+         * `SetAnalysis.liveCountTrusted`. The plan schema is untouched.
+         *
+         * PINNED. `SchemaCountTrustedContractTest` asserts the published key,
+         * its description's reading rules, this entry's marker, the example and
+         * `PLAN_PROMPT`'s line; `SessionExportCountTrustedTest` asserts the
+         * exporter publishes the stored latch and invents none;
+         * `SessionRepositoryLiveTrustTest` and `PublishedCountTrustedTest` pin
+         * the storage and the tracker's null.
          */
         const val SCHEMA_VERSION = "1.22"
 
@@ -2256,6 +2292,37 @@ data class SetExport(
      * is a count.
      */
     val liveReps: Int? = null,
+    /**
+     * Whether the LIVE velocity integrator held its zero through this set
+     * (1.22, #302): `StreamingSetTracker.publishedCountTrusted`, frozen when
+     * the set was recorded and read here out of the stored analysis.
+     *
+     * FALSE: that tracker carried one movement run further than any real
+     * phase of the lift can (`DspConfig.maxRunDisplacementM`, converted
+     * through the declared ratio), so its integral lost its zero and the flag
+     * latched. READ IT AS: `velocityLoss_pct`, `rom_m` and power on this set
+     * are not derived from a trusted velocity. Those figures come from the
+     * batch analysis, a separate drift-corrected estimate over the same
+     * stream, so false does not measure how wrong they are; TRUE CERTIFIES
+     * NOTHING about them, only that the bound was never crossed.
+     *
+     * NOT ABOUT THE COUNT. Since #301 a sensor-counted set is counted by
+     * `DriveImpulseCounter`, which reads no velocity, so this says nothing
+     * about [reps] or [liveReps], and #301's design round forbids wiring it to
+     * a "count this set by hand" warning: replayed over field-43's three
+     * deadlifts it was false on every stream while the impulse counter,
+     * replayed over the same captures, called 13 of 15 reps. No screen reads
+     * it.
+     *
+     * WHICH TRACKER: the one running when the set ended. On a two-unit set
+     * whose readout was rebuilt on the other unit mid-set, that tracker saw
+     * only the frames after the switch.
+     *
+     * ABSENT where no tracker covered the set's end -- none was fed a sample,
+     * or the readout was given up mid-set -- and on every set recorded before
+     * this key. Absent is neither false nor true.
+     */
+    val countTrusted: Boolean? = null,
     val plannedReps: Int? = null,
     /**
      * Hold/carry seconds recorded for timed sets (planks, farmer's walks).
