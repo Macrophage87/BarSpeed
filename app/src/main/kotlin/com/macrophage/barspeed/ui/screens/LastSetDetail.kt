@@ -56,6 +56,7 @@ import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
 import com.macrophage.barspeed.record.carryBlock
 import com.macrophage.barspeed.record.standingAddedKg
+import com.macrophage.barspeed.record.timedVerdicts
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.SectionCaption
 import com.macrophage.barspeed.ui.components.SideArrow
@@ -693,16 +694,31 @@ private fun Stepper(
 @Composable
 private fun RepQualityCard(feedback: SetFeedback) {
     val analysis = feedback.analysis
-    // Which of this set's frozen verdict lines the rest screen shows, decided
-    // once here and handed to whichever renderer runs below (#261). The chip
-    // row above already withholds the velocity pill on a controlled set, and
-    // "significant fatigue this set" was still being printed under the gap.
-    // The decision is CoachingVerdictPolicy's in :core:model, where a test
-    // reaches it; nothing in this file decides anything.
+    // Which verdict lines the rest screen shows (#261, #270).
     //
-    // On a hold or a carry the regime is null and this is the identity, which
-    // is what the timed branch below wants: those verdicts are about the clock.
-    val verdicts = CoachingVerdictPolicy.forRegime(analysis.verdicts, feedback.velocityLossRegime)
+    // On a hold or a carry `analysis.verdicts` is the sentence FROZEN at set
+    // end from the pre-correction seconds -- `timedVerdicts(p.actualDurationS,
+    // p.targetDurationS)` in PlanQueue.kt. A duration correction on this same
+    // screen moves `feedback.effectiveDurationS` and the FAILED flag but never
+    // rewrites that frozen sentence, so a 20 s hold corrected to 15 s went on
+    // reading "Held 20s -- full 20s target. Nice." under "FAILED" (#270). The
+    // fix is to call the same pure function again here, at render time, off
+    // the CURRENT seconds rather than trust the frozen string: `timedVerdicts`
+    // is pinned by `PlanQueueTest`, so this is the one call site left free to
+    // go stale, not a new decision.
+    //
+    // A non-timed set has no correction to go stale against, so it keeps
+    // reading the frozen `analysis.verdicts` through `CoachingVerdictPolicy`,
+    // decided once there and handed to whichever renderer runs below. The
+    // chip row above already withholds the velocity pill on a controlled set,
+    // and "significant fatigue this set" was still being printed under the
+    // gap. Nothing in this file decides that one.
+    val verdicts =
+        if (feedback.actualDurationS != null) {
+            timedVerdicts(feedback.effectiveDurationS, feedback.plannedDurationS)
+        } else {
+            CoachingVerdictPolicy.forRegime(analysis.verdicts, feedback.velocityLossRegime)
+        }
     // Timed sets have no reps; surface the hold verdicts instead of a chart.
     if (feedback.actualDurationS != null) {
         if (verdicts.isEmpty()) return
