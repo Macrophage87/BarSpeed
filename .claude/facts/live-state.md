@@ -245,25 +245,22 @@ mutation killed, and that mapping is the whole content of a mutation table.
 
 - **`:core:ble` has no test source set at all** — `core/ble/src/` contains only `main`. Its
   `testDebugUnitTest`/`testReleaseUnitTest` report `NO-SOURCE`.
-- **`:app` has TWO test files**, both under
-  `app/src/test/kotlin/com/macrophage/barspeed/record/`: `PlanQueueTest.kt`, **5** `@Test`
-  methods over one pure function, and `AppendedSlotTest.kt`, **13** over `appendedState` and the
-  field-by-field rule for a `PlannedSlot` the lifter appends. 18 executed per variant, **36**
-  across the two variants, 0 failures, measured at
-  `eba5aad8df2fcd2f01bf288c94a31a568f8c24e6` by
-  `./gradlew test --rerun-tasks --no-build-cache --console=plain`, whose whole-suite total is
-  1728 executions, 0 failures, all 141 tasks executed rather than restored. (It read **12** and
-  **17**/**34** at `3f13cb4e750e6fff09c9e7199f9de8df3c5cde15`, true there; #188 round 3 added a
-  fourth append sweep.) **This entry said 12
-  over one file and both halves are now wrong**: `PlanQueueTest` had 12 `@Test` methods at
-  `afd4392bf60adbca81acf03fcaf3a94af36e21da`; this branch's c0 added two more, and its c1 moved
-  nine of the resulting fourteen into `:core:model`'s new `AddSetControlTest` when
-  `AddSetControl` was extracted (#188), leaving 5, and a second file arrived on the same
-  branch. This is a correction REVERSING a correction — the entry said 5 before, and that 5 was
-  wrong for its SHA (it was the count in the stale 2026-08-22 `TEST-…PlanQueueTest.xml` quoted
-  as a schema example in §4, read as a test count anyway). The digit agreeing with the old
-  wrong one is a coincidence of the extraction, not a vindication of it. Earlier definitions said `:app` had **zero** test source sets; false too,
-  and it stays retracted.
+- **`:app` has a real test source set, and this entry stops naming a per-file or per-method
+  count (#298).** Every count of that shape written here has gone stale faster than it was
+  read: "TWO test files, 18 executed per variant, 36 across the two variants" was true at
+  `eba5aad8df2fcd2f01bf288c94a31a568f8c24e6` and was already **142 executions, 71 per variant**
+  by `d525452b` (#298's own measurement) — and by `a3c3a2e5aff70eebc88468f0d4bd3c9cf7bbfe08`,
+  `find app/src/test -name '*.kt'` lists **twelve** files under
+  `app/src/test/kotlin/com/macrophage/barspeed/record/`, not two:
+  `AppendedSlotTest.kt`, `CaptureAtTest.kt`, `LastPlannedSetTest.kt`, `LiveFallbackTest.kt`,
+  `LiveFeedSourceTest.kt`, `NextSetSideTest.kt`, `PlanQueueTest.kt`, `RefusedSetAnswerTest.kt`,
+  `SkippedSlotTest.kt`, `SlotCardLineTest.kt`, `WeightUnitChangeDifferentialTest.kt`,
+  `WeightUnitChangeTest.kt`. Even that file list is a structural fact that only survives until
+  the next file is added or removed — it is not immune to the same drift, only cheaper to
+  re-verify (`find`, no Gradle). No number in this bullet has been re-measured by the mandatory
+  suite command since `d525452b`; re-run it per §4's "one measurement per gate" rule and quote
+  the SHA you ran it at, rather than this one. Earlier definitions said `:app` had **zero** test
+  source sets; false too, and it stays retracted.
 - **`:app`'s unit tests run on a JDK 21 launcher as of #188** —
   `app/build.gradle.kts`, `tasks.withType<Test>().configureEach { javaLauncher.set(…21…) }`, the
   block `:core:data` already carried. Before it, `:app` ran its tests on 17 while
