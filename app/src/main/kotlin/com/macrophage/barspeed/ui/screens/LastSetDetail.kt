@@ -490,8 +490,11 @@ private fun DraftWarmupRow(state: RecordState, warmup: Boolean, onDraft: (Boolea
  * chosen lights before anything is stored. `derivedFailed` is the shortfall the
  * app worked out for itself and is read from the STORED state, because no tap
  * here changes it -- and correcting the rep count in the same popup may move it
- * on confirm, which is exactly why the sentence below the grid says a rating
- * cannot clear a shortfall.
+ * on confirm. The sentence above the grid says a short set keeps no rating,
+ * because since #313 the SAVE stores none beside a failure the draft still
+ * derives (`FailedSetRatingPolicy.storedRpe`); a rung tapped there is dropped
+ * unless the count or the time moves the set off short. The wording is
+ * compile-gated only: no test renders it.
  *
  * The grid is worded on the scale FROZEN with the set (#244). A correction is
  * a second answer to the SAME question, so re-asking it in another dimension
@@ -515,7 +518,7 @@ private fun DraftEffortSection(
     SectionCaption("Effort")
     if (selection.derivedShortfall) {
         Text(
-            "This set is already recorded as short of target. Rating it does not change that.",
+            "This set is recorded as short of target, so it keeps no rating unless its count or time is corrected.",
             style = MaterialTheme.typography.bodySmall,
             color = BarColors.Sub,
         )

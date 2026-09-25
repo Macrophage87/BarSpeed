@@ -2144,6 +2144,37 @@ data class SessionExport(
          * PINNED. `SchemaExportBuildContractTest` asserts this entry's marker,
          * the `liveReps` pointer and the prompt's replacement clause; it cannot
          * see this KDoc.
+         *
+         * 1.22 TAKES A NINTH ENTRY (#313, no rpe beside a derived failure), and
+         * it CHANGES NO KEY. A FURTHER ENTRY under the unreleased 1.22: the
+         * latest tag is v0.1.54 and its own `SessionExport.kt` reads
+         * `SCHEMA_VERSION = "1.21"`, both read at the tag this round.
+         *
+         * WHAT WAS UNSTATED, AND UNEVEN. A failure the lifter stated in the rest
+         * screen's correction stored no rpe (#310), while a failure the app
+         * DERIVED -- a hold's recorded seconds under 90 % of its target, or a
+         * count short of the plan -- kept whatever rating stood, so one set
+         * could carry an rpe beside a failure nobody tapped.
+         *
+         * THE CHANGE. Every write that can pair a rating with a failure -- the
+         * set write, the rest screen's re-rating and the correction's SAVE --
+         * reads `FailedSetRatingPolicy.storedRpe` and stores no rpe on a set
+         * that failed by either fact; `failedByLifter` never moves. [SetExport.rpe]
+         * says so.
+         *
+         * WHAT A READER DOES, IN BOTH DIRECTIONS. No key is added, removed or
+         * retyped and the schema accepts and rejects exactly the documents it
+         * did before this entry. What moves is what an absent rpe beside
+         * `failed` may mean: on a set recorded by a build carrying #313 it is
+         * the owner's rule, not a skipped question. NOT RETROACTIVE: the rating
+         * is stored when the set is written or corrected, so every set already
+         * on disk keeps the rpe it has. `DATABASE_VERSION` does NOT move and the
+         * plan schema is untouched.
+         *
+         * PINNED. `SchemaFailedSetRpeContractTest` asserts this entry's marker
+         * and the `rpe` sentence; it cannot see this KDoc.
+         * `FailedSetRatingPolicyTest` and, in `:app`, `DerivedFailureRatingTest`
+         * pin the rule and the three writes.
          */
         const val SCHEMA_VERSION = "1.22"
 
@@ -2671,6 +2702,13 @@ data class SetExport(
      * [SessionExport.sessionRpe] is a different instrument over the same
      * published range, and the two must never be averaged or compared as one
      * quantity.
+     *
+     * FROM 1.22 (#313) A SET THAT FAILED CARRIES NO RPE, whichever of the two
+     * failure facts says so: the owner's rule is that a failed set is not
+     * rated, so `FailedSetRatingPolicy.storedRpe` clears a rating standing
+     * when a failure arrives -- a hold corrected below 90 % of its target, a
+     * count corrected short -- and stores none given beside one. [failedByLifter]
+     * is unchanged by it. A set recorded by an earlier build may carry both.
      */
     val rpe: Int? = null,
     /**

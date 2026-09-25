@@ -66,12 +66,13 @@ object SetCorrectionPolicy {
     /**
      * The rating row the SAVE writes, given the shortfall it re-derived.
      *
-     * A set the lifter calls failed carries NO rpe. The owner's rule, in his
-     * words: "Don't ask for an RPE on failed sets, if you can't do it, it's
-     * failed." Every failure tile already drafts a null rpe; this makes the
-     * one write unable to pair a failure the lifter stated with a rating it
-     * replaced, whatever the draft carried. The rule is
-     * [FailedSetRatingPolicy.storedRpe] (#313).
+     * A set that failed carries NO rpe, whether the lifter called it failed
+     * or the draft's count derives it short. The owner's rule, in his words:
+     * "Don't ask for an RPE on failed sets, if you can't do it, it's failed."
+     * Every failure tile already drafts a null rpe; this makes the one write
+     * unable to pair a failure with a rating, whatever the draft carried. The
+     * rule is [FailedSetRatingPolicy.storedRpe]; until #313 this cleared the
+     * rating for a stated failure only.
      */
     fun row(draft: CountAndRatingDraft, shortfall: Boolean): CorrectedRatingRow = CorrectedRatingRow(
         rpe = FailedSetRatingPolicy.storedRpe(draft.rpe, failedByLifter = draft.tappedFailed, shortfall = shortfall),

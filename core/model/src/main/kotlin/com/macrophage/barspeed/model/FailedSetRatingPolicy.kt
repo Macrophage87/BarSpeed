@@ -11,11 +11,18 @@ package com.macrophage.barspeed.model
  * target, and the failure is derived at the write while the rating is still on
  * the row.
  *
- * THREE WRITES CAN PAIR A RATING WITH A FAILURE: the set write
- * (`SetRatingTracker.onSetRecorded`), the rest screen's re-rating
- * (`SetRatingTracker.rate`) and the Correct popup's SAVE
- * ([SetCorrectionPolicy.row]). SEAM ONLY at this commit: the SAVE reads this
- * rule and the other two store the rating they were handed, as before.
+ * ONE RULE, READ BY ALL THREE WRITES THAT CAN PAIR A RATING WITH A FAILURE:
+ * the set write (`SetRatingTracker.onSetRecorded`), the rest screen's
+ * re-rating (`SetRatingTracker.rate`) and the Correct popup's SAVE
+ * ([SetCorrectionPolicy.row]). Until #313 only the SAVE cleared a rating, and
+ * only for a failure the lifter stated, so the same set could carry a rating
+ * beside a failure the app derived and lose it beside one the lifter tapped.
+ *
+ * WHAT IT COSTS, stated rather than discovered: a rating cleared by a derived
+ * failure is gone from the row. A lifter who then corrects the seconds or the
+ * count back up past the target has an unrated set; while the rest screen is
+ * up, the Correct popup's grid is where they can rate it again. A rung tapped in that same popup
+ * beside a draft that still derives short is not stored either.
  *
  * `failedByLifter` and `shortfall` are the two facts `SetRatingTracker` keeps
  * apart, taken separately so a pin can tell which of them a later change
@@ -24,13 +31,9 @@ package com.macrophage.barspeed.model
  */
 object FailedSetRatingPolicy {
     /**
-     * The rpe to store, given the rating [rpe] the write carries.
-     *
-     * SEAM ONLY at this commit: a failure the lifter stated clears the rating,
-     * which is what `SetCorrectionPolicy.row` has done since #310, and a
-     * derived [shortfall] does not. The parameter is ignored under a stated
-     * suppression until #313's fix reads it.
+     * The rpe to store, given the rating [rpe] the write carries: none on a
+     * set that failed by either fact, the rating otherwise.
      */
-    @Suppress("UnusedParameter")
-    fun storedRpe(rpe: Int?, failedByLifter: Boolean, shortfall: Boolean): Int? = if (failedByLifter) null else rpe
+    fun storedRpe(rpe: Int?, failedByLifter: Boolean, shortfall: Boolean): Int? =
+        if (failedByLifter || shortfall) null else rpe
 }

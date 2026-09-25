@@ -3,6 +3,7 @@ package com.macrophage.barspeed.record
 import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.model.CorrectedRatingRow
 import com.macrophage.barspeed.model.CountAndRatingDraft
+import com.macrophage.barspeed.model.FailedSetRatingPolicy
 import com.macrophage.barspeed.model.SetCorrectionPolicy
 
 /**
@@ -85,8 +86,9 @@ class SetRatingTracker(private val writer: SetRowWriter) {
      * Returns the whole rating half of the row -- the rpe, the OR and the
      * lifter's own half -- so the set write stores one answer rather than
      * re-reading the rating it was handed beside a verdict worked out here
-     * (#313). The rpe is the rating the set ended with, which is what the
-     * write stored before this returned it. The lifter's half is the tap the
+     * (#313). The rpe is [FailedSetRatingPolicy.storedRpe]'s: none beside a
+     * failure of either kind, the rating the set ended with otherwise. The
+     * lifter's half is the tap the
      * row stores beside the OR (#216); it was a separate `lifterCalledFailure`
      * property read straight after this call, and folding it into the answer
      * leaves nothing to read at the wrong moment. The two facts have always
@@ -114,7 +116,11 @@ class SetRatingTracker(private val writer: SetRowWriter) {
         this.plannedDurationS = plannedDurationS
         autoFailed = stoppedEarly
         tappedFailed = rating?.failed == true
-        return CorrectedRatingRow(rpe = rating?.rpe, failed = tappedFailed || autoFailed, failedByLifter = tappedFailed)
+        return CorrectedRatingRow(
+            rpe = FailedSetRatingPolicy.storedRpe(rating?.rpe, failedByLifter = tappedFailed, shortfall = autoFailed),
+            failed = tappedFailed || autoFailed,
+            failedByLifter = tappedFailed,
+        )
     }
 
     /**
@@ -171,12 +177,18 @@ class SetRatingTracker(private val writer: SetRowWriter) {
      * Correct how the set FELT. The shortfall verdict survives the correction.
      *
      * Returns the rating row it wrote, as [correct] does, so the rest screen
-     * mirrors what the row holds rather than what the tap carried.
+     * mirrors what the row holds rather than what the tap carried -- which
+     * differ on a set the app judged short: [FailedSetRatingPolicy.storedRpe]
+     * stores no rating beside that failure (#313).
      */
     suspend fun rate(rpe: Int?, failed: Boolean, warmup: Boolean): CorrectedRatingRow? {
         val id = setId ?: return null
         tappedFailed = failed
-        val row = CorrectedRatingRow(rpe = rpe, failed = failed || autoFailed, failedByLifter = failed)
+        val row = CorrectedRatingRow(
+            rpe = FailedSetRatingPolicy.storedRpe(rpe, failedByLifter = failed, shortfall = autoFailed),
+            failed = failed || autoFailed,
+            failedByLifter = failed,
+        )
         writer.rateSet(id, row.rpe, row.failed, failedByLifter = row.failedByLifter, warmup = warmup)
         return row
     }
