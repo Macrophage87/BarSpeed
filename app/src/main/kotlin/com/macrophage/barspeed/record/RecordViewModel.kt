@@ -4139,12 +4139,16 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * [skippedState]'s.
      *
      * ONE LINE, where its two neighbours take three, and it is not a style
-     * preference: this class sits exactly on detekt's `LargeClass` limit, which
-     * counts code and not comments, so the three-line form reds `:app:detekt`
-     * before a single test runs. Written down so it is not tidied back into
-     * shape by someone who reads the inconsistency as an oversight. The
-     * structural answer is to move behaviour out of this class, which is a task
-     * of its own and not this one.
+     * preference: this class is already at or over detekt's `LargeClass`
+     * default of 600, which counts code and not comments, so the one-line
+     * form is the deliberate choice -- not a claim that a three-line one is
+     * SPECIFICALLY what would tip it over, which is a narrower statement than
+     * this file can back without running detekt with the threshold bisected,
+     * the way #208's own note above (search `bisecting`) records doing once.
+     * Written down so it is not tidied back into shape by someone who reads
+     * the inconsistency as an oversight. The structural answer is to move
+     * behaviour out of this class, which is a task of its own and not this
+     * one.
      */
     fun skipUpcomingSet() = skippedState(stateFlow.value)?.let { stateFlow.value = it }
 
