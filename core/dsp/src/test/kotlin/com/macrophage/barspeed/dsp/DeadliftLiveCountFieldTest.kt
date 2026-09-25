@@ -70,16 +70,19 @@ import kotlin.test.assertTrue
  *   what the archive's `liveReps` and cue track hold, and the replay licence
  *   below is what proves the committed CSVs are the stream the app actually ran
  *   on. They are kept for that reason and are no longer a claim about the app.
+ * - [impulseCalls] is `v0.1.54`'s path, `DriveImpulseCounter` by name:
+ *   **5, 5 and 3 -- thirteen of fifteen, no phantom.**
  * - [liveCalls] is what the app counts NOW: whatever
  *   `LiveRepCounters.forCounted` builds for a sensor-counted set, which since
- *   issue #301 is `DriveImpulseCounter`. **5, 5 and 3 -- thirteen of fifteen,
- *   no phantom.** The retired 3, 1 and 2 stay in the file rather than being
- *   overwritten, because a re-baseline that deletes the number it replaced
- *   deletes the evidence the change was worth making.
+ *   issue #305 is `CycleRepCounter`. **5, 5 and 5 -- fourteen of fifteen and
+ *   one phantom, set 6's set-up pull.** The retired 3, 1 and 2 and 5, 5 and 3
+ *   stay in the file rather than being overwritten, because a re-baseline that
+ *   deletes the number it replaced deletes the evidence the change was worth
+ *   making.
  *
  * `LiveCountDifferentialTest` holds the per-rep and per-instant version of the
- * new figures; what is here is the count-level headline on the lift this file is
- * named for.
+ * drive-impulse figures and `CycleLiveCountFieldTest` the full-cycle ones; what
+ * is here is the count-level headline on the lift this file is named for.
  */
 class DeadliftLiveCountFieldTest {
     private fun load(n: String): List<ImuSample> = ImuCsv.decode(
@@ -171,13 +174,20 @@ class DeadliftLiveCountFieldTest {
     }
 
     /**
-     * SIX calls for fifteen performed reps on `v0.1.53`, and THIRTEEN now.
+     * SIX calls for fifteen performed reps on `v0.1.53`, THIRTEEN on `v0.1.54`,
+     * and FIFTEEN now -- fourteen reps and one phantom.
      *
-     * The re-baseline, both halves in one method so neither can be read without
-     * the other. 5, 5 and 3 against 3, 1 and 2: the touch-and-go set goes from
-     * one call to five, and set 6's two slowest pulls at 102 kg are still
-     * uncounted -- an impulse detector under-counts a grind, and that is the
-     * cost the design was chosen with, not a defect discovered after.
+     * The re-baseline, every half in one method so none can be read without
+     * the others. `v0.1.54`'s drive-impulse counter called 5, 5 and 3 against
+     * `v0.1.53`'s 3, 1 and 2: the touch-and-go set went from one call to five,
+     * and set 6's two slowest pulls at 102 kg stayed uncounted -- an impulse
+     * detector under-counts a grind. Issue #305 RE-BASELINED this method a
+     * second time, deliberately: the app now arms the full-cycle counter, which
+     * calls 5, 5 and 5. On set 6 that is four of the five reps -- rep 4 is
+     * still missed -- plus the set-up pull, which the impulse counter's peak
+     * term excluded and the cycle counter calls (`CycleLiveCountFieldTest`
+     * scores it rep by rep). The 13 and the 5, 5, 3 are kept, asserted by name
+     * through [impulseCalls], rather than overwritten.
      *
      * **Issue #301's headline arithmetic is wrong and is corrected here.** It
      * says *"5 calls for 15 real reps, and one of the 5 is a phantom -- 4 real
@@ -197,7 +207,7 @@ class DeadliftLiveCountFieldTest {
      * correctly (#290, #291).
      */
     @Test
-    fun `v0_1_53 called six times for fifteen reps and the drive counter calls thirteen`() {
+    fun `v0_1_53 called six times, v0_1_54 thirteen, and the cycle counter calls fifteen`() {
         assertEquals(15, sets.sumOf { it.handCount }, "reps performed by hand count")
         assertEquals(6, sets.sumOf { shippedCalls(it.name).size }, "numbers v0.1.53's voice spoke")
         assertEquals(
@@ -206,11 +216,11 @@ class DeadliftLiveCountFieldTest {
             "v0.1.53's calls, set by set -- the retired figures, kept",
         )
         assertEquals(
-            listOf(5, 5, 3),
+            listOf(5, 5, 5),
             sets.map { liveCalls(it.name).size },
             "the calls the app makes now, set by set",
         )
-        assertEquals(13, sets.sumOf { liveCalls(it.name).size }, "numbers the voice speaks now")
+        assertEquals(15, sets.sumOf { liveCalls(it.name).size }, "numbers the voice speaks now")
         assertEquals(
             listOf(5, 5, 3),
             sets.map { impulseCalls(it.name).size },

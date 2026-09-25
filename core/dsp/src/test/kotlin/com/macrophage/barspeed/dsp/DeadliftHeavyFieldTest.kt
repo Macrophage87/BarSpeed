@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.RepCounter
 import com.macrophage.barspeed.model.StartPhase
 import kotlin.math.abs
 import kotlin.test.Test
@@ -150,6 +151,39 @@ class DeadliftHeavyFieldTest {
             sets.map { impulseCalls("${it.name}-imu-b").size },
             "role b, set by set",
         )
+    }
+
+    /**
+     * What the app counts on these five sets NOW, through
+     * `LiveRepCounters.forCounted(RepCounter.SENSOR)` -- `RecordViewModel`'s own
+     * call -- after issue #305 armed the full-cycle counter.
+     *
+     * RE-BASELINED, deliberately: 5, 5, 5, 0 and 0 on role a is what v0.1.54
+     * spoke and the test above keeps it, by name. The app now speaks 5, 5, 5,
+     * 4 and 2 on role a -- twenty-one numbers for twenty-one completed reps, and
+     * nothing for set 5's failed pull (`CycleLiveCountFieldTest` scores it rep
+     * by rep). Role b, the same code on the second unit, speaks 5, 6, 5, 4 and
+     * 2: one extra on set 2, where the drive-impulse counter's extra fell on
+     * sets 1 and 2.
+     */
+    @Test
+    fun `the app now counts 5, 5, 5, 4 and 2 on role a`() {
+        assertEquals(listOf(5, 5, 5, 4, 2), sets.map { liveCalls(it.name).size }, "role a, set by set")
+        assertEquals(sets.map { it.completed }, sets.map { liveCalls(it.name).size }, "against the completed reps")
+        assertEquals(listOf(5, 6, 5, 4, 2), sets.map { liveCalls("${it.name}-imu-b").size }, "role b, set by set")
+    }
+
+    /** Every [RepCall.Speak] the app makes now, through `RecordViewModel`'s own call. */
+    private fun liveCalls(fixture: String): List<RepCall.Speak> {
+        val counter = LiveRepCounters.forCounted(RepCounter.SENSOR, deadlift)
+            ?: error("a sensor-counted set must arm a counter")
+        val tracker = StreamingSetTracker.forLift(deadlift)
+        val spoken = mutableListOf<RepCall.Speak>()
+        for (sample in load(fixture)) {
+            val call = counter.feed(tracker.feed(sample), sample.timestampMs)
+            if (call is RepCall.Speak) spoken += call
+        }
+        return spoken
     }
 
     /**

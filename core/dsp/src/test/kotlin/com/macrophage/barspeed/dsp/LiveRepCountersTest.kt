@@ -98,14 +98,17 @@ class LiveRepCountersTest {
      * `SensorRepCounter.begin` reads -- the `if (sensorCounted)` that used to
      * stand at the call site, now one decision in `:core:model`.
      *
-     * The SENSOR row is a differential and is red at the commit that writes it:
-     * it asserted `is LiveRepCaller` one commit ago, which is what #286 armed.
+     * The SENSOR row is a differential, twice over. It asserted `is
+     * LiveRepCaller` until #301, which is what #286 armed, and `is
+     * DriveImpulseCounter` until #305, which is what v0.1.54 armed; it is red at
+     * the commit that re-baselines it to `is CycleRepCounter` and green once
+     * `LiveCounterPolicy`'s SENSOR row moves.
      */
     @Test
-    fun `forCounted arms only a sensor-counted set, and arms it with the drive counter`() {
+    fun `forCounted arms only a sensor-counted set, and arms it with the cycle counter`() {
         val direction = LiftDirection()
         assertTrue(
-            LiveRepCounters.forCounted(RepCounter.SENSOR, direction) is DriveImpulseCounter,
+            LiveRepCounters.forCounted(RepCounter.SENSOR, direction) is CycleRepCounter,
             "the counter a sensor-counted set is armed with",
         )
         listOf(RepCounter.MANUAL, RepCounter.METRONOME, RepCounter.NOBODY).forEach { counter ->
