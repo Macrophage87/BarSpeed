@@ -33,8 +33,11 @@ import com.macrophage.barspeed.model.ImuSample
  * the measurement is in `ArtefactRuleAlternativesTest`: substituting an
  * out-of-range sample BEFORE the integration, by either of the two methods
  * (hold the last in-range reading, or interpolate between the neighbours),
- * moves the rep COUNT on nine of eleven committed captures that carry one,
- * and does not fix the deadlifts at all.
+ * moves the rep COUNT on nine of the eleven `ArtefactCorpus` captures that
+ * carry one, and does not fix the deadlifts at all. Eleven names that curated
+ * argument set, not every capture on the tree that carries an artefact --
+ * `AccelArtefact.exceedsBound` finds a much larger population above
+ * `BOUND_G` (#307).
  *
  * Both halves of that matter:
  *
@@ -186,11 +189,13 @@ object AccelArtefact {
      * be a bare assertion: this is the EXACT extent of an artefact's residue
      * under the ZUPT stage, and [peakEligible] deliberately uses the narrower
      * [spanOf] instead. Withholding on this interval withholds EVERY peak on
-     * eight of the eleven committed captures that carry an artefact -- these
-     * captures accept few anchors, so the interval is often the whole stream --
-     * which trades a wrong number for no number at all across most of the
-     * corpus. That is a product decision and it is raised rather than taken;
-     * `ArtefactRuleAlternativesTest` carries the per-capture measurement.
+     * eight of the eleven `ArtefactCorpus` captures that carry an artefact --
+     * that curated set, not every capture on the tree above `BOUND_G` (#307) --
+     * these captures accept few anchors, so the interval is often the whole
+     * stream -- which trades a wrong number for no number at all across most
+     * of the corpus. That is a product decision and it is raised rather than
+     * taken; `ArtefactRuleAlternativesTest` carries the per-capture
+     * measurement.
      *
      * DERIVED FROM WHAT `applyZupt` DOES, not fitted to the corpus. Raw velocity
      * is a CUMULATIVE integral, so an out-of-range acceleration adds a step to
