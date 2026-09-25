@@ -32,9 +32,11 @@ import kotlin.test.assertTrue
  * down, `plane` vertical, `sensorOnStack` omitted -- certain, because its
  * published source is `seeded` -- and `sensorInverted` omitted. That last is
  * the LIKELIER reading and not a recorded fact: the key has no published
- * source (#289), and the draft plan kept for that session omits it on both
- * cable lifts. A plan that declared it false would resolve false and read 1,
- * and is left alone.
+ * source (#289). The same imported plan declared `sensorOnStack` and
+ * `sensorInverted` on its lat pulldown and left this pushdown's
+ * `sensorOnStack` to the seed; that is the likelier reading, not a recorded
+ * fact. A plan that declared it false would resolve false and read 1, and is
+ * left alone.
  *
  * ## What this asserts
  *

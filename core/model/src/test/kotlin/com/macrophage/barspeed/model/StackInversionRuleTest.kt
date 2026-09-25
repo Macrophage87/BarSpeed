@@ -19,8 +19,10 @@ import kotlin.test.assertTrue
  * for fourteen reps. Whether that plan omitted `sensorInverted` or declared it
  * false cannot be read from the export -- the key has no published source
  * (#289) -- and is stated here as the likelier reading, not as a fact: its
- * `sensorOnStack` was certainly omitted, and the draft plan kept for that
- * session omits `sensorInverted` on both of its cable lifts.
+ * `sensorOnStack` was certainly omitted. The same imported plan declared
+ * `sensorOnStack` and `sensorInverted` on its lat pulldown and left both
+ * pushdowns' `sensorOnStack` to the seed; that is the likelier reading, not
+ * a recorded fact.
  *
  * ## What this file pins, and in which commit
  *
