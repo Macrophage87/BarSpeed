@@ -1349,7 +1349,7 @@ data class SessionExport(
          * `Set ended` still bounds every set, cadence or none: the app writes
          * that word itself as the set ends and it is never a milestone.
          *
-         * HOW A READER TELLS WHICH RULE APPLIED: [SetExport.tempoPrescribed].
+         * HOW A READER TELLS WHICH RULE APPLIED: [SetPrescriptionExport.tempoPrescribed].
          * A `Done` row in `voiceCues` on a set carrying no `tempoPrescribed`
          * bounded nothing. One caveat, because the two are not one field: the
          * rule reads whether a CADENCE RAN -- `LeadInPolicy.prepCase == CUED`,
@@ -1612,8 +1612,8 @@ data class SessionExport(
          * one the LIFTER corrected: both are a stored value that is neither the
          * span nor the target, and telling those two apart is the whole of
          * #249. A correction that happens to land on the target would read as
-         * the clock as well. So the word is stored, in `set_records` on the
-         * unreleased v19 hop, and published from there.
+         * the clock as well. So the word is stored, in `set_records` on the v19
+         * hop, which shipped in v0.1.54, and published from there.
          *
          * WHAT THE `sensor` WORD CHANGES ABOUT `duration_s` ITSELF, stated
          * because a reader comparing holds across versions needs it: on a hold
@@ -2216,7 +2216,7 @@ data class SessionExport(
          * field-42's six hold streams, `Time` 30.014 to 30.020 s after work
          * start on a 30 s prescription. [SetExport.voiceCues]' published
          * description sent a reader to `Done` or `Set ended` for that instant,
-         * and [SetExport.restS]'s said every hold rests from its end instant.
+         * and [SetPrescriptionExport.restS]'s said every hold rests from its end instant.
          *
          * THE CHANGE. `SetEnd.TIME_UP` joins `SetEnd.TERMINAL_CUES` and bounds
          * `SetEnd.of`: the roll window, the stack-mount verdict's window and the
@@ -2254,7 +2254,7 @@ data class SessionExport(
          * at the tap -- the word a guided set already says when it ends without
          * `Done`. It bounds the working window and seeds the rest unless a
          * release decided the seconds. A timed set the clock ended says `Time`,
-         * as before. [SetExport.voiceCues]' and [SetExport.restS]'s published
+         * as before. [SetExport.voiceCues]' and [SetPrescriptionExport.restS]'s published
          * descriptions say so.
          *
          * WHAT A READER DOES, IN BOTH DIRECTIONS. No key is added, removed or
@@ -2488,7 +2488,7 @@ data class HrSessionSummary(
 @Serializable
 data class ExerciseExport(
     val exercise: String,
-    val sets: List<SetExport>,
+    val sets: List<@Serializable(with = SetExportWireSerializer::class) SetExport>,
 )
 
 @Serializable
@@ -2496,7 +2496,16 @@ data class SetExport(
     @SerialName("load_kg") val loadKg: Double,
     /** Same load in pounds, for readers who think in lb; kg remains canonical. */
     @SerialName("load_lb") val loadLb: Double? = null,
-    @SerialName("plannedLoad_kg") val plannedLoadKg: Double? = null,
+    /**
+     * The set's targets and its rest, published FLAT beside the keys below by
+     * [SetExportWireSerializer]: `plannedLoad_kg`, `plannedReps`,
+     * `plannedDuration_s`, `rest_s` and `tempoPrescribed`. Grouped so the raw
+     * archive's manifest publishes them from the same object (#219).
+     *
+     * No default: every set states its prescription, and a defaulted property
+     * is one the exporter could silently stop passing.
+     */
+    val prescription: SetPrescriptionExport,
     /**
      * The body weight [loadKg] was computed with, kilograms (1.19, #220).
      *
@@ -2692,23 +2701,23 @@ data class SetExport(
      * this key. Absent is neither false nor true.
      */
     val countTrusted: Boolean? = null,
-    val plannedReps: Int? = null,
     /**
      * Hold/carry seconds recorded for timed sets (planks, farmer's walks).
      *
      * Since #168 a timed set ENDS when its clock reaches the seconds the set
-     * was working to -- [plannedDurationS] unless the lifter changed the hold
-     * in the change-set dialog, in which case theirs -- so a set that ran to
-     * its target publishes [plannedDurationS] only when the lifter did not
-     * change it; one the lifter ended by hand publishes what it lasted, and one
-     * corrected afterwards on the rest screen publishes the corrected
+     * was working to -- [SetPrescriptionExport.plannedDurationS] unless the
+     * lifter changed the hold in the change-set dialog, in which case theirs
+     * -- so a set that ran to its target publishes
+     * [SetPrescriptionExport.plannedDurationS] only when the lifter did not
+     * change it; one the lifter ended by hand publishes what it lasted, and
+     * one corrected afterwards on the rest screen publishes the corrected
      * seconds. WHICH of them produced this figure is [durationEndedBy] from
      * 1.21; the sentence that stood here -- that the three are not
-     * distinguishable and that [repsManual] has no counterpart for duration --
-     * is deleted rather than reworded. A reader comparing holds across 1.12 and
-     * 1.13 is still comparing figures whose upper end moved: under 1.12 every
-     * timed set carried the walk back to the phone inside it, and from 1.21 a
-     * hold whose armed unit saw the release does not.
+     * distinguishable and that [repsManual] has no counterpart for duration
+     * -- is deleted rather than reworded. A reader comparing holds across
+     * 1.12 and 1.13 is still comparing figures whose upper end moved: under
+     * 1.12 every timed set carried the walk back to the phone inside it, and
+     * from 1.21 a hold whose armed unit saw the release does not.
      *
      * From 1.22 (#311) a HOLD the CLOCK ended publishes the span to a release
      * instead of the target where its armed unit saw the implement let go and
@@ -2782,7 +2791,6 @@ data class SetExport(
      * distinction and it is what the key is for.
      */
     val durationEndedBy: String? = null,
-    @SerialName("plannedDuration_s") val plannedDurationS: Int? = null,
     /**
      * Unilateral sets: the arm the set WORKED -- "left" or "right".
      *
@@ -3041,19 +3049,23 @@ data class SetExport(
      * True when the LIFTER appended this set to the exercise mid-session, and
      * the plan did not prescribe it. Omitted when false (#177).
      *
-     * WHY A READER NEEDS IT. Adherence is read from [plannedReps] beside
-     * [reps], and from how many sets an exercise carries against how many the
-     * plan asked for. An appended set occupying a prescribed slot corrupts both
-     * readings at once: it inflates the count, and -- because it has no
-     * prescription of its own -- it publishes no [plannedReps] either, so it
-     * reads as a prescribed set whose prescription went missing.
+     * WHY A READER NEEDS IT. Adherence is read from
+     * [SetPrescriptionExport.plannedReps] beside [reps], and from how many
+     * sets an exercise carries against how many the plan asked for. An
+     * appended set occupying a prescribed slot corrupts both readings at
+     * once: it inflates the count, and -- because it has no prescription of
+     * its own -- it publishes no [SetPrescriptionExport.plannedReps] either,
+     * so it reads as a prescribed set whose prescription went missing.
      *
-     * An appended set therefore publishes NO [plannedLoadKg], [plannedReps]
-     * or [plannedDurationS], and that absence is a statement rather than a
-     * gap: nothing prescribed it. [tempoPrescribed] is NOT in that list: it
-     * is read from the same run-value rule `load_kg` and `reps` use, not from
-     * a frozen plan declaration, so an appended set on a block that declares
-     * a tempo publishes it -- naming a tempo nothing prescribed for that
+     * An appended set therefore publishes NO
+     * [SetPrescriptionExport.plannedLoadKg],
+     * [SetPrescriptionExport.plannedReps] or
+     * [SetPrescriptionExport.plannedDurationS], and that absence is a
+     * statement rather than a gap: nothing prescribed it.
+     * [SetPrescriptionExport.tempoPrescribed] is NOT in that list: it is read
+     * from the same run-value rule `load_kg` and `reps` use, not from a
+     * frozen plan declaration, so an appended set on a block that declares a
+     * tempo publishes it -- naming a tempo nothing prescribed for that
      * occurrence. `rest_s` and `plannedPrep_s` are published too, unchanged
      * from the rest of the block: neither is cleared for an appended slot.
      * Its `load_kg`, `reps` and tempo are what the lifter was standing on
@@ -3080,9 +3092,9 @@ data class SetExport(
      * prescribed, and a reader that saw only [prepS] could not tell an
      * adjustment from a declaration without knowing the app's constant.
      *
-     * [restS] beside them is the one planned value in this type whose name does
-     * not say it is planned, so a reader takes a prescription for an
-     * observation. That is issue #76.
+     * [SetPrescriptionExport.restS] beside them is the one planned value in
+     * this type whose name does not say it is planned, so a reader takes a
+     * prescription for an observation. That is issue #76.
      *
      * Both absent on a set that played no prep -- such a set has none -- and
      * both absent on every set recorded before 1.11, and on every hold and
@@ -3098,28 +3110,6 @@ data class SetExport(
      */
     @SerialName("plannedPrep_s") val plannedPrepS: Int? = null,
     @SerialName("prep_s") val prepS: Int? = null,
-    /**
-     * The rest PRESCRIBED after this set, in whole seconds -- never a
-     * measurement of how long the lifter rested (#76).
-     *
-     * From 1.19 the published description states which instant it is counted
-     * FROM, and `RestClockPolicy` owns that instant: a release that decided a
-     * hold's seconds first (#259), then the terminal cue on the set's own cue
-     * track -- which from 1.22 includes a timed set's `Time` where the timed
-     * voice is on (#295) and the `Set ended` a timed set the lifter stopped
-     * says (#288) -- or the set's
-     * end instant where nothing called it over. The countdown and the archive's `rest_before_hrm` window both
-     * begin there (#178); until 1.19 the window began when the set's capture
-     * stopped instead, up to 53.06 s later on one measured set. `rest_after_hrm`
-     * -- the window a session close writes onto the LAST set, when there is no
-     * next set to carry `rest_before_hrm` forward -- follows the same instant
-     * and the same copy-forward. A gap this does not close: `endSet` cancels
-     * the in-set collector before the app enters its rest stage, so a
-     * notification landing in that interval reaches neither capture -- 0.08 to
-     * 0.58 s on the one session measured.
-     */
-    @SerialName("rest_s") val restS: Int? = null,
-    val tempoPrescribed: String? = null,
     val tempoCompliance: TempoComplianceExport? = null,
     @SerialName("velocityLoss_pct") val velocityLossPct: Double? = null,
     /**
@@ -3156,12 +3146,12 @@ data class SetExport(
      * is withheld on a set with no [rpe] because a word with no number beside
      * it names a grid that was drawn rather than a rating that was given.
      *
-     * DERIVED at export time from [tempoPrescribed] and the plane, drive
-     * direction and kind of the set's frozen [geometry] -- all four already
-     * on the row,
-     * so no column and no `DATABASE_VERSION` hop. That is the opposite of
-     * [rpeScale], which records which question a lifter was SHOWN and cannot
-     * be re-derived. [VelocityLossRegime] is the one statement of the rule.
+     * DERIVED at export time from [SetPrescriptionExport.tempoPrescribed] and
+     * the plane, drive direction and kind of the set's frozen [geometry] --
+     * all four already on the row, so no column and no `DATABASE_VERSION`
+     * hop. That is the opposite of [rpeScale], which records which question a
+     * lifter was SHOWN and cannot be re-derived. [VelocityLossRegime] is the
+     * one statement of the rule.
      *
      * ABSENT where the regime is not decidable, which is a state and not a
      * word: a set with no stored [geometry] (every set recorded before that
@@ -3669,11 +3659,12 @@ data class SetSensorsExport(
  * this set — not as a plan declared it, because the app applies a precedence
  * chain and a plan's text may have been overridden.
  *
- * This is what makes the rest of the set checkable. [SetExport.tempoPrescribed]
- * is positional notation — digit 1 is the down stroke, digit 3 the up stroke —
- * so which stroke is the eccentric follows from [concentric] and [plane], not
- * from the digit order. Without those, [SetExport.tempoCompliance] is a verdict
- * whose input the reader cannot see.
+ * This is what makes the rest of the set checkable.
+ * [SetPrescriptionExport.tempoPrescribed] is positional notation — digit 1 is
+ * the down stroke, digit 3 the up stroke — so which stroke is the eccentric
+ * follows from [concentric] and [plane], not from the digit order. Without
+ * those, [SetExport.tempoCompliance] is a verdict whose input the reader
+ * cannot see.
  *
  * **Every field is required, and none has a Kotlin default.** The exporter
  * writes JSON with `encodeDefaults = false`, so a field defaulted to `false`

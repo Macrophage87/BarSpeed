@@ -138,6 +138,7 @@ class SessionRepositoryLiveRepsTest {
         prepS = null,
         startedAtMs = 1_000L,
         endedAtMs = 61_000L,
+        restStartedAtMs = 61_000L,
         analysis = threeReps,
         imuSamples = emptyList(),
         hrSamples = emptyList(),

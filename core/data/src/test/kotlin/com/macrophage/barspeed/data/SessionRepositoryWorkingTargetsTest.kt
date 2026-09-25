@@ -119,7 +119,7 @@ class SessionRepositoryWorkingTargetsTest {
         workingReps: Int?,
         workingDurationS: Int?,
         plannedTempo: String?,
-        restStartedAtMs: Long?,
+        restStartedAtMs: Long,
     ) = CompletedSet(
         exerciseId = "back_squat",
         exerciseName = "Back Squat",
@@ -180,9 +180,14 @@ class SessionRepositoryWorkingTargetsTest {
     }
 
     /**
-     * Absence stays absence. A set with no rep target, no hold, no declared
-     * tempo and no rest instant writes null in each column -- never a 0, and
-     * never the planned sibling copied across.
+     * Absence stays absence. A set with no rep target, no hold and no declared
+     * tempo writes null in each column -- never a 0, and never the planned
+     * sibling copied across.
+     *
+     * The rest instant is not among them: `CompletedSet.restStartedAtMs` is
+     * non-null, because every set the recorder writes has one, so "a set
+     * with no rest instant" is no longer a set this repository can be handed.
+     * The assertion that stood here for it is REMOVED with that state.
      */
     @Test
     fun `absent working targets are written as null, not as a value`() = runTest {
@@ -192,12 +197,11 @@ class SessionRepositoryWorkingTargetsTest {
                     workingReps = null,
                     workingDurationS = null,
                     plannedTempo = null,
-                    restStartedAtMs = null,
+                    restStartedAtMs = 62_500L,
                 ),
             )
         assertNull(row.workingReps, "a set with no rep target was given one")
         assertNull(row.workingDurationS, "a set that is not a hold was given a working hold")
         assertNull(row.plannedTempo, "a set whose plan declared no tempo was given one")
-        assertNull(row.restStartedAtMs, "a set with no rest instant was given one")
     }
 }

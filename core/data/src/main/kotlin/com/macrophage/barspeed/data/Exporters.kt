@@ -32,6 +32,7 @@ import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SessionExport
 import com.macrophage.barspeed.model.SetExport
 import com.macrophage.barspeed.model.SetLimiter
+import com.macrophage.barspeed.model.SetPrescriptionExport
 import com.macrophage.barspeed.model.SetSensorsExport
 import com.macrophage.barspeed.model.SetSummaryExport
 import com.macrophage.barspeed.model.TempoComplianceExport
@@ -319,7 +320,9 @@ class SessionExporter(
         return SetExport(
             loadKg = record.loadKg,
             loadLb = Math.round(record.loadKg * WeightUnit.LB_PER_KG * 10.0) / 10.0,
-            plannedLoadKg = record.plannedLoadKg,
+            // The set's targets and its rest, from ONE builder (#219):
+            // [prescriptionExport] states which columns each key reads.
+            prescription = record.prescriptionExport(),
             // How much of loadKg was the lifter (#220). Straight off the row,
             // never recomputed: it is the figure the arithmetic used, and the
             // one body weight the app holds has moved since. Absent where the
@@ -346,7 +349,6 @@ class SessionExporter(
             // recomputed; null -- no tracker covered the set's end, or the set
             // predates the key -- stays absent rather than becoming an answer.
             countTrusted = analysis?.liveCountTrusted,
-            plannedReps = record.plannedReps,
             durationS = phase.durationS,
             // WHICH of the four things that can end a hold produced that figure
             // (#259). Straight off the row, through the enum, and gated on the
@@ -354,7 +356,6 @@ class SessionExporter(
             // no seconds and cannot have a word about them.
             durationEndedBy = record.publishedHoldEnd(phase),
             abandonedInPrep = phase.abandonedInPrep,
-            plannedDurationS = record.plannedDurationS,
             side = record.side,
             plannedSide = record.plannedSide,
             rpe = record.rpe,
@@ -388,8 +389,6 @@ class SessionExporter(
             added = record.added,
             plannedPrepS = record.plannedPrepS,
             prepS = phase.prepS,
-            restS = record.plannedRestS,
-            tempoPrescribed = record.tempo,
             tempoCompliance =
             analysis?.tempoCompliance?.let {
                 TempoComplianceExport(
@@ -863,6 +862,21 @@ private fun SetRecordEntity.publishedHoldEnd(phase: AbandonedSetPhase): String? 
  */
 private val SetRecordEntity.publishedLimiterNote: String?
     get() = SetLimiter.normalizeNote(limiterNote)?.takeIf { publishedLimiter != null }
+
+/**
+ * This row's targets and its rest as the export publishes them (#157, #219).
+ *
+ * The one builder of [SetPrescriptionExport] in this module. Each key reads
+ * one column, straight off the row and never recomputed: the plan's frozen
+ * load, count and hold, the plan's rest, and the tempo the set ran.
+ */
+private fun SetRecordEntity.prescriptionExport(): SetPrescriptionExport = SetPrescriptionExport(
+    plannedLoadKg = plannedLoadKg,
+    plannedReps = plannedReps,
+    plannedDurationS = plannedDurationS,
+    restS = plannedRestS,
+    tempoPrescribed = tempo,
+)
 
 /**
  * The void reason as it may be PUBLISHED: only where the mark stands beside

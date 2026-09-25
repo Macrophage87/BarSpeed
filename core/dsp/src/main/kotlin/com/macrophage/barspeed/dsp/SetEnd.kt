@@ -171,7 +171,7 @@ sealed interface SetEnd {
          * guided set the plan or the ad-hoc form gave no rep count at all
          * (`PlannedSlot.reps` is nullable; the ad-hoc field may be left blank).
          * `GuidedCadenceRunner` speaks [DONE] only where `plannedReps != null`,
-         * and `RecordViewModel.setTargetMet` offers such a set the effort grid
+         * and `RecordState.setTargetMet` offers such a set the effort grid
          * from the start, so it finishes normally and carries this word. Read
          * `failed` for whether a set was failed; this cue does not say.
          *

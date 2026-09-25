@@ -139,6 +139,7 @@ class SideDeviationRecordTest {
         prepS = null,
         startedAtMs = 1_000L,
         endedAtMs = 41_000L,
+        restStartedAtMs = 41_000L,
         analysis = noReps,
         imuSamples = emptyList(),
         hrSamples = emptyList(),

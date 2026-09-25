@@ -155,8 +155,14 @@ data class CompletedSet(
      * The instant the rest after this set runs from, epoch-ms (#157) -- the
      * value `RestClockPolicy.startedAtMs` gave at the set-end freeze.
      * [SetRecordEntity.restStartedAtMs] states why it is stored.
+     *
+     * Non-null with no default, [workingLoadKg]'s reason: every set the
+     * recorder writes has a rest instant, and a defaulted parameter is one a
+     * call site can silently stop passing -- the export's measured rest would
+     * then go absent on every new set with nothing to red. The column stays
+     * nullable, because a row written before v20 has none.
      */
-    val restStartedAtMs: Long? = null,
+    val restStartedAtMs: Long,
     /**
      * The prep prescribed before this set, and the prep the caller handed the
      * voice guide, in whole seconds.

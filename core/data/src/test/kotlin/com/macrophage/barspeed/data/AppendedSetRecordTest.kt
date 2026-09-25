@@ -132,6 +132,7 @@ class AppendedSetRecordTest {
         prepS = null,
         startedAtMs = 1_000L,
         endedAtMs = 61_000L,
+        restStartedAtMs = 61_000L,
         analysis = analysis,
         imuSamples = emptyList(),
         hrSamples = emptyList(),

@@ -604,14 +604,14 @@ abstract class AppDatabase : RoomDatabase() {
          * `set_records`: which of the four things that can end a hold produced
          * its recorded seconds (#259).
          *
-         * TWO COLUMNS RIDE THIS ONE HOP because 19 has NOT shipped. Read this
-         * round rather than assumed: `git tag --sort=-creatordate | head -1` is
-         * v0.1.53 and `git show v0.1.53:core/data/.../AppDatabase.kt` reads
-         * `DATABASE_VERSION = 18`, so no installed build has run 18 -> 19 and
-         * extending it leaves no phone behind. [Migration16To17Test] states the
-         * same rule for the same reason and [Migration18To19Test] pins the
-         * count of statements here. Had 19 shipped, #259's column would need a
-         * 19 -> 20 hop of its own.
+         * TWO COLUMNS RIDE THIS ONE HOP because 19 had not shipped when the
+         * second was added: the newest tag then was v0.1.53, whose
+         * `AppDatabase.kt` reads `DATABASE_VERSION = 18`, so no installed build
+         * had run 18 -> 19 and extending it left no phone behind.
+         * [Migration16To17Test] states the same rule for the same reason and
+         * [Migration18To19Test] pins the count of statements here. 19 HAS
+         * SHIPPED since, in v0.1.54, so this hop is closed: a column added now
+         * rides a later hop, as #157's five ride [MIGRATION_19_20].
          *
          * A NEW HOP RATHER THAN AN EXTENSION OF 18, and the test is which
          * versions have shipped. v0.1.53 carries `DATABASE_VERSION = 18`, read

@@ -268,6 +268,7 @@ class SessionRepositoryRecordSetTest {
         prepS = 20,
         startedAtMs = 1_000L,
         endedAtMs = 2_000L,
+        restStartedAtMs = 2_000L,
         analysis = analysis,
         geometry = geometry,
         imuSamples = imuSamples,

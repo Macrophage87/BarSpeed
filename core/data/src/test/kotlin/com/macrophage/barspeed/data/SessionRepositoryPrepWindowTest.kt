@@ -111,6 +111,7 @@ class SessionRepositoryPrepWindowTest {
         plannedPrepS = 5,
         startedAtMs = 1_000L,
         endedAtMs = 46_000L,
+        restStartedAtMs = 46_000L,
         analysis = SetAnalysis(emptyList(), 0.0, null, null, emptyList()),
         imuSamples = listOf(ImuSample(1_000L, 0.01, -0.02, 0.98, 1.5, -2.5, 0.25, 10.0, -20.0, 30.0)),
         hrSamples = emptyList(),

@@ -244,6 +244,7 @@ class AnalysedRoleFallbackTest {
             prepS = 10,
             startedAtMs = 1_788_251_947_376L,
             endedAtMs = 1_788_251_999_643L,
+            restStartedAtMs = 1_788_251_999_643L,
             analysis = analysisOf(analysed),
             imuSamples = analysed,
             hrSamples = emptyList(),
