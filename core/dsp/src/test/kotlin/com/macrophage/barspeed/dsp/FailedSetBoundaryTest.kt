@@ -195,8 +195,10 @@ class FailedSetBoundaryTest {
     }
 
     /**
-     * Who is asked for the word: a guided set whose record does not already
-     * end, and nobody else.
+     * Who is asked for the word among sets that are NOT timed: a guided set
+     * whose record does not already end, and nobody else. A timed set the
+     * lifter ends before its clock is asked too since #288; `TimedStopCallTest`
+     * pins that case.
      *
      * The unguided case is #141's own second design question and is
      * deliberately not answered here -- a manual set ends by the same tap, and
