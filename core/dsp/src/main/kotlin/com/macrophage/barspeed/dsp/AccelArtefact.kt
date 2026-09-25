@@ -59,9 +59,11 @@ import com.macrophage.barspeed.model.ImuSample
  * So the figure is withheld instead. That is the owner's other rule: *"a figure
  * the analysis cannot bound is withheld or flagged, never published as if
  * measured."* Every other figure -- the rep count, `rom_m`, the means,
- * `velocityLoss_pct`, tempo compliance -- is bit-identical to what the same
- * capture published before this existed, because nothing upstream of them
- * moved.
+ * `velocityLoss_pct`, tempo compliance -- was bit-identical to what the same
+ * capture published before this rule existed, because nothing upstream of
+ * them moved. Issue #306 later narrowed `velocityLoss_pct` onto the same
+ * eligible reps (the section on #306 below); the rep count, `rom_m`, the
+ * means and tempo compliance are still untouched.
  *
  * ## The bound, and where it comes from
  *
@@ -116,7 +118,7 @@ import com.macrophage.barspeed.model.ImuSample
  * of a stream, and `ArtefactRuleAlternativesTest`'s *"withholding over the
  * exact residue interval takes every peak on eight captures"* is the cost
  * table -- so a peak this rule keeps is not a peak it certifies. Six published
- * figures in the committed corpus survive it. Five are still implausible and
+ * figures in the committed corpus survived it alone. Five are implausible and
  * are named rather than glossed:
  * `field-assistedpullup-3010-s37-set08`'s 407.4 W (#255's own headline: its one
  * 14.982 g sample is at index 4079, inside rep 5's eccentric, and the inflated
@@ -128,18 +130,38 @@ import com.macrophage.barspeed.model.ImuSample
  * `field-pullup-4010-8rep-s42-set13`'s 244.3 W, survives because it needs no
  * movement. Withholding on
  * [corruptedSpan] instead reaches all five and withholds every peak on eight of
- * the eleven captures as well; that trade is raised, not taken.
+ * the eleven captures as well; that trade was raised, not taken. Issue #306's
+ * bound clause reaches all six instead: not one rep of the eleven is bounded
+ * (`RomBoundCorpusTest`), so none of them publishes a peak at all.
  *
  * The other visible residue on these captures is the inflated per-rep `rom_m`,
  * which is issue #291 and is not this rule's to fix.
  *
- * ONE MORE REMAINDER, on a published key rather than a chip alone:
- * `velocityLoss_pct` takes its reference as a maximum over every rep's MEAN
- * drive velocity (`VelocityLoss.of`, and `SetAnalyzer`'s velocity-loss-stop
- * verdict does the same), over the UNFILTERED rep list -- so a marked rep can
- * still set it. A mean is not diluted by the integrator's step the way it is by
- * one acceleration sample, and nothing here measures how far it moves. It is
- * NOT narrowed by this change.
+ * ## Issue #306: the band before a span, the bound, and a peak below its mean
+ *
+ * Three things #290's rule left standing, each measured on a committed
+ * capture, and each now closed in [isPeakEligible] or [setPeakConVelMps]:
+ *
+ * - A floor contact just BEFORE a span. field-44 set 4 rep 3 carries no
+ *   sample above [BOUND_G] and published 7762.4 W on 111.1 kg; its span opens
+ *   0.03 s after a 21.4 g sample. [GUARD_BAND_S] widens the window backwards
+ *   by the interval a contact was measured to ring for.
+ * - A detection whose displacement nothing bounds. field-45 set 2 published
+ *   1.937 m/s from a 1.961 m detection on an 18.1 kg press with no artefact
+ *   in it. `RomBound` already judged every rep; its answer now also decides
+ *   the peaks, because a velocity integral the analysis cannot bound is as
+ *   unbounded at its maximum as at its end.
+ * - A "peak" below the set's own mean. field-44 set 5 published 0.376 m/s
+ *   against a 0.382 mean, because only a 0.267 m partial was left in the
+ *   population. A true set peak cannot be below any rep's mean.
+ *
+ * `velocityLoss_pct` was the remainder this KDoc named here: it took its
+ * reference over EVERY rep, so field-44 set 3 published 84.9 % off the rep
+ * whose 10701.6 W this rule withheld. `VelocityLoss.of` now takes it over the
+ * eligible reps and needs two of them with the last among them. The
+ * `velocityLossStopPct` verdict in `CoachingRules` still takes its best over
+ * every rep; that sentence is frozen into the stored analysis, is not
+ * published, and is raised rather than changed here.
  */
 object AccelArtefact {
     /**
@@ -296,8 +318,8 @@ object AccelArtefact {
     fun peaksWithheld(artefactSamples: Int): Boolean = artefactSamples > 0
 
     /**
-     * The reps a SET's peak figures may be taken over: those whose own span
-     * carries no artefact sample.
+     * The reps a SET's peak figures may be taken over: those [isPeakEligible]
+     * admits.
      *
      * THE ONE STATEMENT OF THE RULE, and the reason it is a function rather
      * than a `filter` at each call site. FIVE places take a SET-LEVEL peak over
@@ -338,28 +360,63 @@ object AccelArtefact {
     fun peakEligible(reps: List<RepAnalysis>): List<RepAnalysis> = reps.filter(::isPeakEligible)
 
     /**
-     * Whether ONE rep may count toward its set's peak figures: [peakEligible]'s
-     * rule for a single rep, stated once so that the set's peaks,
-     * [terminalPeakLossPct]'s last-rep test and `VelocityLoss.of` cannot
-     * disagree about which reps qualify.
+     * Whether ONE rep may count toward its set's peak figures and its velocity
+     * loss, stated once so that the set's peaks, [terminalPeakLossPct]'s
+     * last-rep test and `VelocityLoss.of` cannot disagree about which reps
+     * qualify. Three clauses, each sufficient to disqualify:
+     *
+     * - no sample above [BOUND_G] inside the rep's own span, #290's rule;
+     * - none in the [GUARD_BAND_S] before the span, issue #306 -- a floor
+     *   contact sits there, not inside the pull it precedes;
+     * - a displacement the analysis can bound (`RomBound`, #291), issue #306 --
+     *   a velocity integral nothing bounds is unbounded at its peak too, and a
+     *   mean drive velocity IS the rep's displacement over its drive time.
+     *
+     * A null on any input -- a rep stored before that question was asked -- is
+     * KEPT, on the doctrine the class KDoc states: an archived set keeps the
+     * figures it has always published. `PeakEligibilityTest` pins each clause
+     * on its own, with the other two masked.
      */
-    fun isPeakEligible(rep: RepAnalysis): Boolean = !peaksWithheld(rep.artefactSamples ?: 0)
+    fun isPeakEligible(rep: RepAnalysis): Boolean =
+        !peaksWithheld(rep.artefactSamples ?: 0) &&
+            !peaksWithheld(rep.guardArtefactSamples ?: 0) &&
+            (rep.romBounded ?: true)
 
     /**
      * The peak drive velocity a SET publishes: `summary.peakConVel_mps`, and
-     * the *"Best"* on the post-set peak-velocity chart. Null where no rep is
-     * [peakEligible]. Issue #306 makes this a function rather than a
-     * `maxOfOrNull` at each call site, so that every consumer takes the SET's
-     * figure from one statement.
+     * the *"Best"* on the post-set peak-velocity chart. Issue #306 makes this a
+     * function rather than a `maxOfOrNull` at each call site, so that every
+     * consumer takes the SET's figure from one statement.
+     *
+     * Null where no rep is [peakEligible], and null where the best eligible
+     * peak is below the set's mean drive velocity over EVERY rep -- the figure
+     * `summary.meanConVel_mps` publishes beside it. A rep's peak is a maximum
+     * over the window its mean is an average over, so a true set peak is never
+     * below any rep's mean, let alone below the mean of them all; one that is
+     * was taken over a population that left out the reps the mean is made of.
+     * Compared against the eligible reps' OWN mean the rule could never fire,
+     * for the same reason, which is why the published all-rep mean is the
+     * reference.
      */
-    fun setPeakConVelMps(reps: List<RepAnalysis>): Double? = peakEligible(reps).maxOfOrNull { it.peakConVelMps }
+    fun setPeakConVelMps(reps: List<RepAnalysis>): Double? =
+        notBelowMean(peakEligible(reps).maxOfOrNull { it.peakConVelMps }, reps.map { it.meanConVelMps })
 
     /**
      * The peak drive power a SET publishes: `summary.peakPower_w` and the
-     * drive-power line on both post-set screens, on [setPeakConVelMps]'s terms.
-     * Null where no eligible rep carries a power figure.
+     * drive-power line on both post-set screens, on [setPeakConVelMps]'s terms,
+     * the reference being the mean of every rep's average drive power, which
+     * is `summary.meanConPower_w`. Null where no eligible rep carries a power
+     * figure. A set with no mean power -- no rep carries one -- has nothing to
+     * fall below, and its peak stands on eligibility alone.
      */
-    fun setPeakPowerW(reps: List<RepAnalysis>): Double? = peakEligible(reps).mapNotNull { it.peakPowerW }.maxOrNull()
+    fun setPeakPowerW(reps: List<RepAnalysis>): Double? =
+        notBelowMean(peakEligible(reps).mapNotNull { it.peakPowerW }.maxOrNull(), reps.mapNotNull { it.meanConPowerW })
+
+    /** [peak], or null where it is below the mean of [means]; see [setPeakConVelMps]. */
+    private fun notBelowMean(peak: Double?, means: List<Double>): Double? {
+        if (peak == null || means.isEmpty()) return peak
+        return peak.takeUnless { it < means.average() }
+    }
 
     /**
      * How far the set's LAST rep fell short of the best peak drive velocity the
@@ -380,8 +437,9 @@ object AccelArtefact {
      * marked rep often ends on the largest peak in the set. field-42 set 7 is
      * exactly that: 1.084 m/s against an eligible best of 0.948.
      * `ArtefactBoundTest` pins both halves and `ArtefactPeakWithholdingTest`
-     * carries the per-capture column, on which three of the eleven captures are
-     * in this state.
+     * carries the per-capture column: three of the eleven captures were in
+     * this state under #290's clause alone, and from #306 all eleven are,
+     * because no rep of any of them is bounded.
      *
      * Also null where the chart already draws nothing: no rep at all, or a best
      * that is not positive, because a loss measured against zero is not a

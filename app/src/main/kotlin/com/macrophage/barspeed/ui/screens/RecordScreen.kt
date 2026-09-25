@@ -4066,9 +4066,9 @@ internal fun PeakVelocityChart(analysis: SetAnalysis, verdicts: List<String>) {
     )
     Spacer(Modifier.height(6.dp))
     PowerLine(analysis)
-    // The SET-LEVEL claim, over the reps whose own span carries no sample above
-    // the physical bound (#290). This line printed "Best 2.52 m/s" on a 55 lb
-    // press two lines above an already-corrected "Drive power: peak 329 W".
+    // The SET-LEVEL claim, over the reps AccelArtefact.isPeakEligible admits
+    // (#290, #306). This line printed "Best 2.52 m/s" on a 55 lb press two
+    // lines above an already-corrected "Drive power: peak 329 W".
     val best = AccelArtefact.setPeakConVelMps(analysis.reps)
     if (best != null && best > 0) {
         // Absent rather than zero where the set's own last rep is withheld, and
@@ -4167,9 +4167,9 @@ private fun PowerLine(analysis: SetAnalysis) {
 }
 
 private fun powerSummary(analysis: SetAnalysis): String? {
-    // Over the reps whose own span carries no sample above the physical bound
-    // (#290). This line printed "peak 3606 W" on a 55 lb press, which is the
-    // reading the owner ignores these screens for.
+    // Over the reps AccelArtefact.isPeakEligible admits (#290, #306). This line
+    // printed "peak 3606 W" on a 55 lb press, which is the reading the owner
+    // ignores these screens for.
     val peak = AccelArtefact.setPeakPowerW(analysis.reps) ?: return null
     val avg = analysis.reps.mapNotNull { it.meanConPowerW }.takeIf { it.isNotEmpty() }?.average()
     return "Drive power: peak ${peak.toInt()} W" + (avg?.let { " · avg ${it.toInt()} W" } ?: "")

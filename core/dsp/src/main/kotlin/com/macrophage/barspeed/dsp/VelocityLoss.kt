@@ -4,10 +4,11 @@ package com.macrophage.barspeed.dsp
  * Whether a set has a velocity-loss figure at all, and when it does not, which
  * of three different absences it is in.
  *
- * `velocityLoss_pct` is best rep to LAST rep. The reference is
- * `reps.maxOf { meanConVelMps }`, taken over a list that CONTAINS the last rep,
- * so `best - last` can never be negative and the quotient can reach exactly 0.0
- * only when the last rep TIES the maximum. That makes a published 0.0 a
+ * `velocityLoss_pct` is best rep to LAST rep. The reference is the maximum
+ * `meanConVelMps` over the reps `AccelArtefact.isPeakEligible` admits (#306),
+ * and the last rep is required to be one of them, so the list the maximum is
+ * taken over CONTAINS the last rep, `best - last` can never be negative and the
+ * quotient can reach exactly 0.0 only when the last rep TIES the maximum. That makes a published 0.0 a
  * statement about the ORDER of the rep list rather than a measurement of
  * fatigue, and it is the reason this type exists: a bare `Double?` cannot tell
  * "the lifter held velocity" from "the last thing resolved was the fastest
@@ -82,7 +83,14 @@ sealed interface VelocityLoss {
          */
         fun of(reps: List<RepAnalysis>): VelocityLoss {
             if (reps.size < 2) return NotEnoughReps
-            val best = reps.maxOf { it.meanConVelMps }
+            // The pair must be one the analysis can stand behind (#306): a
+            // reference taken on a rep whose velocity integral nothing bounds,
+            // or on one a floor contact or an impossible sample reached, is a
+            // statement about the integrator. field-44 set 3 published 84.9 %
+            // off a reference rep carrying ten samples above the bound.
+            val eligible = AccelArtefact.peakEligible(reps)
+            if (eligible.size < 2 || !AccelArtefact.isPeakEligible(reps.last())) return NoEligiblePair
+            val best = eligible.maxOf { it.meanConVelMps }
             if (best <= 0) return NoReference
             val last = reps.last().meanConVelMps
             // `>=` against the MAXIMUM, not "is the maximum at the last index".
@@ -91,7 +99,8 @@ sealed interface VelocityLoss {
             // case this branch exists for.
             if (last >= best) return TerminalRepIsFastest
             // No coerceAtLeast, and none is reachable: `best` is a maximum over
-            // a list containing `last`, so best - last is never negative, and
+            // `eligible`, which contains `last` because the guard above
+            // required it, so best - last is never negative, and
             // the branch above has already taken the equality case. What
             // remains is strictly positive.
             return Measured(round1((best - last) / best * 100.0))

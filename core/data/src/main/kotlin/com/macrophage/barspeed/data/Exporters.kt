@@ -540,6 +540,11 @@ class SessionExporter(
                         // needs the sample stream, which this class does not
                         // inflate.
                         artefactSamples = it.artefactSamples,
+                        // The same count over the guard band before the span
+                        // (#306, schema 1.22), read off the stored analysis on
+                        // the same terms. Null on every rep stored before the
+                        // band existed, and published as absence.
+                        guardArtefactSamples = it.guardArtefactSamples,
                     )
                 }
             } else {

@@ -61,11 +61,12 @@ data class RepAnalysis(
      * the difference from anything else it holds, and a defaulted 0 would read
      * as a clean window on every set ever recorded.
      *
-     * A POSITIVE COUNT DISQUALIFIES THIS REP FROM THE SET'S PEAK FIGURES and
-     * changes nothing else about it. [peakConVelMps] and [peakPowerW] are still
-     * what this rep's window measured; [AccelArtefact.peakEligible] is what
-     * keeps them out of the set's published peaks, and this count is what tells
-     * a reader of the per-rep row why.
+     * A POSITIVE COUNT DISQUALIFIES THIS REP FROM THE SET'S PEAK FIGURES and,
+     * from #306, from the pair `velocityLoss_pct` is taken over; it changes
+     * nothing about the rep's own row. [peakConVelMps] and [peakPowerW] are
+     * still what this rep's window measured; [AccelArtefact.isPeakEligible] is
+     * what keeps them out of the set's published figures, and this count is
+     * what tells a reader of the per-rep row why.
      */
     val artefactSamples: Int? = null,
     /**
@@ -82,8 +83,13 @@ data class RepAnalysis(
      * and carries 0 artefact samples. The band may reach into the previous rep's span, so one
      * sample can be counted here and in that rep's [artefactSamples].
      *
+     * A positive count disqualifies this rep from the set's peak figures and
+     * the `velocityLoss_pct` pair exactly as [artefactSamples] does, through
+     * [AccelArtefact.isPeakEligible], and changes nothing about its own row.
+     *
      * Null and 0 are different facts, on [artefactSamples]'s doctrine: null
-     * means the rep was analysed before the band existed.
+     * means the rep was analysed before the band existed, and a null rep is
+     * KEPT.
      */
     val guardArtefactSamples: Int? = null,
     /**

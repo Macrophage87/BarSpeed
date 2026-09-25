@@ -3144,7 +3144,8 @@ data class SetExport(
      *
      * AND THIS KEY IS PUBLISHED ON EVERY SET THE RULE CAN PLACE A WORD ON,
      * including sets carrying no [velocityLossPct] at all -- one too short
-     * for a best-to-last figure, one whose last resolved rep was its fastest.
+     * for a best-to-last figure, one whose last resolved rep was its fastest,
+     * one with no eligible pair (1.22, #306).
      * It names which question the figure WOULD answer, so it stands whether
      * or not the figure came out; that is the opposite of [rpeScale], which
      * is withheld on a set with no [rpe] because a word with no number beside
