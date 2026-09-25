@@ -5,9 +5,9 @@ package com.macrophage.barspeed.model
  * that is short of the rest the plan prescribed (#157).
  *
  * NOTHING CALLS THIS YET. It is the pure half of the measured rest the #157
- * design proposes to publish as `restMeasured_s`; the lane that stores the
- * rest-start instant on the set row and exports the figure wires it. Today
- * the set row does not store the instant its rest ran from.
+ * design proposes to publish as `restMeasured_s`. From database v20 the set
+ * row stores the instant its rest ran from (`restStartedAtMs`); nothing
+ * exports that instant or this figure yet.
  *
  * ## What the measurement is
  *
