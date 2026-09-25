@@ -35,8 +35,13 @@ class StartCueVoiceContractTest {
         return CadenceVoice.beatCall(firstBeat, announcement = null)!!.utterance
     }
 
-    private fun shownWord(def: ExerciseDef): String =
-        StartCuePolicy.of(def.startsWith, def.concentricUp, def.horizontal, GeometrySource.DECLARED).word
+    private fun shownWord(def: ExerciseDef): String = StartCuePolicy.of(
+        def.startsWith,
+        def.concentricUp,
+        def.horizontal,
+        GeometrySource.DECLARED,
+        explosiveUpStroke = false,
+    ).word
 
     private fun assertAgrees(def: ExerciseDef, tempo: String) {
         val spoken = spokenFirstWord(def, tempo)

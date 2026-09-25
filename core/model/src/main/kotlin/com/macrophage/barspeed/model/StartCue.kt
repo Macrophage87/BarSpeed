@@ -58,7 +58,12 @@ object StartCuePolicy {
     /** First movement of a vertical lift that begins at the bottom. */
     const val UP = "UP"
 
-    /** First movement of a horizontal lift that opens on its working stroke. */
+    /**
+     * First movement of a horizontal lift that opens on its working stroke, and
+     * of a vertical lift that opens on a drive its tempo prescribes as `X`
+     * (#264) -- the word the guide speaks for an explosive drive on either
+     * plane.
+     */
     const val DRIVE = "DRIVE"
 
     /** First movement of a horizontal lift that opens on its lowering stroke. */
@@ -95,24 +100,43 @@ object StartCuePolicy {
      * @param horizontal the LIFTER's plane -- [ExerciseDef.horizontal], not the
      *   plane the sensor happens to travel in. A stack-mounted sensor on a
      *   seated row moves vertically and the lifter still does not.
+     * @param explosiveUpStroke the set's tempo writes `X` in digit 3 --
+     *   [Tempo.isExplosiveUpStroke] of the tempo the guide is about to play.
      */
-    fun of(startsWith: StartPhase, concentricUp: Boolean, horizontal: Boolean, source: GeometrySource): StartCue {
-        val word = firstMovementWord(startsWith, concentricUp, horizontal)
+    fun of(
+        startsWith: StartPhase,
+        concentricUp: Boolean,
+        horizontal: Boolean,
+        source: GeometrySource,
+        explosiveUpStroke: Boolean = false,
+    ): StartCue {
+        val word = firstMovementWord(startsWith, concentricUp, horizontal, explosiveUpStroke)
         return StartCue(phrase = phrase(word, horizontal), word = word, marker = marker(source))
     }
 
     /**
      * The word the first stroke of every rep is called by.
      *
-     * The same three inputs `TempoSchedule.of` resolves its first stroke's
-     * label from, in the same order of questions: horizontal work is called by
-     * PHASE because there is no up or down on a seated row, and vertical work
-     * by DIRECTION. Stated twice in two modules, so it is pinned equal in
-     * `:core:dsp` rather than trusted.
+     * The same inputs `TempoSchedule.of` resolves its first stroke's label
+     * from, in the same order of questions: horizontal work is called by PHASE
+     * because there is no up or down on a seated row, and vertical work by
+     * DIRECTION -- except a vertical DRIVE the tempo prescribes as `X`, which
+     * is called [DRIVE] (#264). `X` is legal in digit 3 only, the up stroke, so
+     * that stroke opens the rep only when the lift starts at the bottom, and it
+     * is the drive only when the drive moves up. A vertical lift that starts at
+     * the bottom with its drive DOWN opens on the return, and an `X` there is a
+     * fast return, not a drive, so it keeps [UP]. Stated twice in two modules,
+     * so it is pinned equal in `:core:dsp` rather than trusted.
      */
-    fun firstMovementWord(startsWith: StartPhase, concentricUp: Boolean, horizontal: Boolean): String = when {
+    fun firstMovementWord(
+        startsWith: StartPhase,
+        concentricUp: Boolean,
+        horizontal: Boolean,
+        explosiveUpStroke: Boolean,
+    ): String = when {
         horizontal -> if (startsWith == StartPhase.CONCENTRIC) DRIVE else RETURN
         ExerciseDef.startsAtTop(startsWith, concentricUp) -> DOWN
+        explosiveUpStroke && concentricUp -> DRIVE
         else -> UP
     }
 
@@ -130,11 +154,14 @@ object StartCuePolicy {
      * RETURN opens CONTRACTED, the opposite, because its drive ended
      * contracted. One pair of words cannot be right for both. The word is what
      * the app knows; the position is not.
+     *
+     * A vertical lift that does not start at the top starts at the bottom,
+     * whether its first word is [UP] or an explosive [DRIVE].
      */
     private fun phrase(word: String, horizontal: Boolean): String = when {
         horizontal -> "First movement $word"
         word == DOWN -> "Start at the TOP, first movement $DOWN"
-        else -> "Start at the BOTTOM, first movement $UP"
+        else -> "Start at the BOTTOM, first movement $word"
     }
 
     private fun marker(source: GeometrySource): String? = when (source) {
