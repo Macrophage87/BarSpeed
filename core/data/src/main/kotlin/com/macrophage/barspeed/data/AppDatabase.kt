@@ -38,11 +38,11 @@ import java.io.File
  * file and its sidecars are moved to `files/rescued/`
  * ([DatabaseRescue.RESCUE_DIR]), Room then finds no file and creates an
  * empty one, so History opens empty and Home offers the rescued-database
- * card. v0.1.54 is the newest tag at this commit and
- * `git show v0.1.54:core/data/src/main/kotlin/com/macrophage/barspeed/data/AppDatabase.kt`
- * reads `DATABASE_VERSION = 19`; this hop is held off `main` until v0.1.55 is
- * cut, so v0.1.55 is on the far side of the boundary only if it is cut at 19
- * -- re-read it at that tag rather than trusting this sentence. All of that
+ * card. v0.1.55 is the newest tag at this commit and
+ * `git show v0.1.55:core/data/src/main/kotlin/com/macrophage/barspeed/data/AppDatabase.kt`
+ * reads `DATABASE_VERSION = 19`, so installing v0.1.55 over this build enters
+ * the rescue. The sentence here named v0.1.54 as the newest tag and left
+ * v0.1.55 conditional; v0.1.55 is cut, so that is deleted. All of that
  * is what the code does, read in source; no device has run this hop or its
  * rollback, and the two-way emulator exercise at the cut is where it is seen.
  *
@@ -85,15 +85,17 @@ import java.io.File
  * exists, and every value it ever held went stale before the next round read
  * it.
  *
- * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read at THIS commit. v0.1.54
- * carries 19, so 18 -> 19 HAS shipped and only 19 -> 20 has not. A stock
- * v0.1.54 install runs 19 -> 20 alone; one still on v0.1.53 runs
+ * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read at THIS commit. v0.1.55
+ * and v0.1.54 both carry 19, so 18 -> 19 HAS shipped and only 19 -> 20 has
+ * not. A stock v0.1.55 or v0.1.54 install runs 19 -> 20 alone; one still on
+ * v0.1.53 runs
  * 18 -> 19 -> 20 in one open, and one on v0.1.52 runs 17 -> 18 -> 19 -> 20,
  * which is why the emulator exercise installs an older release first and
  * upgrades over it rather than starting empty. Two earlier readings stood
  * here -- v0.1.52 as the newest tag with only 17 -> 18 unshipped, and v0.1.53
  * with only 18 -> 19 unshipped -- and both are false now; they are deleted
- * rather than kept beside this one.
+ * rather than kept beside this one, as is a third that named v0.1.54 as
+ * the newest tag before v0.1.55 was cut.
  */
 const val DATABASE_VERSION = 20
 
@@ -764,16 +766,16 @@ abstract class AppDatabase : RoomDatabase() {
          *
          * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 20
          * here, so once a phone has opened this build, installing any build
-         * carrying 19 or less -- v0.1.54 and older, and v0.1.55 if it is cut
-         * at 19 -- enters the rescue: the database moves to `files/rescued/`,
+         * carrying 19 or less -- installing v0.1.55 or older -- enters the
+         * rescue: the database moves to `files/rescued/`,
          * Room creates an empty one, and History opens empty. The first
          * version at which a rollback could do that to a stock install was
          * 10; the boundary this build sets, and what it exposes on screen, are
          * stated at the constant with issue #118. An ordinary forward install
          * runs the migration chain and never comes near it. The paragraph that
          * stood here said [DATABASE_VERSION] was 18 and named v0.1.52 as the
-         * newest tag; at this branch's base the constant read 19 and v0.1.54
-         * was the newest tag, so both halves were false and are deleted.
+         * newest tag; both halves were false and are deleted. At this commit
+         * v0.1.55 is the newest tag and reads 19.
          *
          * The EXISTING migrations are untouched, and a missing UPGRADE
          * migration still throws exactly as before.
