@@ -81,12 +81,14 @@ class CycleRepCounterTest {
     /**
      * A drive that HAS armed -- a short hard brake -- and then a contact
      * 0.9 s after the drive ended: the pending rep is rejected, so the stillness
-     * that comes after the minimum cycle has nothing left to close.
+     * that completes 1.6 s after the drive ended, past the minimum cycle, has
+     * nothing left to close. Were the rep still pending, that stillness would
+     * call it: its descent is met.
      */
     @Test
     fun `a contact before the minimum cycle rejects a pending rep`() {
         val calls = Stream().hold(1.0, 0.0).hold(1.3, 1.0).hold(1.8, -2.0).hold(2.2, 0.0).contact()
-            .hold(4.5, 0.0, quiet = true).calls()
+            .hold(2.6, 0.0).hold(4.5, 0.0, quiet = true).calls()
         assertEquals(emptyList(), calls, "the pending rep is rejected at the contact")
     }
 
