@@ -25,8 +25,13 @@ import kotlin.test.assertEquals
  * literally the first thing the lifter hears after the countdown.
  *
  * Ten tempo/lift pairs: the four movement cases crossed with tempos whose
- * digits are read positionally and by phase, plus an explosive `X` upstroke,
- * whose stroke seconds are null and whose label is unaffected.
+ * digits are read positionally and by phase, plus an explosive `X` upstroke.
+ *
+ * The `X` rows used to be described as rows "whose label is unaffected", and
+ * #264 makes that false, so it is deleted: an X DRIVE is called `Drive` on
+ * vertical work too, so a deadlift or an overhead press at `20X0` opens on
+ * `Drive`, and the countdown has to be told the tempo to say the same word.
+ * [shownWord] therefore takes the tempo.
  */
 class StartCueVoiceContractTest {
     private fun spokenFirstWord(def: ExerciseDef, tempo: String): String {
@@ -35,17 +40,17 @@ class StartCueVoiceContractTest {
         return CadenceVoice.beatCall(firstBeat, announcement = null)!!.utterance
     }
 
-    private fun shownWord(def: ExerciseDef): String = StartCuePolicy.of(
+    private fun shownWord(def: ExerciseDef, tempo: String): String = StartCuePolicy.of(
         def.startsWith,
         def.concentricUp,
         def.horizontal,
         GeometrySource.DECLARED,
-        explosiveUpStroke = false,
+        explosiveUpStroke = Tempo.parse(tempo).isExplosiveUpStroke,
     ).word
 
     private fun assertAgrees(def: ExerciseDef, tempo: String) {
         val spoken = spokenFirstWord(def, tempo)
-        val shown = shownWord(def)
+        val shown = shownWord(def, tempo)
         assertEquals(
             shown,
             spoken.uppercase(),
@@ -86,6 +91,18 @@ class StartCueVoiceContractTest {
         assertAgrees(def("chest_press", StartPhase.ECCENTRIC, horizontal = true), "2011")
     }
 
+    /**
+     * Field-39 set 6's own geometry and tempo: a seated overhead press,
+     * concentric-first, drive up, `20X0`. The rep opens on the X drive, so the
+     * voice opens on `Drive` and the countdown has to show `DRIVE` (#264).
+     */
+    @Test
+    fun `an overhead press at 20X0 opens on Drive, and the countdown shows it`() {
+        val ohp = def("seated_overhead_press", StartPhase.CONCENTRIC)
+        assertEquals("Drive", spokenFirstWord(ohp, "20X0"), "the voice's first word")
+        assertAgrees(ohp, "20X0")
+    }
+
     @Test
     fun `the agreement holds across every tempo family`() {
         val lifts =
@@ -119,6 +136,6 @@ class StartCueVoiceContractTest {
     fun `the shown word is the schedule's own first stroke label`() {
         val lift = def("pulldown", StartPhase.CONCENTRIC, concentricUp = false)
         val schedule = TempoSchedule.of(Tempo.parse("1030"), lift.liftDirection())
-        assertEquals(schedule.first.label, shownWord(lift))
+        assertEquals(schedule.first.label, shownWord(lift, "1030"))
     }
 }

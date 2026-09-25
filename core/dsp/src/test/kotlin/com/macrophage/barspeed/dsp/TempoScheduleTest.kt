@@ -160,4 +160,27 @@ class TempoScheduleTest {
         assertEquals(null, s.concentricS)
         assertEquals(3.0, s.eccentricS)
     }
+
+    /**
+     * The word the guide gives an X stroke (#264). Until now it was the
+     * stroke's direction word, `UP`, so field-39's `20X0` sets were called
+     * exactly as its `2010` set was. An X DRIVE is called `DRIVE` on vertical
+     * work too -- the word the prep countdown and the horizontal guide already
+     * use for the working stroke -- and an X that is the RETURN keeps its
+     * direction word, because a fast return is not a drive.
+     */
+    @Test
+    fun `an explosive drive is called DRIVE on vertical work, and an explosive return is not`() {
+        val bench = TempoSchedule.of(Tempo.parse("30X0"), benchPress)
+        assertEquals("DOWN", bench.first.label, "bench: the lowering keeps its word")
+        assertEquals("DRIVE", bench.second.label, "bench: the X drive, second in the rep")
+
+        val ohp = TempoSchedule.of(Tempo.parse("20X0"), LiftDirection(startsWith = StartPhase.CONCENTRIC))
+        assertEquals("DRIVE", ohp.first.label, "field-39 set 6's geometry: the X drive opens the rep")
+        assertEquals("DOWN", ohp.second.label)
+
+        val pulldown = TempoSchedule.of(Tempo.parse("30X0"), legCurl)
+        assertEquals("DOWN", pulldown.first.label, "drive-down: the drive is digit 1, and not X")
+        assertEquals("UP", pulldown.second.label, "drive-down: the X is the return, which keeps UP")
+    }
 }

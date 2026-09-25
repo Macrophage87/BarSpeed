@@ -1982,6 +1982,50 @@ data class SessionExport(
          * exporter publishes the stored latch and invents none;
          * `SessionRepositoryLiveTrustTest` and `PublishedCountTrustedTest` pin
          * the storage and the tracker's null.
+         *
+         * 1.22 TAKES A FIFTH ENTRY (#264, the explosive drive's word), and it
+         * CHANGES NO KEY: a guided cue track on VERTICAL work may now carry
+         * `Drive`. A FURTHER ENTRY under the unreleased 1.22, on the tag
+         * reading the third entry states: the latest tag is v0.1.54 and it
+         * ships 1.21.
+         *
+         * THE CHANGE. The guide speaks a drive the tempo writes as `X` -- digit
+         * 3, on a lift whose drive moves up -- as `Drive` where it said `Up`,
+         * because until now `20X0` and `2010` were the same audio row for row
+         * (field-39 sets 2, 6 and 10). The stroke keeps its one-second beat and
+         * carries no count, and no row moves to another second. Field-39 set 6,
+         * a `20X0` seated overhead press, published `Up` at its first cadence
+         * second; the same plan now says `Drive` there and is otherwise the
+         * same row for row.
+         *
+         * WHERE IT APPEARS depends on which stroke opens the rep. On a lift
+         * whose rep opens with that drive it is published ONCE per set, opening
+         * rep 1, because from rep 2 the rep number takes that stroke's word
+         * (1.20); on a lift whose rep opens with the lowering it is published
+         * on every rep. An `X` in digit 3 of a drive-DOWN lift is the return
+         * and keeps `Up`, and horizontal work already said `Drive` for every
+         * drive and is unchanged -- so on horizontal work `20X0` and `2010` are
+         * still the same audio.
+         *
+         * WHAT A READER DOES, IN BOTH DIRECTIONS. No key is added, removed or
+         * retyped and the schema accepts and rejects exactly the documents it
+         * did before this entry, so an older and a newer reader read every
+         * value identically; the asymmetry the 1.22 mint states is unchanged.
+         * What moves is what one cue string may mean: `Drive` was published on
+         * horizontal work only and is not now, so a reader inferring the plane
+         * from the stroke words must read `geometry.plane` instead, and a
+         * reader counting `Up` rows finds none on such a set where it found one
+         * per rep or one per set. NOT RETROACTIVE: a cue row is what the app
+         * said when the set was recorded, so every set already on disk keeps
+         * its `Up`. `DATABASE_VERSION` does NOT move and the plan schema is
+         * untouched.
+         *
+         * PINNED. `SchemaExplosiveDriveCueContractTest` asserts this entry's
+         * marker in the published log and the `voiceCues` sentence that says
+         * `Drive` is not evidence of horizontal work; it cannot see this KDoc.
+         * `TempoScheduleTest`, `ExplosiveDriveCueTest` and
+         * `TwoSecondStrokeCountTest` in `:core:dsp` pin the words the guide
+         * says.
          */
         const val SCHEMA_VERSION = "1.22"
 

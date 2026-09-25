@@ -377,9 +377,16 @@ class TwoSecondStrokeCountTest {
         )
         // And now, on all three. Written out rather than derived, so a rule and
         // these lists cannot agree by sharing an expression.
+        //
+        // #264 moves ONE row on each 20X0 set, second 0: it read `0 to "Up"` and
+        // reads `0 to "Drive"`, the word the guide now gives an explosive drive.
+        // One row and not six because on this concentric-first geometry the X
+        // drive IS the rep's first stroke, and from rep 2 the rep number takes
+        // that stroke's word (#293) -- so rep 1's opening is the only place the
+        // X word is heard at all. Every other row is unchanged.
         assertEquals(
             listOf(
-                0 to "Up", 1 to "Down", 2 to "1",
+                0 to "Drive", 1 to "Down", 2 to "1",
                 3 to "Rep 2", 4 to "Down", 5 to "1",
                 6 to "Rep 3", 7 to "Down", 8 to "1",
                 9 to "Rep 4", 10 to "Down", 11 to "1",
@@ -405,7 +412,7 @@ class TwoSecondStrokeCountTest {
         )
         assertEquals(
             listOf(
-                0 to "Up", 1 to "Down", 2 to "1",
+                0 to "Drive", 1 to "Down", 2 to "1",
                 3 to "Rep 2", 4 to "Down", 5 to "1",
                 6 to "Rep 3", 7 to "Down", 8 to "1",
                 9 to "Rep 4", 10 to "Down", 11 to "1",
@@ -415,6 +422,22 @@ class TwoSecondStrokeCountTest {
             ),
             CadenceVoice.script(plan(track(s39set10)), 6).map { it.atSecond to it.utterance },
             "field-39 set 10, 20X0 on-stack and inverted: the same rows set 6 gets off-stack",
+        )
+        // The complaint itself: set 2 (2010) and set 6 (20X0) delivered the same
+        // audio, row for row. Set 2's own rows are pinned unchanged in `what a
+        // 2011 rep sounds like now, second by second`; here they are pinned
+        // DIFFERENT from set 6's, by exactly the X word and nothing else.
+        val paced = CadenceVoice.script(plan(track(s39set02)), 6).map { it.atSecond to it.utterance }
+        val explosive = CadenceVoice.script(plan(track(s39set06)), 6).map { it.atSecond to it.utterance }
+        assertEquals(
+            listOf(0 to "Up"),
+            paced - explosive.toSet(),
+            "field-39 set 2 says `Up` where set 6 does not, and nothing else set 6 lacks",
+        )
+        assertEquals(
+            listOf(0 to "Drive"),
+            explosive - paced.toSet(),
+            "field-39 set 6 says `Drive` where set 2 says `Up`, and nothing else set 2 lacks",
         )
     }
 

@@ -23,6 +23,13 @@ import kotlin.test.assertEquals
  * `startsWith`'s job and is deliberately not the wheels': the wheels are the
  * NOTATION, digit 1 first, and every case below is checked against both start
  * phases for exactly that reason.
+ *
+ * One value the wheels do NOT follow the guide on, and it is deliberate: an `X`
+ * on digit 3 of a drive-up vertical lift. The guide calls that stroke `DRIVE`
+ * (#264) and the wheel stays `UP`, because a wheel names a DIGIT position the
+ * lifter scrolls through `X`, `1`, `2` and on, and a caption that changed with
+ * the value under it would move while the lifter was choosing. `1234` has no
+ * `X`, so nothing below reaches that case.
  */
 class TempoLabelContractTest {
     private fun def(concentricUp: Boolean, horizontal: Boolean, startsWith: StartPhase) = ExerciseDef(

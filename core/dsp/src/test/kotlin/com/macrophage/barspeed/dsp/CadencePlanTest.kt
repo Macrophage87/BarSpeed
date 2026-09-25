@@ -534,12 +534,18 @@ class CadencePlanTest {
      * still a one-second beat -- is the shipped behaviour and this commit pins
      * it rather than changing it. No red was shown for these two lines because
      * nothing moved: they are pins on behaviour that already held.
+     *
+     * #264 moves the X beat's LABEL and nothing else: it was `"UP" to 1` and is
+     * `"DRIVE" to 1`, the word the guide now speaks for an explosive drive.
+     * The second stays, which the 1,380-pair no-beat-moved pin above holds
+     * independently, because its oracle reads the label off the same
+     * schedule.
      */
     @Test
     fun `an explosive stroke is played as one second`() {
         val s = schedule("30X0", benchPress)
         assertEquals(null, s.second.seconds, "X has no prescribed seconds")
-        assertEquals(listOf("DOWN" to 3, "UP" to 1), shape(CadencePlan.of(s)))
+        assertEquals(listOf("DOWN" to 3, "DRIVE" to 1), shape(CadencePlan.of(s)))
         assertEquals(3.0, s.prescribedCycleS, "the PRESCRIPTION counts no seconds for X")
         assertEquals(4, CadencePlan.of(s).deliveredCycleS, "the CADENCE plays the X stroke for a second")
     }

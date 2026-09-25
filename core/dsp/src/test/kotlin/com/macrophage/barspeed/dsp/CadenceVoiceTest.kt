@@ -184,20 +184,23 @@ class CadenceVoiceTest {
     /**
      * An X stroke is called as a one-second beat, word then no count (#250).
      *
-     * CHARACTERIZATION, not a change. #250's second comment asks for this
-     * behaviour and states that the guide does not have it -- reading
-     * `TempoSchedule.prescribedCycleS`'s KDoc, which is about the
-     * PRESCRIPTION, as a statement about the metronome. The claim is wrong and
-     * this pin is what says so: `30X0` and `3010` produce the SAME script,
-     * second for second, because `CadencePlan.strokeSeconds` has always
-     * substituted a second for a null stroke. No red preceded these
-     * assertions; nothing moved for them to red against.
+     * CHARACTERIZATION when it was written, against #250's second comment,
+     * which read `TempoSchedule.prescribedCycleS`'s KDoc -- about the
+     * PRESCRIPTION -- as a statement about the metronome. The one-second beat
+     * is still what this pins: `CadencePlan.strokeSeconds` substitutes a second
+     * for a null stroke, so `30X0` and `3010` land every call on the same
+     * second.
+     *
+     * A sentence here said the two produce the SAME script, and #264 makes it
+     * false, so it is deleted: the X drive is called `Drive` where `3010` says
+     * `Up`, on every rep, because on this eccentric-first press the X is the
+     * rep's second stroke and the rep number replaces only the first. The rows
+     * this list held before #264 were `3 to "Up"` and `7 to "Up"`.
      *
      * The X stroke's word is spoken and no count follows it, which is not a
      * rule about X at all -- a one-second stroke of any digit is below
      * [GuidedCadence.COUNT_ALOUD_FROM_S] and the last second of a stroke is
-     * the next beat's word. `3010`'s own `Up` behaves identically, which is
-     * exactly why the two scripts coincide.
+     * the next beat's word.
      *
      * What this does NOT pin, because it is untouched: `Tempo.upS` stays null,
      * so `isExplosiveUpStroke` and the compliance scorer still see an X phase
@@ -211,19 +214,26 @@ class CadenceVoiceTest {
                 0 to "Down",
                 1 to "1",
                 2 to "2",
-                3 to "Up",
+                3 to "Drive",
                 4 to "Last rep",
                 5 to "2",
                 6 to "3",
-                7 to "Up",
+                7 to "Drive",
                 8 to "Done",
             ),
             script.map { it.atSecond to it.utterance },
         )
         assertEquals(
-            CadenceVoice.script(plan("3010"), plannedReps = 2).map { it.atSecond to it.utterance },
-            script.map { it.atSecond to it.utterance },
-            "the owner's rule: 30X0 is four seconds of beats like 3010",
+            CadenceVoice.script(plan("3010"), plannedReps = 2).map { it.atSecond },
+            script.map { it.atSecond },
+            "the owner's rule: 30X0 is four seconds of beats like 3010, every call on the same second",
+        )
+        assertEquals(
+            listOf(3 to "Up", 7 to "Up"),
+            CadenceVoice.script(plan("3010"), plannedReps = 2)
+                .map { it.atSecond to it.utterance }
+                .filterNot { it in script.map { call -> call.atSecond to call.utterance } },
+            "and the only rows 3010 says that 30X0 does not are the one-second drive's own word",
         )
         assertEquals(4, plan("30X0").deliveredCycleS, "one rep of 30X0 is four seconds of cadence")
         assertNull(

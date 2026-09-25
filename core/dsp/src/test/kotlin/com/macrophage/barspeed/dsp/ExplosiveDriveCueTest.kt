@@ -32,6 +32,21 @@ import kotlin.test.assertEquals
  *    audio. That is pinned as it is, not as anyone wants it: the word the
  *    round chose cannot distinguish them on that plane, and this pin is what
  *    reds if a later change does.
+ *
+ * ## The change: an X DRIVE is called `Drive`
+ *
+ * The word the prep countdown and the horizontal guide already use for the
+ * working stroke, so the lifter hears one vocabulary. It carries no count, as
+ * the one-second beat never did. Where the lifter HEARS it depends on which
+ * stroke opens the rep, because the rep number replaces the rep's FIRST stroke
+ * word on every rep after the first (#293) and that rule is not touched:
+ *
+ * - eccentric-first (a bench press): the X drive is the SECOND stroke, so
+ *   `Drive` is said on every rep and the number takes the lowering's `Down`;
+ * - concentric-first (field-39's seated press and pulldown): the X drive IS
+ *   the first stroke, so `Drive` is said once, opening rep 1, and from rep 2
+ *   the number takes its second. On that geometry 20X0 and 2010 now differ by
+ *   that one row per set and no other.
  */
 class ExplosiveDriveCueTest {
     /** field-39 sets 2 and 6: seated overhead press, concentric-first, drive up. */
@@ -70,6 +85,46 @@ class ExplosiveDriveCueTest {
                 "$lift: the rep completes on the same beat",
             )
         }
+    }
+
+    /**
+     * What a lifter hears on a 20X0 bench press, second by second. Before #264
+     * the six `Drive` rows below read `Up` -- seconds 2, 5, 8, 11, 14 and 17 --
+     * and the list was otherwise the same, which is the `2010` bench press's.
+     * `Last rep` still opens the final rep, in place of its `Down`.
+     */
+    @Test
+    fun `a 20X0 bench press says Drive on the X stroke of every rep`() {
+        assertEquals(
+            listOf(
+                0 to "Down", 1 to "1", 2 to "Drive",
+                3 to "Rep 2", 4 to "2", 5 to "Drive",
+                6 to "Rep 3", 7 to "2", 8 to "Drive",
+                9 to "Rep 4", 10 to "2", 11 to "Drive",
+                12 to "Rep 5", 13 to "2", 14 to "Drive",
+                15 to "Last rep", 16 to "2", 17 to "Drive",
+                18 to "Done",
+            ),
+            script("20X0", benchPress, 6),
+        )
+    }
+
+    /**
+     * Field-39 set 6's geometry. `Drive` is heard once, on rep 1's opening
+     * second, and never again: from rep 2 the rep number takes that second
+     * (#293), and `Last rep` takes it on the sixth. Before #264 the one row
+     * read `Up`.
+     */
+    @Test
+    fun `where the X drive opens the rep, Drive opens rep 1 and the rep number takes it after`() {
+        val rows = script("20X0", seatedOhp, 6)
+        assertEquals(listOf(0 to "Drive"), rows.filter { it.second == "Drive" }, "Drive is said once per set here")
+        assertEquals(
+            listOf(3 to "Rep 2", 6 to "Rep 3", 9 to "Rep 4", 12 to "Rep 5", 15 to "Last rep"),
+            rows.filter { it.first in 3..15 && it.first % 3 == 0 },
+            "each later rep's opening second carries its number, as on every plan with a two-second stroke",
+        )
+        assertEquals(listOf<Pair<Int, String>>(), rows.filter { it.second == "Up" }, "and Up is said nowhere")
     }
 
     @Test
