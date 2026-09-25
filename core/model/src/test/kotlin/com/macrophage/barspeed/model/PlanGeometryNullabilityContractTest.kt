@@ -60,20 +60,10 @@ class PlanGeometryNullabilityContractTest {
         }
     }
 
-    /**
-     * The version the app writes, pinned beside the mint that moved it.
-     *
-     * `SchemaProgressionContractTest` held this assertion while 1.11 was the
-     * newest, and the copy naming 1.11 is deleted rather than carried forward.
-     * It lives with whichever mint is current so that the next one has one
-     * place to move it from, and so that a bump left half-done -- the schema
-     * enum widened, `PlanFile.SCHEMA_VERSION` left behind -- reds here rather
-     * than shipping a prompt asking for a version the app does not write.
-     */
-    @Test
-    fun `the app writes plan schema 1_12`() {
-        assertEquals("1.12", PlanFile.SCHEMA_VERSION)
-    }
+    // `the app writes plan schema 1_12` lived here and is DELETED, not
+    // reworded: the app writes 1.13 from the #317 mint, so an assertion that
+    // it writes 1.12 is simply false. The version the app currently writes is
+    // pinned in PlanStackInversionContractTest, beside the mint that moved it.
 
     /**
      * A plan written against the previous contract imports unchanged.
