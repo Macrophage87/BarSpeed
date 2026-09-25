@@ -92,6 +92,7 @@ import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLoadPolicy
 import com.macrophage.barspeed.model.SetRepsPolicy
+import com.macrophage.barspeed.model.SetShortfallPolicy
 import com.macrophage.barspeed.model.SetVoicePolicy
 import com.macrophage.barspeed.model.SetWriteState
 import com.macrophage.barspeed.model.SideChoicePolicy
@@ -5250,33 +5251,35 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // own rep count — never against a possibly-miscounted sensor total.
         // Since #286 a straight-reps set with a sensor is no longer in the
         // manual class, so nothing auto-fails it either: p.manualReps is null
-        // on such a set unless the lifter corrected the count, the branch below
-        // falls through to false, and a short set is recorded as failed only if
+        // on such a set unless the lifter corrected the count, the rule
+        // declines to judge it, and a short set is recorded as failed only if
         // the lifter taps the failed tile. Auto-failing on a live count the
         // detector may have undercounted would write a failure the lifter never
         // made. setTargetMet's KDoc states the same refusal on the control side
         // and the two still match; what changed is which sets are in the manual
         // class, not the rule.
+        //
+        // The rule is SetShortfallPolicy.atWrite in :core:model (#157), where
+        // its branches are pinned. What stays here, compile- and lint-gated
+        // only, is which figures it is handed: the WORKING targets
+        // (targetReps, targetDurationS), never the frozen plan (plannedReps,
+        // plannedDurationS). A lifter who states 6 and does 6 has not stopped
+        // early; judging them against the plan's 8 would record a failed set
+        // for a change they made deliberately, and after #137 that reaches the
+        // RPE record. The row does not store the working target it was judged
+        // against: it stores plannedReps and the actual count, so a set met at
+        // a lowered target reads "planned 10, did 6, not failed". Its seconds
+        // rule is TimedSetEndPolicy.fellShort, the function setTargetMet's
+        // timed branch asks, so the screen and the record draw one boundary
+        // (#168).
         val stoppedEarly =
-            when {
-                // #168: the same function the in-set control gate asks, so the
-                // screen and the record cannot draw the boundary in different
-                // places. The `?: 0` this replaces was unreachable -- a timed
-                // set's actualDurationS is an Int by construction a few lines
-                // up -- so nothing observable changes here; fellShort simply
-                // declines to grade an absent figure rather than reading it as
-                // a zero-second hold.
-                // Judged against the WORKING target, never the frozen
-                // prescription. A lifter who states 6 and does 6 has not
-                // stopped early; judging them against the plan's 8 would
-                // record a failed set for a change they made deliberately,
-                // and after #137 that reaches the RPE record. The deviation
-                // is still visible, because plannedReps is stored beside it.
-                p.isTimed && p.targetDurationS != null ->
-                    TimedSetEndPolicy.fellShort(p.actualDurationS, p.targetDurationS)
-                p.manualReps != null && p.targetReps != null -> p.manualReps < p.targetReps
-                else -> false
-            }
+            SetShortfallPolicy.atWrite(
+                timed = p.isTimed,
+                recordedS = p.actualDurationS,
+                workingDurationS = p.targetDurationS,
+                statedReps = p.manualReps,
+                workingReps = p.targetReps,
+            )
         // The lifter's tap is authoritative for effort, but a set that ended
         // short of its target is still a failed set — both facts are recorded.
         val written = ratings.onSetRecorded(p.targetReps, p.targetDurationS, stoppedEarly, p.rating)

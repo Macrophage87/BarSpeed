@@ -48,17 +48,22 @@ object SetCorrectionPolicy {
     /**
      * The derived shortfall after the draft's count is applied.
      *
-     * Seconds are judged by [TimedSetEndPolicy.fellShort], the function the
-     * set write asked; reps by the rule `SetRatingTracker` has always used,
-     * short of a planned count. A draft that moves neither leaves [standing]
-     * where it is, because nothing it says bears on the verdict.
+     * Seconds are judged by [SetShortfallPolicy.secondsShort] and reps by
+     * [SetShortfallPolicy.repsShort], the two rules the set write asks
+     * through [SetShortfallPolicy.atWrite]. A draft that moves neither leaves
+     * [standing] where it is, because nothing it says bears on the verdict.
+     *
+     * Despite their names, [plannedReps] and [plannedDurationS] receive the
+     * WORKING target: `SetRatingTracker` keeps the set write's `targetReps`
+     * and `targetDurationS` under those names, so a correction is judged
+     * against the figure the set ran to, as the write was.
      */
     fun shortfall(draft: CountAndRatingDraft, plannedReps: Int?, plannedDurationS: Int?, standing: Boolean): Boolean {
         val seconds = draft.seconds
         val reps = draft.reps
         return when {
-            seconds != null -> TimedSetEndPolicy.fellShort(seconds, plannedDurationS)
-            reps != null -> plannedReps != null && reps < plannedReps
+            seconds != null -> SetShortfallPolicy.secondsShort(seconds, plannedDurationS)
+            reps != null -> SetShortfallPolicy.repsShort(reps, plannedReps)
             else -> standing
         }
     }
