@@ -33,10 +33,15 @@ class SetCorrectionPolicyTest {
         assertEquals(CorrectedRatingRow(rpe = null, failed = true, failedByLifter = true), row)
     }
 
+    /**
+     * The rung withdraws the tap and the derived shortfall stands. Until #313
+     * the rung was stored beside that shortfall; the owner's rule -- no rpe
+     * on a failed set -- now clears it (`FailedSetRatingPolicy.storedRpe`).
+     */
     @Test
-    fun `a rung withdraws the tap and leaves the derived shortfall standing`() {
+    fun `a rung withdraws the tap and is not stored beside the derived shortfall`() {
         val row = SetCorrectionPolicy.row(draft(rpe = 8, tappedFailed = false), shortfall = true)
-        assertEquals(CorrectedRatingRow(rpe = 8, failed = true, failedByLifter = false), row)
+        assertEquals(CorrectedRatingRow(rpe = null, failed = true, failedByLifter = false), row)
     }
 
     @Test
