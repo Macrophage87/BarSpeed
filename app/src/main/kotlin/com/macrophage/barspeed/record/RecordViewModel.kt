@@ -1022,84 +1022,83 @@ internal fun RecordState.soleSilenceOver(sinceMs: Long, nowMs: Long): ArmedDeliv
  * `SetRatingTracker.onSetRecorded` says the row stores beside that verdict
  * (#313), not the rating [p] was frozen with.
  */
-private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, written: CorrectedRatingRow) =
-    CompletedSet(
-        exerciseId = p.exercise.id,
-        exerciseName = p.exercise.displayName,
-        loadKg = p.loadKg,
-        plannedLoadKg = p.plannedLoadKg,
-        bodyWeightKg = p.bodyWeightKg,
-        // WHICH QUESTION the lifter was shown, resolved from the FROZEN pair;
-        // the tiles were worded by a DIFFERENT askFor call in RecordScreen,
-        // off state.currentIsTimed/state.currentSlot -- they agree only
-        // because endSet builds this pair from that same state in the same
-        // action (#244).
-        //
-        // Not the raw declaration: the stored word is a capture-time fact
-        // about what was asked, and a later change to how a declaration maps
-        // onto a question must not restate what a past lifter saw.
-        //
-        // `p.slot` is null on an ad-hoc set, which no plan declared anything
-        // for; `askFor` resolves that as WEIGHT and the set's own kind then
-        // decides, so an ad-hoc rep set stores `load` and an ad-hoc hold
-        // stores `time`. #244's brief said an ad-hoc set is written as `load`
-        // outright; that is right for a dynamic one and WRONG for a hold,
-        // which is asked in seconds on screen, and writing `load` there would
-        // record a question nobody was shown.
-        rpeScale = EffortScale.askFor(p.isTimed, p.slot?.progression).word,
-        plannedReps = p.plannedReps,
-        manualReps = p.manualReps,
-        // What the sensor counted, beside what the set is recorded as (#286).
-        // Both come off the frozen write, so a retry stores the same pair.
-        liveReps = p.liveReps,
-        // The live integrator's latch, frozen at endSet (#302); the repository
-        // stores it inside the analysis blob.
-        liveCountTrusted = p.liveCountTrusted,
-        actualDurationS = p.actualDurationS,
-        // The word, not the constant: `HoldEndSource` owns the four strings and
-        // the row stores one of them (#259).
-        durationEndedBy = p.durationEndedBy?.published,
-        plannedDurationS = p.plannedDurationS,
-        side = p.side,
-        plannedSide = p.plannedSide,
-        tempo = p.tempoText,
-        targetMeanConVelMps = p.slot?.targetMeanConVelMps,
-        velocityLossStopPct = p.slot?.velocityLossStopPct,
-        plannedRestS = p.slot?.restS,
-        plannedPrepS = p.plannedPrepS,
-        prepS = p.prepS,
-        prepWindow = p.prepWindow,
-        workBegan = p.workBegan,
-        startedAtMs = p.startedAtMs,
-        endedAtMs = p.endedAtMs,
-        analysis = analysis,
-        geometry = p.geometry,
-        imuSamples = p.samples,
-        hrSamples = p.hrSamples,
-        restHrSamples = p.restHrSamples,
-        voiceCues = p.cues,
-        repMarks = p.repMarks,
-        sensors = p.sensors,
-        secondary = p.secondary,
-        rpe = written.rpe,
-        failed = written.failed,
-        // The OR's two halves, stored apart for the first time (#216). [failed] is
-        // still the OR and nothing about it moves; this says whether the lifter
-        // said so, which the row has never carried and which no export could
-        // therefore publish.
-        failedByLifter = written.failedByLifter,
-        // The plan's declaration, and nothing else can set it: #187 took warm-up
-        // off the effort scale, so there is no tile left to OR in. An ad-hoc or
-        // appended set is false because nothing declared it, which is a gap in
-        // what the app can express rather than a claim that the set was work.
-        warmup = p.slot?.warmup == true,
-        // Off the FROZEN slot, never off live state: the queue has already moved on
-        // by the time a retry runs, and the question this answers is about the set
-        // that was performed. An ad-hoc set has no slot and is not appended to
-        // anything -- it is its own thing, and false is the right answer for it
-        // rather than a missing one (#177).
-        added = p.slot?.isAddedSet == true,
-    )
+private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, written: CorrectedRatingRow) = CompletedSet(
+    exerciseId = p.exercise.id,
+    exerciseName = p.exercise.displayName,
+    loadKg = p.loadKg,
+    plannedLoadKg = p.plannedLoadKg,
+    bodyWeightKg = p.bodyWeightKg,
+    // WHICH QUESTION the lifter was shown, resolved from the FROZEN pair;
+    // the tiles were worded by a DIFFERENT askFor call in RecordScreen,
+    // off state.currentIsTimed/state.currentSlot -- they agree only
+    // because endSet builds this pair from that same state in the same
+    // action (#244).
+    //
+    // Not the raw declaration: the stored word is a capture-time fact
+    // about what was asked, and a later change to how a declaration maps
+    // onto a question must not restate what a past lifter saw.
+    //
+    // `p.slot` is null on an ad-hoc set, which no plan declared anything
+    // for; `askFor` resolves that as WEIGHT and the set's own kind then
+    // decides, so an ad-hoc rep set stores `load` and an ad-hoc hold
+    // stores `time`. #244's brief said an ad-hoc set is written as `load`
+    // outright; that is right for a dynamic one and WRONG for a hold,
+    // which is asked in seconds on screen, and writing `load` there would
+    // record a question nobody was shown.
+    rpeScale = EffortScale.askFor(p.isTimed, p.slot?.progression).word,
+    plannedReps = p.plannedReps,
+    manualReps = p.manualReps,
+    // What the sensor counted, beside what the set is recorded as (#286).
+    // Both come off the frozen write, so a retry stores the same pair.
+    liveReps = p.liveReps,
+    // The live integrator's latch, frozen at endSet (#302); the repository
+    // stores it inside the analysis blob.
+    liveCountTrusted = p.liveCountTrusted,
+    actualDurationS = p.actualDurationS,
+    // The word, not the constant: `HoldEndSource` owns the four strings and
+    // the row stores one of them (#259).
+    durationEndedBy = p.durationEndedBy?.published,
+    plannedDurationS = p.plannedDurationS,
+    side = p.side,
+    plannedSide = p.plannedSide,
+    tempo = p.tempoText,
+    targetMeanConVelMps = p.slot?.targetMeanConVelMps,
+    velocityLossStopPct = p.slot?.velocityLossStopPct,
+    plannedRestS = p.slot?.restS,
+    plannedPrepS = p.plannedPrepS,
+    prepS = p.prepS,
+    prepWindow = p.prepWindow,
+    workBegan = p.workBegan,
+    startedAtMs = p.startedAtMs,
+    endedAtMs = p.endedAtMs,
+    analysis = analysis,
+    geometry = p.geometry,
+    imuSamples = p.samples,
+    hrSamples = p.hrSamples,
+    restHrSamples = p.restHrSamples,
+    voiceCues = p.cues,
+    repMarks = p.repMarks,
+    sensors = p.sensors,
+    secondary = p.secondary,
+    rpe = written.rpe,
+    failed = written.failed,
+    // The OR's two halves, stored apart for the first time (#216). [failed] is
+    // still the OR and nothing about it moves; this says whether the lifter
+    // said so, which the row has never carried and which no export could
+    // therefore publish.
+    failedByLifter = written.failedByLifter,
+    // The plan's declaration, and nothing else can set it: #187 took warm-up
+    // off the effort scale, so there is no tile left to OR in. An ad-hoc or
+    // appended set is false because nothing declared it, which is a gap in
+    // what the app can express rather than a claim that the set was work.
+    warmup = p.slot?.warmup == true,
+    // Off the FROZEN slot, never off live state: the queue has already moved on
+    // by the time a retry runs, and the question this answers is about the set
+    // that was performed. An ad-hoc set has no slot and is not appended to
+    // anything -- it is its own thing, and false is the right answer for it
+    // rather than a missing one (#177).
+    added = p.slot?.isAddedSet == true,
+)
 
 /**
  * Open the session row the first set of a session hangs off.
