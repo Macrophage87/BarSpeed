@@ -440,7 +440,7 @@ private fun SetChips(record: SetRecordEntity, analysis: SetAnalysis, regime: Vel
         // A null regime draws exactly what this card drew before #250 -- every
         // set recorded before the geometry column existed is in that state,
         // and guessing a direction for it would be inventing one.
-        if (regime == VelocityLossRegime.CONTROLLED) {
+        if (regime?.readsVelocityLoss == false) {
             RangeConsistencyChip(analysis)
         } else {
             // Asked of the STORED reps, not of the stored velocityLossPct. History
