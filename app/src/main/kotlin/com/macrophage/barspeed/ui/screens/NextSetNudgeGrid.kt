@@ -100,7 +100,7 @@ import com.macrophage.barspeed.ui.components.SectionCaption
  * FOUR OF ITS INPUTS ARE WRITTEN DURING REST, so this row can appear or vanish
  * part-way through one and shift what is drawn below it. `toggleLastSetWarmup`
  * writes `lastSetWarmupMark` through `applyWarmupMark`; `ratedState` writes
- * `lastSetRpe` and `lastSetFailed`; `applyRepCorrection` and
+ * `lastSetRpe` and `lastSetFailed`; `applyCountAndRating` and
  * `durationCorrectedState` each write `lastSetFailed`;
  * `addSetOfCurrentExercise` writes, through `appendedState`, the queue that
  * `setsLeftInExercise` is counted off.

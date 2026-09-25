@@ -4,6 +4,51 @@ import com.macrophage.barspeed.data.SessionRepository
 import com.macrophage.barspeed.model.TimedSetEndPolicy
 
 /**
+ * Every write [SetRatingTracker] issues against the finished set's row.
+ *
+ * An interface so the ORDER of those writes can be pinned (#310): a test hands
+ * the tracker a writer whose statements suspend and return when the test says,
+ * which is the one way to reach an interleaving Room's pool would otherwise
+ * decide. Production passes the repository, unchanged, through the tracker's
+ * secondary constructor. Nothing here executes Room.
+ */
+interface SetRowWriter {
+    suspend fun rateSet(setId: Long, rpe: Int?, failed: Boolean, failedByLifter: Boolean?, warmup: Boolean)
+    suspend fun overrideReps(setId: Long, reps: Int)
+    suspend fun overrideDuration(setId: Long, seconds: Int)
+    suspend fun overrideLoad(setId: Long, loadKg: Double)
+    suspend fun setWarmupMark(setId: Long, warmupMark: Boolean?)
+    suspend fun setLimiter(setId: Long, limiter: String?, limiterNote: String?)
+}
+
+/** The repository as a [SetRowWriter]: each call is the repository's own, as before. */
+private class RepositoryRowWriter(private val repository: SessionRepository) : SetRowWriter {
+    override suspend fun rateSet(setId: Long, rpe: Int?, failed: Boolean, failedByLifter: Boolean?, warmup: Boolean) {
+        repository.rateSet(setId, rpe, failed, failedByLifter, warmup)
+    }
+
+    override suspend fun overrideReps(setId: Long, reps: Int) {
+        repository.overrideReps(setId, reps)
+    }
+
+    override suspend fun overrideDuration(setId: Long, seconds: Int) {
+        repository.overrideDuration(setId, seconds)
+    }
+
+    override suspend fun overrideLoad(setId: Long, loadKg: Double) {
+        repository.overrideLoad(setId, loadKg)
+    }
+
+    override suspend fun setWarmupMark(setId: Long, warmupMark: Boolean?) {
+        repository.setWarmupMark(setId, warmupMark)
+    }
+
+    override suspend fun setLimiter(setId: Long, limiter: String?, limiterNote: String?) {
+        repository.setLimiter(setId, limiter, limiterNote)
+    }
+}
+
+/**
  * Rest-screen bookkeeping for the set that just finished: the two failure
  * facts, and every correction the rest screen can write onto its row --
  * reps, held seconds, why it ended, the warm-up mark and, since #205, the
@@ -19,7 +64,9 @@ import com.macrophage.barspeed.model.TimedSetEndPolicy
  * Every method returns the effective failed flag to mirror into UI state, or
  * null when there is no recorded set to rate.
  */
-class SetRatingTracker(private val repository: SessionRepository) {
+class SetRatingTracker(private val writer: SetRowWriter) {
+    constructor(repository: SessionRepository) : this(RepositoryRowWriter(repository))
+
     private var setId: Long? = null
     private var autoFailed = false
     private var tappedFailed = false
@@ -86,7 +133,7 @@ class SetRatingTracker(private val repository: SessionRepository) {
      */
     suspend fun markWarmup(mark: Boolean?): Boolean? {
         val id = setId ?: return null
-        repository.setWarmupMark(id, mark)
+        writer.setWarmupMark(id, mark)
         return true
     }
 
@@ -108,7 +155,7 @@ class SetRatingTracker(private val repository: SessionRepository) {
      */
     suspend fun limit(limiter: String?, note: String?): Boolean? {
         val id = setId ?: return null
-        repository.setLimiter(id, limiter, note)
+        writer.setLimiter(id, limiter, note)
         return true
     }
 
@@ -117,7 +164,7 @@ class SetRatingTracker(private val repository: SessionRepository) {
         val id = setId ?: return null
         tappedFailed = failed
         val effective = failed || autoFailed
-        repository.rateSet(id, rpe, effective, failedByLifter = failed, warmup = warmup)
+        writer.rateSet(id, rpe, effective, failedByLifter = failed, warmup = warmup)
         return effective
     }
 
@@ -131,8 +178,8 @@ class SetRatingTracker(private val repository: SessionRepository) {
         val planned = plannedReps
         autoFailed = planned != null && reps < planned
         val effective = tappedFailed || autoFailed
-        repository.overrideReps(id, reps)
-        repository.rateSet(id, rpe = rpe, failed = effective, failedByLifter = tappedFailed, warmup = warmup)
+        writer.overrideReps(id, reps)
+        writer.rateSet(id, rpe = rpe, failed = effective, failedByLifter = tappedFailed, warmup = warmup)
         return effective
     }
 
@@ -152,7 +199,7 @@ class SetRatingTracker(private val repository: SessionRepository) {
      */
     suspend fun correctLoad(loadKg: Double): Boolean? {
         val id = setId ?: return null
-        repository.overrideLoad(id, loadKg)
+        writer.overrideLoad(id, loadKg)
         return true
     }
 
@@ -176,8 +223,8 @@ class SetRatingTracker(private val repository: SessionRepository) {
         val id = setId ?: return null
         autoFailed = TimedSetEndPolicy.fellShort(seconds, plannedDurationS)
         val effective = tappedFailed || autoFailed
-        repository.overrideDuration(id, seconds)
-        repository.rateSet(id, rpe = rpe, failed = effective, failedByLifter = tappedFailed, warmup = warmup)
+        writer.overrideDuration(id, seconds)
+        writer.rateSet(id, rpe = rpe, failed = effective, failedByLifter = tappedFailed, warmup = warmup)
         return effective
     }
 }

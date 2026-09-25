@@ -42,6 +42,7 @@ import com.macrophage.barspeed.model.ArmedLinks
 import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.CountAndRatingDraft
 import com.macrophage.barspeed.model.CountingPolicy
 import com.macrophage.barspeed.model.EffortAsk
 import com.macrophage.barspeed.model.EffortScale
@@ -4787,21 +4788,19 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Rest-screen correction when the sensor miscounted (or the set was manual). */
-    fun overrideLastSetReps(reps: Int) = applyRepCorrection(stateFlow, reps, ratings, container.appScope)
-
     /**
-     * Rest-screen correction of a hold or a carry's recorded seconds (#168):
-     * the only way a genuine overage is entered, and it is entered after the
-     * set. See [durationCorrectedState] for why it is not offered mid-set, and
-     * [overrideLastSetReps] for why this runs on appScope.
+     * One Correct-popup SAVE's count or hold and rating (#310): the rep count
+     * when the sensor miscounted (or the set was manual), a hold or a carry's
+     * seconds (#168) -- the only way a genuine overage is entered, after the
+     * set; see [durationCorrectedState] for why it is not offered mid-set --
+     * and the effort the lifter re-rated beside it.
      */
-    fun addLastSetSeconds(deltaS: Int) = applyDurationCorrection(stateFlow, deltaS, ratings, container.appScope)
+    fun correctLastSet(draft: CountAndRatingDraft) = applyCountAndRating(stateFlow, draft, ratings, container.appScope)
 
     /**
      * Rest-screen correction of the load the just-finished set was recorded at
      * (#205), the one value in a set nothing in the app can observe. See
-     * [overrideLastSetReps] for why this runs on appScope, and
+     * [applyCountAndRating] for why this runs on appScope, and
      * [applyLoadCorrection] for what it does to the load standing for the set
      * coming up.
      */
@@ -5106,7 +5105,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * `launchDemoStream`; it is gone, and this reasoning is what keeps the
      * next one from being added. `Main.immediate` keeps every one of them
      * exactly where it is today, and keeps this write, [rateLastSet] and
-     * [overrideLastSetReps] in tap order now that all three have left
+     * [correctLastSet] in tap order now that all three have left
      * `viewModelScope`.
      *
      * The catch is not optional. `appScope` has no `CoroutineExceptionHandler`,

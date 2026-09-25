@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
+import com.macrophage.barspeed.model.CountAndRatingDraft
 import com.macrophage.barspeed.model.EffortCorrectionPolicy
 import com.macrophage.barspeed.model.HoldEndPolicy
 import com.macrophage.barspeed.model.HoldEndSource
@@ -229,17 +230,16 @@ private fun LastSetCard(state: RecordState, feedback: SetFeedback) {
  * rating. The first three write columns nobody else here writes and cannot
  * collide with anything. THE LAST TWO BOTH WRITE THE RATING ROW, and that is a
  * real and unmeasured hazard when the lifter changes BOTH the count and the
- * rating in one confirm: `applyRepCorrection` reads `lastSetRpe` out of the
- * state at launch and `applyRating` publishes its new rating only after Room
- * returns, so the two `rateSet` writes carry different rpe values and Room's
+ * rating in one confirm: the count's launch in `applyCountAndRating` reads
+ * `lastSetRpe` out of the state at launch and the rating's launch publishes
+ * its new rating only after Room returns, so the two `rateSet` writes carry different rpe values and Room's
  * default query executor is a pool that does not order them. The row may keep
  * the count correction's earlier rating while this screen shows the new one.
  * It is the same unordered window `applyLoadCorrection` and `applyWarmupMark`
  * already document for two fast taps -- what changes is that a confirm reaches
- * it in one frame rather than at human tapping speed. Not fixed here: fixing it
- * means making the corrections awaitable, which is a change to
- * LastSetCorrections.kt that #237 puts out of scope. Read from source; never
- * observed on a device.
+ * it in one frame rather than at human tapping speed. #310 is this hazard,
+ * inferred from field-45's set 13; at this commit the count, hold and rating
+ * writes are gathered into `applyCountAndRating` unchanged and still race.
  *
  * A correction is issued ONLY where the draft differs from what stands, so a
  * confirm that changed nothing spends no Room write and a confirm that changed
@@ -318,7 +318,8 @@ private fun CorrectionDialog(
  * reasons it gives.
  *
  * Not a composable: it is called from a click and reads nothing that
- * recomposes. Every call here is the one the row it replaces made, unchanged.
+ * recomposes. The load, warm-up and reason calls are the ones the rows they
+ * replaced made; the count or hold and the rating are one call (#310).
  */
 private fun applyDraft(
     state: RecordState,
@@ -348,17 +349,21 @@ private fun applyDraft(
     if (limiter != state.lastSetLimiter || storedNote != state.lastSetLimiterNote) {
         viewModel.limitLastSet(limiter, note)
     }
+    // ONE call for the count or hold and the rating (#310), because both end
+    // in the rating row. The seconds are the draft's figure itself rather than
+    // a delta from what stands: DraftHoldRow steps through
+    // TimedSetEndPolicy.adjustedSeconds, so the figure is already floored where
+    // the write would floor it.
     val heldNow = feedback.effectiveDurationS
-    if (timed) {
-        if (seconds != null && heldNow != null && seconds != heldNow) {
-            viewModel.addLastSetSeconds(seconds - heldNow)
-        }
-    } else if (reps != feedback.effectiveReps) {
-        viewModel.overrideLastSetReps(reps)
-    }
-    if (rpe != state.lastSetRpe || tappedFailed != state.lastSetTappedFailed) {
-        viewModel.rateLastSet(rpe, failed = tappedFailed)
-    }
+    val draft =
+        CountAndRatingDraft(
+            reps = if (!timed && reps != feedback.effectiveReps) reps else null,
+            seconds = if (timed && seconds != null && heldNow != null && seconds != heldNow) seconds else null,
+            rpe = rpe,
+            tappedFailed = tappedFailed,
+            ratingChanged = rpe != state.lastSetRpe || tappedFailed != state.lastSetTappedFailed,
+        )
+    if (draft.changesAnything) viewModel.correctLastSet(draft)
 }
 
 /**
@@ -408,7 +413,7 @@ private fun DraftRepsRow(reps: Int, onDraft: (Int) -> Unit) {
         label = "Reps counted",
         figure = "$reps",
         corrected = false,
-        // Floored at zero, the bound applyRepCorrection enforces on the way in:
+        // Floored at zero, the bound applyCountAndRating enforces on the way in:
         // a draft it would silently drop is a draft the lifter watched change.
         onDown = { onDraft((reps - 1).coerceAtLeast(0)) },
         onUp = { onDraft(reps + 1) },

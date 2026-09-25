@@ -297,7 +297,7 @@ class SessionExportRepMarksTest {
      * A corrected rep count leaves the marks it cannot reach, and both are
      * published.
      *
-     * `overrideLastSetReps` rewrites the stored count on the rest screen; no
+     * `correctLastSet` rewrites the stored count on the rest screen; no
      * path anywhere edits a mark, which is already written with its own clock
      * on it. So `reps` and the length of `repMarks` can disagree, and that
      * disagreement is information -- it is where a miscount was noticed. An

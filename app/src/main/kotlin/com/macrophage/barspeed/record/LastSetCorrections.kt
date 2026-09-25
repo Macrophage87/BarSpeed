@@ -11,15 +11,16 @@
 // that did.
 package com.macrophage.barspeed.record
 
+import com.macrophage.barspeed.model.CountAndRatingDraft
 import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.SetLimiter
 import com.macrophage.barspeed.model.SetLoadPolicy
-import com.macrophage.barspeed.model.TimedSetEndPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlin.coroutines.CoroutineContext
 
 /**
  * The state a rest-screen effort correction leaves behind.
@@ -168,66 +169,66 @@ internal fun applyLimiter(
 }
 
 /**
- * The state a rest-screen rep correction leaves behind, and the write that
- * produces it (#140). Lifted whole out of `RecordViewModel.overrideLastSetReps`
- * by #208, which left the member as a one-line call.
+ * The writes behind one Correct-popup SAVE's count, hold and rating (#310),
+ * gathered here out of `applyRepCorrection`, `applyDurationCorrection` and the
+ * popup's own call to `rateLastSet`, whose bodies this carries unchanged.
  *
- * appScope, for the reason `launchSetWrite` is: a correction tapped on the
+ * appScope, for the reason `launchSetWrite` is: a correction saved on the
  * rest screen and then abandoned by Back is a correction the pop cancels, and
  * nothing anywhere can edit a stored set once this screen is gone.
- * Main.immediate keeps it ordered against the other writers and keeps
+ * [context] is `Main.immediate` everywhere but a test, which keeps
  * `SetRatingTracker`'s fields on the thread that already reads them.
+ *
+ * AT THIS COMMIT THE THREE ARE STILL THREE LAUNCHES, and that is the defect
+ * #310 names: the count or hold launch reads `lastSetRpe` before it suspends
+ * in Room, the rating launch writes the lifter's new rating meanwhile, and the
+ * count's `rateSet` then writes the rating it read. The two `rateSet`
+ * statements are unordered on Room's pool, so the row may keep the rating the
+ * lifter replaced. Moved here unfixed so the differential can drive it.
+ *
+ * A negative [CountAndRatingDraft.reps] writes no count, the bound
+ * `applyRepCorrection` enforced on the way in.
  */
-internal fun applyRepCorrection(
+internal fun applyCountAndRating(
     stateFlow: MutableStateFlow<RecordState>,
-    reps: Int,
+    draft: CountAndRatingDraft,
     ratings: SetRatingTracker,
     appScope: CoroutineScope,
+    context: CoroutineContext = Dispatchers.Main.immediate,
 ) {
-    if (reps < 0) return
-    appScope.launch(Dispatchers.Main.immediate) {
-        val s = stateFlow.value
-        val failed = ratings.correctReps(reps, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
-        stateFlow.value =
-            stateFlow.value.copy(
-                lastFeedback = stateFlow.value.lastFeedback?.copy(repsOverride = reps),
-                lastSetFailed = failed,
-                // lastSetTappedFailed is deliberately NOT written here.
-                // correctReps re-derives only the shortfall; the lifter's
-                // own tap is untouched by a rep correction, so carrying it
-                // unchanged is what keeps the two facts two facts.
-            )
+    val seconds = draft.seconds
+    if (seconds != null) {
+        appScope.launch(context) {
+            val s = stateFlow.value
+            val failed =
+                ratings.correctDuration(seconds, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
+            stateFlow.value = durationCorrectedState(stateFlow.value, seconds, failed)
+        }
     }
-}
-
-/**
- * The write behind one tap of the hold or carry seconds correction (#168),
- * lifted whole out of `RecordViewModel.addLastSetSeconds` by #208 for
- * [applyRepCorrection]'s reason.
- *
- * Returns without writing anything when the finished set has no duration to
- * correct, which is every set that is not a hold or a carry. The delta moves
- * the figure that currently stands, so repeated taps accumulate;
- * [durationCorrectedState] says why the correction is post-set rather than
- * mid-set.
- *
- * Two fast taps here are still LOST rather than reordered, for the reason
- * [applyLoadCorrection]'s KDoc gives: this one still reads outside the
- * coroutine and publishes after the write. Not fixed with #205, because the
- * two paths were changed one at a time.
- */
-internal fun applyDurationCorrection(
-    stateFlow: MutableStateFlow<RecordState>,
-    deltaS: Int,
-    ratings: SetRatingTracker,
-    appScope: CoroutineScope,
-) {
-    val current = stateFlow.value.lastFeedback?.effectiveDurationS ?: return
-    val seconds = TimedSetEndPolicy.adjustedSeconds(current, deltaS)
-    appScope.launch(Dispatchers.Main.immediate) {
-        val s = stateFlow.value
-        val failed = ratings.correctDuration(seconds, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
-        stateFlow.value = durationCorrectedState(stateFlow.value, seconds, failed)
+    val reps = draft.reps
+    if (reps != null && reps >= 0) {
+        appScope.launch(context) {
+            val s = stateFlow.value
+            val failed = ratings.correctReps(reps, rpe = s.lastSetRpe, warmup = s.lastSetWarmup) ?: return@launch
+            stateFlow.value =
+                stateFlow.value.copy(
+                    lastFeedback = stateFlow.value.lastFeedback?.copy(repsOverride = reps),
+                    lastSetFailed = failed,
+                    // lastSetTappedFailed is deliberately NOT written here.
+                    // correctReps re-derives only the shortfall; the lifter's
+                    // own tap is untouched by a rep correction, so carrying it
+                    // unchanged is what keeps the two facts two facts.
+                )
+        }
+    }
+    if (draft.ratingChanged) {
+        appScope.launch(context) {
+            // The stored warm-up flag is handed back unchanged, for the reason
+            // applyRating gives (#187).
+            val warmup = stateFlow.value.lastSetWarmup
+            val effectiveFailed = ratings.rate(draft.rpe, draft.tappedFailed, warmup) ?: return@launch
+            stateFlow.value = ratedState(stateFlow.value, draft.rpe, draft.tappedFailed, effectiveFailed)
+        }
     }
 }
 
@@ -316,7 +317,7 @@ internal fun loadCorrectedState(s: RecordState, addedKg: Double, carryFollows: B
  * than naming it.
  *
  * THE CORRECTION IS PUBLISHED BEFORE THE WRITE, as [applyWarmupMark] does and
- * unlike [applyDurationCorrection]. `correctLoad` suspends into Room and
+ * unlike [applyCountAndRating]. `correctLoad` suspends into Room and
  * Dispatchers.Main.immediate runs a coroutine body only as far as its first
  * suspension, so with the write first a second tap arriving before the first
  * returned would read a state the first had not replaced yet, compute the same
@@ -376,9 +377,9 @@ internal fun loadCorrectionRolledBack(s: RecordState, s0: RecordState, carryFoll
 
 /**
  * The write behind a corrected effort rating, lifted whole out of
- * `RecordViewModel.rateLastSet` by #208 for [applyRepCorrection]'s reason.
+ * `RecordViewModel.rateLastSet` by #208 for [applyCountAndRating]'s reason.
  *
- * appScope, as [applyRepCorrection]: the rest screen is the only place a set's
+ * appScope, as [applyCountAndRating]: the rest screen is the only place a set's
  * effort can be corrected, and the pop that leaves it cancelled the correction
  * on the way out.
  */
