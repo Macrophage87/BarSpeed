@@ -377,10 +377,9 @@ object AccelArtefact {
      * figures it has always published. `PeakEligibilityTest` pins each clause
      * on its own, with the other two masked.
      */
-    fun isPeakEligible(rep: RepAnalysis): Boolean =
-        !peaksWithheld(rep.artefactSamples ?: 0) &&
-            !peaksWithheld(rep.guardArtefactSamples ?: 0) &&
-            (rep.romBounded ?: true)
+    fun isPeakEligible(rep: RepAnalysis): Boolean = !peaksWithheld(rep.artefactSamples ?: 0) &&
+        !peaksWithheld(rep.guardArtefactSamples ?: 0) &&
+        (rep.romBounded ?: true)
 
     /**
      * The peak drive velocity a SET publishes: `summary.peakConVel_mps`, and
