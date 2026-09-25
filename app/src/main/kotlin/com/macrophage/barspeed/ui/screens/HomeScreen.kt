@@ -74,6 +74,8 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
     val interrupted by viewModel.interrupted.collectAsState()
     val rescued by viewModel.rescued.collectAsState()
     val busyRescues by viewModel.busyRescues.collectAsState()
+    val busyInterrupted by viewModel.busyInterrupted.collectAsState()
+    val busyCrashReports by viewModel.busyCrashReports.collectAsState()
     val crashReports by viewModel.crashReports.collectAsState()
     // Re-scanned every time this screen is composed, not only on first launch:
     // a set interrupted by a crash that left the process alive would otherwise
@@ -126,10 +128,15 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
             // Above InterruptedSetNotice: a rescued database can be an entire
             // training history, where an interrupted capture is one set.
             RescuedDatabaseNotice(rescued, busyRescues, viewModel::shareRescued, viewModel::discardRescued)
-            InterruptedSetNotice(interrupted, viewModel::shareInterrupted, viewModel::discardInterrupted)
+            InterruptedSetNotice(
+                interrupted,
+                busyInterrupted,
+                viewModel::shareInterrupted,
+                viewModel::discardInterrupted,
+            )
             // Below both: a crash report is a diagnostic about the app, where
             // the two cards above it are the lifter's own data.
-            CrashReportNotice(crashReports, viewModel::shareCrashReport, viewModel::deleteCrashReport)
+            CrashReportNotice(crashReports, busyCrashReports, viewModel::shareCrashReport, viewModel::deleteCrashReport)
             HeroCard(state) { navController.navigate("record") }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -324,12 +331,18 @@ private fun volumeUnit(unit: WeightUnit): String = when (unit) {
 @Composable
 private fun InterruptedSetNotice(
     interrupted: List<OrphanedSet>,
+    busy: Set<File>,
     onShare: (OrphanedSet) -> Unit,
     onDiscard: (OrphanedSet) -> Unit,
 ) {
     if (interrupted.isEmpty()) return
     Column(modifier = Modifier.fillMaxWidth()) {
         for (orphan in interrupted) {
+            // #304: the same busy key RescuedDatabaseNotice already disables
+            // both buttons on, so a second SEND cannot reopen the share-cache
+            // file a first copy is still streaming into, and DISCARD cannot
+            // remove a directory a send has not finished reading.
+            val isBusy = orphan.directory in busy
             Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Column(Modifier.padding(14.dp)) {
                     Text(
@@ -350,10 +363,10 @@ private fun InterruptedSetNotice(
                     SectionCaption("Kept on this phone. Nothing deletes it but you")
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { onShare(orphan) }) {
+                        TextButton(onClick = { onShare(orphan) }, enabled = !isBusy) {
                             Text("SEND IT TO ME", color = BarColors.Volt)
                         }
-                        TextButton(onClick = { onDiscard(orphan) }) {
+                        TextButton(onClick = { onDiscard(orphan) }, enabled = !isBusy) {
                             Text("DISCARD", color = BarColors.Red)
                         }
                     }
@@ -400,12 +413,17 @@ private fun InterruptedSetNotice(
 @Composable
 private fun CrashReportNotice(
     reports: List<CrashReport>,
+    busy: Set<File>,
     onShare: (CrashReport) -> Unit,
     onDelete: (CrashReport) -> Unit,
 ) {
     val newest = reports.firstOrNull() ?: return
     var showOlder by remember { mutableStateOf(false) }
     val older = reports.drop(1)
+    // #304: the same busy key the other two cards use, on SEND only -- a
+    // crash file has a hard ceiling (CrashLogStore.copyBounded), so this is
+    // belt-and-braces rather than a fix for an observed corruption.
+    val newestBusy = newest.file in busy
     Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(Modifier.padding(14.dp)) {
             Text(
@@ -426,7 +444,7 @@ private fun CrashReportNotice(
             SectionCaption("Kept on this phone, newest ten. Nothing sends it but you")
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { onShare(newest) }) {
+                TextButton(onClick = { onShare(newest) }, enabled = !newestBusy) {
                     Text("SEND IT TO ME", color = BarColors.Volt)
                 }
                 TextButton(onClick = { onDelete(newest) }) {
@@ -440,6 +458,7 @@ private fun CrashReportNotice(
             }
             if (showOlder) {
                 for (report in older) {
+                    val isBusy = report.file in busy
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth(),
@@ -450,7 +469,7 @@ private fun CrashReportNotice(
                             color = BarColors.Sub,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { onShare(report) }) {
+                        TextButton(onClick = { onShare(report) }, enabled = !isBusy) {
                             Text("SEND", color = BarColors.Volt)
                         }
                         TextButton(onClick = { onDelete(report) }) {

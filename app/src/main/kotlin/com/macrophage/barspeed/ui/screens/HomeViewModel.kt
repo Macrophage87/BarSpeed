@@ -176,6 +176,23 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val busyRescues: StateFlow<Set<File>> = busyRescuesFlow
 
     /**
+     * [shareInterrupted]'s busy key, the same shape [busyRescuesFlow] gives
+     * [shareRescued] (#304). Keyed on the journal's own [File] the way
+     * [busyRescuesFlow] is keyed on a rescue directory, because
+     * [OrphanedSet.directory] is stable across a recomposition and is the same
+     * identity `zipTo` writes from.
+     */
+    private val busyInterruptedFlow = MutableStateFlow<Set<File>>(emptySet())
+    val busyInterrupted: StateFlow<Set<File>> = busyInterruptedFlow
+
+    /**
+     * [shareCrashReport]'s busy key, the same shape [busyRescuesFlow] gives
+     * [shareRescued] (#304). Keyed on [CrashReport.file].
+     */
+    private val busyCrashReportsFlow = MutableStateFlow<Set<File>>(emptySet())
+    val busyCrashReports: StateFlow<Set<File>> = busyCrashReportsFlow
+
+    /**
      * Crash reports this app wrote about itself. Issue #272.
      *
      * A third flow of the same shape as [interrupted] and [rescued], for the
@@ -272,36 +289,25 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * the archive back as a ByteArray here would put a full-size copy in the
      * heap on the way to a file the share sheet reads from anyway.
      *
-     * NO REENTRANCY GUARD HERE, AND THE BUTTON IS NEVER DISABLED, which the
-     * streaming above makes matter more rather than less. [shareRescued]
-     * refuses a second call while the first is in flight and its card draws
-     * SEND with `enabled = !isBusy`; this function has neither, and
-     * `InterruptedSetNotice` is passed no busy set to draw one from.
-     * [interruptedName] is stable across taps, so a second SEND reopens the
-     * same share-cache path and `FileOutputStream` truncates it. The window
-     * that truncation can land in is what changed: the whole-ByteArray write
-     * this replaced held it open for one `writeBytes`, and a streamed copy
-     * holds it open for the length of the copy -- for the capture behind
-     * #271, 314.6 MB of it -- so the chooser can be handed the file while
-     * the second copy is still rewriting it from zero, which is a zip cut
-     * off before its central directory. A reader reports that as corrupt,
-     * not as complete; the outcome that DOES look complete is a missing or
-     * short ENTRY, which `SetJournalStore.zipTo`'s own per-file
-     * `runCatching` produces and which is a different mechanism. Widened
-     * here, not created here. The same missing
-     * guard leaves DISCARD live during a send, where a stream not yet
-     * reached disappears and the per-file `runCatching` in
-     * `SetJournalStore.zipTo` skips it without a word; POSIX keeps an
-     * already-open stream readable, so which entries survive depends on how
-     * far the copy had got, and none of that has been run on a device.
+     * BUSY-GUARDED AND CAUGHT, the same shape [shareRescued] already uses
+     * (#304, closing the remainder #273 named on this KDoc without folding
+     * it in). Before this: [interruptedName] is stable across taps, so a
+     * second SEND reopened the same share-cache path while the first copy was
+     * still streaming into it -- for the capture behind #271, up to 314.6 MB
+     * of it -- and `FileOutputStream` truncated the file the chooser could
+     * already have been handed, which a reader reports as a zip corrupt
+     * before its central directory. The same missing guard left DISCARD live
+     * during a send, so a stream not yet reached could disappear mid-copy.
+     * Both are closed by the same key: [busyInterruptedFlow] disables SEND
+     * for [orphan] the moment the coroutine starts, `InterruptedSetNotice`
+     * reads it for `enabled`, and DISCARD is expected to check it too.
      *
-     * UNGUARDED `viewModelScope.launch`, which [shareRescued] is not. The
-     * per-file `runCatching` does not cover the central directory that
-     * `zip.close()` writes, so a disk full at that moment throws out of this
-     * coroutine with nothing to catch it, from the first screen of a cold
-     * launch. Both of these want their own issue and a busy key plumbed
-     * through `InterruptedSetNotice`, not a rider on a heap fix; reasoned
-     * from the source and unobserved, so they are [Field] until pressed.
+     * ALSO CATCHES, where before nothing did: the per-file `runCatching`
+     * inside `SetJournalStore.zipTo` does not cover the central directory
+     * `zip.close()` writes, so a disk-full there used to throw out of an
+     * unguarded `viewModelScope.launch` from the first screen of a cold
+     * launch. Now it surfaces as a Toast, the same outcome [shareRescued]
+     * already gives a failed build.
      *
      * Deliberately does NOT discard afterwards. Sharing can fail at the share
      * sheet, silently as far as this code can tell, and a capture deleted on
@@ -309,9 +315,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * exists to close, re-created one step further along.
      */
     fun shareInterrupted(orphan: OrphanedSet) {
+        if (orphan.directory in busyInterruptedFlow.value) return
         viewModelScope.launch {
-            ShareUtil.shareStreamed(getApplication(), interruptedName(orphan), "application/zip") { destination ->
-                container.setJournals.zipTo(orphan, destination)
+            busyInterruptedFlow.update { it + orphan.directory }
+            try {
+                ShareUtil.shareStreamed(getApplication(), interruptedName(orphan), "application/zip") { destination ->
+                    container.setJournals.zipTo(orphan, destination)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(getApplication(), "Couldn't build the archive -- try again", Toast.LENGTH_SHORT).show()
+            } finally {
+                busyInterruptedFlow.update { it - orphan.directory }
             }
         }
     }
@@ -320,8 +336,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * Throw an interrupted capture away, at the lifter's word and never on a
      * timer. Nothing else deletes one: a capture the lifter has not ruled on
      * outlives any number of launches.
+     *
+     * Reads [busyInterruptedFlow] too (#304), the same cross-guard
+     * [discardRescued] takes against [shareRescued]: without it, DISCARD
+     * stayed live while a SEND was streaming the same directory, and a stream
+     * not yet reached could disappear mid-copy with the archive silently
+     * missing it.
      */
     fun discardInterrupted(orphan: OrphanedSet) {
+        if (orphan.directory in busyInterruptedFlow.value) return
         viewModelScope.launch {
             withContext(Dispatchers.IO) { container.setJournals.discard(orphan) }
             refreshInterrupted()
@@ -457,9 +480,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * `startActivity` with no target throws ActivityNotFoundException, a
      * RuntimeException, from the first screen of a cold launch -- and a crash
      * inside the crash reporter is a particularly poor outcome.
+     *
+     * BUSY-GUARDED (#304), the same shape [shareRescued] uses, though a crash
+     * file matters less: [CrashLogStore.copyBounded] gives it a hard ceiling,
+     * so a double tap here cannot reopen a multi-hundred-megabyte stream the
+     * way [shareInterrupted]'s could.
      */
     fun shareCrashReport(report: CrashReport) {
+        if (report.file in busyCrashReportsFlow.value) return
         viewModelScope.launch {
+            busyCrashReportsFlow.update { it + report.file }
             try {
                 ShareUtil.shareStreamed(getApplication(), report.file.name, "text/plain") { destination ->
                     container.crashLogs.copyBounded(report.file, destination)
@@ -468,6 +498,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (e: Exception) {
                 Toast.makeText(getApplication(), "Couldn't send that crash report", Toast.LENGTH_SHORT).show()
+            } finally {
+                busyCrashReportsFlow.update { it - report.file }
             }
         }
     }
