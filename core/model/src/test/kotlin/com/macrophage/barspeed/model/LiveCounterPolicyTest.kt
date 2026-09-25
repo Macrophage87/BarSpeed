@@ -14,10 +14,17 @@ import kotlin.test.assertNull
  * is the only part of it CI ever reached, having aborted at `:core:model:test`
  * before `:core:dsp`'s two differential files and their six red rows ran --
  * LiveCountDifferentialTest (5 of its 6) and LiveRepCountersTest (1 of its 3).
- * The policy answers
- * DRIVE_IMPULSE now and both rows are green. The retired answer is kept in the
- * words: SEGMENTER on a sensor-counted set is what #286 shipped and what
- * field-43 measured at three, one and two calls for five performed reps a set.
+ * The policy answered
+ * DRIVE_IMPULSE from then until #305 and both rows were green. The retired
+ * answer is kept in the words: SEGMENTER on a sensor-counted set is what #286
+ * shipped and what field-43 measured at three, one and two calls for five
+ * performed reps a set.
+ *
+ * #305 RE-BASELINED both rows to [LiveCounter.CYCLE], deliberately, in a
+ * commit pushed alone so its red is a durable CI artifact; the policy's SENSOR
+ * row moves in the commit after it. The answer it retires is kept in the words
+ * too: DRIVE_IMPULSE on a sensor-counted set is what v0.1.54 shipped, and on
+ * field-44 it called 5, 5, 5, 0 and 0 for 5, 5, 5, 4 and 2 completed reps.
  */
 class LiveCounterPolicyTest {
     /**
@@ -36,15 +43,15 @@ class LiveCounterPolicyTest {
     /**
      * The answer this issue requires, counter by counter.
      *
-     * The sensor runs [LiveCounter.DRIVE_IMPULSE]. The other three run no live
+     * The sensor runs [LiveCounter.CYCLE]. The other three run no live
      * detector at all, and null is that absence rather than a fourth quiet
      * counter -- unchanged by this issue, and asserted here so a change that
      * reached them could not pass.
      */
     @Test
-    fun `a sensor-counted set runs the drive-impulse counter and no other set runs one`() {
+    fun `a sensor-counted set runs the cycle counter and no other set runs one`() {
         assertEquals(
-            listOf(LiveCounter.DRIVE_IMPULSE, null, null, null),
+            listOf(LiveCounter.CYCLE, null, null, null),
             RepCounter.entries.map { LiveCounterPolicy.counterFor(it) },
             "the live detector for SENSOR, MANUAL, METRONOME, NOBODY in that order",
         )
@@ -63,7 +70,7 @@ class LiveCounterPolicyTest {
      * `LiveCounterPolicy`'s KDoc carries what that costs.
      */
     @Test
-    fun `the shape field-43 recorded reaches the sensor, and the sensor drives on impulse`() {
+    fun `the shape field-43 recorded reaches the sensor, and the sensor counts full cycles`() {
         val counter = CountingPolicy.counterFor(
             hasTempo = false,
             isTimed = false,
@@ -72,7 +79,7 @@ class LiveCounterPolicyTest {
         )
         assertEquals(RepCounter.SENSOR, counter, "who counts a straight-reps set with a sensor on")
         assertEquals(
-            LiveCounter.DRIVE_IMPULSE,
+            LiveCounter.CYCLE,
             LiveCounterPolicy.counterFor(counter),
             "and which detector that counter runs",
         )

@@ -33,10 +33,10 @@ private fun serialKeysOf(serializer: KSerializer<*>): Set<String> =
  * WHAT THE KEY IS AND IS NOT. `StreamingSetTracker` latches its `countTrusted`
  * false the first time one movement run carries further than any real phase
  * of the lift can: the live integral has lost its zero. Since #301 the count
- * comes from `DriveImpulseCounter`, which reads no velocity, so the flag now
- * describes the velocity, ROM and power path and not the count -- and on
- * field-43's three deadlifts it was false on every stream while the impulse
- * counter called 13 of 15 reps. A reader who took it for "the count is wrong"
+ * comes from a detector that reads no velocity -- `DriveImpulseCounter` in
+ * v0.1.54, `CycleRepCounter` from #305 -- so the flag describes the velocity,
+ * ROM and power path and not the count; on field-43's three deadlifts it was
+ * false on every stream while the impulse counter called 13 of 15 reps. A reader who took it for "the count is wrong"
  * would be told to count by hand a set the sensor counted correctly, so the
  * description has to forbid that reading in words and this file pins that it
  * does.

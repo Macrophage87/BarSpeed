@@ -162,7 +162,7 @@ class SchemaRepsSourceContractTest {
     /**
      * THE FIGURES, in both published copies of the reading key.
      *
-     * WHAT CHANGED (#302). Since #301 in v0.1.54 a sensor-counted set is
+     * WHAT CHANGED (#302). In v0.1.54 (#301) a sensor-counted set was
      * counted by `DriveImpulseCounter`, and every figure this test used to pin
      * -- 35 calls against 103 marks over thirteen tempo'd captures, and the six
      * per-capture overhead-press rows -- was `LiveRepCaller`'s, the retired
@@ -174,8 +174,11 @@ class SchemaRepsSourceContractTest {
      * `:core:dsp`'s corpus and nothing mechanical compares them with the table
      * that produced them. Field-43's 5, 5 and 3, and the overhead-press 8, 8,
      * 7, 10, 11 and 2 against 6, 7, 5, 8, 8 and 2, are computed by
-     * `LiveCountDifferentialTest`, replaying the capture through the counter
-     * the app arms. Field-44's 5, 5, 5, 0 and 0 is what the app exported as
+     * `LiveCountDifferentialTest`, replaying the capture through the
+     * drive-impulse counter -- the counter the app armed until #305, built by
+     * name since. They stay in both copies as what a v0.1.54 recording
+     * carries; `SchemaCycleCounterContractTest` pins what the current detector
+     * has scored. Field-44's 5, 5, 5, 0 and 0 is what the app exported as
      * `liveReps` on the day, the truth of 5, 5, 5, 4 and 2 is the owner's as
      * settled on #305, and no committed test computes either: field-44 is not
      * a fixture here. The retired detector's 3, 1 and 2 is
