@@ -2306,10 +2306,12 @@ private fun recordedTimedEnd(
 ): TimedEnd? {
     if (!isTimed) return null
     fun secondsTo(instantMs: Long) = SetClockPolicy.heldSeconds(prepCase, tappedAtMs, clockStartedAtMs, instantMs)
-    // Asked only where the lifter's tap is what ended the set. A hold the clock
-    // ended is not offered a release at all -- `HoldEndPolicy` would refuse it,
-    // and not reading the stream says so at the one place that could.
-    val releaseAtMs = if (autoEnded) null else HoldRelease.atMs(analysedSamples, clockStartedAtMs)
+    // Asked whoever ended the set. Until #311 a hold the clock ended was not
+    // offered a release at all, so a hold let go before its target and never
+    // tapped recorded the target (field-45 set 13: 35 s against a release
+    // 30.742 s in). `HoldEndPolicy` now weighs it against the target the same
+    // way it weighs it against a tap, and refuses one at or after the target.
+    val releaseAtMs = HoldRelease.atMs(analysedSamples, clockStartedAtMs)
     val decision = HoldEndPolicy.decide(
         measuredS = secondsTo(endedAtMs),
         targetS = targetS,
@@ -4903,12 +4905,14 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // Then, for a hold the CLOCK ended rather than the lifter, the figure
         // the set records is the seconds it was working to and not the
         // measurement (#168) -- plannedDurationS unless the lifter changed the
-        // hold in the change-set dialog, in which case theirs.
+        // hold in the change-set dialog, in which case theirs -- unless its
+        // armed unit saw the implement let go 1 to 20 s before it (#311).
         // The two disagree by whatever the dispatcher did -- delay(1_000)
         // drifts positive, so a sixty-tick hold measures 60 or 61 -- and 61
         // against a 60 s target reads as a hold carried past target on every
         // set, for a reason that is nothing to do with the lifter. A set the
-        // lifter ended is never touched: it records what it lasted.
+        // lifter ended records what it lasted, to the tap or, since #259, to
+        // the release its armed unit saw.
         // Which buffer the DSP is pointed at, and what the row says about the
         // choice (#207). Frozen here with everything else, from the buffers as
         // they stand at the end of the set.

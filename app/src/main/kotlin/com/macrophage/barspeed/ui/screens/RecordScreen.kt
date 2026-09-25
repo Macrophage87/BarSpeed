@@ -3050,7 +3050,8 @@ private fun UnsavedSetNotice(viewModel: RecordViewModel) {
  * row for a Fail-ended set reads EFFORT -- FAILED and carries a Change action,
  * and re-rating overwrites the tapped verdict. (EFFORT -- NOT RATED with a
  * Rate action is the OTHER row, for a set carrying no verdict at all, such as
- * an auto-ended hold; both open the same grid.)
+ * an auto-ended hold its armed unit's release did not put short (#311); both
+ * open the same grid.)
  *
  * This control is not drawn during the set's lead-in. A set whose clock or
  * cadence had not begun has not failed at anything, so that window offers

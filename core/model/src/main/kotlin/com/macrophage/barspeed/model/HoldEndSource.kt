@@ -19,15 +19,17 @@ package com.macrophage.barspeed.model
  */
 enum class HoldEndSource(val published: String) {
     /**
-     * The app's own clock reached the target and ended the set (#168). The
-     * lifter heard `Time` a beat earlier and the recorded seconds are the
-     * target itself.
+     * The app's own clock reached the target and ended the set (#168), and no
+     * armed unit saw the implement let go 1 to [HoldEndPolicy.MAX_TRIM_S]
+     * seconds before it (#311). The lifter heard `Time` a beat earlier and the
+     * recorded seconds are the target itself.
      */
     CLOCK("clock"),
 
     /**
      * An armed unit's stream says when the implement was let go, and that
-     * instant -- not the tap that came after it -- is what the seconds were
+     * instant -- not the tap that came after it, nor, since #311, the clock's
+     * end at the target on a hold nobody tapped -- is what the seconds were
      * measured to. `HoldRelease` in `:core:dsp` finds it.
      */
     SENSOR("sensor"),
@@ -73,7 +75,7 @@ enum class HoldEndSource(val published: String) {
  * ## Why this is a decision and not arithmetic
  *
  * [TimedSetEndPolicy.recordedSeconds] already chooses between the measurement
- * and the target for a set the clock ended. #259 adds a third candidate for
+ * and the target, by who ended the set. #259 adds a third candidate for
  * the instant the measurement runs TO -- the release an armed unit saw -- and
  * a third candidate is where a two-way `if` stops being arithmetic: the same
  * figure now has to say where it came from, because a reader cannot recover
@@ -81,24 +83,36 @@ enum class HoldEndSource(val published: String) {
  *
  * ## The rule
  *
- * The clock's target on a hold the clock ended. Otherwise the release an armed
- * unit saw, where it saw one and where believing it takes no more than
- * [MAX_TRIM_S] seconds off. The tap, where neither spoke.
+ * First the figure that stands without the sensor: the clock's target on a
+ * hold the clock ended, the measurement to the tap on one the lifter ended.
+ * Then the release an armed unit saw, where it saw one and where believing it
+ * takes 1 to [MAX_TRIM_S] seconds off THAT figure. The standing figure, where
+ * the release is absent, at or after it, or further off than the cap.
  *
- * ## Why the clock is not overruled
+ * ## A clock end consults the release too (#311)
  *
- * An auto-ended hold does not consult the sensor at all, and that is a decision
- * rather than an omission. The lifter heard `Time` and put the implement down on
- * the word; the figure recorded is the one the voice announced, measured by the
- * app against an instant the app itself chose (#168). Letting a release shorten
- * it would record less than the lifter was told they had completed, on the
- * strength of one crossing -- silent loss on the progression metric, in the
- * direction the archive cannot argue with.
+ * Until #311 an auto-ended hold did not consult the sensor at all, and the
+ * paragraph that stood here argued that as a decision. It is deleted rather
+ * than reworded, because field-45 measured what it cost: set 13, a rope dead
+ * hang planned at 35 s, let go 30.742 s in by its analysed unit's stream and
+ * never tapped -- the owner's phone is 5-10 s away on a hands-full hold -- so
+ * the clock ended it at 35 and the code recorded 35 under
+ * [HoldEndSource.CLOCK]. Only the lifter's correction restated it.
  *
- * WHAT THAT LEAVES OPEN, stated rather than left to be found: a lifter who lets
- * go early and never taps still has the clock end the set at the target and
- * record the target. Nothing here changes that; the bigger correction step is
- * offered on exactly those sets ([downStepsS]).
+ * What survives of the old argument is the direction it guarded. A hold that
+ * ran to `Time` must not record less than the voice told the lifter they had
+ * completed, and it does not: a release at or after the target takes zero or
+ * fewer seconds off and is refused, and a hold whose stream crosses nothing
+ * keeps the target (field-42 set 16, pinned in `HoldReleaseFieldTest`). The
+ * risk left is a false crossing 1 to [MAX_TRIM_S] seconds before a target the
+ * lifter did reach. `HoldRelease`'s settle is fitted to one measured onset and
+ * its band's margins are measured on four committed hold streams, so that risk
+ * is bounded by what was observed, not by design.
+ *
+ * WHAT IS STILL OPEN: a hold with no unit armed, or one whose unit saw no
+ * release, still has the clock end it at the target and record the target
+ * when the lifter let go early. The bigger correction step is offered on
+ * exactly those sets ([downStepsS]).
  *
  * ## What the sensor does NOT decide
  *
@@ -108,12 +122,15 @@ enum class HoldEndSource(val published: String) {
  * figure is still under [TimedSetEndPolicy.CLOSE_ENOUGH_FRACTION] of 45 s, so
  * the verdict is unchanged there -- but a hold ended by hand at 43 s of 45 whose
  * release sits at 36 would newly read as short, which is the right answer and is
- * pinned.
+ * pinned. The same derivation reaches a clock end since #311: field-45 set 13's
+ * 30 of 35 derives short where its target did not, which is the answer the
+ * lifter gave himself when he tapped the failure tile.
  */
 object HoldEndPolicy {
     /**
-     * The most seconds a sensor release may take off a hold the lifter ended,
-     * in seconds.
+     * The most seconds a sensor release may take off the figure that would
+     * otherwise stand -- the tap's measurement, or since #311 the clock's
+     * target -- in seconds.
      *
      * What a sensor end claims to remove is the walk back to the phone, and a
      * walk has a size: the owner's own estimate for a hands-full hold is 5-10
@@ -148,28 +165,23 @@ object HoldEndPolicy {
      * [measuredS] is the clock's own span, from `SetClockPolicy.heldSeconds`.
      * [targetS] is the seconds the set was working to, null on an ad-hoc hold.
      * [autoEnded] says the app's clock ended the set. [sensorEndS] is the same
-     * span measured to the release instant instead of the tap, or null where
-     * no armed unit saw one.
+     * span measured to the release instant instead of to the tap or the
+     * clock's end, or null where no armed unit saw one.
      */
     fun decide(measuredS: Int, targetS: Int?, autoEnded: Boolean, sensorEndS: Int?): Decision {
-        if (autoEnded) {
-            return Decision(
-                TimedSetEndPolicy.recordedSeconds(measuredS, targetS, autoEnded = true),
-                HoldEndSource.CLOCK,
-            )
-        }
-        // The trim is what believing the sensor costs the figure, and both ends
-        // of the range matter. Zero or less is a release at or after the tap --
-        // nothing to remove, and a sensor end must never LENGTHEN a hold. Beyond
-        // the cap it is not a reach, so the tap stands.
-        val trimS = sensorEndS?.let { measuredS - it }
+        // What stands without the sensor: the target on a hold the clock ended
+        // (#168), the measurement to the tap on one the lifter ended.
+        val standingS = TimedSetEndPolicy.recordedSeconds(measuredS, targetS, autoEnded)
+        // The trim is what believing the sensor costs that figure, and both
+        // ends of the range matter. Zero or less is a release at or after the
+        // tap or the target -- nothing to remove, and a sensor end must never
+        // LENGTHEN a hold nor shorten one that ran to `Time`. Beyond the cap it
+        // is not a reach, so the standing figure stands.
+        val trimS = sensorEndS?.let { standingS - it }
         if (sensorEndS != null && trimS != null && trimS in 1..MAX_TRIM_S) {
             return Decision(sensorEndS, HoldEndSource.SENSOR)
         }
-        return Decision(
-            TimedSetEndPolicy.recordedSeconds(measuredS, targetS, autoEnded = false),
-            HoldEndSource.LIFTER,
-        )
+        return Decision(standingS, if (autoEnded) HoldEndSource.CLOCK else HoldEndSource.LIFTER)
     }
 
     /**
@@ -187,10 +199,11 @@ object HoldEndPolicy {
      *
      * - [HoldEndSource.SENSOR]: the release already decided the figure, so there
      *   is no reach left to remove and the fine step is all that is wanted.
-     * - [HoldEndSource.CLOCK]: the case that is easy to miss. A lifter who lets
-     *   go at 20 s of a 30 s hold and walks away still has the clock end it at
-     *   the target and record the target, so the overstatement can be ten
-     *   seconds or more.
+     * - [HoldEndSource.CLOCK]: the case that is easy to miss. Since #311 an
+     *   armed unit that saw the let-go turns such a hold into a sensor end, but
+     *   a lifter who lets go at 20 s of a 30 s hold with no unit armed, or one
+     *   that saw nothing, still has the clock end it at the target and record
+     *   the target, so the overstatement can be ten seconds or more.
      * - [HoldEndSource.LIFTER]: the defect #259 could not fix -- no unit armed,
      *   or one that saw nothing -- so the whole reach is inside the figure.
      * - [HoldEndSource.CORRECTED]: what decided the pre-correction figure is no

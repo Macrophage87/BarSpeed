@@ -22,6 +22,12 @@ import kotlin.math.sqrt
  * are the progression metric on a `time` exercise, so the error lands on the
  * number the next plan steps up from.
  *
+ * Since #311 it is asked of a hold the CLOCK ended as well. A lifter who lets
+ * go inside that reach of the target never gets to the phone before the clock
+ * ends the set, and until then the target was recorded whatever the stream
+ * said; `HoldEndPolicy` now weighs the release against the target as it
+ * weighs it against a tap, and refuses one at or after the target.
+ *
  * ## Retrospective, never live
  *
  * This is asked at the SET WRITE, over the stream the set already captured,
@@ -53,11 +59,12 @@ import kotlin.math.sqrt
  *
  * A hold that ends with nothing falling and nothing struck -- a plank stood up
  * out of, a wall sit walked away from -- crosses no band, and the answer is
- * null: no release seen, today's behaviour stands, the lifter's tap decides.
- * That is the intended failure direction and it is not a claim that such holds
- * end quietly; no capture of one has been read. Whether a release the owner
- * would call obvious always crosses 1 g on a mount that is neither on the
- * stack nor in a pocket is a [Field] question, not a property of this file.
+ * null: no release seen, and the lifter's tap -- or on a clock end, the
+ * target -- decides. That is the intended failure direction and it is not a
+ * claim that such holds end quietly; no capture of one has been read. Whether
+ * a release the owner would call obvious always crosses 1 g on a mount that is
+ * neither on the stack nor in a pocket is a [Field] question, not a property
+ * of this file.
  *
  * WHICH UNIT IS READ MOVES THE ANSWER, and the corpus measures it. On field-38
  * set 18 role a crosses at 1788518020443, 26.058 s into the hold, and role b at

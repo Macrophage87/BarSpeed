@@ -77,6 +77,10 @@ object RestClockPolicy {
      * for it to outrank in practice -- `Time` is not in `SetEnd.TERMINAL_CUES`,
      * so a hold is `NotCued` whether it ran to target or was broken early -- and
      * the ordering is pinned anyway rather than left to a future cue to settle.
+     * What it does outrank is the write instant, and since #311 on a hold the
+     * CLOCK ended too: where a release before the target decided the seconds,
+     * the rest runs from the release rather than from the write at `Time`, so
+     * field-45 set 13's rest would start 4.284 s earlier than the write.
      *
      * A cue instant AFTER the write instant is still taken. It cannot arise
      * from the app -- the cue is written before the set ends, on the same

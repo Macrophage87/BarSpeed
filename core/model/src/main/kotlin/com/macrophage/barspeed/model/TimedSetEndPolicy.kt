@@ -135,6 +135,11 @@ object TimedSetEndPolicy {
      * A hold with no prescription records its measurement whatever [autoEnded]
      * says, because there is no target to substitute and inventing one is the
      * only alternative.
+     *
+     * What this returns is the figure that stands WITHOUT the sensor.
+     * `HoldEndPolicy.decide` asks it first and may replace it with the release
+     * an armed unit saw -- on a tapped hold since #259, and on one the clock
+     * ended since #311, where the lifter let go before the target.
      */
     fun recordedSeconds(measuredS: Int, targetS: Int?, autoEnded: Boolean): Int =
         if (autoEnded && targetS != null) targetS else measuredS

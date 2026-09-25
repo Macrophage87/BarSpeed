@@ -107,7 +107,9 @@ enum class SetEndKind(val gatesOnCompletion: Boolean) {
  * a Change action that opens the same grid with the failure tile pre-lit. The
  * rating moves from the moment of ending to the rest period rather than
  * disappearing. (An auto-ended hold, which carries no verdict at all, is the
- * row that reads EFFORT -- NOT RATED with a Rate action instead; both routes
+ * row that reads EFFORT -- NOT RATED with a Rate action instead -- unless,
+ * since #311, the release its armed unit saw put its recorded seconds short of
+ * the target, when the derived shortfall is a verdict; both routes
  * reach the same grid. `EffortCorrectionPolicy.lineText` decides which, and a
  * tapped failure is not an absence.) Two things must stay true or the defect
  * IS back -- the rest-screen Rate path has to work on a Fail-ended set, which
