@@ -19,22 +19,27 @@ import kotlin.test.assertNull
  */
 class TimedSetVoiceTest {
     /**
-     * The far half of a long hold is marked, not counted: one utterance every
-     * fifteen seconds of what remains, and silence between them.
+     * The owner's rule (#312): "for holds, count in 5 second increments until
+     * 10 seconds to go (then 1)". A 45 s hold, second by second from the one
+     * after `Hold` to the target, names 40, 35, 30, 25, 20 and 15 seconds, then
+     * every digit from 10, then the terminal word; every other second is
+     * silent. A long hold's first mark keeps today's words: 60 is "60 seconds".
      *
-     * Reds if `MILESTONE_EVERY_S` moves off 15 -- at 20 the 45 s and 15 s rows
-     * both fall silent.
+     * This replaces a pin that said the marks came every fifteen seconds of
+     * what remains; #312 made it false and it is deleted, not reworded. Reds
+     * if `MILESTONE_EVERY_S` moves off 5 -- at 15 the 40 s row is the first to
+     * fall silent.
      */
     @Test
-    fun `a long hold is marked every fifteen seconds of remaining time`() {
-        assertEquals("45 seconds", TimedSetVoice.cueFor(45))
-        assertEquals("30 seconds", TimedSetVoice.cueFor(30))
-        assertEquals("15 seconds", TimedSetVoice.cueFor(15))
-        assertNull(TimedSetVoice.cueFor(44))
-        assertNull(TimedSetVoice.cueFor(31))
-        assertNull(TimedSetVoice.cueFor(16))
-        assertNull(TimedSetVoice.cueFor(14))
-        assertNull(TimedSetVoice.cueFor(11))
+    fun `a 45 s hold names the time left every five seconds, then every second from 10`() {
+        val spoken = (44 downTo 0).mapNotNull { TimedSetVoice.cueFor(it) }
+        assertEquals(
+            listOf("40 seconds", "35 seconds", "30 seconds", "25 seconds", "20 seconds", "15 seconds") +
+                listOf("10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "Time"),
+            spoken,
+        )
+        assertEquals("60 seconds", TimedSetVoice.cueFor(60))
+        listOf(44, 41, 39, 36, 16, 14, 11).forEach { assertNull(TimedSetVoice.cueFor(it), "$it seconds left") }
     }
 
     /**

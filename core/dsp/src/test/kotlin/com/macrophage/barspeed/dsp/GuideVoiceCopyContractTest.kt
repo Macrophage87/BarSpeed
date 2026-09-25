@@ -250,4 +250,29 @@ class GuideVoiceCopyContractTest {
      * `LockoutRepCallTest`'s `the geometry whose drive ends the rep still says
      * nothing, and why`.
      */
+
+    /**
+     * The guide says how often a hold names the time left (#312), and it says
+     * what the voice does.
+     *
+     * The sentence stood at "every 15 seconds remaining" while nothing pinned
+     * it. Two checks: a literal, which reds when the guide states something
+     * other than the owner's rule, and the constants, which red when the guide
+     * and [TimedSetVoice] part.
+     */
+    @Test
+    fun `the guide says a hold names its time left every five seconds, then counts from ten`() {
+        assertTrue(
+            rendered.contains("time checks every 5 seconds remaining"),
+            "the guide's Voice section does not say a hold names its time left every 5 seconds",
+        )
+        assertTrue(
+            rendered.contains("time checks every ${TimedSetVoice.MILESTONE_EVERY_S} seconds remaining"),
+            "the guide's hold spacing is not TimedSetVoice.MILESTONE_EVERY_S",
+        )
+        assertTrue(
+            rendered.contains("count from ${TimedSetVoice.FINAL_COUNTDOWN_FROM_S}."),
+            "the guide's countdown start is not TimedSetVoice.FINAL_COUNTDOWN_FROM_S",
+        )
+    }
 }
