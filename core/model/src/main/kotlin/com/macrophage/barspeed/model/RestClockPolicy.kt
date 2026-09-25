@@ -79,7 +79,8 @@ object RestClockPolicy {
      * decided a clock-ended hold's seconds outranks the `Time` stamp, which
      * would otherwise start the rest at the target the hold did not reach --
      * field-45 set 13's would start 4.284 s earlier than its write, which came
-     * 1 ms after its `Time`. On a tapped hold it outranks the write instant.
+     * 1 ms after its `Time`. On a tapped hold it outranks the write instant,
+     * or since #288 the `Set ended` the tap speaks where the timed voice is on.
      *
      * A cue instant AFTER the write instant is still taken. It cannot arise
      * from the app -- the cue is written before the set ends, on the same

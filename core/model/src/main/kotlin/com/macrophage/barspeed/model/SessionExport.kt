@@ -2239,6 +2239,35 @@ data class SessionExport(
          * both descriptions; it cannot see this KDoc. `HoldTerminalCueFieldTest`
          * and `FailedSetBoundaryTest` in `:core:dsp` and `RawExporterRollWindowTest`
          * in `:core:data` pin the rule.
+         *
+         * 1.22 TAKES A TWELFTH ENTRY (#288, a timed set ended early says `Set
+         * ended`), and it CHANGES NO KEY. A FURTHER ENTRY under the unreleased
+         * 1.22, on the tag reading the ninth entry states.
+         *
+         * WHAT WAS SILENT. A timed set the lifter ended before its clock reached
+         * the target said no word at the break and wrote none, so nothing on the
+         * record said when it stopped: field-41 set 21, a 30 s dead hang broken
+         * at 5 s, carries `Ready`, `Brace`, `Hold` and nothing after.
+         *
+         * THE CHANGE. `SetEnd.terminalCall` asks a timed set the clock did not
+         * end, where the timed voice is on, and it says and writes `Set ended`
+         * at the tap -- the word a guided set already says when it ends without
+         * `Done`. It bounds the working window and seeds the rest unless a
+         * release decided the seconds. A timed set the clock ended says `Time`,
+         * as before. [SetExport.voiceCues]' and [SetExport.restS]'s published
+         * descriptions say so.
+         *
+         * WHAT A READER DOES, IN BOTH DIRECTIONS. No key is added, removed or
+         * retyped and the schema accepts and rejects exactly the documents it
+         * did before this entry. What moves is what `Set ended` may mean: it can
+         * end a timed set's track, so it is not evidence the set was guided, and
+         * it is still not evidence the set failed. NOT RETROACTIVE: a cue row is
+         * what the app said when the set was recorded. `DATABASE_VERSION` does
+         * NOT move and the plan schema is untouched.
+         *
+         * PINNED. `SchemaTimedStopContractTest` asserts this entry's marker and
+         * both descriptions; it cannot see this KDoc. `TimedStopCallTest` in
+         * `:core:dsp` pins the rule on field-41 set 21's committed track.
          */
         const val SCHEMA_VERSION = "1.22"
 
@@ -3021,8 +3050,9 @@ data class SetExport(
      * From 1.19 the published description states which instant it is counted
      * FROM, and `RestClockPolicy` owns that instant: a release that decided a
      * hold's seconds first (#259), then the terminal cue on the set's own cue
-     * track -- which from 1.22 (#295) includes a timed set's `Time` -- or the
-     * set's end instant where nothing called it over. The countdown and the archive's `rest_before_hrm` window both
+     * track -- which from 1.22 includes a timed set's `Time` (#295) and the
+     * `Set ended` a timed set the lifter stopped says (#288) -- or the set's
+     * end instant where nothing called it over. The countdown and the archive's `rest_before_hrm` window both
      * begin there (#178); until 1.19 the window began when the set's capture
      * stopped instead, up to 53.06 s later on one measured set. `rest_after_hrm`
      * -- the window a session close writes onto the LAST set, when there is no

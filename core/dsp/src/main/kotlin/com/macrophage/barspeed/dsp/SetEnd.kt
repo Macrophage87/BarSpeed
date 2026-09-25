@@ -159,9 +159,11 @@ sealed interface SetEnd {
 
         /**
          * The cue the app speaks when a guided set ends without the guide
-         * having called [DONE].
+         * having called [DONE], or since #288 a timed set ends without its
+         * clock having called [TIME_UP].
          *
-         * TWO populations, not one, and the second is an ordinary completion.
+         * On a guided set, TWO populations, not one, and the second is an
+         * ordinary completion.
          * [terminalCall] asks whether the set is already bounded, never how it
          * ended, so this word goes on any guided set whose track carries no
          * terminal cue. That is the lifter stopping early -- the failure tile,
@@ -172,6 +174,15 @@ sealed interface SetEnd {
          * and `RecordViewModel.setTargetMet` offers such a set the effort grid
          * from the start, so it finishes normally and carries this word. Read
          * `failed` for whether a set was failed; this cue does not say.
+         *
+         * On a timed set (#288), the lifter ending it before its clock did,
+         * where the timed voice is on: field-41 set 21, a hang broken at 5 s
+         * of 30, ended with no word at all and no end instant on the record.
+         * The same word rather than a new one, because it is the same case --
+         * a set ended before the call that completes it. A hold with no target
+         * has no `Time` to reach and carries this word whenever it is tapped,
+         * which is an ordinary completion, as on a guided set with no rep
+         * count.
          *
          * A different word from [DONE] on purpose, and the choice is argued
          * rather than incidental. `Done` means the prescription was delivered;
@@ -299,9 +310,15 @@ sealed interface SetEnd {
          * `guidedSet`, which is `prepCase == CUED`. [spoken] is the set's cue
          * track as it stands at the moment the set is ending.
          *
-         * Scoped to guided sets deliberately, and #141 argues why the other
-         * two cases are separate decisions. A timed set whose clock ran out
-         * already carries [TIME_UP], which is terminal since #295.
+         * Asked of a guided set, and since #288 of a TIMED set the lifter ended
+         * before its clock did -- [timed] true, [clockEnded] false -- where the
+         * timed voice speaks on it ([voiceSpeaks], the tick loop's own
+         * `LeadInPolicy.speaks`): a set whose countdown was silent stays silent
+         * at its end. A timed set whose clock ran out is not asked at all: it
+         * carries [TIME_UP], terminal since #295, where the voice is on, and a
+         * `Set ended` beside a clock end with the voice off would say the lifter
+         * stopped a set that ran out. An unguided rep set is still not asked,
+         * which #141 argues as a separate decision.
          *
          * The question asked is "does the record already carry a terminal
          * word", through [calledOver], rather than "was `Done` spoken". Those
@@ -323,20 +340,19 @@ sealed interface SetEnd {
          * last cue. What the boundary changes is that [detectionsAfter] answers
          * 0 instead of null, that `RestClockPolicy`'s seed instant exists, that
          * an analysis no longer has to exclude the failed sets, and that the
-         * lifter hears the set end.
-         *
-         * [timed], [clockEnded] and [voiceSpeaks] describe a TIMED set: it is
-         * one, its own clock ended it, and the timed voice speaks on it
-         * (`LeadInPolicy.speaks`). SEAM ONLY at this commit (#288): none of
-         * the three is read, and a timed set is answered exactly as before.
+         * lifter hears the set end. On a timed set the same holds: field-41
+         * set 21's last sample is 1789124901766 and its write 1789124901799,
+         * so the word bounds the window without excluding a sample there.
          */
-        @Suppress("UnusedParameter")
         fun terminalCall(
             guided: Boolean,
             timed: Boolean,
             clockEnded: Boolean,
             voiceSpeaks: Boolean,
             spoken: List<VoiceCue>,
-        ): SpokenCall? = if (guided && calledOver(spoken) is NotCued) SpokenCall(STOPPED, listOf(STOPPED)) else null
+        ): SpokenCall? {
+            val asked = guided || (timed && !clockEnded && voiceSpeaks)
+            return if (asked && calledOver(spoken) is NotCued) SpokenCall(STOPPED, listOf(STOPPED)) else null
+        }
     }
 }
