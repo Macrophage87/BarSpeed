@@ -38,15 +38,21 @@ import kotlin.test.assertEquals
  * The word the prep countdown and the horizontal guide already use for the
  * working stroke, so the lifter hears one vocabulary. It carries no count, as
  * the one-second beat never did. Where the lifter HEARS it depends on which
- * stroke opens the rep, because the rep number replaces the rep's FIRST stroke
- * word on every rep after the first (#293) and that rule is not touched:
+ * stroke opens the rep and on where the plan names the rep, and neither rule
+ * is touched:
  *
  * - eccentric-first (a bench press): the X drive is the SECOND stroke, so
- *   `Drive` is said on every rep and the number takes the lowering's `Down`;
- * - concentric-first (field-39's seated press and pulldown): the X drive IS
- *   the first stroke, so `Drive` is said once, opening rep 1, and from rep 2
- *   the number takes its second. On that geometry 20X0 and 2010 now differ by
- *   that one row per set and no other.
+ *   `Drive` is said on every rep;
+ * - concentric-first (field-39's seated press and pulldown), on a plan that
+ *   names the rep at the rep's start (#293) -- a `20X0` does, because its
+ *   two-second lowering has room for the call: the X drive IS the first
+ *   stroke, so `Drive` is said once, opening rep 1, and from rep 2 the number
+ *   takes its second. On that geometry 20X0 and 2010 now differ by that one
+ *   row per set and no other;
+ * - concentric-first on a plan that names the rep at the END of the drive
+ *   (#266) -- a `10X0` does, because two one-second strokes and no closing
+ *   pause leave no second at the rep's start: the number takes the lowering's
+ *   `Down`, so `Drive` is said on every rep.
  */
 class ExplosiveDriveCueTest {
     /** field-39 sets 2 and 6: seated overhead press, concentric-first, drive up. */
@@ -110,13 +116,14 @@ class ExplosiveDriveCueTest {
     }
 
     /**
-     * Field-39 set 6's geometry. `Drive` is heard once, on rep 1's opening
-     * second, and never again: from rep 2 the rep number takes that second
-     * (#293), and `Last rep` takes it on the sixth. Before #264 the one row
-     * read `Up`.
+     * Field-39 set 6's geometry and tempo, `20X0`. `Drive` is heard once, on
+     * rep 1's opening second, and never again: from rep 2 the rep number takes
+     * that second (#293), and `Last rep` takes it on the sixth. Before #264 the
+     * one row read `Up`. Not every tempo on this geometry does this: see the
+     * `10X0` pin below.
      */
     @Test
-    fun `where the X drive opens the rep, Drive opens rep 1 and the rep number takes it after`() {
+    fun `where a 20X0 drive opens the rep, Drive opens rep 1 and the rep number takes it after`() {
         val rows = script("20X0", seatedOhp, 6)
         assertEquals(listOf(0 to "Drive"), rows.filter { it.second == "Drive" }, "Drive is said once per set here")
         assertEquals(
@@ -125,6 +132,28 @@ class ExplosiveDriveCueTest {
             "each later rep's opening second carries its number, as on every plan with a two-second stroke",
         )
         assertEquals(listOf<Pair<Int, String>>(), rows.filter { it.second == "Up" }, "and Up is said nowhere")
+    }
+
+    /**
+     * The same geometry at `10X0`. Two one-second strokes and no closing pause
+     * leave no second at the rep's start for the call, so `CadencePlan.of` puts
+     * it at the end of the drive (#266), on the lowering's beat. The drive's
+     * own beat is never replaced, so `Drive` is said on every rep -- a sentence
+     * saying "once per set" for every drive-first lift was false on exactly
+     * this plan (#264 round 1).
+     */
+    @Test
+    fun `a 10X0 seated press names the rep at the drive's end, so Drive is said every rep`() {
+        assertEquals(
+            listOf(
+                0 to "Drive", 1 to "Rep 1",
+                2 to "Drive", 3 to "Rep 2",
+                4 to "Drive", 5 to "Last rep",
+                6 to "Done",
+            ),
+            script("10X0", seatedOhp, 3),
+        )
+        assertEquals(1, plan("10X0", seatedOhp).announceOnBeat, "the call rides the lowering's beat")
     }
 
     @Test

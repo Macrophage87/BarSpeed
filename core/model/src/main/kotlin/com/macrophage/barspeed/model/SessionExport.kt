@@ -1993,19 +1993,18 @@ data class SessionExport(
          * 3, on a lift whose drive moves up -- as `Drive` where it said `Up`,
          * because until now `20X0` and `2010` were the same audio row for row
          * (field-39 sets 2, 6 and 10). The stroke keeps its one-second beat and
-         * carries no count, and no row moves to another second. Field-39 set 6,
-         * a `20X0` seated overhead press, published `Up` at its first cadence
-         * second; the same plan now says `Drive` there and is otherwise the
-         * same row for row.
+         * carries no count, and no row moves to another second.
          *
          * WHERE IT APPEARS depends on which stroke opens the rep. On a lift
-         * whose rep opens with that drive it is published ONCE per set, opening
-         * rep 1, because from rep 2 the rep number takes that stroke's word
-         * (1.20); on a lift whose rep opens with the lowering it is published
-         * on every rep. An `X` in digit 3 of a drive-DOWN lift is the return
-         * and keeps `Up`, and horizontal work already said `Drive` for every
-         * drive and is unchanged -- so on horizontal work `20X0` and `2010` are
-         * still the same audio.
+         * whose rep opens with that drive, a plan that names the rep at the
+         * rep's start publishes it ONCE per set, opening rep 1, because from
+         * rep 2 the rep number takes that stroke's word (1.20); a plan that
+         * names the rep at the end of the drive (#266) -- a `10X0` does --
+         * publishes it on every rep. On a lift whose rep opens with the
+         * lowering it is published on every rep. An `X` in digit 3 of a
+         * drive-DOWN lift is the return and keeps `Up`, and horizontal work
+         * already said `Drive` for every drive and is unchanged -- so on
+         * horizontal work `20X0` and `2010` are still the same audio.
          *
          * WHAT A READER DOES, IN BOTH DIRECTIONS. No key is added, removed or
          * retyped and the schema accepts and rejects exactly the documents it

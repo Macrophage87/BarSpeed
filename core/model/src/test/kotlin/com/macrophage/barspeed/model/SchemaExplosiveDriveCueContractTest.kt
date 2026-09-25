@@ -64,6 +64,10 @@ class SchemaExplosiveDriveCueContractTest {
         val entry = versionLog.substringAfter(marker)
         assertTrue("CHANGES NO KEY" in entry, "the entry does not say no key moved")
         assertTrue("ONCE per set" in entry, "the entry does not say where the word appears on a drive-first lift")
+        assertTrue(
+            "a 10X0 does -- publishes it on every rep" in entry,
+            "the entry says ONCE per set for every drive-first lift, false where the rep is named at the drive's end",
+        )
         assertTrue("keeps 'Up'" in entry, "the entry does not say an X return keeps its word")
         assertTrue("NOT RETROACTIVE" in entry, "the entry does not say archived tracks keep their rows")
         assertTrue(

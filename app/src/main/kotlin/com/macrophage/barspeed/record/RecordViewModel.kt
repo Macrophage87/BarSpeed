@@ -3077,8 +3077,7 @@ data class RecordState(
      * Read off the same parsed tempo the runner's [TempoSchedule] is built
      * from, at the moment the set begins, for [repCallAtDriveEnd]'s reason:
      * a second parse of the slot's tempo string is a second fact that can
-     * disagree with the voice. False on every set that is not a guided
-     * cadence, which has no tempo the voice plays.
+     * disagree with the voice.
      */
     val explosiveUpStroke: Boolean = false,
 
