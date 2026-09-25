@@ -213,24 +213,79 @@ object SetGeometryPolicy {
      * `sensorOnStack` goes through [stackMount] and `bodyweight` through
      * [bodyweightMount], so a plan that says nothing about either gets the
      * app's default for that machine and a plan that says `false` still wins
-     * (#61, #223, #227). `sensorInverted` is the last of the three and needs
-     * neither helper: there is no id table behind it, so the precedence is the
-     * plain one every other key here uses -- a declaration wins, an omission
-     * defers to [base]. It was assigned unconditionally until now, which
-     * cleared a built-in inversion on any plan that did not mention it.
+     * (#61, #223, #227). `sensorInverted` is the last of the three and goes
+     * through [stackInversion], which has no id table behind it but one rule
+     * read off the three values resolved beside it (#317). It was assigned
+     * unconditionally once, which cleared a built-in inversion on any plan
+     * that did not mention it.
      */
     fun resolve(base: ExerciseDef, declared: PlanExerciseDef?): ExerciseDef {
         if (declared == null) return base
+        val concentricUp = declared.concentric?.let { it == "up" } ?: base.concentricUp
+        val horizontal = declared.plane?.let { it == "horizontal" } ?: base.horizontal
+        val onStack = stackMount(base.id, base.sensorOnStack, declared.sensorOnStack).onStack
         return base.copy(
             startsWith = declared.startPhaseOverride ?: base.startsWith,
-            concentricUp = declared.concentric?.let { it == "up" } ?: base.concentricUp,
+            concentricUp = concentricUp,
             kind = declared.effectiveKind,
-            sensorInverted = declared.sensorInverted ?: base.sensorInverted,
+            sensorInverted =
+            stackInversion(declared.sensorInverted, base.sensorInverted, onStack, concentricUp, horizontal),
             travelRatio = declared.travelRatio ?: base.travelRatio,
-            horizontal = declared.plane?.let { it == "horizontal" } ?: base.horizontal,
-            sensorOnStack = stackMount(base.id, base.sensorOnStack, declared.sensorOnStack).onStack,
+            horizontal = horizontal,
+            sensorOnStack = onStack,
             bodyweight = bodyweightMount(base.id, base.bodyweight, declared.bodyweight),
         )
+    }
+
+    /**
+     * Whether the sensor moved opposite to the lifter's drive for this set, and
+     * so whether its measured motion is flipped before analysis (#317).
+     *
+     * Precedence, highest first:
+     *
+     * 1. [declared] non-null -- the plan said so, either way. A declared
+     *    `false` wins even where rule 3 would say true: only whoever clipped
+     *    the unit on knows where it went.
+     * 2. [base] already true -- the app's own definition of the exercise. No
+     *    [ExerciseDef.SEED] entry sets it today, which `SetGeometryPolicyTest`
+     *    pins.
+     * 3. [onStack], a downward drive, and the vertical plane, all as RESOLVED
+     *    for this set -- true. A weight stack rises while the handle is driven
+     *    down, so a unit riding it moves opposite to the drive. Horizontal work
+     *    orients its drive positive and the stack rises on it, and a drive-up
+     *    stack (a leg extension) rises with the lifter, so neither inverts. It
+     *    reads the resolved geometry and never the words in an id, so a plan's
+     *    own name for a pushdown resolves the same as the built-in one.
+     * 4. Otherwise false.
+     *
+     * MEASURED, NOT DERIVED FROM A SPEC: on six pushdown sets across field-38,
+     * field-41 and field-45 the stack unit read the performed count exactly
+     * under rule 3's answer, and 0 to 7 of 12 to 16 under the other. That is
+     * evidence about those machines, not a guarantee about every cable
+     * routing -- a stack that FALLS as the handle goes down would be misread
+     * by it, and nothing here can see one. Rule 1 is the way out: declare
+     * `false`.
+     *
+     * An ASSIST stack is the case rule 3 does not reach, deliberately. On an
+     * assisted pull-up the counterweight falls as the lifter rises, which is
+     * an inversion on a drive-UP lift; field-42's two read 10 and 5 of 8 as
+     * declared and 7 and 8 inverted, which is not a rule, and is raised
+     * rather than folded in.
+     *
+     * There is no provenance for the answer anywhere in the export -- the key
+     * has no `geometry.source` entry (#289) -- so the import gate's line is the
+     * only place a rule-3 answer is visible before the set is recorded.
+     */
+    fun stackInversion(
+        declared: Boolean?,
+        base: Boolean,
+        onStack: Boolean,
+        concentricUp: Boolean,
+        horizontal: Boolean,
+    ): Boolean = when {
+        declared != null -> declared
+        base -> true
+        else -> onStack && !concentricUp && !horizontal
     }
 
     /**

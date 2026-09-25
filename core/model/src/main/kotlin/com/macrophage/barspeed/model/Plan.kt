@@ -189,6 +189,7 @@ data class PlanFile(
         eachExercise(::prepVsPhrase) +
         eachExercise(::sensorsInert) +
         eachExercise(::stackSeeded) +
+        eachExercise(::inversionApplied) +
         eachExercise(::bodyweightSeeded) +
         eachExercise(::progressionVsSets) +
         eachExercise(::cueSplit) +
@@ -548,6 +549,45 @@ data class PlanFile(
     }
 
     /**
+     * An inversion the app is about to apply to a stack lift whose drive goes
+     * down, on a plan that said nothing about it (#317).
+     *
+     * [stackSeeded]'s shape and it sits beside it: the plan said nothing and
+     * the app decides, and the decision flips every measured direction on the
+     * set. The answer is [SetGeometryPolicy.stackInversion]'s, asked with the
+     * same three resolved values [SetGeometryPolicy.resolve] hands it, so the
+     * line and the recorded set cannot disagree. The export publishes no source
+     * for `sensorInverted` (#289), so this line is the only place the inference
+     * shows before the set is recorded.
+     *
+     * Read against a definition the app does not have here:
+     * [SetGeometryPolicy.resolve]'s `base` is the stored exercise, and this has
+     * only the id, so it passes the base values every definition
+     * `SessionRepository.exerciseById` can return carries at this tree -- no
+     * [ExerciseDef.SEED] entry and no custom or unseen id is inverted,
+     * horizontal or drive-down, and each takes its stack term from the same
+     * [ExerciseDef.ridesStack] table [SetGeometryPolicy.stackMount] reads. A
+     * definition that ever sets one of those would be read differently here.
+     *
+     * Silent when the plan declares the key either way, [stackSeeded]'s rule.
+     */
+    private fun inversionApplied(si: Int, ei: Int, exercise: PlanExerciseDef): String? {
+        if (exercise.sensorInverted != null) return null
+        val applied = SetGeometryPolicy.stackInversion(
+            declared = null,
+            base = false,
+            onStack = SetGeometryPolicy.stackMount(exercise.exercise, false, exercise.sensorOnStack).onStack,
+            concentricUp = exercise.concentric?.let { it == "up" } ?: true,
+            horizontal = exercise.plane?.let { it == "horizontal" } ?: false,
+        )
+        if (!applied) return null
+        return "sessions[$si].exercises[$ei]: ${exercise.exercise} rides the weight stack with its drive " +
+            "going DOWN, and this plan does not declare \"sensorInverted\" - the stack rises as the " +
+            "handle is driven down, so the set is recorded inverted. Declare \"sensorOnStack\": false " +
+            "if the sensor was on the handle instead."
+    }
+
+    /**
      * A movement the app seeds as body-weight work, on a plan that said
      * nothing about the flag (#61, #227).
      *
@@ -819,12 +859,13 @@ data class PlanExerciseDef(
      * of that exercise standing rather than clearing it. What differs is what
      * is behind the omission: there is no id table here, because no entry in
      * [ExerciseDef.SEED] sets this and inversion is a property of how a machine
-     * is ROUTED, which only whoever clipped the sensor on can know. So an
-     * omitted key resolves to false today exactly as it did before it was
-     * nullable, the import gate has no inference to name for it, and what the
-     * type buys is that a plan CAN say false as a decision rather than by
-     * silence — and that the day an inverted machine is built in, a plan that
-     * says nothing defers to it (the last third of #64).
+     * is ROUTED. There is one rule instead, since #317: a set that resolves
+     * onto the stack with its drive going down in the vertical plane resolves
+     * an omitted key true, because a weight stack rises while the handle is
+     * driven down ([SetGeometryPolicy.stackInversion]), and the import gate
+     * names that line. Anywhere else an omitted key resolves to false, and a
+     * plan CAN say false as a decision rather than by silence — which wins
+     * over the rule too.
      */
     val sensorInverted: Boolean? = null,
     /**

@@ -82,8 +82,9 @@ sealed interface LiveFallback {
  *    declaration describes the lift, so the partner's stream is described by it
  *    as well as the armed unit's.
  * 3. A MOUNT TERM NOTHING CAN MEASURE refuses: [LiveFallback.Withhold]. Where
- *    `LiftDirection.mountSpecificBesidesStack` is true -- a declared inversion,
- *    or a pulley that does not travel 1:1 -- no code anywhere reads a stream
+ *    `LiftDirection.mountSpecificBesidesStack` is true -- an inversion, declared
+ *    or applied by `SetGeometryPolicy.stackInversion` (#317), or a pulley that
+ *    does not travel 1:1 -- no code anywhere reads a stream
  *    and answers for it, so there is no repair to make. This fires whether or
  *    not a stack is also declared, and it is the population #247 refuses at set
  *    end for the same reason.
@@ -174,9 +175,10 @@ object LiveFallbackPolicy {
      *   can happen.
      * @param declaresStackMount the set's own `sensorOnStack`, as resolved for
      *   the set rather than guessed from the exercise's name.
-     * @param declaresOtherMount `LiftDirection.mountSpecificBesidesStack` -- a
-     *   declared inversion or a travel ratio, neither of which anything
-     *   measures.
+     * @param declaresOtherMount `LiftDirection.mountSpecificBesidesStack` -- an
+     *   inversion (declared, or applied to a drive-down stack set by
+     *   `SetGeometryPolicy.stackInversion`) or a travel ratio, neither of which
+     *   anything measures.
      * @param signal what the stream now feeding the tracker says about riding
      *   the load, from `StackRollSignature` over its working window so far.
      *

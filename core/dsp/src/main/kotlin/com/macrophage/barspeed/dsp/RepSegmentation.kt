@@ -118,10 +118,16 @@ data class LiftDirection(
      * the other two has to ask about them separately, and this is the half a
      * measurement CANNOT settle.
      *
-     * False on every seed id `ExerciseDef.ridesStack` carries: none of the
-     * twelve declares an inversion or a ratio, and no built-in exercise
-     * carries `sensorInverted` at all. True only where a PLAN declared one of
-     * them, which is also the only way either can become true.
+     * No built-in exercise carries `sensorInverted` or a ratio, so a plan is
+     * the only thing that makes this true -- but not only by declaring one of
+     * them. Since #317 a plan that resolves a set onto the stack with its drive
+     * going down in the vertical plane, and omits `sensorInverted`, resolves
+     * it true (`SetGeometryPolicy.stackInversion`), so this is true on a
+     * pushdown, pulldown or leg curl whose plan named no inversion. The
+     * sentence that stood here -- "True only where a PLAN declared one of
+     * them" -- is deleted. The inversion that rule applies is still not a
+     * measurement: it is read off the resolved declaration, and nothing reads
+     * a stream to answer it.
      *
      * `travelRatio != 1.0` is an exact comparison against the type default,
      * for [mountSpecific]'s reason: the value is declared or seeded, never
