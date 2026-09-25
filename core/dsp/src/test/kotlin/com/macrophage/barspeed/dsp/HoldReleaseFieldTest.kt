@@ -1,5 +1,7 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.HoldEndPolicy
+import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PrepCase
 import com.macrophage.barspeed.model.RestClockPolicy
@@ -375,6 +377,54 @@ class HoldReleaseFieldTest {
         assertEquals(26058L, release18 - set18.clockStartedAtMs, "role a's release, into the hold")
         assertEquals(23313L, release18b - set18.clockStartedAtMs, "role b's release, into the hold")
         assertEquals(2745L, release18 - release18b, "how far apart the two units answer")
+    }
+
+    @Test
+    fun `what each committed hold records, read from its own stream`() {
+        // The join `recordedTimedEnd` in `:app` makes -- the release off the
+        // analysed stream, floored by the same `SetClockPolicy.heldSeconds`,
+        // handed to `HoldEndPolicy` -- asked here of the committed streams so
+        // #311's change to a CLOCK end has a pin on real samples either side
+        // of it. GREEN at the commit that adds it, and meant to stay green.
+        //
+        // The carry ran to `Time` with the handles in the lifter's hands and
+        // its stream crosses nothing: a completed hold, which must keep its
+        // target whatever the clock-end rule becomes.
+        val carryRelease = HoldRelease.atMs(load(carry.fixture), carry.clockStartedAtMs)
+        assertEquals(
+            HoldEndPolicy.Decision(30, HoldEndSource.CLOCK),
+            HoldEndPolicy.decide(
+                measuredS = secondsTo(carry, carry.endedAtMs),
+                targetS = carry.targetS,
+                autoEnded = true,
+                sensorEndS = carryRelease?.let { secondsTo(carry, it) },
+            ),
+            "field-42 set 16 records the target it ran to",
+        )
+        // The two dead hangs were ended by the lifter's tap, and their
+        // releases decide: 29 and 26 against 36 and 32 to the tap.
+        val release17 = HoldRelease.atMs(load(set17.fixture), set17.clockStartedAtMs)
+        assertEquals(
+            HoldEndPolicy.Decision(29, HoldEndSource.SENSOR),
+            HoldEndPolicy.decide(
+                measuredS = secondsTo(set17, set17.endedAtMs),
+                targetS = set17.targetS,
+                autoEnded = false,
+                sensorEndS = release17?.let { secondsTo(set17, it) },
+            ),
+            "field-38 set 17",
+        )
+        val release18 = HoldRelease.atMs(load(set18.fixture), set18.clockStartedAtMs)
+        assertEquals(
+            HoldEndPolicy.Decision(26, HoldEndSource.SENSOR),
+            HoldEndPolicy.decide(
+                measuredS = secondsTo(set18, set18.endedAtMs),
+                targetS = set18.targetS,
+                autoEnded = false,
+                sensorEndS = release18?.let { secondsTo(set18, it) },
+            ),
+            "field-38 set 18",
+        )
     }
 
     private fun secondsTo(hold: Hold, instantMs: Long): Int = SetClockPolicy.heldSeconds(

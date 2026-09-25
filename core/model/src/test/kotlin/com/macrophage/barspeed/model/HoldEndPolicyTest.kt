@@ -71,6 +71,43 @@ class HoldEndPolicyTest {
     }
 
     @Test
+    fun `a hold that ran to its target is never shortened by a release at or after it`() {
+        // Issue #311's guard, GREEN at the commit that adds it and green after
+        // the fix, said so rather than implied: today a clock-ended hold never
+        // consults the release at all, so none of these could be written red.
+        // What they pin is the direction #311 must not move -- a completed
+        // hold recording less than the target the lifter heard `Time` at.
+        //
+        // A release at the target: nothing to remove.
+        assertEquals(
+            HoldEndPolicy.Decision(35, HoldEndSource.CLOCK),
+            HoldEndPolicy.decide(measuredS = 35, targetS = 35, autoEnded = true, sensorEndS = 35),
+            "a release on the target second",
+        )
+        // After it -- the handles put down after `Time`, measured on a tick
+        // loop that drifted a second past the target.
+        assertEquals(
+            HoldEndPolicy.Decision(35, HoldEndSource.CLOCK),
+            HoldEndPolicy.decide(measuredS = 36, targetS = 35, autoEnded = true, sensorEndS = 36),
+            "a release after the target",
+        )
+        // Beyond the cap, in LITERAL seconds: twenty-one off a 45 s target is
+        // not a reach, so the target stands.
+        assertEquals(
+            HoldEndPolicy.Decision(45, HoldEndSource.CLOCK),
+            HoldEndPolicy.decide(measuredS = 45, targetS = 45, autoEnded = true, sensorEndS = 24),
+            "twenty-one seconds before the target",
+        )
+        // And no release at all: field-42 set 16's shape, whose stream is
+        // read in `:core:dsp`'s `HoldReleaseFieldTest`.
+        assertEquals(
+            HoldEndPolicy.Decision(30, HoldEndSource.CLOCK),
+            HoldEndPolicy.decide(measuredS = 30, targetS = 30, autoEnded = true, sensorEndS = null),
+            "no release seen",
+        )
+    }
+
+    @Test
     fun `a sensor end may not lengthen a hold, and may not take more than the cap off`() {
         // GREEN at the commit that adds it, and said so rather than implied: the
         // pre-fix code answered the tap's own seconds for both of these too, so
