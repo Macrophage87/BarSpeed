@@ -259,12 +259,13 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
                 // reader shows, and CoachingVerdictPolicy in :core:model is
                 // where that decision is made and tested.
                 //
-                // NOT FIXED for a timed set (#308): HistoryTarget still answers
-                // Frozen on every row, so `a.verdicts` here is the sentence
-                // frozen at set end from the pre-correction seconds. The row's
-                // `plannedDurationS` is the PLAN's original target, which a
-                // duration correction never touches -- not the working target
-                // `restVerdicts` grades against on the rest screen.
+                // A HOLD ON A v20 ROW IS RE-GRADED (#308): HistoryTarget answers
+                // Regrade, and historyVerdicts hands the stored seconds -- the
+                // corrected figure where the lifter corrected it -- and the
+                // WORKING target to the rest screen's own restVerdicts. A row
+                // written before v20 stores no working target, so its frozen
+                // sentence stays, captioned where the hold was corrected after
+                // that sentence was written.
                 (target.verdict as? HistoryTarget.Verdict.Frozen)?.caption?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                 }

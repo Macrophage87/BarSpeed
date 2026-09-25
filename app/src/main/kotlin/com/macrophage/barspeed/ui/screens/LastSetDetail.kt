@@ -715,9 +715,10 @@ private fun RepQualityCard(feedback: SetFeedback) {
     // CURRENT seconds rather than the frozen string, and is pinned by
     // `PlanQueueTest`.
     //
-    // `SessionDetailScreen`'s history card has the same frozen-sentence read
-    // at its own `CoachingVerdictPolicy.forRegime` call and is NOT fixed by
-    // this change -- see the note there.
+    // `SessionDetailScreen`'s history card asks the same `restVerdicts`
+    // through `historyVerdicts` (#308): a hold on a v20 row is re-graded
+    // against its working target; one written before v20 keeps its frozen
+    // sentence, having no working target to re-grade against.
     //
     // A non-timed set has no correction to go stale against, so it keeps
     // reading the frozen `analysis.verdicts` through `CoachingVerdictPolicy`,
