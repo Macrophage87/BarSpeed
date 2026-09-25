@@ -2063,6 +2063,52 @@ data class SessionExport(
          * in the published schema AND in `PLAN_PROMPT`, the absence of each
          * sentence that went false, and this entry's marker. It cannot see this
          * KDoc.
+         *
+         * 1.22 TAKES A SEVENTH ENTRY (#311, a hold let go before its target),
+         * and it CHANGES NO KEY: [SetExport.durationEndedBy] may now read
+         * `sensor` on a hold the app's own clock ended. A FURTHER ENTRY under
+         * the unreleased 1.22, on the tag reading the third entry states: the
+         * latest tag is v0.1.54 and it ships 1.21.
+         *
+         * WHAT GOES FALSE. Under 1.21 `clock` said `duration_s` IS the target
+         * and `sensor` said the release came before a TAP, so a hold the lifter
+         * let go before its target and never tapped -- the clock then ended it
+         * at the target -- recorded the target under `clock`. Field-45's rope
+         * dead hang, 35 s planned, was ended by the clock at 35 s, and the code
+         * as shipped records 35 under `clock` on that shape; its export carries
+         * 30 only because the lifter restated it with the rest screen's
+         * correction, while its armed unit's stream shows the release 30.742 s
+         * into the hold.
+         *
+         * THE CHANGE. On a hold the clock ended, a release the armed unit saw
+         * decides `duration_s` where believing it takes 1 to 20 whole seconds
+         * off the target -- the window a tapped hold already had,
+         * `HoldEndPolicy.MAX_TRIM_S` -- and the key reads `sensor`; a release at
+         * or after the target, or none, leaves `clock` and the target, so a
+         * hold that ran to its target is never shortened.
+         *
+         * THE VERDICT. The release writes neither failure fact. `failed` is
+         * derived from `duration_s` at the write as before, so such a hold can
+         * now derive short where its target would not have; `failedByLifter`
+         * never moves.
+         *
+         * WHAT A READER DOES, IN BOTH DIRECTIONS. No key is added, removed or
+         * retyped and the schema accepts and rejects exactly the documents it
+         * did before this entry, so an older and a newer reader read every
+         * value identically; the asymmetry the 1.22 mint states is unchanged.
+         * What moves is what two words may mean: a `sensor` hold may never have
+         * been tapped, and a `clock` hold is one no armed unit saw let go
+         * before its target. NOT RETROACTIVE: the word and the seconds are
+         * decided when the set is recorded and stored with it, so every set
+         * already on disk keeps its `clock` and its target. `DATABASE_VERSION`
+         * does NOT move and the plan schema is untouched.
+         *
+         * PINNED. `SchemaClockReleaseContractTest` asserts this entry's marker
+         * and its reading rules in the published log, and the `durationEndedBy`
+         * and `duration_s` sentences that state the clock-ended case; it cannot
+         * see this KDoc. `HoldEndPolicyDifferentialTest` and `HoldEndPolicyTest`
+         * pin the rule, and `HoldReleaseFieldTest` in `:core:dsp` pins it on the
+         * committed hold streams.
          */
         const val SCHEMA_VERSION = "1.22"
 
@@ -2445,6 +2491,12 @@ data class SetExport(
      * timed set carried the walk back to the phone inside it, and from 1.21 a
      * hold whose armed unit saw the release does not.
      *
+     * From 1.22 (#311) a set the CLOCK ended publishes the span to a release
+     * instead of the target where its armed unit saw the implement let go and
+     * believing it takes 1 to 20 whole seconds off the target, so such a set
+     * is SHORTER than its target though the clock ran to it. A release at or
+     * after the target, or none, leaves the target.
+     *
      * ABSENT FROM 1.18 on a set that ended before its work phase began, which
      * carries [abandonedInPrep] instead. Such a set stores 0 here and that 0
      * was never a measurement. A set recorded before database v15 carries no
@@ -2482,12 +2534,16 @@ data class SetExport(
      *
      * - `clock` -- the app's own clock reached the target and ended the set
      *   (#168), so [durationS] is the target itself and the lifter heard `Time`
-     *   a beat before it.
+     *   a beat before it. From 1.22 (#311) only where no armed unit's stream
+     *   showed the implement being let go 1 to 20 whole seconds before the
+     *   target.
      * - `sensor` -- an armed unit's stream showed the implement being let go,
      *   and [durationS] runs to THAT instant rather than to the tap that
-     *   followed it. On a hands-full hold the tap is 5-10 s late by the owner's
-     *   own account, and every one of those seconds used to be inside this
-     *   figure.
+     *   followed it -- or, from 1.22 (#311), rather than to the target on a
+     *   hold the clock ended, where the release came 1 to 20 whole seconds
+     *   before the target, so a `sensor` hold may never have been tapped at
+     *   all. On a hands-full hold the tap is 5-10 s late by the owner's own
+     *   account, and every one of those seconds used to be inside this figure.
      * - `lifter` -- the tap decided, and nothing else spoke: no unit was armed
      *   for the set, or the armed unit's stream carried no release. The reach
      *   is still inside [durationS] on these.

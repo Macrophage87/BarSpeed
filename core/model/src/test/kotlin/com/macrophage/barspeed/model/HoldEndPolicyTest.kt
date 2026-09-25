@@ -18,6 +18,13 @@ import kotlin.test.assertTrue
  * as it stands, plus the guards that could not be written red because the
  * pre-fix code happened to answer the same thing.
  *
+ * A third, `a release the clock beat is not consulted at all`, is DELETED on
+ * the same terms at #311's red: it asserted that a hold the clock ended keeps
+ * the target over a release ten seconds before it, which is the defect #311
+ * names. `HoldEndPolicyDifferentialTest` states what replaces it, and the
+ * guard that survives -- a release at or after the target, or past the cap,
+ * never shortens a completed hold -- is pinned below.
+ *
  * The WORDS half is not a differential and does not move: the four strings are
  * a published contract from the moment the schema carries them.
  */
@@ -51,22 +58,6 @@ class HoldEndPolicyTest {
         assertEquals(
             HoldEndPolicy.Decision(22, HoldEndSource.LIFTER),
             HoldEndPolicy.decide(measuredS = 22, targetS = null, autoEnded = false, sensorEndS = null),
-        )
-    }
-
-    @Test
-    fun `a release the clock beat is not consulted at all`() {
-        // The clock is not overruled: a hold that ran to `Time` records the
-        // target whatever its stream says afterwards. Letting a crossing shorten
-        // it would record less than the lifter was told they had completed.
-        assertEquals(
-            HoldEndPolicy.Decision(30, HoldEndSource.CLOCK),
-            HoldEndPolicy.decide(measuredS = 31, targetS = 30, autoEnded = true, sensorEndS = 20),
-            "a clock-ended hold with a release ten seconds early",
-        )
-        assertEquals(
-            HoldEndPolicy.Decision(30, HoldEndSource.CLOCK),
-            HoldEndPolicy.decide(measuredS = 31, targetS = 30, autoEnded = true, sensorEndS = 29),
         )
     }
 
