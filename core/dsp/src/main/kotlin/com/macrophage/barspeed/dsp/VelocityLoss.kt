@@ -19,7 +19,7 @@ package com.macrophage.barspeed.dsp
  * deliberate: best-to-last with last == best is the degenerate case of the
  * definition and carries no information about fatigue in either direction,
  * while `velocityLossBasis` still tells a reader the last rep was the fastest
- * of the set.
+ * of the peak-eligible reps.
  */
 sealed interface VelocityLoss {
     /** Best rep to last rep, percent, rounded as the export publishes it. */
@@ -32,8 +32,8 @@ sealed interface VelocityLoss {
     data object NoReference : VelocityLoss
 
     /**
-     * The last rep resolved is the fastest of the set, so best-to-last is
-     * exactly zero by construction.
+     * The last rep resolved is the fastest of the peak-eligible reps, so
+     * best-to-last is exactly zero by construction.
      *
      * This is also the signature of a spurious final detection -- the sensor
      * set down, or the lifter getting off the machine, moving faster than any
