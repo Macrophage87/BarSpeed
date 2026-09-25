@@ -61,7 +61,8 @@ enum class LiveCounter {
      * [DRIVE_IMPULSE] counts 28 and nothing at 111 and 120 kg. It speaks as the
      * bar lands rather than at the brake -- median 1.16 s after the batch
      * window ends -- and on a light soft landing a rep late.
-     * `ClosingRuleCandidateTest` pins every figure.
+     * `ClosingRuleCandidateTest` pins the counts; it prints the median lag and
+     * asserts it nowhere.
      */
     CYCLE,
 }
