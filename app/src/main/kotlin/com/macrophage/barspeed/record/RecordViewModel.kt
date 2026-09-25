@@ -1052,6 +1052,10 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, written: C
     // record a question nobody was shown.
     rpeScale = EffortScale.askFor(p.isTimed, p.slot?.progression).word,
     plannedReps = p.plannedReps,
+    // The rep target the set RAN against (#157): the frozen figure the
+    // short-set derivation, the rating tracker and the analyzer's target are
+    // handed. Null on a set with no rep target.
+    workingReps = p.targetReps,
     manualReps = p.manualReps,
     // What the sensor counted, beside what the set is recorded as (#286).
     // Both come off the frozen write, so a retry stores the same pair.
@@ -1064,12 +1068,23 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, written: C
     // the row stores one of them (#259).
     durationEndedBy = p.durationEndedBy?.published,
     plannedDurationS = p.plannedDurationS,
+    // The hold the countdown ran to (#157), frozen at endSet; null on a set
+    // that is not timed.
+    workingDurationS = p.targetDurationS,
     side = p.side,
     plannedSide = p.plannedSide,
     tempo = p.tempoText,
+    // The PLAN's tempo, off the frozen slot's declaration, never `tempo`, which
+    // the bake has already written any adjustment into (#157). Null wherever
+    // tempoText is forced null for a timed set, on an ad-hoc set (no slot, no
+    // plan), and on an appended slot, whose plannedTempo is reset.
+    plannedTempo = if (p.isTimed) null else p.slot?.plannedTempo,
     targetMeanConVelMps = p.slot?.targetMeanConVelMps,
     velocityLossStopPct = p.slot?.velocityLossStopPct,
     plannedRestS = p.slot?.restS,
+    // The one instant the countdown and the rest-HR window already read
+    // (#178), frozen at endSet; stored so a measured rest has two instants.
+    restStartedAtMs = p.restStartedAtMs,
     plannedPrepS = p.plannedPrepS,
     prepS = p.prepS,
     prepWindow = p.prepWindow,
@@ -5270,9 +5285,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // plannedDurationS). A lifter who states 6 and does 6 has not stopped
         // early; judging them against the plan's 8 would record a failed set
         // for a change they made deliberately, and after #137 that reaches the
-        // RPE record. The row does not store the working target it was judged
-        // against: it stores plannedReps and the actual count, so a set met at
-        // a lowered target reads "planned 10, did 6, not failed". Its seconds
+        // RPE record. From database v20 the row stores the working target it
+        // was judged against (workingReps, workingDurationS, via
+        // completedSetOf) beside plannedReps and the actual count; the export
+        // does not publish it yet, so there a set met at a lowered target
+        // still reads "planned 10, did 6, not failed". Its seconds
         // rule is TimedSetEndPolicy.fellShort, the function setTargetMet's
         // timed branch asks, so the screen and the record draw one boundary
         // (#168).

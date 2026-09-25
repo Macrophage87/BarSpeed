@@ -470,6 +470,12 @@ class SessionRepository(
                 exerciseName = set.exerciseName,
                 loadKg = set.loadKg,
                 plannedLoadKg = set.plannedLoadKg,
+                // The planned / working / actual triple (#157): the target the
+                // set RAN against, beside the plan's frozen figure and the
+                // actual one. Copied as the caller froze them, never filled
+                // from a sibling -- a working figure read off the plan is the
+                // defect this column exists to end.
+                workingLoadKg = set.workingLoadKg,
                 // What the caller says the load arithmetic used, never a
                 // lookup made here: the app holds one body weight and it
                 // moves, so a reading taken at write time would already be a
@@ -492,9 +498,11 @@ class SessionRepository(
                 // lifter disagreeing with it.
                 liveReps = set.liveReps,
                 plannedReps = set.plannedReps,
+                workingReps = set.workingReps,
                 actualDurationS = set.actualDurationS,
                 durationEndedBy = set.durationEndedBy,
                 plannedDurationS = set.plannedDurationS,
+                workingDurationS = set.workingDurationS,
                 side = set.side,
                 plannedSide = set.plannedSide,
                 rpe = set.rpe,
@@ -503,9 +511,11 @@ class SessionRepository(
                 warmup = set.warmup,
                 added = set.added,
                 tempo = set.tempo,
+                plannedTempo = set.plannedTempo,
                 targetMeanConVelMps = set.targetMeanConVelMps,
                 velocityLossStopPct = set.velocityLossStopPct,
                 plannedRestS = set.plannedRestS,
+                restStartedAtMs = set.restStartedAtMs,
                 plannedPrepS = set.plannedPrepS,
                 prepS = set.prepS,
                 workBegan = set.workBegan,

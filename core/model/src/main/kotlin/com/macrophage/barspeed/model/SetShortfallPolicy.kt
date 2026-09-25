@@ -28,12 +28,15 @@ package com.macrophage.barspeed.model
  *   not provisional.
  *
  * The discrepancy between the working target and the plan is NOT judged
- * here. Noting it is a recording job, not a verdict. What is true today: the
- * set row stores the plan's figure (`plannedReps`, `plannedDurationS`) and
- * the actual one, and does NOT store the working target this function was
- * handed, so a set met at a lowered target reads in the export as "planned
- * 10, did 6, not failed" (#157, field-45 set 8). #157 recovered the working
- * count of a guided set only from where `Last rep` falls in its cue track.
+ * here. Noting it is a recording job, not a verdict. From database v20 the
+ * set row stores the working target this function is handed
+ * (`workingReps`, `workingDurationS`) beside the plan's figure and the
+ * actual one. The export does not publish it yet, so a set met at a lowered
+ * target still reads in the export as "planned 10, did 6, not failed"
+ * (#157, field-45 set 8) until the export carries the working keys. The
+ * sentence here said the row does NOT store the working target; v20 made it
+ * false and it is deleted. #157 recovered the working count of a guided set
+ * only from where `Last rep` falls in its cue track.
  *
  * ## Judged only where the count is trustworthy
  *
@@ -41,8 +44,8 @@ package com.macrophage.barspeed.model
  * person or the guide stated -- never against a possibly-miscounted sensor
  * total. A straight-reps set counted by the sensor and not corrected reaches
  * [atWrite] with no stated count, and is short only if the lifter taps the
- * failed tile. `setTargetMet` in `RecordViewModel` states the same refusal on
- * the control side.
+ * failed tile. `RecordState.setTargetMet` states the same refusal on the
+ * control side.
  *
  * ## What this cannot check
  *

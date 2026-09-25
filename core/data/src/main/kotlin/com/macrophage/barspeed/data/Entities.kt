@@ -145,8 +145,10 @@ data class SetRecordEntity(
      * in-app buttons never move.
      *
      * NULL on every row written before v20, by a build that dropped this
-     * figure at the write. Nothing backfills it: on a corrected row [loadKg]
-     * is the correction, not the target.
+     * figure at the write. Every set has a load, so
+     * `SessionRepository.recordSet` writes one on every row it inserts from
+     * v20. Nothing backfills it: on a corrected row [loadKg] is the
+     * correction, not the target.
      */
     val workingLoadKg: Double? = null,
     /**
