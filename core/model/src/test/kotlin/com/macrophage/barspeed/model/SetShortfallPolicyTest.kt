@@ -21,23 +21,21 @@ import kotlin.test.assertTrue
  * is short and 31 is not.
  */
 class SetShortfallPolicyTest {
-    private fun reps(stated: Int?, working: Int?) =
-        SetShortfallPolicy.atWrite(
-            timed = false,
-            recordedS = null,
-            workingDurationS = null,
-            statedReps = stated,
-            workingReps = working,
-        )
+    private fun reps(stated: Int?, working: Int?) = SetShortfallPolicy.atWrite(
+        timed = false,
+        recordedS = null,
+        workingDurationS = null,
+        statedReps = stated,
+        workingReps = working,
+    )
 
-    private fun hold(recordedS: Int?, workingS: Int?) =
-        SetShortfallPolicy.atWrite(
-            timed = true,
-            recordedS = recordedS,
-            workingDurationS = workingS,
-            statedReps = null,
-            workingReps = null,
-        )
+    private fun hold(recordedS: Int?, workingS: Int?) = SetShortfallPolicy.atWrite(
+        timed = true,
+        recordedS = recordedS,
+        workingDurationS = workingS,
+        statedReps = null,
+        workingReps = null,
+    )
 
     @Test
     fun `a set that met a raised working target met it`() {
