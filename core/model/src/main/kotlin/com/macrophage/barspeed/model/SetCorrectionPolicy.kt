@@ -70,10 +70,11 @@ object SetCorrectionPolicy {
      * words: "Don't ask for an RPE on failed sets, if you can't do it, it's
      * failed." Every failure tile already drafts a null rpe; this makes the
      * one write unable to pair a failure the lifter stated with a rating it
-     * replaced, whatever the draft carried.
+     * replaced, whatever the draft carried. The rule is
+     * [FailedSetRatingPolicy.storedRpe] (#313).
      */
     fun row(draft: CountAndRatingDraft, shortfall: Boolean): CorrectedRatingRow = CorrectedRatingRow(
-        rpe = if (draft.tappedFailed) null else draft.rpe,
+        rpe = FailedSetRatingPolicy.storedRpe(draft.rpe, failedByLifter = draft.tappedFailed, shortfall = shortfall),
         failed = draft.tappedFailed || shortfall,
         failedByLifter = draft.tappedFailed,
     )

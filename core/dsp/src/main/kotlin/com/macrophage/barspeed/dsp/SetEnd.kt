@@ -297,8 +297,19 @@ sealed interface SetEnd {
          * 0 instead of null, that `RestClockPolicy`'s seed instant exists, that
          * an analysis no longer has to exclude the failed sets, and that the
          * lifter hears the set end.
+         *
+         * [timed], [clockEnded] and [voiceSpeaks] describe a TIMED set: it is
+         * one, its own clock ended it, and the timed voice speaks on it
+         * (`LeadInPolicy.speaks`). SEAM ONLY at this commit (#288): none of
+         * the three is read, and a timed set is answered exactly as before.
          */
-        fun terminalCall(guided: Boolean, spoken: List<VoiceCue>): SpokenCall? =
-            if (guided && calledOver(spoken) is NotCued) SpokenCall(STOPPED, listOf(STOPPED)) else null
+        @Suppress("UnusedParameter")
+        fun terminalCall(
+            guided: Boolean,
+            timed: Boolean,
+            clockEnded: Boolean,
+            voiceSpeaks: Boolean,
+            spoken: List<VoiceCue>,
+        ): SpokenCall? = if (guided && calledOver(spoken) is NotCued) SpokenCall(STOPPED, listOf(STOPPED)) else null
     }
 }

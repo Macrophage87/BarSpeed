@@ -399,7 +399,7 @@ internal fun applyRating(
         // correction, so passing anything else here would let re-rating a
         // ramp set silently turn it into work (#187).
         val warmup = stateFlow.value.lastSetWarmup
-        val effectiveFailed = ratings.rate(rpe, failed, warmup) ?: return@launch
-        stateFlow.value = ratedState(stateFlow.value, rpe, failed, effectiveFailed)
+        val row = ratings.rate(rpe, failed, warmup) ?: return@launch
+        stateFlow.value = ratedState(stateFlow.value, row.rpe, row.failedByLifter, row.failed)
     }
 }

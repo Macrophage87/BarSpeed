@@ -73,18 +73,6 @@ class SetRatingTracker(private val writer: SetRowWriter) {
     private var setId: Long? = null
     private var autoFailed = false
     private var tappedFailed = false
-
-    /**
-     * The lifter's tap, exposed so the set write can STORE it beside the OR
-     * (#216).
-     *
-     * Read once, by the recorder, immediately after [onSetRecorded] returns.
-     * The two facts have always been kept apart here and only the OR reached
-     * the database, which is why a set the lifter called a grinder and one the
-     * app derived a shortfall for have been indistinguishable in every export
-     * ever written.
-     */
-    val lifterCalledFailure: Boolean get() = tappedFailed
     private var plannedReps: Int? = null
     private var plannedDurationS: Int? = null
 
@@ -94,8 +82,20 @@ class SetRatingTracker(private val writer: SetRowWriter) {
      * shortfall verdict, judged by the caller only where the rep or second
      * count is trustworthy.
      *
+     * Returns the whole rating half of the row -- the rpe, the OR and the
+     * lifter's own half -- so the set write stores one answer rather than
+     * re-reading the rating it was handed beside a verdict worked out here
+     * (#313). The rpe is the rating the set ended with, which is what the
+     * write stored before this returned it. The lifter's half is the tap the
+     * row stores beside the OR (#216); it was a separate `lifterCalledFailure`
+     * property read straight after this call, and folding it into the answer
+     * leaves nothing to read at the wrong moment. The two facts have always
+     * been kept apart here and only the OR reached the database before #216,
+     * which is why a set the lifter called a grinder and one the app derived a
+     * shortfall for were indistinguishable in every export written before it.
+     *
      * Writes nothing. The rating is now stored with the set row itself rather
-     * than updated onto it afterwards, so the caller passes the returned flag
+     * than updated onto it afterwards, so the caller passes the returned row
      * into the insert. This used to issue `rateSet` as a second statement, and
      * only `if (rating != null || stoppedEarly)`; when that condition was false
      * the values it skipped writing were exactly the row's defaults, so storing
@@ -104,12 +104,17 @@ class SetRatingTracker(private val writer: SetRowWriter) {
      * failed existed in the database rated as nothing, permanently, because no
      * screen can edit a set's rating once the rest screen is gone.
      */
-    fun onSetRecorded(plannedReps: Int?, plannedDurationS: Int?, stoppedEarly: Boolean, rating: SetRating?): Boolean {
+    fun onSetRecorded(
+        plannedReps: Int?,
+        plannedDurationS: Int?,
+        stoppedEarly: Boolean,
+        rating: SetRating?,
+    ): CorrectedRatingRow {
         this.plannedReps = plannedReps
         this.plannedDurationS = plannedDurationS
         autoFailed = stoppedEarly
         tappedFailed = rating?.failed == true
-        return tappedFailed || autoFailed
+        return CorrectedRatingRow(rpe = rating?.rpe, failed = tappedFailed || autoFailed, failedByLifter = tappedFailed)
     }
 
     /**
@@ -162,13 +167,18 @@ class SetRatingTracker(private val writer: SetRowWriter) {
         return true
     }
 
-    /** Correct how the set FELT. The shortfall verdict survives the correction. */
-    suspend fun rate(rpe: Int?, failed: Boolean, warmup: Boolean): Boolean? {
+    /**
+     * Correct how the set FELT. The shortfall verdict survives the correction.
+     *
+     * Returns the rating row it wrote, as [correct] does, so the rest screen
+     * mirrors what the row holds rather than what the tap carried.
+     */
+    suspend fun rate(rpe: Int?, failed: Boolean, warmup: Boolean): CorrectedRatingRow? {
         val id = setId ?: return null
         tappedFailed = failed
-        val effective = failed || autoFailed
-        writer.rateSet(id, rpe, effective, failedByLifter = failed, warmup = warmup)
-        return effective
+        val row = CorrectedRatingRow(rpe = rpe, failed = failed || autoFailed, failedByLifter = failed)
+        writer.rateSet(id, row.rpe, row.failed, failedByLifter = row.failedByLifter, warmup = warmup)
+        return row
     }
 
     /**

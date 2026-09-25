@@ -63,6 +63,14 @@ import kotlin.test.assertNull
  */
 class FailedSetBoundaryTest {
     /**
+     * [SetEnd.terminalCall] on a set that is NOT timed, which is every set
+     * this file is about. The timed arguments are #288's and carry no answer
+     * for a cadence set.
+     */
+    private fun untimedCall(guided: Boolean, spoken: List<VoiceCue>) =
+        SetEnd.terminalCall(guided = guided, timed = false, clockEnded = false, voiceSpeaks = true, spoken = spoken)
+
+    /**
      * Every capture in this corpus is a metronome-guided set -- all 34 cue
      * tracks committed here carry cadence stroke words or a hold's clock -- so
      * a cadence RAN on the sets these pins bound. `SetEnd.of` asks, because
@@ -193,18 +201,18 @@ class FailedSetBoundaryTest {
      */
     @Test
     fun `only a guided set with no boundary on its record asks for one`() {
-        assertNull(SetEnd.terminalCall(guided = false, spoken = emptyList()), "an unguided set says nothing")
+        assertNull(untimedCall(guided = false, spoken = emptyList()), "an unguided set says nothing")
         assertNull(
-            SetEnd.terminalCall(guided = false, spoken = track(fixture)),
+            untimedCall(guided = false, spoken = track(fixture)),
             "and it says nothing however its track ends",
         )
         assertEquals(
             SpokenCall("Set ended", listOf("Set ended")),
-            SetEnd.terminalCall(guided = true, spoken = track(fixture)),
+            untimedCall(guided = true, spoken = track(fixture)),
             "session 32 set 9 is exactly the set that should have said this",
         )
         assertNull(
-            SetEnd.terminalCall(guided = true, spoken = track(fixture) + VoiceCue(1_787_341_230_000L, SetEnd.DONE)),
+            untimedCall(guided = true, spoken = track(fixture) + VoiceCue(1_787_341_230_000L, SetEnd.DONE)),
             "a set the guide already called over does not say it twice",
         )
     }
@@ -219,7 +227,7 @@ class FailedSetBoundaryTest {
      */
     @Test
     fun `the boundary is one utterance and one row carrying the same word`() {
-        val call = SetEnd.terminalCall(guided = true, spoken = emptyList())!!
+        val call = untimedCall(guided = true, spoken = emptyList())!!
         assertEquals(SetEnd.STOPPED, call.utterance, "what the lifter hears")
         assertEquals(listOf(SetEnd.STOPPED), call.recorded, "what the archive keeps")
     }
@@ -346,7 +354,7 @@ class FailedSetBoundaryTest {
     @Test
     fun `a set already carrying the boundary does not ask for another`() {
         assertNull(
-            SetEnd.terminalCall(guided = true, spoken = boundedTrack()),
+            untimedCall(guided = true, spoken = boundedTrack()),
             "the record already says when this set ended",
         )
     }

@@ -193,6 +193,25 @@ object HoldEndPolicy {
     }
 
     /**
+     * Whether a timed set of [kind] is offered the release an armed unit saw
+     * at all, given whether the clock [autoEnded] it (#314).
+     *
+     * SEAM ONLY at this commit: every timed kind is offered it on every
+     * ending, which is what `recordedTimedEnd` in `:app` has done since #311.
+     */
+    @Suppress("UnusedParameter", "FunctionOnlyReturningConstant")
+    fun releaseConsulted(kind: ExerciseKind, autoEnded: Boolean): Boolean = true
+
+    /**
+     * [decide] for a timed set of [kind], with [sensorEndS] withheld where
+     * [releaseConsulted] says the release is not asked. The one entry point
+     * `recordedTimedEnd` in `:app` calls, so the guard and the decision
+     * cannot be wired apart.
+     */
+    fun decideFor(kind: ExerciseKind, measuredS: Int, targetS: Int?, autoEnded: Boolean, sensorEndS: Int?): Decision =
+        decide(measuredS, targetS, autoEnded, sensorEndS.takeIf { releaseConsulted(kind, autoEnded) })
+
+    /**
      * The seconds one tap of the rest screen's DOWN correction offers, smallest
      * step first.
      *

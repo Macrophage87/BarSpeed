@@ -26,6 +26,7 @@ import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.SetAnalyzer
 import com.macrophage.barspeed.dsp.SetEnd
 import com.macrophage.barspeed.dsp.SetTargets
+import com.macrophage.barspeed.dsp.SpokenCall
 import com.macrophage.barspeed.dsp.StackRollSignature
 import com.macrophage.barspeed.dsp.StreamingSetTracker
 import com.macrophage.barspeed.dsp.TempoSchedule
@@ -42,6 +43,7 @@ import com.macrophage.barspeed.model.ArmedLinks
 import com.macrophage.barspeed.model.ArmedSilencePolicy
 import com.macrophage.barspeed.model.BodyWeightPromptPolicy
 import com.macrophage.barspeed.model.ConnectionState
+import com.macrophage.barspeed.model.CorrectedRatingRow
 import com.macrophage.barspeed.model.CountAndRatingDraft
 import com.macrophage.barspeed.model.CountingPolicy
 import com.macrophage.barspeed.model.EffortAsk
@@ -1013,12 +1015,14 @@ internal fun RecordState.soleSilenceOver(sinceMs: Long, nowMs: Long): ArmedDeliv
  * Nothing else about it moved: every argument is the same expression over the
  * same three inputs, all of them already frozen.
  *
- * [failed] is passed rather than derived here. It is the OR of the lifter's own
- * tap and the app's derivation, computed at the call site from state this
- * function cannot see, and re-deriving it from [p] alone would silently drop
- * the half the lifter stated.
+ * [written] is passed rather than derived here. Its `failed` is the OR of the
+ * lifter's own tap and the app's derivation, computed at the call site from
+ * state this function cannot see, and re-deriving it from [p] alone would
+ * silently drop the half the lifter stated; its `rpe` is what
+ * `SetRatingTracker.onSetRecorded` says the row stores beside that verdict
+ * (#313), not the rating [p] was frozen with.
  */
-private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Boolean, failedByLifter: Boolean) =
+private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, written: CorrectedRatingRow) =
     CompletedSet(
         exerciseId = p.exercise.id,
         exerciseName = p.exercise.displayName,
@@ -1077,13 +1081,13 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, failed: Bo
         repMarks = p.repMarks,
         sensors = p.sensors,
         secondary = p.secondary,
-        rpe = p.rating?.rpe,
-        failed = failed,
+        rpe = written.rpe,
+        failed = written.failed,
         // The OR's two halves, stored apart for the first time (#216). [failed] is
         // still the OR and nothing about it moves; this says whether the lifter
         // said so, which the row has never carried and which no export could
         // therefore publish.
-        failedByLifter = failedByLifter,
+        failedByLifter = written.failedByLifter,
         // The plan's declaration, and nothing else can set it: #187 took warm-up
         // off the effort scale, so there is no tile left to OR in. An ad-hoc or
         // appended set is false because nothing declared it, which is a gap in
@@ -2284,7 +2288,10 @@ private fun inSetState(
 
 /**
  * What a finished timed set records, or null for a set that is not timed at
- * all.
+ * all -- [timedKind] null, which the caller passes for a set that is not timed
+ * and the set's `ExerciseKind` otherwise, because whether the release is asked
+ * at all is `HoldEndPolicy.releaseConsulted`'s question and it asks the kind
+ * (#314).
  *
  * Free function for [ratedState]'s reason, and it is the join of three rules
  * rather than any of them: [SetClockPolicy] says which instant the set is
@@ -2295,7 +2302,7 @@ private fun inSetState(
  * repository can execute.
  */
 private fun recordedTimedEnd(
-    isTimed: Boolean,
+    timedKind: ExerciseKind?,
     prepCase: PrepCase,
     tappedAtMs: Long,
     clockStartedAtMs: Long?,
@@ -2304,7 +2311,7 @@ private fun recordedTimedEnd(
     autoEnded: Boolean,
     analysedSamples: List<ImuSample>,
 ): TimedEnd? {
-    if (!isTimed) return null
+    if (timedKind == null) return null
     fun secondsTo(instantMs: Long) = SetClockPolicy.heldSeconds(prepCase, tappedAtMs, clockStartedAtMs, instantMs)
     // Asked whoever ended the set. Until #311 a hold the clock ended was not
     // offered a release at all, so a hold let go before its target and never
@@ -2312,7 +2319,8 @@ private fun recordedTimedEnd(
     // 30.742 s in). `HoldEndPolicy` now weighs it against the target the same
     // way it weighs it against a tap, and refuses one at or after the target.
     val releaseAtMs = HoldRelease.atMs(analysedSamples, clockStartedAtMs)
-    val decision = HoldEndPolicy.decide(
+    val decision = HoldEndPolicy.decideFor(
+        kind = timedKind,
         measuredS = secondsTo(endedAtMs),
         targetS = targetS,
         autoEnded = autoEnded,
@@ -2329,6 +2337,25 @@ private fun recordedTimedEnd(
         restFromMs = releaseAtMs.takeIf { decision.endedBy == HoldEndSource.SENSOR },
     )
 }
+
+/**
+ * What `endSet` says and writes as this set ends, or null for nothing:
+ * `SetEnd.terminalCall`'s decision over this state's own facts.
+ *
+ * Free function for [openSession]'s reason. [clockEnded] is whether the
+ * timed set's own clock ended it, and the timed voice's gate is the one the
+ * tick loop asks before it speaks a countdown word, `LeadInPolicy.speaks` over
+ * the set's [prepCase] and the audio setting -- one predicate, so a set whose
+ * countdown was silent cannot be the one set that speaks its ending (#288).
+ */
+private fun RecordState.endingCall(clockEnded: Boolean, prepCase: PrepCase, spoken: List<VoiceCue>): SpokenCall? =
+    SetEnd.terminalCall(
+        guided = guidedSet,
+        timed = currentIsTimed,
+        clockEnded = clockEnded,
+        voiceSpeaks = LeadInPolicy.speaks(prepCase, audioCues),
+        spoken = spoken,
+    )
 
 /**
  * Which instant the rest after this set runs from.
@@ -2404,7 +2431,7 @@ private fun restingState(
     s: RecordState,
     p: PendingSetWrite,
     analysis: SetAnalysis,
-    failed: Boolean,
+    written: CorrectedRatingRow,
     restS: Int,
     restRemainingS: Int,
 ): RecordState {
@@ -2548,12 +2575,12 @@ private fun restingState(
             // (#244).
             rpeAsk = EffortScale.askFor(p.isTimed, p.slot?.progression),
         ),
-        lastSetRpe = p.rating?.rpe,
-        lastSetFailed = failed,
+        lastSetRpe = written.rpe,
+        lastSetFailed = written.failed,
         // The rating frozen with the write is the only tap there has been at
-        // this point; [failed] above already carries the derived shortfall
-        // OR-ed in, and that OR is what this field exists to see past.
-        lastSetTappedFailed = p.rating?.failed == true,
+        // this point; `written.failed` above already carries the derived
+        // shortfall OR-ed in, and that OR is what this field exists to see past.
+        lastSetTappedFailed = written.failedByLifter,
         lastSetWarmup = p.slot?.warmup == true,
         // A new set arrives unmarked, whatever the last one carried, for the
         // reason stated at the reason fields below.
@@ -4857,7 +4884,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // pending write copies it. The word is chosen by `SetEnd.terminalCall`
         // in :core:dsp -- which sets get one, and whether the record already
         // carries a boundary, are its decisions and not this function's.
-        SetEnd.terminalCall(guided = s.guidedSet, spoken = cueBuffer)?.let { speakCues(it.recorded, it.utterance) }
+        s.endingCall(autoEndedSet, prepCaseForSet, cueBuffer)?.let { speakCues(it.recorded, it.utterance) }
         val exercise = s.currentExercise
         val slot = s.currentSlot
         val isTimed = s.currentIsTimed
@@ -4936,7 +4963,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         )
         val timedEnd =
             recordedTimedEnd(
-                isTimed = isTimed,
+                timedKind = s.currentExerciseKind.takeIf { isTimed },
                 prepCase = prepCaseForSet,
                 tappedAtMs = setStartedAtMs,
                 clockStartedAtMs = clockStartedAtMs,
@@ -5247,7 +5274,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             }
         // The lifter's tap is authoritative for effort, but a set that ended
         // short of its target is still a failed set — both facts are recorded.
-        val failed = ratings.onSetRecorded(p.targetReps, p.targetDurationS, stoppedEarly, p.rating)
+        val written = ratings.onSetRecorded(p.targetReps, p.targetDurationS, stoppedEarly, p.rating)
 
         // Reusing an id already returned is what keeps a retry from writing the
         // set twice. The rating travels with the row rather than following it as
@@ -5257,7 +5284,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             writtenSetId ?: sessionRepository.recordSet(
                 sessionId = sessionId,
                 orderIdx = p.orderIdx,
-                set = completedSetOf(p, analysis, failed, ratings.lifterCalledFailure),
+                set = completedSetOf(p, analysis, written),
             ).also { writtenSetId = it }
         ratings.attachTo(setId)
         // The row and every stream belonging to it are in one transactional
@@ -5280,7 +5307,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // #178 gave it a second reader in the rest-HR window and two
         // computations of one instant is how they came to disagree.
         val restRemainingS = RestClockPolicy.remainingS(restS, p.restStartedAtMs, System.currentTimeMillis())
-        stateFlow.value = restingState(stateFlow.value, p, analysis, failed, restS, restRemainingS)
+        stateFlow.value = restingState(stateFlow.value, p, analysis, written, restS, restRemainingS)
         pendingWrite = null
         writtenSetId = null
         startRestCountdown()
