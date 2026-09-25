@@ -77,7 +77,10 @@ class PlanPromptWorkingTargetContractTest {
         assertStates("On a set that carries \"workingLoad_kg\"")
         assertStates("an absent \"workingReps\" means the set had no rep target")
         assertStates("an absent \"workingDuration_s\" means the set was not a hold or a carry")
-        assertStates("an absent \"plannedTempo\" means the plan declared none")
+        assertStates(
+            "an absent \"plannedTempo\" means no plan declared a tempo for that set: an added " +
+                "set never has one, even when it ran the tempo of its block.",
+        )
         assertStates("On a set without \"workingLoad_kg\"")
         assertStates("do not assume the plan's figures ran")
     }

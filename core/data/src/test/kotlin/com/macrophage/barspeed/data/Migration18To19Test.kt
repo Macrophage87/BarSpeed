@@ -225,9 +225,10 @@ class Migration18To19Test {
      * The migration executes exactly the two appends the baselines call for,
      * and nothing else.
      *
-     * TWO, not one, because 19 has not shipped: v0.1.53 carries
-     * `DATABASE_VERSION = 18`, read at the tag this round, so no phone has run
-     * 18 -> 19 and #259's column can ride the hop rather than needing 19 -> 20.
+     * TWO, not one, because 19 had not shipped when the #259 column was
+     * added: v0.1.53 carried `DATABASE_VERSION = 18`, so no phone had run
+     * 18 -> 19. 19 shipped in v0.1.54, and #259's column rode that hop
+     * rather than needing 19 -> 20.
      * The count is asserted as a whole list so a third statement cannot arrive
      * unnoticed.
      */

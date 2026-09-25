@@ -30,9 +30,9 @@ import kotlin.test.assertEquals
  *
  * BOTH TESTS FAIL WHEN THEY ARE WRITTEN. The parity test reds on
  * `plannedLoad_kg`, the first key the manifest lacks; the coverage test reds
- * because `session.json` publishes none of the five 1.23 keys yet, which is
- * also what keeps the parity test from passing vacuously on keys absent from
- * both documents.
+ * because until export 1.23 `session.json` published none of the five 1.23
+ * keys, which is also what keeps the parity test from passing vacuously on
+ * keys absent from both documents.
  *
  * The keys are a LITERAL, the house rule for key pins: a list derived from
  * the export type would follow a rename silently, and would shrink with the

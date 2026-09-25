@@ -16,8 +16,8 @@ import kotlin.test.assertTrue
 
 /**
  * Differentials for export 1.23 (#157): the row has held a set's working
- * targets, the plan's tempo and its rest instant since database v20, and the
- * session document publishes none of them.
+ * targets, the plan's tempo and its rest instant since database v20, and
+ * until export 1.23 the session document published none of them.
  *
  * FOUR OF THE SEVEN FAIL WHEN THEY ARE WRITTEN. `SessionExporter` has no line
  * for `workingReps`, `workingLoad_kg`, `workingDuration_s`, `plannedTempo` or

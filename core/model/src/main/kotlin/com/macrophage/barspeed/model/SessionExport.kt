@@ -2352,10 +2352,10 @@ data class SessionExport(
          *
          * WHAT WAS UNSAYABLE. Until database v20 the working targets were
          * dropped at the write. field-45's set 8 -- planned 10, lowered to 6,
-         * 6 done -- read "planned 10, did 6, not failed", a shortfall that
-         * never happened, and field-41's seven raised targets read as
-         * over-performance. They were recoverable only from where the cue
-         * track's `Last rep` fell.
+         * 6 done -- was recorded before v20 and reads "planned 10, did 6,
+         * not failed", a shortfall that never happened; nothing backfills it.
+         * field-41's seven raised targets read as over-performance. They were
+         * recoverable only from where the cue track's `Last rep` fell.
          *
          * THE MEASURED REST. `restMeasured_s` is the seconds from the instant
          * this set's rest ran from -- the instant `rest_s`'s countdown starts
