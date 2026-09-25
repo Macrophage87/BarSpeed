@@ -169,8 +169,14 @@ class ClosingRuleCandidateTest {
      * eight deadlift sets -- the only scored captures `LiveCounterPolicy` routes
      * to the live counter today (rep-based, no prescribed tempo, IMU), truth
      * 36. Every other scored capture is tempo'd and counted by the metronome,
-     * so its row is what a counter WOULD do if the routing widened (#303), not
-     * what the lifter hears. The routed "over" is at count level; the per-rep
+     * so the lifter did not hear a live counter on it. But the routing does not
+     * need to widen to reach those exercises: `LiveCounterPolicy` sends every
+     * [RepCounter.SENSOR] set -- IMU connected, not timed, a DYNAMIC or EXPLOSIVE
+     * exercise with no tempo (an EXPLOSIVE one even with a tempo) -- to the live
+     * counter whatever the exercise, so a candidate that replaced DRIVE_IMPULSE
+     * would count an untempo'd leg curl today. The tempo'd rows are the only
+     * non-deadlift evidence; untempo'd machine sets are unmeasured (#303).
+     * The routed "over" is at count level; the per-rep
      * table is what shows a phantom hiding behind a miss.
      */
     @Test
@@ -360,5 +366,84 @@ class ClosingRuleCandidateTest {
             "the event stream the cycle reads on the 120 kg set",
         )
         assertEquals(emptyList(), ClosingFrames.calls(CycleCandidate(), frames(set)).filter { it.driveStartS > 15.0 })
+    }
+
+    /**
+     * What (a) can see, drive by drive. (a) looks for its stillness only once a
+     * drive has ARMED, at the end of its brake run, and drops a drive that arms
+     * more than `maxLockS` (2.0 s) after its own end. For every armed drive on
+     * the eight sets, with (a)'s own 0.15 s still, this prints the window it
+     * matches, the gap from the drive's end to its arming, whether a 0.15 s
+     * still completed between the drive's end and the arming (which (a) never
+     * sees), the first floor event after arming, and the gap from the drive's
+     * end to the next CONTACT. The tallies are pinned so the breakdown the
+     * proposal quotes re-derives here.
+     */
+    @Test
+    fun `what the lockout model can see after each drive arms`() {
+        data class Armed(val endS: Double, val atS: Double, val kind: String)
+        val tally = sortedMapOf<String, Int>()
+        val lagsBySet = mutableMapOf<String, List<Double>>()
+        val repContactGaps = mutableListOf<Double>()
+        DeadliftTruth.SETS.forEach { set ->
+            val drives = mutableListOf<Armed>()
+            val events = mutableListOf<Pair<Double, String>>()
+            val windows = DeadliftTruth.WINDOWS.getValue(set)
+            val probe = object : DriveBrakeTracker(CycleParams(stillS = 0.15)) {
+                override fun onArmed(armed: Drive, brakeIntegral: Double, t: Double): RepClosed? {
+                    val w = windows.minBy { w -> maxOf(0.0, w.startS - armed.endS, armed.startS - w.endS) }
+                    val gap = maxOf(0.0, w.startS - armed.endS, armed.startS - w.endS)
+                    val kind = if (gap > CandidateCorpus.CALL_TOLERANCE_S) "UNMATCHED" else w.kind.name
+                    drives += Armed(armed.endS, t, kind)
+                    return null
+                }
+
+                override fun onEvent(event: FloorEvent, t: Double): RepClosed? {
+                    events += t to event.name
+                    return null
+                }
+            }
+            frames(set).forEach { probe.feed(it) }
+            val lines = drives.map { a ->
+                val lag = r2(a.atS - a.endS)
+                val stillBefore = events.any { (t, e) -> e == "STILL" && t > a.endS && t < a.atS }
+                val next = events.firstOrNull { it.first >= a.atS }?.second ?: "none"
+                val contact = events.firstOrNull { (t, e) -> e == "CONTACT" && t > a.endS }?.first?.minus(a.endS)
+                if (a.kind == "REP" && contact != null) repContactGaps += r2(contact)
+                val key = when {
+                    lag > 2.0 -> "armed after 2.0 s"
+                    stillBefore -> "still before arming"
+                    else -> "first event after arming $next"
+                }
+                tally.merge("${a.kind}: $key", 1, Int::plus)
+                "${a.kind} armed +%.2f still-before=$stillBefore next=$next contact +%s".format(
+                    lag,
+                    contact?.let { "%.2f".format(it) } ?: "none",
+                )
+            }
+            lagsBySet[set] = drives.map { r2(it.atS - it.endS) }
+            println("LOCKOUT $set | ${lines.joinToString(" ; ")}")
+        }
+        println("LOCKOUT tally $tally")
+        println("LOCKOUT completed reps, drive end -> next contact, sorted ${repContactGaps.sorted()}")
+        assertEquals(
+            listOf(2.39, 2.09, 1.03),
+            lagsBySet.getValue(DeadliftTruth.SETS[4]),
+            "120 kg, as the event pin above",
+        )
+        assertEquals(LOCKOUT_TALLY, tally.toString(), "what (a) sees after each armed drive, eight sets")
+    }
+
+    private companion object {
+        /**
+         * Measured by this class's own command. Of the 35 completed reps whose
+         * drive arms, 2 arm after 2.0 s (field-44 set 5), 12 finish a 0.15 s
+         * still between the drive's end and the arming, and of the other 21 the
+         * first event after arming is a CONTACT on 14 and a STILL on 7.
+         */
+        const val LOCKOUT_TALLY = "{FAILED: first event after arming FALL=1, " +
+            "NOT_REP: first event after arming CONTACT=2, NOT_REP: first event after arming STILL=2, " +
+            "REP: armed after 2.0 s=2, REP: first event after arming CONTACT=14, " +
+            "REP: first event after arming STILL=7, REP: still before arming=12}"
     }
 }

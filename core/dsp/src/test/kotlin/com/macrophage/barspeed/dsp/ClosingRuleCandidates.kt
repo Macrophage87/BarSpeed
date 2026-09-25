@@ -184,16 +184,22 @@ internal data class CycleParams(
     /** s: `DspConfig.minStationaryS`. */
     val stillS: Double = 0.3,
     /**
-     * The shortest a completed rep can take from the drive's end to the bar
-     * reaching the floor again, s. Fitted: the failed pull hits the floor 0.85 s
-     * after its drive ends; completed reps take 1.48 s and longer on these sets.
+     * The shortest a completed rep is assumed to take from the drive's end to
+     * the bar reaching the floor again, s. Fitted: the next CONTACT comes 0.68 s
+     * after the failed pull's drive ends, and 1.25 s or later after the drive of
+     * every completed rep that arms (35 of 36; `ClosingRuleCandidateTest`'s
+     * lockout probe prints both). A contact is a proxy for the floor, not a
+     * measurement of it.
      */
     val minCycleS: Double = 1.2,
     /**
-     * Negative velocity the bar must have gained between the drive's end and
-     * the closing event -- the brake plus the descent -- before a STILL may close
-     * a rep, m/s. Fitted: completed reps 1.38-3.1, the two set-down phantoms it
-     * removes 0.35 and 0.51. Null switches the clause off.
+     * The magnitude the negative part of the smoothed drive-frame acceleration
+     * must reach, integrated from the brake run's start to the closing event,
+     * before a rep can be CALLED, m/s. An acceleration integral, not a measured
+     * bar velocity. Until it is reached a STILL keeps the rep pending, and a
+     * CONTACT, a FALL or the next armed drive REJECTS it ([CycleCandidate]).
+     * Fitted: completed reps 1.38-3.1, the two set-down phantoms it removes
+     * 0.35 and 0.51. Null switches the clause off.
      */
     val descentMps: Double? = 0.9,
     /** Whether a FALL too soon after the drive rejects the attempt. */

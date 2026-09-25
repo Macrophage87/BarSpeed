@@ -6,18 +6,30 @@ package com.macrophage.barspeed.dsp
  * two combinations as switches.
  *
  * - OPEN: a drive met by its brake ([DriveBrakeTracker]). The rep is pending.
- * - CLOSE: the first floor event after the drive -- a CONTACT, a FALL, a STILL,
- *   or the next armed drive (touch-and-go without a contact) -- that comes at
- *   least [CycleParams.minCycleS] after the drive ended. A STILL may close only
- *   once the bar has also come back down ([CycleParams.descentMps]); before
- *   that it is a lockout hold and the rep stays pending.
- * - AN ATTEMPT THAT NEVER COMPLETES: a CONTACT or FALL sooner than
- *   [CycleParams.minCycleS] after the drive REJECTS it -- the bar was back on
- *   the floor, or falling, before a completed rep could have locked out and
- *   been lowered. Nothing is spoken for it.
+ *   The drive arms at the END of its brake run, which on field-44's heavy sets
+ *   spans brake and lowering, so arming can come seconds after the drive.
+ * - THE DESCENT GATE: the rep can be CALLED only once the negative part of the
+ *   smoothed drive-frame acceleration, integrated from the brake run's start to
+ *   the closing event, reaches [CycleParams.descentMps] in magnitude. That is
+ *   an acceleration integral, not a measured bar velocity or height.
+ * - CLOSE, from [CycleParams.minCycleS] after the drive ended: the first
+ *   CONTACT, FALL, STILL or next armed drive (touch-and-go without a contact).
+ *   - descent gate met: CALLED.
+ *   - descent gate not met: a STILL keeps the rep pending; a CONTACT, a FALL or
+ *     the next armed drive REJECTS it.
+ * - BEFORE [CycleParams.minCycleS]: a CONTACT or FALL REJECTS the rep; a STILL
+ *   is ignored; the next armed drive REPLACES it and nothing is spoken for it.
+ * - With [minHeightM] set, a rep that passes the descent gate is still REJECTED
+ *   if its short-window height is under [minHeightM].
  *
- * The call is spoken at the closing event: as the bar lands, 1.5-2.5 s after
- * the instant the shipped counter speaks at.
+ * Nothing is spoken for a rejected or replaced rep. A CONTACT or FALL within
+ * [CycleParams.minCycleS] of a drive that has not armed yet also drops that
+ * drive before it can arm -- that, not the pending-rep rule, is what refuses
+ * field-44 set 5's failed pull.
+ *
+ * The call is spoken at the closing event. On the eight deadlift sets its
+ * median lag is 1.16 s after the matched batch window's end, against -0.27 s
+ * for the shipped counter (`ClosingRuleCandidateTest`'s per-rep table).
  *
  * @param relativeDrive (e) a SET-RELATIVE drive: a drive arms only if it gains
  *   at least this fraction of the median gain of the reps already called in
@@ -92,14 +104,29 @@ internal class CycleCandidate(
 }
 
 /**
- * (a) LOCKOUT -- the rep closes on a stillness at the top.
+ * (a) LOCKOUT, AS MODELLED HERE -- meant to close on a stillness at the top,
+ * but it can only look for that stillness after the drive has ARMED.
  *
- * - OPEN: a drive met by its brake, as (b).
- * - CLOSE: a run of quiet samples (`isQuietSample`: |a| within 0.05 g of 1 g,
- *   gyro under 10 deg/s) reaching [lockoutS], beginning within [maxLockS] of
- *   the drive's end, before any descent.
- * - AN ATTEMPT THAT NEVER COMPLETES: a CONTACT or FALL before the stillness,
- *   or no stillness within [maxLockS], drops it. Nothing is spoken.
+ * - OPEN: a drive met by its brake, as (b): the rep is pending only from the
+ *   END of the brake run. A drive that arms more than [maxLockS] after its own
+ *   end is dropped on the next frame, so it can never be called, whatever the
+ *   bar did. On field-44 set 5 both completed reps arm 2.39 s and 2.09 s after
+ *   their drives end (the event-stream pin in `ClosingRuleCandidateTest`), so
+ *   (a) cannot call either. On all eight sets, 12 completed reps finish a
+ *   0.15 s still between the drive's end and the arming, which (a) never
+ *   sees (`ClosingRuleCandidateTest`'s lockout probe).
+ * - CLOSE: the first floor event after arming. If it is a STILL -- a run of
+ *   quiet samples (`isQuietSample`: |a| within 0.05 g of 1 g, gyro under
+ *   10 deg/s) reaching [lockoutS] -- and that run reaches [lockoutS] within
+ *   [maxLockS] of the drive's end, the rep is CALLED. A quiet run that reached
+ *   [lockoutS] before arming is not seen. Nothing checks that the stillness
+ *   is at the top rather than on the floor.
+ * - Otherwise nothing is spoken: a CONTACT or FALL first, the next armed drive
+ *   replacing it, or [maxLockS] passing.
+ *
+ * Its row therefore measures this arming-gated model, not a lockout rule. It
+ * is NOT evidence against a counter that looks for the top's stillness
+ * straight after the drive; no such model is measured here.
  */
 internal class LockoutCandidate(
     lockoutS: Double = 0.15,
