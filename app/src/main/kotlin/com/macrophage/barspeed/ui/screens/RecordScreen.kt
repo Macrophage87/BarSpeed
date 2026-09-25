@@ -4114,7 +4114,7 @@ internal fun EccTempoChart(analysis: SetAnalysis, targetEccS: Double, verdicts: 
 }
 
 @Composable
-internal fun ConVelocityChart(analysis: SetAnalysis, verdicts: List<String>) {
+internal fun ConVelocityChart(analysis: SetAnalysis, verdicts: List<String>, readsVelocityLoss: Boolean = true) {
     Text("Mean concentric velocity per rep", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
     Spacer(Modifier.height(8.dp))
     val velocities = analysis.reps.map { it.meanConVelMps }
@@ -4126,12 +4126,20 @@ internal fun ConVelocityChart(analysis: SetAnalysis, verdicts: List<String>) {
     )
     Spacer(Modifier.height(6.dp))
     PowerLine(analysis)
-    VelocityLoss.of(analysis.reps).pctOrNull?.let {
-        Text(
-            "Velocity loss ${trim(it)}% across the set.",
-            style = MaterialTheme.typography.bodySmall,
-            color = BarColors.Sub,
-        )
+    // Gated on the same regime the chip above already reads (#276): on a
+    // CONTROLLED set the prescribed tempo fixed the drive's speed, so a
+    // slowing rep is a count held poorly and not fatigue, and this caption
+    // stated the figure as fact with no regime attached at all. Default true
+    // keeps a null regime -- not decidable -- drawing exactly what this row
+    // drew before #250's chip gate existed.
+    if (readsVelocityLoss) {
+        VelocityLoss.of(analysis.reps).pctOrNull?.let {
+            Text(
+                "Velocity loss ${trim(it)}% across the set.",
+                style = MaterialTheme.typography.bodySmall,
+                color = BarColors.Sub,
+            )
+        }
     }
     verdicts.take(2).forEach {
         Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)

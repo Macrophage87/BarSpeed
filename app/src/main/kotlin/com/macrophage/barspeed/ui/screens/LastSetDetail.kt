@@ -727,7 +727,8 @@ private fun RepQualityCard(feedback: SetFeedback) {
             when {
                 feedback.explosive -> PeakVelocityChart(analysis, verdicts)
                 targetEccS != null -> EccTempoChart(analysis, targetEccS, verdicts)
-                else -> ConVelocityChart(analysis, verdicts)
+                // Null stays true -- not decidable, same as before #250.
+                else -> ConVelocityChart(analysis, verdicts, feedback.velocityLossRegime?.readsVelocityLoss != false)
             }
         }
     }
