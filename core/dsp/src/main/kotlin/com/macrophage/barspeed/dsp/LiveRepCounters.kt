@@ -8,18 +8,18 @@ import com.macrophage.barspeed.model.RepCounter
  * What a live rep counter is, from the caller's side: one published sample in, a
  * [RepCall] out.
  *
- * Two implementations and no third -- [LiveRepCaller] and [DriveImpulseCounter].
- * The interface exists so `:app` can hold a counter without knowing which one it
- * holds; WHICH one is `LiveCounterPolicy`'s decision, in `:core:model` where a
- * test runs on it.
+ * Three implementations -- [LiveRepCaller], [DriveImpulseCounter] and
+ * [CycleRepCounter]. The interface exists so `:app` can hold a counter without
+ * knowing which one it holds; WHICH one is `LiveCounterPolicy`'s decision, in
+ * `:core:model` where a test runs on it.
  */
 interface LiveRepCounter {
     /**
      * One live sample: the running total to speak, or [RepCall.Hold].
      *
-     * Both implementations take the tracker's own published state rather than a
-     * raw `ImuSample`, so neither runs a second integrator over the stream, and
-     * both take the ARRIVAL stamp separately because [LiveSetState] carries the
+     * Every implementation takes the tracker's own published state rather than
+     * a raw `ImuSample`, so none runs a second integrator over the stream, and
+     * each takes the ARRIVAL stamp separately because [LiveSetState] carries the
      * reconstructed clock and a cue has to be written on the arrival one.
      */
     fun feed(live: LiveSetState, timestampMs: Long): RepCall
@@ -35,6 +35,7 @@ object LiveRepCounters {
     ): LiveRepCounter = when (choice) {
         LiveCounter.SEGMENTER -> LiveRepCaller(direction, config)
         LiveCounter.DRIVE_IMPULSE -> DriveImpulseCounter(direction, config)
+        LiveCounter.CYCLE -> CycleRepCounter(direction, config)
     }
 
     /**

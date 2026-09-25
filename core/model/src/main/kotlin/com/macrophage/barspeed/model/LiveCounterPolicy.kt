@@ -43,6 +43,23 @@ enum class LiveCounter {
      * `DriveImpulseCandidateTest`'s corpus row is where both are pinned.
      */
     DRIVE_IMPULSE,
+
+    /**
+     * `CycleRepCounter`: a drive measured by the velocity it GAINS, met by its
+     * brake, and called only once the bar is back at the floor -- a contact, a
+     * fall, a stillness or the next drive, at least `DspConfig.cycleMinCycleS`
+     * after the drive ends and after enough descent. A contact or fall sooner
+     * rejects the attempt and nothing is spoken for it.
+     *
+     * Issue #305's design round, measured on the eight deadlift sets the
+     * corpus holds (field-43 sets 4-6, field-44 sets 1-5): 35 of 36 completed
+     * reps with one phantom, field-44 set 5's failed pull not called, where
+     * [DRIVE_IMPULSE] counts 28 and nothing at 111 and 120 kg. It speaks as the
+     * bar lands rather than at the brake -- median 1.16 s after the batch
+     * window ends -- and on a light soft landing a rep late.
+     * `ClosingRuleCandidateTest` pins every figure.
+     */
+    CYCLE,
 }
 
 /**

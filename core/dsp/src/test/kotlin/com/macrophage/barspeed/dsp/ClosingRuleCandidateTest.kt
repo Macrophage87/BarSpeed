@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.LiveCounter
 import com.macrophage.barspeed.model.RepCounter
 import kotlin.math.max
 import kotlin.test.Test
@@ -28,9 +29,11 @@ class ClosingRuleCandidateTest {
         Row("(d) contact") { ContactCandidate() },
         Row("(e1) cycle+height") { CycleCandidate(minHeightM = 0.25) },
         Row("(e2) cycle, set-relative drive") { CycleCandidate(relativeDrive = 0.35) },
-        Row("(b) without the duration bound") { CycleCandidate(CycleParams(minCycleS = 0.0)) },
-        Row("(b) without the descent clause") { CycleCandidate(CycleParams(descentMps = null)) },
-        Row("(b) without the fall rejection") { CycleCandidate(CycleParams(fallRejects = false)) },
+        Row("(b) without the duration bound") { CycleCandidate(DspConfig(cycleMinCycleS = 0.0)) },
+        // A zero need switches the descent clause off: the integral starts at
+        // the brake run's own, at most -cycleBrakeLossMps, and only falls.
+        Row("(b) without the descent clause") { CycleCandidate(DspConfig(cycleDescentMps = 0.0)) },
+        Row("(b) without the fall rejection") { CycleCandidate(fallRejects = false) },
     )
 
     private val framesCache = HashMap<String, List<LiveFrame>>()
@@ -45,25 +48,63 @@ class ClosingRuleCandidateTest {
     }
 
     /**
-     * The licence for every other figure. [DriveImpulseRow] over the harness's
-     * frames calls at exactly the instants the app's own path does --
-     * `LiveRepCounters.forCounted(SENSOR)` over `StreamingSetTracker.forLift` --
-     * on all eight sets, 5, 5, 5, 0, 0 and 5, 5, 3.
+     * The licence for the two drive-impulse rows. [DriveImpulseRow] over the
+     * harness's frames calls at exactly the instants the production
+     * `DriveImpulseCounter` does when fed by `StreamingSetTracker.forLift` --
+     * the app's tracker -- on all eight sets, 5, 5, 5, 0, 0 and 5, 5, 3.
+     *
+     * Built BY NAME, `LiveRepCounters.of(DRIVE_IMPULSE)`, not through
+     * `forCounted(SENSOR)`: the row is the impulse detector's whatever the
+     * policy arms, so this licence must not follow the policy when it moves.
+     * Until #305's implement round it read `forCounted(SENSOR)`, which armed
+     * that detector, so the two expressions built the same counter.
      */
     @Test
-    fun `the harness reproduces the app's live path on all eight deadlift sets`() {
+    fun `the harness reproduces the drive-impulse counter's live path on all eight deadlift sets`() {
         val counts = DeadliftTruth.SETS.map { set ->
             val direction = CandidateCorpus.capture(set).direction
-            val counter = LiveRepCounters.forCounted(RepCounter.SENSOR, direction)!!
-            val tracker = StreamingSetTracker.forLift(direction)
-            val app = LiveCountCandidates.load(set).mapNotNull { sample ->
-                val live = tracker.feed(sample)
-                live.elapsedS.takeIf { counter.feed(live, sample.timestampMs) is RepCall.Speak }
-            }
+            val app = appCalls(LiveRepCounters.of(LiveCounter.DRIVE_IMPULSE, direction), set, direction)
             assertEquals(app, ClosingFrames.calls(DriveImpulseRow(), frames(set)).map { it.atS }, "$set: call instants")
             app.size
         }
         assertEquals(listOf(5, 5, 5, 0, 0, 5, 5, 3), counts, "live calls, field-44 sets 1-5 then field-43 sets 4-6")
+    }
+
+    /**
+     * The licence for every (b) row, sweep and ablation. [CycleCandidate]
+     * over the harness's frames calls at exactly the instants the production
+     * [CycleRepCounter] does when fed by the app's tracker, and ends on the
+     * same [CycleRepCounter.called] -- over all 63 committed captures, not only
+     * the eight deadlifts, because the corpus row scores every one of them.
+     *
+     * Two computations are compared, not one read twice: the harness takes the
+     * raw-sample magnitude and quiet flag from the sample itself
+     * ([ClosingFrames.of]), and the production path reads them off the
+     * [LiveSetState] the tracker publishes. And equal `called` totals rule out
+     * a frame on which the rule closed two reps at once, which the harness
+     * would score as one.
+     */
+    @Test
+    fun `the cycle candidate reproduces the production cycle counter on every committed capture`() {
+        var calls = 0
+        for (capture in CandidateCorpus.ALL) {
+            val counter = LiveRepCounters.of(LiveCounter.CYCLE, capture.direction) as CycleRepCounter
+            val app = appCalls(counter, capture.fixture, capture.direction)
+            val harness = ClosingFrames.calls(CycleCandidate(), frames(capture.fixture)).map { it.atS }
+            assertEquals(app, harness, "${capture.fixture}: call instants")
+            assertEquals(app.size, counter.called, "${capture.fixture}: one call per spoken number")
+            calls += app.size
+        }
+        assertEquals(CYCLE_CORPUS_CALLS, calls, "cycle calls across all ${CandidateCorpus.ALL.size} captures")
+    }
+
+    /** The reconstructed-clock instants [counter] speaks at over [fixture], fed by the app's own tracker. */
+    private fun appCalls(counter: LiveRepCounter, fixture: String, direction: LiftDirection): List<Double> {
+        val tracker = StreamingSetTracker.forLift(direction)
+        return LiveCountCandidates.load(fixture).mapNotNull { sample ->
+            val live = tracker.feed(sample)
+            live.elapsedS.takeIf { counter.feed(live, sample.timestampMs) is RepCall.Speak }
+        }
     }
 
     /**
@@ -276,19 +317,20 @@ class ClosingRuleCandidateTest {
      */
     @Test
     fun `the cycle's fitted constants, one at a time`() {
-        val base = CycleParams()
+        val base = DspConfig()
         val sweeps = listOf(
-            "minCycleS" to listOf(0.8, 1.0, 1.2, 1.4, 1.6).map { base.copy(minCycleS = it) },
-            "fallG" to listOf(0.25, 0.4, 0.55, 0.7).map { base.copy(fallG = it) },
-            "descentMps" to listOf(0.6, 0.9, 1.2, 1.4).map { base.copy(descentMps = it) },
-            "driveGainMps" to listOf(0.08, 0.12, 0.16, 0.2, 0.3).map { base.copy(driveGainMps = it) },
-            "runThreshold" to listOf(0.1, 0.15, 0.25, 0.4).map { base.copy(runThreshold = it) },
-            "clipMps2" to listOf(0.5, 1.0, 2.0, 1000.0).map { base.copy(clipMps2 = it) },
-            "maxGapS" to listOf(1.0, 1.5, 2.0).map { base.copy(maxGapS = it) },
+            "cycleMinCycleS" to listOf(0.8, 1.0, 1.2, 1.4, 1.6).map { it to base.copy(cycleMinCycleS = it) },
+            "cycleFallG" to listOf(0.25, 0.4, 0.55, 0.7).map { it to base.copy(cycleFallG = it) },
+            "cycleDescentMps" to listOf(0.6, 0.9, 1.2, 1.4).map { it to base.copy(cycleDescentMps = it) },
+            "cycleDriveGainMps" to listOf(0.08, 0.12, 0.16, 0.2, 0.3).map { it to base.copy(cycleDriveGainMps = it) },
+            "cycleRunThresholdMps2" to listOf(0.1, 0.15, 0.25, 0.4).map { it to base.copy(cycleRunThresholdMps2 = it) },
+            "cycleClipMps2" to listOf(0.5, 1.0, 2.0, 1000.0).map { it to base.copy(cycleClipMps2 = it) },
+            "cycleMaxGapS" to listOf(1.0, 1.5, 2.0).map { it to base.copy(cycleMaxGapS = it) },
         )
         sweeps.forEach { (name, variants) ->
-            variants.forEach { params ->
-                val row = Row(name) { CycleCandidate(params) }
+            variants.forEach { (value, config) ->
+                val params = "= $value"
+                val row = Row(name) { CycleCandidate(config) }
                 val recorded = perRep(row, false).fold(DeadliftTruth.Score.ZERO) { a, b -> a + b }
                 val free = perRep(row, true).fold(DeadliftTruth.Score.ZERO) { a, b -> a + b }
                 var over = 0
@@ -340,7 +382,7 @@ class ClosingRuleCandidateTest {
     fun `the failed pull is dropped by the fall that follows its drive, before a brake can arm it`() {
         val set = DeadliftTruth.SETS[4]
         val log = mutableListOf<String>()
-        val probe = object : DriveBrakeTracker(CycleParams()) {
+        val probe = object : DriveBrakeTracker(DspConfig()) {
             override fun onArmed(armed: Drive, brakeIntegral: Double, t: Double): RepClosed? {
                 log += "armed %.2f-%.2f +%.2f at %.2f".format(armed.startS, armed.endS, armed.gainMps, t)
                 return null
@@ -389,7 +431,7 @@ class ClosingRuleCandidateTest {
             val drives = mutableListOf<Armed>()
             val events = mutableListOf<Pair<Double, String>>()
             val windows = DeadliftTruth.WINDOWS.getValue(set)
-            val probe = object : DriveBrakeTracker(CycleParams(stillS = 0.15)) {
+            val probe = object : DriveBrakeTracker(DspConfig(cycleStillS = 0.15)) {
                 override fun onArmed(armed: Drive, brakeIntegral: Double, t: Double): RepClosed? {
                     val w = windows.minBy { w -> maxOf(0.0, w.startS - armed.endS, armed.startS - w.endS) }
                     val gap = maxOf(0.0, w.startS - armed.endS, armed.startS - w.endS)
@@ -435,6 +477,14 @@ class ClosingRuleCandidateTest {
     }
 
     private companion object {
+        /**
+         * The cycle counter's calls over all 63 committed captures, measured by
+         * this class's own command. Not a score -- 12 of the 63 carry no
+         * truth -- but a floor under the licence: an equality that compared
+         * two empty lists 63 times would pass and say nothing.
+         */
+        const val CYCLE_CORPUS_CALLS = 373
+
         /**
          * Measured by this class's own command. Of the 35 completed reps whose
          * drive arms, 2 arm after 2.0 s (field-44 set 5), 12 finish a 0.15 s

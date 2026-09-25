@@ -8,20 +8,20 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * THE DIFFERENTIAL for issue #301: what a sensor-counted set counts once the
- * drive-impulse counter is the counter it arms.
+ * Issue #301's differential: what a sensor-counted set counted once the
+ * drive-impulse counter was the counter it armed -- `v0.1.54`'s live path.
  *
- * ## This file is RED at the commit that adds it, deliberately
+ * ## It was RED at the commit that added it, and it now names its detector
  *
- * Every count below is taken through `LiveRepCounters.forCounted`, which is the
- * one call `RecordViewModel` makes -- so these are assertions about what the APP
- * counts, not about what a class in `:core:dsp` can do if asked. At the commit
- * that adds this file `LiveCounterPolicy.counterFor(SENSOR)` still returns
- * `LiveCounter.SEGMENTER`, so every method here fails, and that failing CI run
- * is the durable evidence that the pins guard a behaviour change rather than
- * describing one already present. `DriveImpulseCandidateTest` measures the same
- * counter through the harness and is GREEN at this commit; the difference
- * between the two files is the selection, which is the whole fix.
+ * Every count below was taken through `LiveRepCounters.forCounted`, the one
+ * call `RecordViewModel` makes, and at the commit that added this file
+ * `LiveCounterPolicy.counterFor(SENSOR)` still returned `LiveCounter.SEGMENTER`,
+ * so every method failed -- the durable evidence that the pins guarded a
+ * behaviour change. Since #305's implement round the counter is built BY NAME,
+ * `LiveRepCounters.of(LiveCounter.DRIVE_IMPULSE)`, which is what `forCounted`
+ * armed until then, so every figure is unchanged and stays a statement about
+ * that detector whatever the policy arms. What the app counts is
+ * `CycleLiveCountFieldTest`'s, not this file's.
  *
  * ## The instants are on the DSP's reconstructed clock
  *
@@ -39,18 +39,12 @@ class LiveCountDifferentialTest {
     )
 
     /**
-     * The instants a sensor-counted set's own counter speaks at, in seconds on
-     * the reconstructed clock.
-     *
-     * Built by `LiveRepCounters.forCounted(RepCounter.SENSOR, …)` -- the app's
-     * call -- so a change to `LiveCounterPolicy` moves every number in this
-     * file, which is the point of reading it through the policy rather than
-     * naming a class.
+     * The instants the drive-impulse counter speaks at, in seconds on the
+     * reconstructed clock, built by name through the factory.
      */
     private fun callsAtS(fixture: String): List<Double> {
         val direction = CandidateCorpus.capture(fixture).direction
-        val counter = LiveRepCounters.forCounted(RepCounter.SENSOR, direction)
-            ?: error("a sensor-counted set must arm a counter")
+        val counter = LiveRepCounters.of(LiveCounter.DRIVE_IMPULSE, direction)
         val tracker = StreamingSetTracker.forLift(direction)
         val calls = mutableListOf<Double>()
         for (sample in LiveCountCandidates.load(fixture)) {
@@ -146,12 +140,12 @@ class LiveCountDifferentialTest {
      * Every one of them is a tempo'd set whose kind is DYNAMIC, and such a set
      * is counted by the metronome and arms no live counter. That is NOT true of
      * every tempo'd set -- an EXPLOSIVE lift carrying a tempo is
-     * RepCounter.SENSOR and counts on impulse today (CountingPolicyTest > a
-     * tempo'd set is counted by the metronome unless nothing plays the tempo).
-     * So these six over-counts are the nearest measured analogue to a tempo'd
-     * power clean -- evidence about a shape the gate DOES reach: 8, 8, 7, 10, 11
-     * and 2 against hand counts of 6, 7, 5, 8, 8 and 2. Five of the six are
-     * OVER, one of them by three reps.
+     * RepCounter.SENSOR (CountingPolicyTest > a tempo'd set is counted by the
+     * metronome unless nothing plays the tempo), and in v0.1.54 it counted on
+     * impulse. So these six over-counts were the nearest measured analogue to
+     * a tempo'd power clean under that detector: 8, 8, 7, 10, 11 and 2 against
+     * hand counts of 6, 7, 5, 8, 8 and 2. Five of the six are OVER, one of them
+     * by three reps.
      *
      * So this row is not evidence for the DYNAMIC design. It is the boundary of
      * that design written down, and it is also the nearest measurement of what

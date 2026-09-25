@@ -223,4 +223,127 @@ data class DspConfig(
      * down produces an impulse too.
      */
     val driveMaxGapS: Double = 1.0,
+    /**
+     * The run threshold on the smoothed drive-frame acceleration for
+     * [CycleRepCounter], m/s^2: a drive or a brake is a stretch beyond +-this.
+     *
+     * ## Provenance of every `cycle*` value: eight sets, three kinds
+     *
+     * The `cycle*` constants below are issue #305's design round, carried over
+     * unchanged from the harness that scored them (`ClosingRuleCandidates.kt`,
+     * `ClosingRuleVariants.kt`). The eight sets are field-43 sets 4-6 and
+     * field-44 sets 1-5 -- the only deadlifts the corpus holds, one lifter,
+     * dead stop, two mounts -- and every figure behind these values re-derives
+     * in `ClosingRuleCandidateTest`. Each KDoc says which of three kinds its
+     * value is, because a value in [DspConfig] reads as surveyed unless it says
+     * otherwise:
+     *
+     * - FITTED AND SWEPT: chosen against the eight sets and varied one at a
+     *   time in that test's sweep -- this, [cycleDriveGainMps],
+     *   [cycleMaxGapS], [cycleClipMps2], [cycleFallG], [cycleMinCycleS],
+     *   [cycleDescentMps].
+     * - CHOSEN, NEVER VARIED: set during the design round against the same
+     *   eight sets and never varied in the committed harness --
+     *   [cycleBrakeLossMps], [cycleMinRunS], [cycleSmoothFrames],
+     *   [cycleContactWindowS], [cycleContactDebounceS], [cycleFallFrames],
+     *   [cycleFallRefireS]. Their sensitivity is unmeasured.
+     * - BORROWED, NOT FITTED: [cycleContactG] and [cycleStillS], each taken from
+     *   an existing definition and named there.
+     *
+     * FITTED AND SWEPT. Low enough that field-44 set 5's 120 kg pulls form a run
+     * at all.
+     */
+    val cycleRunThresholdMps2: Double = 0.15,
+    /**
+     * The velocity a run above [cycleRunThresholdMps2] must GAIN -- its
+     * integral -- to be a drive, m/s.
+     *
+     * FITTED AND SWEPT. Under the 0.16 m/s field-44 set 5's first completed rep
+     * gains. The failed pull on that set gains 0.23 m/s, so no value of this
+     * separates the two; [cycleMinCycleS] does.
+     */
+    val cycleDriveGainMps: Double = 0.12,
+    /** The velocity a negative run must LOSE to be a brake, m/s. CHOSEN, NEVER VARIED. */
+    val cycleBrakeLossMps: Double = 0.12,
+    /** The shortest run that can be a drive or a brake, s. CHOSEN, NEVER VARIED. */
+    val cycleMinRunS: Double = 0.15,
+    /**
+     * How long after a drive's end its brake may begin and still arm it, s.
+     * FITTED AND SWEPT.
+     */
+    val cycleMaxGapS: Double = 1.5,
+    /**
+     * Frames in the moving mean over the acceleration: 0.1 s at the corpus's
+     * ~100 Hz. A frame count, not a duration, so it spans a different time at
+     * another rate. CHOSEN, NEVER VARIED.
+     */
+    val cycleSmoothFrames: Int = 10,
+    /**
+     * The bound the acceleration is clipped to for [cycleContactWindowS] after
+     * a floor contact, m/s^2, so a strike's ringing cannot become a drive.
+     * FITTED AND SWEPT.
+     */
+    val cycleClipMps2: Double = 1.0,
+    /** How long after a contact the clip holds, s. CHOSEN, NEVER VARIED. */
+    val cycleContactWindowS: Double = 0.3,
+    /** The shortest interval between two CONTACT events, s. CHOSEN, NEVER VARIED. */
+    val cycleContactDebounceS: Double = 0.5,
+    /**
+     * A floor CONTACT: a sample whose accelerometer MAGNITUDE exceeds this, g.
+     *
+     * BORROWED, NOT FITTED: issue #305 lens A's contact definition, the same
+     * 4 g by magnitude `DeadliftLiveCountFieldTest` counts field-43's floor
+     * transients with. Not swept.
+     */
+    val cycleContactG: Double = 4.0,
+    /**
+     * A FALL: the [cycleFallFrames]-frame mean magnitude under this, g -- the
+     * bar in or near free fall.
+     *
+     * FITTED AND SWEPT. Every completed rep's lowering stays above it and the
+     * failed pull does not (field-44 set 5's grip failure reaches 0.14 g).
+     * Completed reps start dropping at 0.55 in the sweep.
+     */
+    val cycleFallG: Double = 0.4,
+    /** Frames in the magnitude mean a FALL is read on. CHOSEN, NEVER VARIED. */
+    val cycleFallFrames: Int = 5,
+    /**
+     * The shortest interval between two FALL events, s.
+     *
+     * CHOSEN, NEVER VARIED. It was a literal `0.3` inside the design harness's
+     * event loop and appeared in no constant list; it is named here so it is
+     * one.
+     */
+    val cycleFallRefireS: Double = 0.3,
+    /**
+     * A STILL: a run of quiet samples (`VelocityEstimator.isQuietSample`)
+     * reaching this, s.
+     *
+     * BORROWED, NOT FITTED: [minStationaryS]'s value, 0.30 s. A field of its own
+     * rather than a read of that one, so re-tuning the ZUPT's window cannot move
+     * the rep count without a diff here. Not swept.
+     */
+    val cycleStillS: Double = 0.30,
+    /**
+     * The shortest a completed rep is taken to need from its drive's END to the
+     * bar being back on the floor, s. A CONTACT or FALL sooner than this rejects
+     * the attempt; the next drive STARTING sooner than this replaces it.
+     *
+     * FITTED AND SWEPT. The next contact comes 0.68 s after field-44 set 5's
+     * failed pull's drive ends, and 1.25 s or later after the drive of every
+     * completed rep that arms (35 of 36). Completed reps start dropping at 1.4
+     * in the sweep. A contact is a proxy for the floor, not a measurement of
+     * it.
+     */
+    val cycleMinCycleS: Double = 1.2,
+    /**
+     * The magnitude the negative part of the smoothed drive-frame acceleration
+     * must reach, integrated from the brake run's start, before a pending rep
+     * can be CALLED, m/s. An acceleration integral, not a measured bar
+     * velocity.
+     *
+     * FITTED AND SWEPT. Completed reps reach 1.38-3.1; the two set-downs it
+     * removes reach 0.35 and 0.51.
+     */
+    val cycleDescentMps: Double = 0.9,
 )

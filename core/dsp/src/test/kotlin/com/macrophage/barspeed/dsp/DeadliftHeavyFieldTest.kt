@@ -1,7 +1,6 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
-import com.macrophage.barspeed.model.RepCounter
 import com.macrophage.barspeed.model.StartPhase
 import kotlin.math.abs
 import kotlin.test.Test
@@ -66,12 +65,12 @@ import kotlin.test.assertTrue
  *
  * ## What this file pins, and what it does not
  *
- * TODAY's counts, on the counter `LiveRepCounters.forCounted` arms for a
- * sensor-counted set -- `DriveImpulseCounter`, unchanged on `main` since the
- * `v0.1.54` tag the session ran. 5, 5, 5, 0, 0 on role a is the number the
- * lifter heard. Nothing here is fixed, and a design that counts sets 4 and 5
- * is EXPECTED to red the live-count pin. The candidates are issue #305's
- * design round, not this file.
+ * The counts `v0.1.54` made -- `DriveImpulseCounter`, the counter the session
+ * ran, built BY NAME so the pins stay about that build whatever
+ * `LiveCounterPolicy` arms. 5, 5, 5, 0, 0 on role a is the number the lifter
+ * heard. Until #305's implement round these read `LiveRepCounters.forCounted`,
+ * which armed the same class. The candidates are issue #305's design round,
+ * not this file.
  */
 class DeadliftHeavyFieldTest {
     private fun load(n: String): List<ImuSample> = ImuCsv.decode(
@@ -91,10 +90,13 @@ class DeadliftHeavyFieldTest {
         Fixture("field-deadlift-straight-2rep-s44-set05", 120.20197805265938, completed = 2, liveReps = 0),
     )
 
-    /** Every [RepCall.Speak] the app makes on a set of this shape, through `RecordViewModel`'s own call. */
-    private fun liveCalls(fixture: String): List<RepCall.Speak> {
-        val counter = LiveRepCounters.forCounted(RepCounter.SENSOR, deadlift)
-            ?: error("a sensor-counted set must arm a counter")
+    /**
+     * Every [RepCall.Speak] `v0.1.54`'s live path makes on a set of this shape:
+     * `DriveImpulseCounter` by name, because this reproduces the build the
+     * session ran and must not follow the policy when the policy moves.
+     */
+    private fun impulseCalls(fixture: String): List<RepCall.Speak> {
+        val counter = DriveImpulseCounter(deadlift)
         val tracker = StreamingSetTracker.forLift(deadlift)
         val spoken = mutableListOf<RepCall.Speak>()
         for (sample in load(fixture)) {
@@ -116,7 +118,7 @@ class DeadliftHeavyFieldTest {
     @Test
     fun `replaying role a reproduces the three live-counted tracks to within 2 ms`() {
         sets.take(3).forEach { set ->
-            val spoken = liveCalls(set.name)
+            val spoken = impulseCalls(set.name)
             val cues = CueTrack.read(set.name)
             assertEquals(set.liveReps, spoken.size, "${set.name}: calls against the exported liveReps")
             assertEquals(5, cues.size, "${set.name}: rows on the cue track")
@@ -141,11 +143,11 @@ class DeadliftHeavyFieldTest {
     @Test
     fun `the shipped counter calls 5, 5, 5, 0 and 0 and falls silent above 102 kg`() {
         assertEquals(21, sets.sumOf { it.completed }, "completed reps, the owner's settled count")
-        assertEquals(listOf(5, 5, 5, 0, 0), sets.map { liveCalls(it.name).size }, "role a, set by set")
+        assertEquals(listOf(5, 5, 5, 0, 0), sets.map { impulseCalls(it.name).size }, "role a, set by set")
         assertEquals(listOf(5, 5, 5, 0, 0), sets.map { it.liveReps }, "the archive's liveReps")
         assertEquals(
             listOf(6, 6, 5, 0, 0),
-            sets.map { liveCalls("${it.name}-imu-b").size },
+            sets.map { impulseCalls("${it.name}-imu-b").size },
             "role b, set by set",
         )
     }

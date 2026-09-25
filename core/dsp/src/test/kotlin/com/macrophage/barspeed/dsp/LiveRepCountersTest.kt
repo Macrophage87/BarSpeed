@@ -1,5 +1,7 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.CountingPolicy
+import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.LiveCounter
 import com.macrophage.barspeed.model.RepCounter
@@ -109,5 +111,47 @@ class LiveRepCountersTest {
         listOf(RepCounter.MANUAL, RepCounter.METRONOME, RepCounter.NOBODY).forEach { counter ->
             assertNull(LiveRepCounters.forCounted(counter, direction), "$counter arms no live counter")
         }
+    }
+
+    /**
+     * Every capture NAMED with a tempo code arms NO live counter, whichever
+     * counter `LiveCounterPolicy` gives a sensor-counted set (#305).
+     *
+     * A capture counts here when its fixture name carries a four-character
+     * tempo code (`-3010-`, `-1120-`, `-30X0-` ...), which is how most of the
+     * corpus names the prescription the session ran. That is a naming
+     * convention read, not a field of the capture, and it is not every tempo'd
+     * capture: `field-ohp-prepinflated-s37-set03` and `-set04` were tempo'd and
+     * carry no code, so they are not counted here. Each is routed as a DYNAMIC
+     * lift with a tempo and an IMU connected -- the shape their exports record
+     * where one has been read (`LiveCountDifferentialTest`'s overhead-press row)
+     * -- which the metronome counts. No fixture name marks an EXPLOSIVE lift,
+     * the one tempo'd shape the sensor does count.
+     *
+     * A GUARD, green before and after a change to the SENSOR row: it reds only
+     * if a change reaches the tempo'd rows, which is what "the tempo sets are
+     * unchanged" means in #305's design.
+     */
+    @Test
+    fun `no capture named with a tempo code arms a live counter`() {
+        val tempoCode = Regex("-[0-9X]{4}-")
+        val guided = CandidateCorpus.ALL.filter { tempoCode.containsMatchIn(it.fixture) }
+        val counter = CountingPolicy.counterFor(
+            hasTempo = true,
+            isTimed = false,
+            kind = ExerciseKind.DYNAMIC,
+            imuConnected = true,
+        )
+        guided.forEach { capture ->
+            assertNull(
+                LiveRepCounters.forCounted(counter, capture.direction),
+                "${capture.fixture} arms a counter",
+            )
+        }
+        assertEquals(TEMPO_GUIDED_CAPTURES, guided.size, "tempo-coded captures: ${guided.map { it.fixture }}")
+    }
+
+    private companion object {
+        const val TEMPO_GUIDED_CAPTURES = 33
     }
 }

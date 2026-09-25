@@ -65,6 +65,29 @@ data class LiveSetState(
      * [RepSegmenter] reads velocity and time only.
      */
     val accelMps2: Double = 0.0,
+    /**
+     * The RAW sample's accelerometer magnitude, g -- `FrameTransform.accMagnitudeG`
+     * of the sample this state was fed, before any filter, bias or frame.
+     *
+     * Published for [CycleRepCounter], which reads a floor CONTACT and a FALL
+     * off it (#305). Nothing else here reads it: the integrator above uses the
+     * vertical linear acceleration, not the magnitude.
+     *
+     * NULL on a state no sample produced -- `LiveSetState()` itself -- rather
+     * than a stand-in number: 0 g would read as free fall and 1 g as a bar at
+     * rest, and neither was measured. Every state [StreamingSetTracker.feed]
+     * returns carries the sample's own value.
+     */
+    val accMagnitudeG: Double? = null,
+    /**
+     * Whether the RAW sample this state was fed passed
+     * `VelocityEstimator.isQuietSample` -- the same per-sample predicate, on the
+     * same [DspConfig], that the tracker's own bias learner and ZUPT read.
+     *
+     * Published for [CycleRepCounter], which reads a STILL off a run of these
+     * (#305). NULL on a state no sample produced, for [accMagnitudeG]'s reason.
+     */
+    val quiet: Boolean? = null,
 )
 
 /**
@@ -214,6 +237,8 @@ class StreamingSetTracker(
                 countTrusted = countTrusted,
                 elapsedS = timeS,
                 accelMps2 = accel,
+                accMagnitudeG = FrameTransform.accMagnitudeG(sample),
+                quiet = quietSample,
             )
         return state
     }

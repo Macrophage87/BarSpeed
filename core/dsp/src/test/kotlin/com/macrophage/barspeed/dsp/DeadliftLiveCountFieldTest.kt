@@ -118,6 +118,13 @@ class DeadliftLiveCountFieldTest {
         fixture,
     )
 
+    /**
+     * Every [RepCall.Speak] `v0.1.54`'s live path makes: `DriveImpulseCounter`
+     * by name, for [shippedCalls]' reason -- a reproduction of a shipped build
+     * names the class that build ran.
+     */
+    private fun impulseCalls(fixture: String): List<RepCall.Speak> = spokenBy(DriveImpulseCounter(deadlift), fixture)
+
     private fun spokenBy(counter: LiveRepCounter, fixture: String): List<RepCall.Speak> {
         val tracker = StreamingSetTracker.forLift(deadlift)
         val spoken = mutableListOf<RepCall.Speak>()
@@ -204,6 +211,11 @@ class DeadliftLiveCountFieldTest {
             "the calls the app makes now, set by set",
         )
         assertEquals(13, sets.sumOf { liveCalls(it.name).size }, "numbers the voice speaks now")
+        assertEquals(
+            listOf(5, 5, 3),
+            sets.map { impulseCalls(it.name).size },
+            "v0.1.54's drive-impulse calls, set by set, by name",
+        )
         sets.forEach { set ->
             val state = finalState(set.name)
             assertEquals(set.liveReps, state.repCount, "${set.name}: the tracker's own count")
