@@ -66,8 +66,9 @@ data class SetPrescriptionExport(
  *
  * Applied where [ExerciseExport] lists its sets, through
  * [SetExportListSerializer], so every set the session document publishes
- * passes through it, and nothing else in the document is touched. Decoding reverses it, so a document this writer produced reads back
- * into the same objects.
+ * passes through it, and nothing else in the document is touched. Decoding
+ * reverses it, so a document this writer produced reads back into the same
+ * objects.
  *
  * WHERE THE KEYS LAND. Where the grouping sits among [SetExport]'s own
  * properties -- not where each key sat before the grouping existed. JSON
