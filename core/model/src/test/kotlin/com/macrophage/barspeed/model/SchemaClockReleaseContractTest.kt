@@ -50,7 +50,7 @@ class SchemaClockReleaseContractTest {
             "a sensor hold may never have been tapped at all" in endedBy,
             "durationEndedBy does not say a sensor hold may carry no tap",
         )
-        val clockStands = "only where no armed unit's stream showed the implement being let go 1 to 20 whole seconds"
+        val clockStands = "only where its armed unit, if any, reported no release taking 1 to 20 whole seconds off"
         assertTrue(clockStands in endedBy, "durationEndedBy still says every clock end records the target")
     }
 
