@@ -5104,9 +5104,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * demo mode was one, writing to that flow off the main thread through
      * `launchDemoStream`; it is gone, and this reasoning is what keeps the
      * next one from being added. `Main.immediate` keeps every one of them
-     * exactly where it is today, and keeps this write, [rateLastSet] and
-     * [correctLastSet] in tap order now that all three have left
-     * `viewModelScope`.
+     * exactly where it is today.
      *
      * The catch is not optional. `appScope` has no `CoroutineExceptionHandler`,
      * so anything escaping reaches the default uncaught handler and kills the

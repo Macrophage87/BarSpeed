@@ -5,11 +5,12 @@ package com.macrophage.barspeed.model
  * the effort of the set just stored (#310).
  *
  * [reps] and [seconds] are null where the draft left that figure where it
- * stood; at most one is ever non-null, because a set is either counted or
- * timed. [rpe] and [tappedFailed] are the draft's rating as the popup drew it
- * at the SAVE. The popup seeds both from what stands, so where the lifter did
- * not touch the grid they ARE the standing rating, and [ratingChanged] says
- * whether they touched it.
+ * stood; the popup constructs at most one non-null at a time, because it
+ * draws a set as either counted or timed, never both -- nothing in this
+ * type enforces that. [rpe] and [tappedFailed] are the draft's rating as
+ * the popup drew it at the SAVE. The popup seeds both from what stands, so
+ * where the lifter did not touch the grid they ARE the standing rating, and
+ * [ratingChanged] says whether they touched it.
  */
 data class CountAndRatingDraft(
     val reps: Int?,

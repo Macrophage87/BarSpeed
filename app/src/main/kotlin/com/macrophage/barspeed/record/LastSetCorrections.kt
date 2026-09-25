@@ -62,9 +62,7 @@ internal fun ratedState(s: RecordState, rpe: Int?, tappedFailed: Boolean, effect
  * inside it. The rare deliberate overage is stated on the rest screen, where
  * every other post-set correction already lives, because the owner does not
  * look at the phone while holding -- "There are rare instances I even look at
- * the phone mid set" -- so a mid-set affordance would be exercised never. The
- * delta moves the figure that currently stands, so repeated taps accumulate,
- * and `TimedSetEndPolicy.adjustedSeconds` floors the result at zero.
+ * the phone mid set" -- so a mid-set affordance would be exercised never.
  */
 internal fun durationCorrectedState(s: RecordState, seconds: Int, effectiveFailed: Boolean): RecordState = s.copy(
     lastFeedback = s.lastFeedback?.copy(
