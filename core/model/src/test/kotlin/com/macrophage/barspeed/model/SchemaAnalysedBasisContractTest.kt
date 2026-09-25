@@ -119,11 +119,11 @@ class SchemaAnalysedBasisContractTest {
      * silently narrow what that file inspects. That is why this entry opens
      * `1.22 TAKES A SECOND ENTRY` with no colon after the number.
      *
-     * The tip literal appears in two files and they guard different things:
-     * `SchemaUnitIdentityContractTest` pins it because that file MINTS 1.22,
-     * and the equality below pins that this entry extends the number the app
-     * actually writes, which is what fires if a later mint leaves this entry
-     * behind.
+     * The equality that stood below pinned that this entry extended the number
+     * the app writes. It fired, as it was written to, when #157 minted 1.23
+     * after 1.22 shipped in v0.1.55, and it is REPLACED by the claim that
+     * survives every later mint: the number this entry is filed under is still
+     * accepted.
      */
     @Test
     fun `the version log files this as a second entry under an unreleased number`() {
@@ -134,11 +134,7 @@ class SchemaAnalysedBasisContractTest {
         assertTrue("analysedRoleBasis" in entry, "the log names no key")
         assertTrue("DATABASE_VERSION does NOT move" in entry, "the log does not say the database stays put")
         assertEquals(1, Regex("1\\.22 TAKES A SECOND ENTRY").findAll(log).count(), "the entry is filed twice")
-        assertEquals(
-            "1.22",
-            SessionExport.SCHEMA_VERSION,
-            "the version this entry extends is not the one the app writes",
-        )
+        assertTrue("1.22" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version filed under is not accepted")
     }
 
     /**

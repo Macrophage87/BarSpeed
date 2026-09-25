@@ -139,10 +139,14 @@ class SchemaUnitIdentityContractTest {
      * already in the field refuses a 1.22 document on the version string before
      * it reaches a key.
      *
-     * THE TIP LITERAL LIVES HERE NOW, on the rule
-     * `SchemaSkippedSetContractTest` wrote when it minted 1.21: the literal the
-     * exporter writes is asserted in the file that MINTS it and nowhere else,
-     * so that file now pins its own filed version and this one pins the tip.
+     * THE TIP CONSTANT IS NO LONGER ASSERTED HERE. This test read
+     * `assertEquals("1.22", SessionExport.SCHEMA_VERSION)` on the rule
+     * `SchemaSkippedSetContractTest` wrote when it minted 1.21 -- the literal
+     * the exporter writes is asserted in the file that MINTS it -- and that rule
+     * is why the assertion is gone rather than re-pointed: 1.22 shipped in
+     * v0.1.55, #157 minted 1.23, and `SchemaWorkingTargetContractTest` is where
+     * the tip literal lives now. What this file pins is its own filed version,
+     * 1.22, being ACCEPTED, which no later mint can make false.
      *
      * The export-time caveat is asserted and not merely written because it is
      * the whole difference between this key and a column: nothing in
@@ -162,8 +166,7 @@ class SchemaUnitIdentityContractTest {
             "REJECTS" in entry.uppercase(),
             "the log does not say the 1.21 schema in the field refuses a 1.22 document",
         )
-        assertEquals("1.22", SessionExport.SCHEMA_VERSION, "the version the exporter writes")
-        assertTrue("1.22" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
+        assertTrue("1.22" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version filed under is not accepted")
         assertTrue("1.21" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.21 left the accepted set")
         assertTrue(
             "export time" in entry,

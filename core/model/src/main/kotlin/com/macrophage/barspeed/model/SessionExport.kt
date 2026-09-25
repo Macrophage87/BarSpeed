@@ -2323,8 +2323,78 @@ data class SessionExport(
          * the narrowing; `PeakEligibilityTest` and `GuardBandProvenanceTest` in
          * `:core:dsp` and `SessionExportPeakEligibilityTest` in `:core:data` are
          * the differentials.
+         *
+         * 1.23 MINTS FIVE KEYS (#157, folding #151, #76 and #219): a set may
+         * carry `workingReps`, `workingLoad_kg`, `workingDuration_s`,
+         * `plannedTempo` and `restMeasured_s`.
+         *
+         * A MINT AND NOT A FOURTEENTH ENTRY UNDER 1.22: `git tag
+         * --sort=-creatordate | head -1` is v0.1.55 and `git show
+         * v0.1.55:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.22"`, both read at the tag this round.
+         * 1.22 has SHIPPED and its thirteen entries are closed.
+         *
+         * THREE LAYERS PER TARGET. PLANNED is what the plan prescribed, frozen
+         * when the plan was flattened, and no in-app control moves it:
+         * `plannedReps`, `plannedLoad_kg`, `plannedDuration_s`, `plannedTempo`
+         * and `rest_s`. WORKING is the target the set ran against, fixed at
+         * START: `workingReps`, `workingLoad_kg`, `workingDuration_s` and
+         * `tempoPrescribed`, whose name is historical. ACTUAL is what the set
+         * is recorded as, after any rest-screen correction: `reps`,
+         * `load_kg`, `duration_s` and `tempoCompliance`. The owner plans at a
+         * productive floor and raises the load or the reps with the in-app
+         * buttons when a set shows headroom, so a working figure above the
+         * planned one is intended use. A working figure below the planned one
+         * is a lowered target, and a set that met it is COMPLETED -- the
+         * owner, 2026-09-25: "It's completed even if the target is lowered,
+         * just note the discrepancy." The note is the two figures side by
+         * side; nothing judges it.
+         *
+         * WHAT WAS UNSAYABLE. Until database v20 the working targets were
+         * dropped at the write. field-45's set 8 -- planned 10, lowered to 6,
+         * 6 done -- read "planned 10, did 6, not failed", a shortfall that
+         * never happened, and field-41's seven raised targets read as
+         * over-performance. They were recoverable only from where the cue
+         * track's `Last rep` fell.
+         *
+         * THE MEASURED REST. `restMeasured_s` is the seconds from the instant
+         * this set's rest ran from -- the instant `rest_s`'s countdown starts
+         * at -- to the START tap on the next set of the session, rounded to a
+         * tenth by [RestMeasurePolicy.measuredS]. `rest_s` is a MINIMUM -- the
+         * owner: "I consider rests a minimum. If it takes more time to setup I
+         * do." -- so only a measured rest SHORTER than `rest_s` is a
+         * discrepancy.
+         *
+         * ONE DESCRIPTOR. Every planned, working and rest key is published from
+         * one [SetPrescriptionExport], which the session document carries flat
+         * and the raw archive's `meta.json` splices into its set descriptor, so
+         * the two documents cannot list different keys again. That is #219:
+         * `meta.json` carries `plannedLoad_kg`, `plannedDuration_s` and
+         * `rest_s` for the first time.
+         *
+         * WHAT AN OLDER READER DOES, and it is not symmetric. The 1.22 schema
+         * v0.1.55 shipped REJECTS a 1.23 document on the version string alone,
+         * and a validator on it would reject the five keys too, its set being
+         * `additionalProperties: false`. This schema still lists 1.0 through
+         * 1.22 and ACCEPTS a 1.22 document unchanged. No existing key is
+         * removed, renamed or retyped, and none changes its value, so a reader
+         * that ignores unknown keys reads a 1.23 document as it read 1.22.
+         *
+         * NOT RETROACTIVE. The columns behind the keys arrived at database v20
+         * with no backfill, so a set recorded before v20 publishes none of the
+         * five. Every set recorded from v20 carries `workingLoad_kg`, which is
+         * how a reader tells the two apart. `DATABASE_VERSION` does NOT move in
+         * this entry, and the plan schema is untouched.
+         *
+         * PINNED. `SchemaWorkingTargetContractTest` asserts the five keys, the
+         * corrected descriptions and this entry's marker in the published log;
+         * `SetPrescriptionExportTest` pins the Kotlin keys against the schema;
+         * `RawExporterPrescriptionParityTest` and
+         * `SessionExportWorkingTargetsTest` in `:core:data` are the
+         * differentials, and `PlanPromptWorkingTargetContractTest` pins the
+         * reading guide the plan prompt carries.
          */
-        const val SCHEMA_VERSION = "1.22"
+        const val SCHEMA_VERSION = "1.23"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -2334,7 +2404,7 @@ data class SessionExport(
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
-                "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22",
+                "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23",
             )
 
         /**

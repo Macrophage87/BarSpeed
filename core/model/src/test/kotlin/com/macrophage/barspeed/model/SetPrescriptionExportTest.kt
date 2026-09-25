@@ -104,11 +104,21 @@ class SetPrescriptionExportTest {
      * derived, the house rule for key pins: a descriptor-derived list follows a
      * `@SerialName` rename silently, and a renamed key is one every reader
      * loses.
+     *
+     * RED WHEN WRITTEN, at export 1.23 (#157): the five keys 1.23 mints --
+     * `workingReps`, `workingLoad_kg`, `workingDuration_s`, `plannedTempo` and
+     * `restMeasured_s` -- are planned, working and rest keys, so they belong in
+     * the one grouping both writers publish, and the grouping did not hold
+     * them when this was written. Renamed from "the grouping holds the plan's targets, the rest
+     * and the working tempo", which named the five it held before.
      */
     @Test
-    fun `the grouping holds the plan's targets, the rest and the working tempo`() {
+    fun `the grouping holds every planned, working and rest key`() {
         assertEquals(
-            setOf("plannedLoad_kg", "plannedReps", "plannedDuration_s", "rest_s", "tempoPrescribed"),
+            setOf(
+                "plannedLoad_kg", "plannedReps", "plannedDuration_s", "rest_s", "tempoPrescribed",
+                "workingLoad_kg", "workingReps", "workingDuration_s", "plannedTempo", "restMeasured_s",
+            ),
             SetExportWireSerializer.prescriptionKeys,
         )
     }

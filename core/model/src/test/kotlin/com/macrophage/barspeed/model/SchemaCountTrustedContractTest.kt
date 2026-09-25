@@ -126,7 +126,10 @@ class SchemaCountTrustedContractTest {
         assertTrue("`countTrusted`" in entry, "the entry names no key")
         assertTrue("NOT RETROACTIVE" in entry, "the entry does not say old sets stay absent")
         assertTrue("DATABASE_VERSION does NOT move" in entry, "the entry does not say the database stays put")
-        assertEquals("1.22", SessionExport.SCHEMA_VERSION, "the version this entry extends is not the one written")
+        // Its filed number being ACCEPTED, not being the tip: 1.22 shipped in
+        // v0.1.55 and #157 minted 1.23, so an equality with the tip went false
+        // at that mint and is not re-pointed at it.
+        assertTrue("1.22" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version filed under is not accepted")
     }
 
     /**
