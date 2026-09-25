@@ -95,12 +95,14 @@ class TempoComplianceTest {
 
     @Test
     fun `coaching verdicts are unaffected by the set-level denominator`() {
-        // The verdict loop reads per-phase counts only, so this whole list must
-        // survive byte-identical. The velocity-loss line shares the list and is
-        // pinned with them; a size assertion alone would miss a dropped entry.
+        // The verdict loop reads per-phase counts only, so the tempo lines must
+        // survive byte-identical. The velocity-loss line shared the list and
+        // read "High velocity loss (79.1%)" until #306: this set has no two
+        // reps the analysis can bound, so it publishes no velocity loss and
+        // the verdict built on it is gone with it. A size assertion alone
+        // would miss a dropped entry, so the whole list is still pinned.
         assertEquals(
             listOf(
-                "High velocity loss (79.1%) — significant fatigue this set.",
                 "Tempo (eccentric): 0/6 reps on tempo; worst was 2.01 s too slow (target 3.00 s).",
                 "Tempo (concentric): 5/10 reps on tempo; worst was 2.96 s too slow (target 1.00 s).",
             ),

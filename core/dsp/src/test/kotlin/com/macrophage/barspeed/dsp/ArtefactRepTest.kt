@@ -297,7 +297,8 @@ class ArtefactRepTest {
         // over every rep and is unaffected; RomBoundCorpusTest carries the
         // per-capture column.
         assertNull(SetAnalyzer.romSpreadPct(a.reps), "summary romSpread_pct")
-        assertEquals(67.0, a.velocityLossPct, "velocityLoss_pct")
+        assertEquals(67.0, everyRepLossPct(a.reps), "velocityLoss_pct, over every rep")
+        assertNull(a.velocityLossPct, "velocityLoss_pct: withheld from #306")
     }
 
     /**

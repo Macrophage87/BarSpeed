@@ -192,8 +192,18 @@ class FallbackMountGeometryTest {
         // both.
         assertEquals(14, roleA.reps.size, "role a, the armed and analysed unit")
         assertEquals(13, roleB.reps.size, "role b, the partner")
-        assertEquals(81.0, roleA.velocityLossPct, "role a velocity loss under the declared geometry")
-        assertEquals(33.5, roleB.velocityLossPct, "role b velocity loss under the same declaration")
+        assertEquals(
+            81.0,
+            everyRepLossPct(roleA.reps),
+            "role a velocity loss under the declared geometry, over every rep",
+        )
+        assertNull(roleA.velocityLossPct, "role a velocity loss under the declared geometry: withheld from #306")
+        assertEquals(
+            33.5,
+            everyRepLossPct(roleB.reps),
+            "role b velocity loss under the same declaration, over every rep",
+        )
+        assertNull(roleB.velocityLossPct, "role b velocity loss under the same declaration: withheld from #306")
         // The rate is a property of the timestamps and matches the rate
         // field-38's own meta.json published for each file.
         assertEquals(99.36374922408443, roleA.sampleRateHz, "role a span-based rate")
@@ -285,8 +295,13 @@ class FallbackMountGeometryTest {
         // needs.
         assertEquals(13, SetAnalyzer.analyze(samples, declared).reps.size, "under the declared stack geometry")
         assertEquals(18, SetAnalyzer.analyze(samples, lifterSide).reps.size, "under the lifter-side geometry")
-        assertEquals(33.5, SetAnalyzer.analyze(samples, declared).velocityLossPct, "declared")
-        assertEquals(79.3, SetAnalyzer.analyze(samples, lifterSide).velocityLossPct, "lifter-side")
+        val underDeclared = SetAnalyzer.analyze(samples, declared)
+        val underLifterSide = SetAnalyzer.analyze(samples, lifterSide)
+        assertEquals(33.5, everyRepLossPct(underDeclared.reps), "declared, over every rep")
+        assertEquals(79.3, everyRepLossPct(underLifterSide.reps), "lifter-side, over every rep")
+        // From #306 neither geometry publishes a figure: no two reps are bounded.
+        assertNull(underDeclared.velocityLossPct, "declared: withheld from #306")
+        assertNull(underLifterSide.velocityLossPct, "lifter-side: withheld from #306")
     }
 
     // ---------------------------------------------------------------------

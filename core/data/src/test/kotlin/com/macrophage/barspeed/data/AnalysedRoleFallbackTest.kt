@@ -397,8 +397,13 @@ class AnalysedRoleFallbackTest {
         // before it -- so the figures are #94/#138's problem and pinning them
         // here would read as a claim that they are trustworthy.
         assertTrue(summary.isNotEmpty(), "the summary is still empty, which is what field-36 published")
-        listOf("meanConVel_mps", "peakConVel_mps", "peakPower_w").forEach { key ->
-            assertTrue(key in summary, "the restored summary has no $key: ${summary.keys}")
+        assertTrue("meanConVel_mps" in summary, "the restored summary has no meanConVel_mps: ${summary.keys}")
+        // AND NO PEAK PAIR, which this test asserted the presence of until
+        // #306 took the set's peaks over the reps the analysis can bound. Not
+        // one of the eight is bounded (below), so there is no population for a
+        // peak to be taken over; the rows still publish their own.
+        listOf("peakConVel_mps", "peakPower_w").forEach { key ->
+            assertTrue(key !in summary, "a set peak over reps nothing bounds: $key in ${summary.keys}")
         }
         val rows = set.getValue("repMetrics").jsonArray
         assertEquals(8, rows.size, "detections; the metronome called 6 (#94/#138)")

@@ -25,17 +25,31 @@ import kotlin.test.assertTrue
  *    implausible. They are listed as survivors rather than left out of the
  *    table. `AccelArtefact.corruptedSpan`'s KDoc carries why the narrower rule
  *    ships anyway, and `ArtefactRuleAlternativesTest` measures the alternative.
+ *
+ * ## After #306: the in-span clause's own table, and what each set publishes
+ *
+ * Issue #306 added two clauses to the rule -- the guard band before a span
+ * and the displacement bound -- and not one rep of these eleven is bounded,
+ * so every capture here now publishes NO peak pair and no terminal-loss
+ * figure. A table of eleven absences would pin nothing about the clause this
+ * file was written for. So the #290 figures are asserted with the other two
+ * inputs masked ([inSpanOnly]): they are what the in-span clause alone keeps,
+ * and deleting that clause reds them. What each set actually publishes is
+ * asserted beside them.
  */
 class ArtefactPeakWithholdingTest {
     private fun case(fixture: String) = ArtefactCorpus.cases.first { it.fixture == fixture }
 
     private fun analyse(fixture: String) = ArtefactCorpus.analyse(case(fixture))
 
+    /** [reps] with #306's band and bound masked, so the in-span clause alone decides. */
+    private fun inSpanOnly(reps: List<RepAnalysis>) = reps.map { it.copy(guardArtefactSamples = 0, romBounded = true) }
+
     private fun publishedPeakPowerW(a: SetAnalysis) =
-        AccelArtefact.peakEligible(a.reps).mapNotNull { it.peakPowerW }.maxOrNull()
+        AccelArtefact.peakEligible(inSpanOnly(a.reps)).mapNotNull { it.peakPowerW }.maxOrNull()
 
     private fun publishedPeakConVelMps(a: SetAnalysis) =
-        AccelArtefact.peakEligible(a.reps).maxOfOrNull { it.peakConVelMps }
+        AccelArtefact.peakEligible(inSpanOnly(a.reps)).maxOfOrNull { it.peakConVelMps }
 
     private fun beforePeakPowerW(a: SetAnalysis) = a.reps.mapNotNull { it.peakPowerW }.maxOrNull()
 
@@ -131,6 +145,13 @@ class ArtefactPeakWithholdingTest {
             },
             "peakPower_w before and after, then peakConVel_mps before and after",
         )
+        // From #306 none of the five publishes either figure: no rep of any of
+        // them is bounded.
+        moved.keys.forEach {
+            val a = analyse(it)
+            assertNull(AccelArtefact.setPeakPowerW(a.reps), "$it peakPower_w published from #306")
+            assertNull(AccelArtefact.setPeakConVelMps(a.reps), "$it peakConVel_mps published from #306")
+        }
         // The implied support acceleration of the two headline figures, so
         // "believable" is a number rather than an adjective.
         val press = 329.4 / (1.155 * 24.94758035055195) / 9.80665
@@ -179,7 +200,15 @@ class ArtefactPeakWithholdingTest {
                 "field-assistedpullup-3010-s37-set08" to 407.4,
             ),
             unchanged.associateWith { publishedPeakPowerW(analyse(it)) },
-            "the survivors, at the figures they still publish",
+            "the survivors of the in-span clause, at the figures it leaves",
+        )
+        // And from #306 not one of the six is published: every rep of every
+        // one is unbounded, which is what finally reaches the five
+        // implausible figures the in-span clause could not.
+        assertEquals(
+            unchanged.associateWith { null },
+            unchanged.associateWith { AccelArtefact.setPeakPowerW(analyse(it).reps) },
+            "peakPower_w each survivor publishes from #306",
         )
         // The sample that inflates field-37 set 8's 407.4 W, and where it is
         // relative to the rep that publishes it -- the measurement the KDoc
@@ -230,9 +259,19 @@ class ArtefactPeakWithholdingTest {
                 "field-ohp-prepinflated-s37-set03" to null,
             ),
             ArtefactCorpus.cases.associate {
-                it.fixture to AccelArtefact.terminalPeakLossPct(analyse(it.fixture).reps)?.let(ArtefactCorpus::round3)
+                it.fixture to AccelArtefact.terminalPeakLossPct(inSpanOnly(analyse(it.fixture).reps))
+                    ?.let(ArtefactCorpus::round3)
             },
-            "the percentage the chart prints beside the set's best peak velocity",
+            "the percentage the in-span clause alone would let the chart print",
+        )
+        // What the chart prints from #306: nothing on any of the eleven, because
+        // the set's best is withheld on every one.
+        assertEquals(
+            ArtefactCorpus.cases.associate { it.fixture to null },
+            ArtefactCorpus.cases.associate {
+                it.fixture to AccelArtefact.terminalPeakLossPct(analyse(it.fixture).reps)
+            },
+            "the percentage the chart prints from #306",
         )
     }
 
@@ -251,8 +290,11 @@ class ArtefactPeakWithholdingTest {
         assertEquals(emptyList(), AccelArtefact.peakEligible(allMarked), "no rep qualifies")
         assertNull(allMarked.let { AccelArtefact.peakEligible(it) }.mapNotNull { it.peakPowerW }.maxOrNull())
         assertNull(AccelArtefact.peakEligible(allMarked).maxOfOrNull { it.peakConVelMps })
-        // And the figures that are NOT peaks are untouched by the rule.
+        // And the per-rep figures are untouched by the rule.
         assertEquals(a.reps.map { it.romM }, allMarked.map { it.romM }, "rom_m is not a peak and does not move")
-        assertEquals(a.velocityLossPct, SetAnalyzer.velocityLossPct(allMarked), "velocity loss is mean-based")
+        // A line here asserted that velocity loss "is mean-based" and so did
+        // not move. From #306 its reference is taken over the same eligible
+        // reps, so a set with none publishes none.
+        assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(allMarked), "velocity loss with no eligible rep")
     }
 }

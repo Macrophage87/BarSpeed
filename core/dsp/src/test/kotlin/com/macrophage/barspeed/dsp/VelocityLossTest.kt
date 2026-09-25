@@ -146,12 +146,14 @@ class VelocityLossTest {
     fun `the leg-curl captures whose last detection is fastest publish no figure`() {
         val b = SetAnalyzer.analyze(load("field-legcurl-1030-12rep-b.csv"), legCurl)
         assertEquals(13, b.reps.size, "segmented detections; the lifter performed 12")
-        assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(b.reps))
+        assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(everyRepEligible(b.reps)), "over every rep")
+        assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(b.reps), "from #306")
         assertNull(b.velocityLossPct, "velocity loss reported to the lifter")
 
         val c = SetAnalyzer.analyze(load("field-legcurl-1030-12rep-c.csv"), legCurl)
         assertEquals(11, c.reps.size, "segmented detections; the lifter performed 12")
-        assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(c.reps))
+        assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(everyRepEligible(c.reps)), "over every rep")
+        assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(c.reps), "from #306")
         assertNull(c.velocityLossPct, "velocity loss reported to the lifter")
 
         val d = SetAnalyzer.analyze(load("field-legcurl-1030-10rep.csv"), legCurl)
@@ -161,13 +163,16 @@ class VelocityLossTest {
         assertEquals(12, d.reps.size, "segmented detections; the lifter performed 10")
         assertEquals<Double?>(1.375, d.reps.last().romM, "ROM of the extra detection, metres")
         assertEquals<Double?>(1.159, d.reps.last().meanConVelMps, "its drive velocity, m/s")
-        assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(d.reps))
+        assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(everyRepEligible(d.reps)), "over every rep")
+        assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(d.reps), "from #306")
         assertNull(d.velocityLossPct, "velocity loss reported to the lifter")
 
         val a = SetAnalyzer.analyze(load("field-legcurl-1030-12rep.csv"), legCurl)
         assertEquals(12, a.reps.size, "segmented detections; the lifter performed 12")
-        assertEquals(VelocityLoss.Measured(36.5), VelocityLoss.of(a.reps))
-        assertEquals<Double?>(36.5, a.velocityLossPct, "velocity loss reported to the lifter")
+        assertEquals(VelocityLoss.Measured(36.5), VelocityLoss.of(everyRepEligible(a.reps)), "over every rep")
+        assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(a.reps), "from #306")
+        assertEquals<Double?>(36.5, everyRepLossPct(a.reps), "velocity loss reported to the lifter, over every rep")
+        assertNull(a.velocityLossPct, "velocity loss reported to the lifter: withheld from #306")
     }
 
     /**
@@ -188,6 +193,7 @@ class VelocityLossTest {
                 VelocityLoss.NotEnoughReps,
                 VelocityLoss.NoReference,
                 VelocityLoss.TerminalRepIsFastest,
+                VelocityLoss.NoEligiblePair,
             )
         val names = cases.map { it.basis }
         assertEquals(cases.size, names.toSet().size, "two cases share a basis name: $names")

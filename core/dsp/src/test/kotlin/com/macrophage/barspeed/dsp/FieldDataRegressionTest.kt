@@ -392,7 +392,12 @@ class FieldDataRegressionTest {
         // Velocity loss is best rep to LAST rep. The last rep here is one of
         // the two slow ones, so the set the lifter completed as prescribed is
         // reported to them as an 85% drawdown.
-        assertEquals<Double?>(85.1, analysis.velocityLossPct, "velocity loss reported to the lifter")
+        assertEquals<Double?>(
+            85.1,
+            everyRepLossPct(analysis.reps),
+            "velocity loss reported to the lifter, over every rep",
+        )
+        assertNull(analysis.velocityLossPct, "velocity loss reported to the lifter: withheld from #306")
     }
 
     @Test
@@ -411,7 +416,12 @@ class FieldDataRegressionTest {
         // fabricated 13th rep was also the fastest, and best-to-last made best
         // and last the same rep. With that rep gone the figure is 51.5% on a
         // 12-rep set taken to RPE 6, which is a number they can act on.
-        assertEquals<Double?>(51.5, analysis.velocityLossPct, "velocity loss reported to the lifter")
+        assertEquals<Double?>(
+            51.5,
+            everyRepLossPct(analysis.reps),
+            "velocity loss reported to the lifter, over every rep",
+        )
+        assertNull(analysis.velocityLossPct, "velocity loss reported to the lifter: withheld from #306")
     }
 
     @Test
@@ -432,7 +442,12 @@ class FieldDataRegressionTest {
         // artefact are one event, which is why the figure is withheld rather
         // than corrected. This fixture carries no cue track at all, so nothing
         // keyed on the voice guide could ever reach it.
-        assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(analysis.reps))
+        assertEquals(
+            VelocityLoss.TerminalRepIsFastest,
+            VelocityLoss.of(everyRepEligible(analysis.reps)),
+            "over every rep",
+        )
+        assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(analysis.reps), "from #306")
         assertNull(analysis.velocityLossPct, "velocity loss reported to the lifter")
     }
 
@@ -1082,7 +1097,12 @@ class FieldDataRegressionTest {
         assertEquals<Double>(99.3937495805463, analysis.sampleRateHz, "measured rate, against this set's own meta.json")
         assertEquals(7, analysis.reps.size, "segmented reps; the lifter performed 6")
         assertEquals(0, analysis.detectionsAfterSetEndCue, "detections after Done")
-        assertEquals<Double?>(16.6, analysis.velocityLossPct, "velocity loss reported to the lifter")
+        assertEquals<Double?>(
+            16.6,
+            everyRepLossPct(analysis.reps),
+            "velocity loss reported to the lifter, over every rep",
+        )
+        assertNull(analysis.velocityLossPct, "velocity loss reported to the lifter: withheld from #306")
         // THIS NO LONGER REPRODUCES THE SHIPPED EXPORT, and that is the
         // sharpest cost issue #87 carries. App 0.1.40 published
         // 0.606/0.599/0.562/0.561/0.458 m and 0.498/0.458/0.385/0.396/0.356
@@ -1173,7 +1193,12 @@ class FieldDataRegressionTest {
         // The last resolved rep is still the fastest of the set, so
         // SetAnalyzer still withholds velocity loss rather than publishing the
         // degenerate 0% app 0.1.40 reported for this set in the field.
-        assertEquals(VelocityLoss.TerminalRepIsFastest, VelocityLoss.of(analysis.reps))
+        assertEquals(
+            VelocityLoss.TerminalRepIsFastest,
+            VelocityLoss.of(everyRepEligible(analysis.reps)),
+            "over every rep",
+        )
+        assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(analysis.reps), "from #306")
         assertNull(analysis.velocityLossPct, "velocity loss reported to the lifter")
     }
 
@@ -1216,7 +1241,12 @@ class FieldDataRegressionTest {
             analysis.reps.mapNotNull { it.topPauseS },
             "top pause, seconds",
         )
-        assertEquals<Double?>(46.8, analysis.velocityLossPct, "velocity loss reported to the lifter")
+        assertEquals<Double?>(
+            46.8,
+            everyRepLossPct(analysis.reps),
+            "velocity loss reported to the lifter, over every rep",
+        )
+        assertNull(analysis.velocityLossPct, "velocity loss reported to the lifter: withheld from #306")
     }
 
     @Test
@@ -1237,7 +1267,12 @@ class FieldDataRegressionTest {
         )
         assertEquals(10, analysis.reps.size, "segmented reps kept once the post-Done tail is bounded out")
         assertEquals(1, analysis.detectionsAfterSetEndCue, "detections dropped")
-        assertEquals<Double?>(40.9, analysis.velocityLossPct, "velocity loss reported to the lifter, tail excluded")
+        assertEquals<Double?>(
+            40.9,
+            everyRepLossPct(analysis.reps),
+            "velocity loss reported to the lifter, tail excluded, over every rep",
+        )
+        assertNull(analysis.velocityLossPct, "velocity loss reported to the lifter, tail excluded: withheld from #306")
         // The ten KEPT reps reproduce app 0.1.40's own published repMetrics
         // for its first ten entries -- confirming the Done bound is the ONLY
         // difference it makes here, not a reshuffling of the ten real reps.
@@ -1263,8 +1298,14 @@ class FieldDataRegressionTest {
         val direction = LiftDirection(startsWith = StartPhase.ECCENTRIC)
         val analysis = SetAnalyzer.analyze(samples, direction, loadKg = 43.091275150953365)
         assertEquals(11, analysis.reps.size, "segmented reps with no cue track to bound the set")
-        assertEquals(VelocityLoss.Measured(64.1), VelocityLoss.of(analysis.reps))
-        assertEquals<Double?>(64.1, analysis.velocityLossPct, "velocity loss, as app 0.1.40 published it")
+        assertEquals(VelocityLoss.Measured(64.1), VelocityLoss.of(everyRepEligible(analysis.reps)), "over every rep")
+        assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(analysis.reps), "from #306")
+        assertEquals<Double?>(
+            64.1,
+            everyRepLossPct(analysis.reps),
+            "velocity loss, as app 0.1.40 published it, over every rep",
+        )
+        assertNull(analysis.velocityLossPct, "velocity loss, as app 0.1.40 published it: withheld from #306")
         assertEquals(0.194, analysis.reps.last().meanConVelMps, 1e-3, "the spurious 11th rep's own drive speed")
     }
 }

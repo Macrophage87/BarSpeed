@@ -150,14 +150,19 @@ class SchemaArtefactSampleContractTest {
         val summary = marked["summary"]!!.jsonObject
         listOf("peakConVel_mps", "peakPower_w").forEach { key ->
             val naive = rows.maxOf { it[key]!!.jsonPrimitive.content.toDouble() }
+            // From 1.22 (#306) the population also leaves out a row whose
+            // guard band carries a sample or whose displacement is unbounded;
+            // SchemaPeakEligibilityContractTest pins those two halves.
             val eligible = rows
                 .filter { it["artefactSamples"]!!.jsonPrimitive.content.toInt() == 0 }
+                .filter { it["guardArtefactSamples"]!!.jsonPrimitive.content.toInt() == 0 }
+                .filter { it["romBounded"]!!.jsonPrimitive.content.toBoolean() }
                 .maxOf { it[key]!!.jsonPrimitive.content.toDouble() }
             assertTrue(naive > eligible, "the marked rep is not the set's largest $key, so the example shows nothing")
             assertEquals(
                 eligible,
                 summary[key]!!.jsonPrimitive.content.toDouble(),
-                "summary.$key is not the maximum over the reps carrying no count",
+                "summary.$key is not the maximum over the eligible reps",
             )
         }
     }

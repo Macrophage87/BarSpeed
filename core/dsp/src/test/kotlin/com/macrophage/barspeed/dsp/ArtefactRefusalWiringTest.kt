@@ -72,14 +72,21 @@ class ArtefactRefusalWiringTest {
     /**
      * Issue #126's withholding fired on this set because the phantom was the
      * fastest thing in it. With the phantom refused, the basis is re-derived
-     * from the surviving reps and the figure publishes -- 38.7% best-to-last
-     * over four reps, on a set the lifter ended for pace at 6 of 8.
+     * from the surviving reps -- 38.7% best-to-last over four reps, on a set
+     * the lifter ended for pace at 6 of 8.
+     *
+     * RENAMED for #306: it said the set PUBLISHES that figure. It no longer
+     * does. None of the four reps is bounded, so the set's velocity loss is
+     * withheld with `noEligiblePair`; the 38.7% is asserted over every rep,
+     * where it still witnesses the refusal.
      */
     @Test
-    fun `set 10 publishes a measured velocity loss once the phantom is refused`() {
+    fun `set 10's velocity loss over every rep is measured once the phantom is refused`() {
         val a = analyse(set10, 23.443564147942737)
-        assertEquals(38.7, a.velocityLossPct, "velocityLoss_pct")
-        assertEquals(VelocityLoss.MEASURED, VelocityLoss.of(a.reps).basis, "velocityLossBasis")
+        assertEquals(38.7, everyRepLossPct(a.reps), "velocityLoss_pct, over every rep")
+        assertEquals(VelocityLoss.MEASURED, VelocityLoss.of(everyRepEligible(a.reps)).basis, "basis, every rep")
+        assertNull(a.velocityLossPct, "velocityLoss_pct: withheld from #306")
+        assertEquals(VelocityLoss.NO_ELIGIBLE_PAIR, VelocityLoss.of(a.reps).basis, "velocityLossBasis")
     }
 
     @Test
@@ -107,7 +114,8 @@ class ArtefactRefusalWiringTest {
         // over every rep and is unaffected; RomBoundCorpusTest carries the
         // per-capture column.
         assertNull(SetAnalyzer.romSpreadPct(a.reps), "summary romSpread_pct")
-        assertEquals(48.7, a.velocityLossPct, "velocityLoss_pct")
+        assertEquals(48.7, everyRepLossPct(a.reps), "velocityLoss_pct, over every rep")
+        assertNull(a.velocityLossPct, "velocityLoss_pct: withheld from #306")
         assertEquals(0, RepRefusal.refusedCount(a.reps), "and the rule ran and refused nothing")
     }
 
@@ -124,7 +132,8 @@ class ArtefactRefusalWiringTest {
         // over every rep and is unaffected; RomBoundCorpusTest carries the
         // per-capture column.
         assertNull(SetAnalyzer.romSpreadPct(a.reps), "summary romSpread_pct")
-        assertEquals(67.0, a.velocityLossPct, "velocityLoss_pct")
+        assertEquals(67.0, everyRepLossPct(a.reps), "velocityLoss_pct, over every rep")
+        assertNull(a.velocityLossPct, "velocityLoss_pct: withheld from #306")
         assertEquals(0, RepRefusal.refusedCount(a.reps), "and the rule ran and refused nothing")
     }
 }

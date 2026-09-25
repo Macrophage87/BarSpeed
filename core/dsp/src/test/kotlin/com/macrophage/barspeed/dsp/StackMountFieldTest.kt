@@ -12,6 +12,7 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -229,13 +230,19 @@ class StackMountFieldTest {
         assertEquals(listOf(9, 9, 9), rows.map { it.analysis(SensorRole.B).reps.size }, "from the declared mount")
         assertEquals(
             listOf(null, 79.3, null),
-            rows.map { it.analysis(SensorRole.A).velocityLossPct },
-            "velocity loss as recorded: two of the three published none at all",
+            rows.map { everyRepLossPct(it.analysis(SensorRole.A).reps) },
+            "velocity loss as recorded, over every rep: two of the three had none at all",
         )
         assertEquals(
             listOf(64.3, 59.3, 4.5),
-            rows.map { it.analysis(SensorRole.B).velocityLossPct },
-            "velocity loss from the stack unit",
+            rows.map { everyRepLossPct(it.analysis(SensorRole.B).reps) },
+            "velocity loss from the stack unit, over every rep",
+        )
+        // From #306 none of the six publishes a figure: no two reps are bounded.
+        assertEquals(
+            listOf(null, null, null, null, null, null),
+            rows.flatMap { listOf(it.analysis(SensorRole.A), it.analysis(SensorRole.B)) }.map { it.velocityLossPct },
+            "velocity loss the six analyses publish",
         )
     }
 
@@ -322,8 +329,21 @@ class StackMountFieldTest {
         assertEquals(AnalysedRoleBasis.STACK_SIGNATURE, pulldown.choice().basis)
         assertEquals(13, pulldown.analysis(SensorRole.A).reps.size, "as recorded, against 12 performed")
         assertEquals(12, pulldown.analysis(SensorRole.B).reps.size, "from the declared mount")
-        assertEquals(27.5, pulldown.analysis(SensorRole.A).velocityLossPct, "velocity loss as recorded")
-        assertEquals(41.4, pulldown.analysis(SensorRole.B).velocityLossPct, "velocity loss from the stack unit")
+        assertEquals(
+            27.5,
+            everyRepLossPct(pulldown.analysis(SensorRole.A).reps),
+            "velocity loss as recorded, over every rep",
+        )
+        assertNull(pulldown.analysis(SensorRole.A).velocityLossPct, "velocity loss as recorded: withheld from #306")
+        assertEquals(
+            41.4,
+            everyRepLossPct(pulldown.analysis(SensorRole.B).reps),
+            "velocity loss from the stack unit, over every rep",
+        )
+        assertNull(
+            pulldown.analysis(SensorRole.B).velocityLossPct,
+            "velocity loss from the stack unit: withheld from #306",
+        )
     }
 
     /**

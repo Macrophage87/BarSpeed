@@ -4,6 +4,7 @@ import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.VoiceCue
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
  * What bounds the analysed rep list of a set the LIFTER counted. Issue #285.
@@ -219,9 +220,10 @@ class ManualDoneBoundTest {
         val silent = analyse(emptyList(), manualTargets())
         assertEquals(15, spoken.reps.size, "detections kept with the milestone on the record")
         assertEquals(null, spoken.detectionsAfterSetEndCue, "no boundary ran, which is not a boundary that dropped 0")
-        assertEquals(79.2, spoken.velocityLossPct!!, 0.05, "velocity loss over the whole set")
+        assertEquals(79.2, everyRepLossPct(spoken.reps)!!, 0.05, "velocity loss over the whole set, over every rep")
+        assertNull(spoken.velocityLossPct, "velocity loss over the whole set: withheld from #306")
         assertEquals(silent.reps.size, spoken.reps.size, "audio cues on or off, the same set")
-        assertEquals(silent.velocityLossPct, spoken.velocityLossPct, "and the same figure")
+        assertEquals(everyRepLossPct(silent.reps), everyRepLossPct(spoken.reps), "and the same figure")
     }
 
     /**
@@ -252,9 +254,10 @@ class ManualDoneBoundTest {
         val analysis = analyse(stopped, manualTargets())
         assertEquals(8, analysis.reps.size, "detections kept inside the app's own set-end call")
         assertEquals(7, analysis.detectionsAfterSetEndCue, "detections dropped by it")
+        assertNull(analysis.velocityLossPct, "velocity loss the set publishes: withheld from #306")
         assertEquals(
             62.2,
-            analysis.velocityLossPct!!,
+            everyRepLossPct(analysis.reps)!!,
             0.05,
             "velocity loss over the bounded list -- the same figure the published 1.20 entry " +
                 "states for the Done-bounded case, because this Set ended cue sits at the " +

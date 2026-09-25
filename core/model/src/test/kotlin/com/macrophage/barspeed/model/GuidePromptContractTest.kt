@@ -467,6 +467,20 @@ class GuidePromptContractTest {
         )
     }
 
+    /**
+     * The prompt's velocity-loss bullet names every word `velocityLossBasis`
+     * can publish. It listed four; #306 added `noEligiblePair`, the word nearly
+     * every real set now carries, and a reader told only the four would read
+     * it as an unknown value. The vocabulary is read from the constant, so the
+     * next word added reds here too.
+     */
+    @Test
+    fun `the plan prompt names every velocity-loss basis word`() {
+        SessionExport.VALID_VELOCITY_LOSS_BASES.forEach { word ->
+            assertTrue(prompt.contains("\"$word\""), "the plan prompt never names the velocityLossBasis \"$word\"")
+        }
+    }
+
     private companion object {
         /**
          * The source spelling of the interpolation both version sites use. The

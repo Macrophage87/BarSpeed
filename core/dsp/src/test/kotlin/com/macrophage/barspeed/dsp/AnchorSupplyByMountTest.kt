@@ -5,6 +5,7 @@ import com.macrophage.barspeed.model.StartPhase
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -362,13 +363,28 @@ class AnchorSupplyByMountTest {
             ohp,
             "ohp set02 ROM, metres",
         )
-        assertEquals<Double?>(55.3, ohp.velocityLossPct, "ohp set02 velocity loss reported to the lifter")
+        assertEquals<Double?>(
+            55.3,
+            everyRepLossPct(ohp.reps),
+            "ohp set02 velocity loss reported to the lifter, over every rep",
+        )
+        assertNull(ohp.velocityLossPct, "ohp set02 velocity loss reported to the lifter: withheld from #306")
         val bench05 = batchAnalysis("field-bench-3010-6rep-s37-set05", StartPhase.ECCENTRIC, 47.627)
         assertRoms(listOf(0.278, 0.896, 0.898, 0.143, 1.363), bench05, "bench set05 ROM, metres")
-        assertEquals<Double?>(26.0, bench05.velocityLossPct, "bench set05 velocity loss reported to the lifter")
+        assertEquals<Double?>(
+            26.0,
+            everyRepLossPct(bench05.reps),
+            "bench set05 velocity loss reported to the lifter, over every rep",
+        )
+        assertNull(bench05.velocityLossPct, "bench set05 velocity loss reported to the lifter: withheld from #306")
         val bench06 = batchAnalysis("field-bench-3010-6rep-s37-set06", StartPhase.ECCENTRIC, 49.895)
         assertRoms(listOf(0.691, 0.462, 1.045, 1.384, 0.168, 1.724), bench06, "bench set06 ROM, metres")
-        assertEquals<Double?>(24.0, bench06.velocityLossPct, "bench set06 velocity loss reported to the lifter")
+        assertEquals<Double?>(
+            24.0,
+            everyRepLossPct(bench06.reps),
+            "bench set06 velocity loss reported to the lifter, over every rep",
+        )
+        assertNull(bench06.velocityLossPct, "bench set06 velocity loss reported to the lifter: withheld from #306")
 
         // And the back squat. Its velocity loss moved 26.6% to 82.3% with #87
         // on a set the lifter logged at RPE 1 -- the effort he recorded and the
@@ -382,7 +398,12 @@ class AnchorSupplyByMountTest {
             squat,
             "back squat ROM, metres",
         )
-        assertEquals<Double?>(82.3, squat.velocityLossPct, "back squat velocity loss reported to the lifter")
+        assertEquals<Double?>(
+            82.3,
+            everyRepLossPct(squat.reps),
+            "back squat velocity loss reported to the lifter, over every rep",
+        )
+        assertNull(squat.velocityLossPct, "back squat velocity loss reported to the lifter: withheld from #306")
     }
 
     /** Anchor coverage this file requires bar-mounted work to clear, per cent. */

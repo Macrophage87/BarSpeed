@@ -117,7 +117,8 @@ class PrepDetectionFieldTest {
             a.reps.map { it.peakPowerW },
             "peakPower_w",
         )
-        assertEquals(62.1, a.velocityLossPct!!, 1e-12, "velocityLoss_pct")
+        assertEquals(62.1, everyRepLossPct(a.reps)!!, 1e-12, "velocityLoss_pct, over every rep")
+        assertNull(a.velocityLossPct, "velocityLoss_pct: withheld from #306")
         assertEquals(402.5, a.reps.mapNotNull { it.peakPowerW }.max(), 1e-12, "summary.peakPower_w")
     }
 
@@ -185,7 +186,8 @@ class PrepDetectionFieldTest {
             a.reps.filter { it.eccS != null }.map { it.romM },
             "rom_m of the reps session.json published, unchanged and in order",
         )
-        assertEquals(27.4, a.velocityLossPct!!, 1e-12, "velocityLoss_pct does not move")
+        assertEquals(27.4, everyRepLossPct(a.reps)!!, 1e-12, "velocityLoss_pct does not move, over every rep")
+        assertNull(a.velocityLossPct, "velocityLoss_pct does not move: withheld from #306")
         assertEquals(584.0, a.reps.mapNotNull { it.peakPowerW }.max(), 1e-12, "summary.peakPower_w does not move")
     }
 
@@ -256,7 +258,8 @@ class PrepDetectionFieldTest {
     fun `set 5 stops publishing the countdown as its fastest and most powerful rep`() {
         val a = bounded(ohp, ohpDirection, ohpKg)
         assertEquals(10, a.reps.size, "detections that are reps of the set")
-        assertEquals(40.3, a.velocityLossPct!!, 1e-12, "velocityLoss_pct")
+        assertEquals(40.3, everyRepLossPct(a.reps)!!, 1e-12, "velocityLoss_pct, over every rep")
+        assertNull(a.velocityLossPct, "velocityLoss_pct: withheld from #306")
         assertEquals(320.1, a.reps.mapNotNull { it.peakPowerW }.max(), 1e-12, "summary.peakPower_w")
         assertEquals(
             listOf(1.274, 0.461, 0.202, 0.35, 0.415, 0.813, 0.61, 1.405, 0.533, 0.683),
@@ -289,7 +292,8 @@ class PrepDetectionFieldTest {
     fun `set 2 stops dividing its velocity loss by a drive from the countdown`() {
         val a = bounded(press, pressDirection, pressKg)
         assertEquals(12, a.reps.size, "detections that are reps of the set")
-        assertEquals(11.6, a.velocityLossPct!!, 1e-12, "velocityLoss_pct")
+        assertEquals(11.6, everyRepLossPct(a.reps)!!, 1e-12, "velocityLoss_pct, over every rep")
+        assertNull(a.velocityLossPct, "velocityLoss_pct: withheld from #306")
         assertEquals(584.0, a.reps.mapNotNull { it.peakPowerW }.max(), 1e-12, "summary.peakPower_w does not move")
         assertEquals(0.658, a.reps.maxOf { it.meanConVelMps }, 1e-12, "the fastest survivor is the new basis")
         assertEquals(0.582, a.reps.last().meanConVelMps, 1e-12, "the last rep does not move")
@@ -329,7 +333,11 @@ class PrepDetectionFieldTest {
             val withInstant = bounded(f, d, kg)
             assertEquals(0, withInstant.detectionsBeforeWorkStart, "$f: detections before work start")
             assertEquals(unbounded.reps, withInstant.reps, "$f: the rep list moved")
-            assertEquals(unbounded.velocityLossPct, withInstant.velocityLossPct, "$f: velocityLoss_pct moved")
+            assertEquals(
+                everyRepLossPct(unbounded.reps),
+                everyRepLossPct(withInstant.reps),
+                "$f: velocityLoss_pct over every rep moved",
+            )
             assertEquals(unbounded.noRepsReason, withInstant.noRepsReason, "$f: noRepsReason moved")
         }
     }

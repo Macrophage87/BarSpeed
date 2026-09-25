@@ -2268,6 +2268,56 @@ data class SessionExport(
          * PINNED. `SchemaTimedStopContractTest` asserts this entry's marker and
          * both descriptions; it cannot see this KDoc. `TimedStopCallTest` in
          * `:core:dsp` pins the rule on field-41 set 21's committed track.
+         *
+         * 1.22 TAKES A THIRTEENTH ENTRY (#306, which reps a set's peaks and its
+         * velocity loss are taken over). A FURTHER ENTRY under the unreleased
+         * 1.22 and not a mint: `git tag --sort=-creatordate | head -1` is
+         * v0.1.54 and `git show
+         * v0.1.54:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.21"`, both read at the tag this round.
+         *
+         * THE CHANGE. A rep is PEAK-ELIGIBLE when its own span carries no
+         * sample above 4 g (#290), the 0.4 s GUARD BAND before the span carries
+         * none either, and its displacement is bounded (`romBounded`, #291).
+         * `AccelArtefact.isPeakEligible` in `:core:dsp` states the rule once.
+         * `summary.peakConVel_mps` and `summary.peakPower_w` are taken over the
+         * eligible reps, and withheld where the best of them falls below the
+         * mean of the same quantity the summary publishes over every rep.
+         * `velocityLoss_pct` takes its best over the eligible reps, and is
+         * withheld unless at least two reps are eligible AND the set's last rep
+         * is one; [SetExport.velocityLossBasis] then reads the new word
+         * `noEligiblePair`. Each `repMetrics` row may carry
+         * [RepMetricsExport.guardArtefactSamples], the band's own count.
+         *
+         * WHAT WAS WRONG. field-44 set 4, a 111.1 kg deadlift, published
+         * `peakPower_w` 7762.4 from a rep whose span opens 0.03 s after a 21.4 g
+         * floor contact and holds no sample above the bound itself. field-44
+         * set 5 published `peakConVel_mps` 0.376 against a `meanConVel_mps` of
+         * 0.382. field-45 set 2 published 1.937 m/s and 623.6 W from an
+         * unbounded 1.961 m detection with no artefact in it. field-44 set 3's
+         * `velocityLoss_pct` of 84.9 took its best from the rep whose power #290
+         * already withheld.
+         *
+         * NOT PURELY ADDITIVE. One optional key and one basis word are added
+         * and nothing is removed or retyped, but three existing keys are now
+         * taken over a narrower population, so comparing them across versions
+         * compares different quantities. On the committed field corpus not one
+         * capture has two eligible reps, so every capture with two or more reps
+         * withholds `velocityLoss_pct`, and the peak pair is withheld on every
+         * capture whose reps are all unbounded. RETROACTIVE FOR v0.1.54
+         * RECORDINGS: the export re-asks the stored reps, and a set recorded by
+         * v0.1.54 carries `romBounded` and `artefactSamples`, so re-exporting it
+         * withholds figures v0.1.54's own export published. A set recorded
+         * before v0.1.54 carries neither and keeps every figure it published,
+         * and no stored rep carries a band count, so the band decides only on
+         * sets recorded from v0.1.55. `DATABASE_VERSION` does NOT move: the
+         * count rides in `analysisJson`. The plan schema is untouched.
+         *
+         * PINNED. `SchemaPeakEligibilityContractTest` asserts the key, the word,
+         * the three descriptions, this entry's marker and an example that shows
+         * the narrowing; `PeakEligibilityTest` and `GuardBandProvenanceTest` in
+         * `:core:dsp` and `SessionExportPeakEligibilityTest` in `:core:data` are
+         * the differentials.
          */
         const val SCHEMA_VERSION = "1.22"
 
@@ -2316,7 +2366,7 @@ data class SessionExport(
          * that can see both.
          */
         val VALID_VELOCITY_LOSS_BASES =
-            setOf("measured", "notEnoughReps", "noReference", "terminalRepIsFastest")
+            setOf("measured", "notEnoughReps", "noReference", "terminalRepIsFastest", "noEligiblePair")
 
         /**
          * Why a set resolved no reps, the values [SetSummaryExport.noRepsReason]
@@ -3698,11 +3748,17 @@ data class GeometrySourceExport(
 data class SetSummaryExport(
     @SerialName("meanConVel_mps") val meanConVelMps: Double? = null,
     /**
-     * Best instantaneous concentric (drive) velocity across the set, m/s. Over
-     * the reps whose own span carries no sample above the physical bound, from
-     * schema 1.21 -- see `artefactSamples`; a consumer taking the max over
-     * `repMetrics[].peakConVel_mps` will not reproduce this figure on a set
-     * whose `artefactSamples` is positive.
+     * Best instantaneous concentric (drive) velocity across the set, m/s.
+     *
+     * From schema 1.22 (#306) over the PEAK-ELIGIBLE reps only: a rep whose own
+     * span carries a sample above the physical bound (`artefactSamples`, 1.21),
+     * whose guard band before the span carries one (`guardArtefactSamples`), or
+     * whose displacement is not bounded (`romBounded` false) is left out, and a
+     * rep carrying none of those keys -- an older recording -- is kept. ABSENT
+     * when no rep is eligible, and ABSENT when the best eligible peak falls
+     * below [meanConVelMps], which is over every rep: a peak below the set's
+     * own mean is not a peak. A consumer taking the max over
+     * `repMetrics[].peakConVel_mps` will not reproduce this figure.
      */
     @SerialName("peakConVel_mps") val peakConVelMps: Double? = null,
     @SerialName("meanEcc_s") val meanEccS: Double? = null,
@@ -3725,11 +3781,12 @@ data class SetSummaryExport(
      */
     @SerialName("romSpread_pct") val romSpreadPct: Double? = null,
     /**
-     * Best instantaneous concentric power across the set, watts. Over the reps
-     * whose own span carries no sample above the physical bound, from schema
-     * 1.21 -- see `artefactSamples`; a consumer taking the max over
-     * `repMetrics[].peakPower_w` will not reproduce this figure on a set whose
-     * `artefactSamples` is positive.
+     * Best instantaneous concentric power across the set, watts. Over the same
+     * peak-eligible reps [peakConVelMps] is, from schema 1.22 (#306) -- no
+     * `artefactSamples` in the span, no `guardArtefactSamples` in the band,
+     * `romBounded` not false -- and ABSENT when none is eligible or when the
+     * best eligible peak falls below [meanConPowerW]. A consumer taking the max over `repMetrics[].peakPower_w`
+     * will not reproduce this figure.
      */
     @SerialName("peakPower_w") val peakPowerW: Double? = null,
     /** Mean of per-rep average concentric power, watts. */
@@ -3781,7 +3838,10 @@ data class RepMetricsExport(
      * rep's span crosses was closed by an anchor taken on starvation, which caps
      * nothing at all. Either way this row's displacement rests on nothing the
      * analysis can state a limit for, and the rep was left out of the set's
-     * `summary.meanRom_m` and `summary.romSpread_pct`. TRUE DOES NOT SAY THE
+     * `summary.meanRom_m` and `summary.romSpread_pct` -- and, from 1.22 (#306),
+     * out of `summary.peakConVel_mps`, `summary.peakPower_w` and the pair
+     * `velocityLoss_pct` is taken over, since a mean drive velocity is this
+     * rep's displacement over its drive time. TRUE DOES NOT SAY THE
      * DISTANCE IS RIGHT: the bound is on what the correction was licensed to
      * remove, never on the residual an uncorrected bias leaves, and it is that
      * licence PER INTERVAL the rep's span crosses rather than 0.10 m per rep.
@@ -3802,13 +3862,37 @@ data class RepMetricsExport(
      * A positive count says [peakConVelMps] and [peakPowerW] ON THIS ROW were
      * taken across a reading the sensor cannot have measured, and that this rep
      * was therefore left out of the set's `summary.peakConVel_mps` and
-     * `summary.peakPower_w`. The row still publishes what its own window
-     * measured; this is the key that says not to trust the pair.
+     * `summary.peakPower_w` -- and, from 1.22 (#306), out of the pair
+     * `velocityLoss_pct` is taken over. The row still publishes what its own
+     * window measured; this is the key that says not to trust the pair.
      *
      * Absent when the rep was analysed before the count existed, which is
      * permanent. Absent and 0 are different facts: 0 is a counted clean span.
      */
     @SerialName("artefactSamples") val artefactSamples: Int? = null,
+    /**
+     * Samples above 4 g of total support acceleration in the GUARD BAND before
+     * this rep's span: the 0.4 s that end where the span begins, the span
+     * excluded. Schema 1.22, issue #306.
+     *
+     * [artefactSamples] counts inside the span. This counts just before it,
+     * because a deadlift's floor contact sits there: the pull that follows it
+     * opens within a few hundredths of a second, carries no sample above the
+     * bound itself, and on field-44 set 4 published 7762.4 W at 111.1 kg. A
+     * positive count left this rep out of the set's peak pair and the
+     * `velocityLoss_pct` pair. The band can reach into the previous rep's span,
+     * so one sample can be counted here and in that rep's [artefactSamples].
+     *
+     * THE BAND IS MEASURED: 0.362 s is the longest a floor contact rang above
+     * 2 g on the sixteen deadlift streams the analysis was checked against, and
+     * 0.4 s is that rounded up. It says where ringing was measured to reach,
+     * not how far it moved a velocity.
+     *
+     * Absent when the rep was analysed before the band existed, which is
+     * permanent; absent and 0 are different facts, and an absent count KEEPS
+     * the rep in both populations.
+     */
+    @SerialName("guardArtefactSamples") val guardArtefactSamples: Int? = null,
 )
 
 @OptIn(ExperimentalSerializationApi::class)

@@ -218,6 +218,11 @@ class SessionExportVelocityLossTest {
                 analysisOf(0.40, 0.35, 0.50, storedVelocityLossPct = 0.0) to "terminalRepIsFastest",
                 analysisOf(0.40, storedVelocityLossPct = null) to "notEnoughReps",
                 analysisOf(0.0, 0.0, storedVelocityLossPct = null) to "noReference",
+                // #306: three reps, none of whose displacement the analysis
+                // can bound, so there is no eligible pair to take a loss over.
+                analysisOf(0.60, 0.55, 0.50, storedVelocityLossPct = 16.7).let { a ->
+                    a.copy(reps = a.reps.map { it.copy(romBounded = false) })
+                } to "noEligiblePair",
             )
         for ((stored, expected) in cases) {
             assertEquals(expected, exportedSet(stored).velocityLossBasis, "basis for ${stored.reps.size} reps")

@@ -228,7 +228,12 @@ class BlankAnalysisTest {
             rdl.reps.map { it.romM },
             "ROM per rep, metres -- the spread this count is built out of",
         )
-        assertEquals<Double?>(74.2, rdl.velocityLossPct, "velocity loss now reported to the lifter")
+        assertEquals<Double?>(
+            74.2,
+            everyRepLossPct(rdl.reps),
+            "velocity loss now reported to the lifter, over every rep",
+        )
+        assertNull(rdl.velocityLossPct, "velocity loss now reported to the lifter: withheld from #306")
         assertNull(rdl.tempoCompliance, "tempo compliance with no target declared")
         assertNull(rdl.detectionsAfterSetEndCue, "no cue track was passed, so nothing bounded the set")
         assertEquals(99.351, rdl.sampleRateHz, 1e-3, "measured sample rate, unmoved by the correction")
@@ -344,6 +349,16 @@ class BlankAnalysisTest {
         // withholds the figure rather than publishing a negative drawdown.
         // Absence stays absence, and it is now absence for a stated reason
         // instead of for want of reps.
-        assertNull(analysis.velocityLossPct, "the last rep is the fastest, so no velocity loss")
+        //
+        // From #306 the set is withheld for a THIRD reason, which comes first:
+        // none of its reps is bounded. The terminal-rep reason is asserted over
+        // every rep so this pin still says what it was written to say.
+        assertNull(analysis.velocityLossPct, "no velocity loss")
+        assertEquals(
+            VelocityLoss.TerminalRepIsFastest,
+            VelocityLoss.of(everyRepEligible(analysis.reps)),
+            "over every rep, the last rep is the fastest",
+        )
+        assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(analysis.reps), "what the set publishes, from #306")
     }
 }

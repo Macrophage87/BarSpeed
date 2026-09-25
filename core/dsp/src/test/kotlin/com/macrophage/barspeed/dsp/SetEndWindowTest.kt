@@ -485,7 +485,8 @@ class SetEndWindowTest {
         // against 67.0 -- twenty-one points, over a rep list four times as
         // long. The drop the cue bound produces survives the correction; its
         // size does not.
-        assertEquals(67.0, analysis.velocityLossPct, "velocity loss over the reps of the set")
+        assertEquals(67.0, everyRepLossPct(analysis.reps), "velocity loss over the reps of the set, over every rep")
+        assertNull(analysis.velocityLossPct, "velocity loss over the reps of the set: withheld from #306")
     }
 
     /**
@@ -554,7 +555,8 @@ class SetEndWindowTest {
                 cues = track(case.name),
             ).reps
             assertEquals(case.reps, reps.size, "${case.name} detections kept")
-            assertEquals(case.loss, VelocityLoss.of(reps), "${case.name} velocity loss")
+            assertEquals(case.loss, VelocityLoss.of(everyRepEligible(reps)), "${case.name} velocity loss, every rep")
+            assertEquals(VelocityLoss.NoEligiblePair, VelocityLoss.of(reps), "${case.name} velocity loss from #306")
             assertEquals(case.peakConVelMps, reps.maxOf { it.peakConVelMps }, "${case.name} peak drive velocity")
         }
     }
@@ -600,7 +602,8 @@ class SetEndWindowTest {
         )
         // 82.6% was the published figure and this file's own reproduction of
         // it. It is now 88.0%, over a rep list three times as long.
-        assertEquals(88.0, analysis.velocityLossPct, "velocityLoss_pct, against 82.6 published")
+        assertEquals(88.0, everyRepLossPct(analysis.reps), "velocityLoss_pct, against 82.6 published, over every rep")
+        assertNull(analysis.velocityLossPct, "velocityLoss_pct, against 82.6 published: withheld from #306")
         assertEquals(
             2.085,
             analysis.reps.maxOf { it.peakConVelMps },
