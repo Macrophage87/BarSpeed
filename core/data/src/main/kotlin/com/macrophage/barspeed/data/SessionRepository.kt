@@ -31,6 +31,17 @@ data class CompletedSet(
     val loadKg: Double,
     val plannedLoadKg: Double?,
     /**
+     * The load the set RAN against, resolved when it ended, on [loadKg]'s
+     * body-weight-inclusive scale (#157). [SetRecordEntity.workingLoadKg]
+     * states what the column means; this is the object that fills it.
+     *
+     * Non-null with no default: every set has a load, and a defaulted
+     * parameter is one a call site can silently stop passing. At the moment a
+     * set is written it equals [loadKg]; the two part only when a rest-screen
+     * correction later overwrites the row's `loadKg`.
+     */
+    val workingLoadKg: Double,
+    /**
      * The body weight [loadKg] was computed with, or null where no body-weight
      * term went into it (#220). [SetRecordEntity.bodyWeightKg] states the three
      * cases null covers; this is the object that fills it.
@@ -46,6 +57,12 @@ data class CompletedSet(
      */
     val rpeScale: String? = null,
     val plannedReps: Int?,
+    /**
+     * The rep count the set RAN against, or null on a set with no rep target
+     * (#157). [SetRecordEntity.workingReps] states what the column means; this
+     * is the object that fills it.
+     */
+    val workingReps: Int? = null,
     /** Lifter-counted reps for sensorless sets; overrides the analysis count. */
     val manualReps: Int? = null,
     /**
@@ -102,6 +119,11 @@ data class CompletedSet(
     val durationEndedBy: String? = null,
     val plannedDurationS: Int? = null,
     /**
+     * The hold seconds the set RAN against, or null on a set that is not timed
+     * (#157). [SetRecordEntity.workingDurationS] states what the column means.
+     */
+    val workingDurationS: Int? = null,
+    /**
      * The side this set WORKED: "left", "right", or null on bilateral work.
      *
      * Since #215 this is the lifter's own choice where they made one on the
@@ -120,9 +142,21 @@ data class CompletedSet(
      */
     val plannedSide: String? = null,
     val tempo: String?,
+    /**
+     * The tempo the PLAN declared, frozen at flatten, beside [tempo], which is
+     * the working one (#157). [SetRecordEntity.plannedTempo] states what its
+     * null covers.
+     */
+    val plannedTempo: String? = null,
     val targetMeanConVelMps: Double?,
     val velocityLossStopPct: Double?,
     val plannedRestS: Int?,
+    /**
+     * The instant the rest after this set runs from, epoch-ms (#157) -- the
+     * value `RestClockPolicy.startedAtMs` gave at the set-end freeze.
+     * [SetRecordEntity.restStartedAtMs] states why it is stored.
+     */
+    val restStartedAtMs: Long? = null,
     /**
      * The prep prescribed before this set, and the prep the caller handed the
      * voice guide, in whole seconds.

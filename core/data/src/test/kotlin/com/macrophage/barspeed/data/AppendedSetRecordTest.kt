@@ -121,6 +121,7 @@ class AppendedSetRecordTest {
         exerciseId = "seated_overhead_press",
         exerciseName = "Seated Overhead Press",
         loadKg = 13.6,
+        workingLoadKg = 13.6,
         plannedLoadKg = if (added) null else 18.1,
         plannedReps = if (added) null else 8,
         tempo = null,

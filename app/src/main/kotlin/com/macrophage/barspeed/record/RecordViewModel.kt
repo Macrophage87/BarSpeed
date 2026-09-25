@@ -1028,6 +1028,10 @@ private fun completedSetOf(p: PendingSetWrite, analysis: SetAnalysis, written: C
     exerciseName = p.exercise.displayName,
     loadKg = p.loadKg,
     plannedLoadKg = p.plannedLoadKg,
+    // The load the set RAN against (#157): the figure endSet resolved, off
+    // the frozen write. It equals loadKg here; a rest-screen correction later
+    // overwrites the row's loadKg and never this.
+    workingLoadKg = p.loadKg,
     bodyWeightKg = p.bodyWeightKg,
     // WHICH QUESTION the lifter was shown, resolved from the FROZEN pair;
     // the tiles were worded by a DIFFERENT askFor call in RecordScreen,

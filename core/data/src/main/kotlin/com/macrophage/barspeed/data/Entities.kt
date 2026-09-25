@@ -133,6 +133,23 @@ data class SetRecordEntity(
     val loadKg: Double,
     val plannedLoadKg: Double? = null,
     /**
+     * The load the set RAN against, in kilograms, on the same
+     * body-weight-inclusive scale as [loadKg] (v20, #157).
+     *
+     * Resolved at set end; no DAO statement writes it afterwards. [loadKg] is the
+     * same figure at insert and is then overwritten in place by
+     * `SessionDao.overrideLoad` when the lifter corrects the load on the rest
+     * screen (#205), so after a correction the pair reads the target beside
+     * the figure the lifter stated; without a correction the two are equal.
+     * [plannedLoadKg] is the plan's figure, frozen at flatten, which the
+     * in-app buttons never move.
+     *
+     * NULL on every row written before v20, by a build that dropped this
+     * figure at the write. Nothing backfills it: on a corrected row [loadKg]
+     * is the correction, not the target.
+     */
+    val workingLoadKg: Double? = null,
+    /**
      * The body weight the load arithmetic USED for this set, in kilograms
      * (v17, #220).
      *
@@ -226,6 +243,24 @@ data class SetRecordEntity(
     val liveReps: Int? = null,
     val plannedReps: Int? = null,
     /**
+     * The rep count the set RAN against: the plan's count unless the lifter
+     * changed it with the in-app controls before START, in which case theirs
+     * (v20, #157).
+     *
+     * The figure `RecordViewModel.endSet` already judged the set against --
+     * the short-set derivation, the effort grid's gate and the rest-screen
+     * feedback all read it -- and, until v20, dropped at the write, so a row
+     * could show the plan's count and the actual count and never the target
+     * the set was actually judged by. [plannedReps] stays the plan's frozen
+     * figure; the two differ exactly where the lifter changed the count.
+     *
+     * NULL on a set with no rep target (a hold or carry, or a set the plan
+     * gave no count), and on every row written before v20, where it means
+     * "this build could not say" -- never "the plan's count ran". A backfill
+     * from [plannedReps] would be the #157 defect itself, so there is none.
+     */
+    val workingReps: Int? = null,
+    /**
      * Timed sets (planks, carries): recorded and planned hold/carry seconds.
      *
      * `actualDurationS` is the seconds the set was working to on a set that
@@ -241,6 +276,16 @@ data class SetRecordEntity(
      */
     val actualDurationS: Int? = null,
     val plannedDurationS: Int? = null,
+    /**
+     * The hold or carry seconds the set RAN against: the plan's target unless
+     * the lifter changed it in the change-set dialog, in which case theirs
+     * (v20, #157). The countdown ran to this figure.
+     *
+     * [plannedDurationS] stays the plan's frozen figure. NULL on a set that is
+     * not timed and on every row written before v20; nothing backfills it,
+     * for [workingReps]'s reason.
+     */
+    val workingDurationS: Int? = null,
     /**
      * Which of the four things that can end a hold produced [actualDurationS]:
      * `HoldEndSource`'s published word, or null. Issues #259 and #249.
@@ -492,10 +537,38 @@ data class SetRecordEntity(
      * for why the two transforms are not the same function.
      */
     val limiterNote: String? = null,
+    /** The WORKING tempo: what the cadence ran and what compliance is scored against. */
     val tempo: String? = null,
+    /**
+     * The tempo the PLAN declared for this set, frozen at flatten, beside
+     * [tempo], which carries the lifter's adjustment once one is baked in
+     * (v20, #157).
+     *
+     * NULL where no plan declared one -- an ad-hoc set, an appended set, a
+     * timed set, a planned set with no tempo -- and on every row written
+     * before v20. Nothing backfills it from [tempo]: on a row where the lifter
+     * adjusted the tempo that would state the adjustment as the plan's.
+     */
+    val plannedTempo: String? = null,
     val targetMeanConVelMps: Double? = null,
     val velocityLossStopPct: Double? = null,
     val plannedRestS: Int? = null,
+    /**
+     * The instant, epoch-ms on the phone's wall clock, that the rest AFTER
+     * this set runs from (v20, #157).
+     *
+     * `RestClockPolicy.startedAtMs` decides it once, at the set-end freeze,
+     * and the countdown and the next set's rest-HR window already read that
+     * one value (#178). Stored so a measured rest can be computed from two
+     * stored instants -- this and the next set's [startedAtMs] -- rather than
+     * assumed to be [endedAtMs]: the rule prefers a release that decided a
+     * hold's seconds, then the set's terminal cue, and falls back to the
+     * write instant only when neither exists.
+     *
+     * NULL on every row written before v20. Nothing backfills it; the
+     * migration re-derives nothing.
+     */
+    val restStartedAtMs: Long? = null,
     /**
      * The prep prescribed before this set, and the prep handed to the voice
      * guide, in whole seconds.

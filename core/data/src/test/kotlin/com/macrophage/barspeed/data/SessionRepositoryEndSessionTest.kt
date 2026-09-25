@@ -174,6 +174,7 @@ class SessionRepositoryEndSessionTest {
         exerciseId = "seated_overhead_press",
         exerciseName = "Seated overhead press",
         loadKg = 25.0,
+        workingLoadKg = 25.0,
         plannedLoadKg = null,
         plannedReps = 8,
         tempo = null,

@@ -100,6 +100,7 @@ class SessionRepositoryPrepWindowTest {
         exerciseId = "back_squat",
         exerciseName = "Back Squat",
         loadKg = 100.0,
+        workingLoadKg = 100.0,
         plannedReps = 5,
         tempo = "3010",
         plannedLoadKg = null,

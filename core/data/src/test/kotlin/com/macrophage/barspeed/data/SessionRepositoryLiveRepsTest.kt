@@ -125,6 +125,7 @@ class SessionRepositoryLiveRepsTest {
         exerciseId = "deadlift",
         exerciseName = "Deadlift",
         loadKg = 120.0,
+        workingLoadKg = 120.0,
         plannedLoadKg = 120.0,
         plannedReps = 5,
         manualReps = manualReps,

@@ -232,6 +232,7 @@ class AnalysedRoleFallbackTest {
             exerciseId = "back_squat",
             exerciseName = "Back Squat",
             loadKg = loadKg,
+            workingLoadKg = loadKg,
             plannedLoadKg = loadKg,
             plannedReps = 6,
             manualReps = 6,

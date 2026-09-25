@@ -126,6 +126,7 @@ class SideDeviationRecordTest {
         exerciseId = "dumbbell_curl",
         exerciseName = "Dumbbell Curl",
         loadKg = 14.0,
+        workingLoadKg = 14.0,
         plannedLoadKg = 14.0,
         plannedReps = 10,
         side = side,

@@ -121,6 +121,7 @@ class SessionRepositoryDualSensorTest {
         exerciseId = "bench_press",
         exerciseName = "Bench Press",
         loadKg = 80.0,
+        workingLoadKg = 80.0,
         plannedLoadKg = 80.0,
         plannedReps = 5,
         tempo = null,

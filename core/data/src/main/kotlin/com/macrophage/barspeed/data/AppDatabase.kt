@@ -22,25 +22,41 @@ import java.io.File
  * rescued-database card -- three tiers, their titles, the discard dialog and
  * the share path -- had never been reachable outside a test. Ten was the first
  * value that could make that card appear; every value above it, this build's
- * seventeen included, is simply the next such value, and the first-time claim
+ * twenty included, is simply the next such value, and the first-time claim
  * that used to stand here is history rather than something these bumps repeat.
+ * The sentence here named "this build's seventeen" while the constant below
+ * read 19; it was false and is deleted.
  *
- * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 17 writes the
- * file, then any build carrying 16 or less opens it. A forward install runs
+ * REACHABLE IS NOT SHOWN. It takes a rollback: a build carrying 20 writes the
+ * file, then any build carrying 19 or less opens it. A forward install runs
  * the migration chain and never enters the rescue at all, so an ordinary
  * upgrade sees none of it.
  *
- * The version has moved before -- fifteen SHIPPED times, in v0.1.5, v0.1.10,
+ * THE ROLLBACK BOUNDARY THIS BUILD SETS (#157). Once a phone has opened a
+ * build carrying 20, installing any build carrying 19 or less -- v0.1.55 or
+ * older -- enters [DatabaseRescue] at that build's first open. The database
+ * file and its sidecars are moved to `files/rescued/`
+ * ([DatabaseRescue.RESCUE_DIR]), Room then finds no file and creates an
+ * empty one, so History opens empty and Home offers the rescued-database
+ * card. v0.1.54 is the newest tag at this commit and
+ * `git show v0.1.54:core/data/src/main/kotlin/com/macrophage/barspeed/data/AppDatabase.kt`
+ * reads `DATABASE_VERSION = 19`; this hop is held off `main` until v0.1.55 is
+ * cut, so v0.1.55 is on the far side of the boundary only if it is cut at 19
+ * -- re-read it at that tag rather than trusting this sentence. All of that
+ * is what the code does, read in source; no device has run this hop or its
+ * rollback, and the two-way emulator exercise at the cut is where it is seen.
+ *
+ * The version has moved before -- eighteen SHIPPED hops, in v0.1.5, v0.1.10,
  * v0.1.13, v0.1.15, v0.1.16, v0.1.20, twice in v0.1.38, once in v0.1.42,
- * twice in v0.1.44, once in v0.1.45, once in v0.1.49 and twice in v0.1.50 --
- * every one read off `git show <tag>:core/data/.../AppDatabase.kt` rather
- * than remembered. It read "thirteen ... once in v0.1.49" and stopped there,
- * which was true until v0.1.50 was cut carrying 16 against v0.1.49's 14.
+ * twice in v0.1.44, once each in v0.1.45 and v0.1.49, twice in v0.1.50, and
+ * once each in v0.1.51, v0.1.53 and v0.1.54 -- every one read off
+ * `git show <tag>:core/data/.../AppDatabase.kt` at this commit rather than
+ * remembered. It read "fifteen" and stopped at v0.1.50, which was false from
+ * v0.1.51 on; the count is re-measured here, not extended.
  * What was new at 11 was that a committed baseline existed for the version
  * below it, so for the first time in this repository a migration had a
- * document to be read against; 12 was the second such bump, 13 the third,
- * 14 the fourth, 15 the fifth, 16 the sixth, 17 the seventh and 18 the
- * eighth, with `17.json` as its baseline.
+ * document to be read against; 20 is the tenth such bump, with `19.json` as
+ * its baseline.
  *
  * A CORRECTION TO WHAT STOOD HERE, named rather than reworded around. This
  * paragraph read "BOTH bumps of this cluster reach the emulator in the SAME
@@ -53,25 +69,6 @@ import java.io.File
  * build ran was 12 -> 13. That also settles which release the two-way bench
  * exercise installs first: v0.1.44, the last tag carrying the old version --
  * not v0.1.43, which carries 10.
- *
- * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read at this commit rather
- * than carried forward: v0.1.52 is the newest tag and
- * `git show v0.1.52:core/data/.../AppDatabase.kt` reads
- * `DATABASE_VERSION = 17`, so only 17 -> 18 has NOT SHIPPED. The reading
- * below was v0.1.50 at 16 and is superseded rather than kept beside this
- * one: 16 -> 17 HAS shipped, which is why #286's column mints 18 instead
- * of riding on 17. A stock v0.1.50
- * install therefore runs 16 -> 17 alone, an install still on v0.1.49 runs
- * 14 -> 15 -> 16 -> 17 in one open, and a phone still on v0.1.44 runs
- * 12 -> 13 -> 14 -> 15 -> 16 -> 17, which is why the emulator exercise
- * installs an older release first and upgrades over it rather than starting
- * empty. TWO CLAIMS ARE DELETED HERE RATHER THAN REWORDED, both of them
- * this lane's: that v0.1.49 is still the newest tag, and that 14 -> 15 and
- * 15 -> 16 have not shipped. v0.1.50 exists, resolves to the same commit as
- * `origin/main`'s tip, and carries 16, so two of the three hops that
- * sentence called unshipped had shipped before it was written. The sentence
- * above about v0.1.48 carrying 13 was true when it was written and is not
- * now; it is replaced rather than kept beside this one.
  *
  * SEVENTEEN IS WHAT #60 TOLD THIS LANE TO USE, and the collision it warned
  * about happened. The paragraph that stood here said sixteen was not settled
@@ -88,20 +85,17 @@ import java.io.File
  * exists, and every value it ever held went stale before the next round read
  * it.
  *
- * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read at THIS commit and
- * superseding the reading above rather than standing beside it:
- * `git tag --sort=-creatordate | head -1` is v0.1.53 and
- * `git show v0.1.53:core/data/src/main/kotlin/com/macrophage/barspeed/data/AppDatabase.kt`
- * reads `DATABASE_VERSION = 18`, so 17 -> 18 HAS now shipped and only
- * 18 -> 19 has not. The sentence above saying v0.1.52 is the newest tag and
- * that 17 -> 18 is unshipped is DELETED by this paragraph rather than reworded
- * in place: both halves were true when written and neither is now. That is
- * also why #300's column mints 19 instead of riding on 18 -- extending a hop
- * an installed build has already run leaves that phone without the column. A
- * stock v0.1.53 install runs 18 -> 19 alone; an install still on v0.1.52 runs
- * 17 -> 18 -> 19 in one open.
+ * WHICH HOPS A PHONE RUNS INTO THIS BUILD, re-read at THIS commit. v0.1.54
+ * carries 19, so 18 -> 19 HAS shipped and only 19 -> 20 has not. A stock
+ * v0.1.54 install runs 19 -> 20 alone; one still on v0.1.53 runs
+ * 18 -> 19 -> 20 in one open, and one on v0.1.52 runs 17 -> 18 -> 19 -> 20,
+ * which is why the emulator exercise installs an older release first and
+ * upgrades over it rather than starting empty. Two earlier readings stood
+ * here -- v0.1.52 as the newest tag with only 17 -> 18 unshipped, and v0.1.53
+ * with only 18 -> 19 unshipped -- and both are false now; they are deleted
+ * rather than kept beside this one.
  */
-const val DATABASE_VERSION = 19
+const val DATABASE_VERSION = 20
 
 /** The database file name, shared with the downgrade check for the same reason. */
 const val DATABASE_NAME = "accelerometer_lifting.db"
@@ -665,6 +659,55 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         /**
+         * v20: the targets a set RAN against, and the instant its rest began
+         * -- five columns on set_records (#157).
+         *
+         * `workingReps`, `workingDurationS` and `workingLoadKg` are the
+         * working targets `RecordViewModel.endSet` already computes and, until
+         * this hop, dropped at the write: the rep count and the hold the set
+         * was judged against after any change-set edit, and the load resolved
+         * at set end, before a rest-screen correction overwrites `loadKg` in
+         * place. `plannedTempo` is the plan's tempo frozen at flatten, beside
+         * `tempo`, which carries the working one. `restStartedAtMs` is the
+         * instant the rest after the set runs from -- the one the countdown
+         * and the rest-HR window already share (#178). `SetRecordEntity`
+         * states what each one's null means.
+         *
+         * A NEW HOP, NOT AN EXTENSION OF 19. v0.1.54 carries
+         * `DATABASE_VERSION = 19`, read by `git show v0.1.54:...` rather than
+         * assumed, so an installed build has run 18 -> 19 and a column added
+         * to that hop would never reach its phone.
+         *
+         * ALL FIVE NULLABLE WITH NO DEFAULT, [MIGRATION_12_13]'s shape. Every
+         * row written before v20 came from a build that dropped these
+         * figures, so each column has a real absent state -- "this build
+         * could not say" -- that no value stands for.
+         *
+         * NO BACKFILL, and the obvious ones are refused on purpose. Copying
+         * `plannedReps` into `workingReps` is the #157 defect itself: it would
+         * state that the plan's count ran on every set the lifter raised or
+         * lowered with the in-app buttons. `loadKg` into `workingLoadKg` fails
+         * the same way on any row corrected afterwards, where it is the
+         * correction and not the target, and `tempo` into `plannedTempo`
+         * would publish the lifter's adjustment as the plan's.
+         *
+         * [Migration19To20Test] pins the five statements, the baseline
+         * difference, the refusal to write into any existing row, and that the
+         * hop is in [MIGRATIONS]. None of it executes SQLite; the two-way
+         * emulator exercise at the cut is owed.
+         */
+        internal val MIGRATION_19_20 =
+            object : Migration(19, 20) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN workingReps INTEGER")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN workingDurationS INTEGER")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN workingLoadKg REAL")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN plannedTempo TEXT")
+                    db.execSQL("ALTER TABLE set_records ADD COLUMN restStartedAtMs INTEGER")
+                }
+            }
+
+        /**
          * Every hop, in order, as one list.
          *
          * Extracted from the `addMigrations` call below, which named all
@@ -693,6 +736,7 @@ abstract class AppDatabase : RoomDatabase() {
                 MIGRATION_16_17,
                 MIGRATION_17_18,
                 MIGRATION_18_19,
+                MIGRATION_19_20,
             )
 
         /**
@@ -718,12 +762,18 @@ abstract class AppDatabase : RoomDatabase() {
          * was deleted there rather than reworded. A crash with the data
          * recoverable beats a clean start with it gone.
          *
-         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 18
-         * here, so a rollback from this build to any build carrying 17 or less
-         * enters the rescue -- which now includes v0.1.52, the newest tag. The
-         * first version at which that was true of a stock install was 10, and
-         * what it exposes on screen is stated at the constant, with issue #118. An ordinary forward install runs the
-         * migration chain and never comes near it.
+         * A ROLLBACK IS WHAT REACHES ANY OF THIS. [DATABASE_VERSION] is 20
+         * here, so once a phone has opened this build, installing any build
+         * carrying 19 or less -- v0.1.54 and older, and v0.1.55 if it is cut
+         * at 19 -- enters the rescue: the database moves to `files/rescued/`,
+         * Room creates an empty one, and History opens empty. The first
+         * version at which a rollback could do that to a stock install was
+         * 10; the boundary this build sets, and what it exposes on screen, are
+         * stated at the constant with issue #118. An ordinary forward install
+         * runs the migration chain and never comes near it. The paragraph that
+         * stood here said [DATABASE_VERSION] was 18 and named v0.1.52 as the
+         * newest tag; at this branch's base the constant read 19 and v0.1.54
+         * was the newest tag, so both halves were false and are deleted.
          *
          * The EXISTING migrations are untouched, and a missing UPGRADE
          * migration still throws exactly as before.

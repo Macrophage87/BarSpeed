@@ -253,6 +253,7 @@ class SessionRepositoryRecordSetTest {
         exerciseId = "back_squat",
         exerciseName = "Back Squat",
         loadKg = 102.5,
+        workingLoadKg = 102.5,
         plannedLoadKg = 100.0,
         plannedReps = 5,
         manualReps = manualReps,
