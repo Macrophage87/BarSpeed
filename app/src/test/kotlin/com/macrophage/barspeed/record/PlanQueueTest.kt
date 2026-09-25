@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.record
 
+import com.macrophage.barspeed.model.VelocityLossRegime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -105,13 +106,16 @@ class PlanQueueTest {
     @Test
     fun `a non-timed set keeps the frozen verdicts, filtered by regime`() {
         assertEquals(
-            emptyList(),
+            listOf("Rep 3 was the slowest."),
             restVerdicts(
                 isTimed = false,
                 effectiveDurationS = null,
                 plannedDurationS = null,
-                frozenVerdicts = emptyList(),
-                velocityLossRegime = null,
+                frozenVerdicts = listOf(
+                    "Rep 3 was the slowest.",
+                    "High velocity loss (32%) — significant fatigue this set.",
+                ),
+                velocityLossRegime = VelocityLossRegime.CONTROLLED,
             ),
         )
     }

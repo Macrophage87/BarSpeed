@@ -300,7 +300,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * during a send, so a stream not yet reached could disappear mid-copy.
      * Both are closed by the same key: [busyInterruptedFlow] disables SEND
      * for [orphan] the moment the coroutine starts, `InterruptedSetNotice`
-     * reads it for `enabled`, and DISCARD is expected to check it too.
+     * reads it for `enabled`. [discardInterrupted] checks and holds the same key.
      *
      * ALSO CATCHES, where before nothing did: the per-file `runCatching`
      * inside `SetJournalStore.zipTo` does not cover the central directory

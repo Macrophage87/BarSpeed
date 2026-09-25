@@ -253,10 +253,9 @@ mutation killed, and that mapping is the whole content of a mutation table.
   `SkippedSlotTest.kt`, `SlotCardLineTest.kt`, `WeightUnitChangeDifferentialTest.kt`,
   `WeightUnitChangeTest.kt`. Even that file list is a structural fact that only survives until
   the next file is added or removed — it is not immune to the same drift, only cheaper to
-  re-verify (`find`, no Gradle). No number in this bullet has been re-measured by the mandatory
-  suite command since `d525452b`; re-run it per §4's "one measurement per gate" rule and quote
-  the SHA you ran it at, rather than this one. Earlier definitions said `:app` had **zero** test
-  source sets; false too, and it stays retracted.
+  re-verify (`find`, no Gradle). This bullet carries no current execution count; re-run
+  it per §4's "one measurement per gate" rule and quote the SHA you ran it at. Earlier
+  definitions said `:app` had **zero** test source sets; false too, and it stays retracted.
 - **`:app`'s unit tests run on a JDK 21 launcher as of #188** —
   `app/build.gradle.kts`, `tasks.withType<Test>().configureEach { javaLauncher.set(…21…) }`, the
   block `:core:data` already carried. Before it, `:app` ran its tests on 17 while
