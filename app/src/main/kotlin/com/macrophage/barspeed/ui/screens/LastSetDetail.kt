@@ -39,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.macrophage.barspeed.model.BodyweightLoadDisplay
-import com.macrophage.barspeed.model.CoachingVerdictPolicy
 import com.macrophage.barspeed.model.EffortCorrectionPolicy
 import com.macrophage.barspeed.model.HoldEndPolicy
 import com.macrophage.barspeed.model.HoldEndSource
@@ -55,8 +54,8 @@ import com.macrophage.barspeed.record.RecordState
 import com.macrophage.barspeed.record.RecordViewModel
 import com.macrophage.barspeed.record.SetFeedback
 import com.macrophage.barspeed.record.carryBlock
+import com.macrophage.barspeed.record.restVerdicts
 import com.macrophage.barspeed.record.standingAddedKg
-import com.macrophage.barspeed.record.timedVerdicts
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.SectionCaption
 import com.macrophage.barspeed.ui.components.SideArrow
@@ -703,11 +702,14 @@ private fun RepQualityCard(feedback: SetFeedback) {
     // PlanQueue.kt. A duration correction on this same screen moves
     // `feedback.effectiveDurationS` and the FAILED flag but never rewrites
     // that frozen sentence, so a 20 s hold corrected to 15 s went on reading
-    // "Held 20s -- full 20s target. Nice." under "FAILED" (#270). The fix is
-    // to call the same pure function again here, at render time, off the
-    // CURRENT seconds rather than trust the frozen string: `timedVerdicts` is
-    // pinned by `PlanQueueTest`'s five cases, so this is the one call site
-    // left free to go stale, not a new decision.
+    // "Held 20s -- full 20s target. Nice." under "FAILED" (#270). `restVerdicts`
+    // (PlanQueue.kt) re-grades the same pure function at render time, off the
+    // CURRENT seconds rather than the frozen string, and is pinned by
+    // `PlanQueueTest`.
+    //
+    // `SessionDetailScreen`'s history card has the same frozen-sentence read
+    // at its own `CoachingVerdictPolicy.forRegime` call and is NOT fixed by
+    // this change -- see the note there.
     //
     // A non-timed set has no correction to go stale against, so it keeps
     // reading the frozen `analysis.verdicts` through `CoachingVerdictPolicy`,
@@ -716,11 +718,13 @@ private fun RepQualityCard(feedback: SetFeedback) {
     // and "significant fatigue this set" was still being printed under the
     // gap. Nothing in this file decides that one.
     val verdicts =
-        if (feedback.actualDurationS != null) {
-            timedVerdicts(feedback.effectiveDurationS, feedback.plannedDurationS)
-        } else {
-            CoachingVerdictPolicy.forRegime(analysis.verdicts, feedback.velocityLossRegime)
-        }
+        restVerdicts(
+            isTimed = feedback.actualDurationS != null,
+            effectiveDurationS = feedback.effectiveDurationS,
+            plannedDurationS = feedback.plannedDurationS,
+            frozenVerdicts = analysis.verdicts,
+            velocityLossRegime = feedback.velocityLossRegime,
+        )
     // Timed sets have no reps; surface the hold verdicts instead of a chart.
     if (feedback.actualDurationS != null) {
         if (verdicts.isEmpty()) return

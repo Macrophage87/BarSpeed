@@ -253,6 +253,18 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
                 // frozen text and stay frozen; this decides which of them this
                 // reader shows, and CoachingVerdictPolicy in :core:model is
                 // where that decision is made and tested.
+                //
+                // NOT FIXED for a timed set (#270, part not yet closed): `a.verdicts`
+                // here is still the sentence frozen at set end from the
+                // pre-correction seconds, same as the rest screen's bug --
+                // but this is not the rest screen's one-line fix. The header
+                // above (SetCardHeader) prints `record.actualDurationS`, which
+                // Daos.kt's overrideDuration DOES rewrite on a correction, next
+                // to `record.plannedDurationS`, the PLAN's original target,
+                // which a duration correction never touches -- not the working
+                // target `restVerdicts` grades against on the rest screen. So
+                // fixing this call site needs its own read of what "corrected"
+                // means for history, not a copy of PlanQueue.kt's restVerdicts.
                 CoachingVerdictPolicy.forRegime(a.verdicts, regime).forEach {
                     Text("• $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                 }

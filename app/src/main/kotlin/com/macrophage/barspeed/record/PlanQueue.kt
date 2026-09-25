@@ -1,11 +1,13 @@
 package com.macrophage.barspeed.record
 
 import com.macrophage.barspeed.data.SessionRepository
+import com.macrophage.barspeed.model.CoachingVerdictPolicy
 import com.macrophage.barspeed.model.PlanNoteDisplay
 import com.macrophage.barspeed.model.PlanSessionDef
 import com.macrophage.barspeed.model.ProgressionKind
 import com.macrophage.barspeed.model.SetGeometryPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
+import com.macrophage.barspeed.model.VelocityLossRegime
 
 /**
  * Fraction of a timed target that still counts as having made the hold.
@@ -147,3 +149,29 @@ fun timedVerdicts(actualS: Int?, plannedS: Int?): List<String> {
         else -> listOf("Held ${actualS}s of ${plannedS}s. Consider a shorter target or lighter load.")
     }
 }
+
+/**
+ * Which verdict lines the rest screen shows for a set just finished (#270).
+ *
+ * A hold or a carry is re-graded HERE, off the CURRENT seconds
+ * ([effectiveDurationS], [plannedDurationS]) rather than the sentence
+ * FROZEN into [frozenVerdicts] at set end -- a duration correction on the
+ * rest screen must not leave that frozen sentence contradicting the
+ * corrected figure printed beside it (a 20 s target corrected to 15 s used
+ * to keep reading "full 20s target. Nice." under "FAILED"). A rep-based set
+ * has no duration to correct, so [isTimed] false keeps the frozen sentence,
+ * filtered through [CoachingVerdictPolicy] for the set's velocity-loss
+ * regime.
+ */
+fun restVerdicts(
+    isTimed: Boolean,
+    effectiveDurationS: Int?,
+    plannedDurationS: Int?,
+    frozenVerdicts: List<String>,
+    velocityLossRegime: VelocityLossRegime?,
+): List<String> =
+    if (isTimed) {
+        timedVerdicts(effectiveDurationS, plannedDurationS)
+    } else {
+        CoachingVerdictPolicy.forRegime(frozenVerdicts, velocityLossRegime)
+    }
