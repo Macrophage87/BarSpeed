@@ -201,12 +201,8 @@ left to check against. Three things travel together:
   PlanQueueTest.xml` in the primary checkout (`<testsuite name="…PlanQueueTest" tests="5"
   skipped="0" failures="0" errors="0" …>`); the file is from a stale build dated 2026-08-22, so
   its counts are not evidence for any particular SHA, but the emitted schema is Gradle's own
-  JUnit-XML writer and does not vary with the SHA that produced it. **That `tests="5"` is not the
-  same 5 that §5 now states for `PlanQueueTest`, and the agreement is a coincidence** — this
-  example's 5 was already wrong when it was quoted here, and §5's 5 is what is left after #188
-  moved nine methods to `:core:model`. Reading either as corroborating the other is the mistake
-  §5 records having made once already. Quote this block for its ATTRIBUTE NAMES and take no
-  digit from it.
+  JUnit-XML writer and does not vary with the SHA that produced it. Quote this block for its
+  ATTRIBUTE NAMES and take no digit from it.
 
 Tail the console log only on failure — a green multi-module log is thousands of tokens carrying
 zero findings once the XML tuple and the task count both check out.
@@ -248,8 +244,8 @@ mutation killed, and that mapping is the whole content of a mutation table.
 - **`:app` has a real test source set, and this entry stops naming a per-file or per-method
   count (#298).** Every count of that shape written here has gone stale faster than it was
   read: "TWO test files, 18 executed per variant, 36 across the two variants" was true at
-  `eba5aad8df2fcd2f01bf288c94a31a568f8c24e6` and was already **142 executions, 71 per variant**
-  by `d525452b` (#298's own measurement) — and by `a3c3a2e5aff70eebc88468f0d4bd3c9cf7bbfe08`,
+  `eba5aad8df2fcd2f01bf288c94a31a568f8c24e6` and was already stale by
+  `a3c3a2e5aff70eebc88468f0d4bd3c9cf7bbfe08`, where
   `find app/src/test -name '*.kt'` lists **twelve** files under
   `app/src/test/kotlin/com/macrophage/barspeed/record/`, not two:
   `AppendedSlotTest.kt`, `CaptureAtTest.kt`, `LastPlannedSetTest.kt`, `LiveFallbackTest.kt`,
