@@ -39,12 +39,15 @@ class StackInversionRuleTest {
     private val declaredTrue = ""","sensorInverted":true"""
     private val offStack = ""","sensorOnStack":false"""
 
-    private fun document(id: String, declarations: String) =
-        """
-        {"schemaVersion":"1.12","planName":"P","sessions":[{"name":"S","exercises":[
-          {"exercise":"$id"$declarations,"sets":[{"reps":12,"tempo":"1120"}]}
-        ]}]}
-        """.trimIndent()
+    private fun document(id: String, declarations: String): String {
+        val text =
+            """
+            {"schemaVersion":"1.12","planName":"P","sessions":[{"name":"S","exercises":[
+              {"exercise":"$id"$declarations,"sets":[{"reps":12,"tempo":"1120"}]}
+            ]}]}
+            """.trimIndent()
+        return text
+    }
 
     private fun declared(id: String, declarations: String = ""): PlanExerciseDef =
         json.decodeFromString(PlanFile.serializer(), document(id, declarations)).sessions[0].exercises[0]
