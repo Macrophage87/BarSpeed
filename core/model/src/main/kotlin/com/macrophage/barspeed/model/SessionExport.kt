@@ -2286,7 +2286,9 @@ data class SessionExport(
          * `velocityLoss_pct` takes its best over the eligible reps, and is
          * withheld unless at least two reps are eligible AND the set's last rep
          * is one; [SetExport.velocityLossBasis] then reads the new word
-         * `noEligiblePair`. Each `repMetrics` row may carry
+         * `noEligiblePair`. The word `noReference` narrows with it: it now
+         * says no peak-eligible rep carried a positive drive velocity, where
+         * before 1.22 it said no rep did. Each `repMetrics` row may carry
          * [RepMetricsExport.guardArtefactSamples], the band's own count.
          *
          * WHAT WAS WRONG. field-44 set 4, a 111.1 kg deadlift, published

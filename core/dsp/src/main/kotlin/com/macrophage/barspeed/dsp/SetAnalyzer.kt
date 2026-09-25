@@ -234,9 +234,8 @@ data class SetAnalysis(
     val reps: List<RepAnalysis>,
     val sampleRateHz: Double,
     /**
-     * Best rep to LAST rep, percent. Null whenever there is no such figure:
-     * fewer than two reps, no positive drive velocity, or a last rep that is
-     * the fastest of the set. [VelocityLoss] is what names which of the three.
+     * Best rep to LAST rep, percent. Null whenever there is no such figure.
+     * [VelocityLoss] is what names which absence a set is in.
      */
     val velocityLossPct: Double?,
     val tempoCompliance: TempoComplianceResult?,

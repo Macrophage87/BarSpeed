@@ -1,8 +1,8 @@
 package com.macrophage.barspeed.dsp
 
 /**
- * Whether a set has a velocity-loss figure at all, and when it does not, which
- * of three different absences it is in.
+ * Whether a set has a velocity-loss figure at all, and when it does not,
+ * which absence it is in.
  *
  * `velocityLoss_pct` is best rep to LAST rep. The reference is the maximum
  * `meanConVelMps` over the reps `AccelArtefact.isPeakEligible` admits (#306),
@@ -28,7 +28,7 @@ sealed interface VelocityLoss {
     /** Fewer than two reps resolved: there is no pair to take a difference over. */
     data object NotEnoughReps : VelocityLoss
 
-    /** No rep carries a positive drive velocity, so there is nothing to divide by. */
+    /** No peak-eligible rep carries a positive drive velocity, so there is nothing to divide by. */
     data object NoReference : VelocityLoss
 
     /**
