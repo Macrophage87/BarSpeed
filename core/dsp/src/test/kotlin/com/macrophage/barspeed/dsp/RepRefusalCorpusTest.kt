@@ -112,6 +112,13 @@ class RepRefusalCorpusTest {
         Triple("field-deadlift-straight-5rep-s43-set04", con, 61.234969951354785),
         Triple("field-deadlift-straight-5rep-s43-set05", con, 83.91458845185656),
         Triple("field-deadlift-straight-5rep-s43-set06", con, 102.05828325225797),
+        // field-44's five deadlifts, committed for issue #305. Loads from that
+        // session's own meta.json.
+        Triple("field-deadlift-straight-2rep-s44-set05", con, 120.20197805265938),
+        Triple("field-deadlift-straight-4rep-s44-set04", con, 111.13013065245867),
+        Triple("field-deadlift-straight-5rep-s44-set01", con, 61.234969951354785),
+        Triple("field-deadlift-straight-5rep-s44-set02", con, 83.91458845185656),
+        Triple("field-deadlift-straight-5rep-s44-set03", con, 102.05828325225797),
         Triple("field-facepull-static-12rep", con, 9.97903214022078),
         Triple("field-inclinepress-3010-12rep-s38-set02", ecc, 27.215542200602126),
         Triple("field-latpulldown-1120-12rep-s38-set14", latPulldown, 34.019427750752655),
@@ -172,8 +179,9 @@ class RepRefusalCorpusTest {
         assertEquals(onDisk, corpus.map { it.first }.sorted())
         // 58, not the 42 that stood before any of the four landings: #301
         // committed three, #259 three, issues #290 and #255 six, and issue
-        // #278 four base captures this file did not already walk.
-        assertEquals(58, corpus.size, "captures this file walks")
+        // #278 four base captures this file did not already walk. 63 since
+        // issue #305 committed field-44's five deadlifts.
+        assertEquals(63, corpus.size, "captures this file walks")
     }
 
     /**

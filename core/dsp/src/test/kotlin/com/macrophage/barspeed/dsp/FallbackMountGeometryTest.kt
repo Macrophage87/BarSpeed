@@ -225,6 +225,15 @@ class FallbackMountGeometryTest {
                 "field-cablerow-3010-8rep-s42-set08-imu-b",
                 "field-cablerow-3010-8rep-s42-set09-imu-b",
                 "field-cablerow-3010-8rep-s42-set10-imu-b",
+                // field-44's five second units, committed for issue #305 and
+                // read by `DeadliftHeavyFieldTest`, which pins what the shipped
+                // counter calls on each. Both units sat at the bar's CENTRE on
+                // that session, so the partner is a second witness of one
+                // rigid body rather than of a different mount. Sorted, so the
+                // 2- and 4-rep names sit here and the three 5-rep ones after
+                // field-43's.
+                "field-deadlift-straight-2rep-s44-set05-imu-b",
+                "field-deadlift-straight-4rep-s44-set04-imu-b",
                 // field-43's three second units, landed on `origin/main` with
                 // issue #301 and read here for issues #290 and #255: both
                 // units sat on the collars, and the partner is what shows the
@@ -234,6 +243,9 @@ class FallbackMountGeometryTest {
                 "field-deadlift-straight-5rep-s43-set04-imu-b",
                 "field-deadlift-straight-5rep-s43-set05-imu-b",
                 "field-deadlift-straight-5rep-s43-set06-imu-b",
+                "field-deadlift-straight-5rep-s44-set01-imu-b",
+                "field-deadlift-straight-5rep-s44-set02-imu-b",
+                "field-deadlift-straight-5rep-s44-set03-imu-b",
                 "field-latpulldown-1120-12rep-s38-set14-imu-b",
                 "field-latpulldown-1120-12rep-s41-set18-imu-b",
                 "field-pullup-3010-8rep-s42-set11-imu-b",

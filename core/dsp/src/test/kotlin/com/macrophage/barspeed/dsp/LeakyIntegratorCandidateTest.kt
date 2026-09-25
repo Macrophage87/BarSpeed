@@ -182,10 +182,13 @@ class LeakyIntegratorCandidateTest {
         // Re-measured over the 58 committed captures, 46 of them scored,
         // after issue #278's four new base captures: truth 296 -> 338, leak
         // 279 -> 296, its over-count unchanged at 26, matched 253 -> 270.
-        assertEquals(338, truthTotal, "reps the corpus truth set holds")
-        assertEquals(296, leakTotal, "reps the leak reports over them")
-        assertEquals(26, leakOver, "reps the leak reports beyond a capture's truth")
-        assertEquals(270, leakMatched, "reps the leak reports within a capture's truth")
+        // Then issue #305's five field-44 deadlifts (4/3/8/4/3 against
+        // 5/5/5/4/2): truth 338 -> 359, leak 296 -> 318, over-count 26 -> 30,
+        // matched 270 -> 288.
+        assertEquals(359, truthTotal, "reps the corpus truth set holds")
+        assertEquals(318, leakTotal, "reps the leak reports over them")
+        assertEquals(30, leakOver, "reps the leak reports beyond a capture's truth")
+        assertEquals(288, leakMatched, "reps the leak reports within a capture's truth")
         val fly = "field-reardeltfly-s32-set06"
         assertEquals(
             listOf(12, 0, 23),

@@ -508,6 +508,19 @@ internal object CandidateCorpus {
         "field-cablerow-3010-8rep-s42-set09" to 8,
         "field-pullup-3010-8rep-s42-set11" to 8,
         "field-pullup-4010-8rep-s42-set13" to 8,
+        // Field-44's five deadlift sets, committed for issue #305. Their
+        // `-cues.csv` is the sensor's own calls (sets 1-3) or the lifter's
+        // post-set taps (set 4), and set 5 has none, so a stated count is the
+        // only truth they have. Each number is the OWNER'S SETTLED count, not
+        // the stored `reps`: set 4 stores 5 and the owner, shown the four
+        // pulls in the capture, said "It could indeed be 4"; set 5 stores 3,
+        // and its third pull failed "about halfway up. Grip failed." -- a
+        // failed attempt, not a rep, so the set is scored against 2.
+        "field-deadlift-straight-5rep-s44-set01" to 5,
+        "field-deadlift-straight-5rep-s44-set02" to 5,
+        "field-deadlift-straight-5rep-s44-set03" to 5,
+        "field-deadlift-straight-4rep-s44-set04" to 4,
+        "field-deadlift-straight-2rep-s44-set05" to 2,
     )
 
     val ALL = listOf(
@@ -532,6 +545,11 @@ internal object CandidateCorpus {
         Capture("field-deadlift-straight-5rep-s43-set04", CON),
         Capture("field-deadlift-straight-5rep-s43-set05", CON),
         Capture("field-deadlift-straight-5rep-s43-set06", CON),
+        Capture("field-deadlift-straight-2rep-s44-set05", CON),
+        Capture("field-deadlift-straight-4rep-s44-set04", CON),
+        Capture("field-deadlift-straight-5rep-s44-set01", CON),
+        Capture("field-deadlift-straight-5rep-s44-set02", CON),
+        Capture("field-deadlift-straight-5rep-s44-set03", CON),
         Capture("field-facepull-static-12rep", CON),
         Capture("field-inclinepress-3010-12rep-s38-set02", ECC),
         Capture("field-latpulldown-1120-12rep-s38-set14", DOWN_ON_STACK),

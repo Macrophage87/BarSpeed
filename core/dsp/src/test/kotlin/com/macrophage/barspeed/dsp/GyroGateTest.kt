@@ -50,6 +50,11 @@ class GyroGateTest {
         "field-deadlift-straight-5rep-s43-set04",
         "field-deadlift-straight-5rep-s43-set05",
         "field-deadlift-straight-5rep-s43-set06",
+        "field-deadlift-straight-2rep-s44-set05",
+        "field-deadlift-straight-4rep-s44-set04",
+        "field-deadlift-straight-5rep-s44-set01",
+        "field-deadlift-straight-5rep-s44-set02",
+        "field-deadlift-straight-5rep-s44-set03",
         "field-facepull-static-12rep",
         "field-inclinepress-3010-12rep-s38-set02",
         "field-latpulldown-1120-12rep-s38-set14",
@@ -245,6 +250,17 @@ class GyroGateTest {
             "field-deadlift-straight-5rep-s43-set04",
             "field-deadlift-straight-5rep-s43-set05",
             "field-deadlift-straight-5rep-s43-set06",
+            // Field-44's five deadlift sets, committed for issue #305 -- the
+            // first CENTRE-mounted barbell hinge in the corpus, at 61-120 kg.
+            // The gate holds on all five, asserted below rather than predicted
+            // here. So a centre mount does not straddle the band either on
+            // this session; what rotates on these sets still rotates in bursts
+            // at the floor, not throughout.
+            "field-deadlift-straight-2rep-s44-set05",
+            "field-deadlift-straight-4rep-s44-set04",
+            "field-deadlift-straight-5rep-s44-set01",
+            "field-deadlift-straight-5rep-s44-set02",
+            "field-deadlift-straight-5rep-s44-set03",
             // The seven pairs issue #278 committed, base captures only --
             // a partner is not in [FieldCorpus.onClasspath] and so not in
             // this corpus. Three of the seven -- field-42 sets 9, 11 and 13

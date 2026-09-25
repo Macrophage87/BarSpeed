@@ -266,6 +266,11 @@ class BatchCueCoverageTest {
         "field-rdl-3010-10rep-s36-set04",
         "field-seated-ohp-2rep",
         "field-still-0rep",
+        // Field-44 set 5, committed for issue #305: the app wrote NO cue file
+        // for it -- nothing was spoken live and its stored 3 was entered
+        // without a spoken tap -- so there is no track to score and no truth
+        // this file can read.
+        "field-deadlift-straight-2rep-s44-set05",
         "field-ropedeadhang-hold20-s37-set11",
         // The three holds committed for #259: two rope dead hangs from
         // field-38 and one rope farmers hold from field-42. Tracks committed,
@@ -339,6 +344,15 @@ class BatchCueCoverageTest {
         "field-deadlift-straight-5rep-s43-set04",
         "field-deadlift-straight-5rep-s43-set05",
         "field-deadlift-straight-5rep-s43-set06",
+        // Field-44's first four deadlift sets, committed for issue #305. Their
+        // tracks are the sensor's own live calls (sets 1-3) or the lifter's
+        // five post-set `+1 REP` taps (set 4), on the same terms as field-43's
+        // three above. The owner's settled counts are pinned in
+        // `DeadliftHeavyFieldTest`, not scored here.
+        "field-deadlift-straight-4rep-s44-set04",
+        "field-deadlift-straight-5rep-s44-set01",
+        "field-deadlift-straight-5rep-s44-set02",
+        "field-deadlift-straight-5rep-s44-set03",
         "field-inclinepress-3010-12rep-s38-set02",
         "field-latpulldown-1120-12rep-s41-set18",
         "field-ohp-3010-7rep-s42-set02",

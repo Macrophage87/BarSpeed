@@ -116,7 +116,7 @@ class RepMarkTrackTest {
      * the cue-only set move in opposite directions and still add up.
      */
     @Test
-    fun `thirteen captures carry marks and thirty-two carry cues without them`() {
+    fun `thirteen captures carry marks and thirty-six carry cues without them`() {
         val captures = FieldCorpus.onClasspath()
         assertEquals(corpus.map { it.first }.sorted(), captures.filter { hasSidecar(it, "-reps.csv") })
         val cuedOnly = captures.filter { hasSidecar(it, "-cues.csv") && !hasSidecar(it, "-reps.csv") }
@@ -132,8 +132,10 @@ class RepMarkTrackTest {
         // here because this file's per-capture mark counts are a claim about
         // rep counting, which neither issue is about. The test's own name
         // carried the sixteen and is renamed with it rather than left saying a
-        // number it no longer means.
-        assertEquals(32, cuedOnly.size)
+        // number it no longer means. 36, not 32: issue #305 committed
+        // field-44's first four deadlift sets with their tracks and no rep
+        // file, on field-43's terms (set 5 has no track at all).
+        assertEquals(36, cuedOnly.size)
         assertEquals(
             listOf(
                 "field-backsquat-wrapping-s36-set01",

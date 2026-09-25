@@ -237,6 +237,11 @@ class CuedRepCoverageTest {
         "field-backsquat-10hz",
         "field-backsquat-10hz-set5",
         "field-cablerow-static-8rep",
+        // Field-44 set 5, committed for issue #305: the app wrote NO cue file
+        // for it -- nothing was spoken live and its stored 3 was entered
+        // without a spoken tap -- so there is no track to score and no truth
+        // this file can read.
+        "field-deadlift-straight-2rep-s44-set05",
         "field-facepull-static-12rep",
         "field-ohp-100hz-bursty",
         "field-pallof-static-12rep",
@@ -321,6 +326,15 @@ class CuedRepCoverageTest {
         "field-deadlift-straight-5rep-s43-set04",
         "field-deadlift-straight-5rep-s43-set05",
         "field-deadlift-straight-5rep-s43-set06",
+        // Field-44's first four deadlift sets, committed for issue #305. Their
+        // tracks are the sensor's own live calls (sets 1-3) or the lifter's
+        // five post-set `+1 REP` taps (set 4), on the same terms as field-43's
+        // three above. The owner's settled counts are pinned in
+        // `DeadliftHeavyFieldTest`, not scored here.
+        "field-deadlift-straight-4rep-s44-set04",
+        "field-deadlift-straight-5rep-s44-set01",
+        "field-deadlift-straight-5rep-s44-set02",
+        "field-deadlift-straight-5rep-s44-set03",
         "field-inclinepress-3010-12rep-s38-set02",
         "field-latpulldown-1120-12rep-s41-set18",
         "field-ohp-3010-8rep-s38-set05",
@@ -575,16 +589,19 @@ class CuedRepCoverageTest {
         // 13 until issue #125 committed field-ohp-3010-8rep-s37-set01,
         // whose archived cue track is deliberately not committed beside it,
         // and 14 until #259 committed three holds whose tracks ARE committed
-        // and call no rep.
-        assertEquals(17, notCueTracked.size, "captures with no track that calls a rep")
+        // and call no rep. 18, not 17: issue #305 committed field-44 set 5,
+        // for which the app wrote no cue file at all.
+        assertEquals(18, notCueTracked.size, "captures with no track that calls a rep")
         // 19, not the 6 that stood before any of the landings: issue #301
         // committed the three field-43 deadlifts, whose tracks carry the
         // sensor's own calls rather than a metronome's, issues #290 and #255
         // six more, and issue #278 four that were not already here -- field-42
         // sets 8 and 10, the field-41 triceps pushdown and the field-41 lat
         // pulldown. All thirteen are cue-tracked and none is scored for rep
-        // coverage.
-        assertEquals(19, notRepCorpus.size, "captures committed for something other than rep coverage")
+        // coverage. 23, not 19: issue #305 committed field-44's first four
+        // deadlift sets, whose tracks are the sensor's calls and the lifter's
+        // post-set taps, on field-43's terms.
+        assertEquals(23, notRepCorpus.size, "captures committed for something other than rep coverage")
         notRepCorpus.forEach { fixture ->
             assertTrue(
                 javaClass.getResourceAsStream("/$fixture-cues.csv") != null,

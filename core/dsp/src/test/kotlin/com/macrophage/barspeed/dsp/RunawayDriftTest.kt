@@ -196,13 +196,15 @@ class RunawayDriftTest {
         // 4=1}: the triceps pushdown, whose armed unit sat on the stack,
         // carries no runaway at all and lands in bucket 0, two of the four
         // need one pass and one needs two. The worst capture in the corpus is
-        // still unchanged at four passes.
+        // still unchanged at four passes. Issue #305's five field-44
+        // deadlifts then move them to {0=17, 1=34, 2=8, 3=3, 4=1}: set 1
+        // carries no runaway, sets 2, 4 and 5 need one pass and set 3 two.
         assertEquals(
-            mapOf(0 to 16, 1 to 31, 2 to 7, 3 to 3, 4 to 1),
+            mapOf(0 to 17, 1 to 34, 2 to 8, 3 to 3, 4 to 1),
             passesNeeded.values.groupingBy { it }.eachCount().toSortedMap(),
             "captures by passes needed",
         )
-        assertEquals(58, passesNeeded.size, "committed captures walked")
+        assertEquals(63, passesNeeded.size, "committed captures walked")
         assertEquals(
             mapOf(
                 "field-bench-3010-6rep-s42-set05" to 2,
@@ -213,6 +215,10 @@ class RunawayDriftTest {
                 "field-cablerow-3010-8rep-s42-set08" to 2,
                 "field-cablerow-3010-8rep-s42-set09" to 2,
                 "field-deadlift-straight-5rep-s43-set05" to 2,
+                // Issue #305's one field-44 deadlift needing a second pass:
+                // set 3, the 102 kg set whose stream opens with 119 s of plate
+                // handling.
+                "field-deadlift-straight-5rep-s44-set03" to 2,
                 "field-ohp-3010-7rep-s42-set02" to 3,
                 "field-ohp-prepinflated-s37-set03" to 3,
                 "field-pullup-3010-8rep-s42-set11" to 2,
@@ -244,6 +250,10 @@ class RunawayDriftTest {
                 "field-assistedpullup-3010-s37-set10",
                 "field-backsquat-10hz-set5",
                 "field-bench-rotating-6rep-ok",
+                // The one of issue #305's five field-44 deadlifts whose
+                // anchored series holds no runaway: set 1, the 61 kg warm-up.
+                // The other four each carry at least one.
+                "field-deadlift-straight-5rep-s44-set01",
                 "field-facepull-static-12rep",
                 "field-legcurl-1030-12rep",
                 "field-legcurl-1030-12rep-b",
