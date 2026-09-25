@@ -66,8 +66,9 @@ object TimedSetEndPolicy {
     const val CLOSE_ENOUGH_FRACTION = 0.9
 
     /**
-     * Seconds one tap of the post-set duration correction moves the recorded
-     * hold by.
+     * Seconds one tap of the post-set duration correction moves a hold with
+     * no target by, unless the floor at zero stops a down step sooner, and
+     * moves a hold at or past its target UP by (#312).
      *
      * Five rather than one, because the thing being corrected is the walk
      * back to the phone: the owner's estimate of it is "the time that it

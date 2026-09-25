@@ -146,8 +146,9 @@ object HoldEndPolicy {
     const val MAX_TRIM_S = 20
 
     /**
-     * The LEAST the larger of the rest screen's two down steps moves the
-     * recorded hold by, in seconds.
+     * The least the larger of the rest screen's two down steps moves the
+     * recorded hold by, in seconds, unless the floor at zero stops it sooner:
+     * a 7 s draft steps to 0 and is labelled "−7s".
      *
      * It survives #312, and for a new reason. It was sized for the walk back
      * to the phone -- the owner's "about 5-10 sec", #172's 4.3 to 13.7 s -- as
@@ -276,9 +277,11 @@ object HoldEndPolicy {
      *   that direction, 15 left down and 10 left up.
      * - inside the last [TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S] seconds: one
      *   second, because the voice said every one of them.
-     * - at or past the target: [TimedSetEndPolicy.CORRECTION_STEP_S] up, as an
+     * - past the target: [TimedSetEndPolicy.CORRECTION_STEP_S] up, as an
      *   overage was always stated, and down by the same but never past the
-     *   target, the one mark on that side.
+     *   target, the one mark on that side. At the target itself the up step
+     *   is the same, and the down step is the one second of the bullet above:
+     *   0 s left is inside the last [TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S].
      *
      * The same rule for every [HoldEndSource]: what ended the hold decides
      * whether a larger step is offered ([downStepsS]), not where the fine one

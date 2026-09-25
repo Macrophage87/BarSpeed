@@ -137,11 +137,11 @@ class HoldCorrectionStepTest {
     /**
      * The larger step survives #312 for a new reason: a clock-ended hold sits
      * where a fine step is one second, so "let go at 10 to go" would be ten
-     * taps without it. It moves at least ten seconds down and lands on a mark,
-     * and its label says how far it actually moves.
+     * taps without it. It moves at least ten seconds down unless the floor at
+     * zero stops it sooner, and its label says how far it actually moves.
      */
     @Test
-    fun `the larger step moves at least ten down, lands on a mark and says how far`() {
+    fun `the larger step moves at least ten down or to zero, and says how far`() {
         val clock = HoldEndPolicy.correction(45, 45, HoldEndSource.CLOCK)
         assertEquals(35, clock.bigDownS)
         assertEquals("−10s", clock.bigDownLabel)
