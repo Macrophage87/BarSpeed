@@ -97,24 +97,23 @@ class SessionExportPeakEligibilityTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     /** One stored rep carrying what the rule reads, as the analyzer froze it. */
-    private fun rep(index: Int, mean: Double, peak: Double, power: Double, band: Int?, bounded: Boolean?) =
-        RepAnalysis(
-            index = index,
-            eccS = 2.0,
-            bottomPauseS = 0.3,
-            conS = 1.0,
-            topPauseS = null,
-            meanConVelMps = mean,
-            peakConVelMps = peak,
-            meanEccVelMps = -0.25,
-            peakEccVelMps = -0.4,
-            romM = 0.5,
-            peakPowerW = power,
-            meanConPowerW = 150.0,
-            artefactSamples = if (band == null) null else 0,
-            guardArtefactSamples = band,
-            romBounded = bounded,
-        )
+    private fun rep(index: Int, mean: Double, peak: Double, power: Double, band: Int?, bounded: Boolean?) = RepAnalysis(
+        index = index,
+        eccS = 2.0,
+        bottomPauseS = 0.3,
+        conS = 1.0,
+        topPauseS = null,
+        meanConVelMps = mean,
+        peakConVelMps = peak,
+        meanEccVelMps = -0.25,
+        peakEccVelMps = -0.4,
+        romM = 0.5,
+        peakPowerW = power,
+        meanConPowerW = 150.0,
+        artefactSamples = if (band == null) null else 0,
+        guardArtefactSamples = band,
+        romBounded = bounded,
+    )
 
     private fun analysisOf(reps: List<RepAnalysis>) = SetAnalysis(
         reps = reps,
