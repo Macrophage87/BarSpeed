@@ -2534,9 +2534,8 @@ data class SetExport(
      *
      * - `clock` -- the app's own clock reached the target and ended the set
      *   (#168), so [durationS] is the target itself and the lifter heard `Time`
-     *   a beat before it. From 1.22 (#311) only where no armed unit's stream
-     *   showed the implement being let go 1 to 20 whole seconds before the
-     *   target.
+     *   a beat before it. From 1.22 (#311) only where its armed unit, if any,
+     *   reported no release taking 1 to 20 whole seconds off the target.
      * - `sensor` -- an armed unit's stream showed the implement being let go,
      *   and [durationS] runs to THAT instant rather than to the tap that
      *   followed it -- or, from 1.22 (#311), rather than to the target on a

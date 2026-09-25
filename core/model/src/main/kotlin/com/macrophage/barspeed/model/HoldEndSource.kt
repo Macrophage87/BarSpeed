@@ -20,8 +20,8 @@ package com.macrophage.barspeed.model
 enum class HoldEndSource(val published: String) {
     /**
      * The app's own clock reached the target and ended the set (#168), and no
-     * armed unit saw the implement let go 1 to [HoldEndPolicy.MAX_TRIM_S]
-     * seconds before it (#311). The lifter heard `Time` a beat earlier and the
+     * armed unit reported a release 1 to [HoldEndPolicy.MAX_TRIM_S] seconds
+     * before it (#311). The lifter heard `Time` a beat earlier and the
      * recorded seconds are the target itself.
      */
     CLOCK("clock"),
@@ -199,11 +199,12 @@ object HoldEndPolicy {
      *
      * - [HoldEndSource.SENSOR]: the release already decided the figure, so there
      *   is no reach left to remove and the fine step is all that is wanted.
-     * - [HoldEndSource.CLOCK]: the case that is easy to miss. Since #311 an
-     *   armed unit that saw the let-go turns such a hold into a sensor end, but
-     *   a lifter who lets go at 20 s of a 30 s hold with no unit armed, or one
-     *   that saw nothing, still has the clock end it at the target and record
-     *   the target, so the overstatement can be ten seconds or more.
+     * - [HoldEndSource.CLOCK]: the case that is easy to miss. Since #311 a
+     *   reported release 1 to MAX_TRIM_S s before the target turns such a hold
+     *   into a sensor end, but a lifter who lets go at 20 s of a 30 s hold with
+     *   no unit armed, or one that saw nothing, still has the clock end it at
+     *   the target and record the target, so the overstatement can be ten
+     *   seconds or more.
      * - [HoldEndSource.LIFTER]: the defect #259 could not fix -- no unit armed,
      *   or one that saw nothing -- so the whole reach is inside the figure.
      * - [HoldEndSource.CORRECTED]: what decided the pre-correction figure is no
