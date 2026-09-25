@@ -189,8 +189,10 @@ class TimedSetEndPolicyTest {
     }
 
     /**
-     * One tap of the post-set correction adds [TimedSetEndPolicy.CORRECTION_STEP_S]
-     * seconds, and one the other way takes them off.
+     * [TimedSetEndPolicy.adjustedSeconds] moves the recorded hold by the delta it is
+     * given, either way. Where one tap of the post-set correction lands on a hold with
+     * a target is `HoldEndPolicy.steppedSeconds`' decision (#312), pinned in
+     * `HoldCorrectionStepTest`.
      *
      * The rest-screen control is where the genuine overage is entered, because
      * the owner does not look at the phone mid-set: *"There are rare instances
@@ -198,7 +200,7 @@ class TimedSetEndPolicyTest {
      * exercised never.
      */
     @Test
-    fun `one tap of the correction moves the recorded hold by the step`() {
+    fun `adjustedSeconds moves the recorded hold by the delta it is given`() {
         assertEquals(25, TimedSetEndPolicy.adjustedSeconds(currentS = 20, deltaS = 5))
         assertEquals(30, TimedSetEndPolicy.adjustedSeconds(currentS = 25, deltaS = 5))
         assertEquals(20, TimedSetEndPolicy.adjustedSeconds(currentS = 25, deltaS = -5))

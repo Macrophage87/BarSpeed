@@ -76,10 +76,7 @@ object TimedSetEndPolicy {
      * not one second. A one-second step would need ten taps to say what one
      * tap says here, on a rest screen with a countdown running.
      *
-     * Since #312 it is the whole step only on a hold with no target, and past
-     * the target. With a target, `HoldEndPolicy.steppedSeconds` lands the
-     * step on the voice's marks and steps one second inside the last
-     * [FINAL_COUNTDOWN_FROM_S].
+     * With a target, where a tap lands is `HoldEndPolicy.steppedSeconds`' decision (#312).
      */
     const val CORRECTION_STEP_S = 5
 

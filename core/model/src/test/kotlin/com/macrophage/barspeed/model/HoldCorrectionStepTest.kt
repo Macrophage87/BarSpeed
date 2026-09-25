@@ -150,6 +150,8 @@ class HoldCorrectionStepTest {
         assertEquals("−12s", offMark.bigDownLabel)
         assertEquals(25, HoldEndPolicy.correction(35, 45, HoldEndSource.CLOCK).bigDownS)
         assertEquals("−7s", HoldEndPolicy.correction(7, null, HoldEndSource.CLOCK).bigDownLabel)
+        // Past the target the larger step can cross back over it.
+        assertEquals(40, HoldEndPolicy.bigStepDownSeconds(50, 45))
     }
 
     @Test

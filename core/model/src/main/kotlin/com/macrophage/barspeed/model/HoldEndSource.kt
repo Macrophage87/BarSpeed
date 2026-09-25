@@ -276,7 +276,9 @@ object HoldEndPolicy {
      *   marks (a sensor end at 33 of 45, 12 s left) snaps to the nearest one in
      *   that direction, 15 left down and 10 left up.
      * - inside the last [TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S] seconds: one
-     *   second, because the voice said every one of them.
+     *   second, because the voice said every one of them. Stepping down from
+     *   exactly [TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S] left goes to the
+     *   next mark: 35 of 45 steps down to 30.
      * - past the target: [TimedSetEndPolicy.CORRECTION_STEP_S] up, as an
      *   overage was always stated, and down by the same but never past the
      *   target, the one mark on that side. At the target itself the up step
@@ -308,7 +310,9 @@ object HoldEndPolicy {
      * on to the next mark where that lands above the last
      * [TimedSetEndPolicy.FINAL_COUNTDOWN_FROM_S] seconds and off the marks --
      * 45 of 45 lands on 35 (10 left), 42 of 45 on 30 (15 left). With no target,
-     * the flat [BIG_CORRECTION_STEP_S]. Floored at zero.
+     * the flat [BIG_CORRECTION_STEP_S]. Floored at zero. Past the target the
+     * larger step can cross back over it: 50 of a 45 s target lands on 40, five
+     * short of the target rather than at it.
      */
     fun bigStepDownSeconds(currentS: Int, targetS: Int?): Int {
         val target = targetS?.takeIf { it > 0 }
