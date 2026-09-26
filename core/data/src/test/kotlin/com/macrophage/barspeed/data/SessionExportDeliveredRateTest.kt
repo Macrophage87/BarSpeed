@@ -254,6 +254,26 @@ class SessionExportDeliveredRateTest {
     }
 
     /**
+     * A stream under a role the set did not arm has no entry, though it
+     * streamed.
+     *
+     * The published description says only roles in `present` appear, and
+     * `present` is the armed roles that streamed. A stream carrying an unarmed
+     * role is not expected from the record path, so this is a synthetic shape.
+     * It pins the filter the description states rather than a case seen in a
+     * capture.
+     */
+    @Test
+    fun `a stream under a role the set did not arm is not published`() = runTest {
+        val sensors =
+            sensorsObject(
+                sensors = RecordedSensors(count = 1, expected = listOf(SensorRole.A), analysed = SensorRole.A),
+            )
+        assertEquals(mapOf("a" to 44.5), sensors.rates(), "an unarmed role's stream was published")
+        assertEquals(mapOf("a" to 90L), sensors.spacings(), "an unarmed role's spacing was published")
+    }
+
+    /**
      * A set whose single stream carries no role publishes neither key. There
      * is no role to key the figure by, and the raw archive's set-level
      * `sampleRate_hz` is that stream's rate.
