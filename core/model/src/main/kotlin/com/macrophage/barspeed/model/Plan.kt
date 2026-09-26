@@ -700,7 +700,7 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.12"
+        const val SCHEMA_VERSION = "1.13"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader parsing this as a float
