@@ -152,8 +152,10 @@ class SessionExportUnclosedHeartRateTest {
      * The derived mean is truncated as the close truncates it. DIFFERENTIAL:
      * fails at this commit, where no block is published at all.
      *
-     * 120 and 121 average to 120.5. A reader that rounded would publish 121
-     * for a session the close, had it run, would have stored as 120.
+     * 120, 121 and 121 average to 120.67. A reader that rounded to the
+     * nearest beat, under any tie rule, would publish 121 for a session the
+     * close, had it run, would have stored as 120. A mean of exactly .5 would not do: half-even
+     * rounding takes 120.5 to 120 and passes.
      */
     @Test
     fun `an unclosed session's derived average is truncated as the close truncates it`() = runTest {
@@ -163,6 +165,7 @@ class SessionExportUnclosedHeartRateTest {
                 listOf(
                     setRow(5L, orderIdx = 0, hrAvgBpm = 120, hrMaxBpm = 150),
                     setRow(6L, orderIdx = 1, hrAvgBpm = 121, hrMaxBpm = 151),
+                    setRow(7L, orderIdx = 2, hrAvgBpm = 121, hrMaxBpm = 152),
                 ),
             )
 

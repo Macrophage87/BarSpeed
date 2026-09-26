@@ -6,15 +6,15 @@ import kotlin.test.assertEquals
 /**
  * A session's heart-rate summary, and which answer a reader publishes (#62).
  *
- * GREEN WHEN WRITTEN, and deliberately so: [SessionHeartRate] is a new symbol
- * whose [SessionHeartRate.aggregate] is `endSession`'s existing arithmetic,
- * moved rather than changed, and whose [SessionHeartRate.of] nothing reads
- * yet. The differential is the exporter's, in `:core:data`, and it cannot
- * compile until this rule exists.
+ * GREEN WHEN WRITTEN, and deliberately so: [SessionHeartRate] was a new
+ * symbol whose [SessionHeartRate.aggregate] is `endSession`'s arithmetic,
+ * moved rather than changed, and whose [SessionHeartRate.of] nothing read at
+ * the commit that added it. The differential is the exporter's, in
+ * `:core:data`, and it could not compile until this rule existed.
  *
- * The aggregate cases are characterization pins on what `endSession` has
- * always written: a reader deriving an unclosed session's figure by any
- * other arithmetic would publish a number no closed session could have.
+ * The aggregate cases are characterization pins on what `endSession` wrote
+ * before #62: a reader deriving an unclosed session's figure by any other
+ * arithmetic would publish a number no closed session could have.
  */
 class SessionHeartRateTest {
     // ---- the aggregate: endSession's arithmetic ------------------------------
@@ -26,9 +26,9 @@ class SessionHeartRateTest {
 
     /**
      * 120 and 121 average to 120.5 and three sets of 120, 121 and 121 to
-     * 120.67; `endSession` writes 120 for both. A rounding rule writes 121
-     * for both, which is the one-beat disagreement between a derived and a
-     * stored figure the rule exists to rule out.
+     * 120.67; truncation gives 120 for both. Half-up rounding writes 121
+     * for both. Half-even rounding writes 120 for 120.5 and so passes the
+     * first case; the second, above .5, fails under every round-to-nearest rule.
      */
     @Test
     fun `the mean is truncated as endSession truncates it, never rounded`() {

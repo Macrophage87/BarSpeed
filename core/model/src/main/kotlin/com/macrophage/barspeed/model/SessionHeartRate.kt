@@ -36,9 +36,9 @@ data class SessionHeartRate(val avgBpm: Int?, val maxBpm: Int?) {
          *
          * The mean is of the per-set averages, unweighted by how long each
          * set lasted, and TRUNCATED toward zero by `toInt()`, not rounded:
-         * that is what `endSession` has always written, and a rounding rule
+         * that is what `endSession` wrote before #62, and a rounding rule
          * here would make a derived figure one beat higher than the close's
-         * wherever the mean's fractional part is .5 or more. Voided sets are
+         * on every mean whose fractional part is above .5. Voided sets are
          * included: nothing here can see the mark, and `endSession` counts
          * them too.
          */
