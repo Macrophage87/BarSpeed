@@ -783,13 +783,18 @@ data class RawStreamEntity(
         const val KIND_CUES = "cues"
 
         /**
-         * The instants a rep was COUNTED during this set, issue #158.
+         * The instants this set's counter advanced, issue #158: the lifter's
+         * taps on a tap-counted set, the cadence guide's cycle ends on a
+         * guided one (#294).
          *
          * A different population from [KIND_CUES] and nothing may blur them:
-         * a cue is what the app said, on a schedule, whether or not anybody
-         * moved, and a mark is what was counted. The stream exists only for
-         * sets that produced marks -- a tap-counted set or a guided one --
-         * and its absence is not a statement that no rep was performed.
+         * a cue is what the app said. On a guided set both run on the guide's
+         * schedule whether or not anybody moved, so neither records a rep the
+         * lifter was seen to perform; the clause that stood here, "a mark is
+         * what was counted", set the two against each other on that point and
+         * is DELETED rather than reworded. The stream exists only for sets
+         * that produced marks -- a tap-counted set or a guided one -- and its
+         * absence is not a statement that no rep was performed.
          */
         const val KIND_REPS = "reps"
 

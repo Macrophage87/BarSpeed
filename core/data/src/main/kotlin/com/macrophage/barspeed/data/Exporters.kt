@@ -277,8 +277,9 @@ class SessionExporter(
             } else {
                 null
             }
-        // The instants a rep was COUNTED, issue #158, from the same fetch the
-        // cue track came out of.
+        // The instants the set's counter advanced, issue #158 -- on a guided
+        // set the cadence guide's cycle ends, not observed reps (#294) -- from
+        // the same fetch the cue track came out of.
         //
         // Detail-gated on the same terms as voiceCues: both are per-set event
         // lists on the raw clock, read against the IMU stream rather than

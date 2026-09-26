@@ -3,11 +3,14 @@ package com.macrophage.barspeed.dsp
 /**
  * A set's rep-mark track, read from the `-reps.csv` beside a capture.
  *
- * A MARK IS NOT ALWAYS A TAP. `SessionExport.repMarks` holds "the instant the
- * lifter tapped the rep button, or the instant the voice guide called a rep"
- * -- the file records WHEN a rep was marked and says nothing about which of
- * the two marked it. On a guided set the guide marks, and every capture
- * committed to this repository is a guided set.
+ * A MARK IS NOT ALWAYS A TAP. `SessionExport.repMarks` holds the instant the
+ * lifter tapped the rep button, or the instant the cadence guide finished a
+ * cycle -- the file records WHEN the counter advanced and says nothing about
+ * which of the two advanced it. On a guided set the guide marks, and every
+ * capture committed to this repository is a guided set. (The quote that stood
+ * here, "the instant the voice guide called a rep", was `repMarks`' KDoc
+ * until #294 deleted it: the guide marks the end of its cycle, not its rep
+ * call.)
  *
  * [RepMarkTrackTest] measures what that means for this corpus: all 103 marks
  * across the thirteen captures land within 1 ms of a row of the same

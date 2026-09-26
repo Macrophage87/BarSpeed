@@ -209,7 +209,8 @@ data class CompletedSet(
     /** Spoken cues during the set, epoch-ms stamped for IMU cross-reference. */
     val voiceCues: List<VoiceCue> = emptyList(),
     /**
-     * The instants a rep was COUNTED during this set, epoch-ms, issue #158.
+     * The instants this set's counter advanced, epoch-ms, issue #158 -- on a
+     * guided set the cadence guide's cycle ends, not observed reps (#294).
      *
      * Empty is the ordinary case and does NOT mean no rep was performed: marks
      * exist only where something counted them out loud -- the lifter's `+1
