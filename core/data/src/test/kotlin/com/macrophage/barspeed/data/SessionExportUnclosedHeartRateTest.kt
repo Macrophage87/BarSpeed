@@ -127,10 +127,11 @@ class SessionExportUnclosedHeartRateTest {
      * The case #62 was filed for. DIFFERENTIAL: fails at this commit, where
      * the block is built from the row's null columns and omitted.
      *
-     * The block carries exactly the two figures [SessionHeartRate] derives.
-     * `hrvRmssd_ms` is published only from a close; a derived block never
-     * carries it. Deriving it from the stored hrm and rest_before_hrm streams
-     * is #62 half (b), measured and not built.
+     * The block carries exactly the two heart rates [SessionHeartRate]
+     * derives from the set rows. These rows store no heart-rate stream, so
+     * no HRV can be computed for them and the block carries none; an HRV
+     * derived from stored streams is `SessionExportUnclosedHrvTest`'s (#62
+     * half (b)).
      */
     @Test
     fun `an unclosed session with per-set heart rate publishes the summary its close would have`() = runTest {
@@ -144,7 +145,7 @@ class SessionExportUnclosedHeartRateTest {
             )
         val hr = heartRate(document)
 
-        assertEquals(setOf("avgBpm", "maxBpm"), hr.keys, "the derived block carries a figure the rule does not derive")
+        assertEquals(setOf("avgBpm", "maxBpm"), hr.keys, "a block derived with no stored stream carries an HRV")
         assertEquals(130, hr.getValue("avgBpm").jsonPrimitive.int)
         assertEquals(165, hr.getValue("maxBpm").jsonPrimitive.int)
     }

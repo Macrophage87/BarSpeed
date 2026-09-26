@@ -258,13 +258,13 @@ class SessionExportSkippedSetTest {
     }
 
     /**
-     * The document declares 1.22, and 1.21 is the version that added the key.
+     * The document declares 1.24, and 1.21 is the version that added the key.
      *
      * It is asserted HERE so a session document carrying a skip cannot
      * advertise a version whose contract does not describe one: a reader of a
      * 1.20 document is entitled to assume no such key exists. The literal read
      * 1.21, the number that minted the key; #260's mint moved what the exporter
-     * writes to 1.22 and #157's to 1.23, and each log carries every entry the
+     * writes to 1.22, #157's to 1.23 and #62's to 1.24, and each log carries every entry the
      * one before it did, so the document still declares a contract that
      * describes the key. This literal
      * moves at every mint, which is the price of asserting the emitted number
@@ -274,7 +274,7 @@ class SessionExportSkippedSetTest {
     @Test
     fun `a document carrying a skip declares the version that describes it`() = runTest {
         assertEquals(
-            "1.23",
+            "1.24",
             document(session(encoded(SkippedSet("back_squat", 4))))
                 .getValue("schemaVersion").jsonPrimitive.content,
             "the exported document does not declare the version the skip key rides under",

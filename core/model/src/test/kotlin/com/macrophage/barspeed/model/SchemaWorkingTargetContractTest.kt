@@ -33,9 +33,12 @@ import kotlin.test.assertTrue
  * minimum, and says a measured rest shorter than it is a discrepancy and draws
  * no conclusion from a long one.
  *
- * THE TIP LITERAL LIVES HERE, on the rule `SchemaSkippedSetContractTest` wrote
- * when it minted 1.21: the literal the exporter writes is asserted in the file
- * that mints it and nowhere else.
+ * THE TIP LITERAL NO LONGER LIVES HERE. It did while 1.23 was the tip, on the
+ * rule `SchemaSkippedSetContractTest` wrote when it minted 1.21: the literal the
+ * exporter writes is asserted in the file that mints it. 1.23 shipped in
+ * v0.1.56 and #62 minted 1.24, so `SchemaSessionHrvContractTest` holds it now.
+ * What this file pins is its own filed version, 1.23, being accepted, which no
+ * later mint can make false.
  */
 class SchemaWorkingTargetContractTest {
     private fun document(name: String): JsonObject = Json.parseToJsonElement(
@@ -57,12 +60,11 @@ class SchemaWorkingTargetContractTest {
     private val minted = listOf("workingReps", "workingLoad_kg", "workingDuration_s", "plannedTempo", "restMeasured_s")
 
     @Test
-    fun `the exporter writes 1_23, which the schema accepts, and 1_22 is still readable`() {
+    fun `1_23 is accepted by the code and the schema, and 1_22 is still readable`() {
         val enum = schema.getValue("properties").jsonObject.getValue("schemaVersion").jsonObject
             .getValue("enum").jsonArray.map { it.jsonPrimitive.content }
-        assertEquals("1.23", SessionExport.SCHEMA_VERSION, "the version the exporter writes")
-        assertTrue("1.23" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
-        assertTrue("1.23" in enum, "the published schema rejects the version the exporter writes")
+        assertTrue("1.23" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version filed under is not accepted")
+        assertTrue("1.23" in enum, "the published schema rejects the version filed under")
         assertTrue("1.22" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.22, shipped in v0.1.55, left the accepted set")
     }
 
@@ -187,7 +189,6 @@ class SchemaWorkingTargetContractTest {
     @Test
     fun `the published example carries every key 1_23 mints`() {
         val example = document("examples/session-export.example.json")
-        assertEquals("1.23", example.getValue("schemaVersion").jsonPrimitive.content)
         val keys = example.getValue("exercises").jsonArray
             .flatMap { it.jsonObject.getValue("sets").jsonArray }
             .flatMap { it.jsonObject.keys }

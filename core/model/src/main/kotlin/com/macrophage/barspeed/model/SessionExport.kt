@@ -2586,8 +2586,59 @@ data class SessionExport(
          * marker in the published log and the block's description;
          * `SessionHeartRateTest` pins the rule; `SessionExportUnclosedHeartRateTest`
          * in `:core:data` is the export differential.
+         *
+         * 1.24 MINTS NO KEY (#62, a derived session HRV): the session's
+         * `heartRate.hrvRmssd_ms` is published for a session with no
+         * `endedAt`, computed when the document is written from the session's
+         * stored heart-rate streams -- each set's `rest_before_hrm` window and
+         * then its `hrm` stream, in set order, a notification stored in two
+         * windows counted once -- by `SessionHrv` in `:core:hrm`, which runs
+         * the R-R de-duplication and the RMSSD the session close uses, read
+         * through [SessionHeartRate].
+         *
+         * A MINT AND NOT A FURTHER 1.23 ENTRY: `git tag --sort=-creatordate |
+         * head -1` is v0.1.56 and `git show
+         * v0.1.56:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.23"`, both read this round. 1.23 has
+         * SHIPPED and takes no further entries.
+         *
+         * WHAT IS RETRACTED. The 1.23 #62 entry above says `hrvRmssd_ms` is
+         * published only from a close and a derived block never carries it.
+         * That holds for a 1.23 document and not for a 1.24 one. The 1.23
+         * text is left as the record of what 1.23 documents carry.
+         *
+         * A DERIVED HRV IS COMPUTED FROM STORED STREAMS, not from the
+         * intervals the close received. A window that was never stored is not
+         * in it; the final rest window is written only by the close, so an
+         * unfinished session has none; and `HrCsv` stores intervals rounded
+         * to 0.1 ms. MEASURED, NOT GUARANTEED: on six closed strap sessions
+         * (field-40 to field-45), the same computation over each set's
+         * `rest_before_hrm` and `hrm` streams, the final rest window left out,
+         * matched the figure each close stored within 0.8 percent. That was
+         * measured read-only with a Python port of the rule; `SessionHrv`
+         * says what the port was checked against.
+         *
+         * WHAT DOES NOT MOVE. A session with an `endedAt` publishes the HRV
+         * its close stored, unchanged, and no stream is read for it. Fewer
+         * than ten usable successive differences publishes no key, never 0.
+         * The block is still withheld when a session has sets and none of
+         * them publishes an `hr` block (#83).
+         *
+         * RETROACTIVE: re-exporting an older unfinished session now publishes
+         * the key. READER IN BOTH DIRECTIONS: the 1.23 schema v0.1.56 shipped
+         * REJECTS a 1.24 document on its version string; this schema accepts
+         * a 1.23 document unchanged. No key is added, removed, renamed or
+         * retyped, and `DATABASE_VERSION` does NOT move. The plan schema is
+         * untouched.
+         *
+         * PINNED. `SchemaSessionHrvContractTest` asserts this entry's marker
+         * in the published log, the block's and the key's descriptions, the
+         * tip literal and the example's version; `SessionHrvTest` in
+         * `:core:hrm` and `SessionHeartRateTest` pin the rule;
+         * `SessionExportUnclosedHrvTest` in `:core:data` is the export
+         * differential.
          */
-        const val SCHEMA_VERSION = "1.23"
+        const val SCHEMA_VERSION = "1.24"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -2597,7 +2648,7 @@ data class SessionExport(
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
-                "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23",
+                "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23", "1.24",
             )
 
         /**
@@ -2744,7 +2795,13 @@ data class SessionExport(
 data class HrSessionSummary(
     val avgBpm: Int? = null,
     val maxBpm: Int? = null,
-    /** Session-wide HRV (RMSSD, ms) from R-R intervals. */
+    /**
+     * Session-wide HRV (RMSSD, ms) from R-R intervals: the figure the close
+     * stored, or, on a session with no `endedAt`, computed from the stored
+     * heart-rate streams when the document is written (1.24, #62). A derived
+     * figure is computed from stored streams, not from the intervals the
+     * close received; see [SessionHeartRate].
+     */
     @SerialName("hrvRmssd_ms") val hrvRmssdMs: Double? = null,
 )
 

@@ -33,19 +33,16 @@ class SchemaSessionHeartRateContractTest {
     /**
      * The block's own description says where each figure comes from, so a
      * reader of one key need not find the log: stored by the close, derived
-     * where there is no `endedAt`, and the HRV only from a close.
+     * where there is no `endedAt`. What it says about the HRV moved with 1.24
+     * and is pinned in `SchemaSessionHrvContractTest`.
      */
     @Test
-    fun `the heartRate block says a session with no endedAt carries a derived summary and no HRV`() {
+    fun `the heartRate block says a session with no endedAt carries a derived summary`() {
         val description = properties()["heartRate"]!!.jsonObject["description"]?.jsonPrimitive?.content.orEmpty()
 
         assertTrue("no `endedAt`" in description, "the block does not say what an unfinished session carries")
         assertTrue("derived by the same rule" in description, "the block does not say the figure is derived")
         assertTrue("truncated to a whole beat" in description, "the block does not state the mean's rounding")
-        assertTrue(
-            "`hrvRmssd_ms` is published only from a close" in description,
-            "the block does not say a derived summary carries no HRV",
-        )
     }
 
     /**
