@@ -246,7 +246,9 @@
             "withinTolerance": 7,
             "of": 10,
             "scoredPhases": ["eccentric", "concentric"],
-            "prescribedEccConRatio": 3.0
+            "prescribedEccConRatio": 3.0,
+            "actualEccConRatio": 2.64,
+            "actualEccConRatioReps": 7
           },
           "velocityLossBasis": "terminalRepIsFastest",
           "velocityLossRegime": "controlled",

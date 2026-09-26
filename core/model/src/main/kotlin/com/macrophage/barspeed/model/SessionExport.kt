@@ -2472,6 +2472,27 @@ data class SessionExport(
          *
          * PINNED. `SchemaCountAgreementContractTest`; the value is guarded in
          * `:core:data` by `SessionExportRepMarksTest`'s count-equal guided set.
+         *
+         * 1.23 FURTHER ENTRY (#88, the ecc:con ratio says how many reps it
+         * covers): `tempoCompliance` may carry
+         * [TempoComplianceExport.actualEccConRatioReps], the number of reps
+         * `actualEccConRatio` was taken over -- the reps that resolved an
+         * eccentric, each paired with its own concentric -- published only
+         * beside a ratio. WHAT WAS UNSAYABLE: `of` counts reps that resolved any
+         * scored phase, a different population, so a ratio over a few reps of a
+         * set read exactly like one over every rep. Counted in the pass that
+         * takes the ratio and frozen with it in the stored analysis. NOT
+         * RETROACTIVE: a set analysed before this key carries none and keeps its
+         * ratio; absent means not recorded, never 0. A count re-derived at
+         * export was rejected: it would describe today's pairing rule, and a set
+         * analysed before #46 carries a ratio taken by another. A reader that
+         * ignores unknown keys reads the block as before; a validator on an
+         * older schema rejects the key, `tempoCompliance` being
+         * `additionalProperties: false`. `DATABASE_VERSION` does NOT move: the
+         * count rides in the stored analysis.
+         *
+         * PINNED. `SchemaEccConCoverageContractTest`, `EccConRatioCoverageTest`
+         * in `:core:dsp` and `SessionExportEccConCoverageTest` in `:core:data`.
          */
         const val SCHEMA_VERSION = "1.23"
 
@@ -4114,6 +4135,17 @@ data class TempoComplianceExport(
     /** Prescribed eccentric:concentric contrast — what a tempo block actually trains. */
     val prescribedEccConRatio: Double? = null,
     val actualEccConRatio: Double? = null,
+    /**
+     * How many reps [actualEccConRatio] was taken over (1.23, #88): the reps
+     * that resolved an eccentric, each paired with its own concentric. NOT
+     * [of], which counts reps that resolved any scored phase.
+     *
+     * Copied out of the stored analysis, where it was frozen with the ratio,
+     * and never re-counted here. Absent beside no ratio, and on every set
+     * analysed before the count existed, where the ratio is still published
+     * and how many reps it covers is unknown -- absent, never 0.
+     */
+    val actualEccConRatioReps: Int? = null,
 )
 
 @Serializable

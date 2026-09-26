@@ -411,6 +411,9 @@ class SessionExporter(
                     scoredPhases = it.phases.filter { p -> p.scored }.map { p -> p.phase },
                     prescribedEccConRatio = it.prescribedEccConRatio,
                     actualEccConRatio = it.actualEccConRatio,
+                    // Frozen with the ratio when the set was analysed (#88);
+                    // null on a set analysed before, and never re-counted here.
+                    actualEccConRatioReps = it.actualEccConRatioReps,
                 )
             },
             velocityLossPct = velocityLoss.pctOrNull,

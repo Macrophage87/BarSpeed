@@ -171,12 +171,27 @@ data class TempoComplianceResult(
      *
      * Taken over the reps that resolved BOTH phases. A rep counted on the
      * drive alone contributes to neither mean, so this need not cover every
-     * rep of the set, and nothing published beside it says how many reps it
-     * did cover -- that gap is issue #88. Null when no rep resolved an
+     * rep of the set; [actualEccConRatioReps] says how many it did cover. The
+     * clause that stood here said nothing published beside it says so, and is
+     * DELETED rather than reworded (#88). Null when no rep resolved an
      * eccentric at all, which is a different fact from a low ratio and must
      * stay distinguishable from one.
      */
     val actualEccConRatio: Double? = null,
+    /**
+     * How many reps [actualEccConRatio] was taken over: the reps that resolved
+     * an eccentric, each paired with its own concentric (#88).
+     *
+     * Counted in the same pass and from the same population as the ratio, and
+     * frozen with it into the stored analysis, so it describes the rule the
+     * stored ratio was actually taken by -- a count re-derived later from the
+     * stored reps would describe whatever rule is current. NOT [repsEvaluated],
+     * which counts reps that resolved ANY scored phase.
+     *
+     * Null exactly where the ratio is null, and on every result stored before
+     * this field existed: absent, never 0.
+     */
+    val actualEccConRatioReps: Int? = null,
 ) {
     /**
      * Seconds the ECCENTRIC of this set was graded against.
@@ -782,6 +797,7 @@ object SetAnalyzer {
         // A rep that resolved none is an absence, not a failure; counting it
         // as one is what graded a set of on-tempo drives as 0 of N.
         val gradeable = reps.filter { rep -> scoredDefs.any { def -> def.actual(rep) != null } }
+        val eccConRatio = pairedEccConRatio(reps)
         val fullyCompliant =
             gradeable.count { rep ->
                 scoredDefs.all { def ->
@@ -796,9 +812,19 @@ object SetAnalyzer {
             repsFullyCompliant = fullyCompliant,
             repsEvaluated = gradeable.size,
             prescribedEccConRatio = ratioOf(schedule.eccentricS, schedule.concentricS),
-            actualEccConRatio = pairedEccConRatio(reps),
+            actualEccConRatio = eccConRatio,
+            // The reps the ratio above was taken over, from the same
+            // population, and only where there is a ratio to qualify (#88).
+            actualEccConRatioReps = eccConRatio?.let { pairedReps(reps).size },
         )
     }
+
+    /**
+     * The reps the ecc:con ratio pairs: those that resolved an eccentric.
+     * One statement of the population, read by the ratio and by its count, so
+     * the two cannot describe different reps (#88).
+     */
+    private fun pairedReps(reps: List<RepAnalysis>): List<RepAnalysis> = reps.filter { it.eccS != null }
 
     /**
      * The set's measured ecc:con contrast, over the reps that resolved both
@@ -812,7 +838,7 @@ object SetAnalyzer {
      * from a 36% overstatement to a 33% understatement. Issue #46.
      */
     private fun pairedEccConRatio(reps: List<RepAnalysis>): Double? {
-        val paired = reps.filter { it.eccS != null }
+        val paired = pairedReps(reps)
         if (paired.isEmpty()) return null
         return ratioOf(paired.mapNotNull { it.eccS }.average(), paired.map { it.conS }.average())
     }
