@@ -37,12 +37,15 @@ class PlanWrittenStackContractTest {
     private fun property(key: String): String = plan()["\$defs"]!!.jsonObject["exercise"]!!
         .jsonObject["properties"]!!.jsonObject[key]!!.jsonObject["description"]!!.jsonPrimitive.content
 
-    private fun document(version: String): String =
-        """
-        {"schemaVersion":"$version","planName":"P","sessions":[{"name":"S","exercises":[
-          {"exercise":"rope_pushdown","concentric":"down","sensorOnStack":true,"sets":[{"reps":12,"tempo":"1120"}]}
-        ]}]}
-        """.trimIndent()
+    private fun document(version: String): String {
+        val text =
+            """
+            {"schemaVersion":"$version","planName":"P","sessions":[{"name":"S","exercises":[
+              {"exercise":"rope_pushdown","concentric":"down","sensorOnStack":true,"sets":[{"reps":12,"tempo":"1120"}]}
+            ]}]}
+            """.trimIndent()
+        return text
+    }
 
     /**
      * The version the app writes, pinned beside the mint that moved it.
