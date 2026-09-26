@@ -9,8 +9,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import com.macrophage.barspeed.ui.BarColors
 
@@ -62,10 +64,29 @@ private const val SHAFT_HEIGHT_FRACTION = 0.34f
  *
  * A [side] that is neither "left" nor "right" draws nothing, so a value that
  * never passed `PlanFile.VALID_SIDES` degrades to the text on its own.
+ *
+ * SIZED AGAINST THE TEXT BESIDE IT, NOT IN BARE dp (#129). [length] and
+ * [thickness] are the glyph's size at font scale 1.0. Each caller passes
+ * [textSize], the font size of the run the arrow sits beside, and the glyph
+ * is scaled by the factor the density's sp-to-dp conversion enlarges a run of
+ * that size by: `textSize.toDp()` over `textSize.value.dp`. At font scale 1.0
+ * that factor is 1, so the default glyph is 30 x 17 dp exactly as before.
+ * At a raised font scale the glyph grows by the factor its own text grows by,
+ * so the word does not outgrow the arrow. It used to: the glyph was fixed dp
+ * while the text was sp. The conversion is read for the neighbour's size and
+ * not for a fixed one because Android may scale sp non-linearly, larger
+ * sizes by less, so one factor would not fit two text sizes.
+ *
+ * What this cannot check: nothing has drawn the screen at a raised font
+ * scale, and no test reaches a composable. How the glyph looks beside its
+ * text at 1.5 or 2.0 is unobserved, and this change is compile- and
+ * lint-gated only. A [textSize] that is not in sp (an unspecified or em size)
+ * leaves the glyph at its font-scale-1.0 size.
  */
 @Composable
 fun SideArrow(
     side: String?,
+    textSize: TextUnit,
     modifier: Modifier = Modifier,
     color: Color = BarColors.Volt,
     length: Dp = 30.dp,
@@ -77,7 +98,9 @@ fun SideArrow(
             "right" -> false
             else -> return
         }
-    Canvas(modifier.size(width = length, height = thickness).clearAndSetSemantics {}) {
+    val density = LocalDensity.current
+    val scale = if (textSize.isSp) with(density) { textSize.toDp() / textSize.value.dp } else 1f
+    Canvas(modifier.size(width = length * scale, height = thickness * scale).clearAndSetSemantics {}) {
         val headLength = size.width * HEAD_LENGTH_FRACTION
         val shaftHeight = size.height * SHAFT_HEIGHT_FRACTION
         val midY = size.height / 2f

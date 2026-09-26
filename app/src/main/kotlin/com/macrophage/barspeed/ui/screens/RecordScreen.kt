@@ -2830,7 +2830,7 @@ private fun InSetHeader(state: RecordState, slot: PlannedSlot?) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
             // The same value the word in `parts` carries, drawn as a shape
             // rather than a word. See [SideArrow].
-            SideArrow(side, Modifier.padding(end = 8.dp))
+            SideArrow(side, MaterialTheme.typography.bodyMedium.fontSize, Modifier.padding(end = 8.dp))
             Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = BarColors.Sub)
         }
         state.hrBpm?.let {
@@ -3909,7 +3909,12 @@ internal fun RestHeader(state: RecordState, viewModel: RecordViewModel) {
                     // and "Up next" -- and they must not read as one signal.
                     // Colour separates last from next; direction alone
                     // separates left from right.
-                    SideArrow(feedback.side, Modifier.padding(end = 6.dp), color = BarColors.Text)
+                    SideArrow(
+                        feedback.side,
+                        MaterialTheme.typography.titleMedium.fontSize,
+                        Modifier.padding(end = 6.dp),
+                        color = BarColors.Text,
+                    )
                     Text(
                         // "8 × 2 × 40 lb" would put two different meanings on
                         // one glyph, so the rep joiner becomes "reps @" when
@@ -4213,7 +4218,7 @@ private fun SlotCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(vertical = 4.dp),
             ) {
-                SideArrow(side, Modifier.padding(end = 8.dp))
+                SideArrow(side, MaterialTheme.typography.titleMedium.fontSize, Modifier.padding(end = 8.dp))
                 Text(
                     struckLine("${slot.exercise.displayName} — ", values),
                     style = MaterialTheme.typography.titleMedium,
