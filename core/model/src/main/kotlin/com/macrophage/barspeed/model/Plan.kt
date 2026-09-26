@@ -555,9 +555,12 @@ data class PlanFile(
      * [stackSeeded]'s shape and it sits beside it: the plan said nothing and
      * the app decides, and the decision flips every measured direction on the
      * set. The answer is [SetGeometryPolicy.stackInversion]'s, asked with the
-     * same three resolved values [SetGeometryPolicy.resolve] hands it, so the
-     * line and the recorded set cannot disagree. The export publishes no source
-     * for `sensorInverted` (#289), so this line is the only place the inference
+     * same three resolved values [SetGeometryPolicy.resolve] hands it. It is
+     * the PLAN-TIME answer, and since #323 the line says so rather than
+     * promising an inversion: [SetGeometryPolicy.analysedUnder] completes it
+     * at the end of each set, keeping it only where the analysed unit's own
+     * roll says it rode the stack. The export publishes no source for
+     * `sensorInverted` (#289), so this line is the only place the inference
      * shows before the set is recorded.
      *
      * Read against a definition the app does not have here:
@@ -583,8 +586,9 @@ data class PlanFile(
         if (!applied) return null
         return "sessions[$si].exercises[$ei]: ${exercise.exercise} rides the weight stack with its drive " +
             "going DOWN, and this plan does not declare \"sensorInverted\" - the stack rises as the " +
-            "handle is driven down, so the set is recorded inverted. Declare \"sensorOnStack\": false " +
-            "if the sensor was on the handle instead."
+            "handle is driven down, so the set is recorded inverted wherever the analysed unit's own roll " +
+            "says it rode the stack, and uninverted where it moved with the handle. Declare " +
+            "\"sensorOnStack\": false if the sensor was on the handle instead."
     }
 
     /**
@@ -863,7 +867,10 @@ data class PlanExerciseDef(
      * onto the stack with its drive going down in the vertical plane resolves
      * an omitted key true, because a weight stack rises while the handle is
      * driven down ([SetGeometryPolicy.stackInversion]), and the import gate
-     * names that line. Anywhere else an omitted key resolves to false, and a
+     * names that line. Since #323 that answer is completed at the end of each
+     * set, and stands only where the analysed unit's own roll says it rode the
+     * stack ([SetGeometryPolicy.analysedUnder]). Anywhere else an omitted key
+     * resolves to false, and a
      * plan CAN say false as a decision rather than by silence — which wins
      * over the rule too.
      */

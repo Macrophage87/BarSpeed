@@ -163,7 +163,10 @@ data class AnalysedRoleChoice(
  *
  * IT DOES NOT SWAP THE GEOMETRY. The declaration is unchanged; what changes is
  * which stream it is applied to. That is the repair #278 asks for: a stack
- * declaration read against the unit that measurably sat on the stack.
+ * declaration read against the unit that measurably sat on the stack. The one
+ * geometry term the end of a set does revisit is an inversion the stack rule
+ * alone applied, and it is revisited after this choice, not by it --
+ * `SetGeometryPolicy.analysedUnder`, from the chosen unit's own roll (#323).
  *
  * IT DECIDES NOTHING RETROACTIVELY, for [SensorCapturePolicy.analysedStream]'s
  * reason: this runs when a set is recorded and the analysis it selects the

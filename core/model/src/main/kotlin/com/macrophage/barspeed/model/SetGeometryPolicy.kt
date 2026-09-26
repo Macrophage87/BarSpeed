@@ -288,6 +288,13 @@ object SetGeometryPolicy {
      * There is no provenance for the answer anywhere in the export -- the key
      * has no `geometry.source` entry (#289) -- so the import gate's line is the
      * only place a rule-3 answer is visible before the set is recorded.
+     *
+     * RULE 3 IS THE PLAN-TIME ANSWER, and since #323 not the last word. The
+     * stack mount it reads names a machine, not where the unit was clipped, so
+     * a unit on the handle or the rope under a plan leaving `sensorOnStack` to
+     * the stack table was read inverted by it. [analysedUnder] completes the
+     * answer at the end of each set from the ANALYSED unit's own roll; the
+     * live tracker, built before any sample, still reads this one.
      */
     fun stackInversion(
         declared: Boolean?,
@@ -327,18 +334,47 @@ object SetGeometryPolicy {
      * before it began; [stackRuleApplied] is [SetGeometryPolicy.stackRuleApplied]
      * for it; [analysedSignal] is `ArmedCapture.analysedSignal`.
      *
-     * THE SEAM ONLY, in the commit that adds it: the resolved definition
-     * stands whatever the stream said, which is what the app did before this
-     * function existed. The suppression goes with the commit that reads the
-     * two parameters.
+     * 1. WHERE THE RULE DID NOT SET THE INVERSION, NOTHING MOVES and the
+     *    stream is not consulted: a declaration either way is somebody's word
+     *    about the machine, and a set the rule never reached has nothing to
+     *    take back.
+     * 2. WHERE THE RULE ALONE SET IT, it stands only on
+     *    [StackMountSignal.ON_STACK] -- the analysed unit's own roll says it
+     *    rode the stack, which is the unit the rule describes. On
+     *    [StackMountSignal.NOT_ON_STACK] the unit moved with the drive -- a
+     *    handle, a rope -- and the inversion is taken back from the definition
+     *    and from its description together. On [StackMountSignal.UNMEASURED]
+     *    nothing measured the unit: absence is not evidence it rode the stack,
+     *    and the rule needs that evidence, so it is taken back too.
+     *
+     * The stack mount the rule reads says which MACHINE, from a declaration or
+     * from [ExerciseDef.STACK_MOUNTED_IDS], never where the unit was clipped;
+     * the analysed stream is the only thing in the app that can say that.
+     *
+     * MEASURED, NOT DESIGNED. Over the committed drive-down stack streams --
+     * field-41 set 16 and set 18 and field-38 set 14, both units each, and the
+     * four `field-legcurl-1030` captures -- every stream the signature reads
+     * [StackMountSignal.ON_STACK] is a unit that sat still, and the three it
+     * reads [StackMountSignal.NOT_ON_STACK] are the handle-side units. The
+     * signature's bounds are fitted, so the failure direction is stated: a
+     * stack unit wrongly read as moved loses the inversion and is read with
+     * drive and return swapped -- field-41 set 16's stack stream reads 1 of 14
+     * that way.
+     *
+     * NOT THE LIVE READOUT. The live tracker is built before any sample exists
+     * and reads [resolve]'s answer, rule included; on a set the sensor counts,
+     * the recorded rep count is that tracker's.
      */
-    @Suppress("UnusedParameter")
     fun analysedUnder(
         used: ExerciseDef,
         geometry: ResolvedGeometry,
         stackRuleApplied: Boolean,
         analysedSignal: StackMountSignal,
-    ): AnalysedGeometry = AnalysedGeometry(used, geometry)
+    ): AnalysedGeometry {
+        val takenBack = stackRuleApplied && analysedSignal != StackMountSignal.ON_STACK
+        if (!takenBack) return AnalysedGeometry(used, geometry)
+        return AnalysedGeometry(used.copy(sensorInverted = false), geometry.copy(sensorInverted = false))
+    }
 
     /**
      * Describe the definition a set was recorded against.
