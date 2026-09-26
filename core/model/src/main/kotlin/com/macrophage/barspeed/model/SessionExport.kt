@@ -2457,6 +2457,21 @@ data class SessionExport(
          *
          * PINNED. `SchemaRepMarksGridContractTest`; the content is guarded in
          * `:core:data` by `SessionExportRepMarksTest`'s failed guided set.
+         *
+         * 1.23 FURTHER ENTRY (#246, repMetricsComplete described as a count
+         * comparison): NO KEY OR VALUE CHANGES; the description of
+         * [SetExport.repMetricsComplete] changes. It is computed as the
+         * segmenter's rep count equal to `reps`, and true says that and nothing
+         * more: a segmenter that misses reps and finds as many movements that
+         * are not reps publishes true, which #246 found on two field sets. A
+         * stronger test would match each detection to a counted rep in time, and
+         * nothing a set stores supports one -- the stored per-rep rows carry
+         * durations and no clock, and the live count is stored as one integer --
+         * so the value is kept, its description narrowed, and the name stays.
+         * `DATABASE_VERSION` does NOT move.
+         *
+         * PINNED. `SchemaCountAgreementContractTest`; the value is guarded in
+         * `:core:data` by `SessionExportRepMarksTest`'s count-equal guided set.
          */
         const val SCHEMA_VERSION = "1.23"
 
@@ -3437,6 +3452,15 @@ data class SetExport(
     /**
      * False when the sensor segmenter resolved a different number of reps than
      * the set records — the lifter or the voice guide counted something else.
+     *
+     * TRUE IS THE TWO COUNTS MATCHING AND NOTHING MORE (1.23, #246). The rule
+     * is count equality, so a segmenter that misses reps and finds as many
+     * movements that are not reps publishes true; true is not evidence that
+     * the per-rep array, or anything drawn from it, is the lifter's reps. No
+     * stronger test can be computed from what a set stores -- the stored
+     * per-rep rows carry durations and no clock, and [liveReps] is one integer
+     * -- so no detection can be matched in time to a counted rep. The name is
+     * historical.
      *
      * Stated without reference to [repMetrics], deliberately. Everything drawn
      * from the segmented reps carries this caveat — [velocityLossPct],

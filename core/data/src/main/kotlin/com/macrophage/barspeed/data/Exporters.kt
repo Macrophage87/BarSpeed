@@ -493,6 +493,10 @@ class SessionExporter(
             // sensor segmenter is a separate opinion. Say so when they disagree
             // rather than letting a short per-rep array look like the whole set.
             //
+            // COUNT EQUALITY AND NOTHING MORE (#246): errors that cancel publish
+            // true. Nothing stronger is computable here -- the stored reps carry
+            // no clock -- and the published description says so.
+            //
             // Gated on the reps, never on the export mode. The three figures
             // this qualifies -- velocityLoss_pct, tempoCompliance and summary --
             // are published in both artifacts and all three are computed from
