@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat
 import com.macrophage.barspeed.hrm.HeartRateMeasurementParser
 import com.macrophage.barspeed.hrm.HeartRateProfile
 import com.macrophage.barspeed.model.BlePermissionPolicy
+import com.macrophage.barspeed.model.ConnectionPriorityPolicy
 import com.macrophage.barspeed.model.ConnectionState
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
@@ -50,6 +51,12 @@ abstract class GattClient(protected val context: Context) {
 
     protected abstract val serviceUuid: UUID
     protected abstract val notifyCharacteristicUuid: UUID
+
+    /**
+     * Which kind of link this is, for [ConnectionPriorityPolicy] to answer
+     * what priority it asks for once its services are discovered (#322).
+     */
+    protected abstract val priorityLink: ConnectionPriorityPolicy.Link
 
     protected abstract fun onNotification(uuid: UUID, value: ByteArray)
 
@@ -212,6 +219,23 @@ abstract class GattClient(protected val context: Context) {
                     return
                 }
                 try {
+                    // The connection priority request (#322). Issued here, after
+                    // discovery found the expected characteristic and before
+                    // the notification is enabled. It runs once per
+                    // onServicesDiscovered callback. This file calls
+                    // discoverServices once per onMtuChanged and requestMtu
+                    // once per STATE_CONNECTED, so it is once per connection
+                    // wherever the stack answers each call once. What the
+                    // request obtains is not observable from this code. The
+                    // stack or the unit may refuse or change it, nothing here
+                    // reads the result back, and the boolean the call returns
+                    // is not read either. Which links ask is
+                    // ConnectionPriorityPolicy's rule, which a test pins. The
+                    // call itself is compile- and lint-gated only.
+                    val priority = ConnectionPriorityPolicy.priorityFor(priorityLink)
+                    if (priority == ConnectionPriorityPolicy.Priority.HIGH) {
+                        g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                    }
                     g.setCharacteristicNotification(characteristic, true)
                     val descriptor = characteristic.getDescriptor(CCC_DESCRIPTOR)
                     if (descriptor != null) {
@@ -223,11 +247,12 @@ abstract class GattClient(protected val context: Context) {
                         }
                     }
                 } catch (e: SecurityException) {
-                    // Same race as connect(), one callback later. These three
-                    // calls are the last step before Connected; none of them
-                    // has run, so no notification is subscribed and there is
-                    // nothing live to protect by staying here instead of
-                    // reporting Failed.
+                    // Same race as connect(), one callback later. The calls in
+                    // this block are the last step before Connected. If one of
+                    // them throws, the notification is not enabled. So nothing
+                    // live is lost by reporting Failed here instead of staying
+                    // on Connecting. The priority request is one of those
+                    // calls and needs the same permission.
                     stateFlow.value = ConnectionState.Failed(PERMISSION_DENIED_REASON)
                     return
                 }
@@ -279,6 +304,7 @@ class WitmotionClient(context: Context, private val clock: () -> Long = System::
     GattClient(context) {
     override val serviceUuid: UUID = UUID.fromString(WitmotionProtocol.SERVICE_UUID)
     override val notifyCharacteristicUuid: UUID = UUID.fromString(WitmotionProtocol.NOTIFY_CHARACTERISTIC_UUID)
+    override val priorityLink: ConnectionPriorityPolicy.Link = ConnectionPriorityPolicy.Link.IMU
 
     private val decoder = WitmotionStreamDecoder()
 
@@ -362,6 +388,7 @@ class HrmClient(context: Context, private val clock: () -> Long = System::curren
     override val serviceUuid: UUID = UUID.fromString(HeartRateProfile.SERVICE_UUID)
     override val notifyCharacteristicUuid: UUID =
         UUID.fromString(HeartRateProfile.MEASUREMENT_CHARACTERISTIC_UUID)
+    override val priorityLink: ConnectionPriorityPolicy.Link = ConnectionPriorityPolicy.Link.HRM
 
     private val samplesFlow = MutableSharedFlow<HrSample>(extraBufferCapacity = 64)
     val samples: SharedFlow<HrSample> = samplesFlow
