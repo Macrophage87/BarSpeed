@@ -392,7 +392,7 @@ private fun historyRowOf(record: SetRecordEntity) = HistoryTarget.Row(
     durationEndedBy = record.durationEndedBy,
 )
 
-private fun HistoryTarget.Tone.chipTone(): ChipTone = when (this) {
+internal fun HistoryTarget.Tone.chipTone(): ChipTone = when (this) {
     HistoryTarget.Tone.OK -> ChipTone.OK
     HistoryTarget.Tone.WARN -> ChipTone.WARN
     HistoryTarget.Tone.BAD -> ChipTone.BAD

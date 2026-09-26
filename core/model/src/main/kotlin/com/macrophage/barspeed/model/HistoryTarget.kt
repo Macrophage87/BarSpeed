@@ -209,8 +209,15 @@ data class HistoryTarget(
          * The chip for [actualS] held against [targetS]: met at or past the
          * target, [TimedSetEndPolicy.CLOSE_ENOUGH_FRACTION] of it or more is
          * close, anything less is well short. No target is not graded.
+         *
+         * Public since #320: `RecordScreen`'s post-set "Held" chip calls this
+         * as well, with the hold's effective seconds and the set's target,
+         * where it used to keep its own copy of the 0.9 rule. The two screens
+         * now get the chip from this one function. `HeldChipTest` pins it
+         * directly. Which arguments the record screen passes is compile- and
+         * lint-gated only.
          */
-        private fun heldChip(actualS: Int, targetS: Int?) = HeldChip(
+        fun heldChip(actualS: Int, targetS: Int?): HeldChip = HeldChip(
             text = if (targetS != null) "Held $actualS/${targetS}s" else "Held ${actualS}s",
             tone = when {
                 targetS == null || actualS >= targetS -> Tone.OK
