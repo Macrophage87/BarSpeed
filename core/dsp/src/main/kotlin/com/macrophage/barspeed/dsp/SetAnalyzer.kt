@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.PhaseCoverage
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.VoiceCue
@@ -1047,9 +1048,17 @@ object CoachingRules {
             // scored phase), so it must not claim the drive was graded either.
             "Eccentric not measured this set."
         } else if (abs(worst.second - targetEccS) <= toleranceS) {
-            // Covers only the reps that resolved an eccentric, which is issue
-            // #89 and is not addressed here.
-            "All reps on tempo."
+            // The worst MEASURED eccentric is in tolerance, which says nothing
+            // about a rep whose eccentric nothing measured. So the sentence is
+            // scoped to the measured reps whenever any went unmeasured, and
+            // the gap is PhaseCoverage's count -- the rule the tempo chip's
+            // note reads too (#89).
+            val coverage = PhaseCoverage(measured = measured.size, of = reps.size)
+            when {
+                coverage.complete -> "All reps on tempo."
+                measured.size == 1 -> "1 measured rep on tempo · ${coverage.notMeasuredClause}."
+                else -> "All ${measured.size} measured reps on tempo · ${coverage.notMeasuredClause}."
+            }
         } else {
             val delta = targetEccS - worst.second
             String.format(
