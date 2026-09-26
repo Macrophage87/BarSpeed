@@ -19,7 +19,7 @@ import kotlin.test.assertNull
  * eccentric nothing measured resolved no scored phase at all. Tolerance
  * 0.5 s. Reps are built by hand so the population is exact.
  *
- * GREEN WHEN WRITTEN: the guards below hold before and after #329.
+ * RED WHEN WRITTEN, except the two guards named in their KDoc.
  */
 class TempoScoreSetCoverageWiringTest {
     private val explosiveUp = Tempo.parse("30X0")
@@ -62,5 +62,41 @@ class TempoScoreSetCoverageWiringTest {
         assertEquals("Tempo 8/8 ✓", score.text)
         assertEquals(TempoScoreTone.ON_TEMPO, score.tone)
         assertNull(score.ungradedNote)
+    }
+
+    /**
+     * Eight reps, every other one with a measured eccentric, all four in
+     * tolerance. The chip reached through the screens' own function withholds
+     * the tick and says how many reps went unmeasured; a hand-off that passed
+     * the graded count as the set's would leave the label's tests green and
+     * this one red.
+     */
+    @Test
+    fun `reps that resolved no scored phase are counted through the screens' function`() {
+        val a = stored((0..7).map { rep(it, if (it % 2 == 0) 3.0 else null) })
+        val c = assertNotNull(a.tempoCompliance)
+        assertEquals(4, c.repsEvaluated, "the fixture's graded count moved")
+        assertEquals(4, c.repsFullyCompliant, "the fixture's compliance moved")
+        val score = assertNotNull(a.tempoScore())
+        assertEquals("Tempo 4/4", score.text)
+        assertEquals(TempoScoreTone.PARTIAL, score.tone)
+        assertEquals("Eccentric: 4 of 8 reps measured · 4 not measured.", score.ungradedNote)
+    }
+
+    /**
+     * One rule, one count: the chip's note and the eccentric caption the rest
+     * screen draws on the same card state the same gap for the same set.
+     */
+    @Test
+    fun `the chip's note and the eccentric caption count the same gap`() {
+        val reps = (0..7).map { rep(it, if (it % 2 == 0) 3.0 else null) }
+        assertEquals(
+            "All 4 measured reps on tempo · 4 not measured.",
+            CoachingRules.eccentricTempoInsight(reps, 3.0, 0.5),
+        )
+        assertEquals(
+            "Eccentric: 4 of 8 reps measured · 4 not measured.",
+            assertNotNull(stored(reps).tempoScore()).ungradedNote,
+        )
     }
 }
