@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
  * compared, so on a set of eight with four measured eccentrics "2/4 reps on
  * tempo" reads as a statement about a four-rep set. The gap is counted by
  * [com.macrophage.barspeed.model.PhaseCoverage] over every rep of the
- * analysis -- the rule the eccentric caption two lines above it reads (#89).
+ * analysis -- the rule the eccentric caption on the same card reads (#89).
  *
  * The line is written only when some measured rep is OUT of tolerance, so
  * every case here has one; a partly measured set with every measured rep in
