@@ -15,6 +15,7 @@ import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.SecondaryCapture
 import com.macrophage.barspeed.model.SensorCapturePolicy
+import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.SessionRpe
 import com.macrophage.barspeed.model.SkippedSet
 import com.macrophage.barspeed.model.StartPhase
@@ -618,12 +619,14 @@ class SessionRepository(
         val session = sessionDao.sessionById(sessionId) ?: return
         if (session.endedAtMs != null) return
         val sets = sessionDao.setsForSession(sessionId)
-        val avg = sets.mapNotNull { it.hrAvgBpm }
+        // The one rule a reader of an unclosed session derives the same
+        // figure by (#62); see SessionHeartRate.
+        val hr = SessionHeartRate.aggregate(sets.map { it.hrAvgBpm }, sets.map { it.hrMaxBpm })
         sessionDao.updateSession(
             session.copy(
                 endedAtMs = endedAtMs,
-                hrAvgBpm = if (avg.isEmpty()) null else avg.average().toInt(),
-                hrMaxBpm = sets.mapNotNull { it.hrMaxBpm }.maxOrNull(),
+                hrAvgBpm = hr.avgBpm,
+                hrMaxBpm = hr.maxBpm,
                 hrvRmssdMs = hrvRmssdMs,
                 sessionRpe = SessionRpe.accepted(sessionRpe),
                 skippedSetsJson = encodeSkippedSets(skippedSets),
