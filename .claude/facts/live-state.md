@@ -488,7 +488,7 @@ Two constraints belong with it:
   published schemas and `PlanFile`/`SessionExport`, not a subset one. e199119 did exactly that.
 
 **Where the module has no tests, red-before-green is not available at all.** For a change confined
-to `:core:ble` — or to any part of `:app` outside `PlanQueue` and `appendedState` — either lift
+to `:core:ble` — or to any part of `:app` that no file under `app/src/test` reaches — either lift
 the decision into a pure function in `:core:model`/`:core:dsp` so c0–c2 can exist, or say
 plainly in the report and the commit body: *"no red was shown; this change is compile- and
 lint-gated only, not test-gated."* Never let the partition's presence in a definition imply it
