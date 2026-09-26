@@ -73,7 +73,7 @@ object SessionRpe {
      * bounds reject, into a document whose reader has been told the range.
      * Throwing kills the session close, which is also the only writer of
      * `hrvRmssdMs` -- a figure computed from R-R intervals held in memory in
-     * `:app` and recoverable from nothing. Dropping the rating loses the
+     * `:app`. Dropping the rating loses the
      * rating; the other two lose the session or corrupt the archive.
      *
      * What this does NOT do is round or clamp. An 11 does not become a 10:

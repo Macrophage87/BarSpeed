@@ -5438,9 +5438,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * each inter-set rest as the following set's `rest_before_hrm` stream, and
      * the window after the last set as `rest_after_hrm` written by the close
      * below (#109). What is held here and nowhere else is the accumulated
-     * list itself and the single `hrvRmssdMs` computed from it. A cancelled
-     * close is the difference between the lifter having that number and
-     * never having it.
+     * list itself and the single `hrvRmssdMs` computed from it.
      *
      * So the work moves to `appScope`, joining the set write and the two rest
      * screen corrections, and on `Dispatchers.Main.immediate` for the reason
@@ -5456,8 +5454,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * Finish and then leaves before it lands now gets the finish, where
      * cancellation used to win. Cancellation winning was never a decision — it
      * was an artefact of the scope. Honouring the finish writes an end time that
-     * was measured when they asked, a summary over the sets that exist, and an
-     * HRV that is otherwise lost; nothing false is written. The screen no longer
+     * was measured when they asked, a summary over the sets that exist, and the
+     * HRV computed over the intervals the session received; nothing false is
+     * written. The screen no longer
      * offers "Leave without finishing" during that window at all, which is what
      * makes this a completed instruction rather than a contradicted one.
      *

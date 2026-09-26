@@ -62,8 +62,7 @@ enum class RecordingHold(val armsService: Boolean) {
      * offers the lifter a labelled exit during exactly this window, and its
      * `ExitAction.LEAVE_SESSION_CLOSING` promises in words that the close lands
      * either way. Dropping the process's priority on the way out is what would
-     * make that promise false, over `hrvRmssdMs`, whose input is held in memory
-     * and reaches storage nowhere else.
+     * make that promise false.
      *
      * A separate member from [SET_WRITE] rather than one shared "a write is
      * running", so that the pair can be represented. The same reasoning keeps
@@ -127,8 +126,8 @@ object RecordingServicePolicy {
      * screen leaves. The screen leaving used to be the whole rule, and that is
      * the defect: a set-end write and a session close both outlive the record
      * screen by design, and stopping the service under them drops the process
-     * out of foreground priority while the only copy of a set's samples, or the
-     * only copy of a session's R-R intervals, is still in memory.
+     * out of foreground priority while the only copy of a set's samples, or of
+     * what a session close writes, is still in memory.
      *
      * "The last reason" is measured on what this call actually took away, which
      * is why an empty result is not enough on its own. A release of something

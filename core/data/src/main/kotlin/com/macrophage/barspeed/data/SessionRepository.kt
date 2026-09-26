@@ -569,9 +569,7 @@ class SessionRepository(
      *
      * That guard is not only about a duplicated end time. [hrvRmssdMs] is an
      * argument with a null default, copied onto the row unconditionally, so a
-     * caller that omits it used to erase a stored HRV -- the one figure here
-     * that cannot be rebuilt from anything durable, its input being R-R
-     * intervals collected across the rest windows and held in memory in `:app`.
+     * caller that omits it used to erase a stored HRV.
      * The heart-rate summary is recomputed from the set rows on every call, so a
      * later close would also replace a correct summary with one drawn from a set
      * list that has since changed.

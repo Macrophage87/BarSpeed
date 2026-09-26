@@ -76,14 +76,13 @@ private data class PendingSessionClose(
  * and `hrMaxBpm` can all be rebuilt later from rows that are already durable,
  * because each set row carries its own end time and its own heart-rate columns.
  * The session HRV cannot. Its input is the R-R intervals collected across the
- * whole session, rests included, and the only R-R that reaches storage is the
- * per-set `hrm` stream covering the sets themselves. A cancelled close is the
- * difference between the lifter having that number and never having it.
+ * whole session, rests included. A session whose close never lands publishes
+ * an HRV derived from its stored heart-rate streams instead (#62), computed
+ * from stored streams rather than from the intervals this close receives.
  *
- * The session rating (#159) is in the same position and is worse: HRV could in
- * principle be recomputed if the R-R ever reached disk, and how a workout FELT
- * is recorded in no artifact at all. It is stated once, at the finish, and a
- * close that never lands takes it with it.
+ * The session rating (#159) is worse off: how a workout FELT is recorded in no
+ * artifact at all. It is stated once, at the finish, and a close that never
+ * lands takes it with it.
  *
  * The rest window after the last set (#109) is written here too, after the
  * close, because there is no next set for it to ride into the database with.
@@ -163,8 +162,7 @@ class SessionCloser(
         // process keeps foreground-service priority for as long as the close is
         // outstanding. The prompt this window raises offers the lifter a labelled
         // exit that promises the close lands either way; dropping priority on the
-        // way out is what would make that promise false, and hrvRmssdMs is the
-        // column that cannot be rebuilt from anything durable.
+        // way out is what would make that promise false.
         holds.acquire(RecordingHold.SESSION_CLOSE)
         scope.launch(Dispatchers.Main.immediate) {
             try {

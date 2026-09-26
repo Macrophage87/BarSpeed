@@ -154,9 +154,8 @@ enum class ExitPrompt(val actions: List<ExitAction>) {
  *
  * [FAILED] exists for the reason [SetWriteState.FAILED] does. "Nothing is being
  * closed" and "the close came back failed" are different facts, and the second
- * is the one worth stopping the lifter over: the session's HRV is computed from
- * R-R intervals that are held in memory and nowhere else, so a close that did
- * not land is the difference between having that number and never having it.
+ * is the one worth stopping the lifter over: the session rating the close
+ * writes is held in memory and nowhere else.
  */
 enum class SessionCloseState {
     /** No close is outstanding. Either none was asked for, or one finished. */
