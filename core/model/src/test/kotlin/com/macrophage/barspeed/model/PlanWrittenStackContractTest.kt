@@ -88,7 +88,8 @@ class PlanWrittenStackContractTest {
             "the 1.14 entry never says a written stack mount keeps the inversion whatever the roll",
         )
         assertTrue(
-            "now applies only where `sensorOnStack` is absent or null and the stack mount is the stack default" in entry,
+            "now applies only where `sensorOnStack` is absent or null and the stack mount is the stack " +
+                "default" in entry,
             "the 1.14 entry never says the roll check still applies to a stack mount left to the default",
         )
         assertTrue(
