@@ -43,7 +43,14 @@ data class RepAnalysis(
     val peakEccVelMps: Double?,
     val romM: Double,
     val peakPowerW: Double?,
-    /** Average power over the concentric (drive) phase, watts. Null for bodyweight. */
+    /**
+     * Average power over the concentric (drive) phase, watts. Null where the
+     * rep analysis's `effectiveLoad` is null: no load, a load of 0, a drive
+     * that goes down, or a sign-inverted sensor. Nothing here reads whether a
+     * set is bodyweight: `:app` analyses a bodyweight set with
+     * `SetLoadPolicy.totalKg`, body weight plus the added load, so it gets a
+     * figure on the same terms as any other set (#221).
+     */
     val meanConPowerW: Double? = null,
     /**
      * Samples inside THIS REP'S OWN SPAN whose acceleration magnitude is above
