@@ -1,6 +1,8 @@
 package com.macrophage.barspeed.model
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -51,6 +53,74 @@ class SessionNotClosedCopyTest {
         assertTrue(
             body.contains("Whatever has not been written is held only here, and leaving now loses it."),
             "the body stopped saying what leaving costs: $body",
+        )
+    }
+
+    /**
+     * #331's proposed copy, checked clause by clause against the code, with
+     * three clauses corrected where they were false against it:
+     *
+     *  - "the end time and the rest recorded after your last set" is false
+     *    when `endSession` landed and only `recordFinalRestWindow` failed
+     *    after it: both report FAILED, and in that case the end time IS
+     *    written. Hence "or only that rest", the second cause the old text
+     *    carried with its own "or".
+     *  - "the session's heart-rate and HRV figures are rebuilt" is false in
+     *    the same case, where the close wrote them and nothing is rebuilt,
+     *    and false for the HRV wherever fewer than ten successive
+     *    differences survive in the stored streams, where
+     *    `SessionHrv.rmssdMs` returns null.
+     *  - "The end time and the final rest are held only here" is false in
+     *    the same case for the end time. The old text's last sentence says
+     *    what is true in both cases, and it stays.
+     */
+    @Test
+    fun `the body is the 331 copy, corrected where it was false against the code`() {
+        assertEquals(
+            "Part of this session was not written: the end time and the rest recorded after your last set, " +
+                "or only that rest. Tapping FINISH SESSION AGAIN on this screen can still write them, after " +
+                "freeing some space on the phone if that is what stopped it. Every set is already saved " +
+                "either way, and any of the session's heart-rate and HRV figures the finish did not write " +
+                "are rebuilt from those sets if you leave, the HRV only where they hold enough usable " +
+                "heartbeats. Whatever has not been written is held only here, and leaving now loses it.",
+            body,
+        )
+    }
+
+    /**
+     * The defect #331 reports. Since #62 a reader publishes an unclosed
+     * session's heart-rate average and maximum from its set rows, and its HRV
+     * from its stored streams where they support one, so the body may not say
+     * that leaving loses them.
+     */
+    @Test
+    fun `the body does not say leaving loses the heart-rate and HRV summary`() {
+        assertFalse(body.contains("HRV summary"), "the body still says the summary is lost: $body")
+    }
+
+    /**
+     * FAILED has two causes (`SessionCloser`): `endSession` not landing, or the
+     * final rest window's write not landing after it did. A body that names
+     * only the first tells a lifter in the second that the end time is lost.
+     */
+    @Test
+    fun `the body names the case where only the final rest was not written`() {
+        assertTrue(
+            body.contains("or only that rest"),
+            "the body names only one of the two ways a finish fails: $body",
+        )
+    }
+
+    /**
+     * `SessionHrv.rmssdMs` returns null, never 0, where fewer than ten
+     * successive differences survive, so the rebuilt HRV is conditional and
+     * the body must not promise it unconditionally.
+     */
+    @Test
+    fun `the body does not promise a rebuilt HRV unconditionally`() {
+        assertTrue(
+            body.contains("the HRV only where they hold enough usable heartbeats"),
+            "the body promises an HRV the stored streams may not support: $body",
         )
     }
 }
