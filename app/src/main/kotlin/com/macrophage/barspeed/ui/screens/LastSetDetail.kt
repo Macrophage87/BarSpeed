@@ -188,7 +188,12 @@ private fun LastSetCard(state: RecordState, feedback: SetFeedback) {
                 // The rest screen can hold two arrows at once -- this one and
                 // "Up next" -- so colour separates last from next, exactly as
                 // RestHeader's does.
-                SideArrow(feedback.side, Modifier.padding(end = 8.dp), color = BarColors.Text)
+                SideArrow(
+                    feedback.side,
+                    MaterialTheme.typography.titleMedium.fontSize,
+                    Modifier.padding(end = 8.dp),
+                    color = BarColors.Text,
+                )
                 Text(
                     struckLine("${feedback.exerciseName} — ", values),
                     style = MaterialTheme.typography.titleMedium,
