@@ -2493,6 +2493,19 @@ data class SessionExport(
          *
          * PINNED. `SchemaEccConCoverageContractTest`, `EccConRatioCoverageTest`
          * in `:core:dsp` and `SessionExportEccConCoverageTest` in `:core:data`.
+         *
+         * 1.23 FURTHER ENTRY (#132, repsManual names the metronome): NO KEY OR
+         * VALUE CHANGES; the description of [SetExport.repsManual] changes. It
+         * called the count one entered or corrected by hand rather than
+         * sensor-counted, which is false on every guided set: the cadence guide
+         * wrote that count on its own schedule, the in-set screen offers no rep
+         * control, and no one entered it. The value was right and only its
+         * description wrong: on a set that is not timed it is true exactly where
+         * `repsSource` reads `manual`, `corrected` or `metronome`, and it is now
+         * described as that and pointed at `repsSource`. The name stays.
+         * `DATABASE_VERSION` does NOT move.
+         *
+         * PINNED. `SchemaRepsManualProvenanceContractTest`.
          */
         const val SCHEMA_VERSION = "1.23"
 
@@ -2716,7 +2729,19 @@ data class SetExport(
      * what stops the default standing in for a count the exporter forgot.
      */
     val reps: Int? = null,
-    /** True when reps were entered or corrected manually rather than sensor-counted. */
+    /**
+     * True when [reps] is not an uncorrected sensor or segmenter count: the
+     * lifter's own taps, a correction the lifter made to a count, or -- on a
+     * guided set -- the cadence guide's count, which the guide wrote on its
+     * own schedule and no one entered (1.23, #132).
+     *
+     * It never says a person counted the set. [repsSource] says whose count it
+     * is: on a set that is not timed, true is `manual`, `corrected` or
+     * `metronome`, and false is `sensor` or `analysis` -- `RepsSourcePolicy`'s
+     * own branches. The name is historical. The one-line KDoc that stood here
+     * called every such count entered or corrected by hand, which was false on
+     * every guided set, and is DELETED rather than reworded.
+     */
     val repsManual: Boolean = false,
     /**
      * WHOSE COUNT [reps] is, as the published word (1.20, #286).

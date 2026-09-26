@@ -56,9 +56,10 @@ enum class RepsSource(val wireName: String) {
  *
  * What could NOT be derived from what the row held before is the difference
  * between a lifter's tally and a correction of a sensor count, because
- * `repsManual` is true in both cases -- one column with two jobs, which its own
- * KDoc has always said: *"True when actualReps was entered or corrected by the
- * lifter"*. `liveReps` separates them: a row with a live count and
+ * `repsManual` is true in both cases -- one column with two jobs, which its
+ * KDoc said as *"True when actualReps was entered or corrected by the
+ * lifter"* until #132 rewrote it to name the third job it always had, the
+ * cadence guide's count. `liveReps` separates the first two: a row with a live count and
  * `repsManual` true is a correction, and a row with no live count and
  * `repsManual` true is a tally.
  *

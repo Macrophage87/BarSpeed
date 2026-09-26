@@ -175,7 +175,8 @@ interface SessionDao {
     //
     // No "corrected" flag beside it, and unlike the seconds one above that is
     // a decision rather than a gap. repsManual distinguishes a count the
-    // sensor MEASURED from one the lifter STATED; a load is never measured by
+    // sensor MEASURED from one the lifter STATED or the cadence guide kept
+    // (#132); a load is never measured by
     // anything, so the same flag on this column would be true of every row
     // ever written and would carry no information. A corrected load is
     // therefore indistinguishable in the export from a load typed before the

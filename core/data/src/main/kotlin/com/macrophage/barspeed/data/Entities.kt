@@ -204,7 +204,14 @@ data class SetRecordEntity(
      */
     val rpeScale: String? = null,
     val actualReps: Int,
-    /** True when actualReps was entered or corrected by the lifter, not the sensor. */
+    /**
+     * True when [actualReps] is not an uncorrected sensor or segmenter count:
+     * the lifter's taps, a correction, or -- on a guided set -- the cadence
+     * guide's count, which no one entered (#132). The export derives whose
+     * count it is from this and [liveReps]; `RepsSourcePolicy` owns the rule.
+     * The one-line KDoc that stood here said the lifter entered or corrected
+     * it, false on every guided set, and is DELETED rather than reworded.
+     */
     val repsManual: Boolean = false,
     /**
      * What the sensor's LIVE detector counted while the set was performed, or
