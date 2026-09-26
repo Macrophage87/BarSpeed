@@ -19,10 +19,11 @@ package com.macrophage.barspeed.model
  * session ran, and the only durable copy of those intervals is the stored
  * heart-rate streams. This rule cannot read streams -- `:core:hrm`, where the
  * close's ingest and RMSSD live, depends on this module and not the other way
- * round -- so [of] takes the derived HRV from its caller as a function, and
- * calls it only for an unclosed session. The one mapping from rows and streams
- * to this rule is `SessionEntity.heartRate` in `:core:data`, which passes
- * `SessionHrv.rmssdMs` over the session's stored windows. A derived HRV is
+ * round -- so [of] takes the derived HRV from its caller as a value, and
+ * publishes it only for an unclosed session. The one mapping from rows and
+ * streams to this rule is `SessionEntity.heartRate` in `:core:data`, which
+ * passes `SessionHrv.rmssdMs` over the session's stored windows and reads
+ * those windows only for an unclosed session. A derived HRV is
  * computed from stored streams, not from the intervals the close received;
  * `SessionHrv` states how closely the two agreed where both exist.
  *
@@ -68,32 +69,35 @@ data class SessionHeartRate(val avgBpm: Int?, val maxBpm: Int?, val hrvRmssdMs: 
          * which writes all four in one update, so a closed row's
          * [storedAvgBpm], [storedMaxBpm] and [storedHrvRmssdMs] are that
          * close's answer -- a null included, which there means the close had
-         * no figure -- and are returned exactly as stored, and
-         * [derivedHrvRmssdMs] is never called. An unclosed row was never
-         * summarised, so its stored columns are not an answer: the two heart
-         * rates are derived from the set rows by [aggregate], and the HRV is
-         * whatever [derivedHrvRmssdMs] returns, null where it has no figure.
+         * no figure -- and are returned exactly as stored, whatever
+         * [derivedHrvRmssdMs] holds. An unclosed row was never summarised, so
+         * its stored columns are not an answer: the two heart rates are
+         * derived from the set rows by [aggregate], and the HRV is
+         * [derivedHrvRmssdMs], null where the caller has no figure.
          *
          * Keyed on the end time rather than on a null column because a
          * closed session whose sets carried no heart rate also stores nulls,
          * and a reader must not replace the close's answer with a later
          * reading of rows that may have changed since.
          *
-         * Inline so that a caller in a coroutine can read streams inside
-         * [derivedHrvRmssdMs] and read them only when the session is unclosed.
+         * A value and not a function: this module is compiled for JVM 21 and
+         * `:core:data` for 17, and an inline function cannot be inlined across
+         * that boundary, so a caller cannot defer a coroutine's stream read
+         * into this call. The caller computes the derived HRV only where the
+         * row has no end time; see `SessionEntity.heartRate`.
          */
-        inline fun of(
+        fun of(
             closed: Boolean,
             storedAvgBpm: Int?,
             storedMaxBpm: Int?,
             storedHrvRmssdMs: Double?,
             setAvgBpm: List<Int?>,
             setMaxBpm: List<Int?>,
-            derivedHrvRmssdMs: () -> Double?,
+            derivedHrvRmssdMs: Double?,
         ): SessionHeartRate = if (closed) {
             SessionHeartRate(storedAvgBpm, storedMaxBpm, storedHrvRmssdMs)
         } else {
-            aggregate(setAvgBpm, setMaxBpm).copy(hrvRmssdMs = derivedHrvRmssdMs())
+            aggregate(setAvgBpm, setMaxBpm).copy(hrvRmssdMs = derivedHrvRmssdMs)
         }
     }
 }

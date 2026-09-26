@@ -26,20 +26,25 @@ fun SessionEntity.heartRate(sets: List<SetRecordEntity>): SessionHeartRate = hea
  *
  * [hrWindows] returns the windows `SessionHrv.rmssdMs` takes, in session
  * order: [SessionRepository.storedHrWindows] is the one production source.
- * It is called only for an unclosed session, because only there does the rule
- * derive an HRV; a closed session publishes the figure its close stored and
- * reads no stream. Inline so that [hrWindows] can read the database from a
- * coroutine.
+ * It is called only for an unclosed session, the only kind whose HRV the rule
+ * publishes from a derivation; a closed session publishes the figure its
+ * close stored and reads no stream. The rule decides what is published
+ * either way -- this check only spares a closed session a read the rule would
+ * discard. Inline, within this module, so that [hrWindows] can read the
+ * database from a coroutine.
  */
 inline fun SessionEntity.heartRate(
     sets: List<SetRecordEntity>,
     hrWindows: () -> List<List<HrSample>>,
-): SessionHeartRate = SessionHeartRate.of(
-    closed = endedAtMs != null,
-    storedAvgBpm = hrAvgBpm,
-    storedMaxBpm = hrMaxBpm,
-    storedHrvRmssdMs = hrvRmssdMs,
-    setAvgBpm = sets.map { it.hrAvgBpm },
-    setMaxBpm = sets.map { it.hrMaxBpm },
-    derivedHrvRmssdMs = { SessionHrv.rmssdMs(hrWindows()) },
-)
+): SessionHeartRate {
+    val closed = endedAtMs != null
+    return SessionHeartRate.of(
+        closed = closed,
+        storedAvgBpm = hrAvgBpm,
+        storedMaxBpm = hrMaxBpm,
+        storedHrvRmssdMs = hrvRmssdMs,
+        setAvgBpm = sets.map { it.hrAvgBpm },
+        setMaxBpm = sets.map { it.hrMaxBpm },
+        derivedHrvRmssdMs = if (closed) null else SessionHrv.rmssdMs(hrWindows()),
+    )
+}

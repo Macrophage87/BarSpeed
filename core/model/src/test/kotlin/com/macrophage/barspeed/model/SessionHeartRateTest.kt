@@ -20,8 +20,9 @@ import kotlin.test.assertNull
  * The HRV cases were added with #62 half (b), green when written: the HRV
  * half of [SessionHeartRate.of] was new and nothing read it at the commit
  * that added it. The derived figure itself is `SessionHrv`'s, pinned in
- * `:core:hrm`; here the derivation is a stub, because the question is which
- * answer the read takes and whether it asks for a derivation at all.
+ * `:core:hrm`; here it is a literal, because the question is which answer
+ * the read takes. Whether streams are read at all for a closed session is
+ * `SessionHeartRateStreamsTest`'s, in `:core:data`.
  */
 class SessionHeartRateTest {
     // ---- the aggregate: endSession's arithmetic ------------------------------
@@ -83,7 +84,7 @@ class SessionHeartRateTest {
                 storedHrvRmssdMs = null,
                 setAvgBpm = listOf(120, 140),
                 setMaxBpm = listOf(150, 165),
-                derivedHrvRmssdMs = { null },
+                derivedHrvRmssdMs = null,
             )
 
         assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165), hr)
@@ -105,7 +106,7 @@ class SessionHeartRateTest {
                 storedHrvRmssdMs = null,
                 setAvgBpm = listOf(120, 140),
                 setMaxBpm = listOf(150, 165),
-                derivedHrvRmssdMs = { null },
+                derivedHrvRmssdMs = null,
             )
 
         assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165), hr)
@@ -127,7 +128,7 @@ class SessionHeartRateTest {
                 storedHrvRmssdMs = null,
                 setAvgBpm = listOf(100, 180),
                 setMaxBpm = listOf(110, 195),
-                derivedHrvRmssdMs = { null },
+                derivedHrvRmssdMs = null,
             )
 
         assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165), hr)
@@ -149,7 +150,7 @@ class SessionHeartRateTest {
                 storedHrvRmssdMs = null,
                 setAvgBpm = listOf(120),
                 setMaxBpm = listOf(150),
-                derivedHrvRmssdMs = { null },
+                derivedHrvRmssdMs = null,
             )
 
         assertEquals(SessionHeartRate(null, null), hr)
@@ -158,13 +159,13 @@ class SessionHeartRateTest {
     // ---- the HRV: stored where the close wrote, derived where it did not ----
 
     /**
-     * A closed session keeps the HRV its close computed, and the read never
-     * asks for a derivation: re-deriving would replace the close's figure,
-     * computed over every interval it received, with one computed from the
-     * streams that happened to be stored.
+     * A closed session keeps the HRV its close computed, whatever a
+     * derivation gave: re-deriving would replace the close's figure, computed
+     * over every interval it received, with one computed from the streams
+     * that happened to be stored.
      */
     @Test
-    fun `a closed session keeps the HRV it stored and never derives one`() {
+    fun `a closed session keeps the HRV it stored, not a derived one`() {
         val hr =
             SessionHeartRate.of(
                 closed = true,
@@ -173,7 +174,7 @@ class SessionHeartRateTest {
                 storedHrvRmssdMs = 14.8,
                 setAvgBpm = listOf(120, 140),
                 setMaxBpm = listOf(150, 165),
-                derivedHrvRmssdMs = { error("a closed session asked for a derived HRV") },
+                derivedHrvRmssdMs = 20.0,
             )
 
         assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165, hrvRmssdMs = 14.8), hr)
@@ -190,7 +191,7 @@ class SessionHeartRateTest {
                 storedHrvRmssdMs = null,
                 setAvgBpm = listOf(120, 140),
                 setMaxBpm = listOf(150, 165),
-                derivedHrvRmssdMs = { 20.0 },
+                derivedHrvRmssdMs = 20.0,
             )
 
         assertNull(hr.hrvRmssdMs)
@@ -210,7 +211,7 @@ class SessionHeartRateTest {
                 storedHrvRmssdMs = 99.0,
                 setAvgBpm = listOf(120, 140),
                 setMaxBpm = listOf(150, 165),
-                derivedHrvRmssdMs = { 14.0 },
+                derivedHrvRmssdMs = 14.0,
             )
 
         assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165, hrvRmssdMs = 14.0), hr)
@@ -227,7 +228,7 @@ class SessionHeartRateTest {
                 storedHrvRmssdMs = null,
                 setAvgBpm = listOf(120, 140),
                 setMaxBpm = listOf(150, 165),
-                derivedHrvRmssdMs = { null },
+                derivedHrvRmssdMs = null,
             )
 
         assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165, hrvRmssdMs = null), hr)
