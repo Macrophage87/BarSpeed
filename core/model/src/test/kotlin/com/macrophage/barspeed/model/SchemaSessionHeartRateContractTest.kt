@@ -25,8 +25,7 @@ class SchemaSessionHeartRateContractTest {
 
     private fun properties() = schema()["properties"]!!.jsonObject
 
-    private fun exportVersionLog() =
-        properties()["schemaVersion"]!!.jsonObject["description"]!!.jsonPrimitive.content
+    private fun exportVersionLog() = properties()["schemaVersion"]!!.jsonObject["description"]!!.jsonPrimitive.content
 
     /** Everything the version log says from this entry's marker onward. */
     private fun entry() = exportVersionLog().substringAfter("1.23 FURTHER ENTRY (#62", missingDelimiterValue = "")
