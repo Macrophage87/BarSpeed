@@ -36,8 +36,6 @@ data class ExerciseDef(
     val startsWith: StartPhase = StartPhase.ECCENTRIC,
     val kind: ExerciseKind = ExerciseKind.DYNAMIC,
     val isCustom: Boolean = false,
-    /** True for straight-bar lifts — enables the plate-loading readout. */
-    val usesBarbell: Boolean = true,
     /**
      * Which way the concentric (the driving, muscle-shortening phase) moves.
      * True for almost everything; false for lifts whose drive goes DOWN — leg
@@ -118,37 +116,19 @@ data class ExerciseDef(
                 ExerciseDef("romanian_deadlift", "Romanian Deadlift"),
                 ExerciseDef("barbell_row", "Barbell Row", startsWith = StartPhase.CONCENTRIC),
                 ExerciseDef("hip_thrust", "Hip Thrust", startsWith = StartPhase.CONCENTRIC),
-                ExerciseDef("plank", "Plank", kind = ExerciseKind.HOLD, usesBarbell = false),
-                ExerciseDef("side_plank", "Side Plank", kind = ExerciseKind.HOLD, usesBarbell = false),
-                ExerciseDef("dead_hang", "Dead Hang", kind = ExerciseKind.HOLD, usesBarbell = false),
-                ExerciseDef("farmers_walk", "Farmer's Walk", kind = ExerciseKind.CARRY, usesBarbell = false),
-                ExerciseDef("suitcase_carry", "Suitcase Carry", kind = ExerciseKind.CARRY, usesBarbell = false),
+                ExerciseDef("plank", "Plank", kind = ExerciseKind.HOLD),
+                ExerciseDef("side_plank", "Side Plank", kind = ExerciseKind.HOLD),
+                ExerciseDef("dead_hang", "Dead Hang", kind = ExerciseKind.HOLD),
+                ExerciseDef("farmers_walk", "Farmer's Walk", kind = ExerciseKind.CARRY),
+                ExerciseDef("suitcase_carry", "Suitcase Carry", kind = ExerciseKind.CARRY),
                 ExerciseDef("snatch", "Snatch", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
                 ExerciseDef("power_snatch", "Power Snatch", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
                 ExerciseDef("clean", "Clean", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
                 ExerciseDef("power_clean", "Power Clean", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
                 ExerciseDef("push_press", "Push Press", StartPhase.ECCENTRIC, ExerciseKind.EXPLOSIVE),
-                ExerciseDef(
-                    "kettlebell_swing",
-                    "Kettlebell Swing",
-                    StartPhase.ECCENTRIC,
-                    ExerciseKind.EXPLOSIVE,
-                    usesBarbell = false,
-                ),
-                ExerciseDef(
-                    "kettlebell_snatch",
-                    "KB Snatch",
-                    StartPhase.CONCENTRIC,
-                    ExerciseKind.EXPLOSIVE,
-                    usesBarbell = false,
-                ),
-                ExerciseDef(
-                    "kettlebell_clean",
-                    "KB Clean",
-                    StartPhase.CONCENTRIC,
-                    ExerciseKind.EXPLOSIVE,
-                    usesBarbell = false,
-                ),
+                ExerciseDef("kettlebell_swing", "Kettlebell Swing", StartPhase.ECCENTRIC, ExerciseKind.EXPLOSIVE),
+                ExerciseDef("kettlebell_snatch", "KB Snatch", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
+                ExerciseDef("kettlebell_clean", "KB Clean", StartPhase.CONCENTRIC, ExerciseKind.EXPLOSIVE),
             )
 
         fun seedById(id: String): ExerciseDef? = SEED.firstOrNull { it.id == id }
@@ -178,9 +158,9 @@ data class ExerciseDef(
          * one.
          *
          * `copy` rather than a fresh constructor call, deliberately: the seed
-         * entry for `dead_hang` carries a display name, a HOLD kind and
-         * `usesBarbell = false`, and rebuilding it from `ExerciseDef(id, id)`
-         * would set one flag and discard those three.
+         * entry for `dead_hang` carries a display name and a HOLD kind, and
+         * rebuilding it from `ExerciseDef(id, id)` would set one flag and
+         * discard both.
          *
          * Only `bodyweight` is seeded here. `sensorOnStack` has the same gap
          * on the same path and is not tracked anywhere; for the owner to
@@ -342,8 +322,8 @@ data class ExerciseDef(
          *
          * Deliberately NOT [SEED] entries, for [STACK_MOUNTED_IDS]'s reason:
          * [ExerciseDef.bodyweight] is the only field this table decides, and a
-         * SEED entry would have to decide [kind], [startsWith], [usesBarbell]
-         * and the rest too. `dead_hang` already has a SEED entry (kind HOLD)
+         * SEED entry would have to decide [kind], [startsWith] and the rest
+         * too. `dead_hang` already has a SEED entry (kind HOLD)
          * that does not set `bodyweight = true` -- this table is what makes an
          * omitted key on it resolve correctly without touching that entry.
          *

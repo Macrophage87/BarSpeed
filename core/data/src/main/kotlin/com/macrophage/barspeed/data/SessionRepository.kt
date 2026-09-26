@@ -948,7 +948,6 @@ class SessionRepository(
                 StartPhase.valueOf(custom.startsWith),
                 kind = ExerciseDef.inferKind(custom.id),
                 isCustom = true,
-                usesBarbell = ExerciseDef.inferBarbell(custom.id),
                 sensorOnStack = ExerciseDef.ridesStack(custom.id),
             )
         } else {
@@ -958,7 +957,6 @@ class SessionRepository(
                 ExerciseDef.inferStartPhase(id),
                 kind = ExerciseDef.inferKind(id),
                 isCustom = true,
-                usesBarbell = ExerciseDef.inferBarbell(id),
                 sensorOnStack = ExerciseDef.ridesStack(id),
             )
         }
