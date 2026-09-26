@@ -22,7 +22,9 @@ import kotlin.test.assertTrue
  *
  * 1.12 shipped saying an omitted `sensorInverted` resolves to false with
  * nothing to infer, and the rule changes that on stack sets driving down, so
- * the rule is a new version rather than an edit to a released one.
+ * the rule is a new version rather than an edit to a released one. #323
+ * narrowed the rule to the analysed unit while 1.13 was still unreleased, so
+ * the 1.13 entry was corrected in place rather than minting 1.14.
  */
 class PlanStackInversionContractTest {
     private fun plan(): JsonObject = Json.parseToJsonElement(
@@ -51,12 +53,16 @@ class PlanStackInversionContractTest {
     }
 
     /**
-     * The 1.13 entry states the rule, and says what it misreads.
+     * The 1.13 entry states the rule, and which unit it reaches.
      *
-     * The rule is read off the resolved declaration, not the stream, so a
-     * unit on the handle of a stack machine whose plan leaves `sensorOnStack`
-     * to the stack default is read inverted by it. The entry is where a plan
-     * writer learns that, so its absence is a contract gap, not a style one.
+     * Since #323 the rule is applied to the ANALYSED unit, and only where that
+     * unit's own roll says it rode the stack; a unit on the handle or the rope
+     * of a stack machine whose plan leaves `sensorOnStack` to the stack
+     * default is read uninverted. The entry said the opposite -- "is read
+     * inverted by it, with drive and return swapped" -- which was true of the
+     * #317 rule and is deleted, not reworded, with its pin moved here. The
+     * entry is where a plan writer learns which unit the rule reads, so its
+     * absence is a contract gap, not a style one.
      */
     @Test
     fun `the plan's 1_13 entry states the stack inversion rule`() {
@@ -68,8 +74,16 @@ class PlanStackInversionContractTest {
             "the 1.13 entry never states what an omitted sensorInverted resolves to on a stack set driving down",
         )
         assertTrue(
+            "to TRUE for a set whose analysed unit's own roll says it rode the stack" in entry,
+            "the 1.13 entry never says the rule reaches only an analysed unit whose roll says stack",
+        )
+        assertTrue(
+            "is read uninverted, and so is a unit whose window held too few samples to measure" in entry,
+            "the 1.13 entry never says a unit whose roll moved, or was not measured, is read uninverted",
+        )
+        assertFalse(
             "is read inverted by it, with drive and return swapped" in entry,
-            "the 1.13 entry never says that a handle-mounted unit under a seeded stack mount is read inverted",
+            "the 1.13 entry still says a handle-mounted unit under a seeded stack mount is read inverted",
         )
     }
 
@@ -87,6 +101,10 @@ class PlanStackInversionContractTest {
         assertFalse(
             "did not move the plan format" in description,
             "sensorInverted still says the rule did not move the plan format, which 1.13 makes false",
+        )
+        assertTrue(
+            "resolves to TRUE for a set whose analysed unit's own roll says it rode the stack" in description,
+            "sensorInverted still says an omitted key resolves true whichever unit the set is analysed from",
         )
     }
 }
