@@ -586,8 +586,9 @@ data class PlanFile(
         if (!applied) return null
         return "sessions[$si].exercises[$ei]: ${exercise.exercise} rides the weight stack with its drive " +
             "going DOWN, and this plan does not declare \"sensorInverted\" - the stack rises as the " +
-            "handle is driven down, so the set is recorded inverted wherever the analysed unit's own roll " +
-            "says it rode the stack, and uninverted where it moved with the handle. Declare " +
+            "handle is driven down, so the set's figures are analysed inverted wherever the analysed " +
+            "unit's own roll says it rode the stack, and uninverted where it moved with the handle or " +
+            "the rope; the live count during the set reads it inverted either way. Declare " +
             "\"sensorOnStack\": false if the sensor was on the handle instead."
     }
 
