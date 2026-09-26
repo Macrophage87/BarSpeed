@@ -62,9 +62,9 @@ enum class RepCounter {
      * set, so there is no rep to count and no count to record.
      *
      * Distinct from [MANUAL] with a count of zero: the absence of a counter is
-     * not a count of nothing. What such a set publishes in `reps` is whatever
-     * the batch segmenter made of a lifter holding still, and no counter
-     * stands behind it.
+     * not a count of nothing. Such a row stores the batch segmenter's count in
+     * `actualReps`, which no counter stands behind, and from export 1.23
+     * publishes no `reps` (#71, [RepsSourcePolicy.publishedReps]).
      */
     NOBODY,
 }

@@ -342,7 +342,8 @@ class SessionExporter(
             // no body weight -- the column's own KDoc says the last two cannot
             // be told apart.
             bodyWeightKg = record.bodyWeightKg,
-            // Withheld on a timed set (#71): the row's 0 there is not a count.
+            // Withheld on a timed set (#71): the row's NOT NULL column holds
+            // the batch segmenter's count there, which no counter produced.
             // One extension read by both writers, so the two cannot disagree.
             reps = record.publishedReps,
             repsManual = record.repsManual,

@@ -110,9 +110,12 @@ object RepsSourcePolicy {
      * (1.23, #71).
      *
      * Null on a TIMED set, on the same marker [published] reads: nothing
-     * counts reps on a hold or a carry, and the row's NOT NULL column holds a
-     * 0 there that no counter produced. Every other set publishes its stored
-     * figure, 0 included -- on a set counted in reps, 0 is a count.
+     * counts reps on a hold or a carry, and the row's NOT NULL column holds
+     * the batch segmenter's count there (SessionRepository.recordSet:
+     * manualReps ?: liveReps ?: analysis.reps.size, the first two null when
+     * nothing counts), which no counter produced. Every other set publishes
+     * its stored figure, 0 included -- on a set counted in reps, 0 is a
+     * count.
      */
     fun publishedReps(actualReps: Int, timed: Boolean): Int? = if (timed) null else actualReps
 

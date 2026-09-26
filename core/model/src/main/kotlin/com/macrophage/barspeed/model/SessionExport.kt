@@ -2412,8 +2412,9 @@ data class SessionExport(
          * WHAT WAS FALSE. The set's required list obliged every set to carry an
          * integer, so a hold published `"reps": 0`, a number nothing counted,
          * which a reader could not tell from a dynamic set that scored none.
-         * The row still stores that 0 (the column is NOT NULL); the exporter
-         * withholds it where the row's duration column marks the set timed --
+         * The row's NOT NULL column holds the batch segmenter's count there,
+         * which no counter produced; the exporter withholds it where the
+         * row's duration column marks the set timed --
          * [RepsSourcePolicy.publishedReps], on the marker `repsSource` has read
          * since 1.20.
          *
@@ -2724,7 +2725,8 @@ data class SetExport(
      * How many reps the set is RECORDED as; [repsSource] says whose count.
      *
      * ABSENT on a timed set (1.23, #71): nothing counts reps on a hold or a
-     * carry, and the 0 the row stores there is not a count.
+     * carry, and the row's NOT NULL column holds the batch segmenter's count
+     * there, which no counter produced.
      * [RepsSourcePolicy.publishedReps] is the rule. Present on every other
      * set, 0 included -- there 0 is a count -- and the init block below
      * refuses a set carrying none of `reps`, [durationS] or [abandonedInPrep],

@@ -24,8 +24,9 @@ import kotlin.test.assertNull
  * WHAT WAS FALSE. The set schema required `reps` on every set, so a plank, a
  * dead hang or a farmer's walk was obliged to publish `"reps": 0` -- a number
  * nothing counted, which a reader cannot tell from a dynamic set that scored
- * no reps. The row stores that 0 in a NOT NULL column; the fix withholds it at
- * export and leaves the database alone.
+ * no reps. The row's NOT NULL column holds the batch segmenter's count there,
+ * which no counter produced; the fix withholds it at export and leaves the
+ * database alone.
  *
  * THE TIMED MARKER is the row's `actualDurationS` column, the one `repsSource`
  * already reads: a set abandoned in its prep publishes no duration and is
@@ -105,7 +106,7 @@ class TimedSetRepsPublishedTest {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** What the analyzer makes of a hold: no reps, which is what the row's 0 was taken from. */
+    /** What the analyzer makes of a hold: no reps, which is what the batch segmenter's count was taken from. */
     private val noReps =
         SetAnalysis(
             reps = emptyList(),

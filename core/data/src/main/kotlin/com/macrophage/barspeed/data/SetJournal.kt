@@ -344,7 +344,8 @@ class SetJournal internal constructor(
     val repMarks: List<Long> get() = marks.toList()
 
     /**
-     * A rep was counted at [timestampMs], by the lifter or by the guide.
+     * A rep was counted at [timestampMs], by the lifter or by the guide -- on
+     * a guided set the guide's per-cycle count, not an observed rep (#294).
      *
      * Its own stream rather than a line in the cue track. A cue is something
      * the app SAID -- the guide speaks "Rep 2" on a schedule whether or not

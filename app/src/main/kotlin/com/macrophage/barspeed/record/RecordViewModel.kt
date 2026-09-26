@@ -695,7 +695,8 @@ private data class PendingSetWrite(
     val cues: List<VoiceCue>,
     /**
      * The instants a rep was counted this set, frozen with everything else
-     * (#158).
+     * (#158) -- on a guided set the guide's per-cycle count, not an observed
+     * rep (#294).
      *
      * Taken from the journal rather than from a buffer of this class's own,
      * because the journal is already the one writer every mark goes through:
