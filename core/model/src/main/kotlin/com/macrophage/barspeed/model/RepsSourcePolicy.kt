@@ -82,11 +82,13 @@ object RepsSourcePolicy {
     /**
      * The word, or null where nothing counted reps.
      *
-     * [timed] is a set measured in seconds, where the published `reps` figure
-     * is whatever the segmenter made of one long movement and no counter
-     * stands behind it. Null is therefore not a sixth word and not an
-     * omission: it is the absence of a counter, and it is the ONLY thing null
-     * means.
+     * [timed] is a set measured in seconds, where no counter stands behind
+     * the row's rep count and [publishedReps] withholds it (1.23, #71). Null
+     * is therefore not a sixth word and not an omission: it is the absence of
+     * a counter, and it is the ONLY thing null means. The clause that stood
+     * here said a timed set's published `reps` is whatever the segmenter made
+     * of one long movement; no such figure is published any more, and it is
+     * DELETED rather than reworded.
      *
      * [guideCounted] separates the guide's count from the lifter's, and it is
      * WHETHER A CADENCE RAN rather than whether a tempo was written down --
@@ -101,6 +103,17 @@ object RepsSourcePolicy {
         guideCounted -> RepsSource.METRONOME
         else -> RepsSource.MANUAL
     }
+
+    /**
+     * The `reps` figure a set publishes, or null where it publishes none
+     * (1.23, #71).
+     *
+     * Null on a TIMED set, on the same marker [published] reads: nothing
+     * counts reps on a hold or a carry, and the row's NOT NULL column holds a
+     * 0 there that no counter produced. Every other set publishes its stored
+     * figure, 0 included -- on a set counted in reps, 0 is a count.
+     */
+    fun publishedReps(actualReps: Int, timed: Boolean): Int? = if (timed) null else actualReps
 
     /** The same answer as the published word, for a caller that wants the string. */
     fun publishedWord(liveReps: Int?, repsManual: Boolean, timed: Boolean, guideCounted: Boolean): String? =

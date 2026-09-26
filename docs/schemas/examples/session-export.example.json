@@ -315,7 +315,6 @@
         {
           "load_kg": 0,
           "load_lb": 0,
-          "reps": 0,
           "duration_s": 0,
           "plannedDuration_s": 20,
           "failed": true,
@@ -329,7 +328,6 @@
         {
           "load_kg": 0,
           "load_lb": 0,
-          "reps": 0,
           "duration_s": 29,
           "durationEndedBy": "sensor",
           "plannedDuration_s": 45,

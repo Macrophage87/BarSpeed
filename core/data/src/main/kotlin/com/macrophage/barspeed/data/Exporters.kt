@@ -341,7 +341,9 @@ class SessionExporter(
             // no body weight -- the column's own KDoc says the last two cannot
             // be told apart.
             bodyWeightKg = record.bodyWeightKg,
-            reps = record.actualReps,
+            // Withheld on a timed set (#71): the row's 0 there is not a count.
+            // One extension read by both writers, so the two cannot disagree.
+            reps = record.publishedReps,
             repsManual = record.repsManual,
             // WHOSE count that figure is (#286). Derived rather than stored,
             // and derived HERE rather than at each writer: the manifest below
@@ -825,6 +827,17 @@ private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?): String? = 
 )
 
 /**
+ * The rep count this row publishes, or null on a timed set (#71).
+ *
+ * One definition read by both export writers, [publishedRepsSource]'s reason.
+ * TIMED is `actualDurationS != null`, the marker that function reads and for
+ * the reason it states: a set abandoned in its prep publishes no duration and
+ * is still a timed set. `RepsSourcePolicy.publishedReps` owns the rule.
+ */
+private val SetRecordEntity.publishedReps: Int?
+    get() = RepsSourcePolicy.publishedReps(actualReps, timed = actualDurationS != null)
+
+/**
  * The word saying which of four things decided this row's recorded seconds, or
  * null where there is nothing to say. Issue #259.
  *
@@ -1194,7 +1207,9 @@ class RawExporter(
         // session.json (#220). `num` drops a null, so a set with no
         // body-weight term publishes no key rather than a zero.
         num("bodyWeight_kg", record.bodyWeightKg)
-        num("reps", record.actualReps)
+        // [num] drops the null [publishedReps] returns on a timed set (#71),
+        // and writes a rep set's 0, which is a count.
+        num("reps", record.publishedReps)
         // The set's targets and its rest -- planned, working, and the rest two
         // instants measured -- from the SAME object session.json publishes
         // (#219, #157). Each writer listing these keys for itself is how

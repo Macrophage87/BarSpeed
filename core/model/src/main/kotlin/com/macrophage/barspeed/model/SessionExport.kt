@@ -2376,9 +2376,7 @@ data class SessionExport(
          * v0.1.55 shipped REJECTS a 1.23 document on the version string alone,
          * and a validator on it would reject the five keys too, its set being
          * `additionalProperties: false`. This schema still lists 1.0 through
-         * 1.22 and ACCEPTS a 1.22 document unchanged. No existing key is
-         * removed, renamed or retyped, and none changes its value, so a reader
-         * that ignores unknown keys reads a 1.23 document as it read 1.22.
+         * 1.22 and ACCEPTS a 1.22 document unchanged.
          *
          * NOT RETROACTIVE. The columns behind the keys arrived at database v20
          * with no backfill, so a set recorded before v20 publishes none of the
@@ -2404,6 +2402,39 @@ data class SessionExport(
          * carry its digits beside the clock's (#217). Description text only: no
          * key, type, value or example moves. `SchemaBareDigitContractTest` pins
          * the description and this entry's marker in the published log.
+         *
+         * 1.23 FURTHER ENTRY (#71, a timed set publishes no reps): `reps` is no
+         * longer required on every set. A set measured in seconds -- a hold or
+         * a carry -- publishes no `reps` key, in session.json and in the raw
+         * archive's meta.json alike, and the schema requires `reps` on any set
+         * carrying neither `duration_s` nor `abandonedInPrep: true`.
+         *
+         * WHAT WAS FALSE. The set's required list obliged every set to carry an
+         * integer, so a hold published `"reps": 0`, a number nothing counted,
+         * which a reader could not tell from a dynamic set that scored none.
+         * The row still stores that 0 (the column is NOT NULL); the exporter
+         * withholds it where the row's duration column marks the set timed --
+         * [RepsSourcePolicy.publishedReps], on the marker `repsSource` has read
+         * since 1.20.
+         *
+         * THE LOOSENESS, stated. The document cannot tell a timed set abandoned
+         * in its prep from a rep set abandoned in its prep -- both carry
+         * `abandonedInPrep` and no duration -- so the schema lets `reps` be
+         * absent on that one shape. This exporter still writes `reps` on every
+         * rep set, 0 included, and [SetExport]'s init refuses a set that is
+         * neither timed nor counted.
+         *
+         * NOT PURELY ADDITIVE: a reader that indexes `reps` on every set breaks
+         * on a hold. The first 1.23 entry's sentence saying no existing key is
+         * removed, and that a reader ignoring unknown keys reads 1.23 as it
+         * read 1.22, is DELETED rather than reworded. RETROACTIVE: the rule
+         * reads a column written on timed sets since database v2, so
+         * re-exporting an older session withholds `reps` on its holds and
+         * carries too. `DATABASE_VERSION` does NOT move, and the plan schema is
+         * untouched.
+         *
+         * PINNED. `SchemaTimedRepsContractTest`, and `TimedSetRepsPublishedTest`
+         * in `:core:data`.
          */
         const val SCHEMA_VERSION = "1.23"
 
@@ -2613,7 +2644,20 @@ data class SetExport(
      * would read as a lifter with no mass.
      */
     @SerialName("bodyWeight_kg") val bodyWeightKg: Double? = null,
-    val reps: Int,
+    /**
+     * How many reps the set is RECORDED as; [repsSource] says whose count.
+     *
+     * ABSENT on a timed set (1.23, #71): nothing counts reps on a hold or a
+     * carry, and the 0 the row stores there is not a count.
+     * [RepsSourcePolicy.publishedReps] is the rule. Present on every other
+     * set, 0 included -- there 0 is a count -- and the init block below
+     * refuses a set carrying none of `reps`, [durationS] or [abandonedInPrep],
+     * which is a rep set that lost its count.
+     *
+     * Defaulted so a document that omits the key decodes; the init block is
+     * what stops the default standing in for a count the exporter forgot.
+     */
+    val reps: Int? = null,
     /** True when reps were entered or corrected manually rather than sensor-counted. */
     val repsManual: Boolean = false,
     /**
@@ -2825,10 +2869,12 @@ data class SetExport(
      * including a slot the app should not have armed at all.
      *
      * What follows from it: [durationS] and [prepS] are absent because neither
-     * was measured, [reps] is 0 because nothing was counted rather than
-     * because nothing was lifted, and any [failed] on such a set is the app's
-     * derivation -- read [failedByLifter] to confirm. The raw stream is real
-     * and worth reading; what it captured is a lead-in.
+     * was measured, and any [failed] on such a set is the app's derivation --
+     * read [failedByLifter] to confirm. The raw stream is real and worth
+     * reading; what it captured is a lead-in. On a rep set [reps] is 0, which
+     * is nothing counted rather than nothing lifted; it is absent on a timed
+     * set (1.23, #71). The clause that stood here said [reps] is 0 on every
+     * such set, and is DELETED rather than reworded.
      *
      * Omitted when false, and omission is NOT proof of the opposite: whether
      * the work began is a database column added at v15, so every set recorded
@@ -3415,7 +3461,18 @@ data class SetExport(
     val sensors: SetSensorsExport? = null,
     /** Always-included summary across reps. */
     val summary: SetSummaryExport,
-)
+) {
+    init {
+        // The twin of the schema's anyOf (#71): a set may go without `reps`
+        // only where it is timed -- it carries `duration_s`, or it ended in
+        // its prep. The exporter cannot trip this: a timed row either began
+        // its work, and then publishes its duration, or did not, and then
+        // publishes abandonedInPrep (AbandonedSetPolicy.published).
+        require(reps != null || durationS != null || abandonedInPrep) {
+            "a set that is not timed must carry reps"
+        }
+    }
+}
 
 /**
  * A set's accelerometer configuration: what was armed, what arrived, which of
