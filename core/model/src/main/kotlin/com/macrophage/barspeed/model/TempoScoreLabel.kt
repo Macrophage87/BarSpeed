@@ -2,10 +2,13 @@ package com.macrophage.barspeed.model
 
 /** How a tempo ratio should be toned, which is not the same question as what it covers. */
 enum class TempoScoreTone {
-    /** Every graded rep was in tolerance, on every phase the set prescribed. */
+    /** Every graded rep was in tolerance, and every prescribed movement phase was measured on every rep of the set. */
     ON_TEMPO,
 
-    /** Every graded rep was in tolerance, but a prescribed phase went ungraded on some or all of them. */
+    /**
+     * Every graded rep was in tolerance, but a prescribed movement phase went
+     * unmeasured on some or all of the set's reps.
+     */
     PARTIAL,
 
     /** At least one graded rep was outside tolerance. */
@@ -93,14 +96,16 @@ object TempoScoreLabel {
         if (repsEvaluated <= 0) return null
         val onRatio = repsFullyCompliant >= repsEvaluated
         val ungraded = ungradedMovementPhases(phases)
-        // Capped at the ratio's own count, which is what the chip has always
-        // counted coverage over: for every set the analyzer produces the cap
-        // IS repsEvaluated, because a graded rep is a rep of the set. #329
-        // moves the chip onto the set's reps.
-        val partial = partlyGraded(phases, minOf(setReps, repsEvaluated))
+        // Over EVERY rep of the set, not the reps the ratio graded (#329). A
+        // rep that resolved no scored phase is outside repsEvaluated, so a
+        // count taken over it could never see that rep, and the chip ticked
+        // over it. The set's reps are the count the eccentric caption (#89)
+        // and the verdict line (#328) take coverage over, so the chip's note
+        // and the lines beside it state one gap with one number.
+        val partial = partlyGraded(phases, setReps)
         // The tick is a claim about the SET, so it needs both: every graded rep
-        // in tolerance, and every phase the set prescribed actually graded ON
-        // EVERY GRADED REP. The ratio alone answers only the first, and a set
+        // in tolerance, and every phase the set prescribed actually measured ON
+        // EVERY REP OF THE SET. The ratio alone answers only the first, and a set
         // graded on its drives alone satisfies it while the eccentric behind it
         // was never measured. PhaseFacts.scored is set-level -- SetAnalyzer's
         // own flag, true the moment ONE rep resolves the phase -- so it cannot

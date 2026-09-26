@@ -2,8 +2,8 @@ package com.macrophage.barspeed.model
 
 /**
  * How many of a set's reps a tempo phase was MEASURED on, out of how many it
- * could have been -- the one coverage rule both tempo surfaces read (#89,
- * #230).
+ * could have been -- the one coverage rule every tempo surface reads (#89,
+ * #230, #328, #329).
  *
  * A tempo statement about a set is computed over the reps that resolved the
  * phase, and the reps that did not are dropped before anything is compared.
@@ -14,11 +14,10 @@ package com.macrophage.barspeed.model
  * screen's eccentric card and the tempo chip's note cannot count or phrase
  * the gap two ways.
  *
- * WHAT [of] COUNTS IS THE CALLER'S, and the two callers differ on purpose:
- * the eccentric card counts every rep of the analysis, because its chart is
- * drawn over every rep; the tempo chip counts the reps its ratio graded
- * (`repsEvaluated`), because its note qualifies that ratio. A rep that
- * resolved neither movement phase is in the first and not the second.
+ * [of] is every rep of the analysis, at every caller: the eccentric
+ * caption, the tempo verdict line and the tempo chip's note. A rep that
+ * resolved no scored phase is still a rep the phase went unmeasured on,
+ * and a count taken over the reps a ratio graded cannot see it (#329).
  *
  * Pure arithmetic over two counts. Nothing here says what the sensor or the
  * lifter did on an unmeasured rep -- only that nothing measured it.
