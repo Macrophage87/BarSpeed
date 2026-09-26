@@ -2393,6 +2393,17 @@ data class SessionExport(
          * `SessionExportWorkingTargetsTest` in `:core:data` are the
          * differentials, and `PlanPromptWorkingTargetContractTest` pins the
          * reading guide the plan prompt carries.
+         *
+         * FURTHER 1.23 ENTRY (#231). `voiceCues`' published description named
+         * two producers of a bare digit, the guide's tempo count and a timed
+         * set's countdown, and left out a third: the sensor-driven counter,
+         * which counts the seconds of a phase it detected. It now names all
+         * three, says where the sensor-driven counter speaks digits -- from
+         * v0.1.53 (#286) only on a set prescribed a tempo with nothing to play
+         * it -- and says a hold or a carry recorded by v0.1.49 or earlier may
+         * carry its digits beside the clock's (#217). Description text only: no
+         * key, type, value or example moves. `SchemaBareDigitContractTest` pins
+         * the description and this entry's marker in the published log.
          */
         const val SCHEMA_VERSION = "1.23"
 
