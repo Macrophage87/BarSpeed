@@ -134,14 +134,13 @@ class BodyWeightAbsenceGateTest {
     /**
      * The rest of the seed entry survives. A fix that reached for
      * `ExerciseDef(id, id, bodyweight = true)` would set the flag and throw
-     * away the display name, the kind and the barbell answer with it.
+     * away the display name and the kind with it.
      */
     @Test
     fun `resolvedById keeps everything else a seed entry declared`() {
         val hang = ExerciseDef.resolvedById("dead_hang")
         assertEquals("Dead Hang", hang.displayName)
         assertEquals(ExerciseKind.HOLD, hang.kind)
-        assertFalse(hang.usesBarbell)
         assertEquals("Back Squat", ExerciseDef.resolvedById("back_squat").displayName)
     }
 

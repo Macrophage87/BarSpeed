@@ -27,7 +27,7 @@ import kotlin.test.assertNull
 class SlotCardLineTest {
     private val squat = ExerciseDef("back_squat", "Back Squat")
     private val pullUp = ExerciseDef("pull_up", "Pull-up", bodyweight = true)
-    private val cable = ExerciseDef("cable_fly", "Cable Fly", usesBarbell = false)
+    private val cable = ExerciseDef("cable_fly", "Cable Fly")
 
     private fun slot(
         exercise: ExerciseDef,
@@ -91,8 +91,8 @@ class SlotCardLineTest {
 
     @Test
     fun `a declared barbell beats the exercise's own body-weight flag`() {
-        // usesBarbell no longer decides anything on this card, and neither
-        // does bodyweight: the suppression existed because barbell-ness was
+        // usesBarbell no longer exists (#268), and bodyweight decides nothing
+        // on this card either: the suppression existed because barbell-ness was
         // GUESSED and "pull_up" guessed true. A plan that writes "barbell" has
         // said what it means.
         assertEquals(

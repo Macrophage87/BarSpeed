@@ -18,8 +18,9 @@ import kotlin.test.assertEquals
  * [ExerciseDef.inferBarbell] is defined in terms of [ExerciseDef.inferKind],
  * so a kind row moving drags a barbell row with it.
  *
- * The three differ in one way that matters more than the arithmetic. `kind` and
- * `usesBarbell` are re-derived from the id on every read
+ * The three differ in one way that matters more than the arithmetic. `kind` is
+ * re-derived from the id on every read, and `usesBarbell` was until #268
+ * deleted it
  * (`SessionRepository.kt:286`, `:288`, `:295`, `:297`), so correcting them
  * corrects history too. `startsWith` is not: `SessionRepository.kt:308` writes
  * `inferStartPhase(id).name` into a `CustomExerciseEntity` the first time an id

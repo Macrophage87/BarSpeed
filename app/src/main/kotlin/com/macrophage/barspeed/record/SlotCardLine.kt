@@ -23,9 +23,10 @@ import com.macrophage.barspeed.model.WeightUnit
  * nothing to compute from before, and there is now.
  *
  * Both readings are the ADDED load, never a body-weight-inclusive total; see
- * ImplementLoad. Nothing here consults `ExerciseDef.usesBarbell` any more:
- * that flag is a guess from the exercise id, and a guess printed beside a rack
- * is an instruction. An exercise the plan says nothing about gets no line.
+ * ImplementLoad. Nothing here guesses from the exercise id: the
+ * `ExerciseDef.usesBarbell` flag this used to read was such a guess, and #268
+ * deleted it once nothing read it. A guess printed beside a rack is an
+ * instruction. An exercise the plan says nothing about gets no line.
  */
 internal fun PlannedSlot.cardInstruction(unit: WeightUnit, statedAddedKg: Double?): String? = ImplementLine
     .forCard(

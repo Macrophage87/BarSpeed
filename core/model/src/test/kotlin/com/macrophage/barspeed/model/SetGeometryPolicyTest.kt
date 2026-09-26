@@ -171,7 +171,6 @@ class SetGeometryPolicyTest {
         val out = SetGeometryPolicy.resolve(base, declared("bench_press", ""","start":"bottom""""))
         assertEquals(base.id, out.id)
         assertEquals(base.displayName, out.displayName)
-        assertEquals(base.usesBarbell, out.usesBarbell)
         assertNotEquals(base.startsWith, out.startsWith)
     }
 
