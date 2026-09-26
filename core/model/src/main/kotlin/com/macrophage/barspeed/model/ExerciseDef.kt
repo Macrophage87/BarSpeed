@@ -461,8 +461,9 @@ data class ExerciseDef(
          * first, so bare "press" stays eccentric-first.
          *
          * This is the one inference whose result is written down. The others are
-         * recomputed from the id on every read, but SessionRepository.kt:308
-         * stores this in a CustomExerciseEntity the first time an id is used and
+         * recomputed from the id on every read, but
+         * SessionRepository.ensureExerciseExists stores this in a
+         * CustomExerciseEntity the first time an id is used and
          * ExerciseDao has no statement that would update it, so an id already
          * seen keeps whatever this returned then. A plan-declared `"start"`
          * overrides it per exercise.

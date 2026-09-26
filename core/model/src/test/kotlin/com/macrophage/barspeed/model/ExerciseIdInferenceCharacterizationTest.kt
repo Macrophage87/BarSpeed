@@ -17,13 +17,13 @@ import kotlin.test.assertEquals
  * hint list matched against the id.
  *
  * The two differ in one way that matters more than the arithmetic. `kind` is
- * re-derived from the id on every read, and `usesBarbell` was until #268
- * deleted it
- * (`SessionRepository.kt:286`, `:288`, `:295`, `:297`), so correcting them
- * corrects history too. `startsWith` is not: `SessionRepository.kt:308` writes
- * `inferStartPhase(id).name` into a `CustomExerciseEntity` the first time an id
- * is seen, `:285` reads it back forever after, and `ExerciseDao`
- * (`Daos.kt:109-121`) has no update path. That column is written once.
+ * re-derived from the id on every read -- `SessionRepository.exerciseById`
+ * calls `inferKind` on both of its non-seed branches -- so correcting it
+ * corrects history too. `startsWith` is not:
+ * `SessionRepository.ensureExerciseExists` writes `inferStartPhase(id).name`
+ * into a `CustomExerciseEntity` the first time an id is seen, `exerciseById`
+ * reads it back forever after, and `ExerciseDao` has no update statement.
+ * That column is written once.
  */
 class ExerciseIdInferenceCharacterizationTest {
     private data class Row(
@@ -228,8 +228,9 @@ class ExerciseIdInferenceCharacterizationTest {
 
     @Test
     fun `every seed id resolves by lookup, so inference never decides one`() {
-        // exerciseById checks seedById first (SessionRepository.kt:153). These
-        // rows are in the sweep to prove a matcher change cannot reach them.
+        // SessionRepository.exerciseById checks ExerciseDef.seedById first.
+        // These rows are in the sweep to prove a matcher change cannot reach
+        // them.
         ExerciseDef.SEED.forEach { seed ->
             assertEquals(seed, ExerciseDef.seedById(seed.id), seed.id)
         }
