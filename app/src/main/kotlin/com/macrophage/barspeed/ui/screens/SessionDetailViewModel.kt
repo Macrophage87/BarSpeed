@@ -11,8 +11,8 @@ import com.macrophage.barspeed.BuildConfig
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.data.repsSourceOf
-import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.RepsCountChip
+import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.model.sessionTimestamp
