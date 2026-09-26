@@ -14,10 +14,10 @@ package com.macrophage.barspeed.model
  * figure derived for an unclosed session is the figure the close would have
  * written over those rows.
  *
- * WHAT IT COVERS. Only `hrAvgBpm` and `hrMaxBpm`. The session HRV is not
- * here and must not be added: its input is the R-R series `RecordViewModel`
- * accumulates in memory across the whole session, and the set rows do not
- * carry it.
+ * WHAT IT COVERS. Only `hrAvgBpm` and `hrMaxBpm`. `hrvRmssd_ms` is
+ * published only from a close; a derived block never carries it. Deriving it
+ * from the stored hrm and rest_before_hrm streams is #62 half (b), measured
+ * and not built.
  *
  * WHAT IT DOES NOT DO. It does not say whether a strap was worn: a set's
  * `hrAvgBpm` is whatever the set row stored. Withholding the session block

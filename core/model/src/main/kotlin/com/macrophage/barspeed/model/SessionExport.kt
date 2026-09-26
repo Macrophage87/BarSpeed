@@ -2570,13 +2570,13 @@ data class SessionExport(
          *
          * WHAT DOES NOT MOVE. A session with an `endedAt` publishes the pair
          * its close stored, unchanged and voided sets included, as 1.18 says.
-         * `hrvRmssd_ms` is published only from a close: its input is held in
-         * memory while the session runs and no set row carries it, so a
-         * derived block never carries it. The block is still withheld when a
-         * session has sets and none of them publishes an `hr` block (#83). The
-         * rows averaged are every set row's stored figures, a voided set and a
-         * set whose `hr` block the document withholds included, as the
-         * close's are.
+         * `hrvRmssd_ms` is published only from a close; a derived block never
+         * carries it. Deriving it from the stored hrm and rest_before_hrm
+         * streams is #62 half (b), measured and not built. The block is still
+         * withheld when a session has sets and none of them publishes an `hr`
+         * block (#83). The rows averaged are every set row's stored figures, a
+         * voided set and a set whose `hr` block the document withholds
+         * included, as the close's are.
          *
          * RETROACTIVE: re-exporting an older unfinished session now publishes
          * the block. No key is added, removed, renamed or retyped, and

@@ -206,9 +206,10 @@ class SessionExporter(
             // pair the close stored where the row has an end time, and
             // otherwise the same aggregate over the set rows, so a session
             // the lifter never finished publishes the figures its close would
-            // have written. hrvRmssdMs stays the row's alone -- its input was
-            // in memory and no set row carries it -- so a derived block
-            // carries none.
+            // have written. `hrvRmssd_ms` is published only from a close; a
+            // derived block never carries it. Deriving it from the stored hrm
+            // and rest_before_hrm streams is #62 half (b), measured and not
+            // built.
             heartRate =
             if (exercises.isNotEmpty() && exercises.all { it.sets.all { set -> set.hr == null } }) {
                 null
