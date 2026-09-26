@@ -24,11 +24,27 @@ data class SecondaryCapture(
     val samples: List<ImuSample>,
 )
 
-/** [armedCaptureOf]'s three answers, which have to be decided together. */
+/** [armedCaptureOf]'s answers, which have to be decided together. */
 data class ArmedCapture(
     val samples: List<ImuSample>,
     val sensors: RecordedSensors?,
     val secondary: SecondaryCapture?,
+    /**
+     * What [samples]' own roll says about whether the unit that produced them
+     * rode the stack, issue #323 -- the ANALYSED stream's signature, whichever
+     * unit that turned out to be, and on a one-sensor set as well as a
+     * two-unit one.
+     *
+     * Asked only where the set declares a stack mount, for the reason
+     * `StackRollSignature` gives: a unit lying still on a bench reads
+     * [StackMountSignal.ON_STACK] as readily as one on a stack. Everywhere
+     * else it is [StackMountSignal.UNMEASURED] -- nothing asked, which is
+     * absence and not a verdict.
+     *
+     * `SetGeometryPolicy.analysedUnder` is its one consumer. It is a statement
+     * about a STREAM's reported roll, never about where a magnet was stuck.
+     */
+    val analysedSignal: StackMountSignal = StackMountSignal.UNMEASURED,
 )
 
 /**
@@ -118,13 +134,14 @@ fun armedCaptureOf(
     // its roll reads -- and consults the roll signature only on a set that
     // declared a stack mount with both units delivering. The signal is measured
     // per BUFFER here, so a role cannot be paired with the other unit's roll.
+    val signalByRole = byRole.mapValues { stackSignalOf(it.value) }
     val decision =
         AnalysedRolePolicy.choose(
             armed = armed?.analysed,
             expected = armed?.expected.orEmpty(),
             framesByRole = framesByRole,
             declaresStackMount = declaresStackMount,
-            signalByRole = byRole.mapValues { stackSignalOf(it.value) },
+            signalByRole = signalByRole,
         )
     // Which armed roles delivered too few frames to analyse, and what the app
     // could see of each one's link when the set ended (#213, #209). The roles
@@ -176,8 +193,19 @@ fun armedCaptureOf(
             ),
             soleDelivery.takeIf { analysedBuffer.size < SensorCapturePolicy.MIN_ANALYSABLE_FRAMES },
         )
+    val samples = decision.role?.let { byRole[it] } ?: analysedBuffer
+    // The analysed stream's own signature (#323), read off the SAME buffer
+    // `samples` is: the role's entry in the map above where a role was chosen,
+    // and the one unroled buffer otherwise -- measured here, because a
+    // one-sensor set has no role to key a signal by and is the set #323 names.
+    // Asked only where the set declares a stack mount; see
+    // [ArmedCapture.analysedSignal].
+    val analysedSignal = when {
+        !declaresStackMount -> StackMountSignal.UNMEASURED
+        else -> decision.role?.let { signalByRole[it] } ?: stackSignalOf(samples)
+    }
     return ArmedCapture(
-        samples = decision.role?.let { byRole[it] } ?: analysedBuffer,
+        samples = samples,
         sensors = sensors,
         // The partner is derived from the declaration rather than carried
         // alongside it, so it cannot name a role the declaration does not.
@@ -185,5 +213,6 @@ fun armedCaptureOf(
         // list, which is what the repository turns into no row and a
         // declaration that still names the role.
         secondary = sensors?.secondaryRole?.let { SecondaryCapture(it, byRole[it].orEmpty()) },
+        analysedSignal = analysedSignal,
     )
 }

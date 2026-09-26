@@ -37,6 +37,7 @@ import com.macrophage.barspeed.hrm.RrIngest
 import com.macrophage.barspeed.model.AbandonedSetPolicy
 import com.macrophage.barspeed.model.AddSetControl
 import com.macrophage.barspeed.model.AddSetSlotKey
+import com.macrophage.barspeed.model.AnalysedGeometry
 import com.macrophage.barspeed.model.ArmedCapture
 import com.macrophage.barspeed.model.ArmedDelivery
 import com.macrophage.barspeed.model.ArmedLinks
@@ -333,6 +334,18 @@ data class PlannedSlot(
      * An ad-hoc set has no slot at all and so is never offered the grid.
      */
     val progression: ProgressionKind = ProgressionKind.WEIGHT,
+    /**
+     * Whether [exercise]'s `sensorInverted` came from the stack inversion rule
+     * alone -- `SetGeometryPolicy.stackRuleApplied`, read at flatten time
+     * (#323). Carried on the slot because the plan declaration it is read
+     * from is gone by the end of the set, and the end of the set is the only
+     * place an analysed unit exists to check it against.
+     *
+     * False on a slot the plan built no rule into, which is what every slot
+     * built before this field existed means. An appended slot inherits it
+     * through the `copy` in `appendedState`, with the exercise it describes.
+     */
+    val stackRuleApplied: Boolean = false,
 ) {
     /**
      * Whether this slot is measured on the clock, which is a question about the
@@ -944,6 +957,35 @@ internal fun RecordState.captureAt(
         )
     },
 )
+
+/**
+ * The definition a set's figures are computed under and the description its
+ * row stores, once the ANALYSED unit's own stream has been read (#323).
+ *
+ * A free function for [liveFeedOf]'s reason: [RecordViewModel] is the class
+ * detekt's `LargeClass` counts. The DECISION is
+ * `SetGeometryPolicy.analysedUnder`'s, in `:core:model` where a test runs on
+ * it; what is left here is handing it three things only this module holds --
+ * the exercise the set ran, the slot it came from, and the capture
+ * [captureAt] froze.
+ *
+ * The slot's own description when the set came from a plan, so what is stored
+ * is what `flattenPlan` resolved, corrected only where the analysed stream
+ * says so. An ad-hoc set has no plan to describe, so its geometry is the
+ * built-in definition's, and no stack rule was applied to it to take back.
+ *
+ * WHAT THIS DOES NOT REACH: the live tracker and counter, built at `beginSet`
+ * from the plan-time definition before any sample exists. On a sensor-counted
+ * set the recorded rep count is the live count, so this corrects the analysed
+ * figures and not that count.
+ */
+internal fun analysedAs(exercise: ExerciseDef, slot: PlannedSlot?, capture: ArmedCapture): AnalysedGeometry =
+    SetGeometryPolicy.analysedUnder(
+        used = exercise,
+        geometry = slot?.geometry ?: SetGeometryPolicy.describe(exercise, null),
+        stackRuleApplied = slot?.stackRuleApplied == true,
+        analysedSignal = capture.analysedSignal,
+    )
 
 /**
  * The four link fields THIS STATE is holding, as `:core:model` wants them.
@@ -5023,12 +5065,13 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         val restStartedAtMs = restStartedFrom(cueBuffer.toList(), timedEnd?.restFromMs, endedAtMs)
         pendingWrite =
             PendingSetWrite(
-                exercise = exercise,
-                // The slot's own description when the set came from a plan, so
-                // what is stored is what flattenPlan resolved and what
-                // SetAnalyzer was handed. An ad-hoc set has no plan to
-                // describe, so its geometry is the built-in definition's.
-                geometry = slot?.geometry ?: SetGeometryPolicy.describe(exercise, null),
+                // The definition SetAnalyzer is handed and the description the
+                // row stores, from ONE decision once the analysed unit's
+                // stream has been read (#323) -- [analysedAs] holds the
+                // argument and the wiring. Read twice, but a pure function of
+                // the same three values cannot disagree with itself.
+                exercise = analysedAs(exercise, slot, capture).exercise,
+                geometry = analysedAs(exercise, slot, capture).geometry,
                 slot = slot,
                 isTimed = isTimed,
                 loadKg = loadKg,

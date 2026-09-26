@@ -1,15 +1,21 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.AnalysedGeometry
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PlanExerciseDef
 import com.macrophage.barspeed.model.PlanSetDef
+import com.macrophage.barspeed.model.RecordedSensors
+import com.macrophage.barspeed.model.SensorRole
 import com.macrophage.barspeed.model.SetGeometryPolicy
+import com.macrophage.barspeed.model.StackMountSignal
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.VoiceCue
+import com.macrophage.barspeed.model.armedCaptureOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -42,6 +48,18 @@ import kotlin.test.assertTrue
  *
  * The count the plan's own geometry produces from the stack unit, against the
  * 14 performed. Before #317 that geometry was uninverted and read 1.
+ *
+ * ## Since #323, through the set-end path
+ *
+ * The rule's inversion is now taken back at the end of a set wherever the
+ * ANALYSED unit's own roll does not say it rode the stack. The last two tests
+ * drive that path -- `armedCaptureOf` with `StackRollSignature` over the set's
+ * own working window, then `SetGeometryPolicy.analysedUnder` -- once with
+ * both streams, where #278 keeps role a (0.28 degrees) and the inversion must
+ * stand, and once with role b's stream ALONE, standing for a pushdown recorded
+ * with one unit clipped to the rope under a plan naming neither key. Role b
+ * really was on the rope in this set (23.588 degrees); a one-unit rope set is
+ * the shape #323 names and has never been recorded.
  */
 class PushdownInversionFieldTest {
     private val name = "field-pushdown-1120-14rep-s41-set16"
@@ -72,6 +90,42 @@ class PushdownInversionFieldTest {
 
     private val used = SetGeometryPolicy.resolve(base, declared)
 
+    private val end = SetEnd.of(cues, cadenceGuided = targets.cadenceGuided)
+
+    /**
+     * What `RecordViewModel.endSet` does with a capture, over committed
+     * streams: `captureAt`'s signature supplier, then `analysedAs`. [armed] is
+     * null on a one-sensor set, whose one stream carries no role.
+     */
+    private fun atSetEnd(armed: RecordedSensors?, analysed: List<ImuSample>, partner: List<ImuSample>): SetEndRead {
+        val capture = armedCaptureOf(
+            armed = armed,
+            secondaryRole = armed?.let { SensorRole.B },
+            analysedBuffer = analysed,
+            secondaryBuffer = partner,
+            declaresStackMount = used.sensorOnStack,
+            stackSignalOf = { StackRollSignature.of(it, workAt, end) },
+        )
+        val result = SetGeometryPolicy.analysedUnder(
+            used = used,
+            geometry = SetGeometryPolicy.describe(used, declared),
+            stackRuleApplied = SetGeometryPolicy.stackRuleApplied(base, declared),
+            analysedSignal = capture.analysedSignal,
+        )
+        return SetEndRead(result, capture.samples)
+    }
+
+    /** The definition the set-end path chose and the stream it pointed the analysis at. */
+    private data class SetEndRead(val result: AnalysedGeometry, val samples: List<ImuSample>)
+
+    private fun count(read: SetEndRead): Int = SetAnalyzer.analyze(
+        read.samples,
+        read.result.exercise.liftDirection(),
+        targets = targets,
+        cues = cues,
+        workStartedAtMs = workAt,
+    ).reps.size
+
     /**
      * RED before #317's rule: the stack rises as the handle is driven down.
      * The first four terms are what field-41 recorded and are green either
@@ -97,5 +151,23 @@ class PushdownInversionFieldTest {
             workStartedAtMs = workAt,
         )
         assertEquals(14, analysis.reps.size, "against 14 performed; 1 before the rule")
+    }
+
+    /**
+     * #278 keeps role a, whose roll says stack, so the rule's inversion stands
+     * through the set-end path and the count is the one above. Green before
+     * #323's fix and after: the fix must not take back an inversion from the
+     * unit that rode the stack.
+     */
+    @Test
+    fun `through the set-end path the stack unit keeps the inversion and reads fourteen`() {
+        val armed = RecordedSensors(count = 2, expected = listOf(SensorRole.A, SensorRole.B), analysed = SensorRole.A)
+        val stack = load(name)
+        val read = atSetEnd(armed, stack, load("$name-imu-b"))
+        assertSame(stack, read.samples, "the analysis left the unit whose roll says stack")
+        assertEquals(StackMountSignal.ON_STACK, StackRollSignature.of(stack, workAt, end))
+        assertEquals(true, read.result.exercise.sensorInverted)
+        assertEquals(true, read.result.geometry.sensorInverted)
+        assertEquals(14, count(read), "against 14 performed")
     }
 }

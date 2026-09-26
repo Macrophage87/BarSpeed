@@ -44,6 +44,10 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
         // Described from the definition that was resolved, not from the plan,
         // so what the export publishes is what the DSP was handed.
         val geometry = SetGeometryPolicy.describe(exercise, exerciseDef)
+        // Whether the stack inversion rule, and nothing declared, set this
+        // exercise's inversion -- carried to the end of the set, where the
+        // analysed unit's own stream decides whether it stands (#323).
+        val stackRuleApplied = SetGeometryPolicy.stackRuleApplied(base, exerciseDef)
         exerciseDef.sets.forEachIndexed { setIdx, set ->
             // Which of the exercise's coaching keys the lifter reads without
             // touching the phone is decided in :core:model, where a test can
@@ -60,6 +64,7 @@ suspend fun SessionRepository.flattenPlan(planSession: PlanSessionDef): List<Pla
                 PlannedSlot(
                     exercise = exercise,
                     geometry = geometry,
+                    stackRuleApplied = stackRuleApplied,
                     setIndexInExercise = setIdx,
                     setsInExercise = exerciseDef.sets.size,
                     reps = set.reps,
