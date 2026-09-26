@@ -2551,6 +2551,41 @@ data class SessionExport(
          * the arithmetic on synthetic streams and on the committed captures;
          * `SessionExportDeliveredRateTest` in `:core:data` is the export
          * differential.
+         *
+         * 1.23 FURTHER ENTRY (#62, a session that was never finished): the
+         * session's `heartRate.avgBpm` and `maxBpm` are published for a
+         * session with no `endedAt`, derived when the document is written from
+         * the session's stored set rows by [SessionHeartRate] -- the rule the
+         * session close uses to store them. A further entry under the
+         * unreleased number and not a mint: `git tag --sort=-creatordate |
+         * head -1` is v0.1.55, its own SessionExport.kt reads
+         * `SCHEMA_VERSION = "1.22"`, and no v0.1.56 tag exists, all read this
+         * round.
+         *
+         * WHAT WAS FALSE. The block was written only by `endSession`, so a
+         * session the lifter left without finishing, or whose process died,
+         * published no session heart rate although every input was already
+         * stored. The 1.18 entry's sentence that these two figures are frozen
+         * at the session close holds only for a session that was closed.
+         *
+         * WHAT DOES NOT MOVE. A session with an `endedAt` publishes the pair
+         * its close stored, unchanged and voided sets included, as 1.18 says.
+         * `hrvRmssd_ms` is published only from a close: its input is held in
+         * memory while the session runs and no set row carries it, so a
+         * derived block never carries it. The block is still withheld when a
+         * session has sets and none of them publishes an `hr` block (#83). The
+         * rows averaged are every set row's stored figures, a voided set and a
+         * set whose `hr` block the document withholds included, as the
+         * close's are.
+         *
+         * RETROACTIVE: re-exporting an older unfinished session now publishes
+         * the block. No key is added, removed, renamed or retyped, and
+         * `DATABASE_VERSION` does NOT move. The plan schema is untouched.
+         *
+         * PINNED. `SchemaSessionHeartRateContractTest` asserts this entry's
+         * marker in the published log and the block's description;
+         * `SessionHeartRateTest` pins the rule; `SessionExportUnclosedHeartRateTest`
+         * in `:core:data` is the export differential.
          */
         const val SCHEMA_VERSION = "1.23"
 
