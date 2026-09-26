@@ -102,6 +102,7 @@ import com.macrophage.barspeed.model.SensorAdvice
 import com.macrophage.barspeed.model.SensorAdvicePolicy
 import com.macrophage.barspeed.model.SensorCapturePolicy
 import com.macrophage.barspeed.model.SensorRoster
+import com.macrophage.barspeed.model.SessionNotClosedCopy
 import com.macrophage.barspeed.model.SessionPreview
 import com.macrophage.barspeed.model.SessionPreviewPolicy
 import com.macrophage.barspeed.model.SessionRpe
@@ -410,13 +411,9 @@ private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
     ExitPrompt.SESSION_CLOSING ->
         "You asked to finish this session and it is being written now. It will finish even if you leave, " +
             "including the end time and the heart-rate and HRV summary. There is nothing left to decide here."
-    // The one prompt that must not undersell what is at stake.
-    ExitPrompt.SESSION_NOT_CLOSED ->
-        "Part of this session was not written — the end time and the heart-rate and HRV summary, or the " +
-            "rest recorded after your last set. Tapping FINISH SESSION AGAIN on this screen can still " +
-            "write what is missing — freeing some space on the phone first if that is what stopped it. " +
-            "Every set is already saved either way. Whatever has not been written is held only here, and " +
-            "leaving now loses it."
+    // The one prompt that must not undersell what is at stake. Its words live
+    // in :core:model, where SessionNotClosedCopyTest pins them (#331).
+    ExitPrompt.SESSION_NOT_CLOSED -> SessionNotClosedCopy.EXIT_BODY
 }
 
 private fun exitLabel(prompt: ExitPrompt, action: ExitAction): String = when (action) {
@@ -3592,7 +3589,11 @@ private fun UnclosedSessionNotice(viewModel: RecordViewModel) {
         onClick = viewModel::retrySessionClose,
         modifier = Modifier.fillMaxWidth().height(64.dp),
     ) {
-        Text("FINISH SESSION AGAIN", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            SessionNotClosedCopy.RETRY_LABEL,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
