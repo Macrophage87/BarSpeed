@@ -143,6 +143,18 @@ data class ResolvedGeometry(
 data class StackMount(val onStack: Boolean, val source: GeometrySource)
 
 /**
+ * The definition a set's figures are analysed under and the description of it
+ * the set is recorded with, decided together by
+ * [SetGeometryPolicy.analysedUnder] so the two cannot disagree (#323).
+ *
+ * A pair rather than two calls for [StackMount]'s reason: the export publishes
+ * `geometry.sensorInverted` beside figures `SetAnalyzer` computed, and a
+ * description worked out apart from the definition it describes is how the
+ * published flag drifts from the one the DSP was handed.
+ */
+data class AnalysedGeometry(val exercise: ExerciseDef, val geometry: ResolvedGeometry)
+
+/**
  * How a plan's declarations combine with the app's built-in definition to give
  * the one [ExerciseDef] a set is recorded against, and how to describe the
  * result afterwards.
@@ -288,6 +300,45 @@ object SetGeometryPolicy {
         base -> true
         else -> onStack && !concentricUp && !horizontal
     }
+
+    /**
+     * Whether [resolve]'s `sensorInverted` for this exercise came from
+     * [stackInversion]'s rule 3 ALONE -- nothing declared the key, the
+     * built-in definition does not carry it, and the resolved stack mount,
+     * drive and plane put the exercise under the rule (#323).
+     *
+     * Read off [resolve] itself rather than restating the rule, so the answer
+     * cannot drift from the value it describes. False with no plan at all:
+     * [resolve] returns [base] unchanged there and applies no rule.
+     *
+     * Carried to the end of the set because that is the only place an
+     * ANALYSED unit exists; see [analysedUnder].
+     */
+    fun stackRuleApplied(base: ExerciseDef, declared: PlanExerciseDef?): Boolean {
+        if (declared == null || declared.sensorInverted != null || base.sensorInverted) return false
+        return resolve(base, declared).sensorInverted
+    }
+
+    /**
+     * The definition a set's figures are computed under, once the ANALYSED
+     * unit's own stream has been read, and its description (#323).
+     *
+     * [used] and [geometry] are what [resolve] and [describe] gave the set
+     * before it began; [stackRuleApplied] is [SetGeometryPolicy.stackRuleApplied]
+     * for it; [analysedSignal] is `ArmedCapture.analysedSignal`.
+     *
+     * THE SEAM ONLY, in the commit that adds it: the resolved definition
+     * stands whatever the stream said, which is what the app did before this
+     * function existed. The suppression goes with the commit that reads the
+     * two parameters.
+     */
+    @Suppress("UnusedParameter")
+    fun analysedUnder(
+        used: ExerciseDef,
+        geometry: ResolvedGeometry,
+        stackRuleApplied: Boolean,
+        analysedSignal: StackMountSignal,
+    ): AnalysedGeometry = AnalysedGeometry(used, geometry)
 
     /**
      * Describe the definition a set was recorded against.
