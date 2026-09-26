@@ -500,8 +500,24 @@ data class ExerciseDef(
         // prefixes because the match was a substring search; as whole tokens
         // they are unambiguous under either reading, which is the only reason
         // to prefer one spelling of a hint over another.
+        //
+        // "dumbell" is the single-b misspelling, and the owner writes it
+        // (#128). It is one exact word, not a fuzzy match: "kettlebel" and
+        // "barbel" are not here, and a token-distance matcher in an inference
+        // path would be a bigger change than this list entry.
         private val NON_BARBELL_HINTS =
-            listOf("dumbbell", "db", "kettlebell", "kb", "cable", "machine", "band", "bodyweight", "smith")
+            listOf(
+                "dumbbell",
+                "dumbell",
+                "db",
+                "kettlebell",
+                "kb",
+                "cable",
+                "machine",
+                "band",
+                "bodyweight",
+                "smith",
+            )
 
         /** Plate math only applies to straight-bar lifts. */
         fun inferBarbell(id: String): Boolean {
