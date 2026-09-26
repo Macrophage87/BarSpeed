@@ -75,8 +75,8 @@ private data class PendingSessionClose(
  * update itself. What that costs is not the timestamp. `endedAtMs`, `hrAvgBpm`
  * and `hrMaxBpm` can all be rebuilt later from rows that are already durable,
  * because each set row carries its own end time and its own heart-rate columns.
- * The session HRV cannot. Its input is the R-R intervals collected across the
- * whole session, rests included. A session whose close never lands publishes
+ * The close's own session HRV cannot: its input is the R-R intervals this close
+ * receives, the final rest included. A session whose close never lands publishes
  * an HRV derived from its stored heart-rate streams instead (#62), computed
  * from stored streams rather than from the intervals this close receives.
  *

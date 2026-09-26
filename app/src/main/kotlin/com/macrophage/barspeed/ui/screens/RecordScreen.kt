@@ -410,10 +410,7 @@ private fun exitBody(prompt: ExitPrompt): String = when (prompt) {
     ExitPrompt.SESSION_CLOSING ->
         "You asked to finish this session and it is being written now. It will finish even if you leave, " +
             "including the end time and the heart-rate and HRV summary. There is nothing left to decide here."
-    // The one prompt that must not undersell what is at stake. Session HRV is
-    // computed from beat-to-beat intervals collected across the whole session,
-    // rests included, and those are held in memory and nowhere else — the
-    // per-set heart-rate streams keep the in-set beats and nothing keeps these.
+    // The one prompt that must not undersell what is at stake.
     ExitPrompt.SESSION_NOT_CLOSED ->
         "Part of this session was not written — the end time and the heart-rate and HRV summary, or the " +
             "rest recorded after your last set. Tapping FINISH SESSION AGAIN on this screen can still " +
