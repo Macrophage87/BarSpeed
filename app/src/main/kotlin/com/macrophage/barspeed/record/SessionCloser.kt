@@ -77,8 +77,9 @@ private data class PendingSessionClose(
  * because each set row carries its own end time and its own heart-rate columns.
  * The close's own session HRV cannot: its input is the R-R intervals this close
  * receives, the final rest included. A session whose close never lands publishes
- * an HRV derived from its stored heart-rate streams instead (#62), computed
- * from stored streams rather than from the intervals this close receives.
+ * an HRV derived from its stored heart-rate streams instead (#62), where they
+ * hold ten or more usable beat-to-beat differences, computed from stored
+ * streams rather than from the intervals this close receives.
  *
  * The session rating (#159) is worse off: how a workout FELT is recorded in no
  * artifact at all. It is stated once, at the finish, and a close that never
