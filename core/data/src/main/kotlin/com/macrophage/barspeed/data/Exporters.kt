@@ -26,6 +26,7 @@ import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.RecordedTimeZone
 import com.macrophage.barspeed.model.RepMetricsExport
+import com.macrophage.barspeed.model.RepsSource
 import com.macrophage.barspeed.model.RepsSourcePolicy
 import com.macrophage.barspeed.model.ResolvedGeometry
 import com.macrophage.barspeed.model.RestMeasurePolicy
@@ -863,8 +864,10 @@ private val SetRecordEntity.publishedLimiter: String?
     get() = SetLimiter.ofStored(limiter)?.stored
 
 /**
- * Whose count this row's [SetRecordEntity.actualReps] is, as the published
- * word (#286).
+ * Whose count this row's [SetRecordEntity.actualReps] is (#286), read by both
+ * export writers as the published word and by the history card's count chip
+ * (#325) -- one derivation, so the card and the export cannot name two
+ * counters for one row.
  *
  * One definition read by both export writers, [publishedLimiterNote]'s reason:
  * the session document is serialised by kotlinx and the archive's manifest is
@@ -895,7 +898,7 @@ private val SetRecordEntity.publishedLimiter: String?
  *   kind at all, and `ExerciseDef`'s kind for an id outside the seed list is its
  *   own admitted guess.
  */
-private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?): String? = RepsSourcePolicy.publishedWord(
+fun SetRecordEntity.repsSourceOf(kind: ExerciseKind?): RepsSource? = RepsSourcePolicy.published(
     liveReps = liveReps,
     repsManual = repsManual,
     timed = actualDurationS != null,
@@ -906,6 +909,9 @@ private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?): String? = 
         kind = kind,
     ),
 )
+
+/** [repsSourceOf] as the word both export writers publish. */
+private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?): String? = repsSourceOf(kind)?.wireName
 
 /**
  * The rep count this row publishes, or null on a timed set (#71).

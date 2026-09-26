@@ -14,10 +14,10 @@ import kotlin.test.assertNull
  */
 class TempoScoreLabelTest {
     private fun bothGraded() = listOf(
-        PhaseFacts("eccentric", prescribed = true, scored = true),
-        PhaseFacts("bottomPause", prescribed = true, scored = false),
-        PhaseFacts("concentric", prescribed = true, scored = true),
-        PhaseFacts("topPause", prescribed = true, scored = false),
+        PhaseFacts("eccentric", prescribed = true, scored = true, repsResolved = 4),
+        PhaseFacts("bottomPause", prescribed = true, scored = false, repsResolved = 0),
+        PhaseFacts("concentric", prescribed = true, scored = true, repsResolved = 4),
+        PhaseFacts("topPause", prescribed = true, scored = false, repsResolved = 0),
     )
 
     private fun score(compliant: Int, evaluated: Int, phases: List<PhaseFacts> = bothGraded()) =
@@ -52,10 +52,10 @@ class TempoScoreLabelTest {
     fun `an ungraded eccentric is named as the gap`() {
         val phases =
             listOf(
-                PhaseFacts("eccentric", prescribed = true, scored = false),
-                PhaseFacts("bottomPause", prescribed = true, scored = false),
-                PhaseFacts("concentric", prescribed = true, scored = true),
-                PhaseFacts("topPause", prescribed = true, scored = false),
+                PhaseFacts("eccentric", prescribed = true, scored = false, repsResolved = 0),
+                PhaseFacts("bottomPause", prescribed = true, scored = false, repsResolved = 0),
+                PhaseFacts("concentric", prescribed = true, scored = true, repsResolved = 4),
+                PhaseFacts("topPause", prescribed = true, scored = false, repsResolved = 0),
             )
         assertEquals(listOf("eccentric"), assertNotNull(score(4, 4, phases)).ungradedPhases)
     }
@@ -72,8 +72,8 @@ class TempoScoreLabelTest {
     fun `a phase the prescription never named is not a gap either`() {
         val phases =
             listOf(
-                PhaseFacts("eccentric", prescribed = false, scored = false),
-                PhaseFacts("concentric", prescribed = true, scored = true),
+                PhaseFacts("eccentric", prescribed = false, scored = false, repsResolved = 0),
+                PhaseFacts("concentric", prescribed = true, scored = true, repsResolved = 4),
             )
         assertEquals(emptyList(), assertNotNull(score(4, 4, phases)).ungradedPhases)
     }
@@ -84,10 +84,10 @@ class TempoScoreLabelTest {
      * on tempo. `TempoScoreWiringTest` builds this same set for real.
      */
     private fun driveOnlyGraded() = listOf(
-        PhaseFacts("eccentric", prescribed = true, scored = false),
-        PhaseFacts("bottomPause", prescribed = true, scored = false),
-        PhaseFacts("concentric", prescribed = true, scored = true),
-        PhaseFacts("topPause", prescribed = true, scored = false),
+        PhaseFacts("eccentric", prescribed = true, scored = false, repsResolved = 0),
+        PhaseFacts("bottomPause", prescribed = true, scored = false, repsResolved = 0),
+        PhaseFacts("concentric", prescribed = true, scored = true, repsResolved = 4),
+        PhaseFacts("topPause", prescribed = true, scored = false, repsResolved = 0),
     )
 
     @Test

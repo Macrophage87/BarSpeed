@@ -4,8 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import com.macrophage.barspeed.dsp.SetAnalysis
+import com.macrophage.barspeed.dsp.tempoScore
 import com.macrophage.barspeed.model.TempoScore
-import com.macrophage.barspeed.model.TempoScoreLabel
 import com.macrophage.barspeed.model.TempoScoreTone
 import com.macrophage.barspeed.ui.BarColors
 import com.macrophage.barspeed.ui.components.ChipTone
@@ -13,22 +13,13 @@ import com.macrophage.barspeed.ui.components.ChipTone
 /**
  * The tempo chip, in the one place both screens read it from.
  *
- * The decision itself is [TempoScoreLabel] in `:core:model`, where a test runs
- * on every push; everything here is mechanical. The rest screen and the history
+ * The decision itself is `TempoScoreLabel` in `:core:model`, and the mapping
+ * onto it is `tempoScore` in `:core:dsp`; a test runs on both on every push,
+ * and nothing here decides anything. The rest screen and the history
  * screen each carried their own copy of it and neither copy was reachable by
  * any test on the CI path -- issue #56.
  */
-internal fun tempoScoreOf(analysis: SetAnalysis): TempoScore? {
-    val compliance = analysis.tempoCompliance ?: return null
-    return TempoScoreLabel.of(
-        repsFullyCompliant = compliance.repsFullyCompliant,
-        repsEvaluated = compliance.repsEvaluated,
-        phases =
-        compliance.phases.map {
-            TempoScoreLabel.PhaseFacts(it.phase, prescribed = it.prescribedS != null, scored = it.scored)
-        },
-    )
-}
+internal fun tempoScoreOf(analysis: SetAnalysis): TempoScore? = analysis.tempoCompliance?.tempoScore()
 
 internal fun TempoScoreTone.chipTone(): ChipTone = when (this) {
     TempoScoreTone.ON_TEMPO -> ChipTone.OK

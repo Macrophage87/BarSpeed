@@ -35,9 +35,6 @@ class TempoScoreWiringTest {
         targets = SetTargets(tempo = Tempo.parse("3010"), toleranceS = 0.5),
     )
 
-    private fun facts(c: TempoComplianceResult) =
-        c.phases.map { TempoScoreLabel.PhaseFacts(it.phase, prescribed = it.prescribedS != null, scored = it.scored) }
-
     @Test
     fun `the analyzer's gradeable phase names are the ones the label looks for`() {
         val c = assertNotNull(driveOnlySet().tempoCompliance)
@@ -56,14 +53,14 @@ class TempoScoreWiringTest {
         // End to end: a real analysis of a real drive-only set reaches the
         // label as one prescribed phase nothing graded. What the label then
         // says about it is TempoScoreLabelTest's subject.
-        val score = assertNotNull(TempoScoreLabel.of(c.repsFullyCompliant, c.repsEvaluated, facts(c)))
+        val score = assertNotNull(c.tempoScore())
         assertEquals(listOf(TempoComplianceResult.PHASE_ECCENTRIC), score.ungradedPhases)
     }
 
     @Test
     fun `a real drive-only set does not tick, and says why`() {
         val c = assertNotNull(driveOnlySet().tempoCompliance)
-        val score = assertNotNull(TempoScoreLabel.of(c.repsFullyCompliant, c.repsEvaluated, facts(c)))
+        val score = assertNotNull(c.tempoScore())
         assertEquals("Tempo 4/4", score.text)
         assertEquals(
             "Eccentric not measured this set -- the ratio covers the concentric only.",

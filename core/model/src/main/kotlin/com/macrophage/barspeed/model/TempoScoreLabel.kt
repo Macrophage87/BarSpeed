@@ -37,7 +37,7 @@ data class TempoScore(
  * neither copy could be tested. Issue #56.
  *
  * The input is a flat description of what the analyzer already decided --
- * names and two booleans -- rather than a `:core:dsp` type, so this module
+ * names, two booleans and a count -- rather than a `:core:dsp` type, so this module
  * keeps no dependency on the analyzer and nothing here re-derives a
  * prescription.
  */
@@ -61,11 +61,15 @@ object TempoScoreLabel {
      * @param name the analyzer's phase name.
      * @param prescribed whether the prescription named a duration for it.
      * @param scored whether the set was actually graded on it.
+     * @param repsResolved how many reps resolved this phase: the analyzer's
+     *   stored per-phase `repsEvaluated`, read rather than recounted. No
+     *   default, so a caller cannot build these facts without saying it.
      */
     data class PhaseFacts(
         val name: String,
         val prescribed: Boolean,
         val scored: Boolean,
+        val repsResolved: Int,
     )
 
     /**
