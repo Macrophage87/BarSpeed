@@ -7,6 +7,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * The tempo chip over a whole set, through [tempoScore] on [SetAnalysis] --
@@ -19,7 +20,7 @@ import kotlin.test.assertNull
  * eccentric nothing measured resolved no scored phase at all. Tolerance
  * 0.5 s. Reps are built by hand so the population is exact.
  *
- * RED WHEN WRITTEN, except the two guards named in their KDoc.
+ * RED WHEN WRITTEN, except the tests whose KDoc opens GUARD.
  */
 class TempoScoreSetCoverageWiringTest {
     private val explosiveUp = Tempo.parse("30X0")
@@ -97,6 +98,45 @@ class TempoScoreSetCoverageWiringTest {
         assertEquals(
             "Eccentric: 4 of 8 reps measured · 4 not measured.",
             assertNotNull(stored(reps).tempoScore()).ungradedNote,
+        )
+    }
+
+    /**
+     * GUARD, green when written: added after the fix, in review round 1.
+     *
+     * The same gap, one number, on a set with a MISS. Eight reps, eccentrics
+     * measured on reps 0, 2, 4 and 6 -- one of them 4.0 s against the 3.00 s
+     * target, a full second outside the 0.5 s tolerance. The chip is off tempo
+     * and still says four reps went unmeasured, and the tempo verdict line
+     * (#328) the same card draws counts those same four. The caption test
+     * above cannot reach this: on a miss the caption names the worst rep and
+     * states no coverage at all.
+     */
+    @Test
+    fun `the chip's note and the tempo verdict line count the same gap on a missed set`() {
+        val reps =
+            (0..7).map {
+                rep(
+                    it,
+                    when {
+                        it == 2 -> 4.0
+                        it % 2 == 0 -> 3.0
+                        else -> null
+                    },
+                )
+            }
+        val a = stored(reps)
+        val c = assertNotNull(a.tempoCompliance)
+        assertEquals(4, c.repsEvaluated, "the fixture's graded count moved")
+        assertEquals(3, c.repsFullyCompliant, "the fixture's compliance moved")
+        val score = assertNotNull(a.tempoScore())
+        assertEquals("Tempo 3/4", score.text)
+        assertEquals(TempoScoreTone.OFF_TEMPO, score.tone)
+        assertEquals("Eccentric: 4 of 8 reps measured · 4 not measured.", score.ungradedNote)
+        val verdicts = CoachingRules.verdicts(a.reps, a.velocityLossPct, c, SetTargets())
+        assertTrue(
+            verdicts.any { it.startsWith("Tempo (eccentric): 3 of 4 measured reps on tempo · 4 not measured;") },
+            "verdicts: $verdicts",
         )
     }
 }
