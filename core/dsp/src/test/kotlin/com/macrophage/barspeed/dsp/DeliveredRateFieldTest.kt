@@ -102,8 +102,8 @@ class DeliveredRateFieldTest {
     }
 
     /**
-     * A pair with neither a prep window nor a cue track: field-44's deadlift,
-     * set 1, measured over each stream's own span.
+     * A pair with no prep window and a cue track that carries no terminal
+     * cue: field-44's deadlift, set 1, measured over each stream's own span.
      */
     @Test
     fun `a pair with no bounds reads over its own span`() {

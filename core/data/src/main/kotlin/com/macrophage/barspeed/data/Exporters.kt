@@ -770,11 +770,13 @@ class SessionExporter(
      *
      * Each stream is inflated and parsed here, which [SetSensorsExport]'s own
      * KDoc states as this key's price. Only roled IMU streams of roles in
-     * [present] are touched, so a set whose stream carries no role -- and every
-     * one-sensor set, which has no declaration and never reaches this
-     * function -- inflates nothing more than it did. Every inflate and decode
-     * is inside `runCatching`: a stream that will not parse costs its own
-     * figure and not the export.
+     * [present] are touched, so a set whose stream carries no role inflates
+     * nothing more than it did. A one-sensor set with no sensors declaration
+     * never reaches this function at all; a sole-silent one-sensor set does
+     * declare and does reach it, with [present] empty, so it too inflates
+     * nothing more than it did. Every inflate and decode is inside
+     * `runCatching`: a stream that will not parse costs its own figure and
+     * not the export.
      */
     private fun deliveredByRole(
         record: SetRecordEntity,
