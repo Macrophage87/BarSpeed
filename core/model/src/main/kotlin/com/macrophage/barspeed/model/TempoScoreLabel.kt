@@ -5,7 +5,7 @@ enum class TempoScoreTone {
     /** Every graded rep was in tolerance, on every phase the set prescribed. */
     ON_TEMPO,
 
-    /** Every graded rep was in tolerance, but a prescribed phase went ungraded. */
+    /** Every graded rep was in tolerance, but a prescribed phase went ungraded on some or all of them. */
     PARTIAL,
 
     /** At least one graded rep was outside tolerance. */
@@ -16,8 +16,9 @@ enum class TempoScoreTone {
  * The tempo chip's text and tone, plus the sentence that must accompany it.
  *
  * [ungradedPhases] is the fact -- which prescribed movement phases the set was
- * never graded on -- and [ungradedNote] is the sentence a screen draws for it,
- * null when there is nothing to qualify. A caller that drops the note renders
+ * never graded on -- and [ungradedNote] is the sentence a screen draws for it
+ * and for any phase graded on only some reps (#230), null when there is
+ * nothing to qualify. A caller that drops the note renders
  * the same overstatement this type exists to end, so it is a separate field
  * rather than an optional suffix on [text].
  */
@@ -88,15 +89,17 @@ object TempoScoreLabel {
         if (repsEvaluated <= 0) return null
         val onRatio = repsFullyCompliant >= repsEvaluated
         val ungraded = ungradedMovementPhases(phases)
+        val partial = partlyGraded(phases, repsEvaluated)
         // The tick is a claim about the SET, so it needs both: every graded rep
-        // in tolerance, and every phase the set prescribed actually graded. The
-        // ratio alone answers only the first, and a set graded on its drives
-        // alone satisfies it while the eccentric behind it was never measured.
-        // Graded is set-level: PhaseFacts.scored is SetAnalyzer's own flag, true
-        // the moment ONE rep resolves the phase. A set where some reps resolved
-        // an eccentric and others did not reports no gap here and still ticks.
-        // Untracked remainder, issue #230.
-        val complete = onRatio && ungraded.isEmpty()
+        // in tolerance, and every phase the set prescribed actually graded ON
+        // EVERY GRADED REP. The ratio alone answers only the first, and a set
+        // graded on its drives alone satisfies it while the eccentric behind it
+        // was never measured. PhaseFacts.scored is set-level -- SetAnalyzer's
+        // own flag, true the moment ONE rep resolves the phase -- so it cannot
+        // say a phase went unmeasured on some reps; repsResolved can, and
+        // PhaseCoverage is the rule that reads it (#230).
+        val covered = ungraded.isEmpty() && partial.isEmpty()
+        val complete = onRatio && covered
         return TempoScore(
             text = "Tempo $repsFullyCompliant/$repsEvaluated" + if (complete) " ✓" else "",
             // Compliance and coverage are separate questions and are answered
@@ -105,12 +108,43 @@ object TempoScoreLabel {
             tone =
             when {
                 !onRatio -> TempoScoreTone.OFF_TEMPO
-                ungraded.isEmpty() -> TempoScoreTone.ON_TEMPO
+                covered -> TempoScoreTone.ON_TEMPO
                 else -> TempoScoreTone.PARTIAL
             },
             ungradedPhases = ungraded,
-            ungradedNote = noteFor(ungraded, gradedMovementPhases(phases)),
+            ungradedNote =
+            listOfNotNull(
+                noteFor(ungraded, gradedMovementPhases(phases)),
+                partialNoteFor(partial),
+            ).joinToString(" ").ifEmpty { null },
         )
+    }
+
+    /**
+     * The sentence for phases measured on some graded reps and not others,
+     * or null when there are none: each phase's count and its gap, the gap in
+     * [PhaseCoverage]'s words.
+     */
+    private fun partialNoteFor(partial: List<Pair<String, PhaseCoverage>>): String? {
+        if (partial.isEmpty()) return null
+        return partial.joinToString(" ") { (name, coverage) ->
+            "${name.replaceFirstChar { it.uppercase() }}: ${coverage.measured} of ${coverage.of} reps measured · " +
+                "${coverage.notMeasuredClause}."
+        }
+    }
+
+    /**
+     * Prescribed movement phases the set WAS graded on, but not on every rep
+     * the ratio counts, each with its coverage over [repsEvaluated].
+     *
+     * Only scored phases: a phase no rep resolved is [ungradedMovementPhases]'
+     * and already has its sentence.
+     */
+    private fun partlyGraded(phases: List<PhaseFacts>, repsEvaluated: Int): List<Pair<String, PhaseCoverage>> {
+        val scored = phases.filter { it.name in MOVEMENT_PHASES && it.prescribed && it.scored }
+        return scored
+            .map { it.name to PhaseCoverage(measured = it.repsResolved, of = repsEvaluated) }
+            .filter { (_, coverage) -> !coverage.complete }
     }
 
     /**

@@ -23,7 +23,8 @@ fun TempoComplianceResult.tempoScore(): TempoScore? = TempoScoreLabel.of(
             it.phase,
             prescribed = it.prescribedS != null,
             scored = it.scored,
-            // Carried, and not yet read by the label.
+            // The phase's own count, never the set's: the label compares it
+            // with repsEvaluated to find reps the phase went unmeasured on.
             repsResolved = it.repsEvaluated,
         )
     },
