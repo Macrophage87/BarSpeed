@@ -4,7 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Characterization sweep over the three id-based inferences in [ExerciseDef].
+ * Characterization sweep over the two id-based inferences in [ExerciseDef].
  *
  * Twenty rows moved when whole-token matching replaced substring matching.
  * They were written here first, against the substring matcher, so every one
@@ -13,12 +13,10 @@ import kotlin.test.assertEquals
  * is named in the section comments below as a fix, an accepted loss, or a
  * question nobody has answered.
  *
- * All three inferences are swept together because they share one mechanism —
- * a hint list matched against the id — and because they feed each other:
- * [ExerciseDef.inferBarbell] is defined in terms of [ExerciseDef.inferKind],
- * so a kind row moving drags a barbell row with it.
+ * Both inferences are swept together because they share one mechanism — a
+ * hint list matched against the id.
  *
- * The three differ in one way that matters more than the arithmetic. `kind` is
+ * The two differ in one way that matters more than the arithmetic. `kind` is
  * re-derived from the id on every read, and `usesBarbell` was until #268
  * deleted it
  * (`SessionRepository.kt:286`, `:288`, `:295`, `:297`), so correcting them
@@ -32,23 +30,18 @@ class ExerciseIdInferenceCharacterizationTest {
         val id: String,
         val kind: ExerciseKind,
         val start: StartPhase,
-        val barbell: Boolean,
     )
 
     private val sweep =
         listOf(
-            // --- issue #24's reported cases: fixes. The barbell column moves
-            // with them, because inferBarbell asks inferKind: a leg raise that
-            // stops being a HOLD starts being plate-loadable, which shows one
-            // line of plate text on a set that declares a load, and nothing at
-            // all on a set that does not (RecordScreen.kt:1336-1337). ---
-            Row("hanging_leg_raise", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("hanging_knee_raise", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("walking_lunge", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("dumbbell_walking_lunge", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, false),
-            Row("snatch_grip_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("clean_grip_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("snatch_grip_rdl", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
+            // --- issue #24's reported cases: fixes. ---
+            Row("hanging_leg_raise", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("hanging_knee_raise", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("walking_lunge", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("dumbbell_walking_lunge", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("snatch_grip_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("clean_grip_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("snatch_grip_rdl", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
 
             // --- Olympic variants. These are the reason the slow-lift veto
             // does NOT contain "squat", though issue #24's fix section says it
@@ -62,56 +55,56 @@ class ExerciseIdInferenceCharacterizationTest {
             // are ordinary slow deadlift work. Both are FIXES and both move,
             // EXPLOSIVE to DYNAMIC, alongside the seven from issue #24 -- they
             // are counted there, not treated as a separate argument. ---
-            Row("squat_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("hang_squat_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("squat_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("hang_power_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("hang_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("hang_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("clean_pull", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("snatch_pull", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("clean_and_jerk", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("power_clean_from_blocks", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("romanian_deadlift_snatch_grip", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("deadlift_snatch_grip", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
+            Row("squat_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("hang_squat_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("squat_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("hang_power_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("hang_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("hang_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("clean_pull", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("snatch_pull", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("clean_and_jerk", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("power_clean_from_blocks", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("romanian_deadlift_snatch_grip", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("deadlift_snatch_grip", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
 
             // --- every seed id, which resolves by lookup before inference ever runs ---
-            Row("back_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("front_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("overhead_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("romanian_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("barbell_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("hip_thrust", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("plank", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
-            Row("side_plank", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
-            Row("dead_hang", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
-            Row("farmers_walk", ExerciseKind.CARRY, StartPhase.ECCENTRIC, false),
-            Row("suitcase_carry", ExerciseKind.CARRY, StartPhase.ECCENTRIC, false),
-            Row("snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("power_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("power_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("push_press", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC, true),
-            Row("kettlebell_swing", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC, false),
-            Row("kettlebell_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, false),
-            Row("kettlebell_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, false),
+            Row("back_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("front_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("overhead_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("romanian_deadlift", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("barbell_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("hip_thrust", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("plank", ExerciseKind.HOLD, StartPhase.ECCENTRIC),
+            Row("side_plank", ExerciseKind.HOLD, StartPhase.ECCENTRIC),
+            Row("dead_hang", ExerciseKind.HOLD, StartPhase.ECCENTRIC),
+            Row("farmers_walk", ExerciseKind.CARRY, StartPhase.ECCENTRIC),
+            Row("suitcase_carry", ExerciseKind.CARRY, StartPhase.ECCENTRIC),
+            Row("snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("power_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("power_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("push_press", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC),
+            Row("kettlebell_swing", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC),
+            Row("kettlebell_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("kettlebell_clean", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
 
             // --- ids already asserted elsewhere, swept here so the whole table moves together ---
-            Row("kettlebell_swing_heavy", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC, false),
-            Row("dumbbell_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, false),
-            Row("med_ball_slam", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC, true),
-            Row("pallof_hold", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
-            Row("wall_sit", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
-            Row("overhead_carry", ExerciseKind.CARRY, StartPhase.CONCENTRIC, false),
-            Row("sled_push", ExerciseKind.CARRY, StartPhase.ECCENTRIC, false),
-            Row("goblet_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("incline_bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("paused_bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("dumbbell_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, false),
-            Row("cable_fly", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, false),
-            Row("plank_reach", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
+            Row("kettlebell_swing_heavy", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC),
+            Row("dumbbell_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("med_ball_slam", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC),
+            Row("pallof_hold", ExerciseKind.HOLD, StartPhase.ECCENTRIC),
+            Row("wall_sit", ExerciseKind.HOLD, StartPhase.ECCENTRIC),
+            Row("overhead_carry", ExerciseKind.CARRY, StartPhase.CONCENTRIC),
+            Row("sled_push", ExerciseKind.CARRY, StartPhase.ECCENTRIC),
+            Row("goblet_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("incline_bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("paused_bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("dumbbell_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("cable_fly", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("plank_reach", ExerciseKind.HOLD, StartPhase.ECCENTRIC),
 
             // --- plurals: `contains` tolerates them by accident, and a whole-
             // token rule has to do it on purpose. Two hints pluralise with -es
@@ -119,12 +112,12 @@ class ExerciseIdInferenceCharacterizationTest {
             // push_presses is EXPLOSIVE only through EXPLOSIVE_HINTS' own
             // "push_press" plus the -es arm, and snatches is CONCENTRIC only
             // through "snatch" plus the -es arm. None of these rows moves. ---
-            Row("farmers_walks", ExerciseKind.CARRY, StartPhase.ECCENTRIC, false),
-            Row("wall_sits", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
-            Row("planks", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
-            Row("push_presses", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC, true),
-            Row("snatches", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, true),
-            Row("barbell_curls", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
+            Row("farmers_walks", ExerciseKind.CARRY, StartPhase.ECCENTRIC),
+            Row("wall_sits", ExerciseKind.HOLD, StartPhase.ECCENTRIC),
+            Row("planks", ExerciseKind.HOLD, StartPhase.ECCENTRIC),
+            Row("push_presses", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC),
+            Row("snatches", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("barbell_curls", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
 
             // --- unsegmented ids: accepted losses. `contains` reached inside
             // them for free; whole-token matching cannot, by construction.
@@ -136,22 +129,20 @@ class ExerciseIdInferenceCharacterizationTest {
             // single words in the vocabulary the published schema uses
             // ("lat pulldowns and pushdowns", plan.schema.json), so they are
             // added to the hint list instead and their rows do not move. ---
-            Row("deadhang", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("kbswing", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("farmerswalk", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("pullup", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("chinup", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("dbsnatch", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
+            Row("deadhang", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("kbswing", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("farmerswalk", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("pullup", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("chinup", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("dbsnatch", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
 
-            // --- NON_BARBELL_HINTS' "db_" and "kb_" become "db" and "kb".
-            // Written as prefixes because the match was a substring search;
-            // as whole tokens they are unambiguous under either reading, and
-            // none of these rows moves. ---
-            Row("db_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC, false),
-            Row("kb_swing", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC, false),
-            Row("db_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, false),
-            Row("kb_carry", ExerciseKind.CARRY, StartPhase.ECCENTRIC, false),
-            Row("dumbbell_push_press", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC, false),
+            // --- ids carrying the "db" and "kb" abbreviations. None of these
+            // rows moves. ---
+            Row("db_snatch", ExerciseKind.EXPLOSIVE, StartPhase.CONCENTRIC),
+            Row("kb_swing", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC),
+            Row("db_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("kb_carry", ExerciseKind.CARRY, StartPhase.ECCENTRIC),
+            Row("dumbbell_push_press", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC),
 
             // --- hint lists colliding with themselves and with each other:
             // "narrow" contains "row"; "pullover" contains "pull"; "machine"
@@ -172,21 +163,21 @@ class ExerciseIdInferenceCharacterizationTest {
             // declared "start" -- and because startsWith is written once per
             // id and never updated, an id already recorded keeps whichever
             // value it was given. This is [Field] F3, open. ---
-            Row("narrow_grip_bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("pullover", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("machine_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, false),
-            Row("machine_chest_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, false),
-            Row("machine_fly", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, false),
-            Row("prowler_push", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("ball_throw", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC, true),
+            Row("narrow_grip_bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("pullover", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("machine_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("machine_chest_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("machine_fly", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("prowler_push", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("ball_throw", ExerciseKind.EXPLOSIVE, StartPhase.ECCENTRIC),
 
             // --- "pull" reaches inside "pulldown", which is the movement's
             // own name. A lat pulldown begins with the drive, so CONCENTRIC is
             // right today and whole-token matching would lose it. These three
             // rows do not move, because "pulldown" joins the hint list. ---
-            Row("lat_pulldown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("pulldown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("cable_pulldown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, false),
+            Row("lat_pulldown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("pulldown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("cable_pulldown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
 
             // --- issue #59: "pushdown" was never on the list, so a tricep
             // pushdown -- which also begins with the drive -- fell to the
@@ -197,32 +188,32 @@ class ExerciseIdInferenceCharacterizationTest {
             // plan using this id still needs "concentric": "down" declared to
             // get the tempo digits and drive direction right; this row only
             // fixes which phase is counted and announced first. ---
-            Row("tricep_pushdown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
+            Row("tricep_pushdown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
 
             // --- ordinary ids that must not move ---
-            Row("seated_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("pull_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("chin_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("dip", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("sled_drag", ExerciseKind.CARRY, StartPhase.ECCENTRIC, false),
-            Row("yoke_walk", ExerciseKind.CARRY, StartPhase.ECCENTRIC, false),
-            Row("l_sit", ExerciseKind.HOLD, StartPhase.ECCENTRIC, false),
-            Row("cable_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, false),
-            Row("landmine_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("landmine_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("t_bar_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("leg_curl", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("seated_leg_curl", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("calf_raise", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("leg_extension", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("cossack_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("rear_foot_elevated_split_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, true),
-            Row("shoulder_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("military_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, true),
-            Row("smith_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, false),
-            Row("band_pull_apart", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC, false),
-            Row("bodyweight_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, false),
-            Row("dumbbell_bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC, false),
+            Row("seated_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("pull_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("chin_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("dip", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("sled_drag", ExerciseKind.CARRY, StartPhase.ECCENTRIC),
+            Row("yoke_walk", ExerciseKind.CARRY, StartPhase.ECCENTRIC),
+            Row("l_sit", ExerciseKind.HOLD, StartPhase.ECCENTRIC),
+            Row("cable_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("landmine_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("landmine_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("t_bar_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("leg_curl", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("seated_leg_curl", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("calf_raise", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("leg_extension", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("cossack_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("rear_foot_elevated_split_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("shoulder_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("military_press", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("smith_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("band_pull_apart", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("bodyweight_squat", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
+            Row("dumbbell_bench_press", ExerciseKind.DYNAMIC, StartPhase.ECCENTRIC),
         )
 
     @Test
@@ -233,11 +224,6 @@ class ExerciseIdInferenceCharacterizationTest {
     @Test
     fun `inferStartPhase over the id sweep`() {
         sweep.forEach { assertEquals(it.start, ExerciseDef.inferStartPhase(it.id), it.id) }
-    }
-
-    @Test
-    fun `inferBarbell over the id sweep`() {
-        sweep.forEach { assertEquals(it.barbell, ExerciseDef.inferBarbell(it.id), it.id) }
     }
 
     @Test

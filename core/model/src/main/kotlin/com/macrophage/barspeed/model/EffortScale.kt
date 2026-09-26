@@ -41,9 +41,7 @@ package com.macrophage.barspeed.model
  * which is why the app never has to know which is in front of the lifter.
  * It cannot know: there is no declared equipment increment anywhere in this
  * codebase. [ImplementLoad]'s 2.5 lb is a display artefact of halving a
- * total, and `ExerciseDef.inferBarbell` is a name heuristic over
- * `NON_BARBELL_HINTS`, not a declared property. The tile therefore names a
- * WEIGHT and never "one notch".
+ * total. The tile therefore names a WEIGHT and never "one notch".
  *
  * ## Anchors, and the gaps between them
  *
