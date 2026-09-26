@@ -237,7 +237,9 @@ class SessionExportUnperformedSetTest {
         val set = setObject()
         assertEquals(0, set.getValue("duration_s").jsonPrimitive.content.toInt())
         assertEquals(20, set.getValue("plannedDuration_s").jsonPrimitive.content.toInt())
-        assertEquals(0, set.getValue("reps").jsonPrimitive.content.toInt())
+        // A hold carries no rep count from export 1.23 (#71); the 0 this line
+        // asserted was the defect TimedSetRepsPublishedTest pins.
+        assertTrue("reps" !in set, "a timed set published a rep count: $set")
         assertTrue(set.getValue("failed").jsonPrimitive.content.toBoolean())
     }
 
@@ -261,7 +263,7 @@ class SessionExportUnperformedSetTest {
         assertEquals(
             listOf(
                 "duration_s", "failed", "load_kg", "load_lb", "plannedDuration_s",
-                "plannedPrep_s", "prep_s", "reps", "rest_s", "summary",
+                "plannedPrep_s", "prep_s", "rest_s", "summary",
             ).sorted(),
             set.keys.sorted(),
             "the published set gained or lost a key; this is a characterization of what it says today",

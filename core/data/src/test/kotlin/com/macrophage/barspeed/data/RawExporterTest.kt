@@ -459,6 +459,10 @@ class RawExporterTest {
      * recorded set has, and no geometry -- geometry's own presence and absence
      * are pinned by their own tests below and would only blur what this one is
      * about.
+     *
+     * The fixture is a 45 s TIMED set, so from export 1.23 (#71) it carries no
+     * `reps`: the key set lost it deliberately, and `TimedSetRepsPublishedTest`
+     * is the differential that says why.
      */
     @Test
     fun `a one-sensor set's descriptor states exactly the keys it states today`() = runTest {
@@ -473,7 +477,6 @@ class RawExporterTest {
                 "exercise",
                 "load_kg",
                 "load_lb",
-                "reps",
                 "duration_s",
                 "startedAt_ms",
                 "endedAt_ms",
