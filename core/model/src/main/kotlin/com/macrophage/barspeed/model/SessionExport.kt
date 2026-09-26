@@ -2435,6 +2435,28 @@ data class SessionExport(
          *
          * PINNED. `SchemaTimedRepsContractTest`, and `TimedSetRepsPublishedTest`
          * in `:core:data`.
+         *
+         * 1.23 FURTHER ENTRY (#294, repMarks described as what they hold): NO
+         * KEY, VALUE OR FILE CHANGES; the descriptions of `repMarks` and
+         * `voiceCues` change. MEASURED by `RepMarkTrackTest` on the thirteen
+         * committed captures that carry a rep-mark stream, all guided sets: all
+         * 103 marks fall within 1 ms of a row of the same set's cue track, 94 on
+         * the same millisecond -- the next cycle's opening stroke word or
+         * `Done` -- spaced at the tempo's sum. So on a `metronome` set each mark
+         * is the instant the cadence guide finished one prescribed cycle, the
+         * prescribed grid, and not an instant anyone observed a rep; #294 found
+         * a failed set carrying more marks than reps. On a `manual` set the
+         * marks are the lifter's taps. NO TRUE REP INSTANT IS STORED on a guided
+         * set -- the per-rep rows carry no clock, the cue track is what the app
+         * said, and the live count is an integer -- so the content is kept, and
+         * the key and the archive's `_reps.csv` filename keep their names: a
+         * rename would break every reader and add no fact. DELETED rather than
+         * reworded: `repMarks`' opening and its "the guide writes a mark as it
+         * calls a rep", and `voiceCues`' clause calling `repMarks` what was
+         * counted. `DATABASE_VERSION` does NOT move.
+         *
+         * PINNED. `SchemaRepMarksGridContractTest`; the content is guarded in
+         * `:core:data` by `SessionExportRepMarksTest`'s failed guided set.
          */
         const val SCHEMA_VERSION = "1.23"
 
@@ -3376,27 +3398,40 @@ data class SetExport(
     /** Spoken cues with epoch-ms stamps, cross-referenceable with the raw IMU stream (detailed export only). */
     val voiceCues: List<VoiceCue>? = null,
     /**
-     * The instants a rep was COUNTED during this set, epoch milliseconds on
-     * the same clock as the raw IMU, heart-rate and cue streams. Detailed
-     * export only, the same terms [voiceCues] is published on.
+     * The instants this set's COUNTER advanced, epoch milliseconds on the same
+     * clock as the raw IMU, heart-rate and cue streams. Detailed export only,
+     * the same terms [voiceCues] is published on.
      *
-     * What was counted, never what the bar did. A mark is written when the
-     * lifter taps the rep button or when the voice guide calls a rep, so on a
-     * straight-rep set carrying no tempo these are the only per-rep instants
-     * that exist anywhere in the document: [repMetrics] entries carry
-     * durations and an ordinal position and no clock, and [voiceCues] is what
-     * the app SAID rather than what was counted.
+     * WHICH COUNTER, and so what a mark is, is what [repsSource] says (1.23,
+     * #294). On a `metronome` set each mark is the instant the cadence guide
+     * finished one prescribed cycle -- the prescribed grid, spaced at the
+     * tempo's sum and kept on the guide's own schedule whether or not the
+     * lifter moved with it -- so these are NOT instants anyone observed a rep,
+     * and a failed or early-ended set can carry more marks than [reps].
+     * `RepMarkTrackTest` measures it on the thirteen committed captures that
+     * carry marks, all guided: all 103 marks within 1 ms of a row of the same
+     * set's cue track, the next cycle's opening stroke word or `Done`. On a
+     * `manual` set they are the lifter's taps, and on a straight-rep set
+     * carrying no tempo the only per-rep instants in the document: [repMetrics]
+     * entries carry no clock and [voiceCues] is what the app SAID.
+     *
+     * NO TRUE REP INSTANT IS STORED on a guided set, which is why the content
+     * is kept and described rather than replaced; the name, and the raw
+     * archive's `_reps.csv` holding the same instants, are historical. The
+     * opening that stood here called these the instants a rep was counted and
+     * said the guide writes a mark as it calls a rep; both are DELETED rather
+     * than reworded -- the guide marks the end of its cycle, not its rep call.
      *
      * Absent rather than empty, and the absence is weak. A sensor-counted set
-     * produces no marks at all, and neither does any set recorded before the
-     * app stored them; nothing here tells those two apart, and neither is
-     * evidence that no rep was performed.
+     * produces no marks at all -- a correction made during it writes none --
+     * and neither does any set recorded before the app stored them; nothing
+     * here tells those two apart, and neither is evidence that no rep was
+     * performed.
      *
      * The number of marks may disagree with [reps], in both directions. A
      * rest-screen correction rewrites [reps] and cannot reach a mark already
-     * written, and the guide calls a rep on its own schedule whether or not
-     * the lifter followed it. Where they disagree, [reps] is what the set was
-     * recorded as and this is what was counted while it happened.
+     * written, and the guide keeps its schedule whether or not the lifter
+     * followed it. Where they disagree, [reps] is what the set was recorded as.
      */
     val repMarks: List<Long>? = null,
     /**
