@@ -232,7 +232,7 @@ private fun SetCard(record: SetRecordEntity, viewModel: SessionDetailViewModel, 
             VoidRow(record, viewModel)
             analysis?.let { a ->
                 val regime = viewModel.velocityLossRegime(record)
-                SetChips(record, a, regime, target)
+                SetChips(record, a, regime, target, viewModel.countChip(record))
                 // What the ratio in the chip above does not cover. History
                 // carried no qualifier at all, so a set graded on the drive
                 // alone read as a fully compliant one. #56.
@@ -423,6 +423,7 @@ private fun SetChips(
     analysis: SetAnalysis,
     regime: VelocityLossRegime?,
     target: HistoryTarget,
+    countChip: String?,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (record.failed) VerdictChip("FAILED", ChipTone.BAD)
@@ -439,7 +440,11 @@ private fun SetChips(
         // carries no plannedReps, so without the chip it reads on this screen
         // as a prescribed set whose prescription went missing (#177).
         if (record.added) VerdictChip("ADDED", ChipTone.NEUTRAL)
-        if (record.repsManual) VerdictChip("MANUAL COUNT", ChipTone.NEUTRAL)
+        // Whose count the header's figure is, named from repsSource and not
+        // from repsManual, which is also true on a guided set: the old chip
+        // read MANUAL COUNT on every set the metronome counted (#325).
+        // The words are RepsCountChip's, in :core:model where a test runs.
+        countChip?.let { VerdictChip(it, ChipTone.NEUTRAL) }
         record.rpe?.let { VerdictChip("RPE $it", if (it >= 10) ChipTone.WARN else ChipTone.NEUTRAL) }
         target.heldChip?.let { VerdictChip(it.text, it.tone.chipTone()) }
         // One decision with the rest screen, in :core:model where a test

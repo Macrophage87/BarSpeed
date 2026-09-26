@@ -11,16 +11,24 @@ package com.macrophage.barspeed.model
  */
 object RepsCountChip {
     /**
-     * The chip's text, or null where the card draws no count chip.
+     * The chip's text, or null where nothing counted reps.
      *
-     * This body is the screen's current wording, lifted unchanged so the
-     * decision can be tested: the screen drew `MANUAL COUNT` whenever the row's
-     * `repsManual` column was true, which on a set counted in reps is the
-     * three sources that column stands behind. The screen does not read this
-     * yet.
+     * One chip per counter, named for it. The screen used to draw
+     * `MANUAL COUNT` whenever the row's `repsManual` column was true, and that
+     * column is also true on a guided set -- the metronome's figure is stored
+     * the way a tally is -- so every set the metronome counted read in
+     * History as one the lifter had tapped. The export's `repsSource` already separates the
+     * three; this reads the same word (#325).
+     *
+     * Null only where [RepsSourcePolicy] returns null: a timed set, where no
+     * counter stands behind the rep figure and the card draws none.
      */
     fun label(source: RepsSource?): String? = when (source) {
-        RepsSource.MANUAL, RepsSource.CORRECTED, RepsSource.METRONOME -> "MANUAL COUNT"
-        RepsSource.SENSOR, RepsSource.ANALYSIS, null -> null
+        RepsSource.SENSOR -> "SENSOR COUNT"
+        RepsSource.MANUAL -> "MANUAL COUNT"
+        RepsSource.METRONOME -> "METRONOME COUNT"
+        RepsSource.CORRECTED -> "CORRECTED COUNT"
+        RepsSource.ANALYSIS -> "ANALYSIS COUNT"
+        null -> null
     }
 }

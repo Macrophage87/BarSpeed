@@ -10,6 +10,8 @@ import androidx.lifecycle.viewModelScope
 import com.macrophage.barspeed.BuildConfig
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.SetRecordEntity
+import com.macrophage.barspeed.data.repsSourceOf
+import com.macrophage.barspeed.model.RepsCountChip
 import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.WeightUnit
 import com.macrophage.barspeed.model.sessionTimestamp
@@ -76,6 +78,15 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
         val geometry = repository.decodeGeometry(record)
         return VelocityLossRegime.of(record.tempo, geometry?.concentricUp, geometry?.horizontal, geometry?.kind)
     }
+
+    /**
+     * The count chip's text for this row: whose count its rep figure is, from
+     * the export's own derivation over the geometry FROZEN on the row, so the
+     * card and the export's `repsSource` name one counter (#325). Null on a
+     * timed set, where nothing counted reps.
+     */
+    fun countChip(record: SetRecordEntity): String? =
+        RepsCountChip.label(record.repsSourceOf(repository.decodeGeometry(record)?.kind))
 
     /**
      * Mark a recorded set as one the lifter did not perform, or take the mark
