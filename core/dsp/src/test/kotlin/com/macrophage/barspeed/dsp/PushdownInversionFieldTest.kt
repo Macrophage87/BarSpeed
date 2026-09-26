@@ -170,4 +170,26 @@ class PushdownInversionFieldTest {
         assertEquals(true, read.result.geometry.sensorInverted)
         assertEquals(14, count(read), "against 14 performed")
     }
+
+    /**
+     * RED before #323's fix. Role b's stream alone, as a one-sensor set whose
+     * one unit was on the rope, under the same plan naming neither
+     * `sensorOnStack` nor `sensorInverted`. Its roll says it moved, so the
+     * rule's inversion is taken back and the stream is read the way it moved.
+     * The count moves from 16 to 15 against 14 performed -- measured on this
+     * stream both ways before the fix, and a small move, because what the
+     * inversion swaps is which half of each rep is the drive; the count is
+     * pinned so a fix that drops the flag without reaching the analysis
+     * cannot pass.
+     */
+    @Test
+    fun `a pushdown recorded with one unit on the rope under a plan naming neither key is read uninverted`() {
+        val rope = load("$name-imu-b")
+        val read = atSetEnd(null, rope, emptyList())
+        assertSame(rope, read.samples)
+        assertEquals(StackMountSignal.NOT_ON_STACK, StackRollSignature.of(rope, workAt, end))
+        assertEquals(false, read.result.exercise.sensorInverted, "the rope unit is read with drive and return swapped")
+        assertEquals(false, read.result.geometry.sensorInverted, "the row publishes an inversion the analysis dropped")
+        assertEquals(15, count(read), "16 inverted, 15 as it moved, against 14 performed")
+    }
 }

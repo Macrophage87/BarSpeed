@@ -164,4 +164,17 @@ class StackInversionRuleTest {
         assertTrue(lines[0].startsWith("sessions[0].exercises[0]: triceps_pushdown"), lines[0])
         assertTrue("does not declare \"sensorInverted\"" in lines[0], lines[0])
     }
+
+    /**
+     * RED before #323's fix. The gate's line said "the set is recorded
+     * inverted" whichever unit the set came to be analysed from; since #323 a
+     * unit whose own roll moved -- on the handle or the rope -- is recorded
+     * uninverted, so the line names the unit the rule reads.
+     */
+    @Test
+    fun `the import gate's inversion line names the unit the rule reaches`() {
+        val line = inversionLines("triceps_pushdown", down).single()
+        assertTrue("recorded inverted wherever the analysed unit's own roll says it rode the stack" in line, line)
+        assertTrue("uninverted where it moved with the handle" in line, line)
+    }
 }

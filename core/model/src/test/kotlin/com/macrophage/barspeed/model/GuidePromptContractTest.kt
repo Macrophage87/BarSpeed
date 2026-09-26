@@ -153,6 +153,11 @@ class GuidePromptContractTest {
      * true, so the pin is on the sentence that says so, and on the deleted
      * "There is no such line" staying deleted -- the import gate names that
      * inversion now.
+     *
+     * And moved again with #323: the rule reaches only a set whose ANALYSED
+     * unit's own roll says it rode the stack, so the #317 sentence, which
+     * said true whichever unit the set was read from, is pinned deleted and
+     * the pin is on the sentence that names the unit.
      */
     @Test
     fun `the plan prompt states what omitting a geometry flag means`() {
@@ -161,8 +166,13 @@ class GuidePromptContractTest {
             "the plan prompt never tells the model that an omitted geometry flag is not a declared false",
         )
         assertTrue(
+            "an omitted key means true on a set whose analysed unit's own roll says it rode the stack, " +
+                "because the stack rises as I drive the handle down" in prompt,
+            "the plan prompt never says an omitted sensorInverted resolves true only on the unit that rode the stack",
+        )
+        assertFalse(
             "an omitted key means true, because the stack rises as I drive the handle down" in prompt,
-            "the plan prompt never says an omitted sensorInverted resolves true on a stack lift driving down",
+            "the plan prompt still says an omitted sensorInverted resolves true whichever unit the set is read from",
         )
         assertFalse(
             "There is no such line for \"sensorInverted\"" in prompt,

@@ -193,4 +193,36 @@ class AnalysedInversionTest {
         assertSame(a, stayed.samples)
         assertEquals(StackMountSignal.NOT_ON_STACK, stayed.analysedSignal, "neither qualified: the armed unit's")
     }
+
+    // ---- the case #323 exists for: red before the fix -------------------------
+
+    /**
+     * RED before #323's fix. The rule alone inverted this set, and the unit it
+     * is analysed from moved with the drive -- a handle or a rope -- so the
+     * inversion is taken back from the definition AND from the description
+     * the row stores, and nothing else in the description moves.
+     */
+    @Test
+    fun `a rule inversion is taken back on a unit whose roll moved`() {
+        val plan = declared("triceps_pushdown", down)
+        val used = SetGeometryPolicy.resolve(base("triceps_pushdown"), plan)
+        val described = SetGeometryPolicy.describe(used, plan)
+        val result = analysed(down, StackMountSignal.NOT_ON_STACK)
+        assertFalse(result.exercise.sensorInverted, "the rope unit is still read with drive and return swapped")
+        assertFalse(result.geometry.sensorInverted, "the row still publishes the inversion the analysis dropped")
+        assertEquals(used.copy(sensorInverted = false), result.exercise)
+        assertEquals(described.copy(sensorInverted = false), result.geometry)
+    }
+
+    /**
+     * RED before #323's fix. Nothing measured the unit, which is absence and
+     * not a verdict -- so it is not evidence the unit rode the stack either,
+     * and the rule, which needs that evidence, does not apply.
+     */
+    @Test
+    fun `a rule inversion is taken back on a unit nothing measured`() {
+        val result = analysed(down, StackMountSignal.UNMEASURED)
+        assertFalse(result.exercise.sensorInverted)
+        assertFalse(result.geometry.sensorInverted)
+    }
 }
