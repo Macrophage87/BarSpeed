@@ -289,10 +289,11 @@ object SetGeometryPolicy {
      * has no `geometry.source` entry (#289) -- so the import gate's line is the
      * only place a rule-3 answer is visible before the set is recorded.
      *
-     * RULE 3 IS THE PLAN-TIME ANSWER, and since #323 not the last word. The
-     * stack mount it reads names a machine, not where the unit was clipped, so
-     * a unit on the handle or the rope under a plan leaving `sensorOnStack` to
-     * the stack table was read inverted by it. [analysedUnder] completes the
+     * RULE 3 IS THE PLAN-TIME ANSWER, and since #323 not the last word. A
+     * stack mount left to the stack table names a machine, not where the unit
+     * was clipped, and one written true cannot say which of two units rode the
+     * stack, so a unit on the handle or the rope under a plan leaving
+     * `sensorOnStack` to the stack table was read inverted by it. [analysedUnder] completes the
      * answer at the end of each set from the ANALYSED unit's own roll; the
      * live tracker, built before any sample, still reads this one.
      */
@@ -347,9 +348,13 @@ object SetGeometryPolicy {
      *    nothing measured the unit: absence is not evidence it rode the stack,
      *    and the rule needs that evidence, so it is taken back too.
      *
-     * The stack mount the rule reads says which MACHINE, from a declaration or
-     * from [ExerciseDef.STACK_MOUNTED_IDS], never where the unit was clipped;
-     * the analysed stream is the only thing in the app that can say that.
+     * A stack mount left to [ExerciseDef.STACK_MOUNTED_IDS] says which
+     * MACHINE, never where the unit was clipped, and one a plan wrote true
+     * cannot say which of two units rode the stack; under either, the analysed
+     * stream is the only thing in the app that can say that. That includes a
+     * plan that wrote `sensorOnStack` true: the roll decides, and a plan sure
+     * its unit rode the stack writes `sensorInverted` true, which case 1 above
+     * leaves standing whatever the roll says.
      *
      * MEASURED, NOT DESIGNED. Over the committed drive-down stack streams --
      * field-41 set 16 and set 18 and field-38 set 14, both units each, and the
