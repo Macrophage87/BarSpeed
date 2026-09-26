@@ -165,8 +165,9 @@ data class AnalysedRoleChoice(
  * which stream it is applied to. That is the repair #278 asks for: a stack
  * declaration read against the unit that measurably sat on the stack. The one
  * geometry term the end of a set does revisit is an inversion the stack rule
- * alone applied, and it is revisited after this choice, not by it --
- * `SetGeometryPolicy.analysedUnder`, from the chosen unit's own roll (#323).
+ * alone applied on a stack mount the plan left to the stack table, and it is
+ * revisited after this choice, not by it -- `SetGeometryPolicy.analysedUnder`,
+ * from the chosen unit's own roll (#323; a written mount is not, #327).
  *
  * IT DECIDES NOTHING RETROACTIVELY, for [SensorCapturePolicy.analysedStream]'s
  * reason: this runs when a set is recorded and the analysis it selects the

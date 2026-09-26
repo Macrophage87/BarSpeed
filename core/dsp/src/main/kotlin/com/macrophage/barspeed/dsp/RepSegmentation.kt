@@ -125,11 +125,13 @@ data class LiftDirection(
      * it true (`SetGeometryPolicy.stackInversion`), so this is true on a
      * pushdown, pulldown or leg curl whose plan named no inversion. The
      * sentence that stood here -- "True only where a PLAN declared one of
-     * them" -- is deleted. Since #323 the analysis at the end of a set keeps
-     * that inversion only where the analysed unit's own roll says it rode the
-     * stack (`SetGeometryPolicy.analysedUnder`), so there this is true only on
-     * such a unit; the live tracker, built before any roll exists, still reads
-     * the rule as resolved. The sentence that stood here -- "still not a
+     * them" -- is deleted. Since #323 the analysis at the end of a set whose
+     * stack mount came from the stack table keeps that inversion only where
+     * the analysed unit's own roll says it rode the stack
+     * (`SetGeometryPolicy.analysedUnder`), so there this is true only on such
+     * a unit; under a plan that wrote `sensorOnStack` true it stands whatever
+     * the roll (plan 1.14, #327). The live tracker, built before any roll
+     * exists, reads the rule as resolved on either. The sentence that stood here -- "still not a
      * measurement ... nothing reads a stream to answer it" -- is deleted.
      *
      * `travelRatio != 1.0` is an exact comparison against the type default,

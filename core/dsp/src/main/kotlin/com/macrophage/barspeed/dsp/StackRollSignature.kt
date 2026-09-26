@@ -71,10 +71,13 @@ import kotlin.math.abs
  *
  * SINCE #323 THAT IS NOT THE ONLY CONSEQUENCE, and the second is not
  * survivable in the same way. On a set whose inversion came from
- * `SetGeometryPolicy.stackInversion`'s rule alone, an ANALYSED stack unit
- * wrongly called [StackMountSignal.NOT_ON_STACK] has that inversion taken back
- * by `SetGeometryPolicy.analysedUnder` and is read with drive and return
- * swapped: field-41 set 16's stack stream reads 1 of 14 that way.
+ * `SetGeometryPolicy.stackInversion`'s rule alone, on a stack mount the plan
+ * left to the stack table, an ANALYSED stack unit wrongly called
+ * [StackMountSignal.NOT_ON_STACK] has that inversion taken back by
+ * `SetGeometryPolicy.analysedUnder` and is read with drive and return
+ * swapped: field-41 set 16's stack stream reads 1 of 14 that way. Where the
+ * plan WROTE `sensorOnStack` true, that verdict decides no inversion (plan
+ * 1.14, #327).
  *
  * [MAX_STACK_ROLL_RATE_DPS] DISQUALIFIES NOTHING IN THIS CORPUS and is stated
  * as a guard rather than as a discriminator. Across those thirty-six streams

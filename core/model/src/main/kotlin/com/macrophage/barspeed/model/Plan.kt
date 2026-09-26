@@ -557,9 +557,12 @@ data class PlanFile(
      * set. The answer is [SetGeometryPolicy.stackInversion]'s, asked with the
      * same three resolved values [SetGeometryPolicy.resolve] hands it. It is
      * the PLAN-TIME answer, and since #323 the line says so rather than
-     * promising an inversion: [SetGeometryPolicy.analysedUnder] completes it
-     * at the end of each set, keeping it only where the analysed unit's own
-     * roll says it rode the stack. The export publishes no source for
+     * promising an inversion: on a stack mount the plan left to the stack
+     * table, [SetGeometryPolicy.analysedUnder] completes it at the end of
+     * each set, keeping it only where the analysed unit's own roll says it
+     * rode the stack. Where the plan WROTE `sensorOnStack` true the answer
+     * stands whatever the roll (plan 1.14, #327), and the line says that
+     * instead. The export publishes no source for
      * `sensorInverted` (#289), so this line is the only place the inference
      * shows before the set is recorded.
      *
@@ -875,9 +878,11 @@ data class PlanExerciseDef(
      * onto the stack with its drive going down in the vertical plane resolves
      * an omitted key true, because a weight stack rises while the handle is
      * driven down ([SetGeometryPolicy.stackInversion]), and the import gate
-     * names that line. Since #323 that answer is completed at the end of each
-     * set, and stands only where the analysed unit's own roll says it rode the
-     * stack ([SetGeometryPolicy.analysedUnder]). Anywhere else an omitted key
+     * names that line. Where [sensorOnStack] is written true that answer
+     * stands (plan 1.14, #327). Where the stack mount came from the stack
+     * table it is completed at the end of each set, and stands only where the
+     * analysed unit's own roll says it rode the stack, since #323
+     * ([SetGeometryPolicy.analysedUnder]). Anywhere else an omitted key
      * resolves to false, and a
      * plan CAN say false as a decision rather than by silence — which wins
      * over the rule too.

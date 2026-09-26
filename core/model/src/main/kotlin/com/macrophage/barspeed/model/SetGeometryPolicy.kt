@@ -289,13 +289,16 @@ object SetGeometryPolicy {
      * has no `geometry.source` entry (#289) -- so the import gate's line is the
      * only place a rule-3 answer is visible before the set is recorded.
      *
-     * RULE 3 IS THE PLAN-TIME ANSWER, and since #323 not the last word. A
-     * stack mount left to the stack table names a machine, not where the unit
-     * was clipped, and one written true cannot say which of two units rode the
-     * stack, so a unit on the handle or the rope under a plan leaving
-     * `sensorOnStack` to the stack table was read inverted by it. [analysedUnder] completes the
-     * answer at the end of each set from the ANALYSED unit's own roll; the
-     * live tracker, built before any sample, still reads this one.
+     * RULE 3 IS THE PLAN-TIME ANSWER, and since #323 not always the last
+     * word. A stack mount left to the stack table names a machine, not where
+     * the unit was clipped, so a unit on the handle or the rope under a plan
+     * leaving `sensorOnStack` to the stack table was read inverted by it.
+     * [analysedUnder] completes the answer at the end of such a set from the
+     * ANALYSED unit's own roll. Where the plan WROTE `sensorOnStack` true,
+     * this answer is the last word (plan 1.14, #327): the owner's account is
+     * that a unit on the stack still rolls, so the roll does not overrule the
+     * plan's word. The live tracker, built before any sample, reads this
+     * answer on every set.
      */
     fun stackInversion(
         declared: Boolean?,
@@ -320,7 +323,10 @@ object SetGeometryPolicy {
      * [resolve] returns [base] unchanged there and applies no rule.
      *
      * Carried to the end of the set because that is the only place an
-     * ANALYSED unit exists; see [analysedUnder].
+     * ANALYSED unit exists; see [analysedUnder]. True under a plan that WROTE
+     * `sensorOnStack` true as well -- the rule did set that inversion -- and
+     * [analysedUnder] reads the stack mount's source beside it to leave such
+     * a set alone (#327), so this answers only what it names.
      */
     fun stackRuleApplied(base: ExerciseDef, declared: PlanExerciseDef?): Boolean {
         if (declared == null || declared.sensorInverted != null || base.sensorInverted) return false
@@ -339,7 +345,16 @@ object SetGeometryPolicy {
      *    stream is not consulted: a declaration either way is somebody's word
      *    about the machine, and a set the rule never reached has nothing to
      *    take back.
-     * 2. WHERE THE RULE ALONE SET IT, it stands only on
+     * 2. WHERE THE PLAN WROTE `sensorOnStack` TRUE, NOTHING MOVES either and
+     *    the stream is not consulted (plan 1.14, #327). Read off
+     *    [geometry]'s `sources.sensorOnStack`, which [describe] sets to
+     *    [GeometrySource.DECLARED] exactly where the plan wrote the key; a
+     *    written false never reaches here, because it takes the set out of
+     *    the rule. The owner's answer on #327 -- "It still rolls on the
+     *    stack." -- is that a unit clipped to the stack still shows roll, so
+     *    the roll does not overrule a plan that says the unit rode it.
+     * 3. WHERE THE RULE ALONE SET IT ON A STACK MOUNT THE PLAN LEFT TO THE
+     *    STACK TABLE, it stands only on
      *    [StackMountSignal.ON_STACK] -- the analysed unit's own roll says it
      *    rode the stack, which is the unit the rule describes. On
      *    [StackMountSignal.NOT_ON_STACK] the unit moved with the drive -- a
@@ -349,22 +364,26 @@ object SetGeometryPolicy {
      *    and the rule needs that evidence, so it is taken back too.
      *
      * A stack mount left to [ExerciseDef.STACK_MOUNTED_IDS] says which
-     * MACHINE, never where the unit was clipped, and one a plan wrote true
-     * cannot say which of two units rode the stack; under either, the analysed
-     * stream is the only thing in the app that can say that. That includes a
-     * plan that wrote `sensorOnStack` true: the roll decides, and a plan sure
-     * its unit rode the stack writes `sensorInverted` true, which case 1 above
-     * leaves standing whatever the roll says.
+     * MACHINE, never where the unit was clipped, and there the analysed
+     * stream is the only thing in the app that can say that. A plan that
+     * wrote `sensorOnStack` true has said it, and case 2 takes its word. WHAT
+     * THAT COSTS, stated: a plan that writes the stack mount while its one
+     * unit is clipped to the handle or the rope has that unit read inverted,
+     * with drive and return swapped, and nothing here takes it back --
+     * field-41 set 16's rope stream is pinned at 16 of 14 that way and 15 as
+     * it moved (`PushdownInversionFieldTest`). Such a plan writes
+     * `sensorInverted` false, or `sensorOnStack` false.
      *
      * MEASURED, NOT DESIGNED. Over the committed drive-down stack streams --
      * field-41 set 16 and set 18 and field-38 set 14, both units each, and the
      * four `field-legcurl-1030` captures -- every stream the signature reads
      * [StackMountSignal.ON_STACK] is a unit that sat still, and the three it
      * reads [StackMountSignal.NOT_ON_STACK] are the handle-side units. The
-     * signature's bounds are fitted, so the failure direction is stated: a
-     * stack unit wrongly read as moved loses the inversion and is read with
-     * drive and return swapped -- field-41 set 16's stack stream reads 1 of 14
-     * that way.
+     * signature's bounds are fitted, so the failure direction is stated: on
+     * a stack mount left to the table, a stack unit wrongly read as moved
+     * loses the inversion and is read with drive and return swapped --
+     * field-41 set 16's stack stream reads 1 of 14 that way. Under a written
+     * stack mount that failure cannot happen, because case 2 asks no roll.
      *
      * NOT THE LIVE READOUT. The live tracker is built before any sample exists
      * and reads [resolve]'s answer, rule included; on a set the sensor counts,
@@ -376,7 +395,8 @@ object SetGeometryPolicy {
         stackRuleApplied: Boolean,
         analysedSignal: StackMountSignal,
     ): AnalysedGeometry {
-        val takenBack = stackRuleApplied && analysedSignal != StackMountSignal.ON_STACK
+        val rollDecides = stackRuleApplied && geometry.sources.sensorOnStack != GeometrySource.DECLARED
+        val takenBack = rollDecides && analysedSignal != StackMountSignal.ON_STACK
         if (!takenBack) return AnalysedGeometry(used, geometry)
         return AnalysedGeometry(used.copy(sensorInverted = false), geometry.copy(sensorInverted = false))
     }
