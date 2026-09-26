@@ -5,7 +5,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -25,6 +24,11 @@ import kotlin.test.assertTrue
  * the rule is a new version rather than an edit to a released one. #323
  * narrowed the rule to the analysed unit while 1.13 was still unreleased, so
  * the 1.13 entry was corrected in place rather than minting 1.14.
+ *
+ * 1.13 then shipped in v0.1.56, and #327 changed what a WRITTEN
+ * `sensorOnStack` true does to the rule, which is plan 1.14 and is pinned in
+ * `PlanWrittenStackContractTest`. The 1.13 entry is left as what 1.13 said,
+ * and the pins on it below stand.
  */
 class PlanStackInversionContractTest {
     private fun plan(): JsonObject = Json.parseToJsonElement(
@@ -37,20 +41,10 @@ class PlanStackInversionContractTest {
     private fun sensorInverted(): String = plan()["\$defs"]!!.jsonObject["exercise"]!!.jsonObject["properties"]!!
         .jsonObject["sensorInverted"]!!.jsonObject["description"]!!.jsonPrimitive.content
 
-    /**
-     * The version the app writes, pinned beside the mint that moved it.
-     *
-     * Moved here from `PlanGeometryNullabilityContractTest`, whose copy naming
-     * 1.12 is deleted rather than carried forward. It lives with whichever
-     * mint is current so that the next one has one place to move it from,
-     * and so that a bump left half-done -- the schema enum widened,
-     * `PlanFile.SCHEMA_VERSION` left behind -- reds here rather than shipping
-     * a prompt asking for a version the app does not write.
-     */
-    @Test
-    fun `the app writes plan schema 1_13`() {
-        assertEquals("1.13", PlanFile.SCHEMA_VERSION)
-    }
+    // `the app writes plan schema 1_13` lived here and is DELETED, not
+    // reworded: the app writes 1.14 from the #327 mint, so an assertion that
+    // it writes 1.13 is simply false. The version the app currently writes is
+    // pinned in PlanWrittenStackContractTest, beside the mint that moved it.
 
     /**
      * The 1.13 entry states the rule, and which unit it reaches.
@@ -90,12 +84,18 @@ class PlanStackInversionContractTest {
     /**
      * The property points at the 1.13 entry for what an omission means, and
      * no longer claims the rule left the plan format where it was.
+     *
+     * Moved by #327: the pointer read "is stated once, in the 1.13 entry",
+     * and since 1.14 the entry that says what a written stack mount changes
+     * is a second one, so "once" is deleted and the pin reads the pointer
+     * that names 1.13. The roll clause is qualified to the stack default,
+     * where 1.14 leaves it.
      */
     @Test
     fun `sensorInverted points at the 1_13 entry and no longer says its rule moved no version`() {
         val description = sensorInverted()
         assertTrue(
-            "is stated once, in the 1.13 entry of the version log above" in description,
+            "is stated in the 1.13 entry of the version log above" in description,
             "sensorInverted does not point at the 1.13 entry for what an absent or null value means",
         )
         assertFalse(
@@ -103,7 +103,8 @@ class PlanStackInversionContractTest {
             "sensorInverted still says the rule did not move the plan format, which 1.13 makes false",
         )
         assertTrue(
-            "resolves to TRUE for a set whose analysed unit's own roll says it rode the stack" in description,
+            "where the stack mount is the stack default `sensorOnStack` states for the machines it lists, it " +
+                "holds for a set whose analysed unit's own roll says it rode the stack" in description,
             "sensorInverted still says an omitted key resolves true whichever unit the set is analysed from",
         )
     }

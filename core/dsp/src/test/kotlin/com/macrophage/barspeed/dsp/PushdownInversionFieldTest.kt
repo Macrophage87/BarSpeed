@@ -60,6 +60,15 @@ import kotlin.test.assertTrue
  * with one unit clipped to the rope under a plan naming neither key. Role b
  * really was on the rope in this set (23.588 degrees); a one-unit rope set is
  * the shape #323 names and has never been recorded.
+ *
+ * ## Plan 1.14 (#327)
+ *
+ * The last test reads role b's stream alone under a plan that WRITES
+ * `sensorOnStack` true. 1.14 trusts that word and keeps the inversion
+ * whatever the roll, so this is the cost of the change measured on a real
+ * stream rather than argued: a plan that writes the stack mount while its
+ * one unit was on the rope has that unit read inverted. No plan in the
+ * archive has done that; the stream stands in for one.
  */
 class PushdownInversionFieldTest {
     private val name = "field-pushdown-1120-14rep-s41-set16"
@@ -97,19 +106,25 @@ class PushdownInversionFieldTest {
      * streams: `captureAt`'s signature supplier, then `analysedAs`. [armed] is
      * null on a one-sensor set, whose one stream carries no role.
      */
-    private fun atSetEnd(armed: RecordedSensors?, analysed: List<ImuSample>, partner: List<ImuSample>): SetEndRead {
+    private fun atSetEnd(
+        armed: RecordedSensors?,
+        analysed: List<ImuSample>,
+        partner: List<ImuSample>,
+        plan: PlanExerciseDef = declared,
+    ): SetEndRead {
+        val resolved = SetGeometryPolicy.resolve(base, plan)
         val capture = armedCaptureOf(
             armed = armed,
             secondaryRole = armed?.let { SensorRole.B },
             analysedBuffer = analysed,
             secondaryBuffer = partner,
-            declaresStackMount = used.sensorOnStack,
+            declaresStackMount = resolved.sensorOnStack,
             stackSignalOf = { StackRollSignature.of(it, workAt, end) },
         )
         val result = SetGeometryPolicy.analysedUnder(
-            used = used,
-            geometry = SetGeometryPolicy.describe(used, declared),
-            stackRuleApplied = SetGeometryPolicy.stackRuleApplied(base, declared),
+            used = resolved,
+            geometry = SetGeometryPolicy.describe(resolved, plan),
+            stackRuleApplied = SetGeometryPolicy.stackRuleApplied(base, plan),
             analysedSignal = capture.analysedSignal,
         )
         return SetEndRead(result, capture.samples)
@@ -191,5 +206,24 @@ class PushdownInversionFieldTest {
         assertEquals(false, read.result.exercise.sensorInverted, "the rope unit is read with drive and return swapped")
         assertEquals(false, read.result.geometry.sensorInverted, "the row publishes an inversion the analysis dropped")
         assertEquals(15, count(read), "16 inverted, 15 as it moved, against 14 performed")
+    }
+
+    /**
+     * RED before #327's fix. The same rope stream alone, under the same plan
+     * except that it WRITES `sensorOnStack` true. The roll still says the
+     * unit moved, and under plan 1.14 that no longer matters: the plan's word
+     * keeps the inversion on the definition and on the row, and the stream is
+     * counted inverted -- 16 against 14 performed, the figure the test above
+     * names for the inverted reading. The count is pinned so a fix that keeps
+     * the flag without reaching the analysis cannot pass.
+     */
+    @Test
+    fun `a plan that writes the stack mount keeps the inversion on a rope unit whose roll moved`() {
+        val rope = load("$name-imu-b")
+        val read = atSetEnd(null, rope, emptyList(), declared.copy(sensorOnStack = true))
+        assertEquals(StackMountSignal.NOT_ON_STACK, StackRollSignature.of(rope, workAt, end))
+        assertEquals(true, read.result.exercise.sensorInverted, "the roll overruled a plan that wrote the stack")
+        assertEquals(true, read.result.geometry.sensorInverted, "the row drops the inversion the plan's word kept")
+        assertEquals(16, count(read), "16 inverted, 15 as it moved, against 14 performed")
     }
 }

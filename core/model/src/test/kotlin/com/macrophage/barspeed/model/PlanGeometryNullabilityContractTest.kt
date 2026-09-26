@@ -61,9 +61,10 @@ class PlanGeometryNullabilityContractTest {
     }
 
     // `the app writes plan schema 1_12` lived here and is DELETED, not
-    // reworded: the app writes 1.13 from the #317 mint, so an assertion that
-    // it writes 1.12 is simply false. The version the app currently writes is
-    // pinned in PlanStackInversionContractTest, beside the mint that moved it.
+    // reworded: the app has written a later version since the #317 mint, so
+    // an assertion that it writes 1.12 is simply false. The version the app
+    // currently writes is pinned in PlanWrittenStackContractTest, beside the
+    // mint that moved it.
 
     /**
      * A plan written against the previous contract imports unchanged.

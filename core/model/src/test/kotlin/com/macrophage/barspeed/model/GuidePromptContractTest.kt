@@ -158,6 +158,12 @@ class GuidePromptContractTest {
      * unit's own roll says it rode the stack, so the #317 sentence, which
      * said true whichever unit the set was read from, is pinned deleted and
      * the pin is on the sentence that names the unit.
+     *
+     * And moved again with #327, plan 1.14: a WRITTEN `sensorOnStack` true
+     * keeps the inversion whatever the analysed unit's roll, and the roll
+     * decides only where the stack mount is the app's own. The #323 sentence,
+     * which let the roll decide under a written mount too, is pinned deleted,
+     * and the pins are on the two sentences that split the cases.
      */
     @Test
     fun `the plan prompt states what omitting a geometry flag means`() {
@@ -166,9 +172,19 @@ class GuidePromptContractTest {
             "the plan prompt never tells the model that an omitted geometry flag is not a declared false",
         )
         assertTrue(
+            "so an omitted key means true on every set where I write \"sensorOnStack\": true, whatever the " +
+                "unit's roll, since a unit clipped to the stack still rolls" in prompt,
+            "the plan prompt never says a written stack mount keeps an omitted sensorInverted true whatever the roll",
+        )
+        assertTrue(
+            "where the stack mount is the app's own rather than written, an omitted key means true on a set whose " +
+                "analysed unit's own roll says it rode the stack" in prompt,
+            "the plan prompt never says an omitted sensorInverted resolves true only on the unit that rode the stack",
+        )
+        assertFalse(
             "an omitted key means true on a set whose analysed unit's own roll says it rode the stack, " +
                 "because the stack rises as I drive the handle down" in prompt,
-            "the plan prompt never says an omitted sensorInverted resolves true only on the unit that rode the stack",
+            "the plan prompt still lets the roll decide under a written stack mount, which plan 1.14 withdrew",
         )
         assertFalse(
             "an omitted key means true, because the stack rises as I drive the handle down" in prompt,

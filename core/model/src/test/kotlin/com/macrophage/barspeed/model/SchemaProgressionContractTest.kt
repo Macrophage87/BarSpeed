@@ -54,7 +54,7 @@ class SchemaProgressionContractTest {
     // writes 1.11 is simply false. What this class is for -- that 1.11 exists,
     // is accepted, is published and imports clean -- is unaffected and is
     // pinned by the tests below. The version the app currently writes is pinned
-    // in PlanStackInversionContractTest, beside the mint that moved it.
+    // in PlanWrittenStackContractTest, beside the mint that moved it.
 
     @Test
     fun `the import gate still accepts both 1_10 and 1_11`() {

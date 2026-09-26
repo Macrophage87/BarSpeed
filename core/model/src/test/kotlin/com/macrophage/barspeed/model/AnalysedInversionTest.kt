@@ -28,6 +28,16 @@ import kotlin.test.assertTrue
  * capture, and the three cases the fix must not move -- a declared inversion,
  * a rule inversion on a unit whose roll says stack, a set the rule never
  * reached. The case #323 exists for is a separate, red differential.
+ *
+ * ## Plan 1.14 (#327)
+ *
+ * The owner's answer on #327 -- "It still rolls on the stack." -- is that a
+ * unit clipped to the weight stack still shows roll, so the roll check must
+ * not overrule a plan that WROTE `sensorOnStack` true. [SetGeometryPolicy.stackRuleApplied]
+ * still says the rule set such a set's inversion; what changes is that
+ * [SetGeometryPolicy.analysedUnder] consults the roll only where the stack
+ * mount was left to the stack table. The last section holds that change's
+ * reds and the seeded cases it must not move.
  */
 class AnalysedInversionTest {
     private val json = Json { ignoreUnknownKeys = true }
@@ -224,5 +234,67 @@ class AnalysedInversionTest {
         val result = analysed(down, StackMountSignal.UNMEASURED)
         assertFalse(result.exercise.sensorInverted)
         assertFalse(result.geometry.sensorInverted)
+    }
+
+    // ---- plan 1.14 (#327): a written stack mount is not roll-checked ----------
+
+    private val writtenStack = down + ""","sensorOnStack":true"""
+
+    /**
+     * RED before #327's fix. The plan WROTE `sensorOnStack` true and omitted
+     * `sensorInverted`, and the analysed unit's roll ran over the 3.0 degree
+     * bound. A unit on the stack still rolls, so the plan's word stands: the
+     * inversion is kept on the definition AND on the description the row
+     * stores, and the result is exactly what the plan resolved. Asked on an
+     * id the stack table carries and on one it does not, because what decides
+     * is what the plan wrote, never the table.
+     */
+    @Test
+    fun `a written stack mount keeps the rule's inversion on a unit whose roll moved`() {
+        for (id in listOf("triceps_pushdown", "rope_pushdown")) {
+            val plan = declared(id, writtenStack)
+            val used = SetGeometryPolicy.resolve(base(id), plan)
+            val result = analysed(writtenStack, StackMountSignal.NOT_ON_STACK, id)
+            assertTrue(result.exercise.sensorInverted, "$id: the roll overruled a plan that wrote the stack mount")
+            assertTrue(result.geometry.sensorInverted, "$id: the row drops an inversion the plan's word kept")
+            assertEquals(used, result.exercise, id)
+            assertEquals(SetGeometryPolicy.describe(used, plan), result.geometry, id)
+        }
+    }
+
+    /** RED before #327's fix. Absence of a roll verdict takes nothing back from a written mount either. */
+    @Test
+    fun `a written stack mount keeps the rule's inversion on a unit nothing measured`() {
+        val result = analysed(writtenStack, StackMountSignal.UNMEASURED)
+        assertTrue(result.exercise.sensorInverted)
+        assertTrue(result.geometry.sensorInverted)
+    }
+
+    /**
+     * Green before #327's fix and after: a written mount whose roll says
+     * stack kept the inversion under 1.13 as well, so this is the case the
+     * fix must not move from the other side.
+     */
+    @Test
+    fun `a written stack mount keeps the rule's inversion on a unit whose roll says stack`() {
+        val result = analysed(writtenStack, StackMountSignal.ON_STACK)
+        assertTrue(result.exercise.sensorInverted)
+        assertTrue(result.geometry.sensorInverted)
+    }
+
+    /**
+     * Green before #327's fix and after: the roll check #323 added still
+     * governs a stack mount the plan left to the table, and a written
+     * `sensorOnStack` false still takes the set out of the rule whatever the
+     * roll -- 1.14 moves only the written true.
+     */
+    @Test
+    fun `a seeded stack mount is still roll-checked and a written false is still out of the rule`() {
+        assertFalse(analysed(down, StackMountSignal.NOT_ON_STACK).exercise.sensorInverted, "seeded, roll moved")
+        assertTrue(analysed(down, StackMountSignal.ON_STACK).exercise.sensorInverted, "seeded, roll says stack")
+        assertFalse(
+            analysed(down + ""","sensorOnStack":false""", StackMountSignal.ON_STACK).exercise.sensorInverted,
+            "written false",
+        )
     }
 }

@@ -584,6 +584,13 @@ data class PlanFile(
             horizontal = exercise.plane?.let { it == "horizontal" } ?: false,
         )
         if (!applied) return null
+        if (exercise.sensorOnStack == true) {
+            return "sessions[$si].exercises[$ei]: ${exercise.exercise} rides the weight stack with its drive " +
+                "going DOWN, and this plan does not declare \"sensorInverted\" - the stack rises as the " +
+                "handle is driven down, and this plan writes \"sensorOnStack\": true, so the set's figures " +
+                "and the live count during the set are both read inverted, whatever the unit's roll. Declare " +
+                "\"sensorOnStack\": false if the sensor was on the handle or the rope instead."
+        }
         return "sessions[$si].exercises[$ei]: ${exercise.exercise} rides the weight stack with its drive " +
             "going DOWN, and this plan does not declare \"sensorInverted\" - the stack rises as the " +
             "handle is driven down, so the set's figures are analysed inverted wherever the analysed " +
@@ -705,7 +712,7 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.13"
+        const val SCHEMA_VERSION = "1.14"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader parsing this as a float
@@ -715,7 +722,7 @@ data class PlanFile(
         val SUPPORTED_SCHEMA_VERSIONS =
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9",
-                "1.10", "1.11", "1.12", "1.13",
+                "1.10", "1.11", "1.12", "1.13", "1.14",
             )
         val VALID_SIDES = setOf("left", "right")
 

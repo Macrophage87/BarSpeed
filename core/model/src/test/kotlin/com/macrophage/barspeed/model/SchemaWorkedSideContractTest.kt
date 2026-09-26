@@ -175,14 +175,15 @@ class SchemaWorkedSideContractTest {
      * #215 changes what is RECORDED, not what a coach may write. Pinned
      * because the two vocabularies are one word apart and a change made in the
      * wrong document would mint a plan version for nothing. The figure this
-     * asserts moves with each plan mint and is 1.13 now, minted by #317 for
-     * the stack inversion rule; the sentence that named 1.12 as #64's mint
-     * here is deleted rather than reworded. What the test checks is
+     * asserts moves with each plan mint and is 1.14 now, minted by #327 for
+     * what a written stack mount does to the stack inversion; the sentence
+     * that named 1.13 as #317's mint here is deleted rather than reworded.
+     * What the test checks is
      * unchanged -- that the plan version moved for a PLAN reason.
      */
     @Test
     fun `the plan contract is untouched by a recorded side`() {
-        assertEquals("1.13", PlanFile.SCHEMA_VERSION, "the plan version moved for a change to the record")
+        assertEquals("1.14", PlanFile.SCHEMA_VERSION, "the plan version moved for a change to the record")
         val planSet = schema("plan.schema.json").getValue("\$defs").jsonObject.getValue("set").jsonObject
         assertFalse(
             "plannedSide" in planSet.getValue("properties").jsonObject.keys,

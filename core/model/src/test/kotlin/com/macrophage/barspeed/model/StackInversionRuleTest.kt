@@ -3,6 +3,7 @@ package com.macrophage.barspeed.model
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -188,5 +189,23 @@ class StackInversionRuleTest {
             "reads it inverted either way"
         assertTrue(analysed in line, line)
         assertTrue(live in line, line)
+    }
+
+    /**
+     * Plan 1.14 (#327). Where the plan WRITES `sensorOnStack` true the
+     * inversion stands whatever the analysed unit's roll, so the gate's line
+     * says the figures and the live count are both read inverted, and no
+     * longer promises a roll check the set will not make. Asked on an id the
+     * stack table carries and on one it does not, because the line is keyed
+     * on what the plan wrote, never on the table.
+     */
+    @Test
+    fun `the import gate's inversion line under a written stack mount says the roll is not consulted`() {
+        for (id in listOf("triceps_pushdown", "rope_pushdown")) {
+            val line = inversionLines(id, down + ""","sensorOnStack":true""").single()
+            assertTrue("this plan writes \"sensorOnStack\": true" in line, line)
+            assertTrue("are both read inverted, whatever the unit's roll" in line, line)
+            assertFalse("wherever the analysed unit's own roll" in line, line)
+        }
     }
 }
