@@ -22,6 +22,19 @@ object SyntheticSets {
         val romM: Double,
     )
 
+    /**
+     * [eccentricFirst] HAS A PHASE NAME BUT PICKS A SIGN. `true` emits each
+     * rep's negative (downward) stroke first, `false` its positive (upward)
+     * stroke first. [RepSpec.eccS] is always the downward stroke's duration
+     * and [RepSpec.conS] the upward one's. So the flag chooses which STROKE
+     * starts a rep, and it matches its name only on a lift whose drive goes
+     * up. On a drive-down lift, passing a phase fact here gets the opposite
+     * stroke from the one the name promises (#135).
+     *
+     * Its only production caller was demo mode's stream, which passed
+     * `startsWith == ECCENTRIC` and ignored `concentricUp`. #262 deleted
+     * demo mode, and every caller left is a test.
+     */
     fun generate(
         reps: List<RepSpec>,
         sampleRateHz: Double = 100.0,
