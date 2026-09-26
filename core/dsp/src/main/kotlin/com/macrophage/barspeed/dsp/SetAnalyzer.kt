@@ -1010,12 +1010,44 @@ object CoachingRules {
         tempoCompliance?.phases?.forEach { phase ->
             if (phase.scored && phase.repsEvaluated > 0 && phase.repsWithinTolerance < phase.repsEvaluated) {
                 val direction = if (phase.worstDeviationS < 0) "fast" else "slow"
-                out += "Tempo (${phase.phase}): ${phase.repsWithinTolerance}/${phase.repsEvaluated} reps on " +
-                    "tempo; worst was ${fmt(abs(phase.worstDeviationS))} s too $direction " +
+                out += "Tempo (${phase.phase}): ${tempoRatio(phase, reps.size)}; " +
+                    "worst was ${fmt(abs(phase.worstDeviationS))} s too $direction " +
                     "(target ${fmt(phase.prescribedS ?: 0.0)} s)."
             }
         }
         return out
+    }
+
+    /**
+     * The "x/y reps on tempo" half of a tempo verdict line (#328).
+     *
+     * y is the phase's `repsEvaluated`: the reps that RESOLVED the phase, the
+     * others having been dropped before anything was compared. So whenever
+     * any rep of the analysis went unmeasured, the ratio is scoped to the
+     * measured reps and the gap is stated, counted by [PhaseCoverage] over
+     * every rep of the analysis -- the same rule, and the same
+     * [of][PhaseCoverage.of], as the eccentric caption [eccentricTempoInsight]
+     * that the rest screen draws on the same card (#89). Reps the lifter
+     * counted and the sensor never segmented are not in that count; they are
+     * the "Sensor resolved x of y reps" line's, written above in [verdicts].
+     *
+     * A fully measured phase keeps the x/y form byte for byte, because on
+     * such a phase it is already a statement about every rep. NOT
+     * RETROACTIVE: the verdicts are frozen into a set's analysisJson when it
+     * is recorded, so a set recorded before this change keeps the line it was
+     * written with. "Not measured" says nothing about what the lifter did on
+     * that rep -- only that nothing measured the phase.
+     */
+    private fun tempoRatio(phase: PhaseComplianceResult, repCount: Int): String {
+        val coverage = PhaseCoverage(measured = phase.repsEvaluated, of = repCount)
+        val within = phase.repsWithinTolerance
+        val measured = phase.repsEvaluated
+        val clause = coverage.notMeasuredClause
+        return if (clause == null) {
+            "$within/$measured reps on tempo"
+        } else {
+            "$within of $measured measured ${if (measured == 1) "rep" else "reps"} on tempo · $clause"
+        }
     }
 
     /**
