@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.data
 
+import com.macrophage.barspeed.dsp.RepAnalysis
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.model.VoiceCue
 import kotlinx.coroutines.Dispatchers
@@ -350,6 +351,59 @@ class SessionExportRepMarksTest {
         assertEquals(4, set.reps, "the recorded count moved")
         assertEquals("metronome", set.repsSource, "the fixture is not a guided set")
         assertEquals(grid, set.repMarks, "the guide's cycle marks were dropped or trimmed to the count")
+    }
+
+    /**
+     * GUARD for #246's decision, green before and after it: a guided set whose
+     * segmenter resolved as many reps as the guide counted publishes
+     * `repMetricsComplete` true, however its detections fell against the
+     * cycle marks beside them.
+     *
+     * #246's two field-38 sets published true at 12 of 12 and 14 of 14 while
+     * some cycles held no detection and others two. That misalignment cannot
+     * be written into this fixture, and that is the point: the stored reps
+     * carry durations and an ordinal and no clock, so the exporter has no
+     * instant to align a detection with, and count equality is the strongest
+     * statement it can make. The value is kept; the published description
+     * says what it does not certify.
+     */
+    @Test
+    fun `a guided set whose counts agree publishes true however its detections fell`() = runTest {
+        val twelve =
+            (1..12).map {
+                RepAnalysis(
+                    index = it,
+                    eccS = 1.0,
+                    bottomPauseS = null,
+                    conS = 1.0,
+                    topPauseS = null,
+                    meanConVelMps = 0.3,
+                    peakConVelMps = 0.5,
+                    meanEccVelMps = -0.2,
+                    peakEccVelMps = -0.3,
+                    romM = 0.2,
+                    peakPowerW = null,
+                )
+            }
+        val analysis = noReps.copy(reps = twelve, sampleRateHz = 99.4)
+        val guided =
+            row().copy(
+                actualReps = 12,
+                plannedReps = 12,
+                tempo = "1120",
+                analysisJson = json.encodeToString(SetAnalysis.serializer(), analysis),
+            )
+        val dao =
+            FakeSessionDao(
+                session = SessionEntity(id = 1L, startedAtMs = 1_000L, endedAtMs = 61_000L),
+                rows = listOf(guided),
+                streams = mapOf(5L to listOf(repStream((0 until 12).map { 5_000L + it * 4_004L }))),
+            )
+        val exporter =
+            SessionExporter(SessionRepository(dao, FakeExerciseDao()), dispatcher = Dispatchers.Default)
+        val set = exporter.buildExport(1L, includeRepDetail = true)!!.exercises.single().sets.single()
+        assertEquals("metronome", set.repsSource, "the fixture is not a guided set")
+        assertEquals(true, set.repMetricsComplete, "equal counts no longer publish true")
     }
 
     /**
