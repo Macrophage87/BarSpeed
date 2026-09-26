@@ -255,7 +255,8 @@ object SetGeometryPolicy {
      *    orients its drive positive and the stack rises on it, and a drive-up
      *    stack (a leg extension) rises with the lifter, so neither inverts. It
      *    reads the resolved geometry and never the words in an id, so a plan's
-     *    own name for a pushdown resolves the same as the built-in one.
+     *    own name for a pushdown resolves the same as the built-in one only
+     *    where the plan writes `sensorOnStack` true.
      * 4. Otherwise false.
      *
      * MEASURED, NOT DERIVED FROM A SPEC: on six pushdown sets across field-38,
