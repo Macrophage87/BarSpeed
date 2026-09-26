@@ -1,3 +1,5 @@
+package com.macrophage.barspeed.model
+
 /**
  * A session's heart-rate summary: the mean of its sets' average heart rates,
  * the highest of their maxima, and the session HRV (#62).
