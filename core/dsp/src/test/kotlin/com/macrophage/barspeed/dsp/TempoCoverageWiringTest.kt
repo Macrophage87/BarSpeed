@@ -60,4 +60,22 @@ class TempoCoverageWiringTest {
         assertEquals(4, c.phases.single { it.phase == TempoComplianceResult.PHASE_ECCENTRIC }.repsEvaluated)
         assertEquals(8, c.phases.single { it.phase == "concentric" }.repsEvaluated)
     }
+
+    /**
+     * RED WHEN WRITTEN. The same eight reps, every one in tolerance on what it
+     * resolved: the chip reached through the screens' own function withholds
+     * the tick and says how many reps the eccentric was measured on. This is
+     * the pin on the hand-off -- a mapping that passed the set's count as the
+     * phase's would leave the label's own tests green and this one red.
+     */
+    @Test
+    fun `a partly measured set does not tick through the screens' function`() {
+        val reps = (0..7).map { rep(it, if (it % 2 == 0) 3.0 else null) }
+        val c = stored(SetAnalyzer.complianceFor(Tempo.parse("3010"), 0.5, reps))
+        assertEquals(8, c.repsFullyCompliant, "the fixture's compliance moved")
+        val score = assertNotNull(c.tempoScore())
+        assertEquals("Tempo 8/8", score.text)
+        assertEquals(TempoScoreTone.PARTIAL, score.tone)
+        assertEquals("Eccentric: 4 of 8 reps measured · 4 not measured.", score.ungradedNote)
+    }
 }
