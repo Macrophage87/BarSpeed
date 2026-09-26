@@ -3659,11 +3659,11 @@ data class RecordState(
  * The sensor's rep count for ONE set: the caller, what it has called, and what
  * the lifter has corrected it by (#145, #286).
  *
- * Outside [RecordViewModel] for the reason [VoiceMilestones] below is: that
- * class is measured AT detekt's `LargeClass` limit, and this cluster is four
- * fields and two decisions that say nothing about recording. Nothing here
- * touches state, the journal or the voice -- the view model does that with the
- * number this returns.
+ * Outside [RecordViewModel] for the reason [VoiceMilestones] below is:
+ * detekt's `LargeClass` counts that class against a default of 600, and this
+ * cluster is four fields and two decisions that say nothing about recording.
+ * Nothing here touches state, the journal or the voice -- the view model does
+ * that with the number this returns.
  *
  * WHICH DETECTOR IT HOLDS IS NOT DECIDED HERE. `LiveRepCounters.forCounted`
  * builds it from `LiveCounterPolicy`'s answer for the set's `RepCounter`, so
@@ -4221,8 +4221,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // One line, like skipUpcomingSet and selectSide, for skipUpcomingSet's
-    // reason: this class sits on detekt's `LargeClass` limit, and these two
-    // pay for the line #302's frozen live-trust flag adds to endSet.
+    // reason: detekt's `LargeClass` counts this class against a default of
+    // 600, and these two pay for the line #302's frozen live-trust flag adds
+    // to endSet.
     fun selectExercise(id: String) = stateFlow.value.copy(selectedExerciseId = id).let { stateFlow.value = it }
 
     fun updateLoadInput(text: String) {
