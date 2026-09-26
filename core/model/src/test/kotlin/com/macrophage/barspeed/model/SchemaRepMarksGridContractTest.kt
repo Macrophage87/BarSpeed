@@ -68,7 +68,9 @@ class SchemaRepMarksGridContractTest {
     @Test
     fun `repMarks on a metronome set is described as the cadence guide's cycle grid`() {
         val d = description("repMarks")
-        assertTrue("the instant the cadence guide finished one prescribed cycle" in d, "no cycle: $d")
+        assertTrue("counted one prescribed cycle -- after its last stroke" in d, "no count after the stroke: $d")
+        assertTrue("one beat before the cycle ends" in d, "repMarks does not say a closing pause follows the mark")
+        assertTrue("no mark falls on a rep call" in d, "repMarks does not say which spoken rows the marks sit on")
         assertTrue("the prescribed grid" in d, "repMarks does not name the grid")
         assertTrue("NOT instants anyone observed a rep" in d, "repMarks does not say a mark is not an observed rep")
         assertTrue("`metronome`" in d && "`manual`" in d, "repMarks does not say which counter wrote which marks")
@@ -100,6 +102,14 @@ class SchemaRepMarksGridContractTest {
         assertFalse(d.startsWith("The instants a rep was COUNTED"), "repMarks still opens by calling them reps")
         assertFalse("when the voice guide calls a rep" in d, "repMarks still says the guide marks on its rep call")
         assertFalse("repMarks is what was counted" in description("voiceCues"), "voiceCues still calls marks reps")
+        // Review round 1: a mark is written after the cycle's last stroke,
+        // which on a tempo ending in a pause is a beat before the cycle ends,
+        // and on the back squat it sits on the rep call itself.
+        for (gone in listOf("finished one prescribed cycle", "opening stroke word", "the end of its cycle")) {
+            assertFalse(gone in d, "repMarks still says: $gone")
+        }
+        assertFalse("cycle ends" in description("voiceCues"), "voiceCues still calls the marks cycle ends")
+        assertTrue("per-cycle count" in description("voiceCues"), "voiceCues does not name the per-cycle count")
     }
 
     /** The log files the change once, and says nothing but descriptions moved. */
@@ -111,11 +121,17 @@ class SchemaRepMarksGridContractTest {
         for (fact in listOf("NO KEY, VALUE OR FILE CHANGES", "103", "DATABASE_VERSION does NOT move")) {
             assertTrue(fact in entry, "the #294 entry does not state: $fact")
         }
+        assertTrue("counted one prescribed cycle -- after its last stroke" in entry, "the #294 entry: no count")
+        for (gone in listOf("finished one prescribed cycle", "opening stroke word")) {
+            assertFalse(gone in entry, "the #294 entry still says: $gone")
+        }
     }
 
     /** The copy the coach receives says not to count the marks as reps. */
     @Test
     fun `the plan prompt says the marks are not reps on a guided set`() {
         assertTrue("never count their rows as reps" in prompt, "the plan prompt lets a coach count marks as reps")
+        assertTrue("voice guide's per-cycle count" in prompt, "the plan prompt does not name the per-cycle count")
+        assertFalse("cycle ends" in prompt, "the plan prompt still calls the marks cycle ends")
     }
 }

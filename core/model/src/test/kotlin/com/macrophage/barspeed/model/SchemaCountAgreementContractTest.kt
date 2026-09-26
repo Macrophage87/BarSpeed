@@ -6,6 +6,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -66,12 +67,19 @@ class SchemaCountAgreementContractTest {
         assertTrue("historical" in d, "repMetricsComplete does not say its name is historical")
     }
 
-    /** It says why nothing stronger is published: no stored figure can match a detection to a rep in time. */
+    /**
+     * It says why nothing stronger is published: none is computed, because
+     * matching a detection to a rep in time needs the segmenter re-run over
+     * the stored raw stream. Review round 1 deleted "none can be computed
+     * from what a set stores" -- #246 built its alignment from that stream.
+     */
     @Test
-    fun `repMetricsComplete says why no stronger test exists`() {
+    fun `repMetricsComplete says why no stronger test is computed`() {
         val d = description("repMetricsComplete")
         assertTrue("carry durations and no clock" in d, "the per-rep rows' missing clock is not stated")
         assertTrue("one integer" in d, "the live count's shape is not stated")
+        assertTrue("segmenter re-run over the stored raw stream" in d, "the raw stream's role is not stated")
+        assertFalse("none can be computed from what a set stores" in d, "the false impossibility is still stated")
     }
 
     /** The log files the change once, and says nothing but a description moved. */
@@ -83,6 +91,8 @@ class SchemaCountAgreementContractTest {
         for (fact in listOf("NO KEY OR VALUE CHANGES", "DATABASE_VERSION does NOT move")) {
             assertTrue(fact in entry, "the #246 entry does not state: $fact")
         }
+        assertTrue("segmenter re-run over the stored raw stream" in entry, "the #246 entry: no raw stream")
+        assertFalse("nothing a set stores supports one" in entry, "the #246 entry still states the impossibility")
     }
 
     /** The copy the coach receives: the per-rep line said what false means and nothing about true. */
