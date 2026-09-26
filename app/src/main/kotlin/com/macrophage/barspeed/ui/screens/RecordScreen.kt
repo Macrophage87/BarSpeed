@@ -83,6 +83,7 @@ import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
 import com.macrophage.barspeed.model.ExitPrompt
 import com.macrophage.barspeed.model.GuidedRepCaption
+import com.macrophage.barspeed.model.HistoryTarget
 import com.macrophage.barspeed.model.Implement
 import com.macrophage.barspeed.model.ImplementLoad
 import com.macrophage.barspeed.model.LeadInPolicy
@@ -3974,17 +3975,12 @@ private fun FeedbackChips(feedback: SetFeedback, hrBpm: Int?, hrvMs: Int? = null
     ) {
         // effectiveDurationS, not actualDurationS: this chip's tone is the
         // shortfall signal, and a hold corrected up past its target left it
-        // red against a record that says the target was met.
+        // red against a record that says the target was met. The text and
+        // the tone are HistoryTarget.heldChip's, the history card's own, so
+        // the two screens cannot colour one hold two ways (#320).
         feedback.effectiveDurationS?.let { actual ->
-            val planned = feedback.plannedDurationS
-            VerdictChip(
-                if (planned != null) "Held $actual/${planned}s" else "Held ${actual}s",
-                when {
-                    planned == null || actual >= planned -> ChipTone.OK
-                    actual >= (planned * 0.9).toInt() -> ChipTone.WARN
-                    else -> ChipTone.BAD
-                },
-            )
+            val chip = HistoryTarget.heldChip(actual, feedback.plannedDurationS)
+            VerdictChip(chip.text, chip.tone.chipTone())
         }
         // The wording, the tick and the tone are TempoScoreLabel's in
         // :core:model, so this screen and the history screen cannot drift and
