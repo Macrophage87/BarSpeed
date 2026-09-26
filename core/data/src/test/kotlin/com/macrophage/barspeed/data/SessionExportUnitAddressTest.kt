@@ -217,13 +217,18 @@ class SessionExportUnitAddressTest {
      * honest answer and this document expresses every other unknown by
      * omission; an empty object would read as "the app looked and there were no
      * units".
+     *
+     * The set is exact, so it moved with #321: both roles here stream 100 rows,
+     * which is enough for `deliveredRate_hz` and `burstSpacing_ms` to be
+     * published beside the declaration. Neither says anything about which unit
+     * carried a role.
      */
     @Test
     fun `no pairing known publishes no unit key`() = runTest {
         val sensors = sensorsObject(roleByAddress = emptyMap())
 
         assertEquals(
-            setOf("count", "expected", "present", "analysedRole"),
+            setOf("count", "expected", "present", "analysedRole", "deliveredRate_hz", "burstSpacing_ms"),
             sensors.keys,
             "an empty pairing store still wrote something",
         )
