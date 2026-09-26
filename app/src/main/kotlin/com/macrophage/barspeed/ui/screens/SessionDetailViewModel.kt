@@ -11,6 +11,7 @@ import com.macrophage.barspeed.BuildConfig
 import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.SetRecordEntity
 import com.macrophage.barspeed.data.repsSourceOf
+import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.RepsCountChip
 import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.WeightUnit
@@ -21,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,6 +38,20 @@ class SessionDetailViewModel(app: Application, private val sessionId: Long) : An
     val sets =
         repository.observeSets(sessionId)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * The header's heart-rate summary (#62): what the close stored, or, on a
+     * session never closed, the aggregate over every set row and an HRV
+     * computed from the session's stored heart-rate streams.
+     *
+     * Off the main thread, because an unclosed session's figure inflates and
+     * parses every stored heart-rate stream; a closed session reads none.
+     * Null until the session row has been read.
+     */
+    val heartRate: StateFlow<SessionHeartRate?> =
+        combine(session, sets) { s, rows -> s?.let { repository.sessionHeartRate(it, rows) } }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val weightUnit =
         container.settings.weightUnit

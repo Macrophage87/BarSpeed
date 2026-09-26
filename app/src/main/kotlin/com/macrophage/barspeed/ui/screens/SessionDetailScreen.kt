@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.data.SetRecordEntity
-import com.macrophage.barspeed.data.heartRate
 import com.macrophage.barspeed.dsp.AccelArtefact
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
@@ -79,6 +78,7 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
     val session by viewModel.session.collectAsState()
     val weightUnit by viewModel.weightUnit.collectAsState()
     val sets by viewModel.sets.collectAsState()
+    val heartRate by viewModel.heartRate.collectAsState()
     val exporting by viewModel.exporting.collectAsState()
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -131,10 +131,11 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
                 // number this change exists to correct at the top of the very
                 // screen the mark is applied from (#60).
                 val performed = VoidSetPolicy.performed(sets) { it.voided }
-                // The stored pair where the session was closed, else derived
-                // from every set row by the close's own rule (#62), so a
-                // session the lifter left without finishing still shows it.
-                val hr = s.heartRate(sets)
+                // The stored figures where the session was closed, else derived
+                // by the close's own rule (#62) -- the heart rates from every
+                // set row, the HRV from the stored heart-rate streams -- so a
+                // session the lifter left without finishing still shows them.
+                val hr = heartRate
                 val parts =
                     listOfNotNull(
                         formatter.format(started),
@@ -143,8 +144,8 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
                         } else {
                             "${performed.size} sets · ${sets.size - performed.size} not performed"
                         },
-                        hr.avgBpm?.let { "♥ $it avg / ${hr.maxBpm} max" },
-                        s.hrvRmssdMs?.let { "HRV ${it.toInt()} ms" },
+                        hr?.let { h -> h.avgBpm?.let { "♥ $it avg / ${h.maxBpm} max" } },
+                        hr?.hrvRmssdMs?.let { "HRV ${it.toInt()} ms" },
                     )
                 Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                 Spacer(Modifier.height(10.dp))

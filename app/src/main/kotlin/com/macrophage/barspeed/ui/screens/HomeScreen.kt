@@ -282,7 +282,7 @@ private fun HistoryCard(row: HistoryRow, onClick: () -> Unit) {
                         formatter.format(started),
                         "${row.setCount} sets",
                         row.heartRate.avgBpm?.let { "♥ $it avg" },
-                        row.session.hrvRmssdMs?.let { "HRV ${it.toInt()}" },
+                        row.heartRate.hrvRmssdMs?.let { "HRV ${it.toInt()}" },
                     )
                 Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
             }

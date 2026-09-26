@@ -133,8 +133,9 @@ class SessionExporter(
         // within an exercise: the measured rest runs to whichever set came
         // next (#157). Taken before the grouping below, which loses the order.
         val nextStart = nextStartsById(sets)
-        // Read over every set row, voided included, as endSession reads them.
-        val sessionHr = session.heartRate(sets)
+        // Read over every set row, voided included, as endSession reads them,
+        // and on an unclosed session over its stored heart-rate streams (#62).
+        val sessionHr = sessionRepository.sessionHeartRate(session, sets)
         val byExercise = sets.groupBy { it.exerciseId }
         val exercises =
             byExercise.map { (exerciseId, records) ->
@@ -202,22 +203,24 @@ class SessionExporter(
             // outcome is right on the one session that fires it, for a reason
             // narrower than the gate states.
             //
-            // avgBpm and maxBpm are read through SessionHeartRate (#62): the
-            // pair the close stored where the row has an end time, and
-            // otherwise the same aggregate over the set rows, so a session
+            // All three figures are read through SessionHeartRate (#62): what
+            // the close stored where the row has an end time. Otherwise avgBpm
+            // and maxBpm are the same aggregate over the set rows, so a session
             // the lifter never finished publishes the figures its close would
-            // have written. `hrvRmssd_ms` is published only from a close; a
-            // derived block never carries it. Deriving it from the stored hrm
-            // and rest_before_hrm streams is #62 half (b), measured and not
-            // built.
+            // have written, and hrvRmssd_ms is SessionHrv's RMSSD over the
+            // session's stored rest_before_hrm and hrm streams (1.24). That HRV
+            // is computed from stored streams, not from the intervals the close
+            // received, so it is not guaranteed to equal what a close would
+            // have stored; the published description says how closely the two
+            // agreed where both exist.
             heartRate =
             if (exercises.isNotEmpty() && exercises.all { it.sets.all { set -> set.hr == null } }) {
                 null
-            } else if (sessionHr.avgBpm != null || sessionHr.maxBpm != null || session.hrvRmssdMs != null) {
+            } else if (sessionHr.avgBpm != null || sessionHr.maxBpm != null || sessionHr.hrvRmssdMs != null) {
                 HrSessionSummary(
                     avgBpm = sessionHr.avgBpm,
                     maxBpm = sessionHr.maxBpm,
-                    hrvRmssdMs = session.hrvRmssdMs?.let { Math.round(it * 10.0) / 10.0 },
+                    hrvRmssdMs = sessionHr.hrvRmssdMs?.let { Math.round(it * 10.0) / 10.0 },
                 )
             } else {
                 null

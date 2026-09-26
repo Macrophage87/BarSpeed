@@ -10,7 +10,6 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.data.SessionEntity
-import com.macrophage.barspeed.data.heartRate
 import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.VolumeSet
@@ -52,8 +51,9 @@ data class HistoryRow(
     val setCount: Int,
     val sparkline: List<Double>,
     /**
-     * The session's heart-rate summary: the pair the close stored, or, on a
-     * session never closed, the same aggregate over every set row (#62).
+     * The session's heart-rate summary: what the close stored, or, on a
+     * session never closed, the same aggregate over every set row and an HRV
+     * computed from the session's stored heart-rate streams (#62).
      */
     val heartRate: SessionHeartRate,
 )
@@ -626,7 +626,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                             ?.average()
                             ?.takeIf { it.isFinite() }
                     }
-                HistoryRow(session, performed.size, spark, session.heartRate(sets))
+                HistoryRow(session, performed.size, spark, sessionRepository.sessionHeartRate(session, sets))
             }
 
         return HomeState(
