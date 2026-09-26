@@ -713,6 +713,41 @@ class SessionRepository(
     suspend fun rawStreams(setId: Long): List<RawStreamEntity> = sessionDao.rawStreamsForSet(setId)
 
     /**
+     * [session]'s heart-rate summary, its HRV included (#62): the one read the
+     * exporter, the session detail header and the history card share.
+     *
+     * [sets] must be [session]'s own set rows. A closed session publishes
+     * what its close stored and reads no stream; an unclosed one derives its
+     * HRV from [storedHrWindows]. See [SessionHeartRate.of].
+     */
+    suspend fun sessionHeartRate(session: SessionEntity, sets: List<SetRecordEntity>): SessionHeartRate =
+        session.heartRate(sets) { storedHrWindows(sets) }
+
+    /**
+     * The session's stored heart-rate windows, in session order, as
+     * `SessionHrv.rmssdMs` takes them (#62 half (b)): for each of [sets], in
+     * the order given, its `rest_before_hrm` window and then its `hrm`
+     * stream.
+     *
+     * `rest_after_hrm` is not read. Its only writer is [recordFinalRestWindow],
+     * which runs after [endSession], so a session with no end time -- the only
+     * kind whose HRV is derived -- never has one.
+     *
+     * Every kind is matched by equality, as [RawStreamEntity.KIND_REST_BEFORE_HRM]
+     * requires. A window that is missing, or that will not inflate or parse,
+     * contributes nothing rather than failing the read, the same handling the
+     * exporter gives a set's own `hrm` stream; the HRV is then computed over
+     * the windows that remain.
+     */
+    suspend fun storedHrWindows(sets: List<SetRecordEntity>): List<List<HrSample>> = sets.flatMap { set ->
+        val streams = sessionDao.rawStreamsForSet(set.id)
+        listOf(RawStreamEntity.KIND_REST_BEFORE_HRM, RawStreamEntity.KIND_HRM).mapNotNull { kind ->
+            streams.firstOrNull { it.kind == kind }
+                ?.let { stream -> runCatching { HrCsv.decode(Gzip.decompress(stream.csvGzip)) }.getOrNull() }
+        }
+    }
+
+    /**
      * Rest-screen effort rating (RPE, failed, or warm-up) applied to the
      * just-recorded set.
      *

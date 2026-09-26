@@ -2,6 +2,7 @@ package com.macrophage.barspeed.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
  * A session's heart-rate summary, and which answer a reader publishes (#62).
@@ -15,6 +16,12 @@ import kotlin.test.assertEquals
  * The aggregate cases are characterization pins on what `endSession` wrote
  * before #62: a reader deriving an unclosed session's figure by any other
  * arithmetic would publish a number no closed session could have.
+ *
+ * The HRV cases were added with #62 half (b), green when written: the HRV
+ * half of [SessionHeartRate.of] was new and nothing read it at the commit
+ * that added it. The derived figure itself is `SessionHrv`'s, pinned in
+ * `:core:hrm`; here the derivation is a stub, because the question is which
+ * answer the read takes and whether it asks for a derivation at all.
  */
 class SessionHeartRateTest {
     // ---- the aggregate: endSession's arithmetic ------------------------------
@@ -73,8 +80,10 @@ class SessionHeartRateTest {
                 closed = false,
                 storedAvgBpm = null,
                 storedMaxBpm = null,
+                storedHrvRmssdMs = null,
                 setAvgBpm = listOf(120, 140),
                 setMaxBpm = listOf(150, 165),
+                derivedHrvRmssdMs = { null },
             )
 
         assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165), hr)
@@ -93,8 +102,10 @@ class SessionHeartRateTest {
                 closed = false,
                 storedAvgBpm = 99,
                 storedMaxBpm = 101,
+                storedHrvRmssdMs = null,
                 setAvgBpm = listOf(120, 140),
                 setMaxBpm = listOf(150, 165),
+                derivedHrvRmssdMs = { null },
             )
 
         assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165), hr)
@@ -113,8 +124,10 @@ class SessionHeartRateTest {
                 closed = true,
                 storedAvgBpm = 130,
                 storedMaxBpm = 165,
+                storedHrvRmssdMs = null,
                 setAvgBpm = listOf(100, 180),
                 setMaxBpm = listOf(110, 195),
+                derivedHrvRmssdMs = { null },
             )
 
         assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165), hr)
@@ -133,10 +146,90 @@ class SessionHeartRateTest {
                 closed = true,
                 storedAvgBpm = null,
                 storedMaxBpm = null,
+                storedHrvRmssdMs = null,
                 setAvgBpm = listOf(120),
                 setMaxBpm = listOf(150),
+                derivedHrvRmssdMs = { null },
             )
 
         assertEquals(SessionHeartRate(null, null), hr)
+    }
+
+    // ---- the HRV: stored where the close wrote, derived where it did not ----
+
+    /**
+     * A closed session keeps the HRV its close computed, and the read never
+     * asks for a derivation: re-deriving would replace the close's figure,
+     * computed over every interval it received, with one computed from the
+     * streams that happened to be stored.
+     */
+    @Test
+    fun `a closed session keeps the HRV it stored and never derives one`() {
+        val hr =
+            SessionHeartRate.of(
+                closed = true,
+                storedAvgBpm = 130,
+                storedMaxBpm = 165,
+                storedHrvRmssdMs = 14.8,
+                setAvgBpm = listOf(120, 140),
+                setMaxBpm = listOf(150, 165),
+                derivedHrvRmssdMs = { error("a closed session asked for a derived HRV") },
+            )
+
+        assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165, hrvRmssdMs = 14.8), hr)
+    }
+
+    /** A close that computed no HRV stored none, and that null is its answer. */
+    @Test
+    fun `a closed session that stored no HRV is not given one at read time`() {
+        val hr =
+            SessionHeartRate.of(
+                closed = true,
+                storedAvgBpm = 130,
+                storedMaxBpm = 165,
+                storedHrvRmssdMs = null,
+                setAvgBpm = listOf(120, 140),
+                setMaxBpm = listOf(150, 165),
+                derivedHrvRmssdMs = { 20.0 },
+            )
+
+        assertNull(hr.hrvRmssdMs)
+    }
+
+    /**
+     * An unclosed session's HRV is the derived figure, never its column: the
+     * close is the column's only writer and it has not run.
+     */
+    @Test
+    fun `an unclosed session's HRV is the derived figure, not its column`() {
+        val hr =
+            SessionHeartRate.of(
+                closed = false,
+                storedAvgBpm = null,
+                storedMaxBpm = null,
+                storedHrvRmssdMs = 99.0,
+                setAvgBpm = listOf(120, 140),
+                setMaxBpm = listOf(150, 165),
+                derivedHrvRmssdMs = { 14.0 },
+            )
+
+        assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165, hrvRmssdMs = 14.0), hr)
+    }
+
+    /** No derivable HRV is no HRV, and the two heart rates are still derived. */
+    @Test
+    fun `an unclosed session with no derivable HRV publishes its heart rates without one`() {
+        val hr =
+            SessionHeartRate.of(
+                closed = false,
+                storedAvgBpm = null,
+                storedMaxBpm = null,
+                storedHrvRmssdMs = null,
+                setAvgBpm = listOf(120, 140),
+                setMaxBpm = listOf(150, 165),
+                derivedHrvRmssdMs = { null },
+            )
+
+        assertEquals(SessionHeartRate(avgBpm = 130, maxBpm = 165, hrvRmssdMs = null), hr)
     }
 }
