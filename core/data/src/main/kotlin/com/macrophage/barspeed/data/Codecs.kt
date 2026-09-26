@@ -61,7 +61,7 @@ object CueCsv {
 /**
  * Canonical CSV for rep marks: the instants the set's counter advanced, on
  * the same epoch-ms clock as ImuCsv, HrCsv and CueCsv -- the lifter's taps on
- * a hand-counted set, the cadence guide's cycle ends on a guided one, which
+ * a hand-counted set, the cadence guide's per-cycle count on a guided one, which
  * are not rep instants anyone observed (#294, `SetExport.repMarks`).
  *
  * One column, because a mark carries nothing but its instant. What a rep was

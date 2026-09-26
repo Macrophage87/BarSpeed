@@ -2441,10 +2441,13 @@ data class SessionExport(
          * `voiceCues` change. MEASURED by `RepMarkTrackTest` on the thirteen
          * committed captures that carry a rep-mark stream, all guided sets: all
          * 103 marks fall within 1 ms of a row of the same set's cue track, 94 on
-         * the same millisecond -- the next cycle's opening stroke word or
-         * `Done` -- spaced at the tempo's sum. So on a `metronome` set each mark
-         * is the instant the cadence guide finished one prescribed cycle, the
-         * prescribed grid, and not an instant anyone observed a rep; #294 found
+         * the same millisecond -- the guide's next spoken word: a stroke word, a
+         * rep call, or `Done`; on eight of the thirteen no mark falls on a rep
+         * call -- spaced at the tempo's sum. So on a `metronome` set each mark
+         * is the instant the cadence guide counted one prescribed cycle -- after
+         * its last stroke, so on a tempo ending in a pause one beat before the
+         * cycle ends -- and the marks are the prescribed grid, not instants
+         * anyone observed a rep; #294 found
          * a failed set carrying more marks than reps. On a `manual` set the
          * marks are the lifter's taps. NO TRUE REP INSTANT IS STORED on a guided
          * set -- the per-rep rows carry no clock, the cue track is what the app
@@ -2464,10 +2467,12 @@ data class SessionExport(
          * segmenter's rep count equal to `reps`, and true says that and nothing
          * more: a segmenter that misses reps and finds as many movements that
          * are not reps publishes true, which #246 found on two field sets. A
-         * stronger test would match each detection to a counted rep in time, and
-         * nothing a set stores supports one -- the stored per-rep rows carry
-         * durations and no clock, and the live count is stored as one integer --
-         * so the value is kept, its description narrowed, and the name stays.
+         * stronger test would match each detection to a counted rep in time.
+         * None is computed: the stored per-rep rows carry durations and no
+         * clock, and the live count is stored as one integer, so matching
+         * detections to counted reps in time would need the segmenter re-run
+         * over the stored raw stream, which the export does not do. So the value
+         * is kept, its description narrowed, and the name stays.
          * `DATABASE_VERSION` does NOT move.
          *
          * PINNED. `SchemaCountAgreementContractTest`; the value is guarded in
@@ -3465,13 +3470,16 @@ data class SetExport(
      *
      * WHICH COUNTER, and so what a mark is, is what [repsSource] says (1.23,
      * #294). On a `metronome` set each mark is the instant the cadence guide
-     * finished one prescribed cycle -- the prescribed grid, spaced at the
-     * tempo's sum and kept on the guide's own schedule whether or not the
-     * lifter moved with it -- so these are NOT instants anyone observed a rep,
-     * and a failed or early-ended set can carry more marks than [reps].
-     * `RepMarkTrackTest` measures it on the thirteen committed captures that
-     * carry marks, all guided: all 103 marks within 1 ms of a row of the same
-     * set's cue track, the next cycle's opening stroke word or `Done`. On a
+     * counted one prescribed cycle -- after its last stroke, so on a tempo
+     * ending in a pause one beat before the cycle ends. The marks are the
+     * prescribed grid, spaced at the tempo's sum and kept on the guide's own
+     * schedule whether or not the lifter moved with it, so these are NOT
+     * instants anyone observed a rep, and a failed or early-ended set can
+     * carry more marks than [reps]. `RepMarkTrackTest` measures it on the
+     * thirteen committed captures that carry marks, all guided: all 103 marks
+     * within 1 ms of a row of the same set's cue track, the guide's next
+     * spoken word: a stroke word, a rep call, or `Done`; on eight of the
+     * thirteen no mark falls on a rep call. On a
      * `manual` set they are the lifter's taps, and on a straight-rep set
      * carrying no tempo the only per-rep instants in the document: [repMetrics]
      * entries carry no clock and [voiceCues] is what the app SAID.
@@ -3481,7 +3489,8 @@ data class SetExport(
      * archive's `_reps.csv` holding the same instants, are historical. The
      * opening that stood here called these the instants a rep was counted and
      * said the guide writes a mark as it calls a rep; both are DELETED rather
-     * than reworded -- the guide marks the end of its cycle, not its rep call.
+     * than reworded -- the guide marks as it counts a cycle, and on eight of
+     * the thirteen captures no mark falls on a rep call.
      *
      * Absent rather than empty, and the absence is weak. A sensor-counted set
      * produces no marks at all -- a correction made during it writes none --
@@ -3503,9 +3512,10 @@ data class SetExport(
      * is count equality, so a segmenter that misses reps and finds as many
      * movements that are not reps publishes true; true is not evidence that
      * the per-rep array, or anything drawn from it, is the lifter's reps. No
-     * stronger test can be computed from what a set stores -- the stored
-     * per-rep rows carry durations and no clock, and [liveReps] is one integer
-     * -- so no detection can be matched in time to a counted rep. The name is
+     * stronger test is published. None is computed: the stored per-rep rows
+     * carry durations and no clock, and [liveReps] is one integer, so matching
+     * detections to counted reps in time would need the segmenter re-run over
+     * the stored raw stream, which the export does not do. The name is
      * historical.
      *
      * Stated without reference to [repMetrics], deliberately. Everything drawn

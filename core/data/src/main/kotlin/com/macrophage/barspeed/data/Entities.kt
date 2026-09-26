@@ -784,7 +784,7 @@ data class RawStreamEntity(
 
         /**
          * The instants this set's counter advanced, issue #158: the lifter's
-         * taps on a tap-counted set, the cadence guide's cycle ends on a
+         * taps on a tap-counted set, the cadence guide's per-cycle count on a
          * guided one (#294).
          *
          * A different population from [KIND_CUES] and nothing may blur them:

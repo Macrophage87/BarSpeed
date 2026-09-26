@@ -278,7 +278,7 @@ class SessionExporter(
                 null
             }
         // The instants the set's counter advanced, issue #158 -- on a guided
-        // set the cadence guide's cycle ends, not observed reps (#294) -- from
+        // set the cadence guide's per-cycle count, not observed reps (#294) -- from
         // the same fetch the cue track came out of.
         //
         // Detail-gated on the same terms as voiceCues: both are per-set event
@@ -498,8 +498,10 @@ class SessionExporter(
             // rather than letting a short per-rep array look like the whole set.
             //
             // COUNT EQUALITY AND NOTHING MORE (#246): errors that cancel publish
-            // true. Nothing stronger is computable here -- the stored reps carry
-            // no clock -- and the published description says so.
+            // true. Nothing stronger is computed here -- the stored reps carry
+            // no clock, and matching detections to counted reps in time would
+            // need the segmenter re-run over the stored raw stream, which the
+            // export does not do -- and the published description says so.
             //
             // Gated on the reps, never on the export mode. The three figures
             // this qualifies -- velocityLoss_pct, tempoCompliance and summary --
