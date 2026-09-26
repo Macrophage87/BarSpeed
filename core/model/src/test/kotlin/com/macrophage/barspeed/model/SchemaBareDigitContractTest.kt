@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  * by second, or a timed set counting down". That names two producers. The
  * sensor-driven counter is a third. It counts the seconds of a phase it
  * detected. It still speaks today, on a set prescribed a tempo with nothing to
- * play it. Before #217 it also ran on every timed set, so a hold recorded by
+ * play it. Before #217 it also ran on timed sets, so a hold recorded by
  * v0.1.49 or earlier may carry its digits beside the clock's. A reader who took
  * the description at its word would read those digits as a countdown.
  *
