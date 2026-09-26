@@ -2393,6 +2393,45 @@ data class SessionExport(
          * `SessionExportWorkingTargetsTest` in `:core:data` are the
          * differentials, and `PlanPromptWorkingTargetContractTest` pins the
          * reading guide the plan prompt carries.
+         *
+         * 1.23 FURTHER ENTRY (#321, what each unit's link delivered): a set's
+         * `sensors` block may carry `deliveredRate_hz` and `burstSpacing_ms`,
+         * each keyed by role. A further entry under the unreleased number and
+         * not a mint: `git tag --sort=-creatordate | head -1` is v0.1.55, its
+         * own SessionExport.kt reads `SCHEMA_VERSION = "1.22"`, and no v0.1.56
+         * tag exists, all read this round.
+         *
+         * WHAT WAS UNSAYABLE. On field-42 one unit's link delivered 43.5 to
+         * 44.5 frames a second in 90 ms bursts while its partner delivered
+         * about 99 in 31 ms bursts, on every committed capture of that
+         * session. This document said nothing about it, and the raw archive
+         * carried the figure only as `sampleRate_hz`, a name that reads as the
+         * sensor's own rate.
+         *
+         * COMPUTED AT EXPORT, NOT STORED. Both keys are measured from the IMU
+         * rows already in the database by `DeliveredRate`, over the working
+         * window `RollExcursion` uses. They therefore reach every set recorded
+         * with roled streams, including sets recorded before this entry. No
+         * row changes and `DATABASE_VERSION` does NOT move. Nothing about how
+         * frames are recorded changes: no frame is dropped, filled or
+         * re-stamped.
+         *
+         * NO THRESHOLD. The committed two-unit captures put every unit at 99.1
+         * to 99.6 except field-42's one unit at 43.5 to 44.5, and any boundary
+         * in between separates them equally well. So the rate is published and
+         * nothing on the rest screen warns.
+         *
+         * ADDITIVE. This entry adds two optional keys, removes, renames or
+         * retypes none, and changes no existing value. The 1.22 schema v0.1.55
+         * shipped rejects a 1.23 document on its version string whatever this
+         * entry adds, as the 1.23 mint states. The plan schema is untouched.
+         *
+         * PINNED. `SchemaDeliveredRateContractTest` asserts both keys, their
+         * shapes, this entry's marker in the published log and the example;
+         * `DeliveredRateTest` and `DeliveredRateFieldTest` in `:core:dsp` pin
+         * the arithmetic on synthetic streams and on the committed captures;
+         * `SessionExportDeliveredRateTest` in `:core:data` is the export
+         * differential.
          */
         const val SCHEMA_VERSION = "1.23"
 
@@ -3418,11 +3457,18 @@ data class SetExport(
  * streamed (#207). [present] is stated rather than left to be inferred from
  * filenames this document does not contain.
  *
- * No per-stream sample counts or rates. Those live in the raw archive's
- * `meta.json`, where the exporter already holds the inflated text; putting
- * them here would force the standalone share path to inflate and parse every
- * IMU stream, which it does not do today -- reintroducing the double
- * decompression issue #29 removed.
+ * No per-stream sample counts, and no whole-capture rates: those live in the
+ * raw archive's `meta.json`. What this object does carry since 1.23 (#321) is
+ * each unit's DELIVERED rate and notification spacing over the working
+ * window, [deliveredRateHz] and [burstSpacingMs]. Their price is stated
+ * rather than hidden. Until they existed this object was built without
+ * touching an IMU stream. Now the exporter inflates and parses each roled
+ * IMU stream once more to measure them, on the standalone share path and
+ * inside the raw archive alike, where `RawExporter` has already inflated the
+ * same bytes once for the CSV entry. That is a second decompression of the
+ * kind issue #29 folded away, taken on so that the standalone document and
+ * the copy inside the archive come from one code path. Its cost has not been
+ * measured on a phone.
  *
  * **[expected] and [present] have no Kotlin default, and that is deliberate**
  * -- the reasoning [GeometryExport] gives for its own fields. The exporter
@@ -3722,6 +3768,52 @@ data class SetSensorsExport(
      * false` drops the null.
      */
     val analysedRoleBasis: String? = null,
+    /**
+     * How many frames each unit's link DELIVERED per second over the set's
+     * working window, keyed by role and rounded to 0.1 (1.23, #321).
+     *
+     * `DeliveredRate` in `:core:dsp` is the arithmetic: the rows of that
+     * role's capture stamped inside the window, over the window's length. The
+     * window is the one `RollExcursion` measures over, from the work-start
+     * instant to the terminal cue, with a missing bound replaced by the
+     * stream's own first or last row. So it is the interval the raw archive's
+     * `rollExcursionBasis` names for the same role.
+     *
+     * DELIVERED, NOT SAMPLED. Every row carries the instant the app stamped
+     * when Android's stack delivered its notification. Nothing in the stream
+     * says how many frames the sensor produced. A unit producing 100 frames a
+     * second over a link that carried 44 of them and a unit producing 44
+     * publish the same figure.
+     * A link that delivered nothing for part of the window lowers it too.
+     *
+     * NO THRESHOLD, and no warning drawn anywhere. On the committed two-unit
+     * captures every unit read 99.1 to 99.6 except one unit on field-42, which
+     * read 43.5 to 44.5. Any boundary between those two clusters separates
+     * them equally well, so the captures do not fix one.
+     *
+     * Only roles in [present] appear, and a role whose window holds fewer than
+     * two rows has no entry. Absent rather than empty on a set whose stream
+     * carries no role and on every document written before this key, for
+     * [unitAddresses]' reason: an empty object would read as "the app looked
+     * and found no units".
+     */
+    @SerialName("deliveredRate_hz") val deliveredRateHz: Map<String, Double> = emptyMap(),
+    /**
+     * The median gap, in whole milliseconds, between consecutive distinct
+     * arrival stamps of each unit's rows over the same window as
+     * [deliveredRateHz], keyed by role (1.23, #321).
+     *
+     * Every frame decoded from one notification shares that notification's
+     * stamp, so this is how often the link handed a notification over, not
+     * how often the sensor sampled. On the committed two-unit captures the
+     * healthy links read 30 to 32 and field-42's slow link 90. A MEDIAN, so one
+     * long stall does not move it, while it does lower [deliveredRateHz].
+     *
+     * Only roles in [present] appear, and a role whose window holds fewer than
+     * two distinct stamps has no entry. Absent rather than empty wherever
+     * [deliveredRateHz] is, and for the same reason.
+     */
+    @SerialName("burstSpacing_ms") val burstSpacingMs: Map<String, Long> = emptyMap(),
 )
 
 /**
