@@ -48,7 +48,7 @@ Your output must be **decisive**. A verdict that lists thirty findings and does 
 
 The full list is in `.claude/facts/live-state.md` §5, and §3 for reading a CI run. What a ruling must refuse:
 
-- **"Tests pass" is never evidence of platform behaviour** for a change in `:app`, `:core:ble` or `:core:data`. `:core:ble` has no test source set, `:app` has a test source set that reaches only the pure functions its files under `app/src/test` call, there is no `androidTest` directory anywhere, and `:core:data`'s tests take a fake DAO and never touch Room.
+- **"Tests pass" is never evidence of platform behaviour** for a change in `:app`, `:core:ble` or `:core:data`. `:core:ble` has no test source set; `:app` has a test source set, but nothing in `:app` that draws, connects or reaches Room is test-gated; there is no `androidTest` directory anywhere; and `:core:data`'s tests take a fake DAO and never touch Room.
 - **`UP-TO-DATE` and `FROM-CACHE` mean nothing ran.** Require `--rerun-tasks` when a number matters, and read the task list rather than the last line.
 - **Require the full 40-character SHA**, and **read the `event` field rather than counting runs** — a branch-only SHA with an open PR already carries two before it ever reaches `main`, and two runs that really are one workflow twice are a flake check, not independent evidence.
 - CI runs sequentially with no `continue-on-error` and **ktlint + detekt first**, so a red run reporting a formatting error tells you nothing downstream.
