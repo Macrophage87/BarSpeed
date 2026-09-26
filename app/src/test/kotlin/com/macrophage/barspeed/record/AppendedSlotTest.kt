@@ -120,6 +120,11 @@ private val APPEND_DECISIONS: Map<String, Append> = mapOf(
     // exercise progresses the way that exercise progresses, so it follows
     // the anchor like everything else about how the movement is performed.
     "progression" to Append.INHERITED,
+    // Whether the stack inversion rule alone set the exercise's inversion
+    // (#323). It describes `exercise`, which is INHERITED, so it follows the
+    // anchor with it: a flag describing one definition beside another would
+    // let the set end take back an inversion the appended set never had.
+    "stackRuleApplied" to Append.INHERITED,
     // What the lifter is standing on for that exercise.
     "loadKg" to Append.CARRIED,
     "reps" to Append.CARRIED,
@@ -187,6 +192,9 @@ private fun slot(
     // Deliberately NOT the ProgressionKind default: an inheritance pin
     // comparing two copies of a default value cannot fail.
     progression = ProgressionKind.REPS,
+    // Deliberately NOT the default either, for the same reason; this press is
+    // not a stack lift, and nothing here reads what the flag means.
+    stackRuleApplied = true,
     isExerciseChange = setIndexInExercise == 0,
     warmup = warmup,
     isAddedSet = false,
