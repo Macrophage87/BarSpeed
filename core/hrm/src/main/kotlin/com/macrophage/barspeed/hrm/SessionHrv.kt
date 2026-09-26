@@ -59,6 +59,5 @@ object SessionHrv {
      * joined stream is equal to it in timestamp, bpm and intervals: the
      * [HrSample] data-class equality.
      */
-    fun rmssdMs(windows: List<List<HrSample>>): Double? =
-        Hrv.rmssdMs(RrIngest.newBeats(windows.flatten().distinct()))
+    fun rmssdMs(windows: List<List<HrSample>>): Double? = Hrv.rmssdMs(RrIngest.newBeats(windows.flatten().distinct()))
 }
