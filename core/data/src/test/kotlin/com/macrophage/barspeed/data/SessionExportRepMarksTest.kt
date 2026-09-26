@@ -322,6 +322,37 @@ class SessionExportRepMarksTest {
     }
 
     /**
+     * GUARD for #294's decision, green before and after it: the field-42 set
+     * 12 SHAPE -- a guided set the lifter failed at 4 reps while the cadence
+     * guide ran its schedule to 8 -- publishes all 8 marks beside `reps` 4.
+     *
+     * The content is kept on purpose. On a guided set the marks are the
+     * guide's cycle ends, the prescribed grid, and no stored figure holds the
+     * instants the lifter's reps happened, so the export neither drops the
+     * grid nor trims it to the count; the schema's description says what the
+     * rows are. The marks here are 4004 ms apart, inside the 4002-4006 ms a
+     * 3010 cadence leaves on the committed captures `RepMarkTrackTest` reads. The row has
+     * no stored geometry, so its tempo is read as the guide.
+     */
+    @Test
+    fun `a failed guided set publishes every cycle mark beside a smaller count`() = runTest {
+        val grid = (0 until 8).map { 5_000L + it * 4_004L }
+        val failed = row().copy(actualReps = 4, plannedReps = 8, tempo = "3010", failed = true)
+        val dao =
+            FakeSessionDao(
+                session = SessionEntity(id = 1L, startedAtMs = 1_000L, endedAtMs = 61_000L),
+                rows = listOf(failed),
+                streams = mapOf(5L to listOf(repStream(grid))),
+            )
+        val exporter =
+            SessionExporter(SessionRepository(dao, FakeExerciseDao()), dispatcher = Dispatchers.Default)
+        val set = exporter.buildExport(1L, includeRepDetail = true)!!.exercises.single().sets.single()
+        assertEquals(4, set.reps, "the recorded count moved")
+        assertEquals("metronome", set.repsSource, "the fixture is not a guided set")
+        assertEquals(grid, set.repMarks, "the guide's cycle marks were dropped or trimmed to the count")
+    }
+
+    /**
      * A stream that will not decode costs the key, never the export.
      *
      * The same shape the HRM path uses: a manifest or a document is not worth
