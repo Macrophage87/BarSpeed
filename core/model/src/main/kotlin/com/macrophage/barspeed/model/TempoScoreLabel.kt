@@ -76,6 +76,10 @@ object TempoScoreLabel {
     /**
      * @param repsFullyCompliant reps in tolerance on every scored phase they resolved.
      * @param repsEvaluated reps that resolved at least one scored phase.
+     * @param setReps every rep of the analysis the ratio was taken from,
+     *   graded or not -- the count the eccentric caption (#89) and the
+     *   verdict line (#328) take [PhaseCoverage] over. No default, so a
+     *   caller cannot build the chip without saying it.
      * @param phases every phase the analyzer reported for the set, pauses included.
      * @return null when there is no ratio to draw at all. No gradeable rep
      *   means no ratio: drawing it anyway printed "Tempo 0/0 ✓" in the OK tone,
@@ -85,11 +89,15 @@ object TempoScoreLabel {
      *   set, so it appeared beside a "0 ×" header with nothing to contradict
      *   it. Both screens carried that guard separately; it is here now.
      */
-    fun of(repsFullyCompliant: Int, repsEvaluated: Int, phases: List<PhaseFacts>): TempoScore? {
+    fun of(repsFullyCompliant: Int, repsEvaluated: Int, setReps: Int, phases: List<PhaseFacts>): TempoScore? {
         if (repsEvaluated <= 0) return null
         val onRatio = repsFullyCompliant >= repsEvaluated
         val ungraded = ungradedMovementPhases(phases)
-        val partial = partlyGraded(phases, repsEvaluated)
+        // Capped at the ratio's own count, which is what the chip has always
+        // counted coverage over: for every set the analyzer produces the cap
+        // IS repsEvaluated, because a graded rep is a rep of the set. #329
+        // moves the chip onto the set's reps.
+        val partial = partlyGraded(phases, minOf(setReps, repsEvaluated))
         // The tick is a claim about the SET, so it needs both: every graded rep
         // in tolerance, and every phase the set prescribed actually graded ON
         // EVERY GRADED REP. The ratio alone answers only the first, and a set
@@ -135,15 +143,15 @@ object TempoScoreLabel {
 
     /**
      * Prescribed movement phases the set WAS graded on, but not on every rep
-     * the ratio counts, each with its coverage over [repsEvaluated].
+     * in [of], each with its [PhaseCoverage] over [of].
      *
      * Only scored phases: a phase no rep resolved is [ungradedMovementPhases]'
      * and already has its sentence.
      */
-    private fun partlyGraded(phases: List<PhaseFacts>, repsEvaluated: Int): List<Pair<String, PhaseCoverage>> {
+    private fun partlyGraded(phases: List<PhaseFacts>, of: Int): List<Pair<String, PhaseCoverage>> {
         val scored = phases.filter { it.name in MOVEMENT_PHASES && it.prescribed && it.scored }
         return scored
-            .map { it.name to PhaseCoverage(measured = it.repsResolved, of = repsEvaluated) }
+            .map { it.name to PhaseCoverage(measured = it.repsResolved, of = of) }
             .filter { (_, coverage) -> !coverage.complete }
     }
 

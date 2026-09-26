@@ -19,7 +19,7 @@ import com.macrophage.barspeed.ui.components.ChipTone
  * screen each carried their own copy of it and neither copy was reachable by
  * any test on the CI path -- issue #56.
  */
-internal fun tempoScoreOf(analysis: SetAnalysis): TempoScore? = analysis.tempoCompliance?.tempoScore()
+internal fun tempoScoreOf(analysis: SetAnalysis): TempoScore? = analysis.tempoScore()
 
 internal fun TempoScoreTone.chipTone(): ChipTone = when (this) {
     TempoScoreTone.ON_TEMPO -> ChipTone.OK

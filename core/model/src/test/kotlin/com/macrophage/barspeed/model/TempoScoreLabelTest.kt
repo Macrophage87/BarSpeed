@@ -21,7 +21,7 @@ class TempoScoreLabelTest {
     )
 
     private fun score(compliant: Int, evaluated: Int, phases: List<PhaseFacts> = bothGraded()) =
-        TempoScoreLabel.of(compliant, evaluated, phases)
+        TempoScoreLabel.of(compliant, evaluated, setReps = evaluated, phases = phases)
 
     @Test
     fun `nothing to draw when no rep was evaluated`() {

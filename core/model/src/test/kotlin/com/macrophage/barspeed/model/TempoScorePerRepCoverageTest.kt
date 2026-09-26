@@ -28,7 +28,7 @@ class TempoScorePerRepCoverageTest {
 
     @Test
     fun `a set whose eccentric was measured on some reps does not tick`() {
-        val s = assertNotNull(TempoScoreLabel.of(7, 7, phases(eccResolved = 5)))
+        val s = assertNotNull(TempoScoreLabel.of(7, 7, setReps = 7, phases = phases(eccResolved = 5)))
         assertEquals("Tempo 7/7", s.text)
         assertEquals(TempoScoreTone.PARTIAL, s.tone)
     }
@@ -37,14 +37,14 @@ class TempoScorePerRepCoverageTest {
     fun `the gap is stated with the count`() {
         assertEquals(
             "Eccentric: 5 of 7 reps measured · 2 not measured.",
-            assertNotNull(TempoScoreLabel.of(7, 7, phases(eccResolved = 5))).ungradedNote,
+            assertNotNull(TempoScoreLabel.of(7, 7, setReps = 7, phases = phases(eccResolved = 5))).ungradedNote,
         )
     }
 
     /** Coverage and compliance stay two questions: a miss is a miss, and the note is still owed. */
     @Test
     fun `a missed rep on a partly measured set is off tempo and still qualified`() {
-        val s = assertNotNull(TempoScoreLabel.of(6, 7, phases(eccResolved = 5)))
+        val s = assertNotNull(TempoScoreLabel.of(6, 7, setReps = 7, phases = phases(eccResolved = 5)))
         assertEquals("Tempo 6/7", s.text)
         assertEquals(TempoScoreTone.OFF_TEMPO, s.tone)
         assertEquals("Eccentric: 5 of 7 reps measured · 2 not measured.", s.ungradedNote)
@@ -61,14 +61,16 @@ class TempoScorePerRepCoverageTest {
         assertEquals(
             "Eccentric: 5 of 7 reps measured · 2 not measured. " +
                 "Concentric: 6 of 7 reps measured · 1 not measured.",
-            assertNotNull(TempoScoreLabel.of(7, 7, phases(eccResolved = 5, conResolved = 6))).ungradedNote,
+            assertNotNull(
+                TempoScoreLabel.of(7, 7, setReps = 7, phases = phases(eccResolved = 5, conResolved = 6)),
+            ).ungradedNote,
         )
     }
 
     /** GUARD, green before and after: every graded rep resolved every prescribed phase. */
     @Test
     fun `a set measured on every graded rep ticks with no note`() {
-        val s = assertNotNull(TempoScoreLabel.of(7, 7, phases(eccResolved = 7)))
+        val s = assertNotNull(TempoScoreLabel.of(7, 7, setReps = 7, phases = phases(eccResolved = 7)))
         assertEquals("Tempo 7/7 ✓", s.text)
         assertEquals(TempoScoreTone.ON_TEMPO, s.tone)
         assertNull(s.ungradedNote)

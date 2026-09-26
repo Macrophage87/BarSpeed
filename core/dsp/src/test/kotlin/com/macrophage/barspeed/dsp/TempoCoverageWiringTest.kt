@@ -40,9 +40,10 @@ class TempoCoverageWiringTest {
     /** GUARD, green before and after: every rep resolved both phases, on tempo. */
     @Test
     fun `a set measured on every rep ticks, read back from storage`() {
-        val c = stored(SetAnalyzer.complianceFor(Tempo.parse("3010"), 0.5, (0..5).map { rep(it, 3.0) }))
+        val reps = (0..5).map { rep(it, 3.0) }
+        val c = stored(SetAnalyzer.complianceFor(Tempo.parse("3010"), 0.5, reps))
         assertEquals(6, c.repsEvaluated, "the fixture's `of` moved")
-        val score = assertNotNull(c.tempoScore())
+        val score = assertNotNull(c.tempoScore(setReps = reps.size))
         assertEquals("Tempo 6/6 ✓", score.text)
         assertEquals(TempoScoreTone.ON_TEMPO, score.tone)
         assertNull(score.ungradedNote)
@@ -73,7 +74,7 @@ class TempoCoverageWiringTest {
         val reps = (0..7).map { rep(it, if (it % 2 == 0) 3.0 else null) }
         val c = stored(SetAnalyzer.complianceFor(Tempo.parse("3010"), 0.5, reps))
         assertEquals(8, c.repsFullyCompliant, "the fixture's compliance moved")
-        val score = assertNotNull(c.tempoScore())
+        val score = assertNotNull(c.tempoScore(setReps = reps.size))
         assertEquals("Tempo 8/8", score.text)
         assertEquals(TempoScoreTone.PARTIAL, score.tone)
         assertEquals("Eccentric: 4 of 8 reps measured · 4 not measured.", score.ungradedNote)
