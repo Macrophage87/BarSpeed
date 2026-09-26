@@ -168,13 +168,25 @@ class StackInversionRuleTest {
     /**
      * RED before #323's fix. The gate's line said "the set is recorded
      * inverted" whichever unit the set came to be analysed from; since #323 a
-     * unit whose own roll moved -- on the handle or the rope -- is recorded
-     * uninverted, so the line names the unit the rule reads.
+     * unit whose own roll moved -- on the handle or the rope -- has its
+     * figures analysed uninverted, so the line names the unit the rule reads.
+     *
+     * Moved in #323's round 1: the line then said the set "is recorded
+     * inverted" / "uninverted where it moved with the handle", which
+     * overclaimed -- on a set the sensor counts, the recorded rep count is the
+     * live tracker's, and that tracker applies the rule whatever the roll says
+     * -- and named only the handle where the schema and PLAN_PROMPT both name
+     * the rope too. The first pin reads what the analysis does; the second
+     * names the rope and what the live count does.
      */
     @Test
     fun `the import gate's inversion line names the unit the rule reaches`() {
         val line = inversionLines("triceps_pushdown", down).single()
-        assertTrue("recorded inverted wherever the analysed unit's own roll says it rode the stack" in line, line)
-        assertTrue("uninverted where it moved with the handle" in line, line)
+        val analysed = "the set's figures are analysed inverted wherever the analysed unit's own roll " +
+            "says it rode the stack"
+        val live = "uninverted where it moved with the handle or the rope; the live count during the set " +
+            "reads it inverted either way"
+        assertTrue(analysed in line, line)
+        assertTrue(live in line, line)
     }
 }
