@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.dsp.AccelArtefact
+import com.macrophage.barspeed.dsp.DeliveredRate
 import com.macrophage.barspeed.dsp.ImuCsv
 import com.macrophage.barspeed.dsp.RollExcursion
 import com.macrophage.barspeed.dsp.RomBound
@@ -535,7 +536,7 @@ class SessionExporter(
             // qualifies every figure the summary publishes, and a caveat that
             // appears only in the detailed export leaves the summary-only
             // reader holding the numbers with the warning removed.
-            sensors = sensorsExport(record, streams, roleByAddress),
+            sensors = sensorsExport(record, streams, roleByAddress, geometry?.kind),
             repMetrics =
             if (includeRepDetail && reps.isNotEmpty()) {
                 reps.map {
@@ -676,15 +677,18 @@ class SessionExporter(
         record: SetRecordEntity,
         streams: List<RawStreamEntity>,
         roleByAddress: Map<String, SensorRole>,
+        kind: ExerciseKind?,
     ): SetSensorsExport? {
         val declared = sessionRepository.decodeSensors(record) ?: return null
         val captured =
             streams.filter { it.kind == RawStreamEntity.KIND_IMU }
                 .mapNotNull { SensorCapturePolicy.roleFromWire(it.role) }
+        val present = SensorCapturePolicy.present(declared.expected, captured)
+        val delivered = deliveredByRole(record, streams, kind, present)
         return SetSensorsExport(
             count = declared.count,
             expected = declared.expected.map(SensorCapturePolicy::wireOf),
-            present = SensorCapturePolicy.present(declared.expected, captured).map(SensorCapturePolicy::wireOf),
+            present = present.map(SensorCapturePolicy::wireOf),
             analysedRole = declared.analysed?.let(SensorCapturePolicy::wireOf),
             // Read off the row, never re-decided here (#207). The analysis
             // this document publishes was computed when the set was RECORDED,
@@ -738,7 +742,71 @@ class SessionExporter(
             // not a defaulted `declared` claiming a rule ran over a set nothing
             // looked at.
             analysedRoleBasis = declared.analysedRoleBasis?.published,
+            // What each present unit's link delivered over the working window
+            // (#321). MEASURED HERE from the stored rows, not read off the
+            // row: nothing stores it, and measuring at export is what reaches
+            // every set already recorded. Both maps are keyed by the same
+            // roles; a role whose window holds one distinct stamp keeps its
+            // rate and has no spacing.
+            deliveredRateHz = delivered.mapValues { (_, measured) -> measured.hz.round1() },
+            burstSpacingMs =
+            delivered.mapNotNull { (role, measured) -> measured.burstSpacingMs?.let { role to it } }.toMap(),
         )
+    }
+
+    /**
+     * Each present role's delivery over the set's working window, keyed by the
+     * role's wire spelling, or empty where no present role has a stream that
+     * can state one (#321).
+     *
+     * [DeliveredRate] is the arithmetic and [RollExcursion]'s window is the
+     * interval. What is decided here is only where the two bounds come from,
+     * and they come from where [RawExporter] takes them for the raw archive's
+     * `rollExcursion_deg`: the stored prep window's work start, and [SetEnd.of]
+     * over the stored cue track with `RepsSourcePolicy.guideCounted` over the
+     * row's frozen tempo, its timed marker and [kind]. So a `Done` on a set no
+     * cadence ran on closes neither window (#285), and the archive does not
+     * hold two answers to when one set ended.
+     *
+     * Each stream is inflated and parsed here, which [SetSensorsExport]'s own
+     * KDoc states as this key's price. Only roled IMU streams of roles in
+     * [present] are touched, so a set whose stream carries no role -- and every
+     * one-sensor set, which has no declaration and never reaches this
+     * function -- inflates nothing more than it did. Every inflate and decode
+     * is inside `runCatching`: a stream that will not parse costs its own
+     * figure and not the export.
+     */
+    private fun deliveredByRole(
+        record: SetRecordEntity,
+        streams: List<RawStreamEntity>,
+        kind: ExerciseKind?,
+        present: List<SensorRole>,
+    ): Map<String, DeliveredRate.Measured> {
+        val imu =
+            streams.filter { it.kind == RawStreamEntity.KIND_IMU }.mapNotNull { stream ->
+                SensorCapturePolicy.roleFromWire(stream.role)?.takeIf { it in present }?.let { it to stream }
+            }
+        if (imu.isEmpty()) return emptyMap()
+        val workStartedAtMs =
+            streams.firstOrNull { it.kind == RawStreamEntity.KIND_PREP }
+                ?.let { stream -> runCatching { PrepWindowCsv.decode(Gzip.decompress(stream.csvGzip)) }.getOrNull() }
+                ?.workStartedAtMs
+        val cadenceGuided =
+            RepsSourcePolicy.guideCounted(
+                hasTempo = record.tempo != null,
+                isTimed = record.actualDurationS != null,
+                kind = kind,
+            )
+        val end =
+            streams.firstOrNull { it.kind == RawStreamEntity.KIND_CUES }
+                ?.let { stream -> runCatching { CueCsv.decode(Gzip.decompress(stream.csvGzip)) }.getOrNull() }
+                ?.let { cues -> SetEnd.of(cues, cadenceGuided) }
+                ?: SetEnd.NotCued
+        return imu.mapNotNull { (role, stream) ->
+            runCatching { ImuCsv.decode(Gzip.decompress(stream.csvGzip)) }.getOrNull()
+                ?.let { samples -> DeliveredRate.of(samples, workStartedAtMs, end) }
+                ?.let { measured -> SensorCapturePolicy.wireOf(role) to measured }
+        }.toMap()
     }
 
     /**
@@ -1004,6 +1072,14 @@ class RawExporter(
      * [SessionExporter.buildExport]'s `minBpmOverride`, rather than letting
      * that call inflate the same stream a second time the way it did when
      * minBpm was added for issue #90.
+     *
+     * The fold stops at this class. [SessionExporter], called last here to
+     * write `session.json`, inflates some of the same streams again from its
+     * own fetch: the HRM stream for its trust verdict, the cue track for
+     * `voiceCues`, and since #321 each present role's IMU stream, with the
+     * prep and cue streams, to measure `deliveredRate_hz` and
+     * `burstSpacing_ms`. [SetSensorsExport]'s KDoc states the #321 part as
+     * that key's price.
      */
     suspend fun buildZip(sessionId: Long): ByteArray? = withContext(dispatcher) {
         val session = sessionRepository.session(sessionId) ?: return@withContext null
