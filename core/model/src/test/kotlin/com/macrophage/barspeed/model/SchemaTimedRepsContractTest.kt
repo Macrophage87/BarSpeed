@@ -57,7 +57,18 @@ class SchemaTimedRepsContractTest {
 
     private val marker = "1.23 FURTHER ENTRY (#71"
 
-    private val lenient = Json { ignoreUnknownKeys = true }
+    /**
+     * The decoder `SetPrescriptionExportTest` reads a published set with.
+     * `explicitNulls = false` is load-bearing: [SetPrescriptionExport]'s keys
+     * are nullable with no default, so without it a set that omits any of them
+     * fails on THOSE keys, and a test about `reps` fails or passes for a
+     * reason that is not `reps`.
+     */
+    private val lenient =
+        Json {
+            ignoreUnknownKeys = true
+            explicitNulls = false
+        }
 
     @Test
     fun `the published set no longer requires reps on every set`() {
