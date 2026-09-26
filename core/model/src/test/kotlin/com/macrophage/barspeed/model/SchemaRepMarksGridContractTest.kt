@@ -18,19 +18,24 @@ import kotlin.test.assertTrue
  * thirteen committed captures that carry a rep-mark stream, all guided sets:
  * every one of their 103 marks lands within 1 ms of a row of the same set's
  * cue track, 94 on the same millisecond. Read against those rows the mark
- * sits on the NEXT cycle's opening stroke word, or on `Done`; on eight of
- * the thirteen sets that stroke word carries no rep word at all.
- * So on a guided set a mark is the instant the cadence guide finished one
- * prescribed cycle: the prescribed grid, kept on the guide's own schedule.
+ * sits on the guide's next spoken word -- a stroke word, a rep call, or
+ * `Done` -- and on eight of the thirteen sets no mark falls on a rep call.
+ * `GuidedCadenceRunner` counts a rep after the cycle's last stroke, before
+ * any closing pause: on `field-backsquat-4011-6rep-s36-set01` the first five
+ * marks sit on the rep call (`Rep 1` to `Rep 4`, then `Last rep`), each 1000
+ * to 1002 ms before the next `Down`, and the sixth on `Done`. So on a guided
+ * set a mark is the instant the cadence guide counted one prescribed cycle:
+ * the prescribed grid, kept on the guide's own schedule.
  * #294 measured the consequence on field-42: a failed set published more
  * marks than reps.
  *
- * WHY THE CONTENT IS KEPT. No true rep instant exists in what a guided set
- * stores. The per-rep rows carry durations and an ordinal and no clock, the
- * cue track is what the app said, and the live count is one integer. Publishing
- * "rep instants" would mean inventing them. The name is historical and is
- * corrected by its description, never by a rename: a renamed key or file
- * breaks every reader and adds no fact.
+ * WHY THE CONTENT IS KEPT. No true rep instant is stored on a guided set.
+ * The per-rep rows carry durations and an ordinal and no clock, the cue track
+ * is what the app said, and the live count is one integer; a detection's
+ * instant would need the segmenter re-run over the stored raw stream, which
+ * the export does not do. The name is historical and is corrected by its
+ * description, never by a rename: a renamed key or file breaks every reader
+ * and adds no fact.
  *
  * RED WHEN WRITTEN: the description opens "The instants a rep was COUNTED",
  * says a mark is written "when the voice guide calls a rep", and `voiceCues`
@@ -85,9 +90,8 @@ class SchemaRepMarksGridContractTest {
 
     /**
      * DELETED, not reworded: the opening "The instants a rep was COUNTED", and
-     * "when the voice guide calls a rep" -- on the committed corpus the guide's
-     * mark sits on an opening stroke word, which on eight of thirteen sets
-     * carries no rep call.
+     * "when the voice guide calls a rep" -- on the committed corpus no mark
+     * falls on a rep call on eight of the thirteen sets.
      * `voiceCues`' "repMarks is what was counted" goes with them.
      */
     @Test

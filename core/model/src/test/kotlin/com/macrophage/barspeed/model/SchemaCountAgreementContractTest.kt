@@ -21,11 +21,14 @@ import kotlin.test.assertTrue
  * and not re-measured here -- neither set is a committed capture.
  *
  * WHY THE VALUE IS KEPT AND ONLY THE DESCRIPTION NARROWED. A stronger test
- * would match each detection to a counted rep IN TIME, and nothing a set
- * stores can do that: the stored per-rep rows carry durations and an ordinal
- * and no clock, and the live count is stored as one integer. So `true` can
- * only ever mean the counts agree, and the description now says so. The name
- * is historical and is corrected by its description, never by a rename.
+ * would match each detection to a counted rep IN TIME, and none is computed:
+ * the stored per-rep rows carry durations and an ordinal and no clock, and
+ * the live count is stored as one integer, so the match would need the
+ * segmenter re-run over the stored raw stream, which the export does not do.
+ * #246 built its alignment from that stream and the marks, so a stronger
+ * test is possible and is not implemented; as published, `true` means the
+ * counts agree, and the description now says so. The name is historical and
+ * is corrected by its description, never by a rename.
  *
  * RED WHEN WRITTEN: the description says what false means and never says what
  * true does not.

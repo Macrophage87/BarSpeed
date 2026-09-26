@@ -328,7 +328,7 @@ class SessionExportRepMarksTest {
      * guide ran its schedule to 8 -- publishes all 8 marks beside `reps` 4.
      *
      * The content is kept on purpose. On a guided set the marks are the
-     * guide's cycle ends, the prescribed grid, and no stored figure holds the
+     * guide's per-cycle count, the prescribed grid, and no stored figure holds the
      * instants the lifter's reps happened, so the export neither drops the
      * grid nor trims it to the count; the schema's description says what the
      * rows are. The marks here are 4004 ms apart, inside the 4002-4006 ms a
@@ -361,11 +361,11 @@ class SessionExportRepMarksTest {
      *
      * #246's two field-38 sets published true at 12 of 12 and 14 of 14 while
      * some cycles held no detection and others two. That misalignment cannot
-     * be written into this fixture, and that is the point: the stored reps
-     * carry durations and an ordinal and no clock, so the exporter has no
-     * instant to align a detection with, and count equality is the strongest
-     * statement it can make. The value is kept; the published description
-     * says what it does not certify.
+     * be written into this fixture: the stored reps carry durations and an
+     * ordinal and no clock, and the exporter does not re-run the segmenter
+     * over the stored raw stream, which is where #246 took its alignment
+     * from. So count equality is all the exporter compares. The value is
+     * kept; the published description says what it does not certify.
      */
     @Test
     fun `a guided set whose counts agree publishes true however its detections fell`() = runTest {

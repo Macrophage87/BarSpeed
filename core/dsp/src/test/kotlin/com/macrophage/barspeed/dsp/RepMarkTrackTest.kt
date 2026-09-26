@@ -74,9 +74,9 @@ import kotlin.test.assertTrue
  * metronome-paced, and `the marks sit on the cue track` measures what that
  * costs: all 103 marks land within 1 ms of a row of the same capture's own
  * `-cues.csv`, 94 of them on its exact millisecond, and the rows they sit on
- * are the guide's own words. So the marks on this corpus are the GUIDE's rep
- * calls, and scoring a rep call against them is scoring it against the
- * metronome a second time.
+ * are the guide's own words -- on eight of the thirteen sets never a rep
+ * call. So the marks on this corpus are the GUIDE's count, and scoring a rep
+ * call against them is scoring it against the metronome a second time.
  *
  * That is not a reason to leave them out. It is the reason the F1 capture
  * issue #145 asks for is still owed, it is a fact a later reader would
