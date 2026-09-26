@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.macrophage.barspeed.data.SetRecordEntity
+import com.macrophage.barspeed.data.heartRate
 import com.macrophage.barspeed.dsp.AccelArtefact
 import com.macrophage.barspeed.dsp.SetAnalysis
 import com.macrophage.barspeed.dsp.VelocityLoss
@@ -130,6 +131,10 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
                 // number this change exists to correct at the top of the very
                 // screen the mark is applied from (#60).
                 val performed = VoidSetPolicy.performed(sets) { it.voided }
+                // The stored pair where the session was closed, else derived
+                // from every set row by the close's own rule (#62), so a
+                // session the lifter left without finishing still shows it.
+                val hr = s.heartRate(sets)
                 val parts =
                     listOfNotNull(
                         formatter.format(started),
@@ -138,7 +143,7 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
                         } else {
                             "${performed.size} sets · ${sets.size - performed.size} not performed"
                         },
-                        s.hrAvgBpm?.let { "♥ $it avg / ${s.hrMaxBpm} max" },
+                        hr.avgBpm?.let { "♥ $it avg / ${hr.maxBpm} max" },
                         s.hrvRmssdMs?.let { "HRV ${it.toInt()} ms" },
                     )
                 Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)

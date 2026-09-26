@@ -10,6 +10,8 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.data.SessionEntity
+import com.macrophage.barspeed.data.heartRate
+import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.VolumeSet
 import com.macrophage.barspeed.model.WeightUnit
@@ -49,6 +51,11 @@ data class HistoryRow(
      */
     val setCount: Int,
     val sparkline: List<Double>,
+    /**
+     * The session's heart-rate summary: the pair the close stored, or, on a
+     * session never closed, the same aggregate over every set row (#62).
+     */
+    val heartRate: SessionHeartRate,
 )
 
 private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
@@ -619,7 +626,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                             ?.average()
                             ?.takeIf { it.isFinite() }
                     }
-                HistoryRow(session, performed.size, spark)
+                HistoryRow(session, performed.size, spark, session.heartRate(sets))
             }
 
         return HomeState(

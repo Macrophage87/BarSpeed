@@ -133,6 +133,8 @@ class SessionExporter(
         // within an exercise: the measured rest runs to whichever set came
         // next (#157). Taken before the grouping below, which loses the order.
         val nextStart = nextStartsById(sets)
+        // Read over every set row, voided included, as endSession reads them.
+        val sessionHr = session.heartRate(sets)
         val byExercise = sets.groupBy { it.exerciseId }
         val exercises =
             byExercise.map { (exerciseId, records) ->
@@ -199,13 +201,21 @@ class SessionExporter(
             // a strap on a table is on a table for the rests too -- so the
             // outcome is right on the one session that fires it, for a reason
             // narrower than the gate states.
+            //
+            // avgBpm and maxBpm are read through SessionHeartRate (#62): the
+            // pair the close stored where the row has an end time, and
+            // otherwise the same aggregate over the set rows, so a session
+            // the lifter never finished publishes the figures its close would
+            // have written. hrvRmssdMs stays the row's alone -- its input was
+            // in memory and no set row carries it -- so a derived block
+            // carries none.
             heartRate =
             if (exercises.isNotEmpty() && exercises.all { it.sets.all { set -> set.hr == null } }) {
                 null
-            } else if (session.hrAvgBpm != null || session.hrMaxBpm != null || session.hrvRmssdMs != null) {
+            } else if (sessionHr.avgBpm != null || sessionHr.maxBpm != null || session.hrvRmssdMs != null) {
                 HrSessionSummary(
-                    avgBpm = session.hrAvgBpm,
-                    maxBpm = session.hrMaxBpm,
+                    avgBpm = sessionHr.avgBpm,
+                    maxBpm = sessionHr.maxBpm,
                     hrvRmssdMs = session.hrvRmssdMs?.let { Math.round(it * 10.0) / 10.0 },
                 )
             } else {

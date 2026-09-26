@@ -281,7 +281,7 @@ private fun HistoryCard(row: HistoryRow, onClick: () -> Unit) {
                     listOfNotNull(
                         formatter.format(started),
                         "${row.setCount} sets",
-                        row.session.hrAvgBpm?.let { "♥ $it avg" },
+                        row.heartRate.avgBpm?.let { "♥ $it avg" },
                         row.session.hrvRmssdMs?.let { "HRV ${it.toInt()}" },
                     )
                 Text(parts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
