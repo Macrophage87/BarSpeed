@@ -199,15 +199,20 @@ class RunawayDriftTest {
         // still unchanged at four passes. Issue #305's five field-44
         // deadlifts then move them to {0=17, 1=34, 2=8, 3=3, 4=1}: set 1
         // carries no runaway, sets 2, 4 and 5 need one pass and set 3 two.
-        // Issue #335's five field-46 back squats each need one pass.
+        // Issue #335's five field-46 back squats then move them to {0=18,
+        // 1=36, 2=10, 3=3, 4=1}: set 2 carries no runaway, two sets need one
+        // pass and two need two.
         assertEquals(
-            mapOf(0 to 17, 1 to 39, 2 to 8, 3 to 3, 4 to 1),
+            mapOf(0 to 18, 1 to 36, 2 to 10, 3 to 3, 4 to 1),
             passesNeeded.values.groupingBy { it }.eachCount().toSortedMap(),
             "captures by passes needed",
         )
         assertEquals(68, passesNeeded.size, "committed captures walked")
         assertEquals(
             mapOf(
+                // Issue #335's two field-46 back squats needing a second pass.
+                "field-backsquat-straight-s46-set04" to 2,
+                "field-backsquat-straight-s46-set05" to 2,
                 "field-bench-3010-6rep-s42-set05" to 2,
                 "field-bench-3010-6rep-s42-set07" to 3,
                 // The one of issue #278's four new captures needing a second
@@ -250,6 +255,9 @@ class RunawayDriftTest {
                 "field-assistedpullup-3010-s37-set08",
                 "field-assistedpullup-3010-s37-set10",
                 "field-backsquat-10hz-set5",
+                // The one of issue #335's five field-46 back squats whose
+                // anchored series holds no runaway: set 2, 95 lb.
+                "field-backsquat-straight-s46-set02",
                 "field-bench-rotating-6rep-ok",
                 // The one of issue #305's five field-44 deadlifts whose
                 // anchored series holds no runaway: set 1, the 61 kg warm-up.

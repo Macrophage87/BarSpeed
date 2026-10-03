@@ -65,8 +65,8 @@ class LiveRepCountersTest {
         // captures committed before issue #278 added four base captures this
         // corpus did not already hold, and 198 over the 58 before issue #305
         // committed field-44's five deadlifts, which add 12 calls between them.
-        // Issue #335 then committed field-46's five back squats.
-        assertEquals(235, callsSeen, "calls the segmenter makes across all 68 captures")
+        // Issue #335 then committed field-46's five back squats, which add 9.
+        assertEquals(219, callsSeen, "calls the segmenter makes across all 68 captures")
     }
 
     /**
