@@ -55,8 +55,8 @@ enum class LiveCounter {
      * after the drive ends and after enough descent. A contact sooner rejects
      * the attempt and nothing is spoken for it, and so does a fall on a lift
      * that starts with its concentric; on an eccentric-first lift a fall
-     * rejects nothing (#335), which took field-46's back squats from 5, 1, 2,
-     * 1 and 5 to 6, 4, 5, 5 and 5 replayed.
+     * sooner than that rejects nothing (#335), which took field-46's back
+     * squats from 5, 1, 2, 1 and 5 to 6, 4, 5, 5 and 5 replayed.
      *
      * Issue #305's design round, measured on the eight deadlift sets the
      * corpus holds (field-43 sets 4-6, field-44 sets 1-5): 35 of 36 completed

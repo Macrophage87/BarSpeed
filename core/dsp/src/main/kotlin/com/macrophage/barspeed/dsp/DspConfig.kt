@@ -306,9 +306,11 @@ data class DspConfig(
      * the sweep.
      *
      * NOT ON A SQUAT. Replayed on field-46's back squats the FALL this reads
-     * fires within [cycleMinCycleS] of real drives and drops them, so it
-     * rejects only on a concentric-first lift (`CycleRule.fallRejectsFor`,
-     * #335). The value is unchanged.
+     * fires within [cycleMinCycleS] of real drives and drops them, so a FALL
+     * that soon rejects only on a concentric-first lift
+     * (`CycleRule.fallRejectsFor`, #335); from [cycleMinCycleS] on it closes
+     * the pending rep on every lift, and rejects it where the descent gate is
+     * unmet. The value is unchanged.
      */
     val cycleFallG: Double = 0.4,
     /** Frames in the magnitude mean a FALL is read on. CHOSEN, NEVER VARIED. */

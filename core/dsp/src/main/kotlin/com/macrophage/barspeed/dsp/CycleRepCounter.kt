@@ -83,7 +83,9 @@ import com.macrophage.barspeed.model.StartPhase
  *   pull, which [DriveImpulseCounter] excludes only by its peak term.
  * - A FAILED PULL HELD AND LOWERED PAST [DspConfig.cycleMinCycleS] MAY BE
  *   CALLED. Nothing in the corpus holds one; unmeasured.
- * - ON AN ECCENTRIC-FIRST LIFT A FALL REJECTS NOTHING (#335). Replayed on
+ * - ON AN ECCENTRIC-FIRST LIFT A FALL SOONER THAN [DspConfig.cycleMinCycleS]
+ *   REJECTS NOTHING (#335); from then on it closes the pending rep as on any
+ *   lift, and rejects it where the descent gate is unmet. Replayed on
  *   field-46's back squats the FALL dropped real drives -- v0.1.57 counted 5,
  *   1, 2, 1 and 5 against the lifter's at least 4 on each -- and without it
  *   they read 6, 4, 5, 5 and 5 (`SquatLiveCountFieldTest`). What that costs
