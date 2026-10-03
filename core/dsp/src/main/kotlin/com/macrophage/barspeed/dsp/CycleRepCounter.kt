@@ -1,5 +1,7 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.StartPhase
+
 /**
  * A live rep counter that calls a rep only once the whole cycle is over: the
  * drive, and then the bar back at the floor. Issue #305's candidate (b).
@@ -344,6 +346,42 @@ internal open class CycleRule(
     }
 
     private enum class Outcome { CALLED, KEPT, REJECTED }
+
+    internal companion object {
+        /**
+         * Whether a FALL sooner than [DspConfig.cycleMinCycleS] rejects, for a
+         * lift of [direction]: true on a CONCENTRIC-FIRST lift, false on an
+         * ECCENTRIC-FIRST one. Issue #335.
+         *
+         * Decided from [LiftDirection.startsWith] ALONE, the phase the plan or
+         * the seed declares. No other term of the geometry is read, so every
+         * concentric-first lift keeps the rule it ran under v0.1.57 --
+         * the deadlift off the floor, and also the overhead press, barbell
+         * row and hip thrust the seed declares concentric-first and any stack
+         * lift a plan declares so -- and only an eccentric-first lift (back
+         * and front squat, bench press, Romanian deadlift, or anything a plan
+         * declares `start: "eccentric"`) loses it. A narrower predicate --
+         * concentric-first AND vertical AND off the stack -- would also take
+         * the rejection off concentric-first stack and horizontal lifts,
+         * which no measurement here covers.
+         *
+         * WHY. On field-44 set 5's grip failure a FALL 0.49 s after the drive
+         * and the floor CONTACT at 0.69 s each drop the drive before it arms.
+         * On that capture the contact alone still refuses it; with the
+         * contacts taken out -- `ClosingRuleCandidateTest`'s contact-free
+         * column -- the FALL is what refuses it. A FALL is
+         * [DspConfig.cycleFallFrames] frames of mean magnitude under
+         * [DspConfig.cycleFallG]. Replayed on field-46's back squats, one
+         * fires within [DspConfig.cycleMinCycleS] of the end of a real drive
+         * and drops it -- at lockout, on the ingest's reading of the replay;
+         * what the bar was doing then has not been measured -- which is how
+         * v0.1.57 counted 1 and 2 of 5.
+         *
+         * Nothing in production reads this until the commit that wires it
+         * into [CycleRepCounter]'s public constructor.
+         */
+        fun fallRejectsFor(direction: LiftDirection): Boolean = direction.startsWith == StartPhase.CONCENTRIC
+    }
 
     /** [event] null is the next armed drive closing the pending rep. */
     private fun close(open: Pending, event: FloorEvent?): Outcome {
