@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.dsp
 
+import com.macrophage.barspeed.model.RepCounter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -29,11 +30,15 @@ class FallRejectionCorpusTest {
 
     private data class Row(val stream: String, val before: Int, val after: Int)
 
-    private val rows: List<Row> by lazy {
-        val streams = CandidateCorpus.ALL.map { it.fixture to it.direction } +
+    /** Every committed capture, then every partner, each with the geometry it is read under. */
+    private val streams: List<Pair<String, LiftDirection>> by lazy {
+        CandidateCorpus.ALL.map { it.fixture to it.direction } +
             FieldCorpus.partnersOnClasspath().map { partner ->
                 partner to CandidateCorpus.capture(partner.removeSuffix("-imu-b")).direction
             }
+    }
+
+    private val rows: List<Row> by lazy {
         streams.map { (stream, direction) ->
             Row(
                 stream,
@@ -73,5 +78,24 @@ class FallRejectionCorpusTest {
         assertEquals(387 to 398, captures.sumOf { it.before } to captures.sumOf { it.after }, "captures, total calls")
         val partners = rows.drop(68)
         assertEquals(115 to 126, partners.sumOf { it.before } to partners.sumOf { it.after }, "partners, total calls")
+    }
+
+    /**
+     * What the APP counts on every committed stream, through
+     * `LiveRepCounters.forCounted(SENSOR)`, is the predicate column above,
+     * stream by stream. A DIFFERENTIAL: red on the eight streams that move
+     * until the app's counter reads [CycleRule.fallRejectsFor].
+     */
+    @Test
+    fun `the app counts the predicate's column on every committed stream`() {
+        val app = streams.associate { (stream, direction) ->
+            val counter = LiveRepCounters.forCounted(RepCounter.SENSOR, direction)
+                ?: error("a sensor-counted set must arm a counter")
+            val tracker = StreamingSetTracker.forLift(direction)
+            stream to LiveCountCandidates.load(stream).count { sample ->
+                counter.feed(tracker.feed(sample), sample.timestampMs) is RepCall.Speak
+            }
+        }
+        assertEquals(rows.associate { it.stream to it.after }, app, "the app's live count, stream by stream")
     }
 }

@@ -2632,13 +2632,63 @@ data class SessionExport(
          * untouched.
          *
          * PINNED. `SchemaSessionHrvContractTest` asserts this entry's marker
-         * in the published log, the block's and the key's descriptions, the
-         * tip literal and the example's version; `SessionHrvTest` in
-         * `:core:hrm` and `SessionHeartRateTest` pin the rule;
+         * in the published log and the block's and the key's descriptions,
+         * and that 1.24 is still accepted; it held the tip literal and the
+         * example's version until 1.25 moved them to
+         * `SchemaFallRejectionContractTest`. `SessionHrvTest` in `:core:hrm`
+         * and `SessionHeartRateTest` pin the rule;
          * `SessionExportUnclosedHrvTest` in `:core:data` is the export
          * differential.
+         *
+         * 1.25 MINTS NO KEY (#335, the live counter's fall rule): the
+         * description of [SetExport.repsSource] changes and nothing else.
+         * From this version the full-cycle detector's rule that an attempt
+         * the bar FALLS from within 1.2 s of its drive is not counted applies
+         * only to a lift that STARTS WITH ITS CONCENTRIC -- the deadlift off
+         * the floor, and the overhead press, barbell row and hip thrust as
+         * seeded, or any lift a plan declares `start: "concentric"` -- and not
+         * to one that starts with its eccentric: the back and front squat,
+         * the bench press and the Romanian deadlift as seeded, or any lift a
+         * plan declares `start: "eccentric"`. `CycleRule.fallRejectsFor` in
+         * `:core:dsp` is the decision. A floor contact within 1.2 s still
+         * rejects the attempt on every lift.
+         *
+         * A MINT AND NOT A FURTHER 1.24 ENTRY: `git tag --sort=-creatordate |
+         * head -1` is v0.1.57 and `git show
+         * v0.1.57:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * reads `SCHEMA_VERSION = "1.24"`, both read this round. 1.24 has
+         * SHIPPED and takes no further entries.
+         *
+         * WHAT IS RETRACTED. The reading key's sentence that an attempt the
+         * bar is back on the floor from, or falls from, within 1.2 s of its
+         * drive is not counted. It still describes every set recorded by
+         * v0.1.55 to v0.1.57, which applied the fall rule to every lift, and
+         * no longer describes an eccentric-first set this build records.
+         *
+         * MEASURED, NOT GUARANTEED, on replayed captures
+         * (`SquatLiveCountFieldTest`, `FallRejectionCorpusTest`,
+         * `CycleFallRejectionTest` in `:core:dsp`): field-46's five straight
+         * back squats read 6, 4, 5, 5 and 5 where v0.1.57 counted 5, 1, 2, 1
+         * and 5 live, against the lifter's at least 4 on each; the eight
+         * deadlift sets of field-43 and field-44 read 5, 5, 5, 5, 5, 5, 4 and
+         * 2 under both rules, field-44's failed third pull not called; of
+         * every other committed stream one moves, 2 to 3, the second unit of
+         * a timed rope hang, on which no live counter runs.
+         *
+         * NOT RETROACTIVE: `liveReps` and `reps` are stored when the set ends,
+         * so re-exporting a set recorded by an earlier build keeps that
+         * build's count. READER IN BOTH DIRECTIONS: the 1.24 schema v0.1.57
+         * shipped REJECTS a 1.25 document on its version string; this schema
+         * accepts a 1.24 document unchanged. No key is added, removed,
+         * renamed or retyped, and `DATABASE_VERSION` does NOT move. The plan
+         * schema is untouched.
+         *
+         * PINNED. `SchemaFallRejectionContractTest` asserts this entry's
+         * marker in the published log, the reading key in the schema and in
+         * `PLAN_PROMPT`, the tip literal and the example's version. This KDoc
+         * and the reading key's KDoc below are not read by any test.
          */
-        const val SCHEMA_VERSION = "1.24"
+        const val SCHEMA_VERSION = "1.25"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -2648,7 +2698,7 @@ data class SessionExport(
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
-                "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23", "1.24",
+                "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23", "1.24", "1.25",
             )
 
         /**
@@ -2920,8 +2970,13 @@ data class SetExport(
      * count. It speaks as the bar lands, about 1.2 s after the pull ends
      * (a median 1.16 s after the batch detector's concentric window ends, on
      * replayed captures), can speak a rep late after a light soft landing,
-     * and does not count an attempt that is back on the floor, or falls,
-     * within 1.2 s of its drive. On straight-reps work the LIFTER'S HAND
+     * and does not count an attempt that is back on the floor within 1.2 s
+     * of its drive, on any lift. On a lift that starts with its concentric
+     * -- a deadlift off the floor -- it does not count one the bar falls
+     * from within 1.2 s either; from 1.25 (#335) that fall rule does not
+     * apply to an eccentric-first lift, such as a squat or a bench press,
+     * and a set recorded by v0.1.55 to v0.1.57 had it on every lift. On
+     * straight-reps work the LIFTER'S HAND
      * COUNT is the ground truth and this word says which counter to score
      * against it (#286). The batch detector, separately, over-counts all six
      * committed concentric-first captures that carry a hand count, by +1 to
@@ -2935,7 +2990,14 @@ data class SetExport(
      * calls for 5, 5 and 5 at 61.2, 83.9 and 102.1 kg, one of the last set's
      * the set-up pull and that set's rep 4 missed. Field-44: 5, 5, 5, 4 and 2
      * of 5, 5, 5, 4 and 2 at 61.2 to 120.2 kg, the failed third pull of the
-     * last set not called. No other lift has been scored as the app runs it:
+     * last set not called. Field-46's five straight back squats, at 20.4 to
+     * 79.4 kg, carry a BOUNDED count and not a settled one -- at least 4 on
+     * each, most likely the 5 the lifter entered on sets 2 to 4 -- and read
+     * 6, 4, 5, 5 and 5 replayed, where v0.1.57 counted 5, 1, 2, 1 and 5
+     * live; so a low count on a squat set recorded by v0.1.55 to v0.1.57 may
+     * be a miss rather than a short set (`SquatLiveCountFieldTest`). The
+     * committed bench captures replay the same under either rule. No other
+     * lift has been scored as the app runs it:
      * on the six committed seated overhead-press captures -- tempo'd sets the
      * metronome counts -- it would call 7, 8, 6, 10, 9 and 2 against hand
      * counts of 6, 7, 5, 8, 8 and 2, the nearest measurement of the one tempo'd

@@ -83,6 +83,16 @@ class ClosingRuleCandidateTest {
      * [LiveSetState] the tracker publishes. And equal `called` totals rule out
      * a frame on which the rule closed two reps at once, which the harness
      * would score as one.
+     *
+     * Since issue #335 the production counter takes its FALL switch from
+     * [CycleRule.fallRejectsFor] -- off on an eccentric-first lift -- so the
+     * licence hands the harness the same switch for each capture's geometry.
+     * The design rows elsewhere in this file still build [CycleCandidate]
+     * with the rejection on for every capture: they measure #305's rule as it
+     * was designed and shipped in v0.1.55 to v0.1.57, and their tables score
+     * only captures with a truth, none of which moves (`FallRejectionCorpusTest`).
+     * 398, not 387: field-46's five back squats speak 25 numbers under the
+     * predicate where v0.1.57 spoke 14.
      */
     @Test
     fun `the cycle candidate reproduces the production cycle counter on every committed capture`() {
@@ -90,7 +100,9 @@ class ClosingRuleCandidateTest {
         for (capture in CandidateCorpus.ALL) {
             val counter = LiveRepCounters.of(LiveCounter.CYCLE, capture.direction) as CycleRepCounter
             val app = appCalls(counter, capture.fixture, capture.direction)
-            val harness = ClosingFrames.calls(CycleCandidate(), frames(capture.fixture)).map { it.atS }
+            val fallRejects = CycleRule.fallRejectsFor(capture.direction)
+            val harness = ClosingFrames.calls(CycleCandidate(fallRejects = fallRejects), frames(capture.fixture))
+                .map { it.atS }
             assertEquals(app, harness, "${capture.fixture}: call instants")
             assertEquals(app.size, counter.called, "${capture.fixture}: one call per spoken number")
             calls += app.size
@@ -483,7 +495,7 @@ class ClosingRuleCandidateTest {
          * truth -- but a floor under the licence: an equality that compared
          * two empty lists 63 times would pass and say nothing.
          */
-        const val CYCLE_CORPUS_CALLS = 387
+        const val CYCLE_CORPUS_CALLS = 398
 
         /**
          * Measured by this class's own command. Of the 35 completed reps whose

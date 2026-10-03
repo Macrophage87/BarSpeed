@@ -6,7 +6,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -20,10 +19,11 @@ import kotlin.test.assertTrue
  * behaviour they describe is red in `SessionExportUnclosedHrvTest` in
  * `:core:data` until the fix.
  *
- * THE TIP LITERAL LIVES HERE, on the rule `SchemaSkippedSetContractTest` wrote
- * when it minted 1.21: the literal the exporter writes is asserted in the file
- * that mints it and nowhere else. `SchemaWorkingTargetContractTest`, which
- * held it for 1.23, now asserts only that 1.23 is still accepted.
+ * THE TIP LITERAL LIVED HERE until #335 minted 1.25, on the rule
+ * `SchemaSkippedSetContractTest` wrote when it minted 1.21: the literal the
+ * exporter writes is asserted in the file that mints it and nowhere else.
+ * `SchemaFallRejectionContractTest` holds it now, and this file asserts only
+ * that 1.24 is still accepted.
  */
 class SchemaSessionHrvContractTest {
     private fun document(name: String): JsonObject = Json.parseToJsonElement(
@@ -43,12 +43,11 @@ class SchemaSessionHrvContractTest {
     private fun entry() = versionLog().substringAfter("1.24 (#62", missingDelimiterValue = "")
 
     @Test
-    fun `the exporter writes 1_24, which the schema accepts, and 1_23 is still readable`() {
+    fun `1_24 is accepted by the code and the schema, and 1_23 is still readable`() {
         val enum = properties().getValue("schemaVersion").jsonObject.getValue("enum").jsonArray
             .map { it.jsonPrimitive.content }
-        assertEquals("1.24", SessionExport.SCHEMA_VERSION, "the version the exporter writes")
-        assertTrue("1.24" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the version written is not accepted")
-        assertTrue("1.24" in enum, "the published schema rejects the version the exporter writes")
+        assertTrue("1.24" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.24, shipped in v0.1.57, is not accepted")
+        assertTrue("1.24" in enum, "the published schema rejects 1.24")
         assertTrue("1.23" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "1.23, shipped in v0.1.56, left the accepted set")
     }
 
@@ -106,11 +105,5 @@ class SchemaSessionHrvContractTest {
             "REJECTS a 1.24 document",
             "DATABASE_VERSION does NOT move",
         ).forEach { assertTrue(it in entry, "the 1.24 entry does not state: $it") }
-    }
-
-    @Test
-    fun `the published example declares 1_24`() {
-        val example = document("examples/session-export.example.json")
-        assertEquals("1.24", example.getValue("schemaVersion").jsonPrimitive.content)
     }
 }

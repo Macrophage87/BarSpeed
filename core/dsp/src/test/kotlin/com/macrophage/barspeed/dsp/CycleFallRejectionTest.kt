@@ -134,6 +134,21 @@ class CycleFallRejectionTest {
     }
 
     /**
+     * THE APP'S COUNTER, through `LiveRepCounters.forCounted(SENSOR)`, makes
+     * the same calls as the counter built by the predicate: the early FALL
+     * is ignored on an eccentric-first lift and drops the drive on a
+     * concentric-first one. A DIFFERENTIAL, red until the app's counter reads
+     * [CycleRule.fallRejectsFor].
+     */
+    @Test
+    fun `the app's counter ignores an early FALL on an eccentric-first lift`() {
+        fun app(direction: LiftDirection) = LiveRepCounters.forCounted(RepCounter.SENSOR, direction)
+            ?: error("a sensor-counted set must arm a counter")
+        assertEquals(listOf(3.2), pullWithEarlyFall().calls(app(eccentricFirst)), "eccentric-first")
+        assertEquals(emptyList(), pullWithEarlyFall().calls(app(concentricFirst)), "concentric-first")
+    }
+
+    /**
      * A CONTACT is not switched. The same pull with the floor contact at
      * 2.0 s in place of the FALL is refused on either lift, so an
      * eccentric-first attempt the bar is back on the floor from inside

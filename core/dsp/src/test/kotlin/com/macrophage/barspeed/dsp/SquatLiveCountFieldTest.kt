@@ -147,11 +147,26 @@ class SquatLiveCountFieldTest {
 
     /**
      * What the app counts on the five squats, through the one call
-     * `RecordViewModel` makes, on both units.
+     * `RecordViewModel` makes, on both units, once the FALL rejection is held
+     * to concentric-first lifts (#335).
+     *
+     * A DIFFERENTIAL, re-baselined from 5, 1, 2, 1 and 5 -- what v0.1.57 said
+     * and the test above keeps, by name -- and red until the app's counter
+     * reads `CycleRule.fallRejectsFor`.
+     *
+     * Role a, each against the owner's bound of at least 4 and most likely 5:
+     * - set 1, 6: one over the likely 5. v0.1.57 already called 5 here, and
+     *   the sixth call is a drive the FALL used to drop, so either it is a
+     *   real rep and the hand 5 is one short, or it is a call on set-up or
+     *   re-rack motion. Nothing in the capture says which.
+     * - sets 2, 3 and 4, 4, 5 and 5: inside the bound, where v0.1.57 said 1,
+     *   2 and 1.
+     * - set 5, 5: unchanged, the likely count.
+     * Role b reads 4, 5, 4, 5 and 6.
      */
     @Test
     fun `the app counts the five squats live`() {
-        assertEquals(listOf(5, 1, 2, 1, 5), sets.map { calls(app(), it.name).size }, "role a, sets 1-5")
-        assertEquals(listOf(4, 2, 1, 1, 6), sets.map { calls(app(), "${it.name}-imu-b").size }, "role b, sets 1-5")
+        assertEquals(listOf(6, 4, 5, 5, 5), sets.map { calls(app(), it.name).size }, "role a, sets 1-5")
+        assertEquals(listOf(4, 5, 4, 5, 6), sets.map { calls(app(), "${it.name}-imu-b").size }, "role b, sets 1-5")
     }
 }
