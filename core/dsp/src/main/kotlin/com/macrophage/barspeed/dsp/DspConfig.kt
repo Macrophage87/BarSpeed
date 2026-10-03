@@ -300,9 +300,15 @@ data class DspConfig(
      * A FALL: the [cycleFallFrames]-frame mean magnitude under this, g -- the
      * bar in or near free fall.
      *
-     * FITTED AND SWEPT. Every completed rep's lowering stays above it and the
-     * failed pull does not (field-44 set 5's grip failure reaches 0.14 g).
-     * Completed reps start dropping at 0.55 in the sweep.
+     * FITTED AND SWEPT on the eight deadlift sets. Every completed rep's
+     * lowering stays above it and the failed pull does not (field-44 set 5's
+     * grip failure reaches 0.14 g). Completed reps start dropping at 0.55 in
+     * the sweep.
+     *
+     * NOT ON A SQUAT. Replayed on field-46's back squats the FALL this reads
+     * fires within [cycleMinCycleS] of real drives and drops them, so it
+     * rejects only on a concentric-first lift (`CycleRule.fallRejectsFor`,
+     * #335). The value is unchanged.
      */
     val cycleFallG: Double = 0.4,
     /** Frames in the magnitude mean a FALL is read on. CHOSEN, NEVER VARIED. */
@@ -326,8 +332,10 @@ data class DspConfig(
     val cycleStillS: Double = 0.30,
     /**
      * The shortest a completed rep is taken to need from its drive's END to the
-     * bar being back on the floor, s. A CONTACT or FALL sooner than this rejects
-     * the attempt; the next drive STARTING sooner than this replaces it.
+     * bar being back on the floor, s. A CONTACT sooner than this rejects the
+     * attempt, and so does a FALL on a concentric-first lift
+     * (`CycleRule.fallRejectsFor`, #335); the next drive STARTING sooner than
+     * this replaces it.
      *
      * FITTED AND SWEPT. The next contact comes 0.68 s after field-44 set 5's
      * failed pull's drive ends, and 1.25 s or later after the drive of every

@@ -27,14 +27,16 @@ import com.macrophage.barspeed.model.StartPhase
  *     sample.
  *   - descent gate not met: a STILL keeps the rep pending; a CONTACT, a FALL
  *     or the next armed drive REJECTS it, and nothing is spoken.
- * - BEFORE [DspConfig.cycleMinCycleS]: a CONTACT or a FALL REJECTS the pending
- *   rep; a STILL is ignored.
+ * - BEFORE [DspConfig.cycleMinCycleS]: a CONTACT REJECTS the pending rep, and
+ *   so does a FALL on a concentric-first lift ([CycleRule.fallRejectsFor],
+ *   #335); a STILL is ignored, and so is a FALL on an eccentric-first lift.
  * - THE NEXT DRIVE closes the pending rep only if it STARTS at least
  *   [DspConfig.cycleMinCycleS] after the old drive's END -- its start, not
  *   when it arms. Otherwise it REPLACES the pending rep and nothing is spoken
  *   for the one it replaced.
- * - A CONTACT or FALL within [DspConfig.cycleMinCycleS] of a drive that has not
- *   ARMED yet drops that drive before it can arm. On field-44 set 5 that, and
+ * - A CONTACT within [DspConfig.cycleMinCycleS] of a drive that has not ARMED
+ *   yet drops that drive before it can arm, and so does a FALL on a
+ *   concentric-first lift. On field-44 set 5, a deadlift, that, and
  *   not the pending-rep rule, is what refuses the failed pull: its drive ends at
  *   17.72 s, the bar's 5-frame mean magnitude falls under
  *   [DspConfig.cycleFallG] 0.49 s later and the floor contact follows at
@@ -81,6 +83,12 @@ import com.macrophage.barspeed.model.StartPhase
  *   pull, which [DriveImpulseCounter] excludes only by its peak term.
  * - A FAILED PULL HELD AND LOWERED PAST [DspConfig.cycleMinCycleS] MAY BE
  *   CALLED. Nothing in the corpus holds one; unmeasured.
+ * - ON AN ECCENTRIC-FIRST LIFT A FALL REJECTS NOTHING (#335). Replayed on
+ *   field-46's back squats the FALL dropped real drives -- v0.1.57 counted 5,
+ *   1, 2, 1 and 5 against the lifter's at least 4 on each -- and without it
+ *   they read 6, 4, 5, 5 and 5 (`SquatLiveCountFieldTest`). What that costs
+ *   is unmeasured: an eccentric-first attempt the bar drops without striking
+ *   anything above [DspConfig.cycleContactG] is no longer refused by time.
  *
  * Every constant is fitted on, chosen on or borrowed for those eight sets --
  * each [DspConfig] KDoc says which -- and one lifter's dead-stop deadlifts at
@@ -103,7 +111,7 @@ class CycleRepCounter internal constructor(
     constructor(
         direction: LiftDirection = LiftDirection(),
         config: DspConfig = DspConfig(),
-    ) : this(direction, CycleRule(config))
+    ) : this(direction, CycleRule(config, CycleRule.fallRejectsFor(direction)))
 
     /** Sensor frame to drive frame: positive is the direction the lifter drives. */
     private val driveSign: Double = direction.sensorToLifter * direction.concentricSign
@@ -279,15 +287,16 @@ internal abstract class DriveBrakeTracker(protected val config: DspConfig) {
  * [CycleRepCounter]'s rule: the one copy of it, which the design harness wraps
  * rather than restates.
  *
- * Open, with two hooks and one switch, only so that `ClosingRuleCandidateTest`
- * can measure the variants issue #305's design round compared -- a
- * set-relative drive, a height floor, and the rule without its fall rejection
- * -- against THIS code rather than against a copy of it. Production builds it
- * with the defaults and overrides nothing.
+ * Open, with two hooks, only so that `ClosingRuleCandidateTest` can measure
+ * the variants issue #305's design round compared -- a set-relative drive and
+ * a height floor -- against THIS code rather than against a copy of it.
+ * Production overrides nothing.
  *
- * @param fallRejects false is an ABLATION the harness measures: a FALL sooner
- *   than [DspConfig.cycleMinCycleS] then neither rejects a pending rep nor
- *   drops an unarmed drive. Production never sets it.
+ * @param fallRejects false: a FALL sooner than [DspConfig.cycleMinCycleS]
+ *   neither rejects a pending rep nor drops an unarmed drive. Production sets
+ *   it from [fallRejectsFor] -- false on an eccentric-first lift (#335) --
+ *   through [CycleRepCounter]'s public constructor; the harness also runs it
+ *   false on every capture as #305's ablation.
  */
 internal open class CycleRule(
     config: DspConfig,
@@ -377,8 +386,8 @@ internal open class CycleRule(
          * what the bar was doing then has not been measured -- which is how
          * v0.1.57 counted 1 and 2 of 5.
          *
-         * Nothing in production reads this until the commit that wires it
-         * into [CycleRepCounter]'s public constructor.
+         * [CycleRepCounter]'s public constructor reads it, which is the
+         * construction `LiveRepCounters.of` -- and so the app -- uses.
          */
         fun fallRejectsFor(direction: LiftDirection): Boolean = direction.startsWith == StartPhase.CONCENTRIC
     }
