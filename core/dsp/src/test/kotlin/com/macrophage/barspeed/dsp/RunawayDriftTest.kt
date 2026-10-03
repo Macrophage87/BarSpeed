@@ -199,12 +199,13 @@ class RunawayDriftTest {
         // still unchanged at four passes. Issue #305's five field-44
         // deadlifts then move them to {0=17, 1=34, 2=8, 3=3, 4=1}: set 1
         // carries no runaway, sets 2, 4 and 5 need one pass and set 3 two.
+        // Issue #335's five field-46 back squats each need one pass.
         assertEquals(
-            mapOf(0 to 17, 1 to 34, 2 to 8, 3 to 3, 4 to 1),
+            mapOf(0 to 17, 1 to 39, 2 to 8, 3 to 3, 4 to 1),
             passesNeeded.values.groupingBy { it }.eachCount().toSortedMap(),
             "captures by passes needed",
         )
-        assertEquals(63, passesNeeded.size, "committed captures walked")
+        assertEquals(68, passesNeeded.size, "committed captures walked")
         assertEquals(
             mapOf(
                 "field-bench-3010-6rep-s42-set05" to 2,

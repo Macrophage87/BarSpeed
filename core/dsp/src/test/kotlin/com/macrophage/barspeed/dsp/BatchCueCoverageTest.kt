@@ -319,6 +319,16 @@ class BatchCueCoverageTest {
         // lane's copies were byte-identical and the rebase dropped them, so
         // those three entries are #301's files and the comment beside them is
         // the one that lane wrote.
+        // Field-46's five straight back squats, committed for issue #335.
+        // Their tracks are the sensor's own live calls and, on sets 2-4, the
+        // lifter's post-set `+1 REP` taps, on field-43's terms. The owner
+        // bounded the count without settling it; `SquatLiveCountFieldTest`
+        // reads them, not this file.
+        "field-backsquat-straight-s46-set01",
+        "field-backsquat-straight-s46-set02",
+        "field-backsquat-straight-s46-set03",
+        "field-backsquat-straight-s46-set04",
+        "field-backsquat-straight-s46-set05",
         "field-backsquat-wrapping-s36-set01",
         "field-bench-3010-6rep-s42-set05",
         "field-bench-3010-6rep-s42-set07",

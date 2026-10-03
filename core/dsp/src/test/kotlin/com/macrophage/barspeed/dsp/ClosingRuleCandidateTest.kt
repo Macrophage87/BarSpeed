@@ -74,7 +74,7 @@ class ClosingRuleCandidateTest {
      * The licence for every (b) row, sweep and ablation. [CycleCandidate]
      * over the harness's frames calls at exactly the instants the production
      * [CycleRepCounter] does when fed by the app's tracker, and ends on the
-     * same [CycleRepCounter.called] -- over all 63 committed captures, not only
+     * same [CycleRepCounter.called] -- over all 68 committed captures, not only
      * the eight deadlifts, because the corpus row scores every one of them.
      *
      * Two computations are compared, not one read twice: the harness takes the
@@ -483,7 +483,7 @@ class ClosingRuleCandidateTest {
          * truth -- but a floor under the licence: an equality that compared
          * two empty lists 63 times would pass and say nothing.
          */
-        const val CYCLE_CORPUS_CALLS = 373
+        const val CYCLE_CORPUS_CALLS = 387
 
         /**
          * Measured by this class's own command. Of the 35 completed reps whose

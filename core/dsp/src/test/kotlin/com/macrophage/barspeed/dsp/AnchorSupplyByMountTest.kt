@@ -466,8 +466,10 @@ class AnchorSupplyByMountTest {
         // four of them are new here -- field-42 sets 8 and 10, the field-41
         // triceps pushdown and the field-41 lat pulldown. 48, not 43: issue
         // #305 committed field-44's five CENTRE-mounted deadlift sets and the
-        // gate holds on all five (`GyroGateTest` classifies them).
-        assertEquals(48, holding.size, "captures the gate still applies to")
+        // gate holds on all five (`GyroGateTest` classifies them). 51, not 48:
+        // issue #335 committed field-46's five back squats, and the gate holds
+        // on sets 3, 4 and 5 and not on sets 1 and 2 (`GyroGateTest`).
+        assertEquals(51, holding.size, "captures the gate still applies to")
         holding.forEach { fixture ->
             assertContentEquals(
                 maskWithGate(fixture, gyroGate = true),

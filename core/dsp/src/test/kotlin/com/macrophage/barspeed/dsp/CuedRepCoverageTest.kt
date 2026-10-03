@@ -300,6 +300,16 @@ class CuedRepCoverageTest {
         // on `origin/main` with #301 while this lane was in review; this
         // lane's copies were byte-identical and the rebase dropped them, so
         // the comment beside those three entries is the one that lane wrote.
+        // Field-46's five straight back squats, committed for issue #335.
+        // Their tracks are the sensor's own live calls and, on sets 2-4, the
+        // lifter's post-set `+1 REP` taps, on field-43's terms. The owner
+        // bounded the count without settling it; `SquatLiveCountFieldTest`
+        // reads them, not this file.
+        "field-backsquat-straight-s46-set01",
+        "field-backsquat-straight-s46-set02",
+        "field-backsquat-straight-s46-set03",
+        "field-backsquat-straight-s46-set04",
+        "field-backsquat-straight-s46-set05",
         "field-backsquat-wrapping-s36-set01",
         "field-bench-3010-6rep-s42-set05",
         "field-bench-3010-6rep-s42-set07",
@@ -600,8 +610,9 @@ class CuedRepCoverageTest {
         // pulldown. All thirteen are cue-tracked and none is scored for rep
         // coverage. 23, not 19: issue #305 committed field-44's first four
         // deadlift sets, whose tracks are the sensor's calls and the lifter's
-        // post-set taps, on field-43's terms.
-        assertEquals(23, notRepCorpus.size, "captures committed for something other than rep coverage")
+        // post-set taps, on field-43's terms. 28, not 23: issue #335 committed
+        // field-46's five back squats, on the same terms.
+        assertEquals(28, notRepCorpus.size, "captures committed for something other than rep coverage")
         notRepCorpus.forEach { fixture ->
             assertTrue(
                 javaClass.getResourceAsStream("/$fixture-cues.csv") != null,

@@ -94,7 +94,10 @@ class DriveImpulseCandidateTest {
     @Test
     fun `the candidate corpus is every committed capture, 51 of them with a truth`() {
         assertEquals(FieldCorpus.onClasspath(), CandidateCorpus.ALL.map { it.fixture }.sorted())
-        assertEquals(63, CandidateCorpus.ALL.size, "captures on the classpath")
+        // 68, not 63: issue #335 committed field-46's five back squats, and
+        // `CandidateCorpus.UNSETTLED` gives them no truth, so neither the
+        // scored count nor any basis moves.
+        assertEquals(68, CandidateCorpus.ALL.size, "captures on the classpath")
         val scored = CandidateCorpus.scored()
         // 46, not 42: the four #278 base captures new to this corpus each
         // take a cue-called truth. 51, not 46: issue #305's five field-44

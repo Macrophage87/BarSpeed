@@ -390,8 +390,12 @@ internal object DriveImpulseCandidate {
  * 3. **Cue-called reps**, the `Down` rows of `-cues.csv`, where one is
  *    committed. Sixteen captures.
  *
- * Twelve captures get no truth and are scored by neither candidate. Six of
- * those DO carry a performed count in `FieldDataRegressionTest`'s prose
+ * Before all three, a capture in [UNSETTLED] takes no truth whatever its
+ * sidecars say: a human bounded its count without settling it (issue #335).
+ *
+ * Seventeen captures get no truth and are scored by neither candidate: the
+ * five [UNSETTLED] ones, and twelve more. Six of those twelve DO carry a
+ * performed count in `FieldDataRegressionTest`'s prose
  * (`field-cablerow-static-8rep` 8, `field-facepull-static-12rep` 12,
  * `field-pallof-static-12rep` 12, `field-ohp-100hz-bursty` 8,
  * `field-backsquat-10hz-set5` 0, `field-still-0rep` 0) and folding them in
@@ -531,6 +535,14 @@ internal object CandidateCorpus {
         Capture("field-backsquat-10hz-set5", ECC),
         Capture("field-backsquat-4011-6rep-s36-set01", ECC),
         Capture("field-backsquat-99hz-6rep", ECC),
+        // Field-46's five straight back squats, issue #335. Each set's own
+        // `meta.json` declares `startsWith: "eccentric"`, `concentric: "up"`,
+        // vertical, off the stack -- the ECC block. No truth: see [UNSETTLED].
+        Capture("field-backsquat-straight-s46-set01", ECC),
+        Capture("field-backsquat-straight-s46-set02", ECC),
+        Capture("field-backsquat-straight-s46-set03", ECC),
+        Capture("field-backsquat-straight-s46-set04", ECC),
+        Capture("field-backsquat-straight-s46-set05", ECC),
         Capture("field-backsquat-wrapping-s36-set01", ECC),
         Capture("field-bench-3010-6rep-s37-set05", ECC),
         Capture("field-bench-3010-6rep-s37-set06", ECC),
@@ -593,7 +605,28 @@ internal object CandidateCorpus {
         Capture("field-still-0rep", ECC),
     )
 
+    /**
+     * Captures whose performed count a human has bounded but not settled, so
+     * they take NO truth here rather than a number stronger than the words.
+     *
+     * Field-46's five straight back squats, issue #335. The owner, on the
+     * live counts 5, 1, 2, 1, 5: *"I know that I at least did 4 on each. It's
+     * harder to count when under a heavy bar."* -- at least 4, most likely 5.
+     * Their `-cues.csv` is the sensor's own `Rep N` calls plus the lifter's
+     * post-set taps, so the cue rule below would read 0 off it, a wrong truth
+     * rather than a missing one. `SquatLiveCountFieldTest` argues each
+     * set's count against the bound instead.
+     */
+    val UNSETTLED = setOf(
+        "field-backsquat-straight-s46-set01",
+        "field-backsquat-straight-s46-set02",
+        "field-backsquat-straight-s46-set03",
+        "field-backsquat-straight-s46-set04",
+        "field-backsquat-straight-s46-set05",
+    )
+
     fun truth(fixture: String): Truth {
+        if (fixture in UNSETTLED) return Truth(null, Basis.NONE)
         STATED[fixture]?.let { return Truth(it, Basis.STATED) }
         if (LiveCountCandidates.onClasspath("$fixture-reps.csv")) {
             return Truth(RepMarks.read(fixture).size, Basis.MARKS)

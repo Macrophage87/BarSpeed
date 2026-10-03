@@ -86,6 +86,13 @@ class RepRefusalCorpusTest {
         Triple("field-backsquat-10hz-set5", ecc, 60.0),
         Triple("field-backsquat-4011-6rep-s36-set01", ecc, 60.0),
         Triple("field-backsquat-99hz-6rep", ecc, 60.0),
+        // field-46's five back squats, committed for issue #335. Loads from
+        // that session's own meta.json.
+        Triple("field-backsquat-straight-s46-set01", ecc, 20.411656650451594),
+        Triple("field-backsquat-straight-s46-set02", ecc, 43.091275150953365),
+        Triple("field-backsquat-straight-s46-set03", ecc, 61.234969951354785),
+        Triple("field-backsquat-straight-s46-set04", ecc, 70.3068173515555),
+        Triple("field-backsquat-straight-s46-set05", ecc, 79.3786647517562),
         Triple("field-backsquat-wrapping-s36-set01", ecc, 60.0),
         Triple("field-bench-3010-6rep-s37-set05", ecc, 47.62719885105372),
         Triple("field-bench-3010-6rep-s37-set06", ecc, 49.8951607011039),
@@ -180,8 +187,9 @@ class RepRefusalCorpusTest {
         // 58, not the 42 that stood before any of the four landings: #301
         // committed three, #259 three, issues #290 and #255 six, and issue
         // #278 four base captures this file did not already walk. 63 since
-        // issue #305 committed field-44's five deadlifts.
-        assertEquals(63, corpus.size, "captures this file walks")
+        // issue #305 committed field-44's five deadlifts, and 68 since issue
+        // #335 committed field-46's five back squats.
+        assertEquals(68, corpus.size, "captures this file walks")
     }
 
     /**

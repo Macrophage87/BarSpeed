@@ -227,6 +227,16 @@ class FallbackMountGeometryTest {
 
         assertEquals(
             listOf(
+                // field-46's five second units, committed for issue #335 and
+                // read by `SquatLiveCountFieldTest`, which pins what the live
+                // counter calls on each. Role a is the unit the sets were
+                // analysed from; the archive's meta.json records no mount for
+                // either unit.
+                "field-backsquat-straight-s46-set01-imu-b",
+                "field-backsquat-straight-s46-set02-imu-b",
+                "field-backsquat-straight-s46-set03-imu-b",
+                "field-backsquat-straight-s46-set04-imu-b",
+                "field-backsquat-straight-s46-set05-imu-b",
                 // The seven pairs committed for issue #278, scored by
                 // `StackMountFieldTest` in this module rather than by the
                 // tests above: what is asked of them is which unit a

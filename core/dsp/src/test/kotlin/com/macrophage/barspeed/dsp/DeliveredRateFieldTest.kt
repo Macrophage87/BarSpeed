@@ -8,7 +8,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * [DeliveredRate] on the seventeen committed two-unit captures, issue #321.
+ * [DeliveredRate] on the committed two-unit captures, issue #321.
  *
  * DIFFERENTIALS. At the commit that adds this file [DeliveredRate.of] answers
  * null for every stream, so every case here fails. The fix is the commit after
@@ -58,6 +58,11 @@ class DeliveredRateFieldTest {
 
     private val pairs =
         listOf(
+            "field-backsquat-straight-s46-set01",
+            "field-backsquat-straight-s46-set02",
+            "field-backsquat-straight-s46-set03",
+            "field-backsquat-straight-s46-set04",
+            "field-backsquat-straight-s46-set05",
             "field-cablerow-3010-8rep-s42-set08",
             "field-cablerow-3010-8rep-s42-set09",
             "field-cablerow-3010-8rep-s42-set10",
@@ -142,9 +147,17 @@ class DeliveredRateFieldTest {
             for (role in listOf("a", "b")) {
                 val m = measured(base, role)
                 val slow = role == "a" && "-s42-" in base
+                // Field-46's role a, committed for issue #335: the 99 Hz
+                // cluster's rate on a 43-44 ms rhythm rather than 30-32 --
+                // 99.4 Hz on every set, spacings 44, 44, 43, 44 and 43 ms by a
+                // read-only Python pass over the same files this round.
+                val wideRhythm = role == "a" && "-s46-" in base
                 if (slow) {
                     assertTrue(round1(m.hz) in listOf(43.5, 44.1, 44.3, 44.5), "$base $role read ${m.hz}")
                     assertEquals(90L, m.burstSpacingMs, "$base $role")
+                } else if (wideRhythm) {
+                    assertTrue(round1(m.hz) in 99.1..99.6, "$base $role read ${m.hz}")
+                    assertTrue((m.burstSpacingMs ?: -1L) in 43L..44L, "$base $role spaced ${m.burstSpacingMs}")
                 } else {
                     assertTrue(round1(m.hz) in 99.1..99.6, "$base $role read ${m.hz}")
                     assertTrue((m.burstSpacingMs ?: -1L) in 30L..32L, "$base $role spaced ${m.burstSpacingMs}")

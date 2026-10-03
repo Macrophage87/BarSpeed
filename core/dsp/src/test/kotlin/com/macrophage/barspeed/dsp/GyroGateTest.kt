@@ -36,6 +36,11 @@ class GyroGateTest {
         "field-backsquat-10hz-set5",
         "field-backsquat-4011-6rep-s36-set01",
         "field-backsquat-99hz-6rep",
+        "field-backsquat-straight-s46-set01",
+        "field-backsquat-straight-s46-set02",
+        "field-backsquat-straight-s46-set03",
+        "field-backsquat-straight-s46-set04",
+        "field-backsquat-straight-s46-set05",
         "field-backsquat-wrapping-s36-set01",
         "field-bench-3010-6rep-s37-set05",
         "field-bench-3010-6rep-s37-set06",
@@ -261,6 +266,13 @@ class GyroGateTest {
             "field-deadlift-straight-5rep-s44-set01",
             "field-deadlift-straight-5rep-s44-set02",
             "field-deadlift-straight-5rep-s44-set03",
+            // Field-46's back squats 3, 4 and 5, committed for issue #335.
+            // Medians 9.279, 7.019 and 4.959 deg/s against tenth percentiles
+            // of 1.099, 0.132 and 0.000, read this round by a Python pass
+            // over the committed role-a files; recorded, not asserted.
+            "field-backsquat-straight-s46-set03",
+            "field-backsquat-straight-s46-set04",
+            "field-backsquat-straight-s46-set05",
             // The seven pairs issue #278 committed, base captures only --
             // a partner is not in [FieldCorpus.onClasspath] and so not in
             // this corpus. Three of the seven -- field-42 sets 9, 11 and 13
@@ -363,6 +375,12 @@ class GyroGateTest {
             // 2 above, one session later, and it straddles for the reason they
             // do. Its eight siblings are in `holds`.
             "field-ohp-3010-7rep-s42-set02",
+            // Field-46's back squats 1 and 2, committed for issue #335. Both
+            // straddle: medians 12.058 and 14.038 deg/s against tenth
+            // percentiles of 0.000 and 0.735, read the same way as their
+            // three siblings in `holds`.
+            "field-backsquat-straight-s46-set01",
+            "field-backsquat-straight-s46-set02",
         )
         holds.forEach { assertTrue(VelocityEstimator.gyroGateApplies(load(it), config), "$it: gate should hold") }
         fails.forEach { assertFalse(VelocityEstimator.gyroGateApplies(load(it), config), "$it: gate should fail") }
