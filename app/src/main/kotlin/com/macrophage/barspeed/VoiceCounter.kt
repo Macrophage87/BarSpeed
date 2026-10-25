@@ -5,10 +5,10 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.speech.tts.TextToSpeech
-import android.speech.tts.TtsSpan
 import android.speech.tts.UtteranceProgressListener
 import android.text.SpannableString
 import android.text.Spanned
+import android.text.style.TtsSpan
 import com.macrophage.barspeed.model.SpokenRepCall
 import com.macrophage.barspeed.model.VoiceFocusPolicy
 import com.macrophage.barspeed.model.VoiceFocusState
