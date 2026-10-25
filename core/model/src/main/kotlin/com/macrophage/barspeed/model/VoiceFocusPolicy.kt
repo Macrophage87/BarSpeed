@@ -35,7 +35,7 @@ enum class VoiceFocusStep { REQUEST, ABANDON, KEEP }
  */
 object VoiceFocusPolicy {
     /** Whether focus is wanted in [state]. */
-    @Suppress("UnusedParameter", "UNUSED_PARAMETER")
+    @Suppress("UnusedParameter", "UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
     fun holds(state: VoiceFocusState): Boolean = false
 
     /** The move from [held] to [wanted]. */
