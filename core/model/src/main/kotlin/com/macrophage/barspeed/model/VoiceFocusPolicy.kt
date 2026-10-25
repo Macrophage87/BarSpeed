@@ -27,20 +27,45 @@ enum class VoiceFocusStep { REQUEST, ABANDON, KEEP }
  * both can be played?"* `VoiceCounter` in `:app` acts on [step]'s answer with
  * a transient, may-duck focus request; this decides only WHEN focus is held.
  *
- * NOTHING READS THIS YET, and at this commit [holds] and [step] answer what
- * the voice does at the parent: it never holds focus and never asks for it.
- * The event functions are bookkeeping and change no answer while that holds.
- * A voice going away starts again from `VoiceFocusState()`: no set, nothing
- * playing.
+ * ## Held for the set, not taken per word
+ *
+ * Focus is wanted while a word is playing, and -- once a set has said
+ * anything -- for the rest of that set. Per-word focus was the alternative
+ * and is rejected: a guided set speaks on every second, so releasing after
+ * each word would raise the music in every gap and duck it again at the next
+ * word, a pumping the lifter would hear for the whole set. Held, the music
+ * ducks at the set's first word and comes back after its last.
+ *
+ * - **Not before the first word.** A set recorded with the voice off, or one
+ *   no voice counts, says nothing and must not duck the lifter's music for
+ *   its length; [VoiceFocusState.spokenThisSet] is what tells them apart.
+ * - **Released at the set's end**, which `RecordViewModel.endSet` reports,
+ *   once the word playing then -- `Set ended`, spoken at the tap -- finishes.
+ *   The rest that follows is outside any set.
+ * - **Outside a set, per word.** The rest countdown's digits and `Rest over`
+ *   take focus for each word and give it back when it finishes; they are
+ *   four words a second apart, and the music comes back between them.
+ * - **A voice going away** starts again from `VoiceFocusState()`: no set,
+ *   nothing playing, so whatever is held is abandoned. `VoiceCounter.shutdown`
+ *   does that; it is reached from `RecordViewModel.onCleared`, which is also
+ *   the path a set abandoned by leaving the screen takes.
+ *
+ * WHAT IS NOT DECIDED HERE: what kind of focus is asked for, which is the
+ * caller's (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`, never `AUDIOFOCUS_GAIN`,
+ * which asks music to stop), and whether the platform granted it -- [step]
+ * takes what is held as given. What a music app does when asked to duck is
+ * the app's, and is `[Field]`.
  */
 object VoiceFocusPolicy {
-    /** Whether focus is wanted in [state]. */
-    @Suppress("UnusedParameter", "UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
-    fun holds(state: VoiceFocusState): Boolean = false
+    /** Whether focus is wanted in [state]: a word is playing, or a set under way has spoken. */
+    fun holds(state: VoiceFocusState): Boolean = state.speaking != null || (state.inSet && state.spokenThisSet)
 
     /** The move from [held] to [wanted]. */
-    @Suppress("UnusedParameter", "UNUSED_PARAMETER")
-    fun step(held: Boolean, wanted: Boolean): VoiceFocusStep = VoiceFocusStep.KEEP
+    fun step(held: Boolean, wanted: Boolean): VoiceFocusStep = when {
+        wanted && !held -> VoiceFocusStep.REQUEST
+        held && !wanted -> VoiceFocusStep.ABANDON
+        else -> VoiceFocusStep.KEEP
+    }
 
     /** A set has begun: nothing has been said in it yet. */
     fun setStarted(state: VoiceFocusState): VoiceFocusState = state.copy(inSet = true, spokenThisSet = false)

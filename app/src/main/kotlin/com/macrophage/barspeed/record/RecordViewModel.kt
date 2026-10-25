@@ -4375,6 +4375,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // The readout starts on the armed unit; nothing has arrived yet.
         liveFedBy = armedSensors?.analysed
         endingSet = false
+        // #339: the voice holds audio focus for a set once it has spoken.
+        // VoiceFocusPolicy decides; this and endSet are the set's two edges.
+        voice?.setStarted()
         plannedRepsForSet =
             if (s.currentIsTimed) {
                 null
@@ -4733,7 +4736,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * the prep -- and is answered in [beginSet].
      */
     private fun newVoiceRunner(): GuidedCadenceRunner {
-        if (voice == null) voice = VoiceCounter(getApplication())
+        // Reached only from beginSet, after its setStarted, so a voice made
+        // here is made inside a set and is told so (#339).
+        if (voice == null) voice = VoiceCounter(getApplication()).also { it.setStarted() }
         return GuidedCadenceRunner(
             scope = viewModelScope,
             speak = { cues, utterance -> if (cues.isEmpty()) speakOnly(utterance) else speakCues(cues, utterance) },
@@ -4837,9 +4842,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * are written down and why the digits are not; this function is only the
      * half that obeys it.
      */
-    private fun speakOnly(utterance: String) {
-        voice?.speak(utterance)
-    }
+    // An expression body to pay for #339's two lines in beginSet and endSet,
+    // for toggleAudioCues's reason above.
+    private fun speakOnly(utterance: String) = voice?.speak(utterance)
 
     /**
      * The `+1 REP` tap, which means different things to different counters
@@ -4954,6 +4959,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // in :core:dsp -- which sets get one, and whether the record already
         // carries a boundary, are its decisions and not this function's.
         s.endingCall(autoEndedSet, prepCaseForSet, cueBuffer)?.let { speakCues(it.recorded, it.utterance) }
+        voice?.setEnded()
         val exercise = s.currentExercise
         val slot = s.currentSlot
         val isTimed = s.currentIsTimed
