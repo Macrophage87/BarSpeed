@@ -124,6 +124,19 @@ class VoiceFocusPolicyTest {
         assertEquals(List(2) { listOf(VoiceFocusStep.REQUEST, VoiceFocusStep.ABANDON) }.flatten(), rest)
     }
 
+    /**
+     * The same two in ONE walk, as they happen: a set's end must leave the
+     * voice outside any set, or the countdown that follows would count as
+     * the set's words and keep the music down through the rest. Two walks
+     * from idle cannot see that, which is how a mutation leaving `inSet` true
+     * at the set's end survived the test above.
+     */
+    @Test
+    fun `after a set the rest countdown still lets go after each word`() {
+        val steps = walk(start, say("Down"), end, done("Down"), say("3"), done("3"), say("2"), done("2"))
+        assertEquals(List(3) { listOf(VoiceFocusStep.REQUEST, VoiceFocusStep.ABANDON) }.flatten(), steps)
+    }
+
     @Test
     fun `focus already where it is wanted is left alone`() {
         assertEquals(VoiceFocusStep.KEEP, VoiceFocusPolicy.step(held = false, wanted = false))
