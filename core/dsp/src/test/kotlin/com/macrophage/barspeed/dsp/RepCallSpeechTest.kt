@@ -48,6 +48,33 @@ class RepCallSpeechTest {
     private fun isRepCall(utterance: String) =
         utterance.startsWith(CadencePlan.REP_CALL_PREFIX) || utterance == CadencePlan.LAST_REP
 
+    /**
+     * Every rep call the guide speaks across the corpus: `Rep N` marks the word
+     * over the prefix and N as a cardinal, `Last rep` marks the word alone.
+     * Read off [CadencePlan.REP_CALL_PREFIX] and [CadencePlan.LAST_REP], so a
+     * respelling of either moves this test with it.
+     */
+    @Test
+    fun `every rep call the guide speaks is marked as one`() {
+        val calls = utterances().filter(::isRepCall)
+        assertTrue(calls.any { it == CadencePlan.LAST_REP })
+        assertTrue(calls.any { it.startsWith(CadencePlan.REP_CALL_PREFIX) })
+        val wordEnd = CadencePlan.REP_CALL_PREFIX.trimEnd().length
+        for (call in calls.distinct()) {
+            val expected = if (call == CadencePlan.LAST_REP) {
+                val at = call.length - SpokenRepCall.WORD.length
+                listOf(SpokenRepCall.Span(at, call.length, SpokenRepCall.Reading.WORD, SpokenRepCall.WORD))
+            } else {
+                val numberAt = CadencePlan.REP_CALL_PREFIX.length
+                listOf(
+                    SpokenRepCall.Span(0, wordEnd, SpokenRepCall.Reading.WORD, SpokenRepCall.WORD),
+                    SpokenRepCall.Span(numberAt, call.length, SpokenRepCall.Reading.CARDINAL, call.substring(numberAt)),
+                )
+            }
+            assertEquals(expected, SpokenRepCall.spansOf(call), call)
+        }
+    }
+
     @Test
     fun `nothing the guide, the lead-in or the timed voice says besides a rep call is marked`() {
         val others = utterances().filterNot(::isRepCall) +
