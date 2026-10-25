@@ -94,7 +94,6 @@ class VoiceFocusPolicyTest {
         assertFalse(VoiceFocusPolicy.holds(VoiceFocusPolicy.finished(replaced, "b")))
     }
 
-    /** `Set ended` is spoken at the tap: the set's end waits for that word. */
     @Test
     fun `the end of a set lets go once its last word has finished`() {
         val ending = VoiceFocusPolicy.setEnded(VoiceFocusPolicy.spoke(VoiceFocusPolicy.setStarted(idle), "end"))

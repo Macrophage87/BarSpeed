@@ -34,14 +34,17 @@ enum class VoiceFocusStep { REQUEST, ABANDON, KEEP }
  * and is rejected: a guided set speaks on every second, so releasing after
  * each word would raise the music in every gap and duck it again at the next
  * word, a pumping the lifter would hear for the whole set. Held, the music
- * ducks at the set's first word and comes back after its last.
+ * ducks at the set's first word and comes back when the set ends, not at
+ * `Done`.
  *
  * - **Not before the first word.** A set recorded with the voice off, or one
  *   no voice counts, says nothing and must not duck the lifter's music for
  *   its length; [VoiceFocusState.spokenThisSet] is what tells them apart.
  * - **Released at the set's end**, which `RecordViewModel.endSet` reports,
- *   once the word playing then -- `Set ended`, spoken at the tap -- finishes.
- *   The rest that follows is outside any set.
+ *   once the word playing then, if any, finishes. `Set ended` is spoken at
+ *   the tap only where `SetEnd.terminalCall` asks for one; after a guided
+ *   `Done`, and on an unguided rep set, nothing is, and focus goes at the
+ *   tap. The rest that follows is outside any set.
  * - **Outside a set, per word.** The rest countdown's digits and `Rest over`
  *   take focus for each word and give it back when it finishes; they are
  *   four words a second apart, and the music comes back between them.
