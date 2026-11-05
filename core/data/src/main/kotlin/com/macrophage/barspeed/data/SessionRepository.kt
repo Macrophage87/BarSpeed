@@ -9,6 +9,7 @@ import com.macrophage.barspeed.model.FinalRestWindowPolicy
 import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.LatestSession
 import com.macrophage.barspeed.model.PrepWindow
 import com.macrophage.barspeed.model.RecordedSensors
 import com.macrophage.barspeed.model.RecordedTimeZone
@@ -751,6 +752,31 @@ class SessionRepository(
             )
         }
         return decision
+    }
+
+    /**
+     * The newest session started between [sinceMs] and [nowMs], with what the
+     * resume question needs to know about its sets (#48), or null where none
+     * started in that span.
+     *
+     * The newest whatever its state, closed or not, so the caller can tell
+     * "the last session was finished" from "there was no session". Read
+     * through `sessionsInRange`, an existing query, rather than a new one: a
+     * new abstract DAO member would have to be implemented by every
+     * hand-written fake in this module's tests.
+     */
+    suspend fun latestSession(sinceMs: Long, nowMs: Long): LatestSession? {
+        val row = sessionDao.sessionsInRange(sinceMs, nowMs).maxByOrNull { it.startedAtMs } ?: return null
+        val sets = sessionDao.setsForSession(row.id)
+        return LatestSession(
+            sessionId = row.id,
+            startedAtMs = row.startedAtMs,
+            endedAtMs = row.endedAtMs,
+            setCount = sets.size,
+            lastSetEndedAtMs = sets.maxOfOrNull { it.endedAtMs },
+            nextOrderIdx = (sets.maxOfOrNull { it.orderIdx } ?: -1) + 1,
+            planSessionName = row.planSessionName,
+        )
     }
 
     fun observeSession(id: Long): Flow<SessionEntity?> = sessionDao.observeSession(id)
