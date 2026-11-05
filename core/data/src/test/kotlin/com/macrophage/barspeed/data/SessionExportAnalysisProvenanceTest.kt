@@ -174,4 +174,23 @@ class SessionExportAnalysisProvenanceTest {
         val bench = manifestSets().single { it.getValue("exercise").jsonPrimitive.content == "bench_press" }
         assertFalse("analysisSchemaVersion" in bench, "meta.json gave an unrecorded set a version")
     }
+
+    /** The stored contract reaches session.json, per set, beside the document's own version. */
+    @Test
+    fun `a set recorded under database 21 publishes the contract it was analysed under`() = runTest {
+        val export = assertNotNull(SessionExporter(repository()).buildExport(1L, includeRepDetail = false))
+        assertEquals("1.26", export.set("back_squat").analysisSchemaVersion)
+        assertEquals(
+            "1.26",
+            encodedSets().getValue("back_squat")["analysisSchemaVersion"]?.jsonPrimitive?.content,
+            "session.json dropped the stored version",
+        )
+    }
+
+    /** The manifest carries the same stored value: two writers, one fact. */
+    @Test
+    fun `meta json carries the contract a set recorded under database 21 was analysed under`() = runTest {
+        val squat = manifestSets().single { it.getValue("exercise").jsonPrimitive.content == "back_squat" }
+        assertEquals("1.26", squat["analysisSchemaVersion"]?.jsonPrimitive?.content, "meta.json dropped it")
+    }
 }
