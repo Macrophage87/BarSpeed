@@ -52,12 +52,11 @@ class PlanRepositoryWarningsTest {
         }
     }
 
-    private fun plan(set: String) =
-        """
-        {"schemaVersion":"1.4","planName":"P","sessions":[{"name":"S","exercises":[
-          {"exercise":"back_squat","sets":[$set]}
-        ]}]}
-        """.trimIndent()
+    private fun plan(set: String): String = """
+    {"schemaVersion":"1.4","planName":"P","sessions":[{"name":"S","exercises":[
+      {"exercise":"back_squat","sets":[$set]}
+    ]}]}
+    """.trimIndent()
 
     /** A near miss on the load key: the set imports with no load at all. */
     private val nearMiss = plan("""{"reps":5,"loadKg":100}""")
