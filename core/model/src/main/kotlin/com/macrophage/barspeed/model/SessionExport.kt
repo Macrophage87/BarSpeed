@@ -2784,6 +2784,36 @@ data class SessionExport(
          *
          * PINNED. `SchemaSummaryMeansContractTest` asserts this entry's marker
          * in the published log and that all three keys are declared.
+         *
+         * 1.26 FURTHER ENTRY (#66 (c), the grade by phase): ADDS ONE KEY.
+         * `tempoCompliance.byPhase` lists each scored phase with the reps that
+         * resolved it (`of`) and how many of those were within tolerance on it
+         * (`withinTolerance`). The set-level `withinTolerance`/`of` grades each
+         * rep only on the phases THAT rep resolved, so a ratio over a set whose
+         * eccentric the sensor mostly missed is mostly a grade of the drive,
+         * and nothing said so: field-47 set 14 published 7 of 14 with the
+         * eccentric in `scoredPhases`, and none of the seven had an `ecc_s`;
+         * the two eccentrics that were measured were both out of tolerance.
+         * Per-rep grading is NOT added: it is already readable off `repMetrics`,
+         * where a rep was graded on a scored phase exactly when it carries that
+         * phase's duration, and a second per-rep statement would be a copy to
+         * drift.
+         *
+         * Under 1.26 and not a mint: 1.26 is unreleased, minted on this branch
+         * for #289 above. RETROACTIVE: both counts were stored per phase with
+         * the set's analysis, so an older set re-exported gains the key. ABSENT
+         * when no phase was scored. ADDITIVE for a reader that ignores unknown
+         * keys; `tempoCompliance` is `additionalProperties: false`, so a reader
+         * validating against an earlier schema rejects it, as it already
+         * rejects a 1.26 document on its version string. Nothing is renamed or
+         * retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
+         * untouched.
+         *
+         * PINNED. `SchemaTempoByPhaseContractTest` asserts this entry's marker,
+         * the key's declaration and description, and the example;
+         * `SchemaExportKeySetContractTest` pins the entry object's keys to
+         * [PhaseTallyExport]; `SessionExportTempoByPhaseTest` in `:core:data`
+         * is the export differential.
          */
         const val SCHEMA_VERSION = "1.26"
 
@@ -4543,6 +4573,25 @@ data class TempoComplianceExport(
      * "nothing was graded".
      */
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val scoredPhases: List<String> = emptyList(),
+    /**
+     * The set-level ratio taken apart by phase (1.26, #66 (c)): one entry per
+     * phase in [scoredPhases], in the same order, each counting the reps that
+     * RESOLVED that phase ([PhaseTallyExport.of]) and how many of those were
+     * within tolerance on it. [withinTolerance]/[of] folds the phases
+     * together, rep by rep, over whatever each rep resolved, so "7 of 14"
+     * can be seven reps graded on the drive alone beside two eccentrics that
+     * were both out of tolerance (field-47 set 14); this is the field that
+     * says so.
+     *
+     * Copied out of the stored analysis, where each phase's two counts were
+     * frozen when the set was analysed, so it is published for every set that
+     * publishes [scoredPhases]. Null, and so absent, when no phase was scored:
+     * an empty [scoredPhases] already says that, and an empty list here would
+     * say it twice. Which phases graded a GIVEN rep is not repeated per rep:
+     * a rep was graded on a scored phase exactly when its own `repMetrics`
+     * row carries that phase's duration (`ecc_s`, `con_s`).
+     */
+    val byPhase: List<PhaseTallyExport>? = null,
     /** Prescribed eccentric:concentric contrast — what a tempo block actually trains. */
     val prescribedEccConRatio: Double? = null,
     val actualEccConRatio: Double? = null,
@@ -4557,6 +4606,20 @@ data class TempoComplianceExport(
      * and how many reps it covers is unknown -- absent, never 0.
      */
     val actualEccConRatioReps: Int? = null,
+)
+
+/**
+ * One scored phase's share of a set's tempo grade (1.26, #66 (c)). [of] is the
+ * reps that resolved [phase]; a rep the sensor did not resolve it on is not in
+ * [of] and is not held against the lifter, so [of] can be smaller than the
+ * set's own `of`. Never published with [of] 0: a phase nothing resolved is
+ * not scored and has no entry.
+ */
+@Serializable
+data class PhaseTallyExport(
+    val phase: String,
+    val withinTolerance: Int,
+    val of: Int,
 )
 
 @Serializable
