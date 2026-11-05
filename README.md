@@ -63,8 +63,12 @@ the code; when the two disagree, that one is right.
 > exactly one of `{"reps": int}` (dynamic sets) or `{"duration_s": int}` (holds
 > and carries — planks, farmer's walks). Load is `"load_kg"` or `"load_lb"` (at
 > most one, whichever unit I use; omit both for bodyweight). Optional per set:
-> `"tempo"` (4-digit notation like "4010" or "30X0" — eccentric, bottom pause,
-> concentric, top pause seconds, X = explosive; dynamic sets only),
+> `"tempo"` (4-digit notation like "4010" or "30X0"; dynamic sets only — on
+> vertical work the digits are positional: down stroke, bottom pause, up
+> stroke, top pause seconds; on horizontal work digit 1 is the eccentric and
+> digit 3 the concentric. X = as fast as possible, on a stroke only: put it on
+> the drive, so a lat pulldown driven hard is "X010". The plan schema's tempo
+> description has the whole rule),
 > `"side"` ("left" or "right" for unilateral exercises like side planks,
 > suitcase carries, or single-leg work — emit one set per side),
 > `"targetMeanConcentricVelocity_mps"` (number),

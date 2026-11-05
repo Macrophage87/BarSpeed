@@ -208,10 +208,9 @@ class VelocityLossRegimeTest {
      * The one case where the drive direction is genuinely needed and missing.
      *
      * Digit 3 is X, so which stroke the drive is decides the answer, and no
-     * geometry says. Everything else with a tempo is decidable without a
-     * direction, because digit 1 has no explosive form under today's contract
-     * (#258) -- so a numbered digit 3 means a numbered concentric whichever
-     * way the lift goes.
+     * geometry says. A tempo with neither stroke X is decidable without a
+     * direction: the drive is numbered whichever way the lift goes, even
+     * though plan schema 1.15 lets digit 1 be X as well (#258).
      */
     @Test
     fun `an X concentric with no drive direction is undecidable rather than guessed`() {
@@ -219,7 +218,7 @@ class VelocityLossRegimeTest {
         assertEquals(
             VelocityLossRegime.CONTROLLED,
             of("2011", null, ExerciseKind.DYNAMIC),
-            "a numbered digit 3 needs no direction: digit 1 cannot be X, so the drive is numbered either way",
+            "neither stroke is X, so the drive is numbered either way",
         )
     }
 
