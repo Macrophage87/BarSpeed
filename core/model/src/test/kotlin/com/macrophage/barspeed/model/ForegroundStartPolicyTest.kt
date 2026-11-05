@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.model
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
@@ -27,4 +28,48 @@ class ForegroundStartPolicyTest {
     fun `an Error is not a start failure`() {
         assertNull(ForegroundStartPolicy.classify(OutOfMemoryError("boom")))
     }
+
+    @Test
+    fun `a permission refusal is reported as one`() {
+        // From API 34, startForeground with a type whose permission is not
+        // held. Deleting this arm is #52's third hole: the service would
+        // rethrow and the lifter's tap on START SET would kill the app.
+        assertEquals(
+            ForegroundStartFailure.PERMISSION_REFUSED,
+            ForegroundStartPolicy.classify(SecurityException("type requires a permission")),
+        )
+    }
+
+    @Test
+    fun `a refused start is reported, subclasses included`() {
+        // ForegroundServiceStartNotAllowedException extends
+        // ServiceStartNotAllowedException extends IllegalStateException; this
+        // module cannot see either, so a local subclass stands in for the
+        // depth. A classify keyed on the exact class would pass the first
+        // call and red here.
+        assertEquals(
+            ForegroundStartFailure.START_REFUSED,
+            ForegroundStartPolicy.classify(IllegalStateException("not allowed")),
+        )
+        assertEquals(ForegroundStartFailure.START_REFUSED, ForegroundStartPolicy.classify(StartNotAllowed()))
+    }
+
+    @Test
+    fun `a rejected type is reported as one`() {
+        assertEquals(
+            ForegroundStartFailure.TYPE_REJECTED,
+            ForegroundStartPolicy.classify(IllegalArgumentException("type not in the manifest")),
+        )
+    }
+
+    @Test
+    fun `the three families are told apart`() {
+        val answers =
+            listOf(SecurityException(), IllegalStateException(), IllegalArgumentException())
+                .map { ForegroundStartPolicy.classify(it) }
+        assertEquals(ForegroundStartFailure.entries.toList(), answers)
+    }
+
+    /** Stands in for `android.app.ForegroundServiceStartNotAllowedException`'s depth. */
+    private class StartNotAllowed : IllegalStateException("background start not allowed")
 }
