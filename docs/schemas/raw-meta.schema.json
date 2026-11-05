@@ -338,6 +338,11 @@
           "type": "boolean",
           "description": "Whether the lifter said so (true) or the app derived it (false). Written only where failed is, and absent on a failed set recorded before database v15, which stored no author: there, omission says nobody knows, not that the app derived it."
         },
+        "analysisSchemaVersion": {
+          "type": "string",
+          "pattern": "^1\\.(0|[1-9][0-9]*)$",
+          "description": "The session export contract of the build that RECORDED this set, and so the semantics of the analysis stored with it (#38) -- the same value, under the same rule, as the set's `analysisSchemaVersion` in session.json. Absent on every set recorded before database v21, which stored no such fact: absent means not recorded, never the version of the build that wrote this archive."
+        },
         "limiter": {
           "enum": [
             "muscle",

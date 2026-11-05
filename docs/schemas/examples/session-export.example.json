@@ -89,6 +89,7 @@
           "plannedReps": 5,
           "failed": true,
           "failedByLifter": true,
+          "analysisSchemaVersion": "1.26",
           "limiter": "grip",
           "rest_s": 180,
           "sensors": {

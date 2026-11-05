@@ -2822,6 +2822,36 @@ data class SessionExport(
          * `SchemaExportKeySetContractTest` pins the entry object's keys to
          * [PhaseTallyExport]; `SessionExportTempoByPhaseTest` in `:core:data`
          * is the export differential.
+         *
+         * 1.26 FURTHER ENTRY (#38, analysis provenance): ADDS ONE KEY.
+         * [SetExport.analysisSchemaVersion] names the export contract of the
+         * build that RECORDED the set, beside this field's, which names the
+         * build that exported it. The stored analysis is computed once when
+         * the set ends and copied out on every later export, so a set
+         * recorded under 1.0 kept 1.0's best-to-worst `velocityLoss_pct` and
+         * `ecc_s` 0.0 inside documents claiming 1.1 and later, with nothing
+         * in the set to say so. NOT RETROACTIVE: read from database v21's
+         * `analysisSchemaVersion` column, null on every row an earlier build
+         * wrote, so every set recorded before this build publishes the key
+         * ABSENT, meaning not recorded -- no value is inferred from a date or
+         * backfilled with this constant. Per set, and no session minimum: one
+         * absent set leaves none that is not a guess. The stored analysis is
+         * NOT re-run on export. The raw archive's `meta.json` carries the
+         * same key per set.
+         *
+         * Under 1.26 and not a mint: 1.26 is unreleased, minted on this
+         * branch for #289 above. ADDITIVE for a reader that ignores unknown
+         * keys; the set object is closed, so a reader validating against an
+         * earlier schema rejects the key, as it already rejects a 1.26
+         * document on its version string. Nothing is renamed or retyped. The
+         * column is `DATABASE_VERSION` 21's, minted with this release; the
+         * plan schema is untouched.
+         *
+         * PINNED. `SchemaAnalysisProvenanceContractTest` asserts this entry's
+         * marker and the key's declaration in both published schemas;
+         * `SchemaExportKeySetContractTest` pins the set's keys to
+         * [SetExport]; `SessionExportAnalysisProvenanceTest` in `:core:data`
+         * is the export differential.
          */
         const val SCHEMA_VERSION = "1.26"
 
@@ -3905,6 +3935,29 @@ data class SetExport(
      * streamed, taken when the set was recorded (#207).
      */
     val sensors: SetSensorsExport? = null,
+    /**
+     * The export contract of the build that RECORDED this set, and so the
+     * semantics of the analysis stored with it (1.26, #38).
+     *
+     * The document's [SessionExport.schemaVersion] names the build that
+     * EXPORTS it. The rep list and every figure computed from it when the set
+     * ended -- `velocityLoss_pct` and each rep's `ecc_s` are #38's two -- are
+     * stored once, at record time, and copied out verbatim on every later
+     * export; nothing re-runs the analyzer. So a set recorded under 1.0
+     * re-exported today carries 1.0's best-to-worst loss and 0.0 eccentrics
+     * inside a document saying 1.26, and this key is what can say so.
+     *
+     * ABSENT on every set recorded before database v21, the first build that
+     * stored the fact. No stored value names the build that analysed an older
+     * set, so none is published: today's constant would be #38's defect
+     * itself, and a version inferred from the set's date would read exactly
+     * like a recorded one. Absent therefore means "not recorded", never "the
+     * same as the document".
+     *
+     * Per set and not a session minimum: a session can hold sets recorded by
+     * two builds, and one absent set leaves no minimum that is not a guess.
+     */
+    val analysisSchemaVersion: String? = null,
     /** Always-included summary across reps. */
     val summary: SetSummaryExport,
 ) {
