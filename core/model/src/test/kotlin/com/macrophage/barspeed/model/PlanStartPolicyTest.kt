@@ -118,6 +118,27 @@ class PlanStartPolicyTest {
         assertTrue(switch.body.contains("active plan"), "and that approving makes it the active one")
     }
 
+    /**
+     * #58. A staged plan's start is also its approval, and the import dialog
+     * that showed its warnings may have been dismissed, so the prompt that
+     * approves it says they exist and where they are shown. Added with its
+     * fix rather than red first: the count is a new parameter, which cannot
+     * exist before the line that reads it (detekt's UnusedParameter).
+     */
+    @Test
+    fun `a staged start names the import's warnings, and only a staged one`() {
+        fun body(lifecycle: PlanLifecycle, warnings: Int): String {
+            val decision = PlanStartPolicy.decide(plan(), lifecycle, activePlanName = null, stagedWarnings = warnings)
+            return (decision as PlanStartDecision.Startable).switch!!.body
+        }
+
+        assertTrue(PlanStartPolicy.warningsLine(2) in body(PlanLifecycle.STAGED, 2))
+        assertTrue("raised 2 warnings" in body(PlanLifecycle.STAGED, 2))
+        assertTrue("raised 1 warning that" in body(PlanLifecycle.STAGED, 1))
+        assertFalse("warning" in body(PlanLifecycle.STAGED, 0), "a clean plan's prompt is unchanged")
+        assertFalse("warning" in body(PlanLifecycle.ARCHIVED, 3), "an approved plan's warnings were seen")
+    }
+
     @Test
     fun `starting an archived plan says which plan it displaces`() {
         // PlanDao.activate archives the current active row before marking the

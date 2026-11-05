@@ -71,6 +71,7 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
                             plan = repository.decode(entity),
                             lifecycle = PlanLifecycle.of(entity.status),
                             activePlanName = activeName?.takeIf { entity.status != PlanEntity.STATUS_ACTIVE },
+                            stagedWarnings = stagedWarnings(entity),
                         ),
                     )
                 }
@@ -223,8 +224,35 @@ class PlansViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** How many warnings a staged row's import raised, recomputed from its text (#58). */
+    private fun stagedWarnings(entity: PlanEntity): Int =
+        if (entity.status == PlanEntity.STATUS_STAGED) repository.reviewSummary(entity)?.warnings?.size ?: 0 else 0
+
+    /**
+     * "Make active" on a plan row. A STAGED plan is sent back through the
+     * approval gate rather than promoted on this tap (#58): the row is stored
+     * as staged before the import dialog renders, so a lifter who dismissed
+     * that dialog would otherwise be one tap from following a plan whose
+     * warnings -- a misspelt load key that records every set at no load --
+     * they never read, and that exist nowhere else. The gate is reopened on
+     * the summary the import showed, warnings recomputed from the stored
+     * text, and its Approve is the activation. An archived plan was approved
+     * once and is promoted directly, as before.
+     */
     fun activate(planId: Long) {
-        viewModelScope.launch { repository.activate(planId) }
+        viewModelScope.launch {
+            val entity = repository.plan(planId) ?: return@launch
+            val review =
+                if (entity.status == PlanEntity.STATUS_STAGED) repository.reviewSummary(entity) else null
+            if (review != null) {
+                // The body weight was written when the plan was imported, and
+                // nothing writes it again here, so the gate does not say it is
+                // being applied.
+                importResult.value = PlanImportResult.Staged(review.copy(bodyWeightKg = null))
+            } else {
+                repository.activate(planId)
+            }
+        }
     }
 
     fun delete(planId: Long) {

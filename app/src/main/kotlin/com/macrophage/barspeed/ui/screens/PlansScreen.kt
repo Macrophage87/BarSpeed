@@ -263,9 +263,17 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                             Text("• $it", style = MaterialTheme.typography.bodySmall)
                         }
                         MoreLine(result.errors.size, ERRORS_SHOWN)
+                        // The same parse's warnings, below the errors (#58): a
+                        // misspelt load key beside a real error used to be shown
+                        // only after the error was fixed and the plan re-imported.
+                        result.warnings.take(WARNINGS_SHOWN).forEach {
+                            Spacer(Modifier.height(4.dp))
+                            Text("⚠ $it", style = MaterialTheme.typography.bodySmall, color = BarColors.Amber)
+                        }
+                        MoreLine(result.warnings.size, WARNINGS_SHOWN)
                         CopyForTheAuthor(
                             label = "Copy errors",
-                            text = relayText("BarSpeed rejected this plan", result.errors),
+                            text = relayText("BarSpeed rejected this plan", result.errors + result.warnings),
                             clipboard = clipboard,
                         )
                     }
