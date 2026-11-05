@@ -288,6 +288,56 @@ class RomBoundCauseCorpusTest {
         assertEquals(CANCELLED_CYCLE, one)
     }
 
+    @Test
+    fun `no deadlift rep has a rest window both on the floor before its pull and at its lockout`() {
+        // The other floor-anchored span: the concentric alone, from the bar at
+        // rest on the floor to the bar at rest at lockout. Rest is read the
+        // way applyZupt reads it, a run of isQuietSample at least
+        // DspConfig.minStationaryS long; a lone quiet sample is not rest,
+        // because |a| near 1 g with little rotation is also a bar moving at
+        // constant speed. The FLOOR run is the one ending at the last quiet
+        // sample before the drive starts (after the previous call); the TOP
+        // run starts at the first quiet sample after the drive ends, before
+        // this call. Measured: of 36 calls none has both, 2 have only the
+        // floor and 3 only the lockout -- the anchor supply, not the
+        // arithmetic, is what is missing. Issue #316's 2026-10-03 comment
+        // reports 8 of 36 deadlift reps with a 0.3 s window "on both sides";
+        // its definition and population are not stated, so it is not
+        // re-derived here and the two figures are not the same claim.
+        var both = 0
+        var floorOnly = 0
+        var topOnly = 0
+        DeadliftTruth.SETS.forEach { fixture ->
+            val d = CandidateCorpus.capture(fixture).direction
+            val samples = LiveCountCandidates.load(fixture)
+            val frames = ClosingFrames.of(samples, d)
+            val calls = ClosingFrames.calls(CycleCandidate(fallRejects = CycleRule.fallRejectsFor(d)), frames)
+            val quiet = samples.map { VelocityEstimator.isQuietSample(it, cfg) }
+            fun idx(t: Double) = frames.indexOfFirst { it.timeS >= t - 1e-9 }
+            fun runS(from: Int, to: Int) = frames[to].timeS - frames[from].timeS
+            calls.forEachIndexed { ci, c ->
+                val floorFrom = if (ci == 0) 0 else idx(calls[ci - 1].atS)
+                var q0 = idx(c.driveStartS)
+                while (q0 > floorFrom && !quiet[q0]) q0--
+                var r0 = q0
+                while (r0 > 0 && quiet[r0 - 1]) r0--
+                val call = idx(c.atS)
+                var q1 = idx(c.driveEndS)
+                while (q1 < call && !quiet[q1]) q1++
+                var r1 = q1
+                while (r1 < samples.size - 1 && quiet[r1 + 1]) r1++
+                val floorRest = quiet[q0] && runS(r0, q0) >= cfg.minStationaryS
+                val topRest = quiet[q1] && runS(q1, r1) >= cfg.minStationaryS
+                when {
+                    floorRest && topRest -> both++
+                    floorRest -> floorOnly++
+                    topRest -> topOnly++
+                }
+            }
+        }
+        assertEquals(REST_PAIRS, Triple(both, floorOnly, topOnly), "calls with a floor rest and a lockout rest")
+    }
+
     private companion object {
         // Measured by this class's own command; see the KDoc.
         val CORPUS_TALLY = mapOf(
@@ -324,6 +374,7 @@ class RomBoundCauseCorpusTest {
         const val CYCLE_CALLS = 36
         val CYCLES_ERASED_UNDER_CAP = listOf("field-deadlift-straight-5rep-s44-set02" to 0)
         val CLOSURE_MIN_MEDIAN_MAX = Triple(0.143, 1.173, 2.987)
+        val REST_PAIRS = Triple(0, 2, 3)
         val CANCELLED_CYCLE = Cycle("field-deadlift-straight-5rep-s44-set02", 0, -0.026, 0.054, 1.094, 0.0, 1.094)
     }
 }
