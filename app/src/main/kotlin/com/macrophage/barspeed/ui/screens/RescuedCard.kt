@@ -129,8 +129,9 @@ internal fun rescuedTapEffect(tap: RescuedTap, item: RescuedDatabase): RescuedTa
 }
 
 /**
- * Why RESTORE is not on this card, in words the lifter can act on, or null
- * when there is nothing to say: the card is restorable, it is a fragment or
+ * Why RESTORE is not on this card, or is on it but cannot be tapped, in
+ * words the lifter can act on; or null when there is nothing to say: the
+ * card is restorable and nothing is held, it is a fragment or
  * an empty rescue (whose own title already says it holds no database), or no
  * verdict was computed. Issue #112.
  *
@@ -138,15 +139,21 @@ internal fun rescuedTapEffect(tap: RescuedTap, item: RescuedDatabase): RescuedTa
  * names both numbers, because "install a newer build" is only actionable with
  * the number it has to reach.
  *
- * [held] is what the recording holds hold now, as for [rescuedCardButtons].
- * Reserved for round 2 review of #112 (A's N3); not read yet.
+ * A RESTORE GREYED OUT BY A RECORDING HOLD SAYS SO. [held] is what the
+ * recording holds hold now, as for [rescuedCardButtons], which disables
+ * RESTORE while [RecordingServicePolicy.mayEndProcess] says no. Without a
+ * note here that button would be dead with no reason given. Round 2 review
+ * of #112, A's N3.
  */
-@Suppress("UNUSED_PARAMETER")
 internal fun rescuedRestoreNote(
     restore: RestoreVerdict?,
     compiledVersion: Int,
     held: Set<RecordingHold> = emptySet(),
 ): String? {
+    if (restore is RestoreVerdict.Restorable && !RecordingServicePolicy.mayEndProcess(held)) {
+        return "Can't restore yet: a session is open, or a set or session is still saving. " +
+            "RESTORE works again once it has finished."
+    }
     if (restore !is RestoreVerdict.Refused) return null
     val version = restore.version
     return when (restore.reason) {
