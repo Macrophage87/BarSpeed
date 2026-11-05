@@ -368,7 +368,7 @@ class SessionExporter(
             // and derived HERE rather than at each writer: the manifest below
             // asks the same extension, so the two documents cannot come to
             // disagree about who counted a set.
-            repsSource = record.publishedRepsSource(geometry?.kind),
+            repsSource = record.publishedRepsSource(geometry?.kind, streams.guideCalls()),
             // What the sensor counted, beside what the set is recorded as.
             // Published straight off the row and never recomputed: the stored
             // analysis holds the BATCH count, a different detector's answer
@@ -934,13 +934,22 @@ private val SetRecordEntity.publishedLimiter: String?
  *   [kind] is null on a row with no stored geometry, where the fallback is the
  *   tempo and the collapse is the policy's to state.
  *
+ * - WHAT THE GUIDE CALLED is [guideCalls], the length of the set's archived
+ *   rep-mark stream (#336). On a guided set that stream holds one mark per rep
+ *   the cadence called and nothing else, so it is the guide's own count, kept
+ *   whatever the lifter later corrected `actualReps` to; [guideCalls] the
+ *   function reads it. Null where no such stream is stored.
+ *
  * @param kind the frozen geometry's exercise kind, or null where the row stores
  *   no geometry. Passed rather than looked up: the exercise catalogue at export
  *   time is not what the set was recorded against, `custom_exercises` stores no
  *   kind at all, and `ExerciseDef`'s kind for an id outside the seed list is its
  *   own admitted guess.
+ * @param guideCalls how many reps the cadence guide called, or null. Required
+ *   rather than defaulted, so a caller cannot leave it out and publish a word
+ *   the export would not.
  */
-fun SetRecordEntity.repsSourceOf(kind: ExerciseKind?): RepsSource? = RepsSourcePolicy.published(
+fun SetRecordEntity.repsSourceOf(kind: ExerciseKind?, guideCalls: Int?): RepsSource? = RepsSourcePolicy.published(
     liveReps = liveReps,
     repsManual = repsManual,
     timed = actualDurationS != null,
@@ -950,10 +959,27 @@ fun SetRecordEntity.repsSourceOf(kind: ExerciseKind?): RepsSource? = RepsSourceP
         isTimed = actualDurationS != null,
         kind = kind,
     ),
+    recordedReps = actualReps,
+    guideCalls = guideCalls,
 )
 
+/**
+ * How many rep marks a set's archived rep-mark stream holds, or null where it
+ * stores none or the stream will not parse (#336).
+ *
+ * On a guided set that is the count the cadence guide called; on a set the
+ * lifter tapped it is their taps; a sensor-counted set stores none. Which of
+ * those it is, `RepsSourcePolicy` decides from the set's shape -- this only
+ * counts. `runCatching` for the reason the session document's own rep-mark
+ * decode gives: a mark is the least of what either document carries.
+ */
+fun List<RawStreamEntity>.guideCalls(): Int? =
+    firstOrNull { it.kind == RawStreamEntity.KIND_REPS }
+        ?.let { stream -> runCatching { RepMarkCsv.decode(Gzip.decompress(stream.csvGzip)).size }.getOrNull() }
+
 /** [repsSourceOf] as the word both export writers publish. */
-private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?): String? = repsSourceOf(kind)?.wireName
+private fun SetRecordEntity.publishedRepsSource(kind: ExerciseKind?, guideCalls: Int?): String? =
+    repsSourceOf(kind, guideCalls)?.wireName
 
 /**
  * The rep count this row publishes, or null on a timed set (#71).
@@ -1445,7 +1471,7 @@ class RawExporter(
         // manifest publishes are one fact. session.json decodes it once for the
         // same reason, at the top of `setExport`.
         val geometry = sessionRepository.decodeGeometry(record)
-        str("repsSource", record.publishedRepsSource(geometry?.kind))
+        str("repsSource", record.publishedRepsSource(geometry?.kind, streams.guideCalls()))
         num("liveReps", record.liveReps)
         // The prep, both halves. [num] drops a null, which is right -- a set
         // that ran no voice guide has no prep -- and writes a real 0, which is
