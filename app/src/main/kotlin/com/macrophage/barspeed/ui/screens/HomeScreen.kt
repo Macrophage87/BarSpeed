@@ -576,6 +576,8 @@ private fun RescuedDatabaseNotice(
             is RescuedTapEffect.Share -> onShare(effect.item)
             is RescuedTapEffect.ConfirmDiscard -> confirmDiscard = effect.item
             is RescuedTapEffect.Discard -> onDiscard(effect.item)
+            // Issue #112: no RESTORE button is drawn yet, so neither is reachable.
+            is RescuedTapEffect.ConfirmRestore, is RescuedTapEffect.Restore -> Unit
         }
     }
     confirmDiscard?.let { item ->
