@@ -93,7 +93,19 @@ object PlanStartPolicy {
     /** The consent word on a start that also performs the approval. */
     const val APPROVE_AND_START = "APPROVE & START"
 
-    fun decide(plan: PlanFile?, lifecycle: PlanLifecycle, activePlanName: String?): PlanStartDecision {
+    /**
+     * [stagedWarnings] is how many warnings the import gate raised about this
+     * plan, recomputed from its stored text; read only when it is STAGED. A
+     * staged plan's start is also its approval, and the dialog that would
+     * have shown those warnings may have been dismissed (#58), so the prompt
+     * that performs the approval says they exist and where they are shown.
+     */
+    fun decide(
+        plan: PlanFile?,
+        lifecycle: PlanLifecycle,
+        activePlanName: String?,
+        stagedWarnings: Int = 0,
+    ): PlanStartDecision {
         if (plan == null) return PlanStartDecision.Unstartable(UNREADABLE)
         // Counted rather than taken from validate(): a row staged under an
         // older rule still decodes, and PlanRepository.decode returns it on
@@ -120,6 +132,7 @@ object PlanStartPolicy {
                             "Starting this makes it the active plan."
                         },
                     )
+                    if (staged && stagedWarnings > 0) append(warningsLine(stagedWarnings))
                     append(" Every new session follows it until you switch again.")
                     // Named, not implied. PlanDao.activate archives whatever is
                     // active before marking this one, so the plan the lifter
@@ -131,5 +144,11 @@ object PlanStartPolicy {
                 confirmLabel = if (staged) APPROVE_AND_START else START,
             ),
         )
+    }
+
+    /** The staged prompt's sentence about the import's warnings; see [decide]. */
+    fun warningsLine(count: Int): String {
+        val noun = if (count == 1) "warning" else "warnings"
+        return " Its import raised $count $noun that approving it accepts; \"Make active\" shows them first."
     }
 }

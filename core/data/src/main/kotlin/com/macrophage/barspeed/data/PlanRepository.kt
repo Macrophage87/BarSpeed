@@ -59,8 +59,8 @@ class PlanRepository(
      */
     suspend fun importPlan(planJson: String): PlanImportResult {
         val parsed = PlanImport.parse(planJson)
-        val plan = parsed.plan ?: return PlanImportResult.Invalid(parsed.errors)
-        if (parsed.errors.isNotEmpty()) return PlanImportResult.Invalid(parsed.errors)
+        val plan = parsed.plan ?: return PlanImportResult.Invalid(parsed.errors, parsed.warnings)
+        if (parsed.errors.isNotEmpty()) return PlanImportResult.Invalid(parsed.errors, parsed.warnings)
 
         val id =
             planDao.insert(
