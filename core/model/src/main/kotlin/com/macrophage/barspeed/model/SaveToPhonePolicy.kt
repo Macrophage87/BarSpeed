@@ -47,13 +47,16 @@ object SaveToPhonePolicy {
      * memory, and [kind] the export the lifter asked for, kept where it
      * survives the Activity, or null where nothing kept it.
      *
-     * Today [kind] is not read: with no bytes held, nothing is done, which
-     * is the silent 0-byte file.
+     * Where a document came back and the bytes did not survive, the
+     * document already exists, empty, so doing nothing is never the answer:
+     * the export is built again from [kind], or, with no kind either, the
+     * caller is told to refuse, which removes the empty file and says so.
      */
-    @Suppress("UnusedParameter") // The rule arrives with its red (#37); today the kind is not read.
     fun onPicked(documentCreated: Boolean, bytesHeld: Boolean, kind: SaveKind?): SaveOutcome = when {
-        !documentCreated || !bytesHeld -> SaveOutcome.NOTHING
-        else -> SaveOutcome.WRITE_HELD
+        !documentCreated -> SaveOutcome.NOTHING
+        bytesHeld -> SaveOutcome.WRITE_HELD
+        kind != null -> SaveOutcome.REGENERATE
+        else -> SaveOutcome.REFUSE
     }
 
     /** What the lifter is told when an export could not be written at all. */
