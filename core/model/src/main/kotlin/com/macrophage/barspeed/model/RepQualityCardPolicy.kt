@@ -29,7 +29,12 @@ enum class RepQualityLayout {
  *
  * Every chart draws its verdicts under it, so a layout that is a chart is also
  * a layout that shows the verdicts. A chart needs reps to plot; the verdicts
- * do not.
+ * do not, and a rep set with none still draws them (#281). A set #247 refuses
+ * has an empty rep list by construction and states why in its verdicts
+ * (`SetAnalyzer.MOUNT_NOT_DECLARED_VERDICT`); the rest screen is the one window
+ * in which such a set can still be corrected, and the card used to return
+ * before reaching the only renderers of that list, so the lifter got a blank
+ * card with no reason. History draws the same lines outside its reps block.
  */
 object RepQualityCardPolicy {
     /**
@@ -51,7 +56,7 @@ object RepQualityCardPolicy {
     ): RepQualityLayout = when {
         // Timed sets have no reps; the hold verdicts are drawn instead of a chart.
         timed -> if (hasVerdicts) RepQualityLayout.VERDICTS else RepQualityLayout.NONE
-        !hasReps -> RepQualityLayout.NONE
+        !hasReps -> if (hasVerdicts) RepQualityLayout.VERDICTS else RepQualityLayout.NONE
         explosive -> RepQualityLayout.PEAK_VELOCITY_CHART
         gradedEccentric -> RepQualityLayout.ECC_TEMPO_CHART
         else -> RepQualityLayout.CON_VELOCITY_CHART
