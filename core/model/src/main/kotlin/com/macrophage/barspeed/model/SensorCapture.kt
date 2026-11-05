@@ -626,11 +626,13 @@ object SensorCapturePolicy {
      * reason -- so a bar drawn from the live roster can grow, drop or rename
      * its second dot while the capture it sits above has not changed.
      *
-     * NOT YET: this still returns [live] in every case, which is what the bar
-     * drew before this function existed. The suppression goes with the fix.
+     * So in a set the frozen roster wins, and only there. A set with nothing
+     * frozen -- which no set reaching `inSetState` can be, and is answered
+     * anyway -- draws the live roster rather than a blank bar, since a blank
+     * bar would claim no sensor at all.
      */
-    @Suppress("UnusedParameter")
-    fun shownRoster(live: SensorRoster, armedAtBegin: SensorRoster?, inSet: Boolean): SensorRoster = live
+    fun shownRoster(live: SensorRoster, armedAtBegin: SensorRoster?, inSet: Boolean): SensorRoster =
+        if (inSet && armedAtBegin != null) armedAtBegin else live
 
     /**
      * What to store on a set the record flow has just finished arming, or null
