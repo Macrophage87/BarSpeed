@@ -900,14 +900,15 @@ class SchemaContractTest {
         assertEquals(geometry["properties"]!!.jsonObject.keys, required, "a geometry key is optional")
         val source = schema("session-export.schema.json")["\$defs"]!!.jsonObject["geometrySource"]!!.jsonObject
         val sourceRequired = source["required"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
-        assertEquals(source["properties"]!!.jsonObject.keys, sourceRequired, "a geometry source key is optional")
-        // The ONE that carries no provenance, named so its absence is a
-        // decision on the record rather than an oversight; why is stated once
-        // at GeometrySourceExport's KDoc rather than repeated here.
+        // The ONE optional source, the one added last (1.26, #289), named so
+        // its optionality is a decision on the record rather than an
+        // oversight; why is stated once at GeometrySourceExport's KDoc. Until
+        // 1.26 this asserted sensorInverted was the one value with NO source;
+        // that every value now has one is SchemaInversionSourceContractTest's.
         assertEquals(
             setOf("sensorInverted"),
-            geometry["properties"]!!.jsonObject.keys - sourceRequired - setOf("source"),
-            "the set of values carrying no provenance changed",
+            source["properties"]!!.jsonObject.keys - sourceRequired,
+            "the set of optional geometry sources changed",
         )
     }
 
