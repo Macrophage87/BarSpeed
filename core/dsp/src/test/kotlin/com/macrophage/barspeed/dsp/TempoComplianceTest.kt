@@ -191,7 +191,9 @@ class TempoComplianceTest {
         // An explosive up stroke leaves the eccentric as the only scored phase.
         // Case B never resolves one, so nothing is gradeable and the honest
         // denominator is zero -- not four. Rendering that zero is the app's
-        // problem, and RecordScreen currently draws 0/0 as a green tick.
+        // problem. When this pin was written RecordScreen drew 0/0 as a green
+        // tick; TempoScoreLabel.of now returns no chip for a zero denominator,
+        // and this pin is still why the zero reaching it is the honest one.
         val c = assertNotNull(caseB("30X0").tempoCompliance)
         assertEquals(0, c.repsEvaluated, "nothing was gradeable")
         assertEquals(0, c.repsFullyCompliant, "nothing was graded")
