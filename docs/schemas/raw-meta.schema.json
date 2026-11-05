@@ -1,0 +1,660 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Macrophage87/AccelerometerLifting/docs/schemas/raw-meta.schema.json",
+  "title": "Raw Archive Manifest",
+  "description": "The meta.json manifest inside a BarSpeed raw-data zip: one descriptor per set, naming the CSV files the zip holds for it and the facts a reader who opens only the CSVs needs to interpret them -- which way the lift moved, how the sensor was mounted, which sensor was analysed, where the prep window was. The analysis itself is in the zip's session.json (session-export.schema.json); where a key here and a key there state one fact they use the same words, and the flat keys here correspond to nested objects there. Every unknown is expressed by omitting the key: this document writes no null literals. VERSION LOG. meta.json carries no version key of its own -- adding one would change the bytes of every manifest -- so this log is tied to the app build that wrote the file, which meta.json states as `appVersion`. 1.0 (app 0.2.0, issue #326): first publication, describing meta.json exactly as RawExporter writes it on the 0.2.0 release branch; manifests written by earlier builds carry a subset of these keys and no key here changed type across them. Every later change to what RawExporter writes into meta.json adds an entry here and moves this schema, its example and RawExporterTest's manifest pin in the same change; a key this schema does not declare fails validation, because every object here is closed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "epoch",
+    "appVersion",
+    "sensorModel",
+    "analysisFile",
+    "csvHeaderImu",
+    "csvHeaderHrm",
+    "csvHeaderCues",
+    "csvHeaderReps",
+    "csvHeaderPrep",
+    "sets"
+  ],
+  "dependentRequired": {
+    "utcOffsetMinutes": [
+      "timeZoneId"
+    ],
+    "timeZoneId": [
+      "utcOffsetMinutes"
+    ]
+  },
+  "properties": {
+    "epoch": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The session's start instant, UTC, ISO-8601 with a Z. Every *_ms value in this archive is epoch milliseconds, not an offset from this."
+    },
+    "utcOffsetMinutes": {
+      "type": "integer",
+      "description": "The device's UTC offset when the session was recorded, in minutes. Present with timeZoneId or not at all: absent on a session recorded before the app captured its zone. session.json carries the same fact as timeZone.utcOffsetMinutes."
+    },
+    "timeZoneId": {
+      "type": "string",
+      "description": "The device's zone id when the session was recorded (an IANA id such as Europe/London). Named timeZoneId rather than timeZone so one key never means a string here and an object in session.json."
+    },
+    "appVersion": {
+      "type": "string",
+      "description": "The versionName of the build that wrote this archive. Also the key this schema's version log is tied to."
+    },
+    "sensorModel": {
+      "type": "string",
+      "description": "The IMU model the app is built for. A constant string, not a reading from the sensor."
+    },
+    "analysisFile": {
+      "const": "session.json",
+      "description": "The zip entry that holds the full session analysis."
+    },
+    "csvHeaderImu": {
+      "type": "string",
+      "description": "The header row of every *_imu.csv and *_imu-<role>.csv in the zip, as written. Device-frame samples; one row per sample as it arrived."
+    },
+    "csvHeaderHrm": {
+      "type": "string",
+      "description": "The header row of every *_hrm.csv, *_rest_before_hrm.csv and *_rest_after_hrm.csv in the zip."
+    },
+    "csvHeaderCues": {
+      "type": "string",
+      "description": "The header row of every *_cues.csv: what the app spoke, and when."
+    },
+    "csvHeaderReps": {
+      "type": "string",
+      "description": "The header row of every *_reps.csv: the instants the live counter counted a rep."
+    },
+    "csvHeaderPrep": {
+      "type": "string",
+      "description": "The header row of every *_prep.csv: the prep window's two instants."
+    },
+    "sets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/set"
+      },
+      "description": "One descriptor per recorded set, in the order the session recorded them."
+    }
+  },
+  "$defs": {
+    "set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "set",
+        "exercise",
+        "load_kg",
+        "load_lb",
+        "startedAt_ms",
+        "endedAt_ms",
+        "files"
+      ],
+      "dependentRequired": {
+        "startsWith": [
+          "concentric",
+          "concentricSource",
+          "plane",
+          "sensorOnStack",
+          "sensorInverted",
+          "travelRatio",
+          "kind",
+          "bodyweight"
+        ],
+        "concentric": [
+          "startsWith",
+          "concentricSource",
+          "plane",
+          "sensorOnStack",
+          "sensorInverted",
+          "travelRatio",
+          "kind",
+          "bodyweight"
+        ],
+        "concentricSource": [
+          "startsWith",
+          "concentric",
+          "plane",
+          "sensorOnStack",
+          "sensorInverted",
+          "travelRatio",
+          "kind",
+          "bodyweight"
+        ],
+        "plane": [
+          "startsWith",
+          "concentric",
+          "concentricSource",
+          "sensorOnStack",
+          "sensorInverted",
+          "travelRatio",
+          "kind",
+          "bodyweight"
+        ],
+        "sensorOnStack": [
+          "startsWith",
+          "concentric",
+          "concentricSource",
+          "plane",
+          "sensorInverted",
+          "travelRatio",
+          "kind",
+          "bodyweight"
+        ],
+        "sensorInverted": [
+          "startsWith",
+          "concentric",
+          "concentricSource",
+          "plane",
+          "sensorOnStack",
+          "travelRatio",
+          "kind",
+          "bodyweight"
+        ],
+        "travelRatio": [
+          "startsWith",
+          "concentric",
+          "concentricSource",
+          "plane",
+          "sensorOnStack",
+          "sensorInverted",
+          "kind",
+          "bodyweight"
+        ],
+        "kind": [
+          "startsWith",
+          "concentric",
+          "concentricSource",
+          "plane",
+          "sensorOnStack",
+          "sensorInverted",
+          "travelRatio",
+          "bodyweight"
+        ],
+        "bodyweight": [
+          "startsWith",
+          "concentric",
+          "concentricSource",
+          "plane",
+          "sensorOnStack",
+          "sensorInverted",
+          "travelRatio",
+          "kind"
+        ],
+        "sensorsArmed": [
+          "sensorRolesExpected"
+        ],
+        "sensorRolesExpected": [
+          "sensorsArmed"
+        ],
+        "sensorsShortfall": [
+          "sensorsArmed"
+        ],
+        "analysedRole": [
+          "sensorsArmed"
+        ],
+        "analysedFellBack": [
+          "sensorsArmed"
+        ],
+        "analysedRoleBasis": [
+          "sensorsArmed"
+        ],
+        "sensorsSilent": [
+          "sensorsArmed"
+        ],
+        "sensorsSoleSilent": [
+          "sensorsArmed"
+        ],
+        "prepStartedAt_ms": [
+          "workStartedAt_ms"
+        ],
+        "workStartedAt_ms": [
+          "prepStartedAt_ms"
+        ],
+        "rollExcursion_deg": [
+          "rollExcursionBasis"
+        ],
+        "rollExcursionBasis": [
+          "rollExcursion_deg"
+        ],
+        "limiterNote": [
+          "limiter"
+        ],
+        "voidReason": [
+          "voided"
+        ],
+        "failedByLifter": [
+          "failed"
+        ],
+        "durationEndedBy": [
+          "duration_s"
+        ],
+        "rpeScale": [
+          "rpe"
+        ]
+      },
+      "properties": {
+        "set": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based position of this set in the session; also the NN of its set<NN>_ file names."
+        },
+        "exercise": {
+          "type": "string",
+          "description": "The exercise id the set was recorded under."
+        },
+        "load_kg": {
+          "type": "number",
+          "description": "The load as stored, in kilograms: on a body-weight set the sum including bodyWeight_kg."
+        },
+        "load_lb": {
+          "type": "number",
+          "description": "load_kg in pounds, rounded to 0.1. A conversion, not a second measurement."
+        },
+        "bodyWeight_kg": {
+          "type": "number",
+          "description": "The body-weight term inside load_kg. Absent on a set with none."
+        },
+        "reps": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The rep count recorded for the set; whose count it is, is repsSource. Absent on a timed set; a rep set's 0 is a count."
+        },
+        "plannedLoad_kg": {
+          "type": "number",
+          "description": "The load the plan prescribed, on load_kg's scale. Same key and meaning as in session.json."
+        },
+        "workingLoad_kg": {
+          "type": "number",
+          "description": "The load the set ran against, before any rest-screen correction. Same key and meaning as in session.json."
+        },
+        "plannedReps": {
+          "type": "integer",
+          "description": "The rep count the plan prescribed. Same key and meaning as in session.json."
+        },
+        "workingReps": {
+          "type": "integer",
+          "description": "The rep count the set ran against. Same key and meaning as in session.json."
+        },
+        "plannedDuration_s": {
+          "type": "integer",
+          "description": "The hold or carry seconds the plan prescribed. Same key and meaning as in session.json."
+        },
+        "workingDuration_s": {
+          "type": "integer",
+          "description": "The hold or carry seconds the set ran against. Same key and meaning as in session.json."
+        },
+        "rest_s": {
+          "type": "integer",
+          "description": "The rest prescribed after this set, a minimum, in whole seconds. Never a measurement. Same key and meaning as in session.json."
+        },
+        "restMeasured_s": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The seconds from this set's stored rest instant to the next set's start. Absent on the last set of a session and where either instant is missing. Same key and meaning as in session.json."
+        },
+        "tempoPrescribed": {
+          "type": "string",
+          "description": "The tempo the set ran. Same key and meaning as in session.json."
+        },
+        "plannedTempo": {
+          "type": "string",
+          "description": "The tempo the plan prescribed. Same key and meaning as in session.json."
+        },
+        "duration_s": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "A timed set's seconds. Absent on a rep set and on a set abandoned in its prep."
+        },
+        "durationEndedBy": {
+          "enum": [
+            "clock",
+            "sensor",
+            "lifter",
+            "corrected"
+          ],
+          "description": "What decided duration_s. Absent where duration_s is. The same words session.json publishes."
+        },
+        "abandonedInPrep": {
+          "const": true,
+          "description": "The set never entered its work phase, so the zeros beside this are absences, not measurements. Absent otherwise."
+        },
+        "side": {
+          "enum": [
+            "left",
+            "right"
+          ],
+          "description": "The side the set was worked on, where one was recorded."
+        },
+        "plannedSide": {
+          "enum": [
+            "left",
+            "right"
+          ],
+          "description": "The side the plan prescribed."
+        },
+        "rpe": {
+          "type": "integer",
+          "description": "The lifter's effort rating, on rpeScale's scale."
+        },
+        "rpeScale": {
+          "enum": [
+            "load",
+            "reps",
+            "time",
+            "feel"
+          ],
+          "description": "Which question the rating answered. Absent where rpe is."
+        },
+        "failed": {
+          "const": true,
+          "description": "The set was marked failed, by the lifter or by derivation. Absent otherwise."
+        },
+        "failedByLifter": {
+          "type": "boolean",
+          "description": "Whether the lifter said so (true) or the app derived it (false). Written only where failed is."
+        },
+        "limiter": {
+          "enum": [
+            "muscle",
+            "grip",
+            "form",
+            "pace",
+            "slip",
+            "setup",
+            "pain",
+            "outside",
+            "other"
+          ],
+          "description": "The reason the lifter gave for stopping. Absent where none was asked or given."
+        },
+        "limiterNote": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "The lifter's free-text note beside limiter. Written only where limiter is."
+        },
+        "warmup": {
+          "const": true,
+          "description": "The set counts as a warm-up, by the plan's word or the lifter's mark. Absent otherwise."
+        },
+        "warmupByLifter": {
+          "const": true,
+          "description": "The lifter stated this set's purpose themselves rather than leaving the plan's declaration to stand. Present with warmup ABSENT is a real statement: the lifter said the set was not a warm-up. Absent where the plan's word stands."
+        },
+        "added": {
+          "const": true,
+          "description": "The lifter added this set; no plan prescribed it. Absent on a prescribed set."
+        },
+        "voided": {
+          "const": true,
+          "description": "The lifter marked this set not performed. Absent otherwise."
+        },
+        "voidReason": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "The lifter's reason for voided. Written only where voided is."
+        },
+        "repsManual": {
+          "const": true,
+          "description": "reps is not an uncorrected sensor or segmenter count: the lifter's own taps, a correction to a count, or a guided set's cadence count. It never says a person counted the set; repsSource says whose count it is. Absent otherwise."
+        },
+        "repsSource": {
+          "enum": [
+            "sensor",
+            "manual",
+            "metronome",
+            "corrected",
+            "analysis"
+          ],
+          "description": "Whose count reps is. The same words session.json publishes."
+        },
+        "liveReps": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "What the live counter counted during the set. Absent where no live counter ran; 0 is a count."
+        },
+        "plannedPrep_s": {
+          "type": "integer",
+          "description": "The prep the plan prescribed before this set, in whole seconds, or the app's default where none was declared. Absent where the row stored none."
+        },
+        "prep_s": {
+          "type": "integer",
+          "description": "The prep that played before this set, in whole seconds; 0 is a prep in which nothing was spoken before the first stroke call. Absent on a set abandoned in its prep and where the row stored none."
+        },
+        "startsWith": {
+          "enum": [
+            "eccentric",
+            "concentric"
+          ],
+          "description": "Which phase the set starts with. This and the next eight keys are written together, from the set's stored geometry, or not at all: absent on every set recorded before geometry was stored."
+        },
+        "concentric": {
+          "enum": [
+            "up",
+            "down"
+          ],
+          "description": "Which way the drive moved."
+        },
+        "concentricSource": {
+          "enum": [
+            "declared",
+            "seeded",
+            "inferred",
+            "default"
+          ],
+          "description": "Where concentric came from: session.json's geometry.source.concentric. `inferred` is in the vocabulary but is not written here, because this value is resolved with inference off."
+        },
+        "plane": {
+          "enum": [
+            "vertical",
+            "horizontal"
+          ],
+          "description": "The plane of travel."
+        },
+        "sensorOnStack": {
+          "type": "boolean",
+          "description": "The sensor rode a weight stack rather than the implement. Written true or false, never omitted, when geometry is."
+        },
+        "sensorInverted": {
+          "type": "boolean",
+          "description": "The sensor was mounted upside down."
+        },
+        "travelRatio": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Sensor travel per unit of implement travel (2.0 on a 2:1 pulley)."
+        },
+        "kind": {
+          "enum": [
+            "dynamic",
+            "hold",
+            "carry",
+            "explosive"
+          ],
+          "description": "The exercise kind the set was analysed as."
+        },
+        "bodyweight": {
+          "type": "boolean",
+          "description": "The exercise moves the lifter's body weight."
+        },
+        "sensorsArmed": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2,
+          "description": "How many accelerometers the set was armed with. This key and sensorRolesExpected are written together, on a set that stored a sensor declaration, and are absent on an ordinary one-sensor set."
+        },
+        "sensorsShortfall": {
+          "enum": [
+            "rolesUnassigned",
+            "rolesCollide"
+          ],
+          "description": "Why the roster fell short of the roles a dual set needs. Absent when nothing was in the way."
+        },
+        "sensorRolesExpected": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "a",
+              "b"
+            ]
+          },
+          "uniqueItems": true,
+          "description": "The roles the set was armed to capture. Written even when empty."
+        },
+        "analysedRole": {
+          "enum": [
+            "a",
+            "b"
+          ],
+          "description": "The role whose stream every other figure in this descriptor describes."
+        },
+        "analysedFellBack": {
+          "const": true,
+          "description": "The analysed role is not the role the set armed, because that unit delivered too little. Absent otherwise."
+        },
+        "analysedRoleBasis": {
+          "enum": [
+            "declared",
+            "stackSignature",
+            "fallback"
+          ],
+          "description": "Why that role was analysed. The same words session.json publishes."
+        },
+        "sensorsSilent": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "a",
+              "b"
+            ]
+          },
+          "additionalProperties": {
+            "enum": [
+              "tooSoon",
+              "notLinked",
+              "linkWithoutSensor",
+              "linkedSilent"
+            ]
+          },
+          "minProperties": 1,
+          "description": "Which armed units delivered too few frames to analyse, keyed by role, with what the app could see of each one's link at set end. Written only when one was silent."
+        },
+        "sensorsSoleSilent": {
+          "enum": [
+            "tooSoon",
+            "notLinked",
+            "linkWithoutSensor",
+            "linkedSilent"
+          ],
+          "description": "The same word for a set whose single stream carries no role. Written only when that link was silent."
+        },
+        "startedAt_ms": {
+          "type": "integer",
+          "description": "The set's start instant, epoch milliseconds."
+        },
+        "endedAt_ms": {
+          "type": "integer",
+          "description": "The set's end instant, epoch milliseconds."
+        },
+        "prepStartedAt_ms": {
+          "type": "integer",
+          "description": "The prep window's start, epoch milliseconds, on the clock the IMU timestamp_ms column is stamped with. Written with workStartedAt_ms or not at all."
+        },
+        "workStartedAt_ms": {
+          "type": "integer",
+          "description": "The prep window's end, where the work began, epoch milliseconds."
+        },
+        "sampleRate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "The mean rate the analysed stream's rows ARRIVED at -- (n-1) intervals over the span of their timestamps -- not the rate the sensor sampled at; the two are equal only if nothing was dropped. Absent where no rate can be stated, never zero."
+        },
+        "rollExcursion_deg": {
+          "type": "number",
+          "minimum": 0,
+          "description": "How far the analysed sensor's unwrapped roll swept across the interval rollExcursionBasis names, in degrees, rounded to 0.1. Written with rollExcursionBasis or not at all."
+        },
+        "rollExcursionBasis": {
+          "enum": [
+            "workingWindow",
+            "fromWorkStart",
+            "toTerminalCue",
+            "wholeCapture"
+          ],
+          "description": "Which interval rollExcursion_deg covers."
+        },
+        "sensors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sensorStream"
+          },
+          "description": "One entry per role-tagged IMU capture that arrived, each figure measured from its own stream. Absent on a set whose streams carry no role. A role in sensorRolesExpected with no entry here was armed and delivered nothing."
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^set[0-9]{2,}_.+\\.csv$"
+          },
+          "description": "The zip entries that belong to this set, as named in the zip."
+        }
+      }
+    },
+    "sensorStream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "file"
+      ],
+      "dependentRequired": {
+        "rollExcursion_deg": [
+          "rollExcursionBasis"
+        ],
+        "rollExcursionBasis": [
+          "rollExcursion_deg"
+        ]
+      },
+      "properties": {
+        "role": {
+          "enum": [
+            "a",
+            "b"
+          ],
+          "description": "The role this capture was tagged with."
+        },
+        "file": {
+          "type": "string",
+          "description": "This capture's zip entry, one of the set's files."
+        },
+        "samples": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Rows in that file. Absent where the file will not decode."
+        },
+        "sampleRate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "The mean arrival rate of this stream's rows, the set-level key's arithmetic over this stream alone. Absent where it cannot be stated."
+        },
+        "rollExcursion_deg": {
+          "type": "number",
+          "minimum": 0,
+          "description": "This stream's roll excursion, as the set-level key."
+        },
+        "rollExcursionBasis": {
+          "enum": [
+            "workingWindow",
+            "fromWorkStart",
+            "toTerminalCue",
+            "wholeCapture"
+          ],
+          "description": "Which interval this entry's rollExcursion_deg covers."
+        }
+      }
+    }
+  }
+}

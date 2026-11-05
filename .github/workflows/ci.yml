@@ -45,6 +45,8 @@ jobs:
             -s docs/schemas/plan.schema.json -d docs/schemas/examples/plan.example.json
           npx --yes -p ajv-cli@5 -p ajv-formats@2 ajv validate -c ajv-formats --spec=draft2020 \
             -s docs/schemas/session-export.schema.json -d docs/schemas/examples/session-export.example.json
+          npx --yes -p ajv-cli@5 -p ajv-formats@2 ajv validate -c ajv-formats --spec=draft2020 \
+            -s docs/schemas/raw-meta.schema.json -d docs/schemas/examples/raw-meta.example.json
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
