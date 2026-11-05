@@ -104,6 +104,10 @@ object StartCuePolicy {
      *   [Tempo.isExplosiveUpStroke] of the tempo the guide is about to play.
      *   No default: a caller that forgot it would show `UP` over a set whose
      *   voice opens on `Drive`, the disagreement #241 exists to prevent.
+     * @param explosiveDownStroke the set's tempo writes `X` in digit 1 --
+     *   [Tempo.isExplosiveDownStroke] -- which plan schema 1.15 accepts so a
+     *   lift whose drive moves DOWN can declare an explosive drive (#258). No
+     *   default, for [explosiveUpStroke]'s reason.
      */
     fun of(
         startsWith: StartPhase,
@@ -111,9 +115,11 @@ object StartCuePolicy {
         horizontal: Boolean,
         source: GeometrySource,
         explosiveUpStroke: Boolean,
+        explosiveDownStroke: Boolean,
     ): StartCue {
-        val word = firstMovementWord(startsWith, concentricUp, horizontal, explosiveUpStroke)
-        return StartCue(phrase = phrase(word, horizontal), word = word, marker = marker(source))
+        val word = firstMovementWord(startsWith, concentricUp, horizontal, explosiveUpStroke, explosiveDownStroke)
+        val atTop = ExerciseDef.startsAtTop(startsWith, concentricUp)
+        return StartCue(phrase = phrase(word, horizontal, atTop), word = word, marker = marker(source))
     }
 
     /**
@@ -123,21 +129,25 @@ object StartCuePolicy {
      * from, in the same order of questions: horizontal work is called by PHASE
      * because there is no up or down on a seated row, and vertical work by
      * DIRECTION -- except a vertical DRIVE the tempo prescribes as `X`, which
-     * is called [DRIVE] (#264). `X` is legal in digit 3 only, the up stroke, so
-     * that stroke opens the rep only when the lift starts at the bottom, and it
-     * is the drive only when the drive moves up. A vertical lift that starts at
-     * the bottom with its drive DOWN opens on the return, and an `X` there is a
-     * fast return, not a drive, so it keeps [UP]. Stated twice in two modules,
-     * so it is pinned equal in `:core:dsp` rather than trusted.
+     * is called [DRIVE] (#264). An `X` in digit 3, the up stroke, opens the rep
+     * only when the lift starts at the bottom, and it is the drive only when
+     * the drive moves up. An `X` in digit 1, the down stroke -- accepted from
+     * plan schema 1.15 (#258) -- opens the rep only when the lift starts at
+     * the top, and it is the drive only when the drive moves DOWN: a pushdown
+     * or a pulldown driven first. On either stroke an `X` that is the RETURN
+     * is a fast return, not a drive, so it keeps its direction word. Stated
+     * twice in two modules, so it is pinned equal in `:core:dsp` rather than
+     * trusted.
      */
     fun firstMovementWord(
         startsWith: StartPhase,
         concentricUp: Boolean,
         horizontal: Boolean,
         explosiveUpStroke: Boolean,
+        explosiveDownStroke: Boolean,
     ): String = when {
         horizontal -> if (startsWith == StartPhase.CONCENTRIC) DRIVE else RETURN
-        ExerciseDef.startsAtTop(startsWith, concentricUp) -> DOWN
+        ExerciseDef.startsAtTop(startsWith, concentricUp) -> if (explosiveDownStroke && !concentricUp) DRIVE else DOWN
         explosiveUpStroke && concentricUp -> DRIVE
         else -> UP
     }
@@ -158,11 +168,14 @@ object StartCuePolicy {
      * the app knows; the position is not.
      *
      * A vertical lift that does not start at the top starts at the bottom,
-     * whether its first word is [UP] or an explosive [DRIVE].
+     * whether its first word is [UP] or an explosive [DRIVE]. The position is
+     * read off [atTop], never off the word: from #258 a lift that starts at
+     * the TOP can open on an explosive [DRIVE] too -- a pulldown driven
+     * first, with `X` in digit 1 -- so [DRIVE] no longer implies the bottom.
      */
-    private fun phrase(word: String, horizontal: Boolean): String = when {
+    private fun phrase(word: String, horizontal: Boolean, atTop: Boolean): String = when {
         horizontal -> "First movement $word"
-        word == DOWN -> "Start at the TOP, first movement $DOWN"
+        atTop -> "Start at the TOP, first movement $word"
         else -> "Start at the BOTTOM, first movement $word"
     }
 

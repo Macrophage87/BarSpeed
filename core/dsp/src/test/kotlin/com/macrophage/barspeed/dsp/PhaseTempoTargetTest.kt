@@ -328,7 +328,7 @@ class PhaseTempoTargetTest {
         )
         assertEquals(
             4,
-            ecc.count { it > prescribed.downS + toleranceS },
+            ecc.count { it > prescribed.downS!! + toleranceS },
             "runs more than a tolerance past digit 1",
         )
         val resolved = assertNotNull(
@@ -353,7 +353,7 @@ class PhaseTempoTargetTest {
         assertEquals(8, measured.size, "reps whose eccentric resolved, of 11 segmented")
         assertEquals(
             4,
-            measured.count { abs(it - prescribed.downS) <= toleranceS },
+            measured.count { abs(it - prescribed.downS!!) <= toleranceS },
             "bars drawn green against digit 1",
         )
         val stored = assertNotNull(assertNotNull(a.tempoCompliance).eccentricPrescribedS, "stored target")

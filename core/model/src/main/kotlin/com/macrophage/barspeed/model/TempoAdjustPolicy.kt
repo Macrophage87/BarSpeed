@@ -267,7 +267,7 @@ object TempoAdjustPolicy {
         val tempo = tempoText?.let { Tempo.parseOrNull(it) } ?: return null
         val spelled =
             listOf(
-                wholeSecond(tempo.downS) ?: return null,
+                tempo.downS?.let { wholeSecond(it) ?: return null } ?: EXPLOSIVE,
                 wholeSecond(tempo.bottomPauseS) ?: return null,
                 tempo.upS?.let { wholeSecond(it) ?: return null } ?: EXPLOSIVE,
                 wholeSecond(tempo.topPauseS) ?: return null,

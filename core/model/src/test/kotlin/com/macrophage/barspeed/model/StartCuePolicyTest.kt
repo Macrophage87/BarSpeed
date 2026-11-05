@@ -27,7 +27,8 @@ class StartCuePolicyTest {
         horizontal: Boolean = false,
         source: GeometrySource = GeometrySource.DECLARED,
         explosiveUpStroke: Boolean = false,
-    ) = StartCuePolicy.of(startsWith, concentricUp, horizontal, source, explosiveUpStroke)
+        explosiveDownStroke: Boolean = false,
+    ) = StartCuePolicy.of(startsWith, concentricUp, horizontal, source, explosiveUpStroke, explosiveDownStroke)
 
     @Test
     fun `a bench press lowered first starts at the top and goes down`() {
@@ -114,6 +115,46 @@ class StartCuePolicyTest {
         }
     }
 
+    /**
+     * The digit-1 twin of the test above it (#258). A pulldown driven first
+     * starts at the top and its first movement is the drive DOWN, so an `X`
+     * in digit 1 opens the rep as a drive and the countdown shows DRIVE, the
+     * word the guide speaks for it. The other three vertical geometries do
+     * not open on an X drive in digit 1 and keep the word they have without
+     * one: a bench press lowered first opens on an explosive LOWERING, which
+     * is not a drive; a deadlift and a leg curl lowered first open on the up
+     * stroke, which digit 1 is not.
+     *
+     * Green when written, at the commit that added the parameter: no tempo
+     * that `Tempo.parse` accepts there carries an X in digit 1, so no caller
+     * could reach the new branch yet.
+     */
+    @Test
+    fun `an X down stroke opens on DRIVE only where the rep opens on a drive that moves down`() {
+        val c = cue(StartPhase.CONCENTRIC, concentricUp = false, explosiveDownStroke = true)
+        assertEquals("Start at the TOP, first movement DRIVE", c.phrase)
+        assertEquals("DRIVE", c.word)
+        val notOpeningOnTheDownDrive = listOf(
+            StartPhase.ECCENTRIC to true,
+            StartPhase.CONCENTRIC to true,
+            StartPhase.ECCENTRIC to false,
+        )
+        for ((phase, up) in notOpeningOnTheDownDrive) {
+            assertEquals(
+                cue(phase, concentricUp = up),
+                cue(phase, concentricUp = up, explosiveDownStroke = true),
+                "$phase / concentricUp=$up",
+            )
+        }
+        for (phase in StartPhase.entries) {
+            assertEquals(
+                cue(phase, horizontal = true),
+                cue(phase, horizontal = true, explosiveDownStroke = true),
+                "horizontal, starts $phase",
+            )
+        }
+    }
+
     @Test
     fun `horizontal work is called by phase whether or not its drive is X`() {
         for (phase in StartPhase.entries) {
@@ -173,7 +214,7 @@ class StartCuePolicyTest {
         assertEquals(GeometrySource.INFERRED, source)
         assertEquals(
             "Guessed from the name",
-            StartCuePolicy.of(used.startsWith, used.concentricUp, used.horizontal, source, false).marker,
+            StartCuePolicy.of(used.startsWith, used.concentricUp, used.horizontal, source, false, false).marker,
         )
     }
 
@@ -182,6 +223,6 @@ class StartCuePolicyTest {
         val used = ExerciseDef.resolvedById("back_squat")
         val source = SetGeometryPolicy.describe(used, declared = null).sources.startsWith
         assertEquals(GeometrySource.SEEDED, source)
-        assertNull(StartCuePolicy.of(used.startsWith, used.concentricUp, used.horizontal, source, false).marker)
+        assertNull(StartCuePolicy.of(used.startsWith, used.concentricUp, used.horizontal, source, false, false).marker)
     }
 }
