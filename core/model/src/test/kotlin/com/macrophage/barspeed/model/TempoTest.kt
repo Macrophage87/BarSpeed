@@ -92,4 +92,20 @@ class TempoTest {
         assertNull(Tempo.parseOrNull("10010"))
         assertEquals(10.0, Tempo.parse("10-0-1-0").downS)
     }
+
+    /**
+     * A null DOWN stroke is "X", written back as one (#258). Built directly
+     * rather than parsed, because the type can hold one whatever [Tempo.parse]
+     * accepts; this pins the notation and the flag, and nothing about parsing.
+     */
+    @Test
+    fun `a null down stroke is explosive and is written back as X`() {
+        val tempo = Tempo(downS = null, bottomPauseS = 0.0, upS = 3.0, topPauseS = 0.0)
+        assertTrue(tempo.isExplosiveDownStroke)
+        assertEquals(false, tempo.isExplosiveUpStroke, "the up stroke is the number it was given")
+        assertEquals("X030", tempo.notation())
+        assertEquals("X0X0", Tempo(null, 0.0, null, 0.0).notation())
+        assertEquals(false, tempo.hasZeroStroke, "an explosive stroke is not a zero one")
+        assertEquals(false, Tempo.parse("3010").isExplosiveDownStroke)
+    }
 }

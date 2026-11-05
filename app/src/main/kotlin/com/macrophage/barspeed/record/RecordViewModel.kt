@@ -3331,6 +3331,14 @@ data class RecordState(
      */
     val explosiveUpStroke: Boolean = false,
 
+    /**
+     * [explosiveUpStroke]'s sibling for digit 1, which plan schema 1.15
+     * accepts as `X` so a lift whose drive moves DOWN can declare an
+     * explosive drive (#258). Set at the same moment from the same parsed
+     * tempo, for the same reason.
+     */
+    val explosiveDownStroke: Boolean = false,
+
     /** True once the voice guide has called the prescription all the way through. */
     val guidedFinished: Boolean = false,
     val setElapsedS: Int = 0,
@@ -4744,6 +4752,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
             stateFlow.value = stateFlow.value.copy(
                 repCallAtDriveEnd = CadencePlan.of(schedule).announcesAtConcentricEnd,
                 explosiveUpStroke = guidedTempo.isExplosiveUpStroke,
+                explosiveDownStroke = guidedTempo.isExplosiveDownStroke,
             )
             startGuidedCadence(schedule, plannedRepsForSet, prepS)
         }

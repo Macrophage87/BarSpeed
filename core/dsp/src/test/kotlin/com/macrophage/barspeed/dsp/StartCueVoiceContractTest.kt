@@ -46,6 +46,7 @@ class StartCueVoiceContractTest {
         def.horizontal,
         GeometrySource.DECLARED,
         explosiveUpStroke = Tempo.parse(tempo).isExplosiveUpStroke,
+        explosiveDownStroke = Tempo.parse(tempo).isExplosiveDownStroke,
     ).word
 
     private fun assertAgrees(def: ExerciseDef, tempo: String) {

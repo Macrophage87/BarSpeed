@@ -13,14 +13,26 @@ import kotlinx.serialization.Serializable
  * digit is the eccentric therefore depends on the exercise, and the mapping
  * lives in [eccentricS] / [concentricS] rather than in the digits.
  *
- * A null up stroke means "X" (explosive: as fast as possible).
+ * A null stroke means "X" (explosive: as fast as possible). [upS] has always
+ * been able to hold one; [downS] is nullable from #258, so that a lift whose
+ * drive moves DOWN -- a pushdown, a pulldown, a leg curl -- has a digit in
+ * which to declare an explosive drive. Whether [parse] accepts an `X` in
+ * digit 1 is that issue's question and is answered in [parse], not by the
+ * type.
  *
  * Accepts `"4010"`, `"40X0"`, and dash-separated `"4-0-1-0"` forms.
  */
 @Serializable
 data class Tempo(
-    /** Digit 1 — the downward stroke. Serialized under its historical name. */
-    @SerialName("eccentricS") val downS: Double,
+    /**
+     * Digit 1 — the downward stroke; null for "X". Serialized under its
+     * historical name.
+     *
+     * Nullable from #258. A stored analysis written before that carries a
+     * number here, which decodes into a `Double?` unchanged, so no row
+     * already on a device reads differently.
+     */
+    @SerialName("eccentricS") val downS: Double?,
     /** Digit 2 — pause at the bottom of the movement. */
     val bottomPauseS: Double,
     /** Digit 3 — the upward stroke; null for "X". Serialized under its historical name. */
@@ -29,6 +41,15 @@ data class Tempo(
     val topPauseS: Double,
 ) {
     val isExplosiveUpStroke: Boolean get() = upS == null
+
+    /**
+     * Digit 1 is `X`. [isExplosiveUpStroke]'s sibling rather than a
+     * generalisation of it, because every reader of that one asks about the
+     * UP stroke specifically -- the prep countdown's word and the guide's
+     * `Drive` call for a drive-up lift -- and a merged "either stroke is X"
+     * would answer a different question at each of them. #258.
+     */
+    val isExplosiveDownStroke: Boolean get() = downS == null
 
     /**
      * Either stroke is prescribed as no time at all.
@@ -53,8 +74,9 @@ data class Tempo(
     val hasZeroStroke: Boolean get() = downS == 0.0 || upS == 0.0
 
     fun notation(): String {
+        val down = downS?.let { formatDigit(it) } ?: "X"
         val up = upS?.let { formatDigit(it) } ?: "X"
-        return "${formatDigit(downS)}${formatDigit(bottomPauseS)}$up${formatDigit(topPauseS)}"
+        return "$down${formatDigit(bottomPauseS)}$up${formatDigit(topPauseS)}"
     }
 
     private fun formatDigit(value: Double): String =

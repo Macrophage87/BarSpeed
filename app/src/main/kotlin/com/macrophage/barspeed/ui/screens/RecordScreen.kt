@@ -2675,8 +2675,9 @@ private fun StartCueBlock(cue: StartCue, repCallNote: String?) {
  * an ad-hoc set's geometry into the pending write.
  *
  * Whether the tempo's digit 3 is `X` comes off [RecordState.explosiveUpStroke],
- * which `RecordViewModel` sets from the tempo it hands the voice, so a set
- * whose voice opens on an explosive `Drive` is shown `DRIVE` (#264).
+ * and whether its digit 1 is comes off [RecordState.explosiveDownStroke] (plan
+ * 1.15, #258), both set by `RecordViewModel` from the tempo it hands the voice,
+ * so a set whose voice opens on an explosive `Drive` is shown `DRIVE` (#264).
  */
 private fun startCueFor(state: RecordState, slot: PlannedSlot?): StartCue {
     val exercise = state.currentExercise
@@ -2689,6 +2690,7 @@ private fun startCueFor(state: RecordState, slot: PlannedSlot?): StartCue {
         exercise.horizontal,
         source,
         explosiveUpStroke = state.explosiveUpStroke,
+        explosiveDownStroke = state.explosiveDownStroke,
     )
 }
 
