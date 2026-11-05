@@ -241,6 +241,8 @@ class RepsSourcePublishedTest {
 
     private fun JsonObject.live(): Int? = this["liveReps"]?.jsonPrimitive?.content?.toInt()
 
+    private fun JsonObject.guide(): Int? = this["guideReps"]?.jsonPrimitive?.content?.toInt()
+
     /** The case the issue exists for: a straight-reps set the sensor counted. */
     @Test
     fun `a sensor-counted set publishes the sensor as its counter in both writers`() = runTest {
@@ -315,6 +317,16 @@ class RepsSourcePublishedTest {
         val marks = listOf(repMarks(row, 10))
         assertEquals("corrected", setObject(row, marks).word())
         assertEquals("corrected", manifestSet(row, marks).word())
+    }
+
+    /**
+     * `guideReps` (1.26, #336) is the guided twin of `liveReps`: a sensor
+     * set carries none, even with marks stored beside it.
+     */
+    @Test
+    fun `a sensor set publishes no guide count`() = runTest {
+        val row = row(liveReps = 5, geometryKind = ExerciseKind.DYNAMIC)
+        assertNull(setObject(row, listOf(repMarks(row, 5))).guide(), "a sensor set was given a guide's count")
     }
 
     /**

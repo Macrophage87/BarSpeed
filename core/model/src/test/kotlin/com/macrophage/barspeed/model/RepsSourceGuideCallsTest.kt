@@ -83,6 +83,23 @@ class RepsSourceGuideCallsTest {
         assertNull(RepsSourcePolicy.published(null, true, timed = true, guideCounted = true, 0, 4))
     }
 
+    /**
+     * `guideReps` (1.26) is the guided twin of `liveReps`: nothing a guide
+     * did not count carries it, whatever marks are stored beside it.
+     */
+    @Test
+    fun `no guide count is published beside a set the guide did not count`() {
+        // sensor, uncorrected and corrected: its marks, if any, are not a guide's
+        assertNull(RepsSourcePolicy.publishedGuideReps(5, false, false, guideCounted = false, guideCalls = 3))
+        assertNull(RepsSourcePolicy.publishedGuideReps(5, true, false, guideCounted = false, guideCalls = 3))
+        // hand-counted: the marks are the lifter's taps
+        assertNull(RepsSourcePolicy.publishedGuideReps(null, true, false, guideCounted = false, guideCalls = 7))
+        // timed: nothing counted reps
+        assertNull(RepsSourcePolicy.publishedGuideReps(null, true, true, guideCounted = true, guideCalls = 4))
+        // guided with no stored marks: nothing says what the guide called
+        assertNull(RepsSourcePolicy.publishedGuideReps(null, true, false, guideCounted = true, guideCalls = null))
+    }
+
     /** Where the guide's count is unknown, the answer is exactly the four-input form's. */
     @Test
     fun `with no guide count the answer is the four-input form's on every row`() {

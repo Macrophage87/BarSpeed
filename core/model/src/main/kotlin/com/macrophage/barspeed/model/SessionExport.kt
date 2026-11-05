@@ -2855,6 +2855,24 @@ data class SessionExport(
          * `SchemaExportKeySetContractTest` pins the set's keys to
          * [SetExport]; `SessionExportAnalysisProvenanceTest` in `:core:data`
          * is the export differential.
+         *
+         * 1.26 FURTHER ENTRY (#336, whose count a guided set carries): ADDS
+         * ONE KEY and moves one word. `guideReps` publishes how many reps the
+         * cadence guide called -- the length of the set's stored rep-mark
+         * stream -- on every set the guide counted whose marks are stored.
+         * A guided set whose recorded `reps` differ from that count (field-47
+         * set 4: stopped at 8 of the guide's 10) now reads `repsSource`
+         * `corrected`, not `metronome`, with `guideReps` beside it as
+         * `liveReps` sits beside a corrected sensor count; `liveReps` is
+         * absent there. Under 1.26 and not a mint: 1.26 is unreleased.
+         * RETROACTIVE: the marks are stored per set, so an older guided set
+         * re-exported gains the key and, where corrected, the new word; one
+         * with no stored marks reads as before. Nothing is renamed or
+         * retyped, `DATABASE_VERSION` does NOT move, and the plan schema is
+         * untouched. `RepsSourcePolicy.publishedGuideReps` decides the key;
+         * `SchemaExportKeySetContractTest` pins it as declared;
+         * `RepsSourcePublishedTest` in `:core:data` is the export
+         * differential.
          */
         const val SCHEMA_VERSION = "1.26"
 
@@ -3246,6 +3264,24 @@ data class SetExport(
      * is a count.
      */
     val liveReps: Int? = null,
+    /**
+     * How many reps the CADENCE GUIDE called on a guided set (1.26, #336):
+     * the length of the set's archived rep-mark stream, which on a guided
+     * set holds one mark per rep the guide counted and nothing else.
+     * `RepsSourcePolicy.publishedGuideReps` decides it.
+     *
+     * The guided twin of [liveReps]. Beside [repsSource] `metronome` it
+     * equals `reps`; beside `corrected` on a guided set -- the lifter
+     * stopped short of the guide's count or went past it, field-47 set 4
+     * stopped at 8 of the guide's 10 -- it is the guide's figure the
+     * recorded one corrects. Published in the summary document too, where
+     * [repMarks] is not.
+     *
+     * ABSENT on every set no guide counted, on a timed set, and on a guided
+     * set whose marks were never stored (before the stream existed, or a set
+     * whose journal never opened), which still reads `metronome`.
+     */
+    val guideReps: Int? = null,
     /**
      * Whether the LIVE velocity integrator stayed within its displacement
      * bound through this set
