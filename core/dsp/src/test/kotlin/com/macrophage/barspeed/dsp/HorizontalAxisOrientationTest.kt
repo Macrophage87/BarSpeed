@@ -13,22 +13,26 @@ import kotlin.test.assertTrue
  * cannot show it.
  *
  * The horizontal principal axis comes out of the covariance with an arbitrary
- * sign. `SetAnalyzer.orient` resolves it by asking which way the FIRST
- * non-still run points, so any movement before the first rep decides the
- * orientation of the whole set. Issue 28.
+ * sign. `SetAnalyzer.orient` resolves it by asking which way the first
+ * movement run points, and until issue 28's fix that was the FIRST non-still
+ * run of any size, so any movement before the first rep decided the
+ * orientation of the whole set. The fix asks the deciding run to clear
+ * `DspConfig.minRomM` as well -- the floor the pairing stage already uses to
+ * call a run a phase -- so a sub-rep settle no longer decides it.
  *
- * ## Nothing looks wrong when it fires
+ * ## Nothing looked wrong when it fired
  *
  * The published velocity is NOT inverted in sign. `concentricSign` is +1 for
  * horizontal work, so the flip swaps which run is which rather than negating
  * the reported number: the figures stay positive and plausible. **The rep count
  * is identical either way**, so the obvious check misses it entirely.
  *
- * What actually changes is that the eccentric and the concentric swap outright.
- * Below, a 1 s drive is reported as 1.87 s and a 2 s return as 0.96 s. Velocity
- * and power then describe the return stroke and roughly halve. Tempo compliance
- * grades each digit against the wrong stroke, which reaches the lifter through
- * a different surface than velocity does.
+ * What actually changes when it fires is that the eccentric and the
+ * concentric swap outright. A 1 s drive was reported as 1.87 s and a 2 s
+ * return as 0.96 s, and velocity and power then described the return stroke
+ * and roughly halved. Tempo compliance graded each digit against the wrong
+ * stroke, which reaches the lifter through a different surface than velocity
+ * does. A settle of a rep's worth still produces all of this, below.
  *
  * ## Why this is synthetic
  *
@@ -58,10 +62,14 @@ import kotlin.test.assertTrue
  * 44x. That ratio is pinned below.
  *
  * So these samples are fabricated, and nothing here should be read as evidence
- * about a real set. No fix is fitted to them for exactly that reason: a
- * size threshold chosen from this file would be a constant calibrated against
- * the only data that exists, which is a mistake this repository has made
- * before.
+ * about a real set. That is why no threshold is FITTED to them: "No fix is
+ * fitted to them" stood here, and the fix that has since landed fits nothing
+ * either. It reuses `minRomM`, a constant this file did not choose, at the
+ * value it already holds for pairing. What this file can show is that the
+ * 3 cm settle stops deciding the set; whether a real handle-mounted settle is
+ * smaller than 0.10 m is a `[Field]` question no committed capture answers,
+ * and `a settle of a rep's worth still decides the axis` pins what the gate
+ * cannot do.
  */
 class HorizontalAxisOrientationTest {
     private val dt = 0.01
@@ -127,28 +135,24 @@ class HorizontalAxisOrientationTest {
     }
 
     @Test
-    fun `a three-centimetre settle before the first rep inverts the whole set`() {
-        // The defect. Same six reps, preceded by a 0.03 m movement the other
+    fun `a three-centimetre settle before the first rep no longer inverts the set`() {
+        // Issue 28. Same six reps, preceded by a 0.03 m movement the other
         // way, which is what a lifter settling into the seat produces.
+        //
+        // Before the fix this set came out INVERTED with an identical rep
+        // count -- the drive read 1.87 s, the return 0.96 s, mean "drive"
+        // velocity 0.212 m/s and peak power 154.2 W, all positive and
+        // plausible, so nothing looked wrong. Those figures are kept here as
+        // the record of what the defect published; the assertions are now the
+        // clean start's, to the digit.
         val a = SetAnalyzer.analyze(sixReps(0.03), horizontalHandle, loadKg = 50.0)
-
-        // The count is IDENTICAL. Nothing about the number of reps says a thing
-        // went wrong, which is why this cannot be evaluated by rep count.
-        assertEquals(6, a.reps.size, "reps segmented -- unchanged")
-
-        // The phases have swapped. A 1 s drive is now reported as 1.87 s and a
-        // 2 s return as 0.96 s, so tempo compliance grades each prescribed
-        // digit against the opposite stroke.
-        assertEquals(1.87, a.reps.map { it.conS }.average(), 5e-3, "drive seconds now hold the return")
-        assertEquals(0.96, a.reps.first().eccS!!, 5e-3, "return seconds now hold the drive")
-
-        // And the published figures stay POSITIVE and plausible. They describe
-        // the return stroke, so they roughly halve, but nothing about their
-        // sign or magnitude looks like an error.
+        assertEquals(6, a.reps.size, "reps segmented")
+        assertEquals(0.96, a.reps.map { it.conS }.average(), 5e-3, "drive seconds, prescribed 1.0")
+        assertEquals(1.87, a.reps.first().eccS!!, 5e-3, "return seconds, prescribed 2.0")
         val meanVel = a.reps.map { it.meanConVelMps }.average()
-        assertEquals(0.212, meanVel, 5e-3, "mean 'drive' velocity is the return's")
-        assertTrue(meanVel > 0.0, "still positive, so nothing looks wrong")
-        assertEquals(154.2, a.reps.first().peakPowerW!!, 0.05, "peak power, roughly halved")
+        assertEquals(0.412, meanVel, 5e-3, "mean drive velocity")
+        assertTrue(meanVel > 0.0, "positive either way, which is why the sign never showed the defect")
+        assertEquals(314.0, a.reps.first().peakPowerW!!, 0.05, "peak power, W")
     }
 
     /**
@@ -224,17 +228,19 @@ class HorizontalAxisOrientationTest {
         // until mutation M9 converted it here too and the whole suite stayed
         // green.
         //
-        // The differential is the twitch. At `travelRatio` 3.0 a converted
-        // startThresholdMps would be 0.30 m/s, above the 0.03 m settle's peak,
-        // so the settle would stop deciding the orientation and the set would
-        // come out the right way round -- a correct-looking answer produced by
-        // reading the wrong frame. The set is inverted here and must STAY
-        // inverted at every ratio.
+        // The differential is the twitch, and issue 28's fix moved which end
+        // of the ratio range carries it. Before the fix the settle decided
+        // the set at every ratio and a converted startThresholdMps at ratio
+        // 3.0 (0.30 m/s) would have stopped it doing so. Now the settle is
+        // held out by `minRomM`, and a CONVERTED floor at ratio 0.25 is
+        // 0.025 m -- under the 0.03 m settle -- so reading the wrong frame
+        // there would let the settle decide again and invert the set. The set
+        // comes out the right way round here and must do so at every ratio.
         listOf(0.25, 0.5, 1.0, 2.0, 3.0).forEach { ratio ->
             val a = SetAnalyzer.analyze(sixReps(0.03), horizontalHandle.copy(travelRatio = ratio), loadKg = 50.0)
             assertEquals(6, a.reps.size, "ratio $ratio: reps segmented")
-            assertEquals(1.87, a.reps.map { it.conS }.average(), 5e-3, "ratio $ratio: drive seconds hold the return")
-            assertEquals(0.96, a.reps.first().eccS!!, 5e-3, "ratio $ratio: return seconds hold the drive")
+            assertEquals(0.96, a.reps.map { it.conS }.average(), 5e-3, "ratio $ratio: drive seconds")
+            assertEquals(1.87, a.reps.first().eccS!!, 5e-3, "ratio $ratio: return seconds")
         }
     }
 
