@@ -1,5 +1,6 @@
 package com.macrophage.barspeed.data
 
+import com.macrophage.barspeed.model.SensorRole
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -149,7 +150,11 @@ class JournalScanTest {
 
     // ---- what the card says -------------------------------------------------
 
-    private fun header(imuConnected: Boolean = true, secondaryImuConnected: Boolean = false) = SetJournalHeader(
+    private fun header(
+        imuConnected: Boolean = true,
+        secondaryImuConnected: Boolean = false,
+        sensorRoles: List<SensorRole> = emptyList(),
+    ) = SetJournalHeader(
         exerciseId = "back_squat",
         exerciseName = "Back Squat",
         sessionId = null,
@@ -157,6 +162,8 @@ class JournalScanTest {
         startedAtMs = 1_000L,
         orderIdx = 0,
         imuConnected = imuConnected,
+        sensorRoles = sensorRoles,
+        armedRole = sensorRoles.firstOrNull(),
         secondaryImuConnected = secondaryImuConnected,
     )
 
@@ -174,8 +181,9 @@ class JournalScanTest {
         repMarks: JournalStreamScan? = null,
         imuConnected: Boolean = true,
         secondaryImuConnected: Boolean = false,
+        sensorRoles: List<SensorRole> = emptyList(),
     ) = OrphanedSet(
-        header = header(imuConnected, secondaryImuConnected),
+        header = header(imuConnected, secondaryImuConnected, sensorRoles),
         directory = java.io.File("/nowhere"),
         imu = imu,
         secondaryImu = secondaryImu,
@@ -245,6 +253,42 @@ class JournalScanTest {
                 orphan(imu = stream("imu.csv", 120), secondaryImuConnected = true),
             ).joinToString(" · ")
         assertTrue("none from the second sensor" in text, text)
+    }
+
+    /**
+     * DIFFERENTIAL, #171 item 11. A set ARMED FOR TWO whose second unit never
+     * connected must not read like a one-sensor set. The header already holds
+     * both facts -- `sensorRoles` non-empty says two were armed, and
+     * `secondaryImuConnected` false says the second link was down when the
+     * set began -- and the card read neither, so it said "412 from the armed
+     * sensor" exactly as it does for a lifter who owns one sensor. The lifter
+     * deciding whether to keep the capture is the one person who needs to
+     * know a second stream was expected and is not there.
+     */
+    @Test
+    fun `a set armed for two whose second unit never connected says so`() {
+        val text =
+            InterruptedSetSummary.lines(
+                orphan(
+                    imu = stream("imu.csv", rows = 412, bytes = 40_000),
+                    sensorRoles = listOf(SensorRole.A, SensorRole.B),
+                ),
+            ).joinToString(" · ")
+        assertEquals("412 from the armed sensor, the second sensor was not connected · 40.0 KB on disk", text)
+    }
+
+    /**
+     * The same fact when NEITHER unit was connected: "no sensor connected" is
+     * the sentence for a manually counted set with nothing armed, and a set
+     * armed for two with both links down is a different failure.
+     */
+    @Test
+    fun `a set armed for two with neither unit connected is not a sensorless set`() {
+        val text =
+            InterruptedSetSummary.lines(
+                orphan(imuConnected = false, sensorRoles = listOf(SensorRole.A, SensorRole.B)),
+            ).joinToString(" · ")
+        assertTrue(text.startsWith("no armed sensor connected, the second sensor was not connected"), text)
     }
 
     @Test
