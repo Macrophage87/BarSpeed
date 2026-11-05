@@ -1447,5 +1447,13 @@ class RawExporterTest {
             "sets[0].kind needs plane" in unplaned,
             "the check reported nothing for a hold's plane struck off: $unplaned",
         )
+        // The direction the two controls above leave open: a stroke word
+        // still needs the geometry it was resolved with (L1 round 4, lens A
+        // R4-1), so stripping the six from the stroke words' lists reds here.
+        val strokeWithoutPlane = RawMetaSchema.unmetInSet(JsonObject(sets[2] - "plane"), "sets[2].")
+        assertTrue(
+            "sets[2].startsWith needs plane" in strokeWithoutPlane,
+            "the check reported nothing for a dynamic set's plane struck off: $strokeWithoutPlane",
+        )
     }
 }
