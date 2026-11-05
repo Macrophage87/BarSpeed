@@ -866,7 +866,7 @@ private fun SetupStage(state: RecordState, viewModel: RecordViewModel) {
  * often; this repository has never measured that.
  *
  * What PAIR_OR_POWER no longer covers is the phone's Bluetooth being off when
- * `connectGatt` refused the link (#103): `connect()` now reads the adapter
+ * `connectGatt` opened no link (#103): `connect()` now reads the adapter
  * there and the card says TURN_ON_PHONE_BLUETOOTH instead. The phone's
  * Bluetooth is still named under PAIR_OR_POWER for the two early returns
  * above and for Connecting and Disconnected, which read no adapter. The

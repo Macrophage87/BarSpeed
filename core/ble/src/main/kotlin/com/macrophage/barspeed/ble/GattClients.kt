@@ -111,7 +111,7 @@ abstract class GattClient(protected val context: Context) {
                 // connectGatt's null says only that no link was opened, not
                 // why (#103). The adapter's own state is a fact this call can
                 // read, so the phone's Bluetooth being off is told apart from
-                // a link refused with Bluetooth on, and SensorAdvicePolicy can
+                // no link opened with Bluetooth on, and SensorAdvicePolicy can
                 // say which to fix. isEnabled is true only in STATE_ON, so an
                 // adapter turning on or off reads as off -- which it is, for
                 // the link that was just refused. What connectGatt actually
@@ -121,7 +121,7 @@ abstract class GattClient(protected val context: Context) {
                     if (!adapter.isEnabled) {
                         ConnectionState.Failed(PHONE_BLUETOOTH_OFF_REASON, phoneBluetoothOff = true)
                     } else {
-                        ConnectionState.Failed(LINK_REFUSED_REASON)
+                        ConnectionState.Failed(NO_LINK_OPENED_REASON)
                     }
             }
             opened != null
@@ -181,9 +181,12 @@ abstract class GattClient(protected val context: Context) {
         /**
          * `connectGatt` returned null with the adapter on (#103). This was
          * "Bluetooth is off or the link was refused" while nothing here read
-         * the adapter; the first half is now its own reason.
+         * the adapter; the first half is now its own reason. The second half
+         * was briefly "The link was refused", which claimed a refusal: a null
+         * return says only that no link was opened, not that anything refused
+         * one, so that is all this says.
          */
-        const val LINK_REFUSED_REASON = "The link was refused"
+        const val NO_LINK_OPENED_REASON = "No link could be opened"
     }
 
     protected fun updateBattery(pct: Int) {
