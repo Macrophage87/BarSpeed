@@ -43,7 +43,10 @@ kotlin {
 // GuidePromptContractTest with a null resource. Directories under kotlin/ are
 // not excluded, only files, because excluding a directory prunes everything
 // beneath it, GuideScreen.kt included. The admitted set was compared file by
-// file against the include form's when this changed; the lane report has it.
+// file against the include form's when this changed: :core:model's
+// processTestResources copies the same nine files under either form, and a
+// probe .csv dropped into core/model/src/test/resources is copied by this
+// form, while the include form's patterns name no .csv.
 // PlanDocVersionContractTest reads the REAL README.md and PROMPTS.md for the
 // same reason (#240): both hard-code the plan schema number, both went stale at
 // the last mint, and a copy of either would drift exactly as the originals did.
