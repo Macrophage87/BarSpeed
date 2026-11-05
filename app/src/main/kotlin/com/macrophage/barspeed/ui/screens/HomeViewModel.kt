@@ -11,6 +11,8 @@ import com.macrophage.barspeed.LiftingApp
 import com.macrophage.barspeed.data.OrphanedSet
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.data.SessionEntity
+import com.macrophage.barspeed.model.RecordingHold
+import com.macrophage.barspeed.model.RecordingServicePolicy
 import com.macrophage.barspeed.model.RestoreVerdict
 import com.macrophage.barspeed.model.SessionHeartRate
 import com.macrophage.barspeed.model.VoidSetPolicy
@@ -41,6 +43,9 @@ import java.util.concurrent.TimeUnit
  * call in the tree when that buffer was added.
  */
 private const val TAG = "HomeViewModel"
+
+/** Why RESTORE did not restart the app: a set-end write or a session close is still running. */
+private const val SAVING_NOTE = "A set or session is still saving -- try restoring again in a moment"
 
 /** One history row: session summary plus a per-set mean-velocity sparkline. */
 data class HistoryRow(
@@ -146,6 +151,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val restoreVerdictsFlow = MutableStateFlow<Map<File, RestoreVerdict>>(emptyMap())
     val restoreVerdicts: StateFlow<Map<File, RestoreVerdict>> = restoreVerdictsFlow
+
+    /**
+     * Issue #112, round 1 review (A2, B4): what the process-wide recording
+     * holds hold now. The card's RESTORE reads it through
+     * [rescuedCardButtons]; [restoreRescued] reads it again before it ends
+     * the process.
+     */
+    val recordingHolds: StateFlow<Set<RecordingHold>> = container.recordingHolds.held
 
     /**
      * Rescued directories with a share or a discard currently in flight,
@@ -296,9 +309,23 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
      * phone that does not come back simply shows the launcher, and the next
      * start does the restore. If no launch intent exists the lifter is told
      * to reopen the app themselves.
+     *
+     * NOT WHILE ANYTHING IS HELD. A set-end write or a session close runs on
+     * the process-wide scope after the record screen has gone, with the only
+     * copy of what it writes in memory, and the lifter is on Home while it
+     * runs. Ending the process then loses it. So the restart is refused while
+     * [RecordingServicePolicy.mayEndProcess] says no -- checked here before
+     * anything is written, and again just before the exit; on the second, the
+     * request is already on disk and the lifter is told to reopen the app
+     * later instead. Round 1 review, A2/B4. The predicate is test-gated; this
+     * guard is compile- and lint-gated only.
      */
     fun restoreRescued(item: RescuedDatabase) {
         if (!rescuedActionAllowed(item, busyRescuesFlow.value)) return
+        if (!RecordingServicePolicy.mayEndProcess(recordingHolds.value)) {
+            Toast.makeText(getApplication(), SAVING_NOTE, Toast.LENGTH_LONG).show()
+            return
+        }
         viewModelScope.launch {
             busyRescuesFlow.update { it + item.directory }
             val requested = withContext(Dispatchers.IO) { container.databaseRestore.request(item) }
@@ -311,10 +338,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             val app = getApplication<Application>()
             val relaunch = app.packageManager.getLaunchIntentForPackage(app.packageName)
                 ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            if (relaunch == null) {
+            if (relaunch == null || !RecordingServicePolicy.mayEndProcess(recordingHolds.value)) {
                 refreshRescued().join()
                 busyRescuesFlow.update { it - item.directory }
-                Toast.makeText(app, "Close BarSpeed and open it again to finish restoring", Toast.LENGTH_LONG).show()
+                val note = if (relaunch == null) {
+                    "Close BarSpeed and open it again to finish restoring"
+                } else {
+                    "A set or session is still saving. Once it has, close BarSpeed and open it again to " +
+                        "finish restoring"
+                }
+                Toast.makeText(app, note, Toast.LENGTH_LONG).show()
                 return@launch
             }
             app.startActivity(relaunch)

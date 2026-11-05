@@ -5,6 +5,8 @@ import com.macrophage.barspeed.model.FgsCommand
 import com.macrophage.barspeed.model.HoldTransition
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RecordingServicePolicy
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Why the recording foreground service is running, for the whole process.
@@ -30,20 +32,29 @@ import com.macrophage.barspeed.model.RecordingServicePolicy
  * Android lifecycle callback runs on.
  */
 class RecordingHolds(private val app: Application) {
-    private var held: Set<RecordingHold> = emptySet()
+    private val heldFlow = MutableStateFlow<Set<RecordingHold>>(emptySet())
+
+    /**
+     * What is held now, read-only. Issue #112, round 1 review (A2, B4): the
+     * rescued-database card's RESTORE ends the process, and asks
+     * `RecordingServicePolicy.mayEndProcess` of this first, so a restart
+     * never cuts a set-end write or a session close short. A flow rather
+     * than a plain value so the card's button follows it.
+     */
+    val held: StateFlow<Set<RecordingHold>> = heldFlow
 
     /** Take [hold], starting or re-arming the service if that hold arms it. */
     fun acquire(hold: RecordingHold) {
-        apply(RecordingServicePolicy.acquire(held, hold))
+        apply(RecordingServicePolicy.acquire(heldFlow.value, hold))
     }
 
     /** Give up [hold], stopping the service if it was the last reason to run. */
     fun release(hold: RecordingHold) {
-        apply(RecordingServicePolicy.release(held, hold))
+        apply(RecordingServicePolicy.release(heldFlow.value, hold))
     }
 
     private fun apply(transition: HoldTransition) {
-        held = transition.held
+        heldFlow.value = transition.held
         when (transition.command) {
             FgsCommand.START -> RecordingService.start(app)
             FgsCommand.STOP -> RecordingService.stop(app)
