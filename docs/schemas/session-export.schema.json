@@ -262,17 +262,19 @@
               "type": "number"
             },
             "withinTolerance": {
-              "type": "integer"
+              "type": "integer",
+              "description": "Reps within tolerance_s on EVERY scored phase THAT REP RESOLVED, out of `of`. A phase the sensor did not resolve on a rep is not held against that rep, so a rep graded on the drive alone counts here when its drive was on time. byPhase (1.26) gives each scored phase its own count."
             },
             "of": {
-              "type": "integer"
+              "type": "integer",
+              "description": "Reps that resolved at least one scored phase: the denominator of withinTolerance. A rep that resolved none is not in it, so this can be fewer than the set's reps. 0 means nothing was gradeable, never that every rep failed; scoredPhases is then empty."
             },
             "scoredPhases": {
               "type": "array",
               "items": {
                 "type": "string"
               },
-              "description": "Which phases were scored. Pauses are measured and reported but never scored."
+              "description": "Which phases were scored: the movement phases (eccentric, concentric) the prescription times AND at least one rep resolved. A prescribed phase is ABSENT from this list when no rep resolved it -- it was not MEASURED, which is not the same as ignored or passed. Pauses are measured and reported but never scored. Written by this build even when empty, and empty means nothing was graded."
             },
             "byPhase": {
               "type": "array",
