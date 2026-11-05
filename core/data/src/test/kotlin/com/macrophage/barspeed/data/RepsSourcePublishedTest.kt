@@ -320,6 +320,19 @@ class RepsSourcePublishedTest {
     }
 
     /**
+     * #336, export 1.26: beside the guided `corrected`, the session document
+     * keeps the guide's own count, as a corrected sensor set keeps
+     * `liveReps` -- and in a summary export too, which carries no marks.
+     */
+    @Test
+    fun `a guided set stopped short publishes the guide's count beside the correction`() = runTest {
+        val row = row(repsManual = true, tempo = "3010", geometryKind = ExerciseKind.DYNAMIC, actualReps = 8)
+        val set = setObject(row, listOf(repMarks(row, 10)))
+        assertEquals(10, set.guide(), "the guide's count is not beside the corrected figure")
+        assertNull(set.live(), "a guided set published a sensor count")
+    }
+
+    /**
      * `guideReps` (1.26, #336) is the guided twin of `liveReps`: a sensor
      * set carries none, even with marks stored beside it.
      */

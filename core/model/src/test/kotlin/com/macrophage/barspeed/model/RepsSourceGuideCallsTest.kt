@@ -100,6 +100,17 @@ class RepsSourceGuideCallsTest {
         assertNull(RepsSourcePolicy.publishedGuideReps(null, true, false, guideCounted = true, guideCalls = null))
     }
 
+    /**
+     * #336: the guide's own count stands beside a guided set's word -- equal
+     * to `reps` under `metronome`, the figure `reps` corrects under
+     * `corrected` (field-47 set 4: 8 recorded, 10 called).
+     */
+    @Test
+    fun `a guided set publishes the guide's count beside its word`() {
+        assertEquals(12, RepsSourcePolicy.publishedGuideReps(null, true, false, guideCounted = true, guideCalls = 12))
+        assertEquals(10, RepsSourcePolicy.publishedGuideReps(null, true, false, guideCounted = true, guideCalls = 10))
+    }
+
     /** Where the guide's count is unknown, the answer is exactly the four-input form's. */
     @Test
     fun `with no guide count the answer is the four-input form's on every row`() {
