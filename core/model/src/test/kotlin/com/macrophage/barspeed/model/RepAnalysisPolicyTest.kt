@@ -26,4 +26,17 @@ class RepAnalysisPolicyTest {
             assertEquals(true, RepAnalysisPolicy.segmentsReps(isTimed = false, kind = kind), "reps $kind")
         }
     }
+
+    /**
+     * #63. A carry prescribed in reps is counted by the lifter
+     * (`CountingPolicy.counterFor` gives it MANUAL, pinned in
+     * CountingPolicyTest), but its stream went to the segmenter, which
+     * publishes velocity, ROM and power for whatever runs it finds in a
+     * walker's gait. What those figures measure has never been captured
+     * ([Field], #63), so none is published; the stream is kept.
+     */
+    @Test
+    fun `a rep-prescribed carry is not segmented`() {
+        assertFalse(RepAnalysisPolicy.segmentsReps(isTimed = false, kind = ExerciseKind.CARRY))
+    }
 }

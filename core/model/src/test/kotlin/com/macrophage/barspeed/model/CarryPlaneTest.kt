@@ -46,4 +46,29 @@ class CarryPlaneTest {
     fun `a carry declared vertical is read vertical by the inversion line`() {
         assertEquals(1, inversionLines("farmers_walk", stackDriveDown + ""","plane":"vertical"""").size)
     }
+
+    /**
+     * #63. A farmer's walk and a suitcase carry travel with the walker, so
+     * the seed says horizontal, on the ad-hoc path too, which reads the seed.
+     */
+    @Test
+    fun `the two seeded carries travel horizontally`() {
+        assertEquals(
+            listOf("farmers_walk", "suitcase_carry"),
+            ExerciseDef.SEED.filter { it.horizontal }.map { it.id },
+        )
+        assertTrue(ExerciseDef.resolvedById("farmers_walk").horizontal)
+        assertTrue(ExerciseDef.resolvedById("suitcase_carry").horizontal)
+    }
+
+    /**
+     * The near neighbour of the seed: the import gate's inversion line reads
+     * the seed's plane, so a carry with no "plane" is not told its stack
+     * stream is inverted -- SetGeometryPolicy.stackInversion leaves
+     * horizontal work uninverted, and resolve() reads the same seed.
+     */
+    @Test
+    fun `an undeclared carry's inversion line reads the seed's horizontal plane`() {
+        assertEquals(emptyList(), inversionLines("farmers_walk", stackDriveDown))
+    }
 }
