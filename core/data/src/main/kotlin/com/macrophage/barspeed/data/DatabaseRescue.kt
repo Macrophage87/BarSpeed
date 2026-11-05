@@ -15,11 +15,16 @@ sealed interface RescueOutcome {
     data class Rescued(val directory: File) : RescueOutcome
 
     /**
-     * A newer database was found and could NOT be moved.
+     * A newer database was found and could NOT be moved, or a rescue an
+     * earlier launch started could not be finished.
      *
-     * Nothing further is attempted, and in particular nothing destructive: the
-     * builder carries no destructive fallback, so Room meets the newer file and
-     * throws. A crash with the data intact beats a clean start with it gone.
+     * Nothing further is attempted, and in particular nothing destructive.
+     * `AppDatabase.build` refuses to open on this outcome: when the newer
+     * version was only in the `-wal` and the `-wal` has already moved, the
+     * main file left at the path reads OLDER, and Room would open it rather
+     * than throw. The sentence that stood here, "Room meets the newer file and
+     * throws", was false in that case (round 1 review of #113, A1/B1). A
+     * crash with the data on disk beats an open of half of it.
      *
      * SAYS NOTHING ABOUT WHAT IS STILL WHERE IT WAS. An earlier version of this
      * KDoc claimed the original was untouched; that is false when a sidecar has
@@ -50,11 +55,20 @@ sealed interface RescueOutcome {
  * WAL mode, so the set is the database, its -wal and its -shm. The sidecars go
  * FIRST and the main file LAST, which makes the one genuinely dangerous state
  * unreachable by construction: a freshly created database sitting beside a
- * stale -wal from the old one. Crash anywhere mid-rescue and the main file is
- * still in place at its newer version, so the next launch simply retries into a
- * new directory. Nothing here depends on SQLite rejecting a mismatched WAL by
- * its salt -- a design that does not need a fact is better than one resting on
- * a verified fact, and this one does not need it.
+ * stale -wal from the old one. Nothing here depends on SQLite rejecting a
+ * mismatched WAL by its salt -- a design that does not need a fact is better
+ * than one resting on a verified fact, and this one does not need it.
+ *
+ * A RESCUE ONCE DECIDED IS FINISHED, NOT DECIDED AGAIN. Crash mid-rescue and
+ * the main file is still in place -- but since issue #113 it need not read
+ * newer: when the newer version was only in the `-wal`, the `-wal` has gone
+ * and the main file left behind reads older. Deciding again would open it.
+ * So the directory is recorded in [PENDING] before the first move, and a
+ * launch that finds it moves the rest into that same directory without
+ * reading any version. An earlier version of this paragraph said the main
+ * file is "still in place at its newer version, so the next launch simply
+ * retries into a new directory"; that stopped being true at #113's fix and
+ * was found by round 1's review.
  *
  * GROWTH IS UNBOUNDED BY DESIGN, and it is the lifter's to bound. N downgrades
  * leave N rescued corpora, each the size of the database at that moment -- a
@@ -85,8 +99,7 @@ object DatabaseRescue {
     /**
      * A rescue under way: one line, the directory it is moving into, written
      * in [RESCUE_DIR] before the first file moves and removed after the last.
-     * Round 1 review of issue #113 (A1, B1). Reserved by this commit; read by
-     * nothing yet.
+     * Round 1 review of issue #113 (A1, B1); see [rescue].
      */
     const val PENDING = "rescue.pending"
 
@@ -178,10 +191,10 @@ object DatabaseRescue {
      * The three files of a database, in the order they must be moved.
      *
      * SIDECARS FIRST, MAIN FILE LAST, and this is a returned value rather than
-     * the shape of a loop so that a test can hold it. The ordering is the whole
-     * safety argument: crash anywhere mid-rescue and the main file is still in
-     * place at its newer version, so the next launch retries into a new
-     * directory. Move the main file first instead and a crash leaves orphaned
+     * the shape of a loop so that a test can hold it. Crash anywhere
+     * mid-rescue and the main file is still in place, and [PENDING] sends the
+     * next launch's moves into the same directory (see [rescue] for why the
+     * version is not read again). Move the main file first instead and a crash leaves orphaned
      * sidecars beside the name Room is about to recreate -- a fresh database
      * next to a stale -wal, which is the one state that could corrupt rather
      * than merely lose. Nothing here relies on SQLite rejecting a mismatched
@@ -216,32 +229,75 @@ object DatabaseRescue {
      * reported as [RescueOutcome.Failed] rather than silently taken as
      * [RescueOutcome.Rescued].
      *
-     * ONE DIRECTORY IS NOT NECESSARILY ONE DATABASE. A rescue interrupted after
-     * a sidecar has moved leaves that sidecar in one db-<ms> directory and the
-     * main file, moved by the retry on the next launch, in another. Anything
-     * reading these back must not assume a directory holds a complete set.
+     * FINISHED, NOT DECIDED AGAIN. The target directory is written to
+     * [PENDING] before anything moves, and the file is removed only after the
+     * last move. A launch that finds it does not read the version: it moves
+     * whatever of [moveOrder] is still at the path into that directory, so a
+     * database whose newer version left with its `-wal` is still rescued
+     * whole, into one directory. Two exceptions, each read off the disk: a
+     * main file already in the directory means every move was done and only
+     * the bookkeeping was left, so nothing at the path is touched and the
+     * launch decides afresh; and a named directory that does not exist means
+     * nothing had moved, so the same. A move into a name that is already
+     * taken is refused, never made. Any failure leaves [PENDING] in place and
+     * returns [RescueOutcome.Failed], on which the launch does not open.
+     *
+     * Before this, ONE DIRECTORY WAS NOT NECESSARILY ONE DATABASE: an
+     * interrupted rescue left a sidecar in one db-<ms> directory and the main
+     * file, moved by a retry, in another. A rescue started by a build without
+     * [PENDING] can still have left that shape, so anything reading these back
+     * must still not assume a directory holds a complete set.
      */
     fun rescue(
         databaseFile: File,
         rescueRoot: File,
         compiledVersion: Int,
         move: (source: File, dest: File) -> Boolean = File::renameTo,
-    ): RescueOutcome {
+    ): RescueOutcome = runCatching {
+        val marker = File(rescueRoot, PENDING)
+        if (marker.exists()) {
+            val name = marker.readText().trim()
+            val target = File(rescueRoot, name)
+            val unfinished = name.startsWith(DIR_PREFIX) && target.isDirectory &&
+                !File(target, databaseFile.name).exists()
+            if (unfinished) return moveInto(databaseFile, target, marker, move)
+            if (!marker.delete()) return RescueOutcome.Failed("could not clear ${marker.name}")
+        }
         val stored = storedVersion(databaseFile)
         if (DatabaseDowngradePolicy.decide(stored, compiledVersion) == DatabaseOpenAction.OPEN) {
             return RescueOutcome.NotNeeded
         }
-        return runCatching {
-            val target = File(rescueRoot, "$DIR_PREFIX${System.currentTimeMillis()}")
-            if (!target.mkdirs() && !target.isDirectory) {
-                return RescueOutcome.Failed("could not create ${target.path}")
-            }
-            for (source in moveOrder(databaseFile)) {
-                if (source.isFile && !move(source, File(target, source.name))) {
-                    return RescueOutcome.Failed("could not move ${source.name}")
-                }
-            }
-            RescueOutcome.Rescued(target)
-        }.getOrElse { RescueOutcome.Failed(it::class.simpleName ?: "unknown") }
+        val target = File(rescueRoot, "$DIR_PREFIX${System.currentTimeMillis()}")
+        if (!target.mkdirs() && !target.isDirectory) {
+            return RescueOutcome.Failed("could not create ${target.path}")
+        }
+        val temp = File(marker.path + ".tmp")
+        temp.writeText(target.name)
+        if (!temp.renameTo(marker)) return RescueOutcome.Failed("could not record the rescue")
+        moveInto(databaseFile, target, marker, move)
+    }.getOrElse { RescueOutcome.Failed(it::class.simpleName ?: "unknown") }
+
+    /**
+     * Every file of [moveOrder] still at the path, into [target], in that
+     * order; then [marker] goes. A taken destination is refused rather than
+     * overwritten -- POSIX rename would replace it silently.
+     */
+    private fun moveInto(
+        databaseFile: File,
+        target: File,
+        marker: File,
+        move: (source: File, dest: File) -> Boolean,
+    ): RescueOutcome {
+        for (source in moveOrder(databaseFile)) {
+            if (!source.isFile) continue
+            val dest = File(target, source.name)
+            if (dest.exists()) return RescueOutcome.Failed("${dest.name} is already in ${target.name}")
+            if (!move(source, dest)) return RescueOutcome.Failed("could not move ${source.name}")
+        }
+        // Every file has moved. A marker that will not go is harmless: the
+        // next launch finds the main file already in the target and only
+        // retries removing it.
+        marker.delete()
+        return RescueOutcome.Rescued(target)
     }
 }
