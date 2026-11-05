@@ -77,9 +77,12 @@ class RollExcursionTest {
      * reads that set as about 360 degrees -- the figure the coach prompt
      * reads as gravity leaking into every sample. The export has measured the
      * excursion through [RollExcursion.of] since #133, and this is the
-     * end-to-end pin that the seam no longer reads as a rotation: the tests
-     * above pin `unwrap` alone, and an `of` that stopped calling it would pass
-     * all of them. Synthetic: every roll value is written down here.
+     * end-to-end pin that the seam no longer reads as a rotation. "An `of` that
+     * stopped calling it would pass all of them" stood here and was wrong:
+     * mutating `of` to range over the raw column also reds `unwrapping happens
+     * inside the window, not over the file`, below. So this is a second guard
+     * on that call, and the first on #35's own case -- a non-rotating set at
+     * the seam. Synthetic: every roll value is written down here.
      */
     @Test
     fun `a set resting on the seam reports the jitter, not a turn`() {

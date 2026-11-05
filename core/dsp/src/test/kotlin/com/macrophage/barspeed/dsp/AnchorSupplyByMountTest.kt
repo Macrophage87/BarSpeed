@@ -416,10 +416,12 @@ class AnchorSupplyByMountTest {
      * AND on both sets the LAST rep -- the one `VelocityLoss.of` requires
      * among the eligible pair -- carries an out-of-range sample inside its own
      * span: set05's per-rep artefact counts are 0, 1, 1, 0, 1 and set06's
-     * 1, 1, 1, 1, 0, 1, with none in any guard band. A
-     * mutation deleting EITHER clause leaves the test above green, so a later
-     * change to one of them could republish 26.0% or 24.0% with only the other
-     * holding the line, and nothing would say so.
+     * 1, 1, 1, 1, 0, 1, with none in any guard band. Deleting EITHER clause
+     * leaves the two bench assertions above green, so a later change to one of
+     * them could republish 26.0% or 24.0% with only the other holding the
+     * line. (Measured: deleting the bound clause does red the test above, but
+     * at the back squat's `velocityLossPct` line, not at either bench's;
+     * deleting the in-span clause leaves it green.)
      *
      * So each family is pinned alone, with the other masked. The bound alone
      * is #234's own rule -- "the figure should not be published from reps
