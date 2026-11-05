@@ -230,6 +230,10 @@ class RawExporterPrepWindowTest {
         val set = meta(listOf(row(startedAtMs = 7_777L, prepS = null, workBegan = true)), emptyMap()).set(0)
         assertEquals(7_777.0, set.num("workStartedAt_ms"), "a no-prep set published no work start")
         assertTrue("prepStartedAt_ms" !in set, "a set with no prep published a prep start")
+        // The published raw-meta schema (#326) must take what the writer
+        // wrote: a work start with no prep start is a manifest it describes.
+        assertEquals(emptyList(), RawMetaSchema.unmetInSet(set), "the raw-meta schema refuses a no-prep work start")
+        assertEquals(emptyList(), RawMetaSchema.undeclaredInSet(set), "the raw-meta schema omits a key or word")
     }
 
     // ---- differentials -----------------------------------------------------
