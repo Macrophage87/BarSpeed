@@ -95,4 +95,41 @@ class SensorAdvicePolicyTest {
         assertEquals(SensorAdvice.UNRESPONSIVE, established)
         assertNotEquals(notEstablished, established)
     }
+
+    @Test
+    fun `a failure with the phone's Bluetooth read off says to turn it on`() {
+        // #103: GattClient.connect() read the adapter disabled when
+        // connectGatt returned null.
+        assertEquals(
+            SensorAdvice.TURN_ON_PHONE_BLUETOOTH,
+            SensorAdvicePolicy.forState(ConnectionState.Failed("Phone Bluetooth is off", phoneBluetoothOff = true)),
+        )
+    }
+
+    @Test
+    fun `phoneBluetoothOff decides the advice, not the reason string`() {
+        // The same construction as the linkEstablished test above: one
+        // reason string, only the boolean varied, so an implementation
+        // matching on the text ("off", "Bluetooth") cannot pass.
+        val sameReason = "identical reason text, deliberately"
+        val on = SensorAdvicePolicy.forState(ConnectionState.Failed(sameReason, phoneBluetoothOff = false))
+        val off = SensorAdvicePolicy.forState(ConnectionState.Failed(sameReason, phoneBluetoothOff = true))
+        assertEquals(SensorAdvice.PAIR_OR_POWER, on)
+        assertEquals(SensorAdvice.TURN_ON_PHONE_BLUETOOTH, off)
+    }
+
+    @Test
+    fun `the phone's Bluetooth being off outranks an established link`() {
+        // No producer sets both today -- phoneBluetoothOff is set only where
+        // connectGatt returned null, before any link -- but forState is total
+        // over Failed's fields, so the precedence is decided here rather than
+        // left to arm order. With the phone's radio off nothing about the
+        // sensor can be fixed first, so that advice wins.
+        assertEquals(
+            SensorAdvice.TURN_ON_PHONE_BLUETOOTH,
+            SensorAdvicePolicy.forState(
+                ConnectionState.Failed("reason", linkEstablished = true, phoneBluetoothOff = true),
+            ),
+        )
+    }
 }
