@@ -3,6 +3,7 @@ package com.macrophage.barspeed.dsp
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PhaseCoverage
 import com.macrophage.barspeed.model.StackMountSignal
+import com.macrophage.barspeed.model.RepAnalysisPolicy
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoScoreLabel
@@ -1117,6 +1118,24 @@ object SetAnalyzer {
         val variance = roms.sumOf { (it - mean) * (it - mean) } / roms.size
         return round1(sqrt(variance) / mean * 100.0)
     }
+
+    /**
+     * What a set kept off the segmenter by [RepAnalysisPolicy.segmentsReps]
+     * records: a carry prescribed in reps (#63). No reps, no figures, and
+     * [RepAnalysisPolicy.WITHHELD_NOTE] in their place; the stream itself is
+     * written with the row as usual.
+     *
+     * Built here rather than in `:app` so that what such a set records is
+     * test-gated: `RecordViewModel` decides WHICH sets reach it, through the
+     * policy, and calls this for the analysis.
+     */
+    fun withheldCarry(): SetAnalysis = SetAnalysis(
+        reps = emptyList(),
+        sampleRateHz = 0.0,
+        velocityLossPct = null,
+        tempoCompliance = null,
+        verdicts = listOf(RepAnalysisPolicy.WITHHELD_NOTE),
+    )
 
     private fun round1(x: Double) = Math.round(x * 10.0) / 10.0
 
