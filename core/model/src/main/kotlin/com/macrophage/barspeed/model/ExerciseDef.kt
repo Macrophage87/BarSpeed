@@ -134,6 +134,42 @@ data class ExerciseDef(
         fun seedById(id: String): ExerciseDef? = SEED.firstOrNull { it.id == id }
 
         /**
+         * The display name the app derives for an id it ships no entry for:
+         * underscores to spaces, first letter capitalised -- `cable_fly` is
+         * "Cable fly". Stated once here because two writers used to spell it
+         * out separately, `SessionRepository.exerciseById`'s fallback and the
+         * `CustomExerciseEntity` row `ensureExerciseExists` writes, and
+         * [CustomExerciseRepair] compares a stored row against it.
+         */
+        fun inferredDisplayName(id: String): String = id.replace('_', ' ').replaceFirstChar { it.uppercase() }
+
+        /**
+         * The definition the app builds for an id it ships no [SEED] entry for
+         * and has stored no row for: every inference the app makes from an id,
+         * and nothing else.
+         *
+         * Lifted from `SessionRepository.exerciseById`'s fallback branch,
+         * which built exactly this inline, so the plan path's base for an
+         * unseen id is now a function `:core:model` can pin. [resolvedById]'s
+         * fallback is the AD-HOC path's equivalent and is a separate
+         * statement; #69 item 4 is that the two disagree.
+         *
+         * [sensorOnStack] is the [STACK_MOUNTED_IDS] default for the omitted
+         * key, as it is on the plan path; [bodyweight] is NOT seeded here,
+         * because the plan path seeds it in [SetGeometryPolicy.resolve]
+         * through [SetGeometryPolicy.bodyweightMount], and seeding it twice
+         * would be two statements of one rule.
+         */
+        fun inferred(id: String): ExerciseDef = ExerciseDef(
+            id,
+            inferredDisplayName(id),
+            inferStartPhase(id),
+            kind = inferKind(id),
+            isCustom = true,
+            sensorOnStack = ridesStack(id),
+        )
+
+        /**
          * The definition an AD-HOC set runs against -- one with no plan slot,
          * resolved from the exercise picker's id alone.
          *
