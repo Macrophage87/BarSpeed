@@ -5,6 +5,7 @@ import com.macrophage.barspeed.model.DatabaseOpenAction
 import com.macrophage.barspeed.model.SqliteHeader
 import com.macrophage.barspeed.model.SqliteWal
 import java.io.File
+import java.io.FileOutputStream
 
 /** What [DatabaseRescue] did, so a caller can say it rather than infer it. */
 sealed interface RescueOutcome {
@@ -279,10 +280,29 @@ object DatabaseRescue {
             return RescueOutcome.Failed("could not create ${target.path}")
         }
         val temp = File(marker.path + ".tmp")
-        temp.writeText(target.name)
+        writeSynced(temp, target.name)
         if (!temp.renameTo(marker)) return RescueOutcome.Failed("could not record the rescue")
         moveInto(databaseFile, target, marker, move)
     }.getOrElse { RescueOutcome.Failed(it::class.simpleName ?: "unknown") }
+
+    /**
+     * [text] into [file], forced to the storage device before this returns.
+     * A temp file renamed over a marker or a journal must have its bytes on
+     * disk before the rename does: on power loss, delayed allocation can
+     * otherwise commit the rename -- and the next file move's rename --
+     * while the renamed file is still empty. An empty [PENDING] is dropped
+     * and the launch decides afresh, which is round 1's A1 split again; an
+     * empty restore journal falls back to the narrower open check. That is
+     * reasoned from delayed-allocation semantics, not observed on a device,
+     * and no test here can tell a synced write from an unsynced one. Round 2
+     * review, A's N1. Throws on failure; both callers catch.
+     */
+    internal fun writeSynced(file: File, text: String) {
+        FileOutputStream(file).use { out ->
+            out.write(text.toByteArray(Charsets.UTF_8))
+            out.fd.sync()
+        }
+    }
 
     /**
      * Every file of [moveOrder] still at the path, into [target], in that
