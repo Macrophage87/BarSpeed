@@ -285,12 +285,22 @@ class ArtefactPeakWithholdingTest {
      * sample index 4079 that sits in the previous rep's span, not its own; and
      * `field-ohp-prepinflated-s37-set03` publishes 783.2 W from the rep at
      * index 6, a 0.533 m rep with a 135.1 W mean drive power. Both figures are
-     * withheld today, and the test above says so -- but every rep of both
-     * captures is also unbounded, so "withheld" there would survive deleting
-     * either artefact clause outright: `RomBound` would hold both figures out
-     * on its own. That is a pin on the wrong clause. A later change that lets
-     * `RomBound` bound these reps would republish 407.4 W and 783.2 W with
-     * nothing red.
+     * withheld today. Every rep of both captures is also unbounded, so a
+     * set-level "withheld" alone would survive deleting an artefact clause:
+     * `RomBound` would hold the figure out on its own.
+     *
+     * For set 3 that was already covered: `the published peak pair falls on
+     * five captures, from the same reps` masks the band and the bound and
+     * pins 783.2 W falling to 524.6 W on the in-span clause alone. For set 8
+     * it was not. Its 407.4 W survives the in-span clause, and deleting #306's
+     * guard-band clause reds nothing else in this file or in
+     * `AnchorSupplyByMountTest` (measured); `PeakEligibilityTest` pins that
+     * clause on field-44 set 4, not on #255's capture. So before this test a
+     * narrowed or deleted band would have left 407.4 W held out by `RomBound`
+     * alone, and a later change that let `RomBound` bound set 8's reps would
+     * then have republished it with nothing red. "That is a pin on the
+     * wrong clause", which stood here of both captures, was true of set 8
+     * only.
      *
      * So the bound is masked here and the artefact clauses alone decide:
      *
