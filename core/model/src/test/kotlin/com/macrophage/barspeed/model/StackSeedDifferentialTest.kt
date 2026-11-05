@@ -127,14 +127,20 @@ class StackSeedDifferentialTest {
      * RED. The published document and its Kotlin twin, which have to move
      * together: `geometrySource` is `additionalProperties: false`, so a key
      * added to one and not the other either fails ajv or is silently dropped.
+     *
+     * The twin is compared with the block's DECLARED keys, not its required
+     * ones, since 1.26 (#289): `sensorInverted` is the one optional source,
+     * absent on a set recorded before it, and the equality that stood here
+     * against `required` would have had to pretend otherwise.
      */
     @Test
     fun `the published geometry source block and its Kotlin twin both carry the stack mount`() {
-        val required = schema("session-export.schema.json")["\$defs"]!!.jsonObject["geometrySource"]!!
-            .jsonObject["required"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
+        val block = schema("session-export.schema.json")["\$defs"]!!.jsonObject["geometrySource"]!!.jsonObject
+        val required = block["required"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
         assertTrue("sensorOnStack" in required, "the published source block does not carry it: $required")
         val twin = GeometrySourceExport.serializer().descriptor
-        assertEquals(required, (0 until twin.elementsCount).map(twin::getElementName).toSet())
+        val twinKeys = (0 until twin.elementsCount).map(twin::getElementName).toSet()
+        assertEquals(block["properties"]!!.jsonObject.keys, twinKeys)
     }
 
     /**

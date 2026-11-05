@@ -2687,8 +2687,48 @@ data class SessionExport(
          * marker in the published log, the reading key in the schema and in
          * `PLAN_PROMPT`, the tip literal and the example's version. This KDoc
          * and the reading key's KDoc below are not read by any test.
+         *
+         * 1.26 MINTS A KEY (#289, where `sensorInverted` came from): a set's
+         * `geometry.source` may carry `sensorInverted`, in the vocabulary its
+         * seven siblings use. It is the value that decides which measured
+         * phase is called the concentric, and the last geometry value to be
+         * given a provenance. `declared` = the plan wrote the key, true or
+         * false; `inferred` = nothing wrote it and the stack rule set it
+         * (`SetGeometryPolicy.stackInversion`'s rule 3: a stack mount, a drive
+         * going down, the vertical plane), which on a stack mount the plan
+         * left to the stack table the analysed unit's own roll may then have
+         * taken back to false (#323) -- `inferred` beside a false is that
+         * case; `seeded` = the app's own definition of the lift carried it,
+         * which no definition the app ships does today; `default` = nothing
+         * wrote it and no rule set it, so the type default false stood.
+         *
+         * OPTIONAL, unlike its seven siblings, and ABSENT on every set
+         * recorded before this build: no earlier build stored where the value
+         * came from, and those builds set it by the stack rule on some sets
+         * and by a declaration on others, so no answer can be recovered and
+         * none is invented. A set this build records always carries it.
+         *
+         * A MINT AND NOT A FURTHER 1.25 ENTRY: `git tag --sort=-creatordate |
+         * head -1` is v0.1.59, and `git show
+         * v0.1.58:core/model/src/main/kotlin/com/macrophage/barspeed/model/SessionExport.kt`
+         * and the same file at v0.1.59 both read `SCHEMA_VERSION = "1.25"`,
+         * all read this round. 1.25 has SHIPPED and takes no further entries.
+         *
+         * NOT RETROACTIVE, for the reason above. READER IN BOTH DIRECTIONS:
+         * the 1.25 schema v0.1.59 shipped REJECTS a 1.26 document on its
+         * version string, and its `geometrySource` is closed, so it would
+         * reject the key too; this schema accepts a 1.25 document unchanged.
+         * No key is removed, renamed or retyped. `DATABASE_VERSION` does NOT
+         * move: the source rides in the stored geometry JSON, beside the
+         * value it describes. The plan schema is untouched.
+         *
+         * PINNED. `SchemaInversionSourceContractTest` asserts this entry's
+         * marker in the published log, the tip literal, the key's declaration
+         * and description and the example. `SetGeometryPolicyTest` pins the
+         * rule; `SessionExportInversionSourceTest` in `:core:data` is the
+         * export differential.
          */
-        const val SCHEMA_VERSION = "1.25"
+        const val SCHEMA_VERSION = "1.26"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader that parses this field as
@@ -2699,6 +2739,7 @@ data class SessionExport(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5",
                 "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
                 "1.16", "1.17", "1.18", "1.19", "1.20", "1.21", "1.22", "1.23", "1.24", "1.25",
+                "1.26",
             )
 
         /**
@@ -4212,18 +4253,21 @@ data class GeometryExport(
  * here instead of restating it: three copies of the rule drifted, and two
  * review rounds running corrected them one file at a time.
  *
- * ONE of [GeometryExport]'s eight values is missing here: `sensorInverted`.
- * Plan schema 1.12 widened its plan key to `Boolean?`, so a declared `false`
- * and an omitted key are two distinct states there now and it COULD carry a
- * source the way the seven published values do; none is published because
- * that would add a required key to this object for a value no consumer reads
- * yet.
+ * Every one of [GeometryExport]'s eight values carries a source since 1.26
+ * (#289), when `sensorInverted` became the last. It was missing for a reason
+ * that no longer holds: plan schema 1.12 had already made its plan key
+ * `Boolean?`, so a declared `false` and an omitted key were distinct states,
+ * and it was left out only because a required key here was owed to a value
+ * no consumer read. Field-41 read it, and could not tell a reviewed mount
+ * from an unreviewed one. It is the one source that is OPTIONAL:
+ * [GeometrySources.sensorInverted] says why a set recorded before 1.26 has
+ * none, and [SetGeometryPolicy.describe] says how the four words are read.
  *
- * `sensorOnStack` was a second until #223 made the plan key nullable, and an
+ * `sensorOnStack` was without a source too until #223 made the plan key nullable, and an
  * omitted key on a machine the app seeds is answered from
  * [ExerciseDef.STACK_MOUNTED_IDS] and published as `seeded`.
  *
- * `bodyweight` was a third until 1.19 (#220), which publishes it. `#227`
+ * `bodyweight` was without one until 1.19 (#220), which publishes it. `#227`
  * ("Make bodyweight nullable so an omitted key is not a silent false") made
  * `PlanExerciseDef.bodyweight` a `Boolean?`, the same change #223 made for
  * `sensorOnStack`, so a declared `false` and an omitted key are two distinct
@@ -4240,6 +4284,8 @@ data class GeometrySourceExport(
     val travelRatio: String,
     val sensorOnStack: String,
     val bodyweight: String,
+    /** Absent on a set recorded before 1.26 (#289), which stored no answer; see the KDoc above. */
+    val sensorInverted: String? = null,
 )
 
 @Serializable
