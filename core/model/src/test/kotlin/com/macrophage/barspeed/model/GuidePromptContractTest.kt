@@ -550,5 +550,4 @@ class GuidePromptContractTest {
         val SKELETON_VERSION = Regex("\"schemaVersion\": *\"([^\"]*)\"")
         val PROSE_VERSION = Regex("""full (\d+\.\d+) contract""")
     }
-
 }
