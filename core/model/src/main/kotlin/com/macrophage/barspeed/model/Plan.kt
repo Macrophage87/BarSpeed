@@ -1014,9 +1014,12 @@ data class PlanExerciseDef(
     val progression: String? = null,
     /**
      * How the movement is performed: `"dynamic"`, `"hold"`, `"carry"` or
-     * `"explosive"`. Omitted → the built-in definition if there is one, then a
-     * guess from the id, which matches word fragments and gets ordinary names
-     * wrong.
+     * `"explosive"`. Omitted → the built-in definition if there is one, then
+     * [ExerciseDef.inferKind]'s guess from the id, read one whole
+     * underscore-separated token at a time. An id that runs two words together
+     * (`deadhang`, `kbswing`, `farmerswalk`) matches no token and falls to
+     * DYNAMIC; that loss is accepted rather than fixed (#67), because reading
+     * inside a token is the defect #24 reported and this key is the remedy.
      *
      * This says what the movement IS, not how a set of it is measured. Whether
      * a set runs on reps or on the clock comes from the set's own shape — see
