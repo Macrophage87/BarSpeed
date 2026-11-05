@@ -232,6 +232,9 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
             TopAppBar(
                 title = { Text(titleFor(state)) },
                 navigationIcon = {
+                    // Kept a TextButton (#201): the app bar's navigation slot, the same act as the
+                    // system back gesture. Leaving mid-set is the loss the exit gate guards, so it
+                    // should not invite.
                     TextButton(onClick = onBack) { Text("Back") }
                 },
                 actions = {
@@ -361,6 +364,8 @@ private fun ExitButton(
     onAction: (ExitAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Kept a TextButton (#201): every use is an exit dialog's action, and that dialog exists to
+    // make leaving deliberate.
     TextButton(onClick = { onAction(action) }, modifier = modifier) {
         Text(exitLabel(prompt, action), color = exitColor(action))
     }
@@ -508,6 +513,8 @@ private fun BodyWeightPromptDialog(
                 )
             }
         },
+        // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks them
+        // as its answers.
         confirmButton = {
             TextButton(onClick = { unit.parseToKg(text)?.takeIf { it > 0 }?.let(onSet) }) {
                 Text("Save and start")
@@ -589,6 +596,8 @@ private fun BodyWeightRequiredDialog(
                 )
             }
         },
+        // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks them
+        // as its answers.
         confirmButton = {
             TextButton(onClick = { parsed?.let(onSet) }, enabled = parsed != null) {
                 Text("Save and start")
@@ -1695,6 +1704,8 @@ internal fun ChangeSetDialog(
                 PrepAdjuster(state, viewModel)
             }
         },
+        // Kept a TextButton (#201): this dialog's one action; the dialog's frame already marks it
+        // as its answer.
         confirmButton = { TextButton(onClick = onDone) { Text("Done") } },
     )
 }
@@ -1835,6 +1846,7 @@ private fun addSetLabel(state: RecordState): String? {
 private fun RemoveSetSection(state: RecordState, viewModel: RecordViewModel) {
     val target = state.removeSetTarget ?: return
     val slot = state.queue.getOrNull(target.removeAt) ?: return
+    // Kept a TextButton (#201): the KDoc's STILL A TEXT CONTROL says why.
     TextButton(onClick = viewModel::removeAddedSetOfCurrentExercise) {
         Text(
             RemoveSetControl.label(
@@ -1908,6 +1920,8 @@ private fun SkipSetSection(state: RecordState, viewModel: RecordViewModel) {
     val target = state.skipSetTarget ?: return
     val slot = state.queue.getOrNull(target.skipAt) ?: return
     var confirming by remember(state.queueIndex, state.stage) { mutableStateOf(false) }
+    // Kept a TextButton (#201): it drops a prescribed set, so it is available rather than invited,
+    // like REMOVE above it.
     TextButton(onClick = { confirming = true }) {
         Text(
             SkipSetControl.label(slot.exercise.displayName, target.setNumber, target.lastOfBlock),
@@ -1925,6 +1939,8 @@ private fun SkipSetSection(state: RecordState, viewModel: RecordViewModel) {
                     color = BarColors.Sub,
                 )
             },
+            // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks
+            // them as its answers.
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1974,12 +1990,13 @@ private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel
                         color = BarColors.Sub,
                     )
                     choices.forEach { choice ->
-                        TextButton(
+                        OutlinedButton(
                             onClick = {
                                 showChooser = false
                                 viewModel.jumpToExercise(choice.exerciseId)
                             },
                             modifier = Modifier.fillMaxWidth(),
+                            contentPadding = ButtonDefaults.TextButtonContentPadding,
                         ) {
                             Text(
                                 "${choice.displayName} — ${choice.setsLeft} " +
@@ -1989,6 +2006,8 @@ private fun SwitchExerciseSection(state: RecordState, viewModel: RecordViewModel
                     }
                 }
             },
+            // Kept a TextButton (#201): this dialog's one action; the dialog's frame already marks
+            // it as its answer.
             confirmButton = {
                 TextButton(onClick = { showChooser = false }) { Text("Cancel") }
             },
@@ -3532,6 +3551,8 @@ private fun SessionCloseControls(state: RecordState, viewModel: RecordViewModel)
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
             ) { Text("FINISH SESSION", textAlign = TextAlign.Center) }
         } else {
+            // Kept a TextButton (#201): the secondary close while START NEXT SET is primary; the
+            // branch above fills it when finishing is what is left.
             TextButton(onClick = viewModel::askSessionRpe, modifier = Modifier.fillMaxWidth()) {
                 Text("Finish session", color = BarColors.Sub)
             }
@@ -3617,6 +3638,8 @@ private fun SessionRpePanel(viewModel: RecordViewModel) {
         // Null at the call site, not a default on the ViewModel: an unrated
         // session is a decision the lifter made here, and it is recorded as an
         // absence rather than as a number nobody said.
+        // Kept a TextButton (#201): #159's deliberately subdued skip, so declining to rate does not
+        // compete with the ratings.
         TextButton(onClick = { viewModel.finishSession(null) }, modifier = Modifier.fillMaxWidth()) {
             Text("Finish without rating", color = BarColors.Sub)
         }

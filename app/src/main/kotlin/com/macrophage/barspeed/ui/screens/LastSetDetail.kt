@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -281,6 +282,8 @@ private fun CorrectionDialog(
                 DraftLimiterSection(state, timed, limiter, note, { limiter = it }) { note = it }
             }
         },
+        // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks them
+        // as its answers.
         confirmButton = {
             TextButton(onClick = {
                 // Both halves of a retraction, which is what [LimiterPage]'s
@@ -468,7 +471,7 @@ private fun DraftWarmupRow(state: RecordState, warmup: Boolean, onDraft: (Boolea
             color = if (warmup) BarColors.Sub else BarColors.Volt,
             modifier = Modifier.weight(1f),
         )
-        TextButton(onClick = { onDraft(!warmup) }) {
+        OutlinedButton(onClick = { onDraft(!warmup) }, contentPadding = ButtonDefaults.TextButtonContentPadding) {
             Text(if (warmup) "Not a warm-up" else "Warm-up", color = BarColors.Sub)
         }
     }
@@ -689,9 +692,13 @@ private fun Stepper(
     ) {
         if (label != null) Text(label, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
         if (bigDownLabel != null && onBigDown != null) {
-            TextButton(onClick = onBigDown) { Text(bigDownLabel, style = MaterialTheme.typography.bodySmall) }
+            OutlinedButton(onClick = onBigDown, contentPadding = ButtonDefaults.TextButtonContentPadding) {
+                Text(bigDownLabel, style = MaterialTheme.typography.bodySmall)
+            }
         }
-        TextButton(onClick = onDown) { Text("−", style = MaterialTheme.typography.titleMedium) }
+        OutlinedButton(onClick = onDown, contentPadding = ButtonDefaults.TextButtonContentPadding) {
+            Text("−", style = MaterialTheme.typography.titleMedium)
+        }
         if (figure != null) {
             Text(
                 figure,
@@ -699,7 +706,9 @@ private fun Stepper(
                 color = if (corrected) BarColors.Amber else BarColors.Text,
             )
         }
-        TextButton(onClick = onUp) { Text("+", style = MaterialTheme.typography.titleMedium) }
+        OutlinedButton(onClick = onUp, contentPadding = ButtonDefaults.TextButtonContentPadding) {
+            Text("+", style = MaterialTheme.typography.titleMedium)
+        }
     }
 }
 

@@ -179,6 +179,7 @@ internal fun RestEffortPromptSection(state: RecordState, viewModel: RecordViewMo
     // already representable. The Correct button's popup reopens the same grid
     // for the rest of the rest period.
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        // Kept a TextButton (#201): the effort grid's quiet half (#189), findable but not invited.
         TextButton(onClick = { answered = true }, modifier = Modifier.weight(1f)) { Text("SKIP") }
     }
     Spacer(Modifier.height(10.dp))

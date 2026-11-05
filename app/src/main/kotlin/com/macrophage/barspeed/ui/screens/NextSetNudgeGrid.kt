@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -237,11 +238,19 @@ internal fun NextSetNudgeSection(state: RecordState, viewModel: RecordViewModel)
         // hold it was seeded with, and no statement is recorded -- there is
         // nothing for the export to carry, because declining to change
         // something is already what an absent statement means.
+        // Kept a TextButton (#201): the quiet half of this row, present and findable but not
+        // invited, as the effort grid's SKIP is.
         TextButton(onClick = { done = true }, modifier = Modifier.weight(1f)) { Text("SKIP") }
         // The existing surface, not a second load editor. Everything in that
         // dialog is reachable whatever this exercise declares, which is the
         // owner's "the user can still change it on the usual screen".
-        TextButton(onClick = { changing = true }, modifier = Modifier.weight(1f)) { Text("CUSTOM") }
+        OutlinedButton(
+            onClick = { changing = true },
+            modifier = Modifier.weight(1f),
+            contentPadding = ButtonDefaults.TextButtonContentPadding,
+        ) {
+            Text("CUSTOM")
+        }
     }
 }
 

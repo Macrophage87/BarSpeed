@@ -21,6 +21,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -81,6 +82,8 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
             TopAppBar(
                 title = { Text("Plans") },
                 navigationIcon = {
+                    // Kept a TextButton (#201): the app bar's navigation slot, the same act as the
+                    // system back gesture.
                     TextButton(onClick = { navController.popBackStack() }) { Text("Back") }
                 },
             )
@@ -167,6 +170,8 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                     placeholder = { Text("Paste plan JSON here") },
                 )
             },
+            // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks
+            // them as its answers.
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -236,6 +241,8 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                         )
                     }
                 },
+                // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already
+                // marks them as its answers.
                 confirmButton = {
                     TextButton(onClick = { viewModel.approve(summary.planId) }) { Text("Approve") }
                 },
@@ -263,6 +270,8 @@ fun PlansScreen(navController: NavController, viewModel: PlansViewModel = viewMo
                         )
                     }
                 },
+                // Kept a TextButton (#201): this dialog's one action; the dialog's frame already
+                // marks it as its answer.
                 confirmButton = {
                     TextButton(onClick = viewModel::dismissImportResult) { Text("OK") }
                 },
@@ -330,7 +339,12 @@ private fun MoreLine(total: Int, shown: Int) {
 @Composable
 private fun CopyForTheAuthor(label: String, text: String, clipboard: androidx.compose.ui.platform.ClipboardManager) {
     Spacer(Modifier.height(6.dp))
-    TextButton(onClick = { clipboard.setText(AnnotatedString(text)) }) { Text(label) }
+    OutlinedButton(
+        onClick = { clipboard.setText(AnnotatedString(text)) },
+        contentPadding = ButtonDefaults.TextButtonContentPadding,
+    ) {
+        Text(label)
+    }
 }
 
 /** Every line, never the truncated view, with a heading that survives a paste. */
@@ -360,7 +374,7 @@ private fun PlanCard(row: PlanRow, viewModel: PlansViewModel, onConfirmSwitch: (
                     // Anything else changes which plan the app follows, and the
                     // dialog is where that is said in words.
                     is PlanStartDecision.Startable ->
-                        TextButton(
+                        OutlinedButton(
                             onClick = {
                                 if (start.switch == null) {
                                     viewModel.start(plan.id, activateFirst = false)
@@ -368,11 +382,19 @@ private fun PlanCard(row: PlanRow, viewModel: PlansViewModel, onConfirmSwitch: (
                                     onConfirmSwitch()
                                 }
                             },
+                            contentPadding = ButtonDefaults.TextButtonContentPadding,
                         ) { Text("Start", color = BarColors.Volt) }
                 }
                 if (plan.status != PlanEntity.STATUS_ACTIVE) {
-                    TextButton(onClick = { viewModel.activate(plan.id) }) { Text("Make active") }
+                    OutlinedButton(
+                        onClick = { viewModel.activate(plan.id) },
+                        contentPadding = ButtonDefaults.TextButtonContentPadding,
+                    ) {
+                        Text("Make active")
+                    }
                 }
+                // Kept a TextButton (#201): it deletes the plan without asking, so it must not read
+                // as the card's next step.
                 TextButton(onClick = { viewModel.delete(plan.id) }) { Text("Delete") }
             }
         }
@@ -394,6 +416,8 @@ private fun ConfirmSwitchDialog(row: PlanRow, viewModel: PlansViewModel, onDismi
         onDismissRequest = onDismiss,
         title = { Text(switch.title) },
         text = { Text(switch.body, style = MaterialTheme.typography.bodySmall) },
+        // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks them
+        // as its answers.
         confirmButton = {
             TextButton(
                 onClick = {

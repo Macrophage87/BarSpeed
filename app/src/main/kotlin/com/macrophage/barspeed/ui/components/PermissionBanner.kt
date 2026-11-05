@@ -6,10 +6,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -93,10 +94,14 @@ fun PermissionBannerBody(step: BlePermissionStep, headline: Boolean = false) {
             // happens leaves something on screen rather than the silence this
             // defect hid behind.
             if (step == BlePermissionStep.ASK_AGAIN || step == BlePermissionStep.ASK_AGAIN_OR_SETTINGS) {
-                TextButton(onClick = ui.request) { Text("Grant") }
+                OutlinedButton(onClick = ui.request, contentPadding = ButtonDefaults.TextButtonContentPadding) {
+                    Text("Grant")
+                }
             }
             if (step == BlePermissionStep.SETTINGS_ONLY || step == BlePermissionStep.ASK_AGAIN_OR_SETTINGS) {
-                TextButton(onClick = ui.openSettings) { Text("Open settings") }
+                OutlinedButton(onClick = ui.openSettings, contentPadding = ButtonDefaults.TextButtonContentPadding) {
+                    Text("Open settings")
+                }
             }
         }
     }

@@ -94,6 +94,8 @@ fun ExpandableNote(visible: String?, behindTap: String?, color: Color, modifier:
             Text(behindTap, style = MaterialTheme.typography.bodySmall, color = color)
         }
         if (hasMore) {
+            // Kept a TextButton (#201): a disclosure toggle inline with the note it opens; it
+            // reveals rather than acts.
             TextButton(
                 onClick = { expanded = !expanded },
                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),

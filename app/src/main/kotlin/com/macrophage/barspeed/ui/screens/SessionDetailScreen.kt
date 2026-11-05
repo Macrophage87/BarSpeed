@@ -92,6 +92,8 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
                         "and their raw sensor data. This cannot be undone.",
                 )
             },
+            // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks
+            // them as its answers.
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -111,9 +113,13 @@ fun SessionDetailScreen(navController: NavController, sessionId: Long) {
             TopAppBar(
                 title = { Text(session?.planSessionName ?: "Session") },
                 navigationIcon = {
+                    // Kept a TextButton (#201): the app bar's navigation slot, the same act as the
+                    // system back gesture.
                     TextButton(onClick = { navController.popBackStack() }) { Text("Back") }
                 },
                 actions = {
+                    // Kept a TextButton (#201): destructive, behind a confirmation, and quieter
+                    // than the record it would delete.
                     TextButton(onClick = { showDeleteConfirm = true }) {
                         Text("Delete", color = BarColors.Red)
                     }
@@ -341,6 +347,8 @@ private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel) 
                     )
                 }
             },
+            // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks
+            // them as its answers.
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -369,6 +377,8 @@ private fun VoidRow(record: SetRecordEntity, viewModel: SessionDetailViewModel) 
             }
         }
     }
+    // Kept a TextButton (#201): a rare correction to history, available rather than invited; its
+    // label carries the state.
     TextButton(
         onClick = {
             if (record.voided) {

@@ -193,6 +193,8 @@ fun GuideScreen(navController: NavController) {
             TopAppBar(
                 title = { Text("Guide") },
                 navigationIcon = {
+                    // Kept a TextButton (#201): the app bar's navigation slot, the same act as the
+                    // system back gesture.
                     TextButton(onClick = { navController.popBackStack() }) { Text("Back") }
                 },
             )

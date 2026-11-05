@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -159,7 +160,10 @@ private fun PreferenceRow(control: PreferenceControl, onUse: () -> Unit) {
     when (control) {
         is PreferenceControl.InUse ->
             Text(control.line, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
-        is PreferenceControl.Offer -> TextButton(onClick = onUse) { Text(control.label) }
+        is PreferenceControl.Offer ->
+            OutlinedButton(onClick = onUse, contentPadding = ButtonDefaults.TextButtonContentPadding) {
+                Text(control.label)
+            }
     }
 }
 
@@ -189,6 +193,8 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
             TopAppBar(
                 title = { Text("Devices") },
                 navigationIcon = {
+                    // Kept a TextButton (#201): the app bar's navigation slot, the same act as the
+                    // system back gesture.
                     TextButton(onClick = { navController.popBackStack() }) { Text("Back") }
                 },
             )
@@ -286,6 +292,8 @@ fun DevicesScreen(navController: NavController, viewModel: DevicesViewModel = vi
                             } else {
                                 ConnectionChip(device.role.name, state, delivery = delivery)
                             }
+                            // Kept a TextButton (#201): it unpairs the unit, so it stays quieter
+                            // than the controls that pair one.
                             TextButton(onClick = { viewModel.forget(device) }) { Text("Forget") }
                         }
                         // Outside the IMU block: which unit of a role the app

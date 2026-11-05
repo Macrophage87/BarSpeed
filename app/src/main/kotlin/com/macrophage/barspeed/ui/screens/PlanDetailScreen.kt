@@ -85,6 +85,8 @@ fun PlanDetailScreen(navController: NavController, planId: Long) {
             TopAppBar(
                 title = {},
                 navigationIcon = {
+                    // Kept a TextButton (#201): the app bar's navigation slot, the same act as the
+                    // system back gesture.
                     TextButton(onClick = { navController.popBackStack() }) { Text("Back") }
                 },
             )
@@ -222,6 +224,8 @@ private fun ConfirmSwitchDialog(start: PlanStartDecision?, viewModel: PlanDetail
         onDismissRequest = onDismiss,
         title = { Text(switch.title) },
         text = { Text(switch.body, style = MaterialTheme.typography.bodySmall) },
+        // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks them
+        // as its answers.
         confirmButton = {
             TextButton(
                 onClick = {

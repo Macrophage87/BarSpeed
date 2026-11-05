@@ -56,6 +56,8 @@ fun BodyWeightDialog(current: Double?, unit: WeightUnit, onDismiss: () -> Unit, 
                 )
             }
         },
+        // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks them
+        // as its answers.
         confirmButton = {
             TextButton(onClick = { unit.parseToKg(text)?.takeIf { it > 0 }?.let(onSet) }) { Text("Save") }
         },

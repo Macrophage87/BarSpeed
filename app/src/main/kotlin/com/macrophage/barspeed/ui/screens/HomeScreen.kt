@@ -18,9 +18,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -108,6 +110,8 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
                         val imuDelivery = rememberArmedDelivery(imuState, imuFrameAtMs, imuArmedAtMs)
                         HomeSensorDot("IMU", imuState, imuDelivery) { navController.navigate("devices") }
                         HomeSensorDot("HRM", hrmState, null) { navController.navigate("devices") }
+                        // Kept a TextButton (#201): a setting in the app bar's action slot, beside
+                        // the sensor dots, not a next step.
                         TextButton(onClick = viewModel::toggleWeightUnit) {
                             Text("${state.weightUnit.suffix} ⇄", color = BarColors.Sub)
                         }
@@ -156,13 +160,25 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = viewMode
             }
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                TextButton(onClick = { navController.navigate("devices") }, modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    onClick = { navController.navigate("devices") },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = ButtonDefaults.TextButtonContentPadding,
+                ) {
                     Text("Devices", color = BarColors.Sub)
                 }
-                TextButton(onClick = { navController.navigate("plans") }, modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    onClick = { navController.navigate("plans") },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = ButtonDefaults.TextButtonContentPadding,
+                ) {
                     Text("Plans", color = BarColors.Sub)
                 }
-                TextButton(onClick = { navController.navigate("guide") }, modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    onClick = { navController.navigate("guide") },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = ButtonDefaults.TextButtonContentPadding,
+                ) {
                     Text("Guide", color = BarColors.Sub)
                 }
             }
@@ -363,9 +379,15 @@ private fun InterruptedSetNotice(
                     SectionCaption("Kept on this phone. Nothing deletes it but you")
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { onShare(orphan) }, enabled = !isBusy) {
+                        OutlinedButton(
+                            onClick = { onShare(orphan) },
+                            enabled = !isBusy,
+                            contentPadding = ButtonDefaults.TextButtonContentPadding,
+                        ) {
                             Text("SEND IT TO ME", color = BarColors.Volt)
                         }
+                        // Kept a TextButton (#201): destructive, so it stays quieter than the SEND
+                        // beside it.
                         TextButton(onClick = { onDiscard(orphan) }, enabled = !isBusy) {
                             Text("DISCARD", color = BarColors.Red)
                         }
@@ -444,13 +466,21 @@ private fun CrashReportNotice(
             SectionCaption("Kept on this phone, newest ten. Nothing sends it but you")
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { onShare(newest) }, enabled = !newestBusy) {
+                OutlinedButton(
+                    onClick = { onShare(newest) },
+                    enabled = !newestBusy,
+                    contentPadding = ButtonDefaults.TextButtonContentPadding,
+                ) {
                     Text("SEND IT TO ME", color = BarColors.Volt)
                 }
+                // Kept a TextButton (#201): destructive, so it stays quieter than the SEND beside
+                // it.
                 TextButton(onClick = { onDelete(newest) }) {
                     Text("DELETE", color = BarColors.Red)
                 }
                 if (older.isNotEmpty()) {
+                    // Kept a TextButton (#201): a disclosure toggle; it reveals the older reports
+                    // rather than acting on one.
                     TextButton(onClick = { showOlder = !showOlder }) {
                         Text(if (showOlder) "HIDE OLDER" else "OLDER (${older.size})", color = BarColors.Sub)
                     }
@@ -469,9 +499,15 @@ private fun CrashReportNotice(
                             color = BarColors.Sub,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { onShare(report) }, enabled = !isBusy) {
+                        OutlinedButton(
+                            onClick = { onShare(report) },
+                            enabled = !isBusy,
+                            contentPadding = ButtonDefaults.TextButtonContentPadding,
+                        ) {
                             Text("SEND", color = BarColors.Volt)
                         }
+                        // Kept a TextButton (#201): destructive, so it stays quieter than the SEND
+                        // beside it.
                         TextButton(onClick = { onDelete(report) }) {
                             Text("DELETE", color = BarColors.Red)
                         }
@@ -538,6 +574,8 @@ private fun RescuedDatabaseNotice(
             onDismissRequest = { confirmDiscard = null },
             title = { Text("Discard this rescued database?") },
             text = { Text(rescuedDiscardWarning(item)) },
+            // Kept TextButtons (#201): this dialog's two actions; the dialog's frame already marks
+            // them as its answers.
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -579,10 +617,16 @@ private fun RescuedDatabaseNotice(
                         // valid, empty 22-byte zip -- an attachment that
                         // arrives and looks like a backup.
                         if (item.completeness != RescueCompleteness.NOTHING) {
-                            TextButton(onClick = { onShare(item) }, enabled = !isBusy) {
+                            OutlinedButton(
+                                onClick = { onShare(item) },
+                                enabled = !isBusy,
+                                contentPadding = ButtonDefaults.TextButtonContentPadding,
+                            ) {
                                 Text("SEND IT TO ME", color = BarColors.Volt)
                             }
                         }
+                        // Kept a TextButton (#201): destructive (it asks first), so it stays
+                        // quieter than the SEND beside it.
                         TextButton(onClick = { confirmDiscard = item }, enabled = !isBusy) {
                             Text("DISCARD", color = BarColors.Red)
                         }
