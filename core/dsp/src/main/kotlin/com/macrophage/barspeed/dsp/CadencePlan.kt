@@ -354,10 +354,17 @@ data class CadenceBeat(
  *   still hears one movement word per rep -- the other stroke's -- and the rep
  *   number arrives exactly where the replaced one did.
  *
- * A mid-rep isometric pause of [CALL_MIN_STROKE_S] seconds or more could carry
- * a call the way case 3 does. No prescription in the corpus has one, and a home
- * nothing exercises is a home nothing checks, so it is named here and not
- * built.
+ * A MID-REP PAUSE ALREADY CARRIES THE CALL WHERE THE DRIVE OPENS THE REP:
+ * case 2's beat that opens as the drive ends is that pause whenever one
+ * follows the drive, so leg press `1012` speaks on its `Hold`. Where the drive
+ * CLOSES the rep -- the three eccentric-first lifts -- the pause sits between
+ * the return and the drive, and a call there would be a third instant, the
+ * turnaround, that neither #266 nor #293 ruled on. It is not built (#149):
+ * the placement is the owner's to rule, and no prescription in the corpus has
+ * one. `CadencePlanTest` pins the twelve silent pairs, of 1,380, that have a
+ * mid-rep pause of [CALL_MIN_STROKE_S] seconds or more, all eccentric-first.
+ * This paragraph used to say a mid-rep pause carried no call anywhere, which
+ * stopped being true with #266.
  *
  * ## What a call writes to the cue track
  *

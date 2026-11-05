@@ -375,6 +375,85 @@ class CadencePlanTest {
     }
 
     @Test
+    fun `a mid-rep pause carries the call where the drive opens the rep, and is silent where it closes it`() {
+        // Issue #149, measured rather than built. The issue reported 72 silent
+        // (tempo, lift) pairs over this sweep, 24 of them with a mid-rep pause
+        // of at least CALL_MIN_STROKE_S, and leg press 1012 silent with room
+        // to speak. That was before #266 and #293. On this sweep today:
+        //
+        // - leg press 1012 SPEAKS, on beat 1, its `Hold`: #266's beat that
+        //   opens as the drive ends IS the mid-rep pause whenever the drive
+        //   opens the rep and a pause follows it. The issue's own example no
+        //   longer reproduces.
+        // - 39 of 1,380 pairs are silent, and 12 of those have a mid-rep pause
+        //   of two seconds or more. All 12 are on the three ECCENTRIC-FIRST
+        //   lifts, where the pause sits between the return and the drive that
+        //   closes the rep.
+        //
+        // A call on that pause would be a placement nobody has ruled on: not
+        // the start of the rep (#293) and not the lockout (#266), but the
+        // turnaround, mid-rep, naming the rep in hand. And the two-second
+        // threshold is pre-#293 arithmetic; a call takes its beat's word now,
+        // so a one-second pause would serve as well, which reaches bench 1110,
+        // the pair `LockoutRepCallTest` argues stays silent. So the home is
+        // not built here; it waits on the owner. This pins the population it
+        // would reach, so a plan that starts prescribing one shows up here.
+        val whole = (0..4).flatMap { d1 ->
+            (0..2).flatMap { d2 ->
+                (0..4).flatMap { d3 ->
+                    (0..2).map { d4 -> "$d1$d2$d3$d4" }
+                }
+            }
+        }
+        val notations = whole + listOf("30X0", "20X1", "10X0", "3-0-1.5-0", "1-0-2.5-1")
+        val lifts = mapOf(
+            "bench" to benchPress,
+            "leg curl" to legCurl,
+            "face pull" to facePull,
+            "leg press" to legPress,
+            "lat pulldown ecc-first" to latPulldownEccFirst,
+            "chest press ecc-first" to chestPressEccFirst,
+        )
+        var silent = 0
+        val silentWithMidPause = mutableListOf<String>()
+        notations.forEach { n ->
+            lifts.forEach { (name, lift) ->
+                val p = plan(n, lift)
+                if (p.announceOnBeat == null) {
+                    silent++
+                    val hold = p.beats.getOrNull(1)?.takeIf { !it.isStroke && it.label == CadencePlan.HOLD }
+                    if (hold != null && hold.seconds >= CadencePlan.CALL_MIN_STROKE_S) {
+                        silentWithMidPause += "$name $n"
+                        assertEquals(StartPhase.ECCENTRIC, lift.startsWith, "$name $n: silent with a mid-rep pause")
+                    }
+                }
+            }
+        }
+        assertEquals(39, silent, "silent pairs of 1,380")
+        assertEquals(
+            listOf(
+                "bench 0200",
+                "bench 0210",
+                "bench 1200",
+                "bench 1210",
+                "chest press ecc-first 0200",
+                "chest press ecc-first 0210",
+                "chest press ecc-first 1200",
+                "chest press ecc-first 1210",
+                "lat pulldown ecc-first 0002",
+                "lat pulldown ecc-first 0012",
+                "lat pulldown ecc-first 1002",
+                "lat pulldown ecc-first 1012",
+            ),
+            silentWithMidPause.sorted(),
+            "silent pairs with a mid-rep pause of CALL_MIN_STROKE_S or more",
+        )
+        val legPress1012 = plan("1012", legPress)
+        assertEquals(1, legPress1012.announceOnBeat, "leg press 1012: the issue's silent example speaks")
+        assertEquals(CadencePlan.HOLD, legPress1012.beats[1].label, "and the beat it speaks on is the mid-rep pause")
+    }
+
+    @Test
     fun `no plan ever contains a beat the prescription did not ask for`() {
         // The regression guard. BREATHE was the beat issue 106 inserted; it may
         // now appear only when the prescription actually prescribes a closing
