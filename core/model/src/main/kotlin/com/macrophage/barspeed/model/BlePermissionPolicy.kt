@@ -7,10 +7,16 @@ package com.macrophage.barspeed.model
  * manifest has to declare for that choice to be legal. `ForegroundServiceContractTest`
  * pins the two together: the platform rejects a type the manifest never
  * declared, and nothing else in this build checks the pair.
+ *
+ * [platformType] is the `ServiceInfo.FOREGROUND_SERVICE_TYPE_*` int that
+ * `RecordingService` is to hand `ServiceCompat.startForeground` for this
+ * choice (#52). DECLARED, NOT YET READ: both members carry 0 here and the
+ * service still maps the enum itself; the values this has to carry are
+ * pinned by the commit after this one.
  */
-enum class FgsTypeChoice(val manifestToken: String) {
-    CONNECTED_DEVICE("connectedDevice"),
-    SPECIAL_USE("specialUse"),
+enum class FgsTypeChoice(val manifestToken: String, val platformType: Int) {
+    CONNECTED_DEVICE("connectedDevice", 0),
+    SPECIAL_USE("specialUse", 0),
 }
 
 /**
