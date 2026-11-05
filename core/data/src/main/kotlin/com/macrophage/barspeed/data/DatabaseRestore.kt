@@ -169,7 +169,7 @@ class DatabaseRestore(
      * which refuses a lone sidecar and nothing else. That is the one
      * remaining path on which a stuck restore can open a main file whose
      * `-wal` went into a rescue directory: a journal from a later build read
-     * after a downgrade, or one emptied by power loss. It is kept rather than
+     * after a downgrade, or one damaged on disk. It is kept rather than
      * refused because a refusal stops every launch over a bookkeeping file
      * even when the database at the path is whole and untouched, which is
      * the case a journal that cannot be read most often is. Round 2 review,
@@ -386,10 +386,14 @@ class DatabaseRestore(
         },
     )
 
-    /** Temp file, then rename over the target: a reader sees the old text or the new, never half. */
+    /**
+     * Temp file, synced, then rename over the target: a reader sees the old
+     * text or the new, never half. The sync is for power loss; see
+     * [DatabaseRescue.writeSynced]. Round 2 review, A's N1.
+     */
     private fun writeAtomically(target: File, text: String): Boolean = runCatching {
         val temp = File(target.path + ".tmp")
-        temp.writeText(text)
+        DatabaseRescue.writeSynced(temp, text)
         temp.renameTo(target)
     }.getOrDefault(false)
 
