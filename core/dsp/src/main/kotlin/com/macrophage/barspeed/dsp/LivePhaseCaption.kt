@@ -25,13 +25,38 @@ import com.macrophage.barspeed.model.Phase
  *   positive; its strokes read "Driving" and "Returning" and either pause
  *   "Pause".
  *
- * The plane and drive read are the LIFTER'S ([LiftDirection.plane],
- * [LiftDirection.concentricUp]), not the sensor's: a row measured off the
- * stack is still a horizontal lift to the person doing it.
+ * WHOSE UP. [LiftDirection.concentricUp] is the DECLARED drive, not a
+ * reading of the lifter: `ExerciseDef.concentricUp` is never inferred from
+ * the exercise id and stays true until a plan says otherwise. Up and down
+ * are said only where the tracker's frame is the declaration's:
+ *
+ * - On the stack and NOT inverted ([LiftDirection.sensorOnStack] true,
+ *   [LiftDirection.sensorInverted] false) the tracker reads the STACK's
+ *   travel. That is every stack-table pushdown, pulldown or leg curl whose
+ *   plan left `concentric` at the default, where the stack rises as the
+ *   lifter pulls the handle down. No word there says up or down: the strokes
+ *   read "Driving" and "Returning" and either pause "Pause", as on a
+ *   horizontal lift. This also covers the frame #280's fallback can rebuild
+ *   the tracker into, since a rebuild is reachable only from this
+ *   declaration and changes only the stack term.
+ * - Inverted, the tracker reads the lifter's end of the cable, so a drive
+ *   declared down on the stack (rule 3 of `SetGeometryPolicy.stackInversion`)
+ *   reads "Driving down".
+ *
+ * Not covered, and not this caption's to fix: where the declaration is
+ * wrong about a frame it does read -- a drive-down lift measured OFF the
+ * stack with `concentric` left at the default, or an assist stack whose
+ * counterweight falls as the lifter rises -- the tracker names the strokes
+ * the other way round, and the caption names the stroke the tracker names.
+ * Stack-mounted drive-up lifts (a cable curl, a leg extension) lose their
+ * "up" with this rule; "Driving" stays true of them.
  *
  * A withdrawn label draws no caption. [Phase.IDLE] is also the state before an
  * eccentric-first lift's first stroke, which keeps "Ready"; mid-set, with the
- * label withdrawn, "Ready" would say the set had not started.
+ * label withdrawn, "Ready" would say the set had not started. A withheld live
+ * count (#280) draws none either: the screen publishes an empty
+ * [LiveSetState] for the rest of the set, and its IDLE is not the set's
+ * opening one.
  */
 object LivePhaseCaption {
     /**
@@ -40,28 +65,28 @@ object LivePhaseCaption {
      * [countWithheld] the screen's `liveCountWithheld`: true once #280's
      * fallback has given up the live count for the rest of the set, which
      * drops the tracker and leaves [phase] at the [Phase.IDLE] of an empty
-     * [LiveSetState]. Not read yet.
+     * [LiveSetState].
      */
-    @Suppress("UNUSED_PARAMETER")
     fun of(phase: Phase, direction: LiftDirection, labelWithdrawn: Boolean, countWithheld: Boolean): String? {
-        if (labelWithdrawn) return null
-        val horizontal = direction.plane == MovementPlane.HORIZONTAL
+        if (labelWithdrawn || countWithheld) return null
+        val stackFrame = direction.sensorOnStack && !direction.sensorInverted
+        val neutral = direction.plane == MovementPlane.HORIZONTAL || stackFrame
         val up = direction.concentricUp
         return when (phase) {
             Phase.IDLE -> "Ready"
             Phase.ECCENTRIC -> when {
-                horizontal -> "Returning"
+                neutral -> "Returning"
                 up -> "Lowering"
                 else -> "Raising"
             }
             Phase.CONCENTRIC -> when {
-                horizontal -> "Driving"
+                neutral -> "Driving"
                 up -> "Driving up"
                 else -> "Driving down"
             }
-            Phase.BOTTOM_PAUSE -> if (horizontal) "Pause" else "Bottom pause"
+            Phase.BOTTOM_PAUSE -> if (neutral) "Pause" else "Bottom pause"
             Phase.TOP_PAUSE -> when {
-                horizontal -> "Pause"
+                neutral -> "Pause"
                 up -> "Lockout"
                 else -> "Top pause"
             }
