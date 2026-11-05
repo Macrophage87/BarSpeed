@@ -11,12 +11,14 @@ import java.io.InputStream
  * checkpoint copies them back. `PRAGMA user_version` lives in page 1, so a
  * migration that bumps it is, until that checkpoint, in the `-wal` only, and
  * bytes 60-63 of the main file still carry the version before it. Measured
- * while #101 was gated and again for this change, against real SQLite files
- * (SQLite 3.53.1 through Python's `sqlite3`, WAL mode, autocheckpoint off,
- * the three files copied while the writer still held them open): the main
- * file read 0 at bytes 60-63 while SQLite, reading through the `-wal`,
- * reported 21. A package installer force-stopping the app for an in-place
- * reinstall produces exactly that shape -- nothing gets to checkpoint.
+ * while #101 was gated (main file 0, SQLite through the `-wal` 10) and again
+ * for this change with SQLite 3.53.1 through Python's `sqlite3`, WAL mode,
+ * autocheckpoint off, the three files copied while the writer still held
+ * them open (main file 0, and in a second copy 10; SQLite through the `-wal`
+ * 21 in both). A package installer force-stopping the app for an in-place
+ * reinstall is expected to leave the same shape, because a force-stop gives
+ * nothing a chance to checkpoint -- reasoned, not observed on a phone, and a
+ * `[Field]` item.
  *
  * WHAT THIS DOES, stated as what SQLite does, because it has to be the same
  * thing. When the first connection opens a database whose `-wal` is not
@@ -50,11 +52,11 @@ import java.io.InputStream
  * this and a wrong answer.
  *
  * NOT BOUNDED IN SIZE. The checksum is a running one, so reaching the last
- * commit means reading every frame before it. Room's autocheckpoint keeps a
- * healthy `-wal` near 1,000 pages (about 4 MB at the default 4 KB page), but
- * nothing bounds a log a checkpoint never reached. The read is streamed one
- * frame at a time, so its memory is one page whatever the length; its time on
- * a phone for a long log is unmeasured.
+ * commit means reading every frame before it. SQLite's default
+ * autocheckpoint is 1,000 pages; the value the framework sets on the owner's
+ * phone is unverified, and nothing bounds a log a checkpoint never reached.
+ * The read is streamed one frame at a time, so its memory is one page
+ * whatever the length; its time on a phone for a long log is unmeasured.
  */
 object SqliteWal {
     /** The `-wal` file header. */
