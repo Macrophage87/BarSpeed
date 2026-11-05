@@ -62,6 +62,15 @@ tasks.withType<Test>().configureEach {
     // nothing in :core:data has any business needing a quarter of a gigabyte,
     // and if one ever does, this is where it says so.
     maxHeapSize = "256m"
+    // RawExporterTest and RawExporterDualSensorTest hold manifests the writer
+    // really produced to the PUBLISHED raw-meta schema (#326) -- the document a
+    // consumer validates against, not a copy of it, for the reason
+    // core/model/build.gradle.kts gives for SchemaContractTest. Declared as an
+    // input as well as passed as a path, so a change to the schema alone
+    // re-runs these tests instead of restoring them from the build cache.
+    val rawMetaSchema = rootProject.file("docs/schemas/raw-meta.schema.json")
+    inputs.file(rawMetaSchema).withPropertyName("rawMetaSchema").withPathSensitivity(PathSensitivity.NONE)
+    systemProperty("barspeed.rawMetaSchema", rawMetaSchema.absolutePath)
 }
 
 room {

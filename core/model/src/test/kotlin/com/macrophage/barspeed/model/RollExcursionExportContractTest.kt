@@ -10,8 +10,10 @@ import kotlin.test.assertTrue
 /**
  * What the archive's two documents say about `rollExcursion_deg`. Issue #133.
  *
- * The key lives in the raw zip's `meta.json`, which has no published schema of
- * its own, so the two places a reader is told what it means are the
+ * The key lives in the raw zip's `meta.json`, which had no published schema
+ * of its own when this was written (raw-meta.schema.json since #326, whose
+ * description of the key these pins do not read), so the two places a reader
+ * is told what it means are the
  * `schemaVersion` changelog in `session-export.schema.json` -- the archive's
  * only versioned document -- and the analysis-prompt half of `PLAN_PROMPT`,
  * the one prompt constant `GuideScreen.kt` declares, which the COPY PLAN

@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -36,10 +37,12 @@ import kotlin.test.assertTrue
  *
  * The zip is the artifact everything else is recoverable from: the DSP's output
  * can always be recomputed from the gzipped CSVs, so what matters here is that
- * the manifest describes those CSVs truthfully. `meta.json` has no published
- * schema -- `docs/schemas/` holds only the plan and session-export documents --
- * so nothing but these tests states what it contains, and a reader has only
- * `ImuCsv`'s KDoc to interpret it by, which is not shipped in the zip.
+ * the manifest describes those CSVs truthfully. Since #326 its shape is
+ * published as `docs/schemas/raw-meta.schema.json`; until then nothing but
+ * these tests stated what it contains. The schema says which keys and words
+ * may appear; these tests still say which ones a given row produces, and
+ * `every key the manifest writes is declared by the published schema` holds
+ * the two together.
  *
  * The manifest is built by string concatenation rather than serialized, so
  * "is it still valid JSON" is a real question and is asserted rather than
@@ -50,9 +53,10 @@ import kotlin.test.assertTrue
  * output and nothing about what the database did with it.
  *
  * `LargeClass` is suppressed rather than obeyed, and that is a decision about
- * THIS document rather than a general dispensation. `meta.json` has no
- * published schema, so the exact-key-set pins above are its only definition,
- * and a definition split across files is one that can disagree with itself --
+ * THIS document rather than a general dispensation. The exact-key-set pins
+ * here were `meta.json`'s only definition until #326 published a schema, and
+ * they are still the only statement of which keys a given row produces; a
+ * definition split across files is one that can disagree with itself --
  * the drift class this suite exists to catch. The fakes and fixtures are
  * shared by every case, so a split would duplicate them too, and two copies of
  * a fixture is two documents. Adding the #263 provenance case is what crossed
@@ -328,8 +332,8 @@ class RawExporterTest {
      * tell which side of the set each covers without decoding either.
      *
      * The manifest's top-level keys do not move; the file appears inside the
-     * set's own `files` array. `meta.json` has no published schema, so this
-     * test and its neighbours are the only statement of that shape.
+     * set's own `files` array. The schema (#326) declares `files`; this test
+     * and its neighbours say what goes in it.
      */
     @Test
     fun `a stored rest window appears in the zip and in the manifest`() = runTest {
@@ -420,10 +424,10 @@ class RawExporterTest {
      * The manifest's top-level keys, exactly.
      *
      * The test above asserts every value but would go on passing after a key
-     * was added, and this file is the only definition `meta.json` has --
-     * `docs/schemas/` holds the plan and the session export and nothing for
-     * this document. So an exact key set is the whole of its published shape,
-     * and adding to it is a deliberate act rather than a side effect.
+     * was added. When it was written this file was the only definition
+     * `meta.json` had; since #326 `docs/schemas/raw-meta.schema.json` declares
+     * the same ten keys plus the zone pair, and this exact set is still what
+     * makes adding to them a deliberate act rather than a side effect.
      */
     @Test
     fun `the manifest states exactly the top-level keys it states today`() = runTest {
@@ -452,8 +456,8 @@ class RawExporterTest {
      * The neighbouring test pins the manifest's TOP-LEVEL keys and would go on
      * passing while every set inside it grew a key; this is the same
      * instrument one level down, and it is the whole of what "a single-sensor
-     * archive did not move" can be asserted as. `meta.json` has no published
-     * schema, so an exact key set is its only definition.
+     * archive did not move" can be asserted as. The published schema (#326)
+     * says which keys MAY appear; only an exact key set says which do.
      *
      * The fixture carries an IMU and an HRM stream, which is what an ordinary
      * recorded set has, and no geometry -- geometry's own presence and absence
@@ -1209,5 +1213,90 @@ class RawExporterTest {
                 "on this compressible content",
         )
         assertEquals(bestSpeedSize, productionSize, "the production default should be BEST_SPEED")
+    }
+
+    /**
+     * Every key a manifest this writer produced carries, and every word in a
+     * key the schema gives a vocabulary, is one
+     * `docs/schemas/raw-meta.schema.json` declares (#326).
+     *
+     * The schema's example is hand-built, so ajv validating it says nothing
+     * about what [RawExporter] writes. These are real manifests: three rows
+     * between them set every column the descriptor reads that this file's
+     * fixtures can reach -- a plan-prescribed rep set with a declared geometry,
+     * a lifter-stated failure and reason, a side, a lifter's warm-up mark and
+     * a prep; a timed set the lifter ended, added and voided; and a set that
+     * never left its prep -- plus the zone pair at the top. The dual-sensor
+     * keys are held to the schema by `RawExporterDualSensorTest`'s twin of
+     * this case.
+     *
+     * The second assertion is the control: one key the schema does not
+     * declare, added to the same manifest, must be reported. A check that
+     * cannot report anything would pass the first assertion too.
+     */
+    @Test
+    fun `every key the manifest writes is declared by the published schema`() = runTest {
+        val planned =
+            row(
+                id = 5L,
+                exerciseId = "bench_press",
+                actualReps = 5,
+                durationS = null,
+                analysis = analysedAt(100.0),
+                geometry = legCurl,
+            ).copy(
+                plannedLoadKg = 20.0,
+                workingLoadKg = 20.0,
+                plannedReps = 5,
+                workingReps = 5,
+                plannedRestS = 90,
+                restStartedAtMs = 46_000L,
+                tempo = "3010",
+                plannedTempo = "3010",
+                rpe = 9,
+                rpeScale = "reps",
+                failed = true,
+                failedByLifter = true,
+                limiter = "grip",
+                limiterNote = "chalk ran out",
+                warmupMark = true,
+                side = "left",
+                plannedSide = "left",
+                repsManual = true,
+                liveReps = 4,
+                plannedPrepS = 5,
+                prepS = 5,
+            )
+        val timed =
+            row(id = 6L, orderIdx = 1).copy(
+                bodyWeightKg = 80.0,
+                plannedDurationS = 45,
+                workingDurationS = 45,
+                durationEndedBy = "lifter",
+                added = true,
+                voided = true,
+                voidReason = "wrong exercise",
+            )
+        val abandoned = row(id = 7L, orderIdx = 2).copy(workBegan = false, plannedPrepS = 5)
+        val manifest =
+            Json.parseToJsonElement(
+                zipOf(
+                    listOf(planned, timed, abandoned),
+                    mapOf(
+                        5L to listOf(imuStream(5L, stillSamples(45.0), storedRate = 100.0), hrStream(5L)),
+                        6L to listOf(imuStream(6L, stillSamples(45.0), storedRate = 100.0)),
+                    ),
+                    "Europe/London",
+                    60,
+                ).getValue("meta.json"),
+            ).jsonObject
+        assertEquals(emptyList(), RawMetaSchema.undeclaredInManifest(manifest), "keys or words the schema omits")
+
+        val tampered = JsonObject(manifest + ("notInTheSchema" to JsonPrimitive(1)))
+        assertEquals(
+            listOf("notInTheSchema"),
+            RawMetaSchema.undeclaredInManifest(tampered),
+            "the check reported nothing for a key the schema does not declare",
+        )
     }
 }

@@ -1129,8 +1129,9 @@ class RawExporter(
         // A header per format the archive can contain. The rep-mark CSV needs
         // no change to the zip loop -- every stream is written as
         // set%02d_<exercise>_<kind>.csv and the kind alone names the file --
-        // but a column layout stated nowhere is one a reader has to guess at,
-        // and this manifest has no published schema to guess from.
+        // but a column layout stated nowhere is one a reader has to guess at.
+        // docs/schemas/raw-meta.schema.json (#326) describes this key; the
+        // layout itself is only ever stated here.
         meta.append("  \"csvHeaderReps\": \"${RepMarkCsv.HEADER}\",\n")
         // A fifth format, and the same reasoning: the prep window is stored as
         // a stream and so is written into the archive as a file by the same
@@ -1517,8 +1518,9 @@ class RawExporter(
             // keys can CHECK the roll half of the verdict against the figure
             // beside it -- not re-derive it, which means decoding the imu CSV
             // in this same archive. Absent on every row
-            // written before the app could decide it, and the manifest has no
-            // published schema, so no version entry attaches to this one.
+            // written before the app could decide it. When this key landed the
+            // manifest had no published schema and so no version entry; it is
+            // in raw-meta.schema.json's first entry (#326).
             str("analysedRoleBasis", d.analysedRoleBasis?.published)
             // Which armed units delivered too few frames to analyse across
             // the whole set (#209), and what the app could see

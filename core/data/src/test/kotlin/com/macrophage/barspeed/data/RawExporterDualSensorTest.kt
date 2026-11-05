@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -565,5 +566,48 @@ class RawExporterDualSensorTest {
             ).jsonPrimitive.content,
         )
         assertNull(descriptor["sensorsSilent"], "a roleless set grew a role-keyed silence map")
+    }
+
+    /**
+     * `RawExporterTest`'s schema-coverage case for the keys only a sensor
+     * declaration writes (#326): every key and every vocabulary word in these
+     * descriptors is one `docs/schemas/raw-meta.schema.json` declares.
+     *
+     * One descriptor per shape this file already builds -- an ordinary dual
+     * set with its `sensors` array, one that fell back to the other role, two
+     * units the app could not tell apart, an armed unit that went silent, and
+     * a single armed unit that delivered nothing -- because each writes keys
+     * the others do not. The last assertion is the control: a check that
+     * cannot report an undeclared key would pass the first one too.
+     */
+    @Test
+    fun `every sensor key the manifest writes is declared by the published schema`() = runTest {
+        val descriptors =
+            listOf(
+                descriptor(dual, dualStreams()),
+                descriptor(
+                    dual.copy(analysed = SensorRole.B, analysedFellBack = true),
+                    listOf(imuStream(2L, "b", secondarySamples, storedRate = 98.5)),
+                ),
+                descriptor(
+                    RecordedSensors(count = 1, shortfall = DualShortfall.ROLES_COLLIDE),
+                    listOf(imuStream(1L, null, analysedSamples, storedRate = 98.5)),
+                ),
+                descriptorFromStoredJson(
+                    """{"count":2,"expected":["A","B"],"analysed":"A","silent":{"B":"NOT_LINKED"}}""",
+                    listOf(imuStream(1L, "a", analysedSamples, storedRate = 98.5)),
+                ),
+                descriptorFromStoredJson("""{"count":1,"soleSilent":"NOT_LINKED"}""", emptyList()),
+            )
+        assertTrue(descriptors.first()["sensors"] != null, "the dual fixture wrote no sensors array to check")
+        for ((i, set) in descriptors.withIndex()) {
+            assertEquals(
+                emptyList(),
+                RawMetaSchema.undeclaredInSet(set),
+                "descriptor $i: keys or words the schema omits",
+            )
+        }
+        val tampered = JsonObject(descriptors.first() + ("sensorsPlanned" to JsonPrimitive(2)))
+        assertEquals(listOf("sensorsPlanned"), RawMetaSchema.undeclaredInSet(tampered), "the control was not reported")
     }
 }
