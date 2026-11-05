@@ -20,7 +20,14 @@ enum class RestoreRefusal {
      */
     SPLIT_RESCUE,
 
-    /** A restore of this rescue was tried, did not open in this build, and was undone. */
+    /**
+     * A restore of this rescue was undone, by this build or one at a newer
+     * database version, before an open was confirmed. A build at a newer
+     * database version may try it again. The KDoc that stood here said "did
+     * not open in this build"; the mark is also written when a swap turns
+     * round on a failed move, or the process dies before the open, and until
+     * round 1 of review it was never cleared by any build.
+     */
     FAILED_BEFORE,
 
     /** Its version could not be read, so nothing can say whether this build can open it. */
@@ -102,9 +109,10 @@ enum class RestoreLaunchStep {
  * build's migration chain reaches ([RestoreRefusal.NO_MIGRATION_PATH]).
  *
  * ATOMICITY: per file, which is all a rename gives. The journal records which
- * move comes next before each one, so a launch can always carry a swap
- * forward or back to a state where one complete database is in place;
- * [launchStep] decides which.
+ * move comes next before each one, so a launch can carry a swap forward or
+ * back to a state where one complete database is in place when its moves
+ * succeed; [launchStep] decides which, and [oneWholeDatabaseInPlace] says
+ * whether a launch whose moves did not succeed may open anything.
  */
 object DatabaseRestorePolicy {
     /**
@@ -161,15 +169,19 @@ object DatabaseRestorePolicy {
     }
 
     /**
-     * After a restore that could go neither forward nor back, whether Room may
-     * open what is at the database's path. Yes when a main file is there (a
-     * whole database, the displaced one or the restored one), and yes when
-     * nothing is (Room creates an empty one, and every file of both databases
-     * is still on disk where the journal says). NO when a sidecar sits there
-     * with no main file: Room would create a fresh database beside a log from
-     * a different one, the one state `DatabaseRescue`'s move order exists to
-     * make unreachable. Refusing means the launch throws -- a crash with every
-     * byte on disk, which beats an open that can corrupt.
+     * The FALLBACK check after a stuck restore, used only when the journal
+     * cannot say where each database's files belong (unreadable, or written
+     * before it recorded them); [oneWholeDatabaseInPlace] is the check
+     * otherwise. NO when a sidecar sits at the path with no main file: Room
+     * would create a fresh database beside a log from a different one, the
+     * state `DatabaseRescue`'s move order exists to make unreachable.
+     *
+     * A main file at the path is NOT shown by this to be a whole database:
+     * its own `-wal` may be in a rescue directory. The KDoc that stood here
+     * said it was ("a whole database, the displaced one or the restored
+     * one"), and said nothing at the path was safe; round 1's review (A3,
+     * B2) found both false. Without the journal there is nothing better to
+     * ask, so this is what is left, not what is claimed safe.
      */
     fun safeToOpenAfterStuck(mainPresent: Boolean, sidecarPresent: Boolean): Boolean = mainPresent || !sidecarPresent
 

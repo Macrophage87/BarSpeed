@@ -149,7 +149,9 @@ internal fun rescuedRestoreNote(restore: RestoreVerdict?, compiledVersion: Int):
             "Can't restore yet: a partial rescue holds a log that may belong to this database. " +
                 "Send the partial rescue to yourself, then discard it, to restore this one."
         RestoreRefusal.FAILED_BEFORE ->
-            "A restore of this database was tried, it did not open in this build, and both databases were put back."
+            "A restore of this database was tried by this build or a newer one and undone before it was " +
+                "confirmed to open; both databases were put back. A build with a newer database version " +
+                "can try it again."
         RestoreRefusal.VERSION_UNREADABLE -> "Can't restore: this database's version can't be read."
         RestoreRefusal.NEWER_THAN_THIS_BUILD ->
             "Can't restore into this build: this is database version $version and this build reads up to " +

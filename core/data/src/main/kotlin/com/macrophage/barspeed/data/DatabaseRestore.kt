@@ -23,10 +23,13 @@ sealed interface RestoreOutcome {
     /**
      * Neither forward nor back could be completed. Every file is still on
      * disk, in its source or its destination, and the journal says which
-     * move was next -- but what sits at the database's own path may be a
-     * sidecar with no main file beside it, which is the one state Room must
-     * never open. The caller asks [DatabaseRestore.safeToOpen] before it
-     * opens anything on this outcome.
+     * move was next -- but what sits at the database's own path may be part
+     * of a database: a main file whose `-wal` is in a rescue directory, a
+     * sidecar with no main file, or nothing. Room must open none of those.
+     * The caller asks [DatabaseRestore.safeToOpen] before it opens anything
+     * on this outcome. An earlier version of this KDoc named only the lone
+     * sidecar; round 1's review (A3, B2) found the main file split from its
+     * log as well.
      */
     data class Stuck(val reason: String) : RestoreOutcome
 }
@@ -59,7 +62,11 @@ sealed interface RestoreOutcome {
  * state with one whole database in place. Moves out of the database's path go
  * sidecars first, main file last, as [DatabaseRescue.moveOrder] requires;
  * moves into it go in the same order, so the path never holds a main file
- * beside a sidecar from a different database.
+ * beside a sidecar from a DIFFERENT database. It does hold, between moves, a
+ * main file without its OWN sidecars, and a stuck restore can stop there;
+ * that is why [safeToOpen] asks where every file of both databases is
+ * rather than whether a main file is at the path. The journal records each
+ * database's file names when the swap began so that question can be asked.
  *
  * A RESTORE THAT DOES NOT OPEN IS UNDONE. After the last move the phase is
  * [RestorePhase.UNVERIFIED], and only [markOpened] -- called from Room's own
@@ -103,7 +110,7 @@ class DatabaseRestore(
             compiledVersion = compiledVersion,
             migrationEdges = migrationEdges,
             strayLogElsewhere = stray,
-            failedBefore = item.directory.name in failedBefore(),
+            failedBefore = failedBefore()[item.directory.name]?.let { compiledVersion <= it } ?: false,
             restoreInProgress = requestFile.exists() || journalFile.exists(),
         )
     }
@@ -144,14 +151,36 @@ class DatabaseRestore(
 
     /**
      * Whether the database's own path is safe for Room to open after a
-     * [RestoreOutcome.Stuck]: see [DatabaseRestorePolicy.safeToOpenAfterStuck].
+     * [RestoreOutcome.Stuck]: exactly one database's files all at the path
+     * ([DatabaseRestorePolicy.oneWholeDatabaseInPlace]), read off the
+     * journal's record of each database's files and what each one's own
+     * directory holds now.
+     *
+     * A journal that cannot be read, or one written before the file sets
+     * were recorded, says nothing about where anything belongs; then only
+     * [DatabaseRestorePolicy.safeToOpenAfterStuck]'s narrower check is left,
+     * which refuses a lone sidecar and nothing else.
      */
     fun safeToOpen(): Boolean {
         val live = databaseFile.parentFile ?: File(".")
-        val sidecars = DatabaseRescue.moveOrder(databaseFile).filter { it.path != databaseFile.path }
-        return DatabaseRestorePolicy.safeToOpenAfterStuck(
-            mainPresent = databaseFile.exists(),
-            sidecarPresent = sidecars.any { File(live, it.name).exists() },
+        val names = DatabaseRescue.moveOrder(databaseFile).map { it.name }
+        val journal = readJournal()
+        val displacedFiles = journal?.displacedFiles
+        val restoredFiles = journal?.restoredFiles
+        if (journal == null || displacedFiles == null || restoredFiles == null) {
+            return DatabaseRestorePolicy.safeToOpenAfterStuck(
+                mainPresent = databaseFile.exists(),
+                sidecarPresent = names.any { it != databaseFile.name && File(live, it).exists() },
+            )
+        }
+        fun presentIn(dir: File) = names.filter { File(dir, it).exists() }.toSet()
+        return DatabaseRestorePolicy.oneWholeDatabaseInPlace(
+            mainName = databaseFile.name,
+            displacedFiles = displacedFiles,
+            restoredFiles = restoredFiles,
+            inDisplacedDir = presentIn(File(rescueRoot, journal.displaced)),
+            inSourceDir = presentIn(File(rescueRoot, journal.source)),
+            mainAtPath = databaseFile.exists(),
         )
     }
 
@@ -160,12 +189,17 @@ class DatabaseRestore(
      * migrations and validation. Clears an [RestorePhase.UNVERIFIED] journal
      * and nothing else; any other phase is a launch's business, not an
      * open's.
+     *
+     * False when an UNVERIFIED journal was there and could not be removed,
+     * so the caller can log it: the next launch would then undo a restore
+     * that opened and was used. Nothing is lost by that -- sessions recorded
+     * since go back with the restored database into its rescue -- but the
+     * rescue is marked as undone, and the lifter sees the restore reversed
+     * with no reason given. Round 1 review, A6.
      */
-    fun markOpened() {
-        runCatching {
-            if (readJournal()?.phase == RestorePhase.UNVERIFIED) journalFile.delete()
-        }
-    }
+    fun markOpened(): Boolean = runCatching {
+        readJournal()?.phase != RestorePhase.UNVERIFIED || journalFile.delete()
+    }.getOrDefault(false)
 
     private fun begin(): RestoreOutcome {
         val name = pendingRequest()
@@ -183,7 +217,16 @@ class DatabaseRestore(
         if (verdict !is RestoreVerdict.Restorable) return RestoreOutcome.Dropped(verdict)
         var stamp = now()
         while (File(rescueRoot, "${DatabaseRescue.DIR_PREFIX}$stamp").exists()) stamp++
-        val journal = Journal(RestorePhase.SWAPPING, item.directory.name, "${DatabaseRescue.DIR_PREFIX}$stamp", 0)
+        val names = DatabaseRescue.moveOrder(databaseFile).map { it.name }
+        val live = databaseFile.parentFile ?: File(".")
+        val journal = Journal(
+            phase = RestorePhase.SWAPPING,
+            source = item.directory.name,
+            displaced = "${DatabaseRescue.DIR_PREFIX}$stamp",
+            next = 0,
+            displacedFiles = names.filter { File(live, it).exists() }.toSet(),
+            restoredFiles = names.filter { File(item.directory, it).exists() }.toSet(),
+        )
         if (!writeJournal(journal)) return RestoreOutcome.Dropped(verdict)
         return forward(journal)
     }
@@ -210,8 +253,13 @@ class DatabaseRestore(
     /**
      * Reverse every move up to and including [journal]'s next one -- that
      * one may or may not have happened, and [stepBack] tells the two apart
-     * by where the file is. Records the source as [FAILED] so the card stops
-     * offering a restore this build has already seen fail.
+     * by where the file is. Records the source as [FAILED], with this
+     * build's database version, so the card stops offering a restore this
+     * build has already seen undone -- and only this build and older ones: a
+     * build at a newer database version, which may carry the migration whose
+     * absence made the open fail, offers it again. Every undo is recorded,
+     * whether the swap reached an open or turned round on a failed move;
+     * what they share is that no open was confirmed.
      */
     private fun undo(journal: Journal): RestoreOutcome {
         val moves = swapMoves(journal)
@@ -224,7 +272,7 @@ class DatabaseRestore(
             val (from, to) = moves[i]
             if (!stepBack(from, to)) return RestoreOutcome.Stuck("could not move ${to.name} back")
         }
-        runCatching { failedFile.appendText(journal.source + "\n") }
+        runCatching { failedFile.appendText("${journal.source} $compiledVersion\n") }
         journalFile.delete()
         removeIfEmpty(File(rescueRoot, journal.displaced))
         return RestoreOutcome.Undone
@@ -265,16 +313,37 @@ class DatabaseRestore(
         false
     }
 
-    private fun failedBefore(): Set<String> = runCatching {
-        if (!failedFile.isFile) return emptySet()
-        failedFile.readLines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-    }.getOrDefault(emptySet())
+    /**
+     * Each rescue whose restore was undone, with the highest database version
+     * of a build that undid it. A line with no version -- written before the
+     * version was recorded -- counts as undone by every build, which is what
+     * that line meant when it was written.
+     */
+    private fun failedBefore(): Map<String, Int> = runCatching {
+        if (!failedFile.isFile) return emptyMap()
+        failedFile.readLines().mapNotNull { line ->
+            val parts = line.trim().split(' ').filter { it.isNotEmpty() }
+            parts.firstOrNull()?.let { it to (parts.getOrNull(1)?.toIntOrNull() ?: Int.MAX_VALUE) }
+        }.groupBy({ it.first }, { it.second }).mapValues { (_, versions) -> versions.max() }
+    }.getOrDefault(emptyMap())
 
     private fun removeIfEmpty(dir: File) {
         if (dir.isDirectory && dir.listFiles().isNullOrEmpty()) dir.delete()
     }
 
-    internal data class Journal(val phase: RestorePhase, val source: String, val displaced: String, val next: Int)
+    /**
+     * [displacedFiles] and [restoredFiles] are the names of [DatabaseRescue.moveOrder]
+     * each database had when the swap began; null in a journal written before
+     * they were recorded.
+     */
+    internal data class Journal(
+        val phase: RestorePhase,
+        val source: String,
+        val displaced: String,
+        val next: Int,
+        val displacedFiles: Set<String>? = null,
+        val restoredFiles: Set<String>? = null,
+    )
 
     private fun readJournal(): Journal? = runCatching {
         if (!journalFile.isFile) return null
@@ -286,12 +355,21 @@ class DatabaseRestore(
             source = fields.getValue("source").also { require(it.startsWith(DatabaseRescue.DIR_PREFIX)) },
             displaced = fields.getValue("displaced").also { require(it.startsWith(DatabaseRescue.DIR_PREFIX)) },
             next = fields.getValue("next").toInt(),
+            displacedFiles = fields["live"]?.let(::nameSet),
+            restoredFiles = fields["rescue"]?.let(::nameSet),
         )
     }.getOrNull()
 
+    private fun nameSet(field: String): Set<String> = field.split(',').filter { it.isNotEmpty() }.toSet()
+
     private fun writeJournal(journal: Journal): Boolean = writeAtomically(
         journalFile,
-        "phase=${journal.phase}\nsource=${journal.source}\ndisplaced=${journal.displaced}\nnext=${journal.next}\n",
+        buildString {
+            append("phase=${journal.phase}\nsource=${journal.source}\ndisplaced=${journal.displaced}\n")
+            append("next=${journal.next}\n")
+            journal.displacedFiles?.let { append("live=${it.sorted().joinToString(",")}\n") }
+            journal.restoredFiles?.let { append("rescue=${it.sorted().joinToString(",")}\n") }
+        },
     )
 
     /** Temp file, then rename over the target: a reader sees the old text or the new, never half. */
@@ -308,7 +386,10 @@ class DatabaseRestore(
         /** A restore under way: its phase, its two directories, and the next move. */
         const val JOURNAL = "restore.journal"
 
-        /** Rescues whose restore was undone, one directory name per line. */
+        /**
+         * Rescues whose restore was undone: per line, a directory name and
+         * the database version of the build that undid it.
+         */
         const val FAILED = "restore.failed"
     }
 }
