@@ -207,6 +207,19 @@ class ExerciseIdInferenceCharacterizationTest {
             Row("triceps_pushdown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("rope_pushdown", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
 
+            // --- issue #254: a muscle-up begins with the drive out of a dead
+            // hang -- the pull, then the transition, then the press -- and
+            // there is no lowering before it. These rows MOVE: no hint matched
+            // either whole token, so all three fell to the ECCENTRIC default,
+            // and the countdown said "down" to a lifter hanging from a bar,
+            // with the first counted phase the wrong one. The "muscle_up"
+            // hint is two adjacent whole tokens with the plural tolerance, so
+            // the neighbours above stay where they are. ---
+            Row("muscle_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("muscle_ups", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("ring_muscle_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+            Row("bar_muscle_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
+
             // --- ordinary ids that must not move ---
             Row("seated_row", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
             Row("pull_up", ExerciseKind.DYNAMIC, StartPhase.CONCENTRIC),
