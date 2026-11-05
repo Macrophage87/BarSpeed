@@ -1,5 +1,8 @@
 package com.macrophage.barspeed.model
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -71,4 +74,34 @@ class CarryPlaneTest {
     fun `an undeclared carry's inversion line reads the seed's horizontal plane`() {
         assertEquals(emptyList(), inversionLines("farmers_walk", stackDriveDown))
     }
+
+    /**
+     * DIFFERENTIAL, L5 review round 1 (B2). The seed changes what an OMITTED
+     * "plane" means on these ids -- the published geometry, which tempo digit
+     * is the concentric, the inversion line -- and no copy of the plan
+     * contract said so. Every earlier seed (body weight, stack mount) was
+     * stated in its key's description. Read off the seed rather than listed,
+     * so a third horizontal seed that the contract does not name reds here.
+     */
+    @Test
+    fun `every copy of the plan contract names the carries seeded horizontal`() {
+        val seeded = ExerciseDef.SEED.filter { it.horizontal }.map { it.id }
+        assertTrue(seeded.isNotEmpty())
+        val schemaPlane =
+            Json.parseToJsonElement(resource("/plan.schema.json")).jsonObject["\$defs"]!!.jsonObject["exercise"]!!
+                .jsonObject["properties"]!!.jsonObject["plane"]!!.jsonObject["description"]!!.jsonPrimitive.content
+        val promptPlane =
+            resource("/kotlin/com/macrophage/barspeed/ui/screens/GuideScreen.kt").lineSequence()
+                .first { it.trimStart().startsWith("\"plane\": \"vertical\" | \"horizontal\"") }
+        for (id in seeded) {
+            assertTrue(id in schemaPlane, "plan.schema.json's plane description does not name $id: $schemaPlane")
+            assertTrue(id in promptPlane, "PLAN_PROMPT's plane line does not name $id: $promptPlane")
+        }
+        assertTrue("omitted" in schemaPlane, "the schema does not say what an omitted plane means on a carry")
+        assertTrue("omitted" in promptPlane, "PLAN_PROMPT does not say what an omitted plane means on a carry")
+    }
+
+    private fun resource(path: String): String =
+        checkNotNull(javaClass.getResourceAsStream(path)) { "$path is not on the test classpath" }
+            .readBytes().decodeToString()
 }
