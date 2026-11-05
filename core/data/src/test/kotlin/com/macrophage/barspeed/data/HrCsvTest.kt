@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.model.HrSample
+import com.macrophage.barspeed.model.SensorContact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -34,6 +35,20 @@ class HrCsvTest {
         val decoded = HrCsv.decode(text)
         assertEquals(emptyList(), decoded[0].rrIntervalsMs, "an absent R-R field decoded as a value")
         assertEquals(listOf(0.0), decoded[1].rrIntervalsMs, "a reported zero decoded as absence")
+    }
+
+    /**
+     * Every HRM file written before #82 has three columns and no contact
+     * field, and must decode as NOT_RECORDED -- never as either live value,
+     * which would claim a contact report the strap never made. That covers
+     * every capture in the corpus, read below through the same codec.
+     */
+    @Test
+    fun `a three-column file decodes as contact not recorded`() {
+        val decoded = HrCsv.decode("timestamp_ms,hr_bpm,rr_ms\n1,50,\n2,72,830.0\n")
+        assertEquals(listOf(SensorContact.NOT_RECORDED, SensorContact.NOT_RECORDED), decoded.map { it.contact })
+        assertEquals(listOf(emptyList(), listOf(830.0)), decoded.map { it.rrIntervalsMs })
+        assertTrue(HrFixtures.unworn(1).all { it.contact == SensorContact.NOT_RECORDED })
     }
 
     @Test
