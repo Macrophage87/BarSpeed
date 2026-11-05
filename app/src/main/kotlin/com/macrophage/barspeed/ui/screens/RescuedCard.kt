@@ -143,13 +143,29 @@ internal fun rescuedTapEffect(tap: RescuedTap, item: RescuedDatabase): RescuedTa
  * recording holds hold now, as for [rescuedCardButtons], which disables
  * RESTORE while [RecordingServicePolicy.mayEndProcess] says no. Without a
  * note here that button would be dead with no reason given. Round 2 review
- * of #112, A's N3. No default for [held]: a caller that left it out
- * would be told nothing is held whatever is (round 3 review, B's N7).
+ * of #112, A's N3.
+ *
+ * WHAT BRINGS IT BACK DEPENDS ON THE HOLD. A set-end write or a session
+ * close finishes on its own, so the note says to wait. The record screen's
+ * own hold, [RecordingHold.SESSION], is released when that screen goes
+ * away, so read from the code it is held under Home only when it has
+ * leaked -- its KDoc names a task swipe -- and nothing will finish: the
+ * note names the process ending instead, since the holds live in process
+ * memory. That a force-stop clears it on a device is reasoned, not
+ * observed. Round 3 review of #112, A2 and B1.
+ *
+ * No default for [held]: a caller that left it out would be told nothing
+ * is held whatever is (round 3 review, B's N7).
  */
 internal fun rescuedRestoreNote(restore: RestoreVerdict?, compiledVersion: Int, held: Set<RecordingHold>): String? {
     if (restore is RestoreVerdict.Restorable && !RecordingServicePolicy.mayEndProcess(held)) {
-        return "Can't restore yet: a session is open, or a set or session is still saving. " +
-            "RESTORE works again once it has finished."
+        val saving = RecordingHold.SET_WRITE in held || RecordingHold.SESSION_CLOSE in held
+        return if (saving) {
+            "Can't restore yet: a set or session is still saving. RESTORE works again once it has finished."
+        } else {
+            "Can't restore yet: BarSpeed still counts a recording as running. If you are not recording, " +
+                "force-stop BarSpeed in Android settings or restart the phone, and RESTORE comes back."
+        }
     }
     if (restore !is RestoreVerdict.Refused) return null
     val version = restore.version
