@@ -1352,12 +1352,15 @@ class RawExporterTest {
             "the check reported nothing for a key the schema does not declare",
         )
         val sets = manifest.getValue("sets").jsonArray
-        val unpairedSets = listOf(JsonObject(first - "prepStartedAt_ms")) + sets.drop(1)
+        // A prep window's start without its end. The reverse -- a work start
+        // with no prep start -- is what a no-prep set writes since #337, and
+        // the schema takes it.
+        val unpairedSets = listOf(JsonObject(first - "workStartedAt_ms")) + sets.drop(1)
         val unpaired = JsonObject(manifest + ("sets" to JsonArray(unpairedSets)))
         assertEquals(
-            listOf("sets[0].workStartedAt_ms needs prepStartedAt_ms"),
+            listOf("sets[0].prepStartedAt_ms needs workStartedAt_ms"),
             RawMetaSchema.unmetInManifest(unpaired),
-            "the check reported nothing for a work start written without its prep start",
+            "the check reported nothing for a prep start written without its work start",
         )
 
         // The allOf rules tie the basis word to the work start, so they are
