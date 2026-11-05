@@ -320,7 +320,7 @@
             "carry",
             "explosive"
           ],
-          "description": "How the movement is performed. 'dynamic' is ordinary rep work; 'hold' is an isometric; 'carry' is a loaded walk; 'explosive' is an Olympic-style lift judged on peak velocity with no tempo. This says what the movement IS, not how a set of it is measured — whether a set runs on reps or on the clock comes from the set's own reps / duration_s. Omitted: the app uses its built-in definition if the id is one it ships, otherwise guesses from the id, which matches word fragments and gets ordinary names wrong. Declaring it always wins, and any disagreement is flagged at the import gate."
+          "description": "How the movement is performed. 'dynamic' is ordinary rep work; 'hold' is an isometric; 'carry' is a loaded walk; 'explosive' is an Olympic-style lift judged on peak velocity with no tempo. This says what the movement IS, not how a set of it is measured — whether a set runs on reps or on the clock comes from the set's own reps / duration_s. Omitted: the app uses its built-in definition if the id is one it ships, otherwise guesses from the id one whole underscore-separated word at a time, so an id that runs two words together (deadhang, kbswing, farmerswalk) matches no word and is read as dynamic. That loss is accepted rather than fixed, because declaring this key is how a plan says what the guess cannot read. Declaring it always wins, and any disagreement is flagged at the import gate."
         }
       }
     },
