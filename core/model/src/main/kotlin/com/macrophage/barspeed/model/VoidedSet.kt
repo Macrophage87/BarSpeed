@@ -153,6 +153,17 @@ object VoidSetPolicy {
      * died in the middle of never gets an `endedAtMs`, and gating on it would
      * make exactly those sessions -- the ones most likely to hold a set that
      * did not happen -- the ones that can never be marked.
+     *
+     * NO PRODUCTION CODE CALLS THIS, and that is stated rather than papered
+     * over with a call that could only ever answer true (#232).
+     * `SessionDetailScreen` draws the void control on every set card it
+     * shows, and every card there is a row, so the screen's only possible
+     * question is `voidable(SetPlace.RECORDED)`, a constant. Gating the
+     * control on that constant would give this function a caller and the
+     * screen nothing. What this function is for is the boundary itself: it
+     * says in one place, under a pin, that a RECORDED set takes this control
+     * and a QUEUED one takes [RemoveSetControl]. A screen that ever shows a
+     * queued slot beside recorded rows is the caller this is waiting for.
      */
     fun voidable(place: SetPlace): Boolean = place == SetPlace.RECORDED
 
