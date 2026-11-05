@@ -314,9 +314,11 @@ class HistoricalRowReexportTest {
     /**
      * What a 1.0 set publishes today, figure by figure (#38). Each rep's
      * `ecc_s` is copied out of the stored blob, so the 0.0 an unmeasured 1.0
-     * eccentric was stored as is still published as 0.0. The set's
+     * eccentric was stored as is still published as 0.0, and the summary's
+     * `meanEcc_s`, re-derived over those copied-out figures, inherits it as
+     * 0.0 rather than withholding an unmeasured mean. The set's
      * `velocityLoss_pct` is NOT: it is re-derived from the stored reps at
-     * export (#83, 1.9), so the blob's 67.7 is never read -- the two stored
+     * export (#126, 1.10), so the blob's 67.7 is never read -- the two stored
      * reps are equally fast, so the last is the fastest and no loss is
      * published at all. And the row predates database 21, so it names no
      * contract for either figure.
@@ -325,6 +327,7 @@ class HistoricalRowReexportTest {
     fun `a 1_0-era set publishes its stored eccentrics but re-derives its loss`() = runTest {
         val squat = SessionExporter(repository()).buildExport(1L, includeRepDetail = true)!!.set("back_squat")
         assertEquals(listOf(0.0, 0.0), squat.repMetrics?.map { it.eccS }, "a stored rep figure was not copied out")
+        assertEquals(0.0, squat.summary.meanEccS, "the summary mean did not inherit the copied-out ecc_s")
         assertNull(squat.velocityLossPct, "the stored velocityLossPct was published")
         assertEquals("terminalRepIsFastest", squat.velocityLossBasis)
         assertNull(squat.analysisSchemaVersion, "a pre-v21 row was given a contract")
