@@ -3,6 +3,7 @@ package com.macrophage.barspeed.data
 import com.macrophage.barspeed.model.DatabaseDowngradePolicy
 import com.macrophage.barspeed.model.DatabaseOpenAction
 import com.macrophage.barspeed.model.SqliteHeader
+import com.macrophage.barspeed.model.SqliteWal
 import java.io.File
 
 /** What [DatabaseRescue] did, so a caller can say it rather than infer it. */
@@ -96,12 +97,32 @@ object DatabaseRescue {
     private const val JOURNAL_SUFFIX = "-journal"
 
     /**
-     * The version [databaseFile] declares, or null if it will not say.
+     * The version [databaseFile] declares, or null if it will not say --
+     * read the way SQLite will read it, through its `-wal`. Issue #113.
      *
-     * Every failure is null: absent, unreadable, too short, not a database,
-     * permission denied, a directory where a file was expected. No exception
-     * escapes, because this runs before anything else on the launch path and
-     * an exception here would stop the app opening at all.
+     * THE MAIN FILE'S HEADER ALONE WAS STALE, and that was measured, not
+     * supposed: a migration's `user_version` bump sits in the `-wal` until a
+     * checkpoint, and a package installer's force-stop does not wait for one.
+     * Against real SQLite files the main header read 0 while SQLite reported
+     * 21 through the log. Read that way, a rollback past such an upgrade
+     * decided Open, and Room -- seeing the real version -- threw on every
+     * launch. So when `<name>-wal` holds a committed page 1, its header is the
+     * one read ([SqliteWal.effectiveUserVersion]); otherwise the main file's
+     * is, exactly as before.
+     *
+     * THE LOG CAN ONLY ADD A RESCUE SQLITE ITSELF WOULD FORCE. Every way the
+     * `-wal` can fail to say something -- absent, not a file, unreadable,
+     * torn, not a log, nothing committed to page 1 -- leaves the main file's
+     * answer standing, which is the answer every launch got before the log
+     * was read at all. A log page 1 that is not a database header is the one
+     * exception and goes the safe way: null, so Open, so Room throws rather
+     * than anything moving on a guess.
+     *
+     * Every failure of the MAIN file is still null: absent, unreadable, too
+     * short, not a database, permission denied, a directory where a file was
+     * expected. No exception escapes, because this runs before anything else
+     * on the launch path and an exception here would stop the app opening at
+     * all.
      */
     fun storedVersion(databaseFile: File): Int? = runCatching {
         if (!databaseFile.isFile) return null
@@ -115,7 +136,19 @@ object DatabaseRescue {
             }
             if (read < header.size) return null
         }
-        SqliteHeader.userVersion(header)
+        SqliteWal.effectiveUserVersion(header, committedPageOne(File(databaseFile.path + WAL_SUFFIX)))
+    }.getOrNull()
+
+    /**
+     * The newest committed page 1 in [wal], or null -- for an absent or
+     * unreadable log as much as for one with nothing in it, because each of
+     * those means the main file's header stands. Its own catch, separate from
+     * [storedVersion]'s, so that a log that cannot be read falls back to the
+     * main file rather than making the whole answer null.
+     */
+    private fun committedPageOne(wal: File): ByteArray? = runCatching {
+        if (!wal.isFile) return null
+        wal.inputStream().buffered().use { SqliteWal.committedPageOne(it) }
     }.getOrNull()
 
     /**
