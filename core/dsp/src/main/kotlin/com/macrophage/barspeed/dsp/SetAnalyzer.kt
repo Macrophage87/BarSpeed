@@ -829,6 +829,24 @@ object SetAnalyzer {
         // there belongs to the next rep's approach and to rest, and the
         // segmenter cannot separate the two. Publishing it as a pause is what
         // issue #93 measured at 22.73 s.
+        //
+        // IT IS THE STACK'S OR THE BAR'S STILLNESS, NOT THE LOAD COMING OFF
+        // (#92). Nothing in this pipeline assumes a turnaround unloads: the
+        // segmenter pairs a movement run with the next opposite one across
+        // whatever still runs lie between, and on a reversal with no dwell
+        // that is only the dead-band crossing, so it publishes a pause near
+        // zero rather than missing the boundary (TurnaroundPauseTest). And
+        // nothing can tell a
+        // machine that keeps the load on the lifter through the reversal --
+        // a seated leg curl, on the lifter's account -- from one that does
+        // not: the stream is the stack's motion, not the force on the limb.
+        // Measured on this tree over the committed captures, the figure does
+        // not separate them either: median turnaround 0.04-0.05 s on the
+        // four field-legcurl-1030 captures and 0.07-0.08 s on the three leg
+        // press captures, with SetAnalyzer's own defaults. So no declared
+        // "load stays on" property exists to withhold it on, and none is
+        // added: a declaration with nothing measured for it to change would
+        // be consumed by a rule nobody can check.
         val bottomPause = if (direction.startsAtTop) span.turnaroundPauseS else null
         val topPause = if (direction.startsAtTop) null else span.turnaroundPauseS
         return RepAnalysis(
