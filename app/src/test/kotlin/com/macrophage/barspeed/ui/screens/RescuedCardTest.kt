@@ -4,6 +4,7 @@ import com.macrophage.barspeed.data.DATABASE_NAME
 import com.macrophage.barspeed.data.RescueCompleteness
 import com.macrophage.barspeed.data.RescuedDatabase
 import com.macrophage.barspeed.model.ByteSize
+import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RestoreRefusal
 import com.macrophage.barspeed.model.RestoreVerdict
 import java.io.File
@@ -254,5 +255,17 @@ class RescuedCardTest {
         val buttons = rescuedCardButtons(complete, setOf(complete.directory), RestoreVerdict.Restorable(19))
         assertTrue(buttons.showRestore, "busy hid the button rather than disabling it")
         assertFalse(buttons.restoreEnabled, "RESTORE live while a share or discard is in flight")
+    }
+
+    // ---- round 1 review of #112 (A2, B4): RESTORE ends the process ----------
+
+    @Test
+    fun `a restorable rescue cannot be started while any recording hold is held`() {
+        for (hold in RecordingHold.entries) {
+            val buttons = rescuedCardButtons(complete, emptySet(), RestoreVerdict.Restorable(19), setOf(hold))
+            assertTrue(buttons.showRestore, "$hold hid the button rather than disabling it")
+            assertFalse(buttons.restoreEnabled, "RESTORE live while $hold is held: the restart would cut it short")
+            assertTrue(buttons.sendEnabled && buttons.discardEnabled, "$hold disabled actions that end nothing")
+        }
     }
 }

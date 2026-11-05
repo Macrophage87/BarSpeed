@@ -475,6 +475,70 @@ class DatabaseRescueTest {
         assertEquals(realWal.toList(), movedLog.toList(), "the log was not moved intact")
     }
 
+    // ---- round 1 review of #113 (A1, B1): a rescue decided by the -wal, cut off --------
+
+    /**
+     * THE NEAR NEIGHBOUR #113'S FIX LEFT. The newer version is only in the
+     * -wal, and the -wal moves first. When the main file's move then fails
+     * -- or the process dies between the two renames -- the version leaves
+     * with the log: the next launch reads the stale main header (10),
+     * decides Open, and Room migrates a pre-checkpoint snapshot while the
+     * committed frames sit in a fragment card. Before #113 both launches
+     * read the same main header, so the retry fired. The rescue must finish
+     * what it started, into the directory it started, without deciding
+     * again on a version the first move took away.
+     */
+    @Test
+    fun `a rescue cut off after the wal moved is finished into the same directory`() {
+        val file = staleUnderWal()
+        val failMain: (File, File) -> Boolean = { source, dest -> source.name != file.name && source.renameTo(dest) }
+        val first = DatabaseRescue.rescue(file, rescueRoot(), 20, move = failMain)
+        assertTrue(first is RescueOutcome.Failed, "expected Failed, got " + first)
+        val walDir = rescueRoot().listFiles().orEmpty().single { it.isDirectory }
+        assertTrue(File(walDir, file.name + "-wal").isFile, "the log did not move first")
+
+        val dir = assertIsRescued(DatabaseRescue.rescue(file, rescueRoot(), 20))
+        assertEquals(walDir, dir, "the main file was not put with its own log")
+        assertTrue(File(dir, file.name).isFile, "the main file was not rescued")
+        assertTrue(!file.exists(), "the stale main file was left for Room to open")
+        assertEquals(
+            listOf(dir),
+            rescueRoot().listFiles().orEmpty().filter { it.isDirectory },
+            "the finish split the database across a second directory",
+        )
+    }
+
+    /**
+     * Every file had moved and only the bookkeeping was left: the next
+     * launch must not take the database now at the path -- Room's fresh one,
+     * or anything else -- for the rest of the old rescue.
+     */
+    @Test
+    fun `a rescue finished but for its marker moves nothing now in place`() {
+        val done = File(rescueRoot(), "db-1000").apply { mkdirs() }
+        File(done, "accelerometer_lifting.db").writeText("the rescued database")
+        File(rescueRoot(), DatabaseRescue.PENDING).writeText("db-1000")
+        val file = db(20)
+        val bytes = file.readBytes().toList()
+
+        assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(file, rescueRoot(), 20))
+        assertEquals(bytes, file.readBytes().toList(), "the database in place was moved or changed")
+        assertEquals(listOf("accelerometer_lifting.db"), done.list().orEmpty().toList())
+        assertTrue(!File(rescueRoot(), DatabaseRescue.PENDING).exists(), "the finished rescue's marker was left")
+    }
+
+    /** A marker whose directory is not there names a rescue that moved nothing: decide afresh. */
+    @Test
+    fun `a marker naming no directory is dropped and the launch decides afresh`() {
+        rescueRoot().mkdirs()
+        File(rescueRoot(), DatabaseRescue.PENDING).writeText("db-999")
+        val file = db(10)
+        val dir = assertIsRescued(DatabaseRescue.rescue(file, rescueRoot(), 9))
+        assertTrue(dir.name != "db-999", "a rescue went into a directory nothing created")
+        assertTrue(File(dir, file.name).isFile)
+        assertTrue(!File(rescueRoot(), DatabaseRescue.PENDING).exists(), "the stale marker was left")
+    }
+
     private fun opens(file: File): Boolean = runCatching { file.inputStream().use { it.read() } }.isSuccess
 
     /**
