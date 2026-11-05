@@ -1664,8 +1664,9 @@ class RawExporter(
         // quantity published here is one it could not revise.
         //
         // The work start alone is asked of [WorkStartPolicy] (#337): a set
-        // that ran no prep stores no window but its work still began, and the
-        // policy owns which instant that was. The prep start is the stored
+        // that ran no prep stores no window, the app let its work begin at the
+        // START SET tap, and the policy owns which instant that is -- a lower
+        // bound on the work, not where lifting began. The prep start is the stored
         // window's only -- a set with no prep has no prep to have started.
         prepWindow?.let { window -> num("prepStartedAt_ms", window.startedAtMs) }
         num(
