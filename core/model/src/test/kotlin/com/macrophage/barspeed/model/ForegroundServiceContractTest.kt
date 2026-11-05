@@ -73,6 +73,17 @@ class ForegroundServiceContractTest {
     private fun declaredPermissions(): Set<String> =
         elements("uses-permission").map { it.getAttribute("android:name") }.toSet()
 
+    /**
+     * The `android:maxSdkVersion` cap on [name]'s `<uses-permission>`, or null
+     * where it is uncapped (#52). `getAttribute` answers "" for an absent
+     * attribute, and "" is not a cap.
+     */
+    private fun maxSdkVersion(name: String): Int? = elements("uses-permission")
+        .firstOrNull { it.getAttribute("android:name") == name }
+        ?.getAttribute("android:maxSdkVersion")
+        ?.takeIf { it.isNotEmpty() }
+        ?.toInt()
+
     @Test
     fun `the manifest declares every foreground service type the policy can choose`() {
         val declared = declaredTypes()
@@ -94,6 +105,29 @@ class ForegroundServiceContractTest {
             assertTrue(
                 required in permissions,
                 "android:foregroundServiceType declares '$token' but the manifest does not <uses-permission> $required",
+            )
+        }
+    }
+
+    @Test
+    fun `the foreground service permissions are declared with no maxSdkVersion`() {
+        // #52's near neighbour. The test above reads only the NAME of each
+        // <uses-permission>, so a cap on one of these passes it: the
+        // declaration is still there, and the platform ignores it above the
+        // cap. FOREGROUND_SERVICE_CONNECTED_DEVICE capped at 33 would leave
+        // the service with no permission for its type on exactly the levels
+        // that check one (34 up), and every START SET there would land in
+        // onStartCommand's SecurityException catch. BlePermissionManifestTest
+        // holds the same line for the Bluetooth permissions.
+        val required = listOf("android.permission.FOREGROUND_SERVICE") +
+            declaredTypes().map { token ->
+                permissionForToken[token] ?: error("foregroundServiceType token '$token' is undocumented in this test")
+            }
+        for (permission in required) {
+            assertEquals(
+                null,
+                maxSdkVersion(permission),
+                "$permission carries an android:maxSdkVersion cap, so the platform ignores it above that level",
             )
         }
     }
