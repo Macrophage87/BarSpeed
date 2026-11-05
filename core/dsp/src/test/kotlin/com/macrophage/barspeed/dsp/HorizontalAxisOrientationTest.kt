@@ -151,6 +151,29 @@ class HorizontalAxisOrientationTest {
         assertEquals(154.2, a.reps.first().peakPowerW!!, 0.05, "peak power, roughly halved")
     }
 
+    /**
+     * A settle of a REP'S WORTH still decides the axis, and this is pinned so
+     * that no reading of issue 28's fix can claim otherwise.
+     *
+     * The hardening issue 28 proposes asks the deciding run to clear
+     * `DspConfig.minRomM`, 0.10 m -- the floor the pairing stage already uses
+     * to call a run a phase. A 12 cm movement the other way clears it, so it
+     * is a real phase by every rule this segmenter has, and it orients the
+     * set: the eccentric of the first rep holds the 0.96 s drive. Nothing
+     * declared distinguishes a 12 cm settle from a 12 cm rep, which is why no
+     * displacement gate can. The settle is counted as a seventh rep here as
+     * well, so the count moves on this one -- unlike the 3 cm case.
+     *
+     * Synthetic, like everything in this file.
+     */
+    @Test
+    fun `a settle of a rep's worth still decides the axis`() {
+        val a = SetAnalyzer.analyze(sixReps(0.12), horizontalHandle, loadKg = 50.0)
+        assertEquals(7, a.reps.size, "reps segmented -- the settle is one of them")
+        assertEquals(0.96, a.reps.first().eccS!!, 5e-3, "the first rep's return seconds hold a drive")
+        assertEquals(1.657, a.reps.map { it.conS }.average(), 5e-3, "drive seconds, mostly the return's")
+    }
+
     @Test
     fun `the committed horizontal captures cannot reach this code at all`() {
         // Why the two tests above are synthetic. These three captures of
