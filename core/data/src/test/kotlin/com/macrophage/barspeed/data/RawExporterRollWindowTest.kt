@@ -447,7 +447,17 @@ class RawExporterRollWindowTest {
      */
     @Test
     fun `a no-prep set's work start leaves its roll named over the capture, and the schema takes it`() = runTest {
+        // One stream: the set-level figure and basis (allOf[0] and [1]).
         val set =
+            meta(listOf(imuStream(samples(1_000L, sweep(0.0, 12.0, 20)))), tempo = null, workBegan = true)
+        assertEquals(1_000.0, set.num("workStartedAt_ms"), "the no-prep set published no work start")
+        assertTrue("prepStartedAt_ms" !in set, "a set with no prep published a prep start")
+        assertEquals("wholeCapture", set.text("rollExcursionBasis"))
+        assertEquals(emptyList(), RawMetaSchema.unmetInSet(set), "the schema refuses what the writer wrote")
+        // Two roles: each `sensors` entry's basis (allOf[2] and [3]). Two
+        // roles with nothing armed publish no set-level figure, so the
+        // set-level word is asserted on the one-stream set above only.
+        val dual =
             meta(
                 listOf(
                     imuStream(samples(1_000L, sweep(0.0, 12.0, 20)), role = "a", id = 1L),
@@ -456,11 +466,9 @@ class RawExporterRollWindowTest {
                 tempo = null,
                 workBegan = true,
             )
-        assertEquals(1_000.0, set.num("workStartedAt_ms"), "the no-prep set published no work start")
-        assertTrue("prepStartedAt_ms" !in set, "a set with no prep published a prep start")
-        assertEquals("wholeCapture", set.text("rollExcursionBasis"))
-        assertEquals("wholeCapture", set.sensor("a").text("rollExcursionBasis"))
-        assertEquals(emptyList(), RawMetaSchema.unmetInSet(set), "the schema refuses what the writer wrote")
+        assertEquals(1_000.0, dual.num("workStartedAt_ms"), "the two-role no-prep set published no work start")
+        assertEquals("wholeCapture", dual.sensor("a").text("rollExcursionBasis"))
+        assertEquals(emptyList(), RawMetaSchema.unmetInSet(dual), "the schema refuses the sensor entries")
     }
 
     // ---- what must not change ----------------------------------------------
