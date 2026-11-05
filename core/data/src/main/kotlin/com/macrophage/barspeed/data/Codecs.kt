@@ -2,15 +2,30 @@ package com.macrophage.barspeed.data
 
 import com.macrophage.barspeed.model.HrSample
 import com.macrophage.barspeed.model.PrepWindow
+import com.macrophage.barspeed.model.SensorContact
 import com.macrophage.barspeed.model.VoiceCue
 import java.io.ByteArrayOutputStream
 import java.util.Locale
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
-/** Canonical CSV for heart-rate streams (companion to ImuCsv). */
+/**
+ * Canonical CSV for heart-rate streams (companion to ImuCsv).
+ *
+ * FOUR COLUMNS SINCE #82, export 1.26: `contact` is the notification's
+ * Sensor Contact report -- `1` the strap detected skin contact, `0` it
+ * reported none, EMPTY it said nothing (Support clear). Three-state on
+ * purpose, and a reader that parses the column as numbers gets 1, 0 and a
+ * missing value, which is the same three states.
+ *
+ * Every file written before 1.26 has three columns, and [decode] reads its
+ * absent fourth field as [SensorContact.NOT_RECORDED] -- never as either
+ * live value. Stored streams are exported verbatim, each with its own header
+ * line, so an archive spanning both builds holds both widths, and the
+ * manifest's `csvHeaderHrm` is the header THIS build writes.
+ */
 object HrCsv {
-    const val HEADER = "timestamp_ms,hr_bpm,rr_ms"
+    const val HEADER = "timestamp_ms,hr_bpm,rr_ms,contact"
 
     fun encode(samples: List<HrSample>): String {
         val sb = StringBuilder(HEADER).append('\n')
@@ -28,7 +43,23 @@ object HrCsv {
      */
     fun row(sample: HrSample): String {
         val rr = sample.rrIntervalsMs.joinToString("|") { String.format(Locale.US, "%.1f", it) }
-        return "${sample.timestampMs},${sample.bpm},$rr"
+        return "${sample.timestampMs},${sample.bpm},$rr,${contactField(sample.contact)}"
+    }
+
+    private fun contactField(contact: SensorContact): String = when (contact) {
+        SensorContact.DETECTED -> "1"
+        SensorContact.NOT_DETECTED -> "0"
+        SensorContact.NOT_RECORDED -> ""
+    }
+
+    /**
+     * The fourth field back. Absent (a three-column file), empty, or anything
+     * that is not `1` or `0` is NOT_RECORDED: none of them is a contact report.
+     */
+    private fun contactOf(field: String?): SensorContact = when (field) {
+        "1" -> SensorContact.DETECTED
+        "0" -> SensorContact.NOT_DETECTED
+        else -> SensorContact.NOT_RECORDED
     }
 
     fun decode(text: String): List<HrSample> = text.lineSequence()
@@ -42,6 +73,7 @@ object HrCsv {
                 rrIntervalsMs =
                 f.getOrNull(2)?.takeIf { it.isNotEmpty() }
                     ?.split('|')?.map { it.toDouble() } ?: emptyList(),
+                contact = contactOf(f.getOrNull(3)),
             )
         }
         .toList()

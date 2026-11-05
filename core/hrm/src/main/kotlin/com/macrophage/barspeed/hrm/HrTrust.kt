@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.hrm
 
 import com.macrophage.barspeed.model.HrSample
+import com.macrophage.barspeed.model.SensorContact
 import kotlin.math.sqrt
 
 /**
@@ -354,7 +355,9 @@ object HrTrust {
      * notices.
      *
      * A stream that cannot produce a budget is NOT silenced. Issue #82 -- a
-     * strap streaming bpm with no R-R at all -- is deliberately not covered:
+     * strap streaming bpm with no R-R at all -- is deliberately not covered
+     * here; since 1.26 [isTrusted] answers it per sample, and only where the
+     * strap reports no skin contact:
      * "no budget" is equally true of a genuinely short set and of a strap that
      * connected a second before the set ended, and silencing on missing
      * evidence rests on zero observed instances against this rule's one.
@@ -372,17 +375,27 @@ object HrTrust {
      * beats, which no beat detector can mean literally; the bpm arriving in the
      * same notification is not treated as independent of it.
      *
-     * KNOWN GAP, and it is why this returns true more often than it looks like
-     * it should: a sample carrying NO R-R interval at all passes on its bpm
-     * alone, because `all` over an empty list is vacuously true. The R-R
-     * evidence is the only evidence this function has, and a strap that streams
-     * a plausible bpm with the R-R Present flag clear defeats it entirely. That
-     * combination has never been observed in any capture held here, and its
-     * likelihood is unmeasured rather than low. Tracked as issue #82; the
-     * sensor-contact bits are the only remaining signal for it and they are
-     * discarded before anything is persisted.
+     * A SAMPLE WITH NO R-R INTERVAL is judged on the strap's contact report,
+     * since #82, and on nothing else. `all` over an empty list is vacuously
+     * true, so such a sample used to pass on its bpm alone. Where the strap
+     * reports Sensor Contact Support with Status clear -- it says it is not on
+     * skin -- and sends no R-R, nothing supports the bpm and the sample is not
+     * trusted. Where it says nothing about contact ([SensorContact.NOT_RECORDED],
+     * which is also every sample decoded from a file written before 1.26) the
+     * old answer stands: silencing on MISSING evidence would withhold heart
+     * rate from a compliant strap, one that legitimately omits R-R, on every
+     * set, and #82's ruling refuses that. A sample WITH possible R-R intervals
+     * is not overruled by the contact bit; the narrower scope is deliberate,
+     * because no capture held here has ever carried the bits.
+     *
+     * STILL UNMEASURED: whether the strap in use sets Sensor Contact Support at
+     * all. If it does not, this changes nothing for it, and the gap stays open
+     * exactly as it was -- a strap streaming a plausible bpm with neither R-R
+     * nor a contact report is still believed.
      */
-    fun isTrusted(sample: HrSample): Boolean = sample.bpm > 0 && sample.rrIntervalsMs.all { it > 0.0 }
+    fun isTrusted(sample: HrSample): Boolean = sample.bpm > 0 &&
+        sample.rrIntervalsMs.all { it > 0.0 } &&
+        !(sample.rrIntervalsMs.isEmpty() && sample.contact == SensorContact.NOT_DETECTED)
 
     /**
      * Summarise one set's stream over its trusted samples only.
@@ -394,8 +407,9 @@ object HrTrust {
      * published avgBpm 31 beside maxBpm 50, both from the same 72 samples,
      * before this filter existed. A stray low reading is no less plausible a
      * strap artifact than a stray high one -- issue #82's gap (a sample with no
-     * R-R interval at all is trusted on bpm alone) can hand either extremum a
-     * single-sample outlier, so [HrStreamSummary.minBpm] is computed by the
+     * R-R interval and no contact report is trusted on bpm alone) can hand
+     * either extremum a single-sample outlier, so [HrStreamSummary.minBpm] is
+     * computed by the
      * identical rule as [HrStreamSummary.maxBpm], not a stricter or looser one.
      * The cost of excluding an untrusted sample is that a true extreme landing
      * in a sample that also carries an impossible R-R is lost, and the reported
