@@ -14,6 +14,16 @@ import kotlin.math.sqrt
  * [trustedSamples] and [totalSamples] are counts of what the decision was made
  * over. They are not published anywhere; they exist so a test can assert how
  * much of a stream was believed rather than only what came out of it.
+ *
+ * [avgBpm] is the mean of the trusted samples' bpm TRUNCATED toward zero to a
+ * whole beat, never rounded (#296): 120 and 121 store 120. So it reads up to
+ * one beat below the unrounded mean, and on field-42 truncation and rounding
+ * differed on 9 of 16 sets. Kept rather than changed to rounding: every set
+ * row stored since heart rate was first summarised holds a truncated figure,
+ * the column is frozen at set end, and a rule change would make one published
+ * key carry two definitions split by app version, for a difference the
+ * owner's issue says decides nothing. The session figure built from these
+ * truncates again; `SessionHeartRate` says what that costs.
  */
 data class HrStreamSummary(
     val endOfSetBpm: Int?,

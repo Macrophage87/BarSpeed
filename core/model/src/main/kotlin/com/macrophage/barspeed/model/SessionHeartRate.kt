@@ -4,6 +4,18 @@ package com.macrophage.barspeed.model
  * A session's heart-rate summary: the mean of its sets' average heart rates,
  * the highest of their maxima, and the session HRV (#62).
  *
+ * NOT A MEAN OVER SAMPLES, and the difference is measured (#296). Each set
+ * counts once however long it ran, and each set's figure is itself already
+ * truncated to a whole beat (`HrStreamSummary.avgBpm`), so the session mean
+ * truncates truncated values. On field-42 (app 0.1.52) the published 99 is
+ * the mean of sixteen per-set figures, 99.25, truncated; the unfloored set
+ * means average 99.83, and the true mean over all 1528 in-set samples is
+ * 100.34. Kept as it is, and described, rather than redefined: the close
+ * freezes the figure on the session row, a redefinition would give one key
+ * two meanings across the archive, and 1.3 beats on a session average is a
+ * difference the issue itself says decides nothing. A reader wanting the
+ * mean over samples has every in-set `hrm` stream in the raw archive.
+ *
  * ONE RULE FOR THE WRITER AND ITS READERS. `SessionRepository.endSession`
  * writes [aggregate] onto the session row at the close, with the HRV the
  * close computed. A reader that took the row's columns and nothing else
