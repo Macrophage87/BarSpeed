@@ -438,7 +438,8 @@ class SessionExporter(
                     // an unresolved phase as scored (L1 review round 1).
                     byPhase =
                     it.tallyPhases()
-                        .map { p -> PhaseTallyExport(p.phase, p.repsWithinTolerance, p.repsEvaluated) },
+                        .map { p -> PhaseTallyExport(p.phase, p.repsWithinTolerance, p.repsEvaluated) }
+                        .ifEmpty { null },
                     prescribedEccConRatio = it.prescribedEccConRatio,
                     actualEccConRatio = it.actualEccConRatio,
                     // Frozen with the ratio when the set was analysed (#88);
@@ -870,7 +871,7 @@ class SessionExporter(
                 bodyweight = g.sources.bodyweight.name.lowercase(),
                 // Null on a row stored before 1.26 (#289), which never recorded
                 // it, and so omitted: no answer is invented for such a set.
-                sensorInverted = null,
+                sensorInverted = g.sources.sensorInverted?.name?.lowercase(),
             ),
         )
     }
