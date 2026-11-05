@@ -3,8 +3,9 @@
 **Status.** Design round for release 0.2.0. Nothing here changes `RomBound`, the segmenter, #306's
 peak/velocity-loss gating, or any `DspConfig` constant. It needs no contract number: no export
 key, database column or plan field. The issue's measure of success is velocity loss (section 5).
-Set peaks, which #306 gates on the same eligibility, stay withheld; nothing here changes them. The evidence comes from the committed corpus under
-`core/dsp/src/test/resources` and nowhere else. The figures are pinned in
+Set peaks, which #306 gates on the same eligibility, stay withheld; nothing here changes them.
+The evidence comes from the committed corpus under `core/dsp/src/test/resources` and nowhere
+else. The figures are pinned in
 `core/dsp/src/test/kotlin/com/macrophage/barspeed/dsp/RomBoundCauseCorpusTest.kt`.
 
 **Re-derive every figure below:**
@@ -13,7 +14,7 @@ Set peaks, which #306 gates on the same eligibility, stay withheld; nothing here
 ./gradlew -PjvmOnly :core:dsp:test --tests "com.macrophage.barspeed.dsp.RomBoundCauseCorpusTest"
 ```
 
-They were measured at `eec77feb41f6d24d4805d55b8fde84e76e8da9c4` (lane branch
+They were measured at `c976c1a9cbacb69a6519808f0f0dfea7246fce6a` (lane branch
 `claude/v020-l15-rom-design`, on top of `claude/release-0.2.0` at
 `4ab115f62738c71763f8012a7d6e4cab825d7507`), locally with `-PjvmOnly`. CI runs the same class on
 every push to the lane branch. The test is a pure characterization pin. It asserts what the
@@ -47,7 +48,8 @@ Two consequences:
 - no other span lies inside the bracket (SHARED).
 
 The pin works out the three flags separately. Its licence is that its verdict equals
-`SetAnalyzer.analyze`'s `romBounded` count on every capture in `CandidateCorpus.ALL`.
+`RomBound.bounded` span by span, and its bounded count equals `SetAnalyzer.analyze`'s
+`romBounded` count, on every capture in `CandidateCorpus.ALL`.
 
 ### 2.1 Whole corpus (every `CandidateCorpus.ALL` capture)
 
@@ -90,10 +92,10 @@ against the 0.10 m `anchorAcceptable` licenses. Every one is above the budget.
 
 - **Drift is what refuses the completed deadlift reps.** All 41 REP spans fail a drift clause
   (AFTER_LAST or UNCAPPED). On the 34 UNCAPPED ones the correction erased 0.216 to 5.728 m inside
-  the rep's own span; the 7 AFTER_LAST ones have no closing anchor at all. On a working set the bar never
-  goes quiet long enough for an acceptable anchor, so the whole working window is one interval,
-  closed by starvation or not closed at all. This agrees with the 2026-09-25 comment on #316 and
-  with `RomBound`'s own KDoc. The bound is right to refuse them.
+  the rep's own span; the 7 AFTER_LAST ones have no closing anchor at all. On a working set the
+  bar never goes quiet long enough for an acceptable anchor, so the whole working window is one
+  interval, closed by starvation or not closed at all. This agrees with the 2026-09-25 comment on
+  #316 and with `RomBound`'s own KDoc. The bound is right to refuse them.
 - **Segmentation is wrong on part of the population, and that is not the cause.** 19 of the 61
   labelled deadlift spans are NOT_REP: plate handling, bounces, the bar roll, set-downs. Some
   completed lifts are split in two. Removing every segmentation error would leave the completed
@@ -142,9 +144,12 @@ the 36 spans:
 | the next call's drive start, with no quiet sample before it | 6 |
 | the capture's end | 0 |
 
-6 spans run past the next drive's start (the 5 above and one that then found a quiet sample). One
-of the counter's closes is the next *armed* drive, and a drive arms after it has started, so such a
-call lands inside the next pull. Those six spans take in part of the next lift.
+6 spans run past the next drive's start: the 5 above, and one whose call sample was itself quiet
+(field-43 set 6, call 1). Those six spans take in part of the next lift. Why the call lands that
+late is an inference, not measured: one of the counter's closes is the next *armed* drive, and a
+drive arms after it has started (`CycleRepCounter`'s KDoc), so such a call would land inside the
+next pull. `RepClosed` carries no close reason, so a contact close in the same gap is not ruled
+out.
 
 | measure over the 36 cycles | result |
 |---|---|
@@ -185,27 +190,39 @@ span passing one and failing the other.
 ### 3.3 Concentric-only spans (floor rest to lockout rest)
 
 This would integrate only the pull, where less error can accumulate than over the whole cycle:
-the counter's drive runs last 0.29 to 0.98 s on these sets. It needs rest on both sides. Rest is
+the counter's drive runs last 0.29 to 0.98 s on these sets (from the uncommitted scratch harness,
+not pinned). It needs rest on both sides. Rest is
 read the way `applyZupt` reads it, `VelocityEstimator.quietMask`: a run of anchor-candidate samples
 at least `minStationaryS` (0.30 s) long. Single quiet samples are not rest: an accelerometer cannot
 tell rest from constant velocity (`VelocityEstimator.anchorAcceptable`'s KDoc), which is why rest
 is read as a run.
 
 A call has a floor rest when a mask sample lies between the previous call (the capture's start for
-the first call) and the drive's start, and a top rest when one lies between the drive's end and the
-call. Where the bar was in either window is the counter's premise, not something measured here.
+the first call) and the drive's start. It has a top rest when one lies between the drive's end and
+the call, or the next call's drive start if that comes first: on a call that lands past the next
+drive's start, a mask sample after that start belongs to the next pull. Where the bar was in either
+window is the counter's premise, not something measured here. The floor window is empty by
+construction for a call whose previous call landed after this drive started, so those calls cannot
+count a floor rest.
 
 | over the 36 calls | calls |
 |---|---|
 | floor rest and top rest | **4** |
 | floor rest only | 13 |
-| top rest only | 4 |
+| top rest only | 3 |
+
+Correction, mine: this note at `6e979760` gave 4 top-only calls. Its top window ran to the call
+without stopping at the next drive's start, and field-43 set 6's call 1 counted as top-only on a
+mask sample inside the next pull. Capping the window drops it. The other two rows are unchanged.
 
 The four with both are the first call of field-44 sets 4 and 5 and field-43 sets 4 and 6, so the
-floor rest is the setup before the set's first pull. From the last floor-rest sample to the first
-top-rest sample (1.41 to 2.52 s), `0.5·|dv|·T` is **0.236 to 2.123 m**, every one above the
-0.10 m `anchorAcceptable` budget. So the supply is thin, and where it exists the span between the
-two rests does not pass the cap. This route does not bound a completed rep on this corpus either.
+floor rest is the setup before the set's first pull. Field-43 set 6's call 0 is the one NOT_REP call
+of section 3.1, so three of the four are completed reps. That call also lands past the next drive's
+start, but its top-rest sample comes before that start, so its figure stands. From the last
+floor-rest sample to the first top-rest sample (1.41 to 2.52 s), `0.5·|dv|·T` is **0.236 to
+2.123 m**, every one above the 0.10 m `anchorAcceptable` budget. So the supply is thin, and where it
+exists the span between the two rests does not pass the cap. This route does not bound a completed
+rep on this corpus either.
 
 Correction, mine: round 1 of this note said "none has both, 2 have only the floor run and 3 only
 the lockout run". That search walked to the quiet sample nearest the drive on each side and judged
@@ -246,6 +263,10 @@ Nothing ships for #316 in 0.2.0 beyond this note and the pin, and no user-visibl
 > Velocity loss is published on field-44's deadlift sets, and the reps it is taken over match the
 > owner's hand counts: 5, 5, 5, 4 and 2 completed reps on sets 1-5, with set 5's third pull a
 > failed attempt.
+
+Velocity loss is the figure that matters on these sets by the owner's ruling quoted in #250's
+2026-09-04 comment: "When the concentric digit is X, then it matters, or if it's straight reps or
+explosive. Otherwise I don't look at it." Field-44's deadlifts are straight reps.
 
 - **Today, measured:** not met. At the SHA above, 0 of field-44's 38 deadlift spans are bounded,
   so no set has the two eligible reps velocity loss needs.
