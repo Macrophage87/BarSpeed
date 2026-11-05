@@ -2846,6 +2846,26 @@ data class SessionExport(
          * rule, `RepMarkAlignmentFieldTest` in `:core:dsp` the corpus it is
          * argued from, and `SessionExportRepMarksTest` in `:core:data` is the
          * export differential.
+         *
+         * 1.26 FURTHER ENTRY (#242, #287, a unit that cannot stand for the set
+         * beside its partner): THE ANALYSED ROLE MAY MOVE ON TWO MORE SETS.
+         * `SensorCapturePolicy.analysable` now also refuses an armed unit
+         * whose stream ENDED short of its partner's by more than
+         * `SensorCapturePolicy.SPAN_MARGIN_MS` or a tenth of the partner's
+         * span, whichever is longer (#242), and one that NEVER MOVED --
+         * [UnitMotion.still] -- while its partner did (#287), so the analysis
+         * moves by the fallback that already existed: `analysedFellBack`
+         * true, `analysedRoleBasis` `fallback`, refused under a mount-specific
+         * declaration (#247). A still unit is also no longer a candidate for
+         * the stack signature, whose roll test it passes by lying still.
+         * Measured over the committed corpus in `UnitMotionFieldTest`: no
+         * committed pair moves under either rule, field-41 set 16's stack
+         * unit included. NOT RETROACTIVE: the role is frozen when the set is
+         * recorded. No key moves; `DATABASE_VERSION` does NOT move.
+         *
+         * PINNED. `ShortOrStillUnitTest` is the differential;
+         * `SchemaSensorCoverageContractTest` asserts this entry and the three
+         * descriptions.
          */
         const val SCHEMA_VERSION = "1.26"
 
