@@ -268,4 +268,18 @@ class RescuedCardTest {
             assertTrue(buttons.sendEnabled && buttons.discardEnabled, "$hold disabled actions that end nothing")
         }
     }
+
+    // ---- round 2 review of #112 (A's N3): a dead RESTORE says why -----------
+
+    @Test
+    fun `a restorable rescue held by a recording says why RESTORE is dead`() {
+        for (hold in RecordingHold.entries) {
+            assertEquals(
+                "Can't restore yet: a session is open, or a set or session is still saving. " +
+                    "RESTORE works again once it has finished.",
+                rescuedRestoreNote(RestoreVerdict.Restorable(19), 20, setOf(hold)),
+                "RESTORE dead while $hold is held, with nothing on the card to say why",
+            )
+        }
+    }
 }
