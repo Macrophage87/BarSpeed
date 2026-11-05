@@ -137,8 +137,15 @@ internal fun rescuedTapEffect(tap: RescuedTap, item: RescuedDatabase): RescuedTa
  * Every refusal names what would change it. A version the build cannot take
  * names both numbers, because "install a newer build" is only actionable with
  * the number it has to reach.
+ *
+ * [held] is what the recording holds hold now, as for [rescuedCardButtons].
+ * Reserved for round 2 review of #112 (A's N3); not read yet.
  */
-internal fun rescuedRestoreNote(restore: RestoreVerdict?, compiledVersion: Int): String? {
+internal fun rescuedRestoreNote(
+    restore: RestoreVerdict?,
+    compiledVersion: Int,
+    held: Set<RecordingHold> = emptySet(),
+): String? {
     if (restore !is RestoreVerdict.Refused) return null
     val version = restore.version
     return when (restore.reason) {

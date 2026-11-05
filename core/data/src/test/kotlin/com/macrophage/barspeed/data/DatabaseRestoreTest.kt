@@ -298,6 +298,31 @@ class DatabaseRestoreTest {
         }
     }
 
+    /**
+     * GUARD, added because round 2's review found it unpinned: the undo's
+     * KDoc says every undo is recorded, whether the swap reached an open or
+     * turned round on a failed move. A swap turned round at its very first
+     * move (the undo then starts at index -1 and moves nothing) is recorded
+     * too, so this build does not offer the same restore again.
+     */
+    @Test
+    fun `a swap turned round by a failed move is recorded as undone, at every move`() {
+        for (k in 0 until 4) {
+            cleanUp()
+            liveDir.mkdirs()
+            standardSetup()
+            restore().request(item("db-1000"))
+            var calls = 0
+            val failingAt: (File, File) -> Boolean = { from, to -> if (calls++ == k) false else from.renameTo(to) }
+            assertEquals(RestoreOutcome.Undone, restore(failingAt).prepare(), "move $k failing")
+            assertEquals(
+                RestoreVerdict.Refused(RestoreRefusal.FAILED_BEFORE, 19),
+                restore().verdict(item("db-1000"), store().rescued()),
+                "move $k failing: the undone restore is offered again by the build that undid it",
+            )
+        }
+    }
+
     @Test
     fun `a move that throws is a failed move, not a crash`() {
         val before = standardSetup()

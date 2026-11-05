@@ -79,10 +79,14 @@ sealed interface RescueOutcome {
  * one off the phone or throw it away, showing its size so the decision is made
  * with the number in front of them, is filed separately.
  *
- * NOTHING ON THE NORMAL LAUNCH PATH CHANGES. Every failure and every doubt
- * resolves to [RescueOutcome.NotNeeded], no exception escapes, and the case
- * this release actually meets -- a database at the same version as the code --
- * takes the same branch as a first install.
+ * NOTHING ON THE NORMAL LAUNCH PATH CHANGES: with no [PENDING] marker and a
+ * database at or below the compiled version, this returns
+ * [RescueOutcome.NotNeeded] and moves nothing. Every failure to move, record
+ * or clear a rescue is [RescueOutcome.Failed], on which `AppDatabase.build`
+ * throws. No exception escapes this function; the launch's throw is the
+ * caller's. An earlier version of this paragraph said every failure and
+ * every doubt resolves to NotNeeded; that stopped being true when Failed
+ * began to stop the launch, and was found by round 2's review.
  */
 object DatabaseRescue {
     /** Where rescued databases live, beside the in-flight set journals. */
@@ -238,9 +242,12 @@ object DatabaseRescue {
      * main file already in the directory means every move was done and only
      * the bookkeeping was left, so nothing at the path is touched and the
      * launch decides afresh; and a named directory that does not exist means
-     * nothing had moved, so the same. A move into a name that is already
-     * taken is refused, never made. Any failure leaves [PENDING] in place and
-     * returns [RescueOutcome.Failed], on which the launch does not open.
+     * nothing had moved, so the same -- provided the marker can be removed;
+     * if it cannot, that launch is [RescueOutcome.Failed] and does not open,
+     * and every later launch tries again. A move into a name that is already
+     * taken is refused, never made. Any failure once [PENDING] is written
+     * leaves it in place and returns [RescueOutcome.Failed], on which the
+     * launch does not open; a failure before it is written has moved nothing.
      *
      * Before this, ONE DIRECTORY WAS NOT NECESSARILY ONE DATABASE: an
      * interrupted rescue left a sidecar in one db-<ms> directory and the main
@@ -294,9 +301,10 @@ object DatabaseRescue {
             if (dest.exists()) return RescueOutcome.Failed("${dest.name} is already in ${target.name}")
             if (!move(source, dest)) return RescueOutcome.Failed("could not move ${source.name}")
         }
-        // Every file has moved. A marker that will not go is harmless: the
-        // next launch finds the main file already in the target and only
-        // retries removing it.
+        // Every file has moved. A marker that will not go does not undo the
+        // rescue. The next launch finds the main file already in the target
+        // and only retries removing it; if that retry fails too, that launch
+        // is Failed and does not open. Nothing is lost either way.
         marker.delete()
         return RescueOutcome.Rescued(target)
     }
