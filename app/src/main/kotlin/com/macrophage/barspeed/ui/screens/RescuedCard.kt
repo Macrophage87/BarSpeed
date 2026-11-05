@@ -146,11 +146,7 @@ internal fun rescuedTapEffect(tap: RescuedTap, item: RescuedDatabase): RescuedTa
  * of #112, A's N3. No default for [held]: a caller that left it out
  * would be told nothing is held whatever is (round 3 review, B's N7).
  */
-internal fun rescuedRestoreNote(
-    restore: RestoreVerdict?,
-    compiledVersion: Int,
-    held: Set<RecordingHold>,
-): String? {
+internal fun rescuedRestoreNote(restore: RestoreVerdict?, compiledVersion: Int, held: Set<RecordingHold>): String? {
     if (restore is RestoreVerdict.Restorable && !RecordingServicePolicy.mayEndProcess(held)) {
         return "Can't restore yet: a session is open, or a set or session is still saving. " +
             "RESTORE works again once it has finished."
