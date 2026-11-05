@@ -233,9 +233,9 @@ data class TempoComplianceResult(
      * it. A result written before v0.1.31 carries no `scored` key, so every
      * phase -- the pauses included -- decodes as scored; a result written by
      * v0.1.31 to v0.1.35 marks a prescribed movement phase scored even when no
-     * rep resolved it, with [PhaseComplianceResult.repsEvaluated] 0. Neither
-     * is listed: the first is a pause, which byPhase never carries even where
-     * that build graded it, and the second has no count behind it.
+     * rep resolved it, with [PhaseComplianceResult.repsEvaluated] 0.
+     * Neither is listed: the first is a pause, which byPhase never carries
+     * even where that build graded it, and the second has no count behind it.
      *
      * The counts are copied, never re-counted: on a result written before
      * v0.1.31 a prescribed movement phase's [PhaseComplianceResult.repsEvaluated] is every
