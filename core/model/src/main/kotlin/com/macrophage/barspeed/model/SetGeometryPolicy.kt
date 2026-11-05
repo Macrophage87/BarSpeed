@@ -431,13 +431,13 @@ object SetGeometryPolicy {
      * copied straight across rather than recomputed from [declared]. The only
      * thing worked out here is provenance.
      *
-     * One hedge on [GeometrySource.INFERRED] for `startsWith`: an ad-hoc set
+     * One note on [GeometrySource.INFERRED] for `startsWith`: an ad-hoc set
      * against an id the app does not ship is reported inferred, which is what
      * `SessionRepository.exerciseById` produces for both of its non-seed
-     * branches. `RecordViewModel` has a bare fallback that would default it
-     * instead, and this cannot tell the two apart -- but that fallback is not
-     * reachable from the UI today, because the exercise picker offers seeded
-     * ids only.
+     * branches. The ad-hoc path resolves an unseen id through
+     * [ExerciseDef.inferred] (#69 item 4), so it reports inferred on that
+     * path too. Neither path is reachable from the UI with an unseen id
+     * today, because the exercise picker offers seeded ids only.
      */
     fun describe(used: ExerciseDef, declared: PlanExerciseDef?): ResolvedGeometry {
         val seeded = ExerciseDef.seedById(used.id) != null

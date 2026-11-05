@@ -156,9 +156,9 @@ data class ExerciseDef(
          *
          * Lifted from `SessionRepository.exerciseById`'s fallback branch,
          * which built exactly this inline, so the plan path's base for an
-         * unseen id is now a function `:core:model` can pin. [resolvedById]'s
-         * fallback is the AD-HOC path's equivalent and is a separate
-         * statement; #69 item 4 is that the two disagree.
+         * unseen id is now a function `:core:model` can pin. [resolvedById]
+         * falls back to this too since #69 item 4, so the AD-HOC path and the
+         * plan path build one definition for an unseen id.
          *
          * [sensorOnStack] is the [STACK_MOUNTED_IDS] default for the omitted
          * key, as it is on the plan path; [bodyweight] is NOT seeded here,
@@ -516,10 +516,9 @@ data class ExerciseDef(
          * This is the one inference whose result is written down. The others are
          * recomputed from the id on every read, but
          * SessionRepository.ensureExerciseExists stores this in a
-         * CustomExerciseEntity the first time an id is used and
-         * ExerciseDao has no statement that would update it, so an id already
-         * seen keeps whatever this returned then. A plan-declared `"start"`
-         * overrides it per exercise.
+         * CustomExerciseEntity and rewrites the row when [CustomExerciseRepair]
+         * finds it no longer matches today's answer (#59). A plan-declared
+         * `"start"` overrides it per exercise.
          */
         fun inferStartPhase(id: String): StartPhase {
             val tokens = tokens(id)

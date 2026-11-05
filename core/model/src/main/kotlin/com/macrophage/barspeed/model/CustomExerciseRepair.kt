@@ -45,4 +45,20 @@ object CustomExerciseRepair {
      * the app infers for [id] today and nothing should be written.
      */
     fun repaired(id: String, stored: StoredExerciseRow): StoredExerciseRow? = inferredRow(id).takeIf { it != stored }
+
+    /**
+     * The definition the plan path builds for [id] from the row stored for
+     * it: `SessionRepository.exerciseById`'s stored-row branch, lifted here
+     * so `:core:model` can pin what a stored row turns into. The kind and
+     * the stack mount are recomputed from the id, as [ExerciseDef.inferred]
+     * does; the display name and the start phase are the row's.
+     */
+    fun definition(id: String, stored: StoredExerciseRow): ExerciseDef = ExerciseDef(
+        id,
+        stored.displayName,
+        StartPhase.valueOf(stored.startsWith),
+        kind = ExerciseDef.inferKind(id),
+        isCustom = true,
+        sensorOnStack = ExerciseDef.ridesStack(id),
+    )
 }
