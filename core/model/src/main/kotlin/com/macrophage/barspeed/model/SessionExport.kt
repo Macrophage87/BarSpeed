@@ -2789,7 +2789,8 @@ data class SessionExport(
          * `tempoCompliance.byPhase` lists each scored phase with the reps that
          * resolved it (`of`) and how many of those were within tolerance on it
          * (`withinTolerance`). The set-level `withinTolerance`/`of` grades each
-         * rep only on the phases THAT rep resolved, so a ratio over a set whose
+         * rep only on the phases THAT rep resolved (on a set analysed by v0.1.36
+         * or later), so a ratio over a set whose
          * eccentric the sensor mostly missed is mostly a grade of the drive,
          * and nothing said so: field-47 set 14 published 7 of 14 with the
          * eccentric in `scoredPhases`, and none of the seven had an `ecc_s`;
@@ -4566,11 +4567,19 @@ data class TempoComplianceExport(
     /**
      * Reps within tolerance on every scored phase THAT REP RESOLVED, out of
      * [of], the reps that resolved at least one (every rep, on a set
-     * analysed before v0.1.36). Pauses are reported but never scored. A
-     * phase the sensor did not measure is not counted against
-     * the lifter and does not appear in [scoredPhases], so read that field to
+     * analysed before v0.1.36). Pauses are reported but never scored (on a
+     * set analysed by v0.1.31 or later). A phase the sensor did not measure
+     * is not counted against the lifter (on a set analysed by v0.1.36 or
+     * later) and does not appear in [scoredPhases], so read that field to
      * know what this ratio covers: on a slow concentric-first lift it is
      * often the drive alone. `of: 0` means nothing was gradeable.
+     *
+     * A set analysed earlier keeps the count its build stored. By v0.1.31 to
+     * v0.1.35 a rep that did not resolve a scored phase counted as NOT within
+     * tolerance, so a scored phase no rep resolved makes this 0 whatever the
+     * drives did; before v0.1.31 a rep had to be within tolerance on every
+     * prescribed phase, the pauses included. [byPhase] is the per-phase
+     * reading that survives on those sets.
      */
     val withinTolerance: Int,
     val of: Int,
