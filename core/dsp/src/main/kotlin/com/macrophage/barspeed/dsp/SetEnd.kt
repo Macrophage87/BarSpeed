@@ -31,6 +31,13 @@ import com.macrophage.barspeed.model.VoiceCue
  * timestamp is not tuned: it is an instant the app already wrote down, on the
  * same clock the samples carry.
  *
+ * Same clock, not the same instant (#292). A cue is stamped when the app
+ * decided to speak; a sample is stamped when its notification ARRIVED, which
+ * includes whatever delay the sensor, the link and the phone's stack added.
+ * On one session of five a link ran 600 ms behind, which would put a real
+ * drive begun up to that long before the cue after it. `ImuSample`'s KDoc is
+ * the one statement of what was measured and why no offset is applied.
+ *
  * ## The three decisions this type makes, and why
  *
  * **A set with no end cue is [NotCued], and nothing is bounded.** An ad-hoc set

@@ -66,6 +66,12 @@ import kotlin.math.roundToInt
  * rather than restated, so the archive cannot come to hold two answers to
  * "when did this set end".
  *
+ * Both bounds are APP-CLOCK instants applied to sample ARRIVAL stamps, so the
+ * window inherits whatever transport delay the stream carries: 600 ms on one
+ * link of field-42, mostly within 120 ms on four other sessions (#292). [Basis]
+ * names which bounds were known, not how well they line up with the motion.
+ * `ImuSample`'s KDoc is the one statement of what was measured.
+ *
  * Measured on field-37 (2026-09-02, app 0.1.48), recomputed from each set's
  * `imu-a` CSV and confirmed against this code by `RollExcursionFieldTest`: set
  * 3 reports 92.9 over the file against 54.0 over the working window and set 4
