@@ -2915,6 +2915,15 @@ private fun CoroutineScope.offerResume(
  * first slot, so a lifter who picks the same session faces slots the earlier
  * visit already recorded. The prompt says both
  * ([SessionResumePolicy.body]); which pick to allow is the owner's call.
+ *
+ * AND THE SKIPPED-SET LIST, named for the same reason. A continued session's
+ * close writes only the skips taken on this visit ([RecordState.skippedSets]
+ * starts empty on each visit and `endSession` stores it as the row's list); the
+ * earlier visit's were in its memory and are gone. And because the queue
+ * starts again, a skip taken to pass a slot the earlier visit recorded is
+ * stored as a skip of a set the row also holds (`SkipSetControl` refuses a
+ * block opener, so only non-opening slots can be passed this way). Both are
+ * left to the owner with the pick rule.
  */
 private fun resumedState(s: RecordState): RecordState {
     val offer = s.resumeOffer ?: return s

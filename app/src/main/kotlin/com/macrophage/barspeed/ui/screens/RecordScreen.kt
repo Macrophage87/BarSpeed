@@ -955,10 +955,12 @@ private fun AudioCueChip(state: RecordState, viewModel: RecordViewModel) {
 
 @Composable
 private fun ReadyStage(state: RecordState, viewModel: RecordViewModel) {
-    // READY carries START SET, so it is the last screen before a set that would
-    // record nothing. It renders once per session on the way to set one, and
-    // again after a body-weight refusal taken from the rest screen -- see
-    // SkipSetSection -- which is why RESTING carries this too.
+    // READY carries START SET wherever the close allows one
+    // (RestControlPolicy.readyMayStartSet, below), so it is the last screen
+    // before a set that would record nothing. It renders on the way to a
+    // session's first set, on the way to a continued session's first set of
+    // this visit (#48), and again after a body-weight refusal taken from the
+    // rest screen -- see SkipSetSection -- which is why RESTING carries this too.
     //
     // The refusal is drawn HERE and only here, and it covers both doors:
     // `startNextSet` runs `advancedState` -- which writes Stage.READY on the

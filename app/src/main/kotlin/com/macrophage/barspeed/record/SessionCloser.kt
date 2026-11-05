@@ -126,9 +126,9 @@ class SessionCloser(
     /**
      * Whether the pending close's `endSession` has landed on any run of it.
      *
-     * Kept across retries rather than recomputed per run. A REST_UNSAVED retry
-     * calls `endSession` again, whose guard reads the row before refusing the
-     * second write; if that read threw, a per-run flag reported FAILED for a
+     * Kept across retries rather than recomputed per run. Before it was, a
+     * REST_UNSAVED retry called `endSession` again, whose guard reads the row
+     * before refusing the second write; if that read threw, a per-run flag reported FAILED for a
      * row that already had its end time, FAILED drew START NEXT SET, and the
      * sets that followed landed in a session that had already ended. Once
      * landed, a retry skips `endSession` and writes only what is missing.
@@ -209,12 +209,13 @@ class SessionCloser(
                     // exactly what `rest_before_hrm`'s forward attachment
                     // exists to avoid -- so it is placed where it cannot delay
                     // or fail the one write whose input exists nowhere else.
-                    // If it throws, the close reports FAILED and the frozen
-                    // copy is replayed; `endSession` refuses a second write
-                    // and the repository refuses a second window, so the retry
-                    // can only add what is missing.
-                    // FAILED now has two causes and its two consumers say so:
-                    // endSession not landing, or this write not landing after it did.
+                    // If it throws, the close reports REST_UNSAVED (the
+                    // session write landed and only this window is missing,
+                    // #333) and the frozen copy is kept for the retry. The
+                    // retry skips `endSession` once it has landed (rowLanded)
+                    // and the repository refuses a second window, so it can
+                    // only add what is missing. FAILED is the other state:
+                    // `endSession` itself did not land.
                     // The returned FinalRestWindowDecision is discarded: this
                     // caller only needs to know whether the call threw, not
                     // which named outcome it reached, and every branch already
