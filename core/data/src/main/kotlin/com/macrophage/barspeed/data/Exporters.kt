@@ -428,13 +428,16 @@ class SessionExporter(
                     withinTolerance = it.repsFullyCompliant,
                     of = it.repsEvaluated,
                     scoredPhases = it.phases.filter { p -> p.scored }.map { p -> p.phase },
-                    // The same phases, each with its own two counts (#66 (c),
-                    // 1.26): the ratio above folds them together rep by rep,
-                    // over whatever each rep resolved. Copied from the stored
-                    // analysis, never re-counted, and null rather than empty
-                    // where nothing was scored -- scoredPhases says that.
+                    // The scored movement phases some rep resolved, each with
+                    // its own two counts (#66 (c), 1.26): the ratio above folds
+                    // them together rep by rep, over whatever each rep
+                    // resolved. Copied from the stored analysis, never
+                    // re-counted, and null rather than empty where nothing
+                    // qualifies. tallyPhases() rather than the stored flag,
+                    // because a grade stored before v0.1.36 can flag a pause or
+                    // an unresolved phase as scored (L1 review round 1).
                     byPhase =
-                    it.phases.filter { p -> p.scored }
+                    it.tallyPhases()
                         .map { p -> PhaseTallyExport(p.phase, p.repsWithinTolerance, p.repsEvaluated) }
                         .ifEmpty { null },
                     prescribedEccConRatio = it.prescribedEccConRatio,
