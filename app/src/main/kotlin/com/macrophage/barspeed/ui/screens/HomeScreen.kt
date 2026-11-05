@@ -532,6 +532,7 @@ private fun RescuedDatabaseNotice(
     if (rescued.isEmpty()) return
     val clock = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     var confirmDiscard by remember { mutableStateOf<RescuedDatabase?>(null) }
+
     // Every tap goes through rescuedTapEffect (RescuedCard.kt), where the
     // routing is pinned; this only carries out what it returns.
     fun onTap(effect: RescuedTapEffect) {
