@@ -69,6 +69,17 @@ enum class ExitAction {
      */
     LEAVE_SESSION_CLOSING,
 
+    /**
+     * Leave a session that IS finished, giving up only the rest window after
+     * its last set (#333).
+     *
+     * Separate from [LEAVE_SESSION_OPEN] for [LEAVE_SESSION_CLOSING]'s reason,
+     * the label. "Leave without finishing" is false here: the close wrote the
+     * end time, the summary, the rating and the skips, and the only thing
+     * still unwritten is the heart rate recorded after the last set.
+     */
+    LEAVE_FINISHED_SESSION,
+
     /** Dismiss the prompt. Every prompt offers it — a prompt with no way back is a trap. */
     STAY,
 }
@@ -141,6 +152,17 @@ enum class ExitPrompt(val actions: List<ExitAction>) {
      * open, so that action returns.
      */
     SESSION_NOT_CLOSED(listOf(ExitAction.LEAVE_SESSION_OPEN, ExitAction.STAY)),
+
+    /**
+     * A finish the lifter asked for wrote the session's end time, and the
+     * write after it -- the rest window after the last set -- came back failed
+     * (#333). The session is closed; only that window is still in memory.
+     *
+     * Its own member rather than [SESSION_NOT_CLOSED], because that prompt's
+     * claims are false here: the session did finish, and leaving does not
+     * leave it open.
+     */
+    FINAL_REST_UNSAVED(listOf(ExitAction.LEAVE_SESSION_OPEN, ExitAction.STAY)),
 }
 
 /**
@@ -164,8 +186,24 @@ enum class SessionCloseState {
     /** A close is running now. */
     IN_FLIGHT,
 
-    /** A close came back failed and the session row is still open. */
+    /**
+     * A close came back failed before its session write landed, so the
+     * session row is still open: no end time, no summary, and the rating and
+     * skipped sets the close was carrying are held in memory only.
+     */
     FAILED,
+
+    /**
+     * The close's session write landed and the write after it, the rest
+     * window after the last set (#109), came back failed (#333).
+     *
+     * Not [FAILED], which says the row is still open. Here it is closed --
+     * end time, summary, rating and skips are all written -- and what is held
+     * in memory only is that one window. The two used to share [FAILED], and
+     * every consumer that told the lifter the session was still open was
+     * wrong in this case.
+     */
+    REST_UNSAVED,
 }
 
 /**
@@ -281,6 +319,7 @@ object RecordExitPolicy {
                 SessionCloseState.NONE -> ExitPrompt.SESSION_OPEN
                 SessionCloseState.IN_FLIGHT -> ExitPrompt.SESSION_CLOSING
                 SessionCloseState.FAILED -> ExitPrompt.SESSION_NOT_CLOSED
+                SessionCloseState.REST_UNSAVED -> ExitPrompt.FINAL_REST_UNSAVED
             }
     }
 }

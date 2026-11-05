@@ -105,6 +105,7 @@ import com.macrophage.barspeed.model.Stage
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoAdjustPolicy
 import com.macrophage.barspeed.model.TimedSetEndPolicy
+import com.macrophage.barspeed.model.UnwrittenClose
 import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.VoiceCue
 import com.macrophage.barspeed.model.VoiceMilestonePolicy
@@ -2843,8 +2844,39 @@ internal fun startedNextSetState(s: RecordState): RecordState? {
             adHoc = s.adHoc,
         )
     if (RestControl.START_NEXT_SET !in screen.controls) return null
-    return advancedState(s)
+    // What a failed close becomes once the lifter lifts on (#49), decided by
+    // RestControlPolicy.closeOnNextSet. Where it goes back to NONE, what the
+    // close had not written goes with it: the next finish freezes afresh.
+    val close = RestControlPolicy.closeOnNextSet(s.sessionClose)
+    return advancedState(s).copy(
+        sessionClose = close,
+        closeUnwritten = s.closeUnwritten.takeIf { close != SessionCloseState.NONE },
+    )
 }
+
+/**
+ * The state a landed session close leaves behind. A free function for
+ * [sessionOpeningOf]'s reason: `RecordViewModel` is what detekt's
+ * `LargeClass` counts, and #333's close-state wiring had to be paid for.
+ * Behaviour-preserving: the same fields, the same values.
+ */
+private fun closedState(s: RecordState): RecordState = s.copy(
+    stage = Stage.FINISHED,
+    sessionClose = SessionCloseState.NONE,
+    closeUnwritten = null,
+    // The skip lasted the session out and no longer applies (#181).
+    // Cleared here rather than at the next start so the flag names
+    // one session and cannot be read as a standing preference.
+    bodyWeightPromptSkipped = false,
+    // A refusal is a fact about a set that was never started, and
+    // this session has no more sets. The dialog draws only on
+    // READY -- the stage dispatch sends FINISHED to
+    // `FinishedStage`, which never calls `BodyWeightRefusal` --
+    // so this clear is defensive: it stops a flag about a set
+    // that was never started from outliving the session that
+    // refused it (#61).
+    bodyWeightRequiredForSet = false,
+)
 
 /**
  * The same bake, applied to the set already current, when START is tapped on
@@ -3290,8 +3322,18 @@ data class RecordState(
      * paragraph used to say nothing set it to anything but NONE yet; that went
      * false when the close moved to `appScope` and is corrected rather than
      * deleted (#69).
+     *
+     * Since #333 a failed close reports one of two states: FAILED where its
+     * session write did not land, REST_UNSAVED where only the rest window
+     * after the last set did not.
      */
     val sessionClose: SessionCloseState = SessionCloseState.NONE,
+    /**
+     * What a close that came back failed has not written (#333), or null while
+     * no close has failed. Read by the unfinished-session prompt, whose words
+     * are `SessionNotClosedCopy`'s; set and cleared with [sessionClose].
+     */
+    val closeUnwritten: UnwrittenClose? = null,
     /**
      * True once the lifter has tapped Finish session and before they have
      * answered or skipped the session rating (#159).
@@ -5429,7 +5471,9 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Advance to the next planned set; [startedNextSetState] says whether there is one (#195). */
     fun startNextSet() {
+        val close = stateFlow.value.sessionClose
         stateFlow.value = startedNextSetState(stateFlow.value) ?: return
+        if (stateFlow.value.sessionClose != close) closer.discard()
         restJob?.cancel()
         beginSet()
     }
@@ -5524,12 +5568,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      * from the clock.
      */
     fun retrySessionClose() {
-        if (stateFlow.value.sessionClose != SessionCloseState.FAILED) return
+        if (RestControl.RETRY_FINISH !in RestControlPolicy.controls(stateFlow.value.sessionClose)) return
         closer.retry(::onSessionCloseState, ::onSessionClosed)
     }
 
-    private fun onSessionCloseState(close: SessionCloseState) {
-        stateFlow.value = stateFlow.value.copy(sessionClose = close)
+    private fun onSessionCloseState(close: SessionCloseState, unwritten: UnwrittenClose?) {
+        stateFlow.value = stateFlow.value.copy(sessionClose = close, closeUnwritten = unwritten)
     }
 
     /**
@@ -5547,23 +5591,7 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun onSessionClosed() {
         holds.release(RecordingHold.SESSION)
-        stateFlow.value =
-            stateFlow.value.copy(
-                stage = Stage.FINISHED,
-                sessionClose = SessionCloseState.NONE,
-                // The skip lasted the session out and no longer applies (#181).
-                // Cleared here rather than at the next start so the flag names
-                // one session and cannot be read as a standing preference.
-                bodyWeightPromptSkipped = false,
-                // A refusal is a fact about a set that was never started, and
-                // this session has no more sets. The dialog draws only on
-                // READY -- the stage dispatch sends FINISHED to
-                // `FinishedStage`, which never calls `BodyWeightRefusal` --
-                // so this clear is defensive: it stops a flag about a set
-                // that was never started from outliving the session that
-                // refused it (#61).
-                bodyWeightRequiredForSet = false,
-            )
+        stateFlow.value = closedState(stateFlow.value)
     }
 
     /** Back to the session picker; every decision is [previewCancelledState]'s. */

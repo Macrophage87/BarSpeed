@@ -19,6 +19,28 @@ object SessionNotClosedCopy {
     /** The rest screen's retry control after a failed close. */
     const val RETRY_LABEL = "FINISH SESSION AGAIN"
 
+    /** The title of the unfinished-session prompt. */
+    const val NOT_FINISHED_TITLE = "This session did not finish"
+
+    /**
+     * The prompt's title for what [unwritten] says is missing.
+     *
+     * Both branches say [NOT_FINISHED_TITLE] today, written out as two so the
+     * false one can be seen: where `endSession` landed and only the final rest
+     * did not, the session DID finish.
+     */
+    fun title(unwritten: UnwrittenClose): String =
+        if (unwritten.sessionRow) NOT_FINISHED_TITLE else NOT_FINISHED_TITLE
+
+    /**
+     * The prompt's body for what [unwritten] says is missing.
+     *
+     * [EXIT_BODY] in both branches today, which names the end time and the
+     * final rest whatever failed, and never the rating or the skipped sets
+     * the close also holds.
+     */
+    fun body(unwritten: UnwrittenClose): String = if (unwritten.sessionRow) EXIT_BODY else EXIT_BODY
+
     /**
      * The body of the [ExitPrompt.SESSION_NOT_CLOSED] prompt.
      *
