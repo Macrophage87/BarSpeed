@@ -29,8 +29,8 @@ enum class RepsSource(val wireName: String) {
      * the set with `+1 REP`, or afterwards from the rest screen, and
      * `liveReps` is published beside it holding what the sensor said. On a
      * guided set (#336): the lifter recorded a count other than the one the
-     * cadence guide called, and the archive's rep marks hold the guide's
-     * calls. Either way the correction and the figure it corrected are both
+     * cadence guide called, and `guideReps` (export 1.26) holds the guide's
+     * count, its marks the calls themselves. Either way the correction and the figure it corrected are both
      * readable.
      */
     CORRECTED("corrected"),
@@ -154,6 +154,29 @@ object RepsSourcePolicy {
         val guideOverruled = guideCalls != null && guideCalls != recordedReps
         return if (word == RepsSource.METRONOME && guideOverruled) RepsSource.CORRECTED else word
     }
+
+    /**
+     * The guide's own called count, published beside the word as
+     * `guideReps` (export 1.26, #336), or null where none is published.
+     *
+     * The guided twin of `liveReps`: a sensor set the lifter corrected keeps
+     * the sensor's figure beside the corrected one, and a guided set the
+     * lifter corrected -- [published] says `corrected` -- keeps the guide's.
+     * Published on every set the guide counted whose marks are stored, the
+     * uncorrected ones included, so a reader can tell a set the guide called
+     * through from one it was never asked about; null on every set no guide
+     * counted, on a timed set, and where no marks are stored.
+     *
+     * At this commit it publishes nothing; the next commits pin and write it.
+     */
+    @Suppress("UNUSED_PARAMETER", "UnusedParameter", "FunctionOnlyReturningConstant")
+    fun publishedGuideReps(
+        liveReps: Int?,
+        repsManual: Boolean,
+        timed: Boolean,
+        guideCounted: Boolean,
+        guideCalls: Int?,
+    ): Int? = null
 
     /** The same answer as the published word, for a caller that wants the string. */
     fun publishedWord(liveReps: Int?, repsManual: Boolean, timed: Boolean, guideCounted: Boolean): String? =

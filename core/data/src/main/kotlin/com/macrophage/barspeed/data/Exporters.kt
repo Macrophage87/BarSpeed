@@ -376,6 +376,9 @@ class SessionExporter(
             // (#302; the live one reads the acceleration, not a velocity --
             // a drive impulse from #301, a full cycle since #305).
             liveReps = record.liveReps,
+            // The guide's own count beside its word (#336), off the same
+            // stream count `repsSource` read above.
+            guideReps = record.guideRepsOf(geometry?.kind, streams.guideCalls()),
             // The live integrator's latch, frozen into the stored analysis when
             // the set was recorded (#302). Read off the blob and never
             // recomputed; null -- no tracker covered the set's end, or the set
@@ -955,6 +958,25 @@ fun SetRecordEntity.repsSourceOf(kind: ExerciseKind?, guideCalls: Int?): RepsSou
         kind = kind,
     ),
     recordedReps = actualReps,
+    guideCalls = guideCalls,
+)
+
+/**
+ * The guide's own called count this row publishes as `guideReps` (1.26,
+ * #336), or null: [RepsSourcePolicy.publishedGuideReps] over the same inputs
+ * [repsSourceOf] reads, so the count beside the word and the word itself are
+ * one derivation's.
+ */
+fun SetRecordEntity.guideRepsOf(kind: ExerciseKind?, guideCalls: Int?): Int? = RepsSourcePolicy.publishedGuideReps(
+    liveReps = liveReps,
+    repsManual = repsManual,
+    timed = actualDurationS != null,
+    guideCounted =
+    RepsSourcePolicy.guideCounted(
+        hasTempo = tempo != null,
+        isTimed = actualDurationS != null,
+        kind = kind,
+    ),
     guideCalls = guideCalls,
 )
 
