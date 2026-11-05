@@ -851,6 +851,9 @@ class SessionExporter(
             travelRatio = g.sources.travelRatio.name.lowercase(),
             sensorOnStack = g.sources.sensorOnStack.name.lowercase(),
             bodyweight = g.sources.bodyweight.name.lowercase(),
+            // Null on a row stored before 1.26 (#289), which never recorded
+            // it, and so omitted: no answer is invented for such a set.
+            sensorInverted = g.sources.sensorInverted?.name?.lowercase(),
         ),
     )
 
