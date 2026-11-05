@@ -250,6 +250,10 @@
             "withinTolerance": 7,
             "of": 10,
             "scoredPhases": ["eccentric", "concentric"],
+            "byPhase": [
+              { "phase": "eccentric", "withinTolerance": 5, "of": 7 },
+              { "phase": "concentric", "withinTolerance": 9, "of": 10 }
+            ],
             "prescribedEccConRatio": 3.0,
             "actualEccConRatio": 2.64,
             "actualEccConRatioReps": 7

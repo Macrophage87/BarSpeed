@@ -70,6 +70,8 @@ class SchemaExportKeySetContractTest {
             listOf("\$defs", "set", "properties", "summary") to serialKeysOf(SetSummaryExport.serializer()),
             listOf("\$defs", "set", "properties", "tempoCompliance") to
                 serialKeysOf(TempoComplianceExport.serializer()),
+            listOf("\$defs", "set", "properties", "tempoCompliance", "properties", "byPhase", "items") to
+                serialKeysOf(PhaseTallyExport.serializer()),
             listOf("\$defs", "set", "properties", "hr") to serialKeysOf(HrSetSummary.serializer()),
             listOf("\$defs", "set", "properties", "voiceCues", "items") to serialKeysOf(VoiceCue.serializer()),
         )
