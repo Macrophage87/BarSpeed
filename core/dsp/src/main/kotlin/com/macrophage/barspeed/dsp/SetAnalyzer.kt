@@ -2,6 +2,7 @@ package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
 import com.macrophage.barspeed.model.PhaseCoverage
+import com.macrophage.barspeed.model.StackMountSignal
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import com.macrophage.barspeed.model.TempoScoreLabel
@@ -440,10 +441,32 @@ object SetAnalyzer {
      * declaration with different second-unit mounts, so the adjustment is a
      * coin flip and half its outcomes publish an inverted record silently.
      *
+     * EVEN WHERE THE ROLL SAYS THE UNIT RODE THE STACK, and that is a
+     * decision, not an oversight (#318, kept by the owner's default for
+     * 0.2.0). [analysedSignal] can say the unit the analysis fell back to read
+     * [StackMountSignal.ON_STACK], and on a declaration whose ONLY mount term
+     * is `sensorOnStack` it would then be tempting to read it under the
+     * declaration. It is not done, for three reasons: the signature is a
+     * fitted bound that a unit lying still reads as readily as one on a stack
+     * (`StackRollSignature`'s own KDoc), so it confirms the stack term and
+     * nothing else; the inversion that rides with a drive-down stack
+     * declaration is exactly the term no stream can measure
+     * ([LiftDirection.mountSpecificBesidesStack]); and the narrowing was
+     * argued from archived captures only, with no field set having hit the
+     * refusal since v0.1.54. The cost is stated: a stack-declared set whose
+     * armed unit dropped frames publishes no figures even where its partner
+     * could have been read. Its capture is archived either way.
+     * `FallbackMountGeometryTest` pins the refusal under all three signals.
+     *
      * FALSE IS EVERY ORDINARY SET, single-sensor ones included, and nothing
      * about them changes. So is a dual set whose armed unit delivered: the
      * declaration describes the unit the figures came from, which is what it
      * has always meant.
+     *
+     * [analysedSignal] is `ArmedCapture.analysedSignal`: what the ANALYSED
+     * stream's own roll says about riding the load, from `StackRollSignature`
+     * in this module. [StackMountSignal.UNMEASURED] where nothing asked, which
+     * is every caller that passes nothing. Read by nothing yet; issue #279.
      */
     fun analyze(
         samples: List<ImuSample>,
@@ -454,6 +477,7 @@ object SetAnalyzer {
         cues: List<VoiceCue> = emptyList(),
         workStartedAtMs: Long? = null,
         analysedUnitFellBack: Boolean = false,
+        @Suppress("UnusedParameter") analysedSignal: StackMountSignal = StackMountSignal.UNMEASURED,
     ): SetAnalysis {
         val raw = VelocityEstimator.estimate(samples, config, direction.measuredPlane)
         // The analysis moved onto a unit the set did not arm, and [direction]

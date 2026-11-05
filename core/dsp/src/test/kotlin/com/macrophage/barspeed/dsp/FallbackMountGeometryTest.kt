@@ -1,6 +1,7 @@
 package com.macrophage.barspeed.dsp
 
 import com.macrophage.barspeed.model.ImuSample
+import com.macrophage.barspeed.model.StackMountSignal
 import com.macrophage.barspeed.model.StartPhase
 import com.macrophage.barspeed.model.Tempo
 import kotlin.math.PI
@@ -417,5 +418,45 @@ class FallbackMountGeometryTest {
             SetAnalyzer.analyze(samples, freeWeight, analysedUnitFellBack = true).reps.isNotEmpty(),
             "the mount-free fallback published nothing",
         )
+    }
+
+    /**
+     * #318, KEPT: the refusal does not narrow when the roll signature says the
+     * unit the analysis fell back to rode the stack. Pinned under all three
+     * signals so a narrowing that keys off any one of them reds here. See
+     * `SetAnalyzer.analyze`'s KDoc for why it is kept and what it costs.
+     */
+    @Test
+    fun `a fallback under a mount-specific declaration is refused whatever the roll says`() {
+        val stack = stream(handleTrack(), inverted = true)
+        StackMountSignal.entries.forEach { signal ->
+            val refused = SetAnalyzer.analyze(stack, declared, analysedUnitFellBack = true, analysedSignal = signal)
+            assertTrue(refused.reps.isEmpty(), "$signal: figures published under a mount the partner may not share")
+            assertEquals(
+                NoRepsReason.MOUNT_NOT_DECLARED,
+                refused.noRepsReason,
+                "$signal: the blank set does not say why",
+            )
+        }
+    }
+
+    /**
+     * A mount-free declaration over a unit whose roll says it MOVED, or that
+     * nothing measured, is analysed exactly as it was: the signature cannot
+     * place that unit on a stack, so there is no evidence the declaration
+     * fails to describe it. Over-refusal is the defect a refusal invites,
+     * and every barbell stream in the corpus reads moved.
+     */
+    @Test
+    fun `a fallback under a mount-free declaration onto a unit not read as riding a load is analysed`() {
+        val samples = stream(handleTrack(), inverted = false)
+        listOf(StackMountSignal.NOT_ON_STACK, StackMountSignal.UNMEASURED).forEach { signal ->
+            assertEquals(
+                SetAnalyzer.analyze(samples, lifterSide),
+                SetAnalyzer.analyze(samples, lifterSide, analysedUnitFellBack = true, analysedSignal = signal),
+                "$signal: a mount-free fallback changed",
+            )
+        }
+        assertEquals(5, SetAnalyzer.analyze(samples, lifterSide, analysedUnitFellBack = true).reps.size)
     }
 }
