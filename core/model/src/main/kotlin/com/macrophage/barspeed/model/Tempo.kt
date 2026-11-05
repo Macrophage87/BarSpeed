@@ -16,11 +16,12 @@ import kotlinx.serialization.Serializable
  * A null stroke means "X" (explosive: as fast as possible). [upS] has always
  * been able to hold one; [downS] is nullable from #258, so that a lift whose
  * drive moves DOWN -- a pushdown, a pulldown, a leg curl -- has a digit in
- * which to declare an explosive drive. Whether [parse] accepts an `X` in
- * digit 1 is that issue's question and is answered in [parse], not by the
- * type.
+ * which to declare an explosive drive, and [parse] accepts an `X` there from
+ * plan schema 1.15. The notation lets either stroke be `X` and no pause; which
+ * stroke an `X` is honoured on is the lift's business, read by role in
+ * `TempoAdjustPolicy`, `TempoSchedule` and [VelocityLossRegime].
  *
- * Accepts `"4010"`, `"40X0"`, and dash-separated `"4-0-1-0"` forms.
+ * Accepts `"4010"`, `"40X0"`, `"X010"`, and dash-separated `"4-0-1-0"` forms.
  */
 @Serializable
 data class Tempo(
@@ -92,7 +93,8 @@ data class Tempo(
                     cleaned.map { it.toString() }
                 }
             require(parts.size == 4) { "Tempo must have 4 components, got '$text'" }
-            val down = parts[0].toDoubleOrNull() ?: error("Invalid down-stroke component in '$text'")
+            val down =
+                if (parts[0] == "X") null else parts[0].toDoubleOrNull() ?: error("Invalid down stroke in '$text'")
             val bottom = parts[1].toDoubleOrNull() ?: error("Invalid bottom-pause component in '$text'")
             val up = if (parts[2] == "X") null else parts[2].toDoubleOrNull() ?: error("Invalid up stroke in '$text'")
             val top = parts[3].toDoubleOrNull() ?: error("Invalid top-pause component in '$text'")

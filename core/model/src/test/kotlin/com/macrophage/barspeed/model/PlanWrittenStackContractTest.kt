@@ -53,11 +53,12 @@ class PlanWrittenStackContractTest {
      * Moved here from `PlanStackInversionContractTest`, whose copy naming
      * 1.13 is deleted rather than carried forward, for the reason that class
      * gave: a bump left half-done reds here rather than shipping a prompt
-     * asking for a version the app does not write.
+     * asking for a version the app does not write. Moved on to 1.15 by #258,
+     * which minted it; 1.14 is still accepted, below.
      */
     @Test
-    fun `the app writes plan schema 1_14`() {
-        assertEquals("1.14", PlanFile.SCHEMA_VERSION)
+    fun `the app writes plan schema 1_15`() {
+        assertEquals("1.15", PlanFile.SCHEMA_VERSION)
     }
 
     /**

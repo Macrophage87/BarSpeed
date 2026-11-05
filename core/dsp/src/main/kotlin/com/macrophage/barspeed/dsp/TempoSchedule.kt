@@ -70,7 +70,13 @@ data class TempoSchedule(
             val digit1IsConcentric = if (horizontal) false else !direction.concentricUp
             val digit1 =
                 TempoStroke(
-                    label = strokeLabel(horizontal, down = true, isConcentric = digit1IsConcentric, explosive = false),
+                    label =
+                    strokeLabel(
+                        horizontal,
+                        down = true,
+                        isConcentric = digit1IsConcentric,
+                        explosive = tempo.isExplosiveDownStroke,
+                    ),
                     seconds = tempo.downS,
                     isConcentric = digit1IsConcentric,
                 )
@@ -106,8 +112,10 @@ data class TempoSchedule(
          * one-second drive. An `X` that is the RETURN -- digit 3 of a drive-down
          * lift -- keeps its direction word: a fast return is not a drive.
          *
-         * [explosive] is `X` on THIS digit, so digit 1 always passes false:
-         * `Tempo.parse` refuses `X` there (#258). The stroke keeps its
+         * [explosive] is `X` on THIS digit. Digit 1 can carry one since #258
+         * (plan schema 1.15), and on a drive-down lift -- a pulldown at `X010`
+         * -- that is the drive and is called `DRIVE`; on every other shape
+         * digit 1 is the lowering and keeps `DOWN`. The stroke keeps its
          * one-second beat either way -- `CadencePlan.strokeSeconds` decides the
          * seconds and is untouched -- so only the word moves.
          *

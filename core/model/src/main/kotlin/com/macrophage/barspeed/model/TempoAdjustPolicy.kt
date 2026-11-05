@@ -109,9 +109,9 @@ object TempoAdjustPolicy {
     /**
      * The drive's "as fast as possible" marker.
      *
-     * [Tempo.parse] takes it on digit 3 alone, which is why the wheel offers it
-     * on digit 3 alone even though the RULE is about the concentric stroke --
-     * see [wheelChoices] and #258.
+     * [Tempo.parse] takes it on either stroke digit since #258 (plan schema
+     * 1.15), and the wheel offers it on whichever of the two is the
+     * concentric on this lift -- see [wheelChoices].
      */
     const val EXPLOSIVE = "X"
 
@@ -119,7 +119,7 @@ object TempoAdjustPolicy {
 
     private val STROKE_CHOICES: List<String> = (MIN_STROKE_S..MAX_DIGIT_S).map { it.toString() }
 
-    private val UP_STROKE_SPELLABLE: List<String> = STROKE_CHOICES + EXPLOSIVE
+    private val STROKE_SPELLABLE: List<String> = STROKE_CHOICES + EXPLOSIVE
 
     /**
      * The drive's wheel: X FIRST, then 1..9.
@@ -135,8 +135,8 @@ object TempoAdjustPolicy {
      * The values digit [position] may SPELL, in wheel order.
      *
      * The NOTATION's alphabet, and only that. Read off what [Tempo.parse]
-     * already refuses rather than restated: "X" is taken on the up stroke and
-     * nowhere else, and a component of ten or more needs the dash form, which
+     * already refuses rather than restated: "X" is taken on either stroke and
+     * on no pause (#258), and a component of ten or more needs the dash form, which
      * four single-character wheels do not spell.
      *
      * [TempoDigit.choices] is the other half, and the two are deliberately not
@@ -147,8 +147,7 @@ object TempoAdjustPolicy {
      * answering both questions is one flag with two jobs.
      */
     fun spellable(position: Int): List<String> = when (position) {
-        UP_STROKE -> UP_STROKE_SPELLABLE
-        DOWN_STROKE -> STROKE_CHOICES
+        UP_STROKE, DOWN_STROKE -> STROKE_SPELLABLE
         else -> PAUSE_CHOICES
     }
 
@@ -234,12 +233,11 @@ object TempoAdjustPolicy {
      * - The two pauses are 0..9. A pause of 0 is the pause where the lifter
      *   does not stop.
      *
-     * The X is offered only where [spellable] says one can be WRITTEN, which
-     * today is digit 3 alone. On a vertical concentric-down lift the drive is
-     * digit 1, so that lift is offered no X on either stroke -- not because
-     * this rule withholds it but because [Tempo] cannot hold one there.
-     * Widening the notation is #258, and it turns this on by moving that one
-     * statement rather than this one.
+     * The X is offered only where [spellable] says one can be WRITTEN. Since
+     * #258 that is either stroke, so on a vertical concentric-down lift the
+     * drive -- digit 1 -- is offered X, and #258 turned it on by moving that
+     * one statement rather than this one. The eccentric is never offered X on
+     * any lift shape, though it too can now be written one.
      *
      * Private, and reached only through [TempoDigit.choices]: a caller holding
      * a digit holds the lift it was built for, so there is no way to pair one
