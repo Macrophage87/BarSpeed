@@ -45,7 +45,7 @@ class SchemaAnalysisProvenanceContractTest {
         val entry = log.substringAfter("1.26 (#38, analysis provenance)")
         assertTrue(entry.startsWith(": ADDS ONE KEY."), entry.take(80))
         assertTrue("NOT RETROACTIVE" in entry, "the entry does not say older sets publish it absent")
-        assertEquals("1.26", SessionExport.SCHEMA_VERSION)
+        assertTrue("1.26" in SessionExport.SUPPORTED_SCHEMA_VERSIONS, "the entry files the key under no version")
     }
 
     @Test

@@ -341,7 +341,7 @@
         "analysisSchemaVersion": {
           "type": "string",
           "pattern": "^1\\.(0|[1-9][0-9]*)$",
-          "description": "The session export contract of the build that RECORDED this set, and so the semantics of the analysis stored with it (#38) -- the same value, under the same rule, as the set's `analysisSchemaVersion` in session.json. Absent on every set recorded before database v21, which stored no such fact: absent means not recorded, never the version of the build that wrote this archive."
+          "description": "The session export contract current in the build that RECORDED this set and computed the analysis stored with it (#38), and nothing finer: an analysis change shipped without moving that contract is not distinguished by it. It carries the same value, under the same rule, as the set's `analysisSchemaVersion` in session.json. Absent on every set recorded before database v21, which stored no such fact: absent means not recorded, never the version of the build that wrote this archive."
         },
         "limiter": {
           "enum": [

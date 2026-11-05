@@ -2827,10 +2827,13 @@ data class SessionExport(
          * [SetExport.analysisSchemaVersion] names the export contract of the
          * build that RECORDED the set, beside this field's, which names the
          * build that exported it. The stored analysis is computed once when
-         * the set ends and copied out on every later export, so a set
-         * recorded under 1.0 kept 1.0's best-to-worst `velocityLoss_pct` and
-         * `ecc_s` 0.0 inside documents claiming 1.1 and later, with nothing
-         * in the set to say so. NOT RETROACTIVE: read from database v21's
+         * the set ends and never re-run, so every figure the export copies out
+         * of it -- each rep's, `ecc_s` among them -- is the recording build's:
+         * a set recorded under 1.0 still publishes `ecc_s` 0.0 for an
+         * unmeasured eccentric inside documents claiming 1.1 and later, with
+         * nothing in the set to say so. `velocityLoss_pct` is not among them:
+         * it has been re-derived from the stored reps at export since 1.9
+         * (#83). NOT RETROACTIVE: read from database v21's
          * `analysisSchemaVersion` column, null on every row an earlier build
          * wrote, so every set recorded before this build publishes the key
          * ABSENT, meaning not recorded -- no value is inferred from a date or
@@ -3936,16 +3939,24 @@ data class SetExport(
      */
     val sensors: SetSensorsExport? = null,
     /**
-     * The export contract of the build that RECORDED this set, and so the
-     * semantics of the analysis stored with it (1.26, #38).
+     * The export contract current in the build that RECORDED this set and
+     * computed the analysis stored with it (1.26, #38). It is that build's
+     * [SessionExport.SCHEMA_VERSION] and nothing finer: an analysis change
+     * shipped without moving the export contract is not distinguished by it.
      *
      * The document's [SessionExport.schemaVersion] names the build that
-     * EXPORTS it. The rep list and every figure computed from it when the set
-     * ended -- `velocityLoss_pct` and each rep's `ecc_s` are #38's two -- are
-     * stored once, at record time, and copied out verbatim on every later
-     * export; nothing re-runs the analyzer. So a set recorded under 1.0
-     * re-exported today carries 1.0's best-to-worst loss and 0.0 eccentrics
-     * inside a document saying 1.26, and this key is what can say so.
+     * EXPORTS it. The analysis is computed once, when the set ends, and
+     * stored; no export re-runs the analyzer over the stored samples. What
+     * the export COPIES OUT of it is the recording build's: the rep list and
+     * each rep's figures -- so a set recorded under 1.0 still publishes
+     * `ecc_s` 0.0 for an eccentric 1.0 did not measure -- the
+     * [tempoCompliance] grade, and [SetSummaryExport.noRepsReason]. What the
+     * export RE-DERIVES from the stored reps follows the exporting build's
+     * rules over the recording build's reps: [velocityLossPct] (since 1.9,
+     * #83, so 1.0's stored best-to-worst figure is never published),
+     * [velocityLossBasis], [velocityLossRegime], and the summary's means,
+     * peaks and range. This key names the version the copied-out figures
+     * were computed under; the re-derived ones answer to the document's.
      *
      * ABSENT on every set recorded before database v21, the first build that
      * stored the fact. No stored value names the build that analysed an older

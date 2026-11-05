@@ -633,16 +633,18 @@ data class SetRecordEntity(
      * The session-export schema version current in the build that computed
      * [analysisJson], or null when the row predates the column (v21, #38).
      *
-     * WHY IT IS STORED. The blob is computed once, at record time, and every
-     * export afterwards only deserialises it -- nothing re-runs the analyzer.
-     * So the semantics its figures were computed under are those of the build
-     * that RECORDED the set, while every export document stamps the
-     * `schemaVersion` of the build that EXPORTS it. Export 1.1 changed
-     * `velocityLoss_pct` from best-to-worst to best-to-last and made an
-     * unmeasured `ecc_s` null instead of 0.0; a set recorded under 1.0 and
-     * re-exported today carries 1.0's numbers inside a 1.1-or-later document.
-     * This column is what lets the document say which semantics each set's
-     * figures were computed under.
+     * WHY IT IS STORED. The blob is computed once, at record time, and no
+     * export re-runs the analyzer over the stored samples. Every figure an
+     * export copies out of the blob -- the rep list and each rep's figures,
+     * the tempo grade -- is therefore the RECORDING build's, while every
+     * export document stamps the `schemaVersion` of the build that EXPORTS
+     * it. Export 1.1 made an unmeasured `ecc_s` null instead of 0.0, and a
+     * set recorded under 1.0 still publishes its stored 0.0. (1.1 also moved
+     * `velocityLoss_pct` to best-to-last, but that figure is not copied out:
+     * the exporter re-derives it from the stored reps, since 1.9, #83, so the
+     * blob's `velocityLossPct` is read by no export.) This column is what
+     * lets the document say which contract each set's copied-out figures
+     * were computed under.
      *
      * WHAT IT IS AND IS NOT. It is the EXPORT contract's version constant,
      * `SessionExport.SCHEMA_VERSION`, read at the write -- the only version
