@@ -1242,14 +1242,19 @@ class RawExporterTest {
      * The prep window is there so `prepStartedAt_ms` and `workStartedAt_ms`
      * reach the check: they are written only from a stored KIND_PREP stream,
      * and the schema ties them to each other (`dependentRequired`). So the
-     * manifest is held to the schema's `required` and `dependentRequired`
-     * rules as well as its keys and words, and the assertion that the first
-     * set carries both prep keys proves the fixture reached them.
+     * manifest is held to the schema's `required`, `dependentRequired` and
+     * `allOf` rules as well as its keys and words, and the assertion that the
+     * first set carries both prep keys proves the fixture reached them. The
+     * `allOf` rules tie `rollExcursionBasis` to the work start; the first two
+     * sets publish a basis, one with a work start and one without, and an
+     * assertion says so.
      *
-     * The tampered manifests are the controls: one key the schema does not
-     * declare, and the first set with `prepStartedAt_ms` struck off, must each
-     * be reported. A check that cannot report anything would pass the first
-     * assertions too.
+     * The tampered manifests are the controls, one per kind of rule: a key the
+     * schema does not declare, the first set with `prepStartedAt_ms` struck
+     * off, the first set with its required `files` struck off, and the first
+     * set's basis rewritten to `wholeCapture` beside its work start. Each must
+     * be reported, exactly. A check that cannot report one of them would pass
+     * the first assertions too.
      */
     @Test
     fun `every key the manifest writes is declared by the published schema`() = runTest {
@@ -1333,6 +1338,28 @@ class RawExporterTest {
             listOf("sets[0].workStartedAt_ms needs prepStartedAt_ms"),
             RawMetaSchema.unmetInManifest(unpaired),
             "the check reported nothing for a work start written without its prep start",
+        )
+
+        // The allOf rules tie the basis word to the work start, so they are
+        // reached only where the writer published a basis: on the first set,
+        // with a work start, and on the second, without one.
+        assertTrue(
+            sets.take(2).all { "rollExcursionBasis" in it.jsonObject },
+            "the basis rules were never reached: ${sets.take(2)}",
+        )
+        val unopened =
+            JsonObject(manifest + ("sets" to JsonArray(listOf(JsonObject(first - "files")) + sets.drop(1))))
+        assertEquals(
+            listOf("sets[0].files"),
+            RawMetaSchema.unmetInManifest(unopened),
+            "the check reported nothing for a set descriptor without its required files",
+        )
+        val misbased = JsonObject(first + ("rollExcursionBasis" to JsonPrimitive("wholeCapture")))
+        val misbasedManifest = JsonObject(manifest + ("sets" to JsonArray(listOf(misbased) + sets.drop(1))))
+        assertEquals(
+            listOf("sets[0].rollExcursionBasis=\"wholeCapture\" breaks allOf[0]"),
+            RawMetaSchema.unmetInManifest(misbasedManifest),
+            "the check reported nothing for a whole-capture basis on a set that carries a work start",
         )
     }
 }
