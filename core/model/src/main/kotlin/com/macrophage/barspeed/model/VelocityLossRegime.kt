@@ -60,20 +60,16 @@ import kotlinx.serialization.Serializable
  * (#127); reading the direction blindly got every horizontal one backwards,
  * which was this file's.
  *
- * WHAT TODAY'S CONTRACT ALLOWS, stated because the rule above is wider than it.
- * The plan schema's tempo pattern accepts `X` only in digit 3
- * (`[0-9]{2}[Xx][0-9]`) and [Tempo.parse] refuses a non-numeric digit 1. So a
- * VERTICAL concentric-DOWN lift cannot declare an explosive concentric at all:
- * its digit 1 is always a number and it is therefore always [CONTROLLED]
- * whenever it carries a tempo, and the branch that would return [MAX_INTENT]
- * for it is written and unreachable. HORIZONTAL work is not in that position.
- * Its concentric IS digit 3, whatever `concentric` the plan declared beside
- * `plane`, so `30X0` on a chest press or a chest-supported row is [MAX_INTENT]
- * under today's contract -- reachable, and the case the correction above
- * names. Widening the pattern for vertical concentric-down work is its own
- * piece of work, filed as #258, because it changes [Tempo]'s shape, the plan
- * schema under its unreleased number, the voice guide and the tempo scorer
- * together.
+ * WHAT THE CONTRACT ALLOWS. Until plan schema 1.15 the tempo pattern took `X`
+ * in digit 3 alone and [Tempo.parse] refused a non-numeric digit 1, so a
+ * VERTICAL concentric-DOWN lift could not declare an explosive concentric at
+ * all and the branch that returns [MAX_INTENT] for it was written and
+ * unreachable. #258 widened both: digit 1 takes an `X`, so a lat pulldown at
+ * `X010` is [MAX_INTENT] and a bench press at the same `X010` -- whose digit 1
+ * is its lowering -- is [CONTROLLED], because an explosive lowering prescribes
+ * nothing about the drive. HORIZONTAL work reads by phase, so its concentric
+ * is digit 3 whatever `concentric` the plan declared beside `plane`, and an
+ * `X` in its digit 1 is the return.
  *
  * ## Absence is a state
  *
@@ -156,19 +152,19 @@ enum class VelocityLossRegime(
             // prescription: something was asked for and the digits are not
             // available to say what.
             tempo == null -> null
-            // Digit 3 is a number. Whichever digit the drive is, it is a
-            // number -- digit 1 has no explosive form -- so neither the plane
-            // nor the direction can change the answer and neither is consulted.
-            !tempo.isExplosiveUpStroke -> CONTROLLED
-            // Digit 3 is X, so the answer turns on whether digit 3 is the
-            // concentric. The PLANE decides that outright on horizontal work,
-            // where digit 3 is the concentric by phase and the declared drive
+            // Neither stroke is X: whichever digit the drive is, it is a
+            // number, so neither the plane nor the direction can change the
+            // answer and neither is consulted.
+            !tempo.isExplosiveUpStroke && !tempo.isExplosiveDownStroke -> CONTROLLED
+            // A stroke is X, so the answer turns on whether that stroke is the
+            // concentric. The PLANE decides outright on horizontal work, where
+            // digit 3 is the concentric by phase and the declared drive
             // direction has nothing to attach to.
-            horizontal == true -> MAX_INTENT
+            horizontal == true -> maxIntentIf(tempo.isExplosiveUpStroke)
             // Vertical work is positional, so here the direction decides.
-            horizontal == false && concentricUp == true -> MAX_INTENT
-            horizontal == false && concentricUp == false -> CONTROLLED
-            // No plane, or vertical with no direction: an X in digit 3 could be
+            horizontal == false && concentricUp == true -> maxIntentIf(tempo.isExplosiveUpStroke)
+            horizontal == false && concentricUp == false -> maxIntentIf(tempo.isExplosiveDownStroke)
+            // No plane, or vertical with no direction: an X could be on
             // either stroke and nothing on the row says which. Unreachable from
             // the three call sites -- ResolvedGeometry is stored as a unit, so
             // a null plane means a null kind, which returned above -- and null
@@ -176,5 +172,7 @@ enum class VelocityLossRegime(
             // is.
             else -> null
         }
+
+        private fun maxIntentIf(concentricIsExplosive: Boolean) = if (concentricIsExplosive) MAX_INTENT else CONTROLLED
     }
 }

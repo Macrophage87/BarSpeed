@@ -715,7 +715,7 @@ data class PlanFile(
     }
 
     companion object {
-        const val SCHEMA_VERSION = "1.14"
+        const val SCHEMA_VERSION = "1.15"
 
         /**
          * `"1.10"` is not the number 1.1 -- a reader parsing this as a float
@@ -725,7 +725,7 @@ data class PlanFile(
         val SUPPORTED_SCHEMA_VERSIONS =
             setOf(
                 "1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9",
-                "1.10", "1.11", "1.12", "1.13", "1.14",
+                "1.10", "1.11", "1.12", "1.13", "1.14", "1.15",
             )
         val VALID_SIDES = setOf("left", "right")
 
