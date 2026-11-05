@@ -561,6 +561,31 @@ class DatabaseRescueTest {
         assertTrue(!File(rescueRoot(), DatabaseRescue.PENDING).exists(), "the stale marker was left")
     }
 
+    /**
+     * GUARD, added because round 2's review found the prefix check unpinned:
+     * a marker that is empty -- what power loss can leave of a temp file
+     * renamed before its bytes reached the disk -- names [rescueRoot] itself,
+     * which is a directory with no database in it. Without the check the
+     * launch would take that for an unfinished rescue and move the database
+     * in place into the rescue root, where no card lists it.
+     */
+    @Test
+    fun `a marker naming no rescue directory moves nothing and is dropped`() {
+        for (text in listOf("", "\n", "keep")) {
+            cleanUp()
+            File(rescueRoot(), "keep").mkdirs()
+            File(rescueRoot(), DatabaseRescue.PENDING).writeText(text)
+            val file = db(20)
+            val bytes = file.readBytes().toList()
+
+            assertEquals(RescueOutcome.NotNeeded, DatabaseRescue.rescue(file, rescueRoot(), 20), "marker '$text'")
+            assertEquals(bytes, file.readBytes().toList(), "marker '$text': the database in place was moved")
+            assertTrue(!File(rescueRoot(), file.name).exists(), "marker '$text': the database went into the root")
+            assertTrue(!File(rescueRoot(), "keep/${file.name}").exists(), "marker '$text': it went into 'keep'")
+            assertTrue(!File(rescueRoot(), DatabaseRescue.PENDING).exists(), "marker '$text' was left")
+        }
+    }
+
     private fun opens(file: File): Boolean = runCatching { file.inputStream().use { it.read() } }.isSuccess
 
     /**

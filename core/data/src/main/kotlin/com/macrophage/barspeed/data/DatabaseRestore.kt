@@ -59,14 +59,21 @@ sealed interface RestoreOutcome {
  * rename) BEFORE each move. Every file is therefore always in exactly one of
  * two known places, and whichever launch comes next can carry the swap
  * forward ([RestorePhase.SWAPPING]) or back ([RestorePhase.UNDOING]) to a
- * state with one whole database in place. Moves out of the database's path go
- * sidecars first, main file last, as [DatabaseRescue.moveOrder] requires;
- * moves into it go in the same order, so the path never holds a main file
- * beside a sidecar from a DIFFERENT database. It does hold, between moves, a
- * main file without its OWN sidecars, and a stuck restore can stop there;
- * that is why [safeToOpen] asks where every file of both databases is
- * rather than whether a main file is at the path. The journal records each
+ * state with one whole database in place. A swap moves each database
+ * sidecars first, main file last, as [DatabaseRescue.moveOrder] requires. An
+ * undo replays those moves in reverse, so it takes a database out main file
+ * first and brings one back main file first; between moves the path can hold
+ * a lone sidecar, or a main file without its own sidecars, and a stuck
+ * restore can stop in any of those states. The path never holds files of the
+ * two databases together. A stuck restore opens only with one database's
+ * whole set at the path, because [safeToOpen] asks where every file of both
+ * databases is rather than relying on the order; the journal records each
  * database's file names when the swap began so that question can be asked.
+ * The one exception is a journal this build cannot read, named at
+ * [safeToOpen]. An earlier version of this paragraph said moves into the path
+ * go in the same order as moves out; that is true of the swap only, was
+ * quoted as false by round 1's review (A3) and kept by its reply, and was
+ * found again by round 2's.
  *
  * A RESTORE THAT DOES NOT OPEN IS UNDONE. After the last move the phase is
  * [RestorePhase.UNVERIFIED], and only [markOpened] -- called from Room's own
@@ -159,7 +166,14 @@ class DatabaseRestore(
      * A journal that cannot be read, or one written before the file sets
      * were recorded, says nothing about where anything belongs; then only
      * [DatabaseRestorePolicy.safeToOpenAfterStuck]'s narrower check is left,
-     * which refuses a lone sidecar and nothing else.
+     * which refuses a lone sidecar and nothing else. That is the one
+     * remaining path on which a stuck restore can open a main file whose
+     * `-wal` went into a rescue directory: a journal from a later build read
+     * after a downgrade, or one emptied by power loss. It is kept rather than
+     * refused because a refusal stops every launch over a bookkeeping file
+     * even when the database at the path is whole and untouched, which is
+     * the case a journal that cannot be read most often is. Round 2 review,
+     * A's N1 and B's N4.
      */
     fun safeToOpen(): Boolean {
         val live = databaseFile.parentFile ?: File(".")

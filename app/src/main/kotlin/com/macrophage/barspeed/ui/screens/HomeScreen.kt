@@ -660,7 +660,7 @@ private fun RescuedDatabaseNotice(
                     )
                     Spacer(Modifier.height(6.dp))
                     SectionCaption("Kept on this phone. Nothing deletes it but you")
-                    rescuedRestoreNote(restore, DATABASE_VERSION)?.let { note ->
+                    rescuedRestoreNote(restore, DATABASE_VERSION, held)?.let { note ->
                         Spacer(Modifier.height(4.dp))
                         Text(note, style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
                     }
