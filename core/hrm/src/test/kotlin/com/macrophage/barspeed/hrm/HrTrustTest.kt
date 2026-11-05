@@ -99,6 +99,23 @@ class HrTrustTest {
         assertEquals(3, summary.totalSamples)
     }
 
+    /**
+     * The set's mean is TRUNCATED to a whole beat, never rounded (#296).
+     * 120 and 121 average to 120.5, and 120, 121 and 121 to 120.67; both
+     * store 120. Half-up rounding stores 121 for both; half-even passes the
+     * first and fails the second, which every round-to-nearest rule fails.
+     * The same pair of cases `SessionHeartRateTest` pins for the session
+     * figure, because the session truncates these values again.
+     */
+    @Test
+    fun `the set's mean is truncated, never rounded`() {
+        assertEquals(120, HrTrust.summarize(listOf(sample(120, 500.0), sample(121, 496.0))).avgBpm)
+        assertEquals(
+            120,
+            HrTrust.summarize(listOf(sample(120, 500.0), sample(121, 496.0), sample(121, 496.0))).avgBpm,
+        )
+    }
+
     @Test
     fun `the end-of-set reading is the last sample when that sample is trusted`() {
         val summary = HrTrust.summarize(listOf(sample(100, 600.0), sample(0), sample(118, 500.0)))
