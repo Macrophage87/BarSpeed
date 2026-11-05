@@ -44,6 +44,7 @@ import com.macrophage.barspeed.model.VelocityLossRegime
 import com.macrophage.barspeed.model.VoidSetPolicy
 import com.macrophage.barspeed.model.WarmupMarkPolicy
 import com.macrophage.barspeed.model.WeightUnit
+import com.macrophage.barspeed.model.WorkStartPolicy
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -1631,10 +1632,16 @@ class RawExporter(
         // are the analysis's, which has the whole set, can filter without phase
         // lag and can re-run when a method turns out wrong; every derived
         // quantity published here is one it could not revise.
-        prepWindow?.let { window ->
-            num("prepStartedAt_ms", window.startedAtMs)
-            num("workStartedAt_ms", window.workStartedAtMs)
-        }
+        //
+        // The work start alone is asked of [WorkStartPolicy] (#337): a set
+        // that ran no prep stores no window but its work still began, and the
+        // policy owns which instant that was. The prep start is the stored
+        // window's only -- a set with no prep has no prep to have started.
+        prepWindow?.let { window -> num("prepStartedAt_ms", window.startedAtMs) }
+        num(
+            "workStartedAt_ms",
+            WorkStartPolicy.publishedAtMs(prepWindow, record.startedAtMs, record.prepS, record.workBegan),
+        )
         // Parsed from the text buildZip's own loop already inflated -- not
         // re-inflated here, and shared with sampleRate_hz and
         // rollExcursion_deg below besides: decoding a whole IMU capture even

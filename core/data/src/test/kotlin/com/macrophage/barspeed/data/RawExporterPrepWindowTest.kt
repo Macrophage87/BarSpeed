@@ -107,7 +107,13 @@ class RawExporterPrepWindowTest {
 
     private val json = Json { encodeDefaults = true }
 
-    private fun row(id: Long = 5L, startedAtMs: Long = 1_000L, endedAtMs: Long = 46_000L) = SetRecordEntity(
+    private fun row(
+        id: Long = 5L,
+        startedAtMs: Long = 1_000L,
+        endedAtMs: Long = 46_000L,
+        prepS: Int? = 5,
+        workBegan: Boolean? = null,
+    ) = SetRecordEntity(
         id = id,
         sessionId = 1L,
         orderIdx = 0,
@@ -115,8 +121,9 @@ class RawExporterPrepWindowTest {
         exerciseName = "back_squat",
         loadKg = 100.0,
         actualReps = 5,
-        prepS = 5,
-        plannedPrepS = 5,
+        prepS = prepS,
+        plannedPrepS = prepS,
+        workBegan = workBegan,
         startedAtMs = startedAtMs,
         endedAtMs = endedAtMs,
         analysisJson =
@@ -183,19 +190,35 @@ class RawExporterPrepWindowTest {
     }
 
     /**
-     * A set with no stored window says nothing about where its work began.
+     * A set that SET OUT TO RUN A PREP and stored no window says nothing
+     * about where its work began: the prep ran after the tap, so the tap is
+     * not it. The row here has `prepS = 5` and no window.
      *
-     * Every set already on disk is such a set, and so is every set recorded
-     * with no prep at all. Absence must stay absence here: an invented instant
-     * would be indistinguishable from a measured one, and the whole reason
-     * #185 exists is that an analysis currently has to GUESS this boundary
-     * from the samples.
+     * The clause that stood here also covered "every set recorded with no
+     * prep at all", and is narrowed rather than kept: such a set began its
+     * work at its START SET tap, and #337 publishes that (see
+     * `WorkStartPolicy`). Absence must stay absence where the instant is
+     * not known: an invented one would be indistinguishable from a recorded
+     * one, and the whole reason #185 exists is that an analysis had to GUESS
+     * this boundary from the samples.
      */
     @Test
     fun `a set with no stored window publishes no work-start key`() = runTest {
         val set = meta(listOf(row()), emptyMap()).set(0)
         assertTrue("workStartedAt_ms" !in set, "a set with no stored prep window published a work-start instant")
         assertTrue("prepStartedAt_ms" !in set, "a set with no stored prep window published a prep-start instant")
+    }
+
+    /**
+     * A no-prep row written before v15 cannot say its work began, so it
+     * publishes no work start: the tap would be a guess on a row that might
+     * have been abandoned (#337).
+     */
+    @Test
+    fun `a no-prep row that never recorded its work beginning publishes no work start`() = runTest {
+        val set = meta(listOf(row(prepS = null, workBegan = null)), emptyMap()).set(0)
+        assertTrue("workStartedAt_ms" !in set, "a pre-v15 row was given a work start it never recorded")
+        assertTrue("prepStartedAt_ms" !in set, "a set with no prep published a prep start")
     }
 
     // ---- differentials -----------------------------------------------------
