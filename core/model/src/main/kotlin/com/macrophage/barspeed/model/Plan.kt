@@ -1108,6 +1108,21 @@ data class PlanExerciseDef(
      *
      * [SensorCapturePolicy.roster] is where capture is decided and pinned, and
      * it takes no count at all.
+     *
+     * THE DESIGN RECORD, reconciled here because this is the one place the
+     * key's whole history can sit beside it (#171 item 4). The second-sensor
+     * design document's section 7 is reported to have kept the sensor count
+     * out of the plan; that document is not in this repository and nothing
+     * here can quote it. The owner then ruled the other way, on #156, as
+     * decision Q9 of 2026-08-23 -- the sensor count is *"DECLARED IN THE
+     * PLAN, at set or exercise level, and adjustable in-app "like the
+     * rest.""* -- and the key shipped in plan schema 1.8 on that ruling.
+     * #198's ruling quoted above retired it to accepted-and-inert at 1.10.
+     * So the record
+     * reads: excluded by the design, added by owner ruling Q9, inert by owner
+     * ruling at #198 -- which leaves the count out of every capture decision,
+     * where the design document reportedly put it, while the key itself stays
+     * accepted for the import-compatibility reason above.
      */
     val sensors: Int? = null,
     val sets: List<PlanSetDef>,
