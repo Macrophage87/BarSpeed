@@ -213,8 +213,9 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      * Run one tap's DataStore write and link change, reporting a throw instead
      * of letting it reach the process (#50).
      *
-     * Every action on this screen ends in a `DeviceRegistry` or `SettingsStore`
-     * DataStore write launched on [viewModelScope], which has no
+     * Each tap on this screen that changes a pairing, a preference or a label
+     * launches a `DeviceRegistry` or `SettingsStore` DataStore write on
+     * [viewModelScope], which has no
      * `CoroutineExceptionHandler`, so an exception escaping one -- an
      * `IOException` from a full disk, which `DeviceRegistry`'s own try/catch
      * does not cover because it wraps only the JSON decode INSIDE the edit
@@ -224,13 +225,25 @@ class DevicesViewModel(app: Application) : AndroidViewModel(app) {
      * `AutoConnectManager.maintain` already makes the same argument for the
      * reconnect loop.
      *
-     * `Exception`, not `IOException`, for `maintain`'s reason: `forgetAndDrop`
-     * also reads the registry before writing it, and a read failure is not an
-     * `IOException` either. Cancellation is rethrown, so leaving the screen
-     * still cancels the write's coroutine rather than reporting it as a
-     * failure. The write is not retried and nothing it half-did is undone;
-     * what DataStore leaves on disk after a failed `edit` is its own
-     * transactional guarantee and is not re-checked here.
+     * `Exception`, not `IOException`: the pair, switch and forget taps run
+     * `AutoConnectManager` code around the write -- `forgetAndDrop` reads the
+     * registry before its write and `pairAndConnect` after it, and all three
+     * drop or open links after the write -- and nothing here bounds what that
+     * code throws, so a narrower catch would be a claim this file cannot back.
+     * An earlier version of this paragraph said a registry read failure "is not
+     * an IOException either"; DataStore documents its read failures as
+     * `IOException`, so that reason was false and is withdrawn. Cancellation is
+     * rethrown, so leaving the screen still cancels the write's coroutine
+     * rather than reporting it as a failure. The write is not retried and
+     * nothing it half-did is undone; what DataStore leaves on disk after a
+     * failed `edit` is its own transactional guarantee and is not re-checked
+     * here.
+     *
+     * Not covered: the `init` arming collector and the DataStore-backed
+     * `stateIn` reads in this class also collect DataStore flows on this
+     * handler-less scope, and a read failure there still reaches the default
+     * handler while this screen is open. #50 named only the writes; that
+     * remainder is named here rather than claimed.
      *
      * NO TEST REACHES THIS. Nothing in this repository executes a ViewModel or
      * a DataStore; this is compile- and lint-gated only, not test-gated, and

@@ -43,7 +43,7 @@ class SensorAdvicePolicyTest {
         // that predates the field and every future one that forgets to set it.
         assertEquals(
             SensorAdvice.PAIR_OR_POWER,
-            SensorAdvicePolicy.forState(ConnectionState.Failed("Bluetooth is off or the link was refused")),
+            SensorAdvicePolicy.forState(ConnectionState.Failed("No link could be opened")),
         )
     }
 
@@ -67,7 +67,7 @@ class SensorAdvicePolicyTest {
         // exactly where they were.
         assertEquals(
             SensorAdvice.PAIR_OR_POWER,
-            SensorAdvicePolicy.forState(ConnectionState.Failed("The link was refused", phoneBluetoothOff = false)),
+            SensorAdvicePolicy.forState(ConnectionState.Failed("No link could be opened", phoneBluetoothOff = false)),
         )
         assertEquals(
             SensorAdvice.UNRESPONSIVE,

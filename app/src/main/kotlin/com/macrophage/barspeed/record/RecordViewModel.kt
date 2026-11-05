@@ -4495,9 +4495,11 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
         // is the state this whole mechanism replaces -- it must not also stop
         // the set being recorded in memory as it always was.
         journal = openJournal(container.setJournals, s, exercise, sessionStartedAtMs, setStartedAtMs, roster)
-        // Every set, not just the first. All three catch clauses in
-        // RecordingService.onStartCommand end in stopSelf(startId), so a start
-        // that was refused leaves nothing running and this is the only retry.
+        // Every set, not just the first. The catch in
+        // RecordingService.onStartCommand ends every refusal
+        // ForegroundStartPolicy.classify recognises in stopSelf(startId), so a
+        // start that was refused leaves nothing running and this is the only
+        // retry.
         holds.acquire(RecordingHold.SESSION)
 
         val timedTargetS = s.currentTimedTargetS

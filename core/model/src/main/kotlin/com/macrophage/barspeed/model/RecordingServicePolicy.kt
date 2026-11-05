@@ -12,9 +12,10 @@ package com.macrophage.barspeed.model
  *
  * [armsService] is a property of the reason, not of the moment. Only [SESSION]
  * carries it, and it carries it on EVERY acquire rather than only the first.
- * That is deliberate and it is load-bearing: all three catch clauses in
- * `RecordingService.onStartCommand` end in `stopSelf(startId)`, so a start that
- * was refused leaves no service running, and the next `beginSet` re-arming it
+ * That is deliberate and it is load-bearing: the catch in
+ * `RecordingService.onStartCommand` ends every refusal
+ * `ForegroundStartPolicy.classify` recognises in `stopSelf(startId)`, so a
+ * start that was refused leaves no service running, and the next `beginSet` re-arming it
  * is the only retry there is. A first-acquire-only rule would leave the service
  * dead for the rest of the session after one refusal.
  *

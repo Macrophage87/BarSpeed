@@ -23,10 +23,11 @@ class RecordingServicePolicyTest {
 
     @Test
     fun `every set re-arms the service`() {
-        // Not an optimisation left on the table. Every catch clause in
-        // RecordingService.onStartCommand ends in stopSelf(startId), so a start
-        // that was refused leaves nothing running, and the next beginSet is the
-        // only retry there is.
+        // Not an optimisation left on the table. The catch in
+        // RecordingService.onStartCommand ends every refusal
+        // ForegroundStartPolicy.classify recognises in stopSelf(startId), so a
+        // start that was refused leaves nothing running, and the next beginSet
+        // is the only retry there is.
         val t = RecordingServicePolicy.acquire(setOf(RecordingHold.SESSION), RecordingHold.SESSION)
         assertEquals(FgsCommand.START, t.command)
         assertEquals(setOf(RecordingHold.SESSION), t.held)

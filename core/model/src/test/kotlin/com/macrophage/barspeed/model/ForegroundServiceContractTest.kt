@@ -117,7 +117,7 @@ class ForegroundServiceContractTest {
         // cap. FOREGROUND_SERVICE_CONNECTED_DEVICE capped at 33 would leave
         // the service with no permission for its type on exactly the levels
         // that check one (34 up), and every START SET there would land in
-        // onStartCommand's SecurityException catch. BlePermissionManifestTest
+        // onStartCommand's catch as PERMISSION_REFUSED. BlePermissionManifestTest
         // holds the same line for the Bluetooth permissions.
         val required = listOf("android.permission.FOREGROUND_SERVICE") +
             declaredTypes().map { token ->

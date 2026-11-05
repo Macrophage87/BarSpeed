@@ -72,6 +72,10 @@ class RecordingService : Service() {
      * `ForegroundStartPolicyTest` pins each family as an arm; this catches
      * `RuntimeException` and rethrows whatever that answers null for, so a
      * throw of any other shape still crashes rather than becoming a banner.
+     * The catch's own type is not pinned: narrowing it below
+     * `RuntimeException` compiles and no test reds, so #52's third hole has
+     * moved here rather than closed; nothing under `app/src/test` reaches
+     * `onStartCommand`.
      * Two earlier versions of this comment got the hierarchy
      * wrong in two different ways: the first named the not-a-subset case
      * `MissingForegroundServiceTypeException`; the second said "only the
@@ -81,12 +85,16 @@ class RecordingService : Service() {
      * here because that is what makes the claim checkable, by `javap` on
      * `android-35/android.jar`.
      *
-     * The `IllegalArgumentException` clause is broader than the family that
-     * justifies it. The five throws above are what AOSP *documents*, not a
-     * proven bound on what `startForeground` raises; if the platform also
-     * rejects a malformed notification that way, that class of bug now
-     * degrades silently instead of crashing, which cuts against the reason
-     * `buildNotification()` sits outside the try. Nobody read
+     * `ForegroundStartPolicy.classify`'s TYPE_REJECTED arm is broader than
+     * the family that justifies it. The five throws above are what AOSP
+     * *documents*, not a proven bound on what `startForeground` raises. If
+     * the platform also rejects a malformed notification with an
+     * `IllegalArgumentException`, that bug now shows the Record banner's
+     * "rejected the kind of recording service" wording instead of crashing,
+     * which cuts against the reason `buildNotification()` sits outside the
+     * try. An earlier version of this paragraph said such a bug "degrades
+     * silently"; that stopped being true when #53 made every classified
+     * refusal report itself. Nobody read
      * `ActiveServices.setServiceForegroundInnerLocked` to settle it. Not
      * reachable on this tree — fixed channel, fixed drawable,
      * `assembleDebug` green — so the risk is named and accepted, not closed.
@@ -182,8 +190,9 @@ class RecordingService : Service() {
          * An earlier version of this comment said the exception "structurally
          * cannot land" around `startForeground`. That is false, and review
          * caught it: AOSP documents the throw on both `startForeground`
-         * overloads. It is why the `IllegalStateException` catch in
-         * `onStartCommand` is there too — the exception extends
+         * overloads. It is why `ForegroundStartPolicy.classify` maps
+         * `IllegalStateException` and its subclasses to START_REFUSED for
+         * `onStartCommand` too — the exception extends
          * `ServiceStartNotAllowedException` extends `IllegalStateException`,
          * not `SecurityException`, so a permission-shaped catch would see it
          * at neither site.

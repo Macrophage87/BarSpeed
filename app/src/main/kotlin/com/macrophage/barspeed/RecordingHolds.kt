@@ -51,7 +51,14 @@ class RecordingHolds(private val app: Application) {
      *
      * Null is "no refusal reported", not "protected": between the start
      * request and `onStartCommand` running there is a window in which neither
-     * has said anything. A `MutableStateFlow` because the service's callback
+     * has said anything. Non-null can also outlive the session it describes:
+     * [apply] clears it on STOP, but an `onStartCommand` that runs after that
+     * STOP -- the start accepted, the stop issued before the service got to
+     * try -- reports its refusal with nothing recording, and the next Record
+     * screen mirrors it before any set until the next set's `onStartCommand`
+     * reports. That errs toward a warning, never toward a false all-clear,
+     * and it is reasoned from the call order, not watched on a device.
+     * A `MutableStateFlow` because the service's callback
      * and the main-thread [apply] both write it; its `value` setter is
      * thread-safe.
      */

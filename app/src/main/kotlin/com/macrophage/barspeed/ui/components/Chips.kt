@@ -126,12 +126,15 @@ fun SensorDot(label: String, state: ConnectionState, modifier: Modifier = Modifi
  * the branches are exhaustive over [ConnectionState] so a new state has to be
  * decided rather than falling into the grey. The reason string itself is
  * rendered by the caller — the pill is too narrow for a framework diagnostic.
- * [ConnectionState.Failed] has ten producers in `GattClients.kt` carrying
- * six distinct reasons, and exactly one of them interpolates a raw GATT status
- * integer (the service-discovery failure); an earlier version of this comment
- * said seven producers, before three more call sites gained a catch for the
- * same permission-revoked race `connect()` already guarded against, all three
- * reusing the existing reason string rather than adding a new one.
+ * [ConnectionState.Failed]'s reasons in `GattClients.kt` are named rather
+ * than counted: `PERMISSION_DENIED_REASON`, "Bluetooth unavailable", "Bad
+ * device address", `PHONE_BLUETOOTH_OFF_REASON`, `NO_LINK_OPENED_REASON`,
+ * "Expected service/characteristic not found", and the service-discovery
+ * failure, which is the only one that interpolates a raw GATT status
+ * integer. Earlier versions of this comment counted them -- seven producers,
+ * then ten producers and six reasons -- and #103's split of the
+ * null-`connectGatt` reason made the second count false; a count is what
+ * goes stale.
  */
 @Composable
 fun ConnectionChip(
