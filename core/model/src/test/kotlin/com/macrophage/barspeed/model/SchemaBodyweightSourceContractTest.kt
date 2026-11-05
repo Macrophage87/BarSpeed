@@ -94,8 +94,10 @@ class SchemaBodyweightSourceContractTest {
             required - releasedIn118,
             "the keys this version requires and v0.1.50 did not are no longer just bodyweight",
         )
+        // Less the two stroke words, which 1.26 (#297) makes conditional on
+        // the kind and its version-log entry describes.
         assertEquals(
-            emptySet(),
+            setOf("startsWith", "concentric"),
             releasedIn118 - required,
             "a key v0.1.50 required stopped being required, which the version log does not describe",
         )

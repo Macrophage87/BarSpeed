@@ -2727,6 +2727,34 @@ data class SessionExport(
          * and description and the example. `SetGeometryPolicyTest` pins the
          * rule; `SessionExportInversionSourceTest` in `:core:data` is the
          * export differential.
+         *
+         * 1.26 FURTHER ENTRY (#297, a hold has no stroke): REMOVES TWO KEYS
+         * FROM ONE KIND. A set whose geometry `kind` is `hold` or `carry`
+         * carries neither `geometry.startsWith` nor `geometry.concentric`, nor
+         * their entries in `geometry.source`; every other kind carries all four
+         * as before. [GeometryExport.publishesStroke] is the split, read by
+         * both writers. Until now a static hold published a phase that opened
+         * its reps and a direction its drive moved in -- field-42's rope
+         * farmers holds read `startsWith` eccentric (inferred) and
+         * `concentric` up (default) -- though a hold has neither, so the
+         * absence of a stroke was rendered as a value. A carry's walk is not a
+         * stroke of the load either. It is the omission this document already
+         * makes for `velocityLossRegime` on the same two kinds.
+         *
+         * Under 1.26 and not a mint: 1.26 is unreleased, minted on this
+         * branch for #289 above. RETROACTIVE: the kind is stored with the set,
+         * so re-exporting an older hold or carry omits the four. NOT ADDITIVE
+         * for a reader that requires both keys on every geometry, which every
+         * earlier schema did; such a reader already rejects a 1.26 document on
+         * its version string, and this schema accepts a 1.25 document. The
+         * published schema states the condition with an if/then/else on
+         * `kind`. Nothing is renamed or retyped, `DATABASE_VERSION` does NOT
+         * move, and the plan schema is untouched.
+         *
+         * PINNED. `SchemaHoldStrokeContractTest` asserts this entry's marker,
+         * the condition, both descriptions and the example's hold;
+         * `StrokeGeometryTest` pins the split; `SessionExportHoldStrokeTest`
+         * and `RawExporterTest` in `:core:data` are the export differentials.
          */
         const val SCHEMA_VERSION = "1.26"
 
@@ -4221,9 +4249,9 @@ data class SetSensorsExport(
 @Serializable
 data class GeometryExport(
     /**
-     * Which phase opened each rep: "eccentric" or "concentric". Nullable so
-     * that a kind with no stroke can publish none ([publishesStroke], #297);
-     * every set this build exports writes it.
+     * Which phase opened each rep: "eccentric" or "concentric". ABSENT on a
+     * hold or a carry from 1.26 (#297), which has no stroke -- see
+     * [publishesStroke] -- and present on every other kind.
      */
     val startsWith: String? = null,
     /** Which way the driving phase moved: "up" or "down". Nullable on [startsWith]'s terms. */
