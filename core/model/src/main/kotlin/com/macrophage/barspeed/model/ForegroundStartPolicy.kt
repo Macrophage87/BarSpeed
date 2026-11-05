@@ -44,9 +44,10 @@ enum class ForegroundStartFailure {
  * not a subclass, so deleting it compiled cleanly and reinstated the crash at
  * START SET (#52's third hole). Here each family is an arm a test can red.
  *
- * DECLARED, NOT YET READ: [classify] answers null for everything, and the
- * service still catches with its own three clauses and reports nothing. The
- * commit after this one pins the three families.
+ * Read by `RecordingService` at both refusal sites -- `onStartCommand`'s catch
+ * and `start`'s -- and by nothing else. The three families are disjoint under
+ * `RuntimeException` (none is a subclass of another), so the order of the arms
+ * below decides nothing; it follows [ForegroundStartFailure]'s.
  */
 object ForegroundStartPolicy {
     /**
@@ -54,6 +55,10 @@ object ForegroundStartPolicy {
      * families -- which the caller rethrows rather than swallows, so a bug of
      * an unknown shape still crashes visibly.
      */
-    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
-    fun classify(thrown: Throwable): ForegroundStartFailure? = null
+    fun classify(thrown: Throwable): ForegroundStartFailure? = when (thrown) {
+        is SecurityException -> ForegroundStartFailure.PERMISSION_REFUSED
+        is IllegalStateException -> ForegroundStartFailure.START_REFUSED
+        is IllegalArgumentException -> ForegroundStartFailure.TYPE_REJECTED
+        else -> null
+    }
 }

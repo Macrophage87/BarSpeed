@@ -82,6 +82,7 @@ import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseKind
 import com.macrophage.barspeed.model.ExitAction
 import com.macrophage.barspeed.model.ExitPrompt
+import com.macrophage.barspeed.model.ForegroundStartFailure
 import com.macrophage.barspeed.model.GuidedRepCaption
 import com.macrophage.barspeed.model.HistoryTarget
 import com.macrophage.barspeed.model.Implement
@@ -278,6 +279,10 @@ fun RecordScreen(navController: NavController, viewModel: RecordViewModel = view
         Column(
             Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(scroll),
         ) {
+            // Above every stage, not inside one: the refusal lands at
+            // beginSet, so the set it leaves unprotected is IN_SET by the
+            // time the service reports, and the rest after it is no safer.
+            state.foregroundFailure?.let { ForegroundRefusalBanner(it) }
             when (state.stage) {
                 Stage.SETUP -> SetupStage(state, viewModel)
                 Stage.PREVIEW -> PreviewStage(state, viewModel)
@@ -866,6 +871,46 @@ private fun imuAdviceText(advice: SensorAdvice): String = when (advice) {
     SensorAdvice.UNRESPONSIVE ->
         "The sensor answered and then stopped responding -- pairing again is unlikely to help. " +
             "Power-cycle it."
+}
+
+/**
+ * The one place a refused foreground start reaches the lifter (#53).
+ *
+ * Before this, every refusal ended in `RecordingService` with no foreground
+ * service and nothing on screen, so the set ran as killable as any background
+ * app and a screen-off kill would take it with no warning. The wording says
+ * what the code knows -- the platform refused, and which family of refusal --
+ * and hedges what it does not: whether this device actually stops the app at
+ * screen-off is [Field], never measured here, hence "can".
+ */
+@Composable
+private fun ForegroundRefusalBanner(failure: ForegroundStartFailure) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text(
+                "Recording is not protected if the screen turns off",
+                style = MaterialTheme.typography.titleSmall,
+                color = BarColors.Amber,
+            )
+            Text(foregroundRefusalText(failure), style = MaterialTheme.typography.bodySmall, color = BarColors.Sub)
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+}
+
+/** Prose for [ForegroundStartFailure]; the families are `ForegroundStartPolicy.classify`'s. */
+private fun foregroundRefusalText(failure: ForegroundStartFailure): String {
+    val why =
+        when (failure) {
+            ForegroundStartFailure.PERMISSION_REFUSED ->
+                "Android refused the recording service because a permission it needs is not granted."
+            ForegroundStartFailure.START_REFUSED ->
+                "Android would not start the recording service at that moment."
+            ForegroundStartFailure.TYPE_REJECTED ->
+                "Android rejected the kind of recording service this build asks for."
+        }
+    return "$why The app can be stopped while the screen is off, and the set with it. " +
+        "Keep the screen on until this set is saved; the next set tries again."
 }
 
 @Composable

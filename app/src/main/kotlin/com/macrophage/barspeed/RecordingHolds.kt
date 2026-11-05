@@ -2,9 +2,12 @@ package com.macrophage.barspeed
 
 import android.app.Application
 import com.macrophage.barspeed.model.FgsCommand
+import com.macrophage.barspeed.model.ForegroundStartFailure
 import com.macrophage.barspeed.model.HoldTransition
 import com.macrophage.barspeed.model.RecordingHold
 import com.macrophage.barspeed.model.RecordingServicePolicy
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Why the recording foreground service is running, for the whole process.
@@ -32,6 +35,33 @@ import com.macrophage.barspeed.model.RecordingServicePolicy
 class RecordingHolds(private val app: Application) {
     private var held: Set<RecordingHold> = emptySet()
 
+    private val foregroundRefusal = MutableStateFlow<ForegroundStartFailure?>(null)
+
+    /**
+     * Why the foreground service is NOT protecting the recording, or null
+     * while nothing has said it is refused (#53).
+     *
+     * Process scope for the reason this class is: the refusal is reported by
+     * [RecordingService], which no ViewModel owns. Written from two places --
+     * the synchronous refusal [RecordingService.start] returns, and whatever
+     * `onStartCommand` reports when it tries to go foreground -- and cleared
+     * by a start that succeeds and by the stop, after which nothing is
+     * recording for the service to protect. `RecordViewModel` mirrors it into
+     * `RecordState.foregroundFailure`, which `RecordScreen` draws.
+     *
+     * Null is "no refusal reported", not "protected": between the start
+     * request and `onStartCommand` running there is a window in which neither
+     * has said anything. A `MutableStateFlow` because the service's callback
+     * and the main-thread [apply] both write it; its `value` setter is
+     * thread-safe.
+     */
+    val foregroundFailure: StateFlow<ForegroundStartFailure?> = foregroundRefusal
+
+    /** [RecordingService.onStartCommand]'s outcome: null went foreground, non-null did not. */
+    fun reportForeground(failure: ForegroundStartFailure?) {
+        foregroundRefusal.value = failure
+    }
+
     /** Take [hold], starting or re-arming the service if that hold arms it. */
     fun acquire(hold: RecordingHold) {
         apply(RecordingServicePolicy.acquire(held, hold))
@@ -45,8 +75,15 @@ class RecordingHolds(private val app: Application) {
     private fun apply(transition: HoldTransition) {
         held = transition.held
         when (transition.command) {
-            FgsCommand.START -> RecordingService.start(app)
-            FgsCommand.STOP -> RecordingService.stop(app)
+            // A refused request is recorded; an accepted one leaves the
+            // standing value for onStartCommand to settle, so a banner for
+            // the previous set's refusal is not wiped before this start has
+            // actually gone foreground.
+            FgsCommand.START -> RecordingService.start(app)?.let { foregroundRefusal.value = it }
+            FgsCommand.STOP -> {
+                RecordingService.stop(app)
+                foregroundRefusal.value = null
+            }
             FgsCommand.NONE -> Unit
         }
     }

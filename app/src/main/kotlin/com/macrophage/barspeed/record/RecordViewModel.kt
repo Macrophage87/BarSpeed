@@ -51,6 +51,7 @@ import com.macrophage.barspeed.model.EffortAsk
 import com.macrophage.barspeed.model.EffortScale
 import com.macrophage.barspeed.model.ExerciseDef
 import com.macrophage.barspeed.model.ExerciseKind
+import com.macrophage.barspeed.model.ForegroundStartFailure
 import com.macrophage.barspeed.model.HoldEndPolicy
 import com.macrophage.barspeed.model.HoldEndSource
 import com.macrophage.barspeed.model.HrSample
@@ -3390,6 +3391,17 @@ data class RecordState(
     /** Every paired IMU address, and which of them the analysed link maintains. */
     val pairedImuAddresses: List<String> = emptyList(),
     val preferredImuAddress: String? = null,
+    /**
+     * Why the recording foreground service is not protecting this session,
+     * or null while no refusal has been reported (#53).
+     *
+     * Mirrored from `RecordingHolds.foregroundFailure`, and drawn by
+     * `RecordScreen` as a banner above every stage -- the field exists for
+     * that banner and has no other reader. Null is "nothing has said it is
+     * refused", not "protected": the start request and the service going
+     * foreground are two steps, and between them nothing has reported.
+     */
+    val foregroundFailure: ForegroundStartFailure? = null,
 ) {
     val currentSlot: PlannedSlot? get() = queue.getOrNull(queueIndex)
     val nextSlot: PlannedSlot? get() = queue.getOrNull(queueIndex + 1)
@@ -4126,6 +4138,12 @@ class RecordViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.mirrorLinkStates(autoConnect, stateFlow)
+        // A refused foreground start is reported by the service, which no
+        // ViewModel owns, so it reaches the screen through the process-wide
+        // holds rather than through beginSet's return (#53).
+        viewModelScope.launch {
+            holds.foregroundFailure.collect { stateFlow.value = stateFlow.value.copy(foregroundFailure = it) }
+        }
         viewModelScope.launch {
             container.planRepository.activePlan.collect { entity ->
                 val plan = entity?.let { container.planRepository.decode(it) }

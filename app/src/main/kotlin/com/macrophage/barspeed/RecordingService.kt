@@ -15,6 +15,8 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.macrophage.barspeed.model.BlePermissionPolicy
 import com.macrophage.barspeed.model.FgsTypeChoice
+import com.macrophage.barspeed.model.ForegroundStartFailure
+import com.macrophage.barspeed.model.ForegroundStartPolicy
 
 /**
  * Foreground service that keeps the process and BLE connections alive while a
@@ -41,7 +43,7 @@ class RecordingService : Service() {
      * than `SPECIAL_USE` (`0x40000000`) below 34: `SPECIAL_USE` would be
      * masked away to `FOREGROUND_SERVICE_TYPE_NONE` on that band.
      *
-     * Three catches, covering three families, none of them optional. AOSP's
+     * Three families are caught, none of them optional. AOSP's
      * `Service.java` javadoc for `startForeground(int, Notification, int)`
      * documents five throws and scopes them mutually exclusively:
      *
@@ -61,11 +63,16 @@ class RecordingService : Service() {
      * Only Missing-, Invalid- and `ForegroundServiceStartNotAllowedException`
      * descend from `IllegalStateException`; `IllegalArgumentException` and
      * `SecurityException` are both its *siblings* under `RuntimeException`.
-     * That is why each of those two needs its own clause below and why none
-     * of the three is unreachable — deleting the `SecurityException` catch
-     * as redundant with the `IllegalStateException` one compiles cleanly,
-     * because they are siblings, and reinstates the crash this commit
-     * exists to fix. Two earlier versions of this comment got the hierarchy
+     * That is why each of those two needs its own arm and why none of the
+     * three is unreachable. They were three catch clauses here, and deleting
+     * the `SecurityException` one as redundant with the `IllegalStateException`
+     * one compiled cleanly and reinstated the crash at START SET, with
+     * nothing to red it (#52). The decision is now
+     * `ForegroundStartPolicy.classify`'s, in `:core:model`, where
+     * `ForegroundStartPolicyTest` pins each family as an arm; this catches
+     * `RuntimeException` and rethrows whatever that answers null for, so a
+     * throw of any other shape still crashes rather than becoming a banner.
+     * Two earlier versions of this comment got the hierarchy
      * wrong in two different ways: the first named the not-a-subset case
      * `MissingForegroundServiceTypeException`; the second said "only the
      * last three", which reads `SecurityException` as an
@@ -93,6 +100,16 @@ class RecordingService : Service() {
      * lost is surviving the screen going off, which beats losing the set to a
      * crash the moment the lifter taps START SET.
      *
+     * WHAT WAS LOST WAS ALSO SILENT, until #53. Every refusal ended here with
+     * no foreground service and nothing on screen, so a lifter who turned the
+     * screen off mid-set had no warning that the process was now as killable
+     * as any background app. Each refusal is now reported to
+     * [RecordingHolds.reportForeground], which `RecordViewModel` mirrors into
+     * `RecordState.foregroundFailure` and `RecordScreen` draws as a banner
+     * above every stage; a start that succeeds reports null and clears it.
+     * Whether the platform actually kills the process at screen-off on any
+     * given device is [Field] and unmeasured here.
+     *
      * `stopSelf(startId)` rather than `stopSelf()`: `start()` fires on every
      * `beginSet()`, so a bare `stopSelf()` would tear down a service a later
      * start had already re-armed. START_NOT_STICKY stops the system
@@ -100,16 +117,14 @@ class RecordingService : Service() {
      */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = buildNotification()
+        val holds = (application as LiftingApp).container.recordingHolds
         return try {
             ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, foregroundServiceType())
+            holds.reportForeground(null)
             START_STICKY
-        } catch (e: SecurityException) {
-            stopSelf(startId)
-            START_NOT_STICKY
-        } catch (e: IllegalStateException) {
-            stopSelf(startId)
-            START_NOT_STICKY
-        } catch (e: IllegalArgumentException) {
+        } catch (e: RuntimeException) {
+            val failure = ForegroundStartPolicy.classify(e) ?: throw e
+            holds.reportForeground(failure)
             stopSelf(startId)
             START_NOT_STICKY
         }
@@ -172,14 +187,21 @@ class RecordingService : Service() {
          * `ServiceStartNotAllowedException` extends `IllegalStateException`,
          * not `SecurityException`, so a permission-shaped catch would see it
          * at neither site.
+         *
+         * Returns the refusal rather than swallowing it (#53): null when the
+         * platform accepted the start request, which says nothing yet about
+         * whether `onStartCommand` will manage to go foreground -- that half
+         * reports itself. The catch is not widened: only the family this
+         * call was already known to raise is turned into a value.
          */
-        fun start(context: Context) {
-            try {
-                context.startForegroundService(Intent(context, RecordingService::class.java))
-            } catch (e: IllegalStateException) {
-                // Background-start refusal on API 31+. Recording continues in
-                // process; only screen-off survival is lost.
-            }
+        fun start(context: Context): ForegroundStartFailure? = try {
+            context.startForegroundService(Intent(context, RecordingService::class.java))
+            null
+        } catch (e: IllegalStateException) {
+            // Background-start refusal on API 31+. Recording continues in
+            // process; only screen-off survival is lost, and the caller is
+            // told so.
+            ForegroundStartPolicy.classify(e)
         }
 
         fun stop(context: Context) {
