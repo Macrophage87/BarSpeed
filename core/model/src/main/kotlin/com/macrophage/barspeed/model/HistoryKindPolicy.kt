@@ -21,10 +21,13 @@ object HistoryKindPolicy {
      * or null when the row carries no geometry. [seeded] is the built-in
      * definition's kind for the row's exercise id, or null for a custom one.
      *
-     * AS FIRST WRITTEN this is the seed lookup History has always made, so
-     * moving the screen onto it changes nothing; [stored] is read by the
-     * change that prefers it, and the suppression goes with it.
+     * THE STORED KIND WINS wherever the row has one: it is what the set was
+     * recorded and analysed under, and what the rest screen charted. The seed
+     * is the fallback for a row with no geometry -- every set recorded before
+     * geometry capture -- and it is a display fallback only: it is the reading
+     * History always made for such rows, and nothing writes it back or
+     * publishes it, so the export still carries no geometry for them rather
+     * than a guessed kind.
      */
-    @Suppress("UnusedParameter")
-    fun of(stored: ExerciseKind?, seeded: ExerciseKind?): ExerciseKind? = seeded
+    fun of(stored: ExerciseKind?, seeded: ExerciseKind?): ExerciseKind? = stored ?: seeded
 }

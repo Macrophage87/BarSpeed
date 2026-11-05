@@ -50,11 +50,20 @@ object FailureProvenancePolicy {
      * branch in `SessionDetailScreen`, which nothing under `app/src/test`
      * reaches.
      *
-     * AS FIRST WRITTEN this reproduces the chip it replaces -- the stored OR,
-     * one word for both authors -- so moving the screen onto it changes
-     * nothing; [failedByLifter] is read by the change that splits the word,
-     * and the suppression goes with it.
+     * THREE ANSWERS FOR A FAILED SET, keyed off the stored author:
+     *
+     * - [failedByLifter] true: the lifter called it -- [TAPPED_WORD].
+     * - false: the app derived it from a shortfall and the lifter never said
+     *   so -- [DERIVED_WORD]. Until this split the chip drew the lifter's
+     *   word on a set the lifter never called failed.
+     * - null: the row predates v15 and nobody knows whose verdict it was.
+     *   [TAPPED_WORD], the one word History has always drawn for both, because
+     *   splitting it here would guess an author for a set nobody recorded one
+     *   for; [published] withholds the author in the export for the same row.
      */
-    @Suppress("UnusedParameter")
-    fun historyWord(failed: Boolean, failedByLifter: Boolean?): String? = if (failed) TAPPED_WORD else null
+    fun historyWord(failed: Boolean, failedByLifter: Boolean?): String? = when {
+        !failed -> null
+        failedByLifter == false -> DERIVED_WORD
+        else -> TAPPED_WORD
+    }
 }
