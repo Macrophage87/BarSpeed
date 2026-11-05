@@ -35,6 +35,15 @@ data class PlanDetailState(
      * plan could not be read" on screen for the frame before it was read.
      */
     val start: PlanStartDecision? = null,
+    /**
+     * A STAGED plan's import warnings, recomputed from its stored text
+     * (`PlanRepository.reviewSummary`), and empty on any other row (#58). The
+     * import dialog that first showed them can be dismissed, and this screen
+     * is the other place a staged plan is made active from.
+     */
+    val stagedWarnings: List<String> = emptyList(),
+    /** True while MAKE ACTIVE on a staged plan waits for the lifter's approval (#58). */
+    val reviewing: Boolean = false,
 )
 
 class PlanDetailViewModel(app: Application, private val planId: Long) : AndroidViewModel(app) {
@@ -69,11 +78,13 @@ class PlanDetailViewModel(app: Application, private val planId: Long) : AndroidV
 
     init {
         viewModelScope.launch {
+            val entity = repository.plan(planId)
             stateFlow.value =
                 PlanDetailState(
-                    entity = repository.plan(planId),
+                    entity = entity,
                     plan = repository.planFile(planId),
                     loaded = true,
+                    stagedWarnings = stagedWarnings(entity),
                 )
             decide()
         }
@@ -99,14 +110,50 @@ class PlanDetailViewModel(app: Application, private val planId: Long) : AndroidV
                     plan = current.plan,
                     lifecycle = PlanLifecycle.of(current.entity?.status),
                     activePlanName = displacedPlanName,
+                    stagedWarnings = current.stagedWarnings.size,
                 ),
             )
     }
 
+    private fun stagedWarnings(entity: PlanEntity?): List<String> =
+        if (entity != null && entity.status == PlanEntity.STATUS_STAGED) {
+            repository.reviewSummary(entity)?.warnings.orEmpty()
+        } else {
+            emptyList()
+        }
+
+    /**
+     * MAKE ACTIVE. A STAGED plan is not promoted on this tap (#58): it has not
+     * been approved, and the warnings its import raised may only ever have
+     * been shown in a dialog the lifter dismissed, so the tap opens an
+     * approval naming them and [approve] is the activation -- the plans
+     * list's rule, on the other screen that offers the same control. An
+     * archived plan was approved once and is promoted directly, as before.
+     */
     fun activate() {
+        if (stateFlow.value.entity?.status == PlanEntity.STATUS_STAGED) {
+            stateFlow.value = stateFlow.value.copy(reviewing = true)
+            return
+        }
+        activateNow()
+    }
+
+    /** The approval [activate] asked for on a staged plan. */
+    fun approve() {
+        stateFlow.value = stateFlow.value.copy(reviewing = false)
+        activateNow()
+    }
+
+    fun dismissReview() {
+        stateFlow.value = stateFlow.value.copy(reviewing = false)
+    }
+
+    private fun activateNow() {
         viewModelScope.launch {
             repository.activate(planId)
-            stateFlow.value = stateFlow.value.copy(entity = repository.plan(planId))
+            val entity = repository.plan(planId)
+            stateFlow.value =
+                stateFlow.value.copy(entity = entity, stagedWarnings = stagedWarnings(entity))
             decide()
         }
     }
@@ -120,7 +167,9 @@ class PlanDetailViewModel(app: Application, private val planId: Long) : AndroidV
         viewModelScope.launch {
             if (activateFirst) {
                 repository.activate(planId)
-                stateFlow.value = stateFlow.value.copy(entity = repository.plan(planId))
+                val entity = repository.plan(planId)
+                stateFlow.value =
+                    stateFlow.value.copy(entity = entity, stagedWarnings = stagedWarnings(entity))
                 decide()
             }
             startRequests.send(Unit)
