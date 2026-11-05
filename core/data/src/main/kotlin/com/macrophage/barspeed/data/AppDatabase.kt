@@ -206,7 +206,7 @@ abstract class AppDatabase : RoomDatabase() {
          *
          * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2]
          * already does. Nothing in this repository executes either of them:
-         * [Migration10To11Test] covers the v10 to v11 step and no other, and
+         * `Migration10To11Test` covers the v10 to v11 step and no other, and
          * there is no androidTest source set at all, so the first time this
          * runs is on the lifter's phone against their real
          * history. This used to add "no committed schema baseline for any
@@ -237,7 +237,7 @@ abstract class AppDatabase : RoomDatabase() {
          *
          * Two ALTER TABLE statements in one migration, as [MIGRATION_1_2] and
          * [MIGRATION_8_9] already do. Nothing in this repository executes
-         * either of them: [Migration10To11Test] covers the v10 to v11 step and
+         * either of them: `Migration10To11Test` covers the v10 to v11 step and
          * no other, and there is no androidTest source set at all, so the
          * first time this runs is on the lifter's phone against their real
          * history. The SQL was read against the entity diff by hand.
@@ -299,7 +299,7 @@ abstract class AppDatabase : RoomDatabase() {
          * affinities and their nullability are checked against the entity by
          * the build, because 11.json in this same commit is Room's own
          * generated description of the schema this build compiles to.
-         * [Migration10To11Test] then runs this migration body -- not a copy of
+         * `Migration10To11Test` then runs this migration body -- not a copy of
          * its SQL -- against a recording SupportSQLiteDatabase and diffs what
          * it executes against the committed 10.json/11.json baselines, so a
          * column added to an entity and forgotten here is caught, and so is
@@ -342,7 +342,7 @@ abstract class AppDatabase : RoomDatabase() {
          *
          * That is a default written by SQLite into existing rows, not a
          * backfill computed from anything -- no UPDATE runs, and
-         * [Migration11To12Test] pins that.
+         * `Migration11To12Test` pins that.
          */
         internal val MIGRATION_11_12 =
             object : Migration(11, 12) {
@@ -388,7 +388,7 @@ abstract class AppDatabase : RoomDatabase() {
          * which reason, and which past sets the lifter would have called
          * warm-ups, is recorded in no artifact this app has ever written --
          * the refusal every migration since v8 has written down.
-         * [Migration12To13Test] pins all of it.
+         * `Migration12To13Test` pins all of it.
          */
         internal val MIGRATION_12_13 =
             object : Migration(12, 13) {
@@ -419,7 +419,7 @@ abstract class AppDatabase : RoomDatabase() {
          * set that the app knew which limb moved, which is exactly the claim
          * #144 was opened to say it could not make.
          *
-         * [Migration13To14Test] pins the statement, the baseline difference
+         * `Migration13To14Test` pins the statement, the baseline difference
          * and the refusal.
          */
         internal val MIGRATION_13_14 =
@@ -459,7 +459,7 @@ abstract class AppDatabase : RoomDatabase() {
          * `SetRatingTracker`'s memory for the life of the rest screen and was
          * discarded.
          *
-         * [Migration14To15Test] pins the statements, the baseline difference
+         * `Migration14To15Test` pins the statements, the baseline difference
          * and the refusals.
          */
         internal val MIGRATION_14_15 =
@@ -503,7 +503,7 @@ abstract class AppDatabase : RoomDatabase() {
          * LIFTER'S statement: a guessed one is indistinguishable in the export
          * from a made one, and would drop real sets out of the volume figure.
          *
-         * [Migration15To16Test] pins the statements, the baseline difference
+         * `Migration15To16Test` pins the statements, the baseline difference
          * and the refusal.
          */
         internal val MIGRATION_15_16 =
@@ -555,7 +555,7 @@ abstract class AppDatabase : RoomDatabase() {
          * recorded. A past set's progression is not recoverable from anything
          * stored, so there is nothing to backfill FROM even if it were wanted.
          *
-         * [Migration16To17Test] pins both statements, the baseline difference
+         * `Migration16To17Test` pins both statements, the baseline difference
          * and the refusal.
          */
         internal val MIGRATION_16_17 =
@@ -589,7 +589,7 @@ abstract class AppDatabase : RoomDatabase() {
          * number over a different velocity estimate, and writing it here would
          * state that the lifter heard a count the app never spoke.
          *
-         * [Migration17To18Test] pins the shape, the single statement, the
+         * `Migration17To18Test` pins the shape, the single statement, the
          * refusal to write into any existing row, and that the hop is in
          * [MIGRATIONS] at all. None of it executes SQLite; a bench run is
          * owed.
@@ -611,8 +611,8 @@ abstract class AppDatabase : RoomDatabase() {
          * second was added: the newest tag then was v0.1.53, whose
          * `AppDatabase.kt` reads `DATABASE_VERSION = 18`, so no installed build
          * had run 18 -> 19 and extending it left no phone behind.
-         * [Migration16To17Test] states the same rule for the same reason and
-         * [Migration18To19Test] pins the count of statements here. 19 HAS
+         * `Migration16To17Test` states the same rule for the same reason and
+         * `Migration18To19Test` pins the count of statements here. 19 HAS
          * SHIPPED since, in v0.1.54, so this hop is closed: a column added now
          * rides a later hop, as #157's five ride [MIGRATION_19_20].
          *
@@ -651,7 +651,7 @@ abstract class AppDatabase : RoomDatabase() {
          * `SetRecordEntity.durationEndedBy` holds the argument for storing it
          * rather than deriving it at export.
          *
-         * [Migration18To19Test] pins the shape, the two statements, the
+         * `Migration18To19Test` pins the shape, the two statements, the
          * refusal to write into any existing row, and that the hop is in
          * [MIGRATIONS] at all. None of it executes SQLite; a bench run is owed.
          */
@@ -696,7 +696,7 @@ abstract class AppDatabase : RoomDatabase() {
          * correction and not the target, and `tempo` into `plannedTempo`
          * would publish the lifter's adjustment as the plan's.
          *
-         * [Migration19To20Test] pins the five statements, the baseline
+         * `Migration19To20Test` pins the five statements, the baseline
          * difference, the refusal to write into any existing row, and that the
          * hop is in [MIGRATIONS]. None of it executes SQLite; the two-way
          * emulator exercise at the cut is owed.

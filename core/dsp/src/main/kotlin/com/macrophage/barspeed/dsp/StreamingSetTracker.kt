@@ -391,7 +391,7 @@ class StreamingSetTracker(
      * 127 m across 51 s; waiting for it to close would withhold the fact for
      * most of the set, and the point of the flag is to be true of the count
      * while the lifter is still reading it. The two readings agree on every
-     * committed capture — [LiveIntegratorRunawayTest] pins that they do — so
+     * committed capture — `LiveIntegratorRunawayTest` pins that they do — so
      * nothing here rests on the difference.
      *
      * Never cleared. A run that has travelled that far did so because the
