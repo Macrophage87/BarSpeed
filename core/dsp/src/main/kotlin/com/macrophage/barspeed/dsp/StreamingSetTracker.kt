@@ -237,12 +237,20 @@ class StreamingSetTracker(
         val v = (rawV - anchorOffset) * velocityScale
         updateRuns(v, timeS)
 
+        // A run past MAX_LABELLED_RUN_S is named no phase (#95), and a phase
+        // that is not named is not timed either: its elapsed is 0, as IDLE's
+        // was before the first rep.
+        val labelWithdrawn = runType != 0 && timeS - runStartS > MAX_LABELLED_RUN_S
         state =
             LiveSetState(
                 velocityMps = v,
-                phase = currentPhase(),
+                phase = if (labelWithdrawn) Phase.IDLE else currentPhase(),
                 repCount = repCount,
-                currentPhaseElapsedS = if (runType == 0 && repCount == 0) 0.0 else timeS - runStartS,
+                currentPhaseElapsedS = when {
+                    labelWithdrawn -> 0.0
+                    runType == 0 && repCount == 0 -> 0.0
+                    else -> timeS - runStartS
+                },
                 repMeanVelocities = repVelocities.toList(),
                 repPeakVelocities = repPeaks.toList(),
                 countTrusted = countTrusted,
