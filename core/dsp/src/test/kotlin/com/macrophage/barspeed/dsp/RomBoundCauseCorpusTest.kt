@@ -28,7 +28,8 @@ import kotlin.test.assertTrue
  * always holds, because the origin is an anchor. This file re-derives the
  * three flags separately rather than reading the one Boolean, so it can say
  * WHICH clause refused; the licence below is that its own verdict agrees with
- * `SetAnalyzer.analyze`'s `romBounded` on every capture.
+ * `RomBound.bounded` span by span, and its bounded count with
+ * `SetAnalyzer.analyze`'s `romBounded` count, on every capture.
  *
  * ## The erased-in-span figure
  *
@@ -378,9 +379,13 @@ class RomBoundCauseCorpusTest {
         // rest from constant velocity (anchorAcceptable's KDoc). A call has a
         // FLOOR rest when a mask sample lies between the previous call (the
         // capture's start for the first) and this drive's start, and a TOP
-        // rest when one lies between this drive's end and this call. What the
-        // bar was doing in either window is the counter's premise, not
-        // measured here.
+        // rest when one lies between this drive's end and this call, or the
+        // next call's drive start if that comes first: on the calls that land
+        // past the next drive's start, a mask sample after it belongs to the
+        // next pull (one did, field-43 set 6 call 1, before this cap). The
+        // floor window is empty by construction for a call whose previous
+        // call landed after this drive started. What the bar was doing in
+        // either window is the counter's premise, not measured here.
         //
         // The second triple is the definition 8cbac5b8 pinned and retracted:
         // only the run NEAREST the drive on each side, judged by its length.
@@ -411,7 +416,8 @@ class RomBoundCauseCorpusTest {
                 val driveEnd = idx(c.driveEndS)
                 val call = idx(c.atS)
                 val floorAt = (driveStart downTo floorFrom).firstOrNull { mask[it] }
-                val topAt = (driveEnd..call).firstOrNull { mask[it] }
+                val nextDrive = if (ci + 1 < calls.size) idx(calls[ci + 1].driveStartS) else frames.size - 1
+                val topAt = (driveEnd..minOf(call, nextDrive)).firstOrNull { mask[it] }
                 when {
                     floorAt != null && topAt != null -> {
                         both++
@@ -496,7 +502,7 @@ class RomBoundCauseCorpusTest {
         val CYCLE_LABELS = mapOf("NOT_REP" to 1, "REP" to 35)
         val CYCLES_ERASED_UNDER_CAP = listOf("field-deadlift-straight-5rep-s44-set02" to 0)
         val CLOSURE_MIN_MEDIAN_MAX = Triple(0.143, 1.173, 2.987)
-        val REST_PAIRS = Triple(4, 13, 4)
+        val REST_PAIRS = Triple(4, 13, 3)
         val REST_PAIRS_NEAREST_RUN = Triple(0, 2, 3)
         val BOTH_REST_SPANS = listOf(
             RestPair("field-deadlift-straight-4rep-s44-set04", 0, 2.435, 1.744, 2.123),
