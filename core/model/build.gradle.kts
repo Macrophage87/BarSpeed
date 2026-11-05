@@ -23,18 +23,27 @@ kotlin {
 // because the point is one document, not thirty-one source files on a test
 // classpath.
 //
-// The include filter is a property of the whole source set, not of one srcDir:
-// it must admit every resource any test here reads (the schemas, their
-// examples, and this module's own real-plan fixture), and its job is to keep
-// the rest of app/src/main — res/, drawables, file_paths.xml — off the test
+// The filter is a property of the whole source set, not of one srcDir, and its
+// one job is to keep the rest of app/src/main -- res/ (drawables,
+// file_paths.xml) and every Kotlin source but GuideScreen.kt -- off the test
 // classpath.
 //
-// It is a WHITELIST over the whole test source set, and it fails silent. A new
-// resource dropped into core/model/src/test/resources that matches neither
-// pattern is not copied to build/resources/test and getResourceAsStream returns
-// null with no build error — including a field-*.csv, which is this repo's
-// discharge ritual for a hardware-found bug. Widen the include, or switch to
-// exclude("kotlin/**", "res/**"), before adding one.
+// It is an EXCLUDE, not a whitelist (#69 item 7). It used to be
+// include("**/*.json", "AndroidManifest.xml", "**/screens/GuideScreen.kt",
+// "README.md", "PROMPTS.md"), which failed silent: a resource dropped into
+// core/model/src/test/resources matching none of those patterns was never
+// copied to build/resources/test, and getResourceAsStream returned null with
+// no build error. Now everything in every srcDir is admitted except the two
+// app/src/main trees named below, so a new resource is on the classpath by
+// default and only those trees need thinking about.
+//
+// GuideScreen.kt is the one file under kotlin/ that is admitted, which is why
+// this is a spec rather than exclude("kotlin/**", "res/**"): that pattern form,
+// the one this comment used to propose, would also drop GuideScreen.kt and red
+// GuidePromptContractTest with a null resource. Directories under kotlin/ are
+// not excluded, only files, because excluding a directory prunes everything
+// beneath it, GuideScreen.kt included. The admitted set was compared file by
+// file against the include form's when this changed; the lane report has it.
 // PlanDocVersionContractTest reads the REAL README.md and PROMPTS.md for the
 // same reason (#240): both hard-code the plan schema number, both went stale at
 // the last mint, and a copy of either would drift exactly as the originals did.
@@ -51,7 +60,12 @@ sourceSets["test"].resources.apply {
     srcDir(rootProject.file("docs/schemas"))
     srcDir(rootProject.file("app/src/main"))
     srcDir(planDocResources.map { it.destinationDir })
-    include("**/*.json", "AndroidManifest.xml", "**/screens/GuideScreen.kt", "README.md", "PROMPTS.md")
+    exclude { element ->
+        val path = element.relativePath.pathString
+        path == "res" ||
+            path.startsWith("res/") ||
+            (!element.isDirectory && path.startsWith("kotlin/") && !path.endsWith("/screens/GuideScreen.kt"))
+    }
 }
 
 dependencies {
